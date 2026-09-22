@@ -82,3 +82,10 @@ Original source function ranges canonicalize transformed function identities
 before deduplication. Missing functions receive zero counts without adding a
 second set of zero-count statements to functions already measured by a runner.
 Coverage from Node, Jest and Vitest is combined before scoring.
+
+The pinned scorer patch matches Istanbul's zero-based source coordinates to
+ESLint's one-based coordinates using declaration identity and exact function ends.
+Nested same-line and curried callbacks retain separate complexity values and
+locations. TypeScript re-export getters and enum wrappers are compiler scaffolding,
+not source functions; real functions in the same files remain included. The patch
+also waits for every HTML function page before report completion.

@@ -359,6 +359,61 @@ test('repaired statement ranges merge covered and uncovered copies from differen
   }
 });
 
+test('re-export getters are excluded without dropping adjacent first-party functions', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-reexport-'));
+  try {
+    const file = path.join(directory, 'source.ts');
+    writeFileSync(file, 'export { external } from "./external"; export const local = () => 1;');
+    const measured = completeCoverage([file], [])[file];
+    const id = Object.keys(measured.fnMap)[0];
+    measured.f[id] = 7;
+    measured.fnMap.getter = {
+      name: '(anonymous_getter)',
+      decl: { start: { line: 1, column: 9 }, end: { line: 1, column: 17 } },
+      loc: { start: { line: 1, column: 9 }, end: { line: 1, column: 17 } },
+    };
+    measured.f.getter = 1;
+    const completed = completeCoverage([file], [{ [file]: measured }])[file];
+    assert.equal(Object.keys(completed.fnMap).length, 1);
+    assert.deepEqual(Object.values(completed.f), [7]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('nested same-line functions keep their own complexity and source identity', async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-nested-identity-'));
+  try {
+    const file = path.join(directory, 'source.js');
+    writeFileSync(
+      file,
+      [
+        'const outer = () => [1].some(x => x ? true : false);',
+        'const curry = x => y => x ? y : 0;',
+        'const object = () => ({ value: true ? 1 : 0 });',
+        'const methods = { run() { return true ? 1 : 0; } };',
+      ].join('\n'),
+    );
+    const report = await getCrapReport({ testCoverage: completeCoverage([file], []) });
+    const functions = Object.values(report).flatMap(Object.values);
+    assert.equal(functions.length, 6);
+    for (const line of [1, 2]) {
+      const nested = functions.filter((fn) => fn.start.line === line).sort((a, b) => a.start.column - b.start.column);
+      assert.deepEqual(
+        nested.map((fn) => fn.complexity),
+        [1, 2],
+      );
+    }
+    assert.equal(new Set(functions.map((fn) => JSON.stringify([fn.start, fn.end]))).size, 6);
+    assert.deepEqual(
+      functions.filter((fn) => fn.start.line > 2).map((fn) => fn.complexity),
+      [2, 2],
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('runs an Nx library suite and writes consistent JSON, HTML, and summary artifacts', async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'attraccess-crap-integration-'));
   try {

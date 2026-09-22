@@ -121,8 +121,9 @@ it('shows the holder and supervisor and sends scoped takeover and stop submissio
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', { resourceId: 7 }] });
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Takeover Successful' }));
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Other User Session Stopped' }));
-  for (const [options] of state.invalidate.mock.calls) {
-    if (!options.predicate) continue;
+  const historyInvalidations = state.invalidate.mock.calls.filter(([options]) => options.predicate);
+  expect(historyInvalidations).toHaveLength(2);
+  for (const [options] of historyInvalidations) {
     expect(options.predicate({ queryKey: ['history', { resourceId: 7, page: 2 }] })).toBe(true);
     expect(options.predicate({ queryKey: ['history', { resourceId: 8 }] })).toBe(false);
     expect(options.predicate({ queryKey: ['other', { resourceId: 7 }] })).toBe(false);

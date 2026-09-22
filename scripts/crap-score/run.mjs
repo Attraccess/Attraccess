@@ -48,6 +48,7 @@ export function completeCoverage(files, reports) {
         coverage.fileCoverageFor(file).data.f = {};
       }
       removeEnumWrappers(coverage.fileCoverageFor(file), file, source);
+      removeExportGetters(coverage.fileCoverageFor(file), file, source);
       repairFunctionLocations(coverage.fileCoverageFor(file).fnMap, original.fnMap);
       repairStatementLocations(coverage.fileCoverageFor(file).statementMap, original.statementMap);
       fillMissingFunctions(coverage.fileCoverageFor(file), original);
@@ -94,6 +95,23 @@ export function removeEnumWrappers(coverage, file, source) {
       continue;
     delete coverage.fnMap[id];
     delete coverage.f[id];
+  }
+}
+
+// Re-export declarations have no source functions, even in files that also
+// contain maintained functions. TypeScript's generated getters are scaffolding.
+function removeExportGetters(coverage, file, source) {
+  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const ranges = ast.statements.filter(ts.isExportDeclaration).map((node) => ({
+    start: node.getStart(ast),
+    end: node.getEnd(),
+  }));
+  const position = (point) => ast.getPositionOfLineAndCharacter(point.line - 1, point.column ?? 0);
+  for (const [id, fn] of Object.entries(coverage.fnMap)) {
+    if (ranges.some((range) => position(fn.loc.start) >= range.start && position(fn.loc.end) <= range.end)) {
+      delete coverage.fnMap[id];
+      delete coverage.f[id];
+    }
   }
 }
 

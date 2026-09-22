@@ -27,6 +27,7 @@ vi.mock('../../../components/toastProvider', () => ({
 }));
 const type = Object.values(EmailTemplateType)[0];
 const content = '{{t "greeting" "Hello"}} {{t "bye" "Goodbye"}}';
+const originalAnimations = Object.getOwnPropertyDescriptor(Element.prototype, 'getAnimations');
 beforeEach(() => {
   vi.clearAllMocks();
   state.data = { translations: { en: { greeting: 'Hello', unused: 'Preserve' }, de: { greeting: 'Hallo' } } };
@@ -37,7 +38,11 @@ beforeEach(() => {
   if (!Element.prototype.getAnimations)
     Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  if (originalAnimations) Object.defineProperty(Element.prototype, 'getAnimations', originalAnimations);
+  else Reflect.deleteProperty(Element.prototype, 'getAnimations');
+});
 function mount() {
   return render(<TranslationsSection templateType={type} liveContent={content} />);
 }

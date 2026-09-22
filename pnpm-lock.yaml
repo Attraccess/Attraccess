@@ -36,7 +36,7 @@ patchedDependencies:
     hash: db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f
     path: patches/@swc-node__register@1.12.1.patch
   crap-score@1.2.1:
-    hash: 04e3e1e5d93510705db1c98db809330da61a87d330f5f53e02fc02fc049422e1
+    hash: a11d8103444adc51146e0530d7acd5e806f2e83ef290877c3c9bf18ac2647262
     path: patches/crap-score@1.2.1.patch
   ts-api-utils@2.5.0:
     hash: 6e0258a87801309a898a6f073bf6c87272373f88f9077c9d5c1c33b0935349f3
@@ -658,7 +658,7 @@ importers:
         version: 3.50.0
       crap-score:
         specifier: 1.2.1
-        version: 1.2.1(patch_hash=04e3e1e5d93510705db1c98db809330da61a87d330f5f53e02fc02fc049422e1)(@nestjs/platform-express@11.1.28)(@nestjs/websockets@11.1.28)(@swc/cli@0.8.1(@swc/core@1.15.47(@swc/helpers@0.5.23))(chokidar@3.6.0))(@swc/core@1.15.47(@swc/helpers@0.5.23))(@types/node@25.9.5)(class-transformer@0.5.1)(class-validator@0.15.1)(cssnano@7.1.9(postcss@8.5.26))(encoding@0.1.13)(esbuild@0.28.2)(postcss@8.5.26)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(webpack-cli@7.2.2)
+        version: 1.2.1(patch_hash=a11d8103444adc51146e0530d7acd5e806f2e83ef290877c3c9bf18ac2647262)(@nestjs/platform-express@11.1.28)(@nestjs/websockets@11.1.28)(@swc/cli@0.8.1(@swc/core@1.15.47(@swc/helpers@0.5.23))(chokidar@3.6.0))(@swc/core@1.15.47(@swc/helpers@0.5.23))(@types/node@25.9.5)(class-transformer@0.5.1)(class-validator@0.15.1)(cssnano@7.1.9(postcss@8.5.26))(encoding@0.1.13)(esbuild@0.28.2)(postcss@8.5.26)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(webpack-cli@7.2.2)
       electron:
         specifier: ^34.0.0
         version: 34.5.8
@@ -31029,7 +31029,7 @@ snapshots:
       nan: 2.28.0
     optional: true
 
-  crap-score@1.2.1(patch_hash=04e3e1e5d93510705db1c98db809330da61a87d330f5f53e02fc02fc049422e1)(@nestjs/platform-express@11.1.28)(@nestjs/websockets@11.1.28)(@swc/cli@0.8.1(@swc/core@1.15.47(@swc/helpers@0.5.23))(chokidar@3.6.0))(@swc/core@1.15.47(@swc/helpers@0.5.23))(@types/node@25.9.5)(class-transformer@0.5.1)(class-validator@0.15.1)(cssnano@7.1.9(postcss@8.5.26))(encoding@0.1.13)(esbuild@0.28.2)(postcss@8.5.26)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(webpack-cli@7.2.2):
+  crap-score@1.2.1(patch_hash=a11d8103444adc51146e0530d7acd5e806f2e83ef290877c3c9bf18ac2647262)(@nestjs/platform-express@11.1.28)(@nestjs/websockets@11.1.28)(@swc/cli@0.8.1(@swc/core@1.15.47(@swc/helpers@0.5.23))(chokidar@3.6.0))(@swc/core@1.15.47(@swc/helpers@0.5.23))(@types/node@25.9.5)(class-transformer@0.5.1)(class-validator@0.15.1)(cssnano@7.1.9(postcss@8.5.26))(encoding@0.1.13)(esbuild@0.28.2)(postcss@8.5.26)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(webpack-cli@7.2.2):
     dependencies:
       '@nestjs/cli': 10.4.9(@swc/cli@0.8.1(@swc/core@1.15.47(@swc/helpers@0.5.23))(chokidar@3.6.0))(@swc/core@1.15.47(@swc/helpers@0.5.23))(cssnano@7.1.9(postcss@8.5.26))(esbuild@0.28.2)(postcss@8.5.26)(webpack-cli@7.2.2)
       '@nestjs/common': 10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
