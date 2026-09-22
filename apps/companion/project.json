@@ -11,10 +11,7 @@
       "options": {
         "cwd": "apps/companion",
         "parallel": true,
-        "commands": [
-          "vite dev --config renderer/vite.config.ts --port 5273 --strictPort",
-          "node tools/dev.mjs"
-        ]
+        "commands": ["vite dev --config renderer/vite.config.ts --port 5273 --strictPort", "node tools/dev.mjs"]
       }
     },
     "build-renderer": {
@@ -31,8 +28,14 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["companion-ws-client:build", "build-renderer"],
-      "// inputs": "electron-builder with no target flag builds for the host only, so this target's outputs are platform-specific while its file inputs are identical on every runner. The runtime input keeps the three CI runners (linux/mac/windows) on separate hashes — without it they share one entry in the remote cache and two of the three restore the wrong platform's dist/.",
-      "inputs": ["production", "^production", { "runtime": "node -p \"process.platform + '-' + process.arch\"" }],
+      "// inputs": "electron-builder with no target flag builds for the host only, so this target's outputs are platform-specific while its file inputs are identical on every runner. The runtime input keeps the three CI runners (linux/mac/windows) on separate hashes \u2014 without it they share one entry in the remote cache and two of the three restore the wrong platform's dist/.",
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "runtime": "node -p \"process.platform + '-' + process.arch\""
+        }
+      ],
       "outputs": ["{projectRoot}/out", "{projectRoot}/dist"],
       "options": {
         "cwd": "apps/companion",
@@ -52,10 +55,7 @@
       "dependsOn": ["companion-ws-client:generate"],
       "options": {
         "cwd": "apps/companion",
-        "commands": [
-          "tsc -p tsconfig.app.json --noEmit",
-          "tsc -p tsconfig.renderer.json --noEmit"
-        ],
+        "commands": ["tsc -p tsconfig.app.json --noEmit", "tsc -p tsconfig.renderer.json --noEmit"],
         "parallel": false
       }
     },
@@ -86,6 +86,13 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/companion"
+      }
+    },
+    "test-renderer": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "command": "vitest run --config apps/companion/renderer/vitest.config.mts"
       }
     }
   }

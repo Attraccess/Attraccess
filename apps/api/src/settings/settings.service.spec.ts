@@ -5,6 +5,14 @@ import { SettingsService } from './settings.service';
 import { SettingsStoreService } from './settings-store.service';
 import { SmtpSettingsService } from './smtp-settings.service';
 import {
+  APP_PARENT,
+  APP_KEYS,
+  AUTH_PARENT,
+  AUTH_KEYS,
+  MESSAGING_PARENT,
+  MESSAGING_KEYS,
+  RATE_LIMIT_DEFAULTS,
+  MESSAGING_RATE_LIMIT_DEFAULTS,
   METRICS_KEYS,
   METRICS_PARENT,
   METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
@@ -15,7 +23,7 @@ import { METRICS_TOGGLE_INVALIDATOR } from './metrics-toggle-invalidator.token';
 
 describe('SettingsService', () => {
   let service: SettingsService;
-  let store: { getPlainSetting: jest.Mock; setPlainSetting: jest.Mock };
+  let store: { getPlainSetting: jest.Mock; setPlainSetting: jest.Mock; setSecretSetting: jest.Mock };
   let smtpSettings: { getSettings: jest.Mock };
   let userRepository: { count: jest.Mock };
   let invalidator: { refresh: jest.Mock };
@@ -24,6 +32,7 @@ describe('SettingsService', () => {
     store = {
       getPlainSetting: jest.fn().mockResolvedValue(null),
       setPlainSetting: jest.fn().mockResolvedValue(undefined),
+      setSecretSetting: jest.fn().mockResolvedValue(undefined),
     };
     smtpSettings = { getSettings: jest.fn() };
     userRepository = { count: jest.fn() };
@@ -40,6 +49,65 @@ describe('SettingsService', () => {
     }).compile();
 
     service = moduleRef.get(SettingsService);
+  });
+
+  it('updates only supplied application settings and permits explicit clearing of stored secrets', async () => {
+    await service.updateAppSettings({ url: 'https://workspace.test' });
+    expect(store.setPlainSetting).toHaveBeenCalledTimes(1);
+    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.url, 'https://workspace.test');
+    expect(store.setSecretSetting).not.toHaveBeenCalled();
+    await service.updateAppSettings({ url: null, publicInternetUrl: null, licenseKey: null });
+    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.url, null);
+    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.publicInternetUrl, null);
+    expect(store.setSecretSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.licenseKey, null);
+  });
+
+  it('persists every authentication rate-limit option and returns the resolved policy', async () => {
+    const values = new Map<string, string>();
+    store.setPlainSetting.mockImplementation(async (parent, key, value) => {
+      values.set(`${parent}:${key}`, value);
+    });
+    store.getPlainSetting.mockImplementation(async (parent, key) => values.get(`${parent}:${key}`) ?? null);
+    const policy = {
+      maxAttempts: 6,
+      windowSeconds: 120,
+      lockoutDurationSeconds: 300,
+      exponentialBackoff: true,
+      backoffMultiplier: 2.5,
+    };
+    expect(await service.updateAuthRateLimitSettings(policy)).toEqual(policy);
+    expect(store.setPlainSetting).toHaveBeenCalledTimes(5);
+    expect(store.setPlainSetting).toHaveBeenCalledWith(AUTH_PARENT, AUTH_KEYS.rateLimitExponentialBackoff, 'true');
+    expect(await service.updateAuthRateLimitSettings({ exponentialBackoff: false })).toEqual({
+      ...policy,
+      exponentialBackoff: false,
+    });
+  });
+
+  it.each([null, '', 'invalid', '0', '-2', 'Infinity'])(
+    'falls back safely for invalid stored limits: %s',
+    async (value) => {
+      store.getPlainSetting.mockResolvedValue(value);
+      expect(await service.getAuthRateLimitSettings()).toEqual(RATE_LIMIT_DEFAULTS);
+      expect(await service.getMessagingRateLimitSettings()).toEqual(MESSAGING_RATE_LIMIT_DEFAULTS);
+    },
+  );
+
+  it('stores message and contact limits independently without clearing omitted values', async () => {
+    const values = new Map<string, string>();
+    store.setPlainSetting.mockImplementation(async (parent, key, value) => {
+      values.set(`${parent}:${key}`, value);
+    });
+    store.getPlainSetting.mockImplementation(async (parent, key) => values.get(`${parent}:${key}`) ?? null);
+    const policy = { sendMaxPerWindow: 20, sendWindowSeconds: 60, contactMaxPerWindow: 8, contactWindowSeconds: 300 };
+    expect(await service.updateMessagingRateLimitSettings(policy)).toEqual(policy);
+    store.setPlainSetting.mockClear();
+    expect(await service.updateMessagingRateLimitSettings({ contactMaxPerWindow: 4 })).toEqual({
+      ...policy,
+      contactMaxPerWindow: 4,
+    });
+    expect(store.setPlainSetting).toHaveBeenCalledTimes(1);
+    expect(store.setPlainSetting).toHaveBeenCalledWith(MESSAGING_PARENT, MESSAGING_KEYS.contactRateLimitMax, '4');
   });
 
   describe('getFirstTimeSetupStatus', () => {
@@ -150,11 +218,7 @@ describe('SettingsService', () => {
     it('writes the threshold and refreshes the toggle invalidator', async () => {
       await service.setMetricsSlowQueryThresholdSeconds(2);
 
-      expect(store.setPlainSetting).toHaveBeenCalledWith(
-        METRICS_PARENT,
-        METRICS_KEYS.slowQueryThresholdSeconds,
-        '2',
-      );
+      expect(store.setPlainSetting).toHaveBeenCalledWith(METRICS_PARENT, METRICS_KEYS.slowQueryThresholdSeconds, '2');
       expect(invalidator.refresh).toHaveBeenCalledTimes(1);
     });
   });

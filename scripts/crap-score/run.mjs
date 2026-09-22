@@ -267,6 +267,7 @@ export function nodeCoverage(files, tests, output) {
 
 const vitestSuites = {
   '.': [{ cwd: workspace, args: ['--config', 'scripts/crap-score/vitest.config.mts'] }],
+  'apps/companion': [{ cwd: workspace, args: ['--config', 'apps/companion/renderer/vitest.config.mts'] }],
   'apps/frontend': [{ cwd: workspace, args: ['--config', 'apps/frontend/vitest.config.ts'] }],
   'apps/plugins/wago': [
     { cwd: workspace, args: ['--config', 'apps/plugins/wago/frontend/vitest.config.mts'] },
