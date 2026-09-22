@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { plainToClass } from 'class-transformer';
-import { ToBoolean, ToJson } from './request-transformers';
+import { ToBoolean, ToJson, ToNumber } from './request-transformers';
 
 describe('ToBoolean transformer', () => {
   // Create a test class with the transformer
@@ -96,5 +96,27 @@ describe('ToJson transformer', () => {
   it('should leave null and undefined unchanged', () => {
     expect(transform(null)).toBe(null);
     expect(transform(undefined)).toBe(undefined);
+  });
+});
+
+describe('ToNumber request transformer', () => {
+  class NumericRequest {
+    @ToNumber()
+    value: unknown;
+  }
+  it.each([
+    [undefined, undefined],
+    [null, null],
+    [0, 0],
+    [4.5, 4.5],
+    [' 42 ', 42],
+    ['-2.5', -2.5],
+    ['', null],
+    ['  ', null],
+    ['NULL', null],
+    ['not-a-number', 'not-a-number'],
+    [true, true],
+  ])('transforms %p while retaining invalid values for validation', (value, expected) => {
+    expect(plainToClass(NumericRequest, { value }).value).toEqual(expected);
   });
 });

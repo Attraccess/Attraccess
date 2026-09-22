@@ -174,28 +174,49 @@ export function auditSubjectKeyId(value: string): number {
   return Number.parseInt(createHash('sha256').update(value).digest('hex').slice(0, 13), 16) || 1;
 }
 
+function administrationEventFields(input: AdministrationAuditEvent): AdministrationAuditEvent | null {
+  if (!input || ![Object.prototype, null].includes(Object.getPrototypeOf(input))) return null;
+  const source: Record<string, unknown> = {};
+  const allowed = [
+    'action',
+    'actorId',
+    'authenticationMethod',
+    'apiTokenId',
+    'subjectType',
+    'subjectId',
+    'outcome',
+    'details',
+    'operationId',
+  ];
+  for (const key of Reflect.ownKeys(input)) {
+    if (typeof key !== 'string' || !allowed.includes(key)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(input, key);
+    if (!descriptor || !('value' in descriptor)) return null;
+    source[key] = descriptor.value;
+  }
+  return source as unknown as AdministrationAuditEvent;
+}
+
+function administrationDetails(
+  input: AdministrationAuditEvent,
+  rule: (typeof rules)[string],
+): Record<string, string | number> | null {
+  if (!input.details || ![Object.prototype, null].includes(Object.getPrototypeOf(input.details))) return null;
+  const details: Record<string, string | number> = {};
+  for (const key of Reflect.ownKeys(input.details)) {
+    if (typeof key !== 'string' || !Object.hasOwn(rule.fields, key)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(input.details, key);
+    if (!descriptor || !('value' in descriptor) || !rule.fields[key](descriptor.value)) return null;
+    details[key] = descriptor.value;
+  }
+  return details;
+}
+
 export function projectAdministrationAuditEvent(input: AdministrationAuditEvent): AdministrationAuditEvent | null {
   try {
-    if (!input || ![Object.prototype, null].includes(Object.getPrototypeOf(input))) return null;
-    const source: Record<string, unknown> = {};
-    const allowed = [
-      'action',
-      'actorId',
-      'authenticationMethod',
-      'apiTokenId',
-      'subjectType',
-      'subjectId',
-      'outcome',
-      'details',
-      'operationId',
-    ];
-    for (const key of Reflect.ownKeys(input)) {
-      if (typeof key !== 'string' || !allowed.includes(key)) return null;
-      const descriptor = Object.getOwnPropertyDescriptor(input, key);
-      if (!descriptor || !('value' in descriptor)) return null;
-      source[key] = descriptor.value;
-    }
-    input = source as unknown as AdministrationAuditEvent;
+    const source = administrationEventFields(input);
+    if (!source) return null;
+    input = source;
     if (
       input.operationId !== undefined &&
       (typeof input.operationId !== 'string' || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(input.operationId))
@@ -212,14 +233,8 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditEvent)
       (input.outcome !== undefined && !['succeeded', 'failed'].includes(input.outcome))
     )
       return null;
-    if (!input.details || ![Object.prototype, null].includes(Object.getPrototypeOf(input.details))) return null;
-    const details: Record<string, string | number> = {};
-    for (const key of Reflect.ownKeys(input.details)) {
-      if (typeof key !== 'string' || !Object.hasOwn(rule.fields, key)) return null;
-      const descriptor = Object.getOwnPropertyDescriptor(input.details, key);
-      if (!descriptor || !('value' in descriptor) || !rule.fields[key](descriptor.value)) return null;
-      details[key] = descriptor.value;
-    }
+    const details = administrationDetails(input, rule);
+    if (!details) return null;
     if (
       input.action === 'settings.updated' &&
       (!Object.hasOwn(details, 'settingKey') || !Object.hasOwn(details, 'before') || !Object.hasOwn(details, 'after'))

@@ -67,6 +67,8 @@ beforeEach(() => {
     handlers.set(event, callback);
     return process;
   }) as typeof process.on);
+  // The simulator's failure path disconnects IPC; never close Jest's worker channel.
+  if (process.disconnect) jest.spyOn(process, 'disconnect').mockImplementation(() => undefined);
   jest.spyOn(process.stdout, 'write').mockReturnValue(true);
   jest.spyOn(process.stderr, 'write').mockReturnValue(true);
 });

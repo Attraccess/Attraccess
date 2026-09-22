@@ -34,6 +34,16 @@ type CachedState = {
 type NodeKind = 'event' | 'read' | 'wait';
 type Waiter = (state?: CachedState, cancel?: boolean) => void;
 
+type OperationalStream = {
+  active: string;
+  latestSourceTime: number;
+  sampleNotBefore: number;
+  stateTimestamp?: number;
+  exhausted?: boolean;
+  retired: Set<string>;
+  sequences: Map<WagoOperationalMessage['category'], number>;
+};
+
 @Injectable()
 export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   // Plugin registration precedes the host datasource; resolve repositories only when used.
@@ -48,18 +58,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
   private readonly cache = new Map<string, CachedState>();
   private controllerByHardwareId = new Map<string, { controller: WagoController; serverId: number }>();
-  private readonly streams = new Map<
-    number,
-    {
-      active: string;
-      latestSourceTime: number;
-      sampleNotBefore: number;
-      stateTimestamp?: number;
-      exhausted?: boolean;
-      retired: Set<string>;
-      sequences: Map<WagoOperationalMessage['category'], number>;
-    }
-  >();
+  private readonly streams = new Map<number, OperationalStream>();
   private readonly offlineControllers = new Set<number>();
   private readonly unavailableHardware = new Set<number>();
   private readonly unavailableConfiguration = new Set<number>();
@@ -364,8 +363,23 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     }
     // Resolve configuration before mutating stream/cache state, then process the entire snapshot atomically.
     const channels = await this.channels(controller.id);
+    const stream = this.admitEvent(controller, event, eventTime);
+    if (!stream) return;
+    if (event.category === 'state') {
+      this.applyState(controller, event, eventTime, stream, channels);
+    } else if ('channelId' in event) {
+      const channel = channels.find((channel) => channel.id === event.channelId);
+      if (!channel || (event.category === 'measurement' && !channel.capabilities.includes('measurement'))) return;
+      this.store(controller, event.channelId, event, event.category === 'measurement' ? event.value : event);
+    }
+  }
+  private admitEvent(
+    controller: WagoController,
+    event: WagoOperationalMessage,
+    eventTime: number,
+  ): OperationalStream | undefined {
     let stream = this.streams.get(controller.id);
-    if (stream?.exhausted) return;
+    if (stream?.exhausted) return undefined;
     if (!stream || stream.active !== event.streamId) {
       if (
         event.category !== 'state' ||
@@ -374,7 +388,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
           (!event.connected || Date.now() - eventTime > STALE_AFTER_MS || eventTime <= stream.latestSourceTime))
       ) {
         this.context.logger.warn(`Ignoring unestablished or retired WAGO stream for ${controller.hardwareId}`);
-        return;
+        return undefined;
       }
       if (stream && stream.retired.size >= MAX_RETIRED_STREAMS) {
         stream.exhausted = true;
@@ -382,7 +396,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         this.context.logger.warn(
           `WAGO stream history exhausted for ${controller.hardwareId}; refusing further samples`,
         );
-        return;
+        return undefined;
       }
       const retired = stream?.retired ?? new Set<string>();
       if (stream) retired.add(stream.active);
@@ -399,7 +413,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     const previous = stream.sequences.get(event.category);
     if (previous !== undefined && event.sequence <= previous) {
       this.context.logger.warn(`Ignoring duplicate or out-of-order WAGO event for ${controller.hardwareId}`);
-      return;
+      return undefined;
     }
     if (previous !== undefined && event.sequence > previous + 1)
       this.context.logger.warn(
@@ -407,53 +421,48 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       );
     stream.sequences.set(event.category, event.sequence);
     stream.latestSourceTime = Math.max(stream.latestSourceTime, eventTime);
-    if (event.category === 'state') {
-      const wasUnavailable =
-        this.offlineControllers.has(controller.id) ||
-        this.unavailableHardware.has(controller.id) ||
-        this.unavailableConfiguration.has(controller.id) ||
-        (stream.stateTimestamp !== undefined && Date.now() - stream.stateTimestamp > STALE_AFTER_MS);
-      stream.stateTimestamp = eventTime;
-      if (event.connected) this.offlineControllers.delete(controller.id);
-      else this.offlineControllers.add(controller.id);
-      if (event.readiness?.hardwareAvailable === false) this.unavailableHardware.add(controller.id);
-      else if (event.readiness?.hardwareAvailable === true) this.unavailableHardware.delete(controller.id);
-      const applied = this.appliedConfigurations.get(controller.id);
-      if (applied && event.revision === applied.revision && event.contentHash === applied.contentHash)
-        this.unavailableConfiguration.delete(controller.id);
-      else this.unavailableConfiguration.add(controller.id);
-      if (
-        wasUnavailable ||
-        !event.connected ||
-        this.unavailableHardware.has(controller.id) ||
-        this.unavailableConfiguration.has(controller.id)
-      )
-        stream.sampleNotBefore = Math.max(stream.sampleNotBefore, eventTime);
-      // A state message is a complete snapshot. Missing values are unavailable, never held as current.
-      for (const state of this.cache.values()) {
-        if (state.controllerId !== controller.id) continue;
-        if (
-          wasUnavailable ||
-          !event.connected ||
-          this.unavailableHardware.has(controller.id) ||
-          this.unavailableConfiguration.has(controller.id) ||
-          state.category === 'state'
-        )
-          state.invalidated = true;
-      }
-      for (const channel of channels) {
-        const value =
-          channel.capabilities.includes('input') && Object.hasOwn(event.inputs ?? {}, channel.id)
-            ? event.inputs[channel.id]
-            : channel.capabilities.includes('output') && Object.hasOwn(event.outputs, channel.id)
-              ? event.outputs[channel.id]
-              : undefined;
-        if (typeof value === 'boolean') this.store(controller, channel.id, event, value);
-      }
-    } else if ('channelId' in event) {
-      const channel = channels.find((channel) => channel.id === event.channelId);
-      if (!channel || (event.category === 'measurement' && !channel.capabilities.includes('measurement'))) return;
-      this.store(controller, event.channelId, event, event.category === 'measurement' ? event.value : event);
+    return stream;
+  }
+  private applyState(
+    controller: WagoController,
+    event: Extract<WagoOperationalMessage, { category: 'state' }>,
+    eventTime: number,
+    stream: OperationalStream,
+    channels: WagoConfigurationSnapshot['logicalChannels'],
+  ): void {
+    const wasUnavailable =
+      this.offlineControllers.has(controller.id) ||
+      this.unavailableHardware.has(controller.id) ||
+      this.unavailableConfiguration.has(controller.id) ||
+      (stream.stateTimestamp !== undefined && Date.now() - stream.stateTimestamp > STALE_AFTER_MS);
+    stream.stateTimestamp = eventTime;
+    if (event.connected) this.offlineControllers.delete(controller.id);
+    else this.offlineControllers.add(controller.id);
+    if (event.readiness?.hardwareAvailable === false) this.unavailableHardware.add(controller.id);
+    else if (event.readiness?.hardwareAvailable === true) this.unavailableHardware.delete(controller.id);
+    const applied = this.appliedConfigurations.get(controller.id);
+    if (applied && event.revision === applied.revision && event.contentHash === applied.contentHash)
+      this.unavailableConfiguration.delete(controller.id);
+    else this.unavailableConfiguration.add(controller.id);
+    const invalidateSamples =
+      wasUnavailable ||
+      !event.connected ||
+      this.unavailableHardware.has(controller.id) ||
+      this.unavailableConfiguration.has(controller.id);
+    if (invalidateSamples) stream.sampleNotBefore = Math.max(stream.sampleNotBefore, eventTime);
+    // A state message is a complete snapshot. Missing values are unavailable, never held as current.
+    for (const state of this.cache.values()) {
+      if (state.controllerId !== controller.id) continue;
+      if (invalidateSamples || state.category === 'state') state.invalidated = true;
+    }
+    for (const channel of channels) {
+      const value =
+        channel.capabilities.includes('input') && Object.hasOwn(event.inputs ?? {}, channel.id)
+          ? event.inputs[channel.id]
+          : channel.capabilities.includes('output') && Object.hasOwn(event.outputs, channel.id)
+            ? event.outputs[channel.id]
+            : undefined;
+      if (typeof value === 'boolean') this.store(controller, channel.id, event, value);
     }
   }
   private store(controller: WagoController, channelId: string, event: WagoOperationalMessage, value: unknown): void {

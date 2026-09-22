@@ -199,93 +199,97 @@ function omittedField(value: unknown, field: string): boolean {
 }
 
 function providerConfiguration(type: unknown, value: unknown): boolean {
-  if (type === 'oidc') {
-    const config = dataFields(value, [
+  if (type === 'oidc') return oidcProviderConfiguration(value);
+  if (type === 'saml') return samlProviderConfiguration(value);
+  return false;
+}
+
+function oidcProviderConfiguration(value: unknown): boolean {
+  const config = dataFields(value, [
+    'issuer',
+    'authorizationURL',
+    'tokenURL',
+    'userInfoURL',
+    'clientId',
+    'clientSecretConfigured',
+    'scopes',
+    'usernameClaimPaths',
+    'emailClaimPaths',
+    'roleMappings',
+    'omitted',
+  ]);
+  return (
+    !!config &&
+    Reflect.ownKeys(config).length === 11 &&
+    ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL'].every(
+      (key) => safeUrl(config[key]) || (config[key] === '' && omittedField(config.omitted, key)),
+    ) &&
+    typeof config.clientId === 'string' &&
+    config.clientId.length <= 96 &&
+    typeof config.clientSecretConfigured === 'boolean' &&
+    [config.scopes, config.usernameClaimPaths, config.emailClaimPaths].every(
+      (field) => field === null || stringArray(field),
+    ) &&
+    (config.roleMappings === null || roleMappings(config.roleMappings)) &&
+    omissionMetadata(config.omitted, [
+      'name',
       'issuer',
       'authorizationURL',
       'tokenURL',
       'userInfoURL',
       'clientId',
-      'clientSecretConfigured',
       'scopes',
       'usernameClaimPaths',
       'emailClaimPaths',
-      'roleMappings',
-      'omitted',
+    ])
+  );
+}
+
+function samlProviderConfiguration(value: unknown): boolean {
+  const config = dataFields(value, [
+    'entryPoint',
+    'issuer',
+    'audience',
+    'signRequest',
+    'wantAssertionsSigned',
+    'wantAuthnResponseSigned',
+    'forceAuthn',
+    'emailAttributeKeys',
+    'roleMappings',
+    'signingMaterial',
+    'omitted',
+  ]);
+  const material =
+    config &&
+    dataFields(config.signingMaterial, [
+      'identityProviderCertificateConfigured',
+      'provisioningSecretConfigured',
+      'signingCertificateConfigured',
+      'signingPrivateKeyConfigured',
     ]);
-    return (
-      !!config &&
-      Reflect.ownKeys(config).length === 11 &&
-      ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL'].every(
-        (key) => safeUrl(config[key]) || (config[key] === '' && omittedField(config.omitted, key)),
-      ) &&
-      typeof config.clientId === 'string' &&
-      config.clientId.length <= 96 &&
-      typeof config.clientSecretConfigured === 'boolean' &&
-      [config.scopes, config.usernameClaimPaths, config.emailClaimPaths].every(
-        (field) => field === null || stringArray(field),
-      ) &&
-      (config.roleMappings === null || roleMappings(config.roleMappings)) &&
-      omissionMetadata(config.omitted, [
-        'name',
-        'issuer',
-        'authorizationURL',
-        'tokenURL',
-        'userInfoURL',
-        'clientId',
-        'scopes',
-        'usernameClaimPaths',
-        'emailClaimPaths',
-      ])
-    );
-  }
-  if (type === 'saml') {
-    const config = dataFields(value, [
-      'entryPoint',
-      'issuer',
-      'audience',
-      'signRequest',
-      'wantAssertionsSigned',
-      'wantAuthnResponseSigned',
-      'forceAuthn',
-      'emailAttributeKeys',
-      'roleMappings',
-      'signingMaterial',
-      'omitted',
-    ]);
-    const material =
-      config &&
-      dataFields(config.signingMaterial, [
-        'identityProviderCertificateConfigured',
-        'provisioningSecretConfigured',
-        'signingCertificateConfigured',
-        'signingPrivateKeyConfigured',
-      ]);
-    return (
-      !!config &&
-      Reflect.ownKeys(config).length === 11 &&
-      !!material &&
-      Reflect.ownKeys(material).length === 4 &&
-      (safeUrl(config.entryPoint) || (config.entryPoint === '' && omittedField(config.omitted, 'entryPoint'))) &&
-      (opaqueSamlEntityId(config.issuer) || (config.issuer === '' && omittedField(config.omitted, 'issuer'))) &&
-      (config.audience === null ||
-        opaqueSamlEntityId(config.audience) ||
-        (config.audience === '' && omittedField(config.omitted, 'audience'))) &&
-      ['signRequest', 'wantAssertionsSigned', 'wantAuthnResponseSigned', 'forceAuthn'].every(
-        (key) => typeof config[key] === 'boolean',
-      ) &&
-      (config.emailAttributeKeys === null || stringArray(config.emailAttributeKeys)) &&
-      (config.roleMappings === null || roleMappings(config.roleMappings)) &&
-      omissionMetadata(config.omitted, ['name', 'entryPoint', 'issuer', 'audience', 'emailAttributeKeys']) &&
-      [
-        'identityProviderCertificateConfigured',
-        'provisioningSecretConfigured',
-        'signingCertificateConfigured',
-        'signingPrivateKeyConfigured',
-      ].every((key) => typeof material[key] === 'boolean')
-    );
-  }
-  return false;
+  return (
+    !!config &&
+    Reflect.ownKeys(config).length === 11 &&
+    !!material &&
+    Reflect.ownKeys(material).length === 4 &&
+    (safeUrl(config.entryPoint) || (config.entryPoint === '' && omittedField(config.omitted, 'entryPoint'))) &&
+    (opaqueSamlEntityId(config.issuer) || (config.issuer === '' && omittedField(config.omitted, 'issuer'))) &&
+    (config.audience === null ||
+      opaqueSamlEntityId(config.audience) ||
+      (config.audience === '' && omittedField(config.omitted, 'audience'))) &&
+    ['signRequest', 'wantAssertionsSigned', 'wantAuthnResponseSigned', 'forceAuthn'].every(
+      (key) => typeof config[key] === 'boolean',
+    ) &&
+    (config.emailAttributeKeys === null || stringArray(config.emailAttributeKeys)) &&
+    (config.roleMappings === null || roleMappings(config.roleMappings)) &&
+    omissionMetadata(config.omitted, ['name', 'entryPoint', 'issuer', 'audience', 'emailAttributeKeys']) &&
+    [
+      'identityProviderCertificateConfigured',
+      'provisioningSecretConfigured',
+      'signingCertificateConfigured',
+      'signingPrivateKeyConfigured',
+    ].every((key) => typeof material[key] === 'boolean')
+  );
 }
 
 function providerChanges(value: unknown): boolean {
@@ -346,6 +350,48 @@ function provisioningChange(action: string, value: unknown): boolean {
   }
 }
 
+function validSsoDetails(
+  event: Record<string, unknown>,
+  subject: Record<string, unknown>,
+  details: Record<string, unknown>,
+): boolean {
+  const detailKeys = Object.keys(details).sort().join(',');
+  if (
+    event.action === 'sso.provider.created' &&
+    (detailKeys !== 'after,before' ||
+      subject.type !== 'sso.provider' ||
+      details.before !== 'null' ||
+      !providerSnapshot(details.after))
+  )
+    return false;
+  if (
+    event.action === 'sso.provider.deleted' &&
+    (detailKeys !== 'after,before' ||
+      subject.type !== 'sso.provider' ||
+      !providerSnapshot(details.before) ||
+      details.after !== 'null')
+  )
+    return false;
+  if (
+    event.action === 'sso.provider.updated' &&
+    (detailKeys !== 'after,before,changes' ||
+      subject.type !== 'sso.provider' ||
+      !providerSnapshot(details.before) ||
+      !providerSnapshot(details.after) ||
+      !providerChanges(details.changes))
+  )
+    return false;
+  if (
+    (event.action as string).startsWith('sso.provisioning.') &&
+    (detailKeys !== 'changes,provider' ||
+      subject.type !== 'user' ||
+      !providerSnapshot(details.provider) ||
+      !provisioningChange(event.action as string, details.changes))
+  )
+    return false;
+  return true;
+}
+
 export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
   const event = dataFields(input, [
     'action',
@@ -378,40 +424,7 @@ export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
     Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096
   )
     return null;
-  const detailKeys = Object.keys(details).sort().join(',');
-  if (
-    event.action === 'sso.provider.created' &&
-    (detailKeys !== 'after,before' ||
-      subject.type !== 'sso.provider' ||
-      details.before !== 'null' ||
-      !providerSnapshot(details.after))
-  )
-    return null;
-  if (
-    event.action === 'sso.provider.deleted' &&
-    (detailKeys !== 'after,before' ||
-      subject.type !== 'sso.provider' ||
-      !providerSnapshot(details.before) ||
-      details.after !== 'null')
-  )
-    return null;
-  if (
-    event.action === 'sso.provider.updated' &&
-    (detailKeys !== 'after,before,changes' ||
-      subject.type !== 'sso.provider' ||
-      !providerSnapshot(details.before) ||
-      !providerSnapshot(details.after) ||
-      !providerChanges(details.changes))
-  )
-    return null;
-  if (
-    (event.action as string).startsWith('sso.provisioning.') &&
-    (detailKeys !== 'changes,provider' ||
-      subject.type !== 'user' ||
-      !providerSnapshot(details.provider) ||
-      !provisioningChange(event.action as string, details.changes))
-  )
-    return null;
+  if (!validSsoDetails(event, subject, details)) return null;
   return {
     action: event.action as string,
     operationId: event.operationId as string,
@@ -457,9 +470,33 @@ const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonl
   'resource_group.resource_removed': ['resourceId'],
   'introduction.granted': ['recipientUserId', 'tutorUserId'],
   'introduction.revoked': ['recipientUserId'],
-  'maintenance_schedule.created': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
-  'maintenance_schedule.updated': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
-  'maintenance_schedule.deleted': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
+  'maintenance_schedule.created': [
+    'scheduleId',
+    'enabled',
+    'triggerType',
+    'name',
+    'usageDuration',
+    'usageUnit',
+    'usageThreshold',
+  ],
+  'maintenance_schedule.updated': [
+    'scheduleId',
+    'enabled',
+    'triggerType',
+    'name',
+    'usageDuration',
+    'usageUnit',
+    'usageThreshold',
+  ],
+  'maintenance_schedule.deleted': [
+    'scheduleId',
+    'enabled',
+    'triggerType',
+    'name',
+    'usageDuration',
+    'usageUnit',
+    'usageThreshold',
+  ],
   'supervision.approved': ['requesterUserId', 'supervisorUserId', 'requestId'],
   'supervision.rejected': ['requesterUserId', 'supervisorUserId', 'requestId'],
   'health.transition': ['healthSource', 'previousStatus', 'status'],
@@ -477,30 +514,71 @@ const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet<string
   'reader.crash_reported': new Set(['source', 'resetReason', 'hasCoredump']),
 };
 const attractapResetReasons = new Set([
-  'POWERON', 'EXT', 'SW', 'PANIC', 'INT_WDT', 'TASK_WDT', 'WDT', 'DEEPSLEEP', 'BROWNOUT', 'SDIO', 'UNKNOWN',
+  'POWERON',
+  'EXT',
+  'SW',
+  'PANIC',
+  'INT_WDT',
+  'TASK_WDT',
+  'WDT',
+  'DEEPSLEEP',
+  'BROWNOUT',
+  'SDIO',
+  'UNKNOWN',
 ]);
+
+function validAttractapDetails(action: AttractapAuditEvent['action'], details: Record<string, unknown>): boolean {
+  for (const [key, value] of Object.entries(details)) {
+    if (
+      !attractapDetails[action].has(key) ||
+      (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+    )
+      return false;
+    if (key === 'source' && !oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset')(value))
+      return false;
+    if (key === 'resetReason' && !attractapResetReasons.has(value as string)) return false;
+    if (key === 'hasCoredump' && typeof value !== 'boolean') return false;
+    if (key === 'readerId' && !positive(value)) return false;
+  }
+  return true;
+}
 
 export function projectAttractapAuditEvent(input: AttractapAuditEvent): AttractapAuditEvent | null {
   if (!positive(input.subjectId) || !attractapDetails[input.action]) return null;
   const deviceActor = input.authenticationMethod === null;
   if (deviceActor ? input.actorId !== null || input.apiTokenId !== undefined : !positive(input.actorId)) return null;
-  if (
-    !deviceActor &&
-    input.authenticationMethod !== 'session' &&
-    input.authenticationMethod !== 'api-token'
-  ) return null;
-  if (input.authenticationMethod === 'api-token' ? !positive(input.apiTokenId) : input.apiTokenId !== undefined) return null;
+  if (!deviceActor && input.authenticationMethod !== 'session' && input.authenticationMethod !== 'api-token')
+    return null;
+  if (input.authenticationMethod === 'api-token' ? !positive(input.apiTokenId) : input.apiTokenId !== undefined)
+    return null;
   const details = dataFields(input.details, [...attractapDetails[input.action]]);
   if (!details) return null;
-  for (const [key, value] of Object.entries(details)) {
-    if (!attractapDetails[input.action].has(key) || (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')) return null;
-    if (key === 'source' && !oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset')(value)) return null;
-    if (key === 'resetReason' && !attractapResetReasons.has(value as string)) return null;
-    if (key === 'hasCoredump' && typeof value !== 'boolean') return null;
-    if (key === 'readerId' && !positive(value)) return null;
-  }
+  if (!validAttractapDetails(input.action, details)) return null;
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
   return { ...input, details: details as Record<string, string | number | boolean> };
+}
+
+function validResourcePrincipal(input: ResourceAuditEvent): boolean {
+  if (input.actorId === null) {
+    if (
+      (input.authenticationMethod !== undefined && input.authenticationMethod !== null) ||
+      (input.apiTokenId !== undefined && input.apiTokenId !== null)
+    )
+      return false;
+  } else if (
+    (input.authenticationMethod !== undefined &&
+      input.authenticationMethod !== null &&
+      input.authenticationMethod !== 'session' &&
+      input.authenticationMethod !== 'api-token') ||
+    ((input.authenticationMethod === undefined || input.authenticationMethod === null) &&
+      input.apiTokenId !== undefined &&
+      input.apiTokenId !== null) ||
+    (input.apiTokenId !== undefined && input.apiTokenId !== null && !positive(input.apiTokenId)) ||
+    (input.authenticationMethod === 'api-token' && (input.apiTokenId === undefined || input.apiTokenId === null))
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
@@ -521,25 +599,7 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
     if (!allowedFields.includes(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
   }
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
-  if (input.actorId === null) {
-    if (
-      (input.authenticationMethod !== undefined && input.authenticationMethod !== null) ||
-      (input.apiTokenId !== undefined && input.apiTokenId !== null)
-    )
-      return null;
-  } else if (
-    (input.authenticationMethod !== undefined &&
-      input.authenticationMethod !== null &&
-      input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
-    ((input.authenticationMethod === undefined || input.authenticationMethod === null) &&
-      input.apiTokenId !== undefined &&
-      input.apiTokenId !== null) ||
-    (input.apiTokenId !== undefined && input.apiTokenId !== null && !positive(input.apiTokenId)) ||
-    (input.authenticationMethod === 'api-token' && (input.apiTokenId === undefined || input.apiTokenId === null))
-  ) {
-    return null;
-  }
+  if (!validResourcePrincipal(input)) return null;
   return { ...input, details: details as Record<string, string | number> };
 }
 
@@ -590,7 +650,11 @@ const projectDetailValidators: Record<string, (value: string | number) => boolea
   changedFields: (value) => {
     try {
       const fields = JSON.parse(value as string);
-      return Array.isArray(fields) && fields.length > 0 && fields.every((field) => ['name', 'description', 'logo'].includes(field));
+      return (
+        Array.isArray(fields) &&
+        fields.length > 0 &&
+        fields.every((field) => ['name', 'description', 'logo'].includes(field))
+      );
     } catch {
       return false;
     }
@@ -613,7 +677,9 @@ export function projectProjectAuditEvent(input: ProjectAuditEvent): ProjectAudit
   }
   const authenticationMethod = input.authenticationMethod ?? 'session';
   if (
-    (input.authenticationMethod !== undefined && input.authenticationMethod !== 'session' && input.authenticationMethod !== 'api-token') ||
+    (input.authenticationMethod !== undefined &&
+      input.authenticationMethod !== 'session' &&
+      input.authenticationMethod !== 'api-token') ||
     (authenticationMethod === 'api-token' && !positive(input.apiTokenId)) ||
     (authenticationMethod === 'session' && input.apiTokenId !== undefined)
   ) {
@@ -766,6 +832,32 @@ export interface ProjectedIdentityAuditEvent {
 const ipAddress = (value: unknown) => typeof value === 'string' && value.length <= 45 && isIP(value) !== 0;
 const userAgent = (value: unknown) => typeof value === 'string' && value.length <= 512 && !/[\r\n]/.test(value);
 
+function identityRequestMetadata(value: unknown): Pick<ProjectedIdentityAuditEvent, 'ipAddress' | 'userAgent'> {
+  const request = value === undefined ? Object.create(null) : dataFields(value, ['ipAddress', 'userAgent']);
+  // Request metadata is client-controlled and optional; a bad header must not suppress the audit event.
+  const ip =
+    request && typeof request.ipAddress === 'string' && ipAddress(request.ipAddress) ? request.ipAddress : null;
+  const agent =
+    request && typeof request.userAgent === 'string' ? request.userAgent.replace(/[\r\n]/g, '').slice(0, 512) : null;
+  return { ipAddress: ip, userAgent: agent !== null && userAgent(agent) ? agent : null };
+}
+
+function validIdentityPrincipal(event: Record<string, unknown>): boolean {
+  if (event.actorId !== undefined && !positive(event.actorId)) return false;
+  const authenticationMethod = event.authenticationMethod;
+  const apiTokenId = event.apiTokenId;
+  if (
+    (authenticationMethod !== undefined &&
+      authenticationMethod !== 'session' &&
+      authenticationMethod !== 'api-token') ||
+    (apiTokenId !== undefined && !positive(apiTokenId)) ||
+    (authenticationMethod === 'api-token' && !positive(apiTokenId)) ||
+    (authenticationMethod !== 'api-token' && apiTokenId !== undefined)
+  )
+    return false;
+  return true;
+}
+
 /** Closed identity event schema. Request metadata is copied separately from event details. */
 export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAuditEvent | null {
   try {
@@ -790,18 +882,9 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
     const action = event.action as IdentityAuditAction;
     if (!uuid(event.operationId) || !['attempted', 'succeeded', 'failed'].includes(event.outcome as string))
       return null;
-    if (event.actorId !== undefined && !positive(event.actorId)) return null;
+    if (!validIdentityPrincipal(event)) return null;
     const authenticationMethod = event.authenticationMethod;
     const apiTokenId = event.apiTokenId;
-    if (
-      (authenticationMethod !== undefined &&
-        authenticationMethod !== 'session' &&
-        authenticationMethod !== 'api-token') ||
-      (apiTokenId !== undefined && !positive(apiTokenId)) ||
-      (authenticationMethod === 'api-token' && !positive(apiTokenId)) ||
-      (authenticationMethod !== 'api-token' && apiTokenId !== undefined)
-    )
-      return null;
     if (
       event.subjectType !== undefined &&
       !['identity.user', 'identity.role', 'identity.password_policy'].includes(event.subjectType as string)
@@ -815,13 +898,6 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
       if (!identityFields[key](value)) return null;
       details[key] = value as string | number | boolean | null;
     }
-    const request =
-      event.request === undefined ? Object.create(null) : dataFields(event.request, ['ipAddress', 'userAgent']);
-    // Request metadata is client-controlled and optional; a bad header must not suppress the audit event.
-    const ip =
-      request && typeof request.ipAddress === 'string' && ipAddress(request.ipAddress) ? request.ipAddress : null;
-    const agent =
-      request && typeof request.userAgent === 'string' ? request.userAgent.replace(/[\r\n]/g, '').slice(0, 512) : null;
     if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
     return {
       action: `identity.${action}`,
@@ -833,8 +909,7 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
       subjectType: (event.subjectType as IdentityAuditEvent['subjectType'] | undefined) ?? 'identity.user',
       subjectId: (event.subjectId as number | undefined) ?? null,
       details,
-      ipAddress: ip,
-      userAgent: agent !== null && userAgent(agent) ? agent : null,
+      ...identityRequestMetadata(event.request),
     };
   } catch {
     return null;

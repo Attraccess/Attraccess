@@ -50,15 +50,10 @@ export class WagoCommandHandler {
 
   constructor(private readonly dependencies: Dependencies) {}
 
-  async schema(config: Record<string, unknown>, resourceId: number): Promise<Record<string, unknown>> {
-    const controllers = await this.dependencies
-      .controllers()
-      .find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } });
-    const controllerId = positiveInteger(config.controllerId);
-    const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
-    const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
-    const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
-    const outputChannels = snapshot?.logicalChannels.filter((item) => item.capabilities.includes('output')) ?? [];
+  private async channelNames(
+    controllerId: number | undefined,
+    revision: WagoConfigurationRevision | null,
+  ): Promise<Record<string, unknown>> {
     let names: Record<string, unknown> = {};
     if (controllerId) {
       const draft = await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
@@ -69,6 +64,19 @@ export class WagoCommandHandler {
         /* Drafts created before the visual editor have no channel labels. */
       }
     }
+    return names;
+  }
+
+  async schema(config: Record<string, unknown>, resourceId: number): Promise<Record<string, unknown>> {
+    const controllers = await this.dependencies
+      .controllers()
+      .find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } });
+    const controllerId = positiveInteger(config.controllerId);
+    const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
+    const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
+    const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
+    const outputChannels = snapshot?.logicalChannels.filter((item) => item.capabilities.includes('output')) ?? [];
+    const names = await this.channelNames(controllerId, revision);
     const channel = outputChannels.find((item) => item.id === channelId);
     const references = channelId && controllerId ? await this.references(controllerId, channelId, resourceId) : [];
     const properties: Record<string, unknown> = {

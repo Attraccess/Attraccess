@@ -36,6 +36,22 @@ function matchesField(field: CompiledPluginAuditField, value: unknown): boolean 
   return true;
 }
 
+function pluginPrincipal(
+  value: unknown,
+): Pick<ProjectedPluginAuditEvent, 'actorId' | 'authenticationMethod' | 'apiTokenId'> | null {
+  const principal = dataFields(value, ['userId', 'authenticationMethod', 'apiTokenId']);
+  if (!principal || !positive(principal.userId)) return null;
+  const method = principal.authenticationMethod;
+  if (method !== 'session' && method !== 'api-token') return null;
+  const apiTokenId = principal.apiTokenId;
+  if (method === 'api-token' ? !positive(apiTokenId) : apiTokenId !== undefined) return null;
+  return {
+    actorId: principal.userId,
+    authenticationMethod: method,
+    ...(method === 'api-token' && positive(apiTokenId) ? { apiTokenId } : {}),
+  };
+}
+
 /**
  * Projects an event recorded through a plugin's PluginAuditContext against the
  * domain declaration that plugin registered at load time. The host never names
@@ -55,9 +71,7 @@ export function projectPluginAuditEvent(input: unknown): ProjectedPluginAuditEve
       'subject',
       'details',
       'pluginId',
-    ]) as
-      | (Partial<PluginAuditEvent> & { pluginId?: string })
-      | null;
+    ]) as (Partial<PluginAuditEvent> & { pluginId?: string }) | null;
     if (!event) return null;
     if (typeof event.pluginId !== 'string' || !/^[a-zA-Z0-9_-]{21}$/.test(event.pluginId)) return null;
     if (typeof event.action !== 'string' || !uuid(event.operationId)) return null;
@@ -71,12 +85,8 @@ export function projectPluginAuditEvent(input: unknown): ProjectedPluginAuditEve
     if (!policy) return null;
     const outcome = event.outcome;
     if (outcome !== 'attempted' && outcome !== 'succeeded' && outcome !== 'failed') return null;
-    const principal = dataFields(event.principal, ['userId', 'authenticationMethod', 'apiTokenId']);
-    if (!principal || !positive(principal.userId)) return null;
-    const method = principal.authenticationMethod;
-    if (method !== 'session' && method !== 'api-token') return null;
-    const apiTokenId = principal.apiTokenId;
-    if (method === 'api-token' ? !positive(apiTokenId) : apiTokenId !== undefined) return null;
+    const principal = pluginPrincipal(event.principal);
+    if (!principal) return null;
     const subject = dataFields(event.subject, ['type', 'id']);
     if (!subject || !positive(subject.id) || typeof subject.type !== 'string') return null;
     if (!policy.subjectTypes.has(subject.type)) return null;
@@ -95,9 +105,7 @@ export function projectPluginAuditEvent(input: unknown): ProjectedPluginAuditEve
       action: event.action,
       operationId: event.operationId,
       outcome,
-      actorId: principal.userId,
-      authenticationMethod: method,
-      ...(method === 'api-token' && positive(apiTokenId) ? { apiTokenId } : {}),
+      ...principal,
       subjectType: subject.type,
       subjectId: subject.id,
       details,

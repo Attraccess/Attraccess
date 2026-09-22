@@ -43,12 +43,7 @@ interface CommissioningModalProps {
   onConfigure?: (controllerId: number) => void;
 }
 
-export function CommissioningModal({
-  isOpen,
-  session: resumedSession,
-  onOpenChange,
-  onConfigure,
-}: CommissioningModalProps) {
+function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onConfigure }: CommissioningModalProps) {
   const createSessionMutation = useCreateCommissioningSessionMutation();
   const confirmHostKeyMutation = useConfirmCommissioningHostKeyMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
@@ -102,21 +97,12 @@ export function CommissioningModal({
     deliverSessionMutation.isPending ||
     recoverSessionMutation.isPending ||
     removeSessionMutation.isPending;
-  const loadingStatus = recoverSessionMutation.isPending
-    ? [
-        'Cleaning up failed installation',
-        'Cleaning up the runtime installation and credentials. CODESYS and preexisting workloads are not restored.',
-      ]
-    : createSessionMutation.isPending
-      ? [
-          'Preparing commissioning',
-          'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
-        ]
-      : removeSessionMutation.isPending
-        ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
-        : confirmHostKeyMutation.isPending
-          ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
-          : null;
+  const loadingStatus = commissioningLoadingStatus({
+    recoverSessionMutation,
+    createSessionMutation,
+    removeSessionMutation,
+    confirmHostKeyMutation,
+  });
 
   useEffect(() => {
     setSshPassword('');
@@ -153,7 +139,6 @@ export function CommissioningModal({
     setRecoveryPassword('');
     setConfirmRecovery(false);
     createSessionMutation.reset();
-    confirmHostKeyMutation.reset();
     confirmHostKeyMutation.reset();
     deliverSessionMutation.reset();
     recoverSessionMutation.reset();
@@ -233,224 +218,448 @@ export function CommissioningModal({
   const activeStep = session ? sessionStep(session) : step;
   const title = session?.controllerName || name || 'New CC100 controller';
 
+  return {
+    isOpen,
+    onConfigure,
+    session,
+    isLoading,
+    activeStep,
+    title,
+    loadingStatus,
+    name,
+    setName,
+    controllerIp,
+    setControllerIp,
+    mqttServerId,
+    setMqttServerId,
+    mqttServersQuery,
+    setArtifactBusy,
+    artifactBusy,
+    artifactAvailable,
+    selectedMqttServerId,
+    setSelectedArtifact,
+    hostKeyFingerprint,
+    setHostKeyFingerprint,
+    isolatedIdentity,
+    setIsolatedIdentity,
+    deliverSessionMutation,
+    sshUsername,
+    sshPassword,
+    setSshUsername,
+    setSshPassword,
+    confirmInstall,
+    setConfirmInstall,
+    recoveryUsername,
+    recoveryPassword,
+    setRecoveryUsername,
+    setRecoveryPassword,
+    confirmRecovery,
+    setConfirmRecovery,
+    createSessionMutation,
+    confirmHostKeyMutation,
+    removeSessionMutation,
+    recoverSessionMutation,
+    isCancelConfirmationOpen,
+    setCancelConfirmationOpen,
+    setStep,
+    close,
+    createSession,
+    deliverSession,
+    recoverSession,
+    confirmHostKey,
+    configureController,
+  };
+}
+
+type CommissioningModel = ReturnType<typeof useCommissioning>;
+
+export function CommissioningModal(props: CommissioningModalProps) {
+  const model = useCommissioning(props);
   return (
-    <StandardDrawer ariaLabel="Commission a controller" isOpen={isOpen} onOpenChange={(open) => !open && close()}>
+    <StandardDrawer
+      ariaLabel="Commission a controller"
+      isOpen={props.isOpen}
+      onOpenChange={(open) => !open && model.close()}
+    >
       <DrawerHeader>
         <h2 className="wg:text-xl wg:font-semibold">Commission a controller</h2>
       </DrawerHeader>
-      <DrawerBody>
-        <div className="wg:grid wg:min-w-0 wg:gap-5 wg:md:grid-cols-[13rem_minmax(0,1fr)]">
-          <DevicePassport className="wg:hidden wg:md:block" name={title} step={activeStep} />
-          <div className="wg:min-w-0 wg:space-y-5">
-            <StepHeading step={activeStep} />
-            {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
-            {session && <CommissioningOperationStatus key={`operation-${session.id}`} sessionId={session.id} />}
-            {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
-            {!session && activeStep === 1 && (
-              <ConnectionStep
-                controllerIp={controllerIp}
-                mqttServerId={mqttServerId}
-                mqttServersQuery={mqttServersQuery}
-                onControllerIpChange={setControllerIp}
-                onMqttServerIdChange={setMqttServerId}
-              />
-            )}
-            {!session && activeStep === 1 && (
-              <RuntimeArtifactImport
-                disabled={isLoading}
-                onBusyChange={setArtifactBusy}
-                onSelectionChange={setSelectedArtifact}
-              />
-            )}
-            {session?.runtimeArtifactDigest && (
-              <p className="wg:break-all wg:text-sm">
-                Pinned signed release: <code>{session.runtimeArtifactDigest}</code>. Retries keep this release.
-              </p>
-            )}
-            {session?.state === 'awaiting_identity_confirmation' && (
-              <HostKeyConfirmationStep
-                fingerprint={hostKeyFingerprint}
-                expectedFingerprint={session.hostKeyFingerprint}
-                onFingerprintChange={setHostKeyFingerprint}
-              />
-            )}
-            {session?.state === 'awaiting_identity_confirmation' && (
-              <Checkbox isSelected={isolatedIdentity} onChange={setIsolatedIdentity}>
-                <Checkbox.Control>
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                <Checkbox.Content>
-                  Alternatively, I verified the physical 751-9301 label and connected this controller as the only device
-                  on an isolated service network. I accept first-key pinning on that connection, not independent
-                  cryptographic identity verification. Do not select this on a shared LAN.
-                </Checkbox.Content>
-              </Checkbox>
-            )}
-            {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && (
-              <DeliveryStep
-                isDelivering={deliverSessionMutation.isPending}
-                session={session}
-                sshUsername={sshUsername}
-                sshPassword={sshPassword}
-                onSshUsernameChange={setSshUsername}
-                onSshPasswordChange={setSshPassword}
-                confirmInstall={confirmInstall}
-                onConfirmInstallChange={setConfirmInstall}
-              />
-            )}
-            {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
-            {session &&
-              session.state !== 'awaiting_identity_confirmation' &&
-              (canInstall(session) || session.dockerProvisionState) && (
-                <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
-              )}
-            {session &&
-              (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
-                <VerificationStatus session={session} onConfigure={onConfigure ? configureController : undefined} />
-              )}
-            {session && canRecover(session) && (
-              <div className="wg:space-y-4">
-                <Alert status="warning">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Clean up failed installation</Alert.Title>
-                    <Alert.Description>
-                      Cleanup interrupts the Attraccess runtime and reconciles this installation and its credentials.
-                      It cannot undo broker credential revocation or restore CODESYS, other applications, Docker host
-                      settings, or data erased during commissioning. It does not re-enable CODESYS. An incomplete cleanup
-                      keeps its recovery record for another attempt. Cleanup does not certify readiness and is never
-                      automatic.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert>
-                <CredentialFields
-                  intent="recovery"
-                  isDisabled={isLoading}
-                  username={recoveryUsername}
-                  password={recoveryPassword}
-                  onUsernameChange={setRecoveryUsername}
-                  onPasswordChange={setRecoveryPassword}
-                />
-                <Checkbox
-                  isRequired
-                  isDisabled={isLoading}
-                  isSelected={confirmRecovery}
-                  onChange={setConfirmRecovery}
-                  name="confirm-recovery"
-                >
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Checkbox.Content>
-                    I approve interrupting the Attraccess runtime and cleaning up this failed installation. This does
-                    not restore preexisting applications or data.
-                  </Checkbox.Content>
-                </Checkbox>
-                <p className="wg:text-sm wg:text-muted">
-                  Enter fresh SSH credentials and approve each recovery attempt separately. Credentials and recovery
-                  consent are cleared after submission or closing.
-                </p>
-              </div>
-            )}
-            {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
-            {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
-            {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
-            {removeSessionMutation.isError && <ErrorAlert error={removeSessionMutation.error} />}
-            {recoverSessionMutation.isError && <ErrorAlert error={recoverSessionMutation.error} />}
-            {isCancelConfirmationOpen && (
-              <Alert status="warning">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Description>
-                    Canceling revokes the enrollment credential and deletes this commissioning session.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert>
-            )}
-          </div>
-        </div>
-      </DrawerBody>
-      <DrawerFooter className="wg:flex-wrap">
-        {session && canRecover(session) && (
-          <Button
-            variant="danger"
-            isPending={recoverSessionMutation.isPending}
-            isDisabled={isLoading || !confirmRecovery || !recoveryUsername.trim() || !recoveryPassword}
-            onPress={recoverSession}
-          >
-            Clean up failed installation
-          </Button>
-        )}
-        <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>
-          {isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}
-        </Button>
-        {!session && activeStep === 0 && (
-          <Button
-            isDisabled={!name.trim()}
-            onPress={() => {
-              setArtifactBusy(true);
-              setStep(1);
-            }}
-          >
-            Continue
-          </Button>
-        )}
-        {!session && activeStep === 1 && (
-          <Button
-            isPending={isLoading}
-            isDisabled={
-              artifactBusy ||
-              !artifactAvailable ||
-              !controllerIp.trim() ||
-              selectedMqttServerId === null ||
-              mqttServersQuery.isPending ||
-              mqttServersQuery.isError
-            }
-            onPress={createSession}
-          >
-            {isLoading ? 'Preparing commissioning' : 'Scan controller for review'}
-          </Button>
-        )}
-        {session?.state === 'awaiting_identity_confirmation' && (
-          <Button
-            isPending={isLoading}
-            isDisabled={!isolatedIdentity && (!hostKeyFingerprint || hostKeyFingerprint !== session.hostKeyFingerprint)}
-            onPress={confirmHostKey}
-          >
-            {isLoading ? 'Confirming identity' : 'Confirm host key'}
-          </Button>
-        )}
-        {session && canInstall(session) && (
-          <Button
-            variant="danger"
-            isPending={isLoading}
-            isDisabled={isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword}
-            onPress={deliverSession}
-          >
-            {isLoading
-              ? 'Starting installation'
-              : session.state === 'delivery_failed'
-                ? 'Retry installation'
-                : 'Install runtime'}
-          </Button>
-        )}
-        {session &&
-          session.state !== 'completed' &&
-          (isCancelConfirmationOpen ? (
-            <Button
-              variant="danger"
-              isPending={isLoading}
-              onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}
-            >
-              {isLoading ? 'Removing record' : 'Confirm cancellation'}
-            </Button>
-          ) : (
-            <Button variant="secondary" isDisabled={isLoading} onPress={() => setCancelConfirmationOpen(true)}>
-              {session.state === 'revoked' ? 'Delete commissioning record' : 'Cancel enrollment'}
-            </Button>
-          ))}
-      </DrawerFooter>
+      <CommissioningContent model={model} />
+      <CommissioningActions model={model} />
     </StandardDrawer>
+  );
+}
+
+function CommissioningContent({ model }: { model: CommissioningModel }) {
+  const {
+    onConfigure,
+    session,
+    activeStep,
+    title,
+    loadingStatus,
+    hostKeyFingerprint,
+    setHostKeyFingerprint,
+    isolatedIdentity,
+    setIsolatedIdentity,
+    deliverSessionMutation,
+    sshUsername,
+    sshPassword,
+    setSshUsername,
+    setSshPassword,
+    confirmInstall,
+    setConfirmInstall,
+    isCancelConfirmationOpen,
+    configureController,
+  } = model;
+  return (
+    <DrawerBody>
+      <div className="wg:grid wg:min-w-0 wg:gap-5 wg:md:grid-cols-[13rem_minmax(0,1fr)]">
+        <DevicePassport className="wg:hidden wg:md:block" name={title} step={activeStep} />
+        <div className="wg:min-w-0 wg:space-y-5">
+          <StepHeading step={activeStep} />
+          {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
+          {session && <CommissioningOperationStatus key={`operation-${session.id}`} sessionId={session.id} />}
+          <ConnectionFields model={model} />
+          {session?.runtimeArtifactDigest && (
+            <p className="wg:break-all wg:text-sm">
+              Pinned signed release: <code>{session.runtimeArtifactDigest}</code>. Retries keep this release.
+            </p>
+          )}
+          {session?.state === 'awaiting_identity_confirmation' && (
+            <HostKeyConfirmationStep
+              fingerprint={hostKeyFingerprint}
+              expectedFingerprint={session.hostKeyFingerprint}
+              onFingerprintChange={setHostKeyFingerprint}
+            />
+          )}
+          {session?.state === 'awaiting_identity_confirmation' && (
+            <Checkbox isSelected={isolatedIdentity} onChange={setIsolatedIdentity}>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Content>
+                Alternatively, I verified the physical 751-9301 label and connected this controller as the only device
+                on an isolated service network. I accept first-key pinning on that connection, not independent
+                cryptographic identity verification. Do not select this on a shared LAN.
+              </Checkbox.Content>
+            </Checkbox>
+          )}
+          {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && (
+            <DeliveryStep
+              isDelivering={deliverSessionMutation.isPending}
+              session={session}
+              sshUsername={sshUsername}
+              sshPassword={sshPassword}
+              onSshUsernameChange={setSshUsername}
+              onSshPasswordChange={setSshPassword}
+              confirmInstall={confirmInstall}
+              onConfirmInstallChange={setConfirmInstall}
+            />
+          )}
+          {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
+          {session &&
+            session.state !== 'awaiting_identity_confirmation' &&
+            (canInstall(session) || session.dockerProvisionState) && (
+              <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
+            )}
+          {session &&
+            (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
+              <VerificationStatus session={session} onConfigure={onConfigure ? configureController : undefined} />
+            )}
+          <RecoveryFields model={model} />
+          <CommissioningErrors model={model} />
+          {isCancelConfirmationOpen && (
+            <Alert status="warning">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>
+                  Canceling revokes the enrollment credential and deletes this commissioning session.
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </div>
+      </div>
+    </DrawerBody>
+  );
+}
+
+function CommissioningActions({ model }: { model: CommissioningModel }) {
+  const {
+    session,
+    isLoading,
+    hostKeyFingerprint,
+    isolatedIdentity,
+    sshUsername,
+    sshPassword,
+    confirmInstall,
+    recoveryUsername,
+    recoveryPassword,
+    confirmRecovery,
+    recoverSessionMutation,
+    isCancelConfirmationOpen,
+    setCancelConfirmationOpen,
+    close,
+    deliverSession,
+    recoverSession,
+    confirmHostKey,
+  } = model;
+  return (
+    <DrawerFooter className="wg:flex-wrap">
+      {session && canRecover(session) && (
+        <Button
+          variant="danger"
+          isPending={recoverSessionMutation.isPending}
+          isDisabled={isLoading || !confirmRecovery || !recoveryUsername.trim() || !recoveryPassword}
+          onPress={recoverSession}
+        >
+          Clean up failed installation
+        </Button>
+      )}
+      <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>
+        {isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}
+      </Button>
+      <CreateSessionActions model={model} />
+      {session?.state === 'awaiting_identity_confirmation' && (
+        <Button
+          isPending={isLoading}
+          isDisabled={!isolatedIdentity && (!hostKeyFingerprint || hostKeyFingerprint !== session.hostKeyFingerprint)}
+          onPress={confirmHostKey}
+        >
+          {isLoading ? 'Confirming identity' : 'Confirm host key'}
+        </Button>
+      )}
+      {session && canInstall(session) && (
+        <Button
+          variant="danger"
+          isPending={isLoading}
+          isDisabled={isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword}
+          onPress={deliverSession}
+        >
+          {isLoading
+            ? 'Starting installation'
+            : session.state === 'delivery_failed'
+              ? 'Retry installation'
+              : 'Install runtime'}
+        </Button>
+      )}
+      <CancelSessionAction model={model} />
+    </DrawerFooter>
+  );
+}
+
+function RecoveryFields({ model }: { model: CommissioningModel }) {
+  const {
+    session,
+    isLoading,
+    recoveryUsername,
+    recoveryPassword,
+    setRecoveryUsername,
+    setRecoveryPassword,
+    confirmRecovery,
+    setConfirmRecovery,
+  } = model;
+  return (
+    <>
+      {session && canRecover(session) && (
+        <div className="wg:space-y-4">
+          <Alert status="warning">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Clean up failed installation</Alert.Title>
+              <Alert.Description>
+                Cleanup interrupts the Attraccess runtime and reconciles this installation and its credentials. It
+                cannot undo broker credential revocation or restore CODESYS, other applications, Docker host settings,
+                or data erased during commissioning. It does not re-enable CODESYS. An incomplete cleanup keeps its
+                recovery record for another attempt. Cleanup does not certify readiness and is never automatic.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+          <CredentialFields
+            intent="recovery"
+            isDisabled={isLoading}
+            username={recoveryUsername}
+            password={recoveryPassword}
+            onUsernameChange={setRecoveryUsername}
+            onPasswordChange={setRecoveryPassword}
+          />
+          <Checkbox
+            isRequired
+            isDisabled={isLoading}
+            isSelected={confirmRecovery}
+            onChange={setConfirmRecovery}
+            name="confirm-recovery"
+          >
+            <Checkbox.Control>
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            <Checkbox.Content>
+              I approve interrupting the Attraccess runtime and cleaning up this failed installation. This does not
+              restore preexisting applications or data.
+            </Checkbox.Content>
+          </Checkbox>
+          <p className="wg:text-sm wg:text-muted">
+            Enter fresh SSH credentials and approve each recovery attempt separately. Credentials and recovery consent
+            are cleared after submission or closing.
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ConnectionFields({ model }: { model: CommissioningModel }) {
+  const {
+    session,
+    isLoading,
+    activeStep,
+    name,
+    setName,
+    controllerIp,
+    setControllerIp,
+    mqttServerId,
+    setMqttServerId,
+    mqttServersQuery,
+    setArtifactBusy,
+    setSelectedArtifact,
+  } = model;
+  return (
+    <>
+      {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
+      {!session && activeStep === 1 && (
+        <ConnectionStep
+          controllerIp={controllerIp}
+          mqttServerId={mqttServerId}
+          mqttServersQuery={mqttServersQuery}
+          onControllerIpChange={setControllerIp}
+          onMqttServerIdChange={setMqttServerId}
+        />
+      )}
+      {!session && activeStep === 1 && (
+        <RuntimeArtifactImport
+          disabled={isLoading}
+          onBusyChange={setArtifactBusy}
+          onSelectionChange={setSelectedArtifact}
+        />
+      )}
+    </>
+  );
+}
+
+function CreateSessionActions({ model }: { model: CommissioningModel }) {
+  const {
+    session,
+    isLoading,
+    activeStep,
+    name,
+    controllerIp,
+    mqttServersQuery,
+    setArtifactBusy,
+    artifactBusy,
+    artifactAvailable,
+    selectedMqttServerId,
+    setStep,
+    createSession,
+  } = model;
+  return (
+    <>
+      {!session && activeStep === 0 && (
+        <Button
+          isDisabled={!name.trim()}
+          onPress={() => {
+            setArtifactBusy(true);
+            setStep(1);
+          }}
+        >
+          Continue
+        </Button>
+      )}
+      {!session && activeStep === 1 && (
+        <Button
+          isPending={isLoading}
+          isDisabled={
+            artifactBusy ||
+            !artifactAvailable ||
+            !controllerIp.trim() ||
+            selectedMqttServerId === null ||
+            mqttServersQuery.isPending ||
+            mqttServersQuery.isError
+          }
+          onPress={createSession}
+        >
+          {isLoading ? 'Preparing commissioning' : 'Scan controller for review'}
+        </Button>
+      )}
+    </>
+  );
+}
+
+function CancelSessionAction({ model }: { model: CommissioningModel }) {
+  const { session, isLoading, removeSessionMutation, isCancelConfirmationOpen, setCancelConfirmationOpen, close } =
+    model;
+  return (
+    <>
+      {session &&
+        session.state !== 'completed' &&
+        (isCancelConfirmationOpen ? (
+          <Button
+            variant="danger"
+            isPending={isLoading}
+            onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}
+          >
+            {isLoading ? 'Removing record' : 'Confirm cancellation'}
+          </Button>
+        ) : (
+          <Button variant="secondary" isDisabled={isLoading} onPress={() => setCancelConfirmationOpen(true)}>
+            {session.state === 'revoked' ? 'Delete commissioning record' : 'Cancel enrollment'}
+          </Button>
+        ))}
+    </>
+  );
+}
+
+function commissioningLoadingStatus({
+  recoverSessionMutation,
+  createSessionMutation,
+  removeSessionMutation,
+  confirmHostKeyMutation,
+}: Pick<
+  CommissioningModel,
+  'recoverSessionMutation' | 'createSessionMutation' | 'removeSessionMutation' | 'confirmHostKeyMutation'
+>): [string, string] | null {
+  return recoverSessionMutation.isPending
+    ? [
+        'Cleaning up failed installation',
+        'Cleaning up the runtime installation and credentials. CODESYS and preexisting workloads are not restored.',
+      ]
+    : createSessionMutation.isPending
+      ? [
+          'Preparing commissioning',
+          'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
+        ]
+      : removeSessionMutation.isPending
+        ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
+        : confirmHostKeyMutation.isPending
+          ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
+          : null;
+}
+
+function CommissioningErrors({ model }: { model: CommissioningModel }) {
+  const {
+    createSessionMutation,
+    confirmHostKeyMutation,
+    deliverSessionMutation,
+    removeSessionMutation,
+    recoverSessionMutation,
+  } = model;
+  return (
+    <>
+      {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
+      {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
+      {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
+      {removeSessionMutation.isError && <ErrorAlert error={removeSessionMutation.error} />}
+      {recoverSessionMutation.isError && <ErrorAlert error={recoverSessionMutation.error} />}
+    </>
   );
 }
 
@@ -726,10 +935,10 @@ function DeliveryStep({
               <Alert.Title>Destructive installation</Alert.Title>
               <Alert.Description>
                 Installing Attraccess on {session.targetHost} takes over this controller. Existing applications and
-                workloads may stop working or be erased. CODESYS will be stopped and permanently disabled before
-                digital I/O is enabled; installation fails if this cannot be verified. Attraccess does not preserve,
-                back up, or restore preexisting CODESYS applications or other workloads. Make connected equipment safe
-                for the interruption. Installation does not certify management hardening or physical readiness.
+                workloads may stop working or be erased. CODESYS will be stopped and permanently disabled before digital
+                I/O is enabled; installation fails if this cannot be verified. Attraccess does not preserve, back up, or
+                restore preexisting CODESYS applications or other workloads. Make connected equipment safe for the
+                interruption. Installation does not certify management hardening or physical readiness.
               </Alert.Description>
             </Alert.Content>
           </Alert>

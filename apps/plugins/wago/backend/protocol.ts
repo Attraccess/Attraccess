@@ -28,14 +28,7 @@ export function parseAnnouncement(payload: Buffer): WagoAnnouncement {
 export type WagoHeartbeat = Omit<WagoAnnouncement, 'pairingCode'>;
 
 export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
-  let value: unknown;
-  try {
-    value = JSON.parse(payload.toString('utf8'));
-  } catch {
-    throw new Error('announcement is not valid JSON');
-  }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('announcement must be an object');
-  const input = value as Record<string, unknown>;
+  const input = parseObject(payload, 'announcement');
   const required = ['hardwareId', 'protocolVersion', 'runtimeVersion'];
   for (const key of required)
     if (typeof input[key] !== 'string' || !input[key].trim()) throw new Error(`announcement ${key} is required`);
@@ -155,36 +148,7 @@ export function parseOperationalMessage(
     throw new Error('operational streamId is invalid');
   const streamId = value.streamId;
   if (suffix === 'state') {
-    if (
-      typeof value.connected !== 'boolean' ||
-      !isNullableInteger(value.revision) ||
-      !isNullableString(value.contentHash) ||
-      !isBooleanRecord(value.outputs) ||
-      (value.inputs !== undefined && !isBooleanRecord(value.inputs)) ||
-      (value.readiness !== undefined &&
-        (!value.readiness ||
-          typeof value.readiness !== 'object' ||
-          Array.isArray(value.readiness) ||
-          typeof (value.readiness as Record<string, unknown>).hardwareAvailable !== 'boolean'))
-    )
-      throw new Error('invalid state message');
-    return {
-      hardwareId,
-      message: {
-        category: 'state',
-        timestamp,
-        streamId,
-        sequence,
-        connected: value.connected,
-        revision: value.revision as number | null,
-        contentHash: value.contentHash as string | null,
-        outputs: value.outputs as Record<string, boolean>,
-        ...(value.inputs !== undefined ? { inputs: value.inputs as Record<string, boolean> } : {}),
-        ...(value.readiness !== undefined
-          ? { readiness: { hardwareAvailable: (value.readiness as { hardwareAvailable: boolean }).hardwareAvailable } }
-          : {}),
-      },
-    };
+    return { hardwareId, message: parseStateMessage(value, { timestamp, streamId, sequence }) };
   }
   if (suffix === 'measurements') {
     return {
@@ -234,6 +198,34 @@ export function parseOperationalMessage(
   };
 }
 
+function parseStateMessage(value: Record<string, unknown>, envelope: WagoOperationalMessageBase): WagoStateMessage {
+  if (
+    typeof value.connected !== 'boolean' ||
+    !isNullableInteger(value.revision) ||
+    !isNullableString(value.contentHash) ||
+    !isBooleanRecord(value.outputs) ||
+    (value.inputs !== undefined && !isBooleanRecord(value.inputs)) ||
+    (value.readiness !== undefined &&
+      (!value.readiness ||
+        typeof value.readiness !== 'object' ||
+        Array.isArray(value.readiness) ||
+        typeof (value.readiness as Record<string, unknown>).hardwareAvailable !== 'boolean'))
+  )
+    throw new Error('invalid state message');
+  return {
+    category: 'state',
+    ...envelope,
+    connected: value.connected,
+    revision: value.revision as number | null,
+    contentHash: value.contentHash as string | null,
+    outputs: value.outputs as Record<string, boolean>,
+    ...(value.inputs !== undefined ? { inputs: value.inputs as Record<string, boolean> } : {}),
+    ...(value.readiness !== undefined
+      ? { readiness: { hardwareAvailable: (value.readiness as { hardwareAvailable: boolean }).hardwareAvailable } }
+      : {}),
+  };
+}
+
 export function configurationReportedHardwareId(prefix: string, topic: string): string | null {
   const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
   const topicSuffix = '/configuration/reported';
@@ -247,7 +239,8 @@ export function acknowledgementWildcardTopic(prefix: string): string {
 }
 
 export function acknowledgementTopic(prefix: string, hardwareId: string): string {
-  if (!hardwareId || /[+/]/.test(hardwareId)) throw new Error('hardware ID must not be empty or contain MQTT wildcards');
+  if (!hardwareId || /[+/]/.test(hardwareId))
+    throw new Error('hardware ID must not be empty or contain MQTT wildcards');
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/acknowledgements`;
 }
 
