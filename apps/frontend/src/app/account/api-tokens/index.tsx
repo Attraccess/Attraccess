@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Input,
   Label,
@@ -18,10 +18,14 @@ import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-u
 import { Button } from '../../../components/button';
 import { EmptyState } from '../../../components/emptyState';
 import { useToastMessage } from '../../../components/toastProvider';
-import { getBaseUrl } from '../../../api';
 import { PermissionPicker } from '../../../components/permissionPicker';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
-import { useRbacServiceListPermissions } from '@attraccess/react-query-client';
+import {
+  useApiTokensServiceCreateApiToken,
+  useApiTokensServiceListApiTokens,
+  useApiTokensServiceRevokeApiToken,
+  useRbacServiceListPermissions,
+} from '@attraccess/react-query-client';
 import { SimplePagination } from '../../../components/simplePagination';
 import en from './en.json';
 import de from './de.json';
@@ -53,69 +57,31 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const { showToast } = useToastMessage();
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
   const { data: allPermissions } = useRbacServiceListPermissions();
-  const [apiTokens, setApiTokens] = useState<ApiToken[] | null>(null);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [name, setName] = useState('');
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
   const [expiresAt, setExpiresAt] = useState('');
   const [secret, setSecret] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [revokingId, setRevokingId] = useState<number | null>(null);
-  const latestLoadId = useRef(0);
+  const { data: tokenPage, isPending: isLoadingTokens, refetch: refetchTokens } =
+    useApiTokensServiceListApiTokens<ApiTokenPage>({ limit: PAGE_SIZE, page });
+  const { mutateAsync: createApiToken, isPending: isCreating } = useApiTokensServiceCreateApiToken<CreatedApiToken>();
+  const { mutateAsync: revokeApiToken, isPending: isRevoking } = useApiTokensServiceRevokeApiToken();
   const availablePermissionDetails = useMemo(
     () => (allPermissions ?? []).filter((permission) => availablePermissions.includes(permission.key)),
     [allPermissions, availablePermissions],
   );
 
-  const loadTokens = useCallback(async (requestedPage: number) => {
-    const loadId = ++latestLoadId.current;
-    try {
-      // eslint-disable-next-line no-restricted-syntax -- Legacy token pagination has no generated hook.
-      const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens?page=${requestedPage}&limit=${PAGE_SIZE}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Could not load API tokens');
-      const result = (await response.json()) as ApiTokenPage;
-      if (loadId !== latestLoadId.current) return false;
-      setApiTokens(result.data);
-      setTotal(result.total);
-      return true;
-    } catch (error) {
-      if (loadId !== latestLoadId.current) return false;
-      throw error;
-    }
-  }, []);
-
-  const showLoadFailed = useCallback(() => {
-    showToast({ title: t('errors.loadFailed'), type: 'error' });
-  }, [showToast, t]);
-
-  useEffect(() => {
-    loadTokens(page).catch(() => {
-      showLoadFailed();
-      setApiTokens([]);
-    });
-  }, [loadTokens, page, showLoadFailed]);
-
   const createToken = async () => {
-    setIsCreating(true);
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Legacy token creation has no generated hook.
-      const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const created = await createApiToken({
+        requestBody: {
           name: name.trim(),
           permissionKeys: [...permissionKeys],
           expiresAt: expiresAt ? new Date(`${expiresAt}T00:00:00`).toISOString() : undefined,
-        }),
+        },
       });
-      if (!response.ok) throw new Error('Could not create API token');
-      const created = (await response.json()) as CreatedApiToken;
       setSecret(created.token);
-      if (page === 1) void loadTokens(1).catch(showLoadFailed);
+      if (page === 1) void refetchTokens();
       else setPage(1);
       setName('');
       setPermissionKeys(new Set());
@@ -123,27 +89,17 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       showToast({ title: t('success.created'), type: 'success' });
     } catch {
       showToast({ title: t('errors.createFailed'), type: 'error' });
-    } finally {
-      setIsCreating(false);
     }
   };
 
   const revokeToken = async (token: ApiToken) => {
-    setRevokingId(token.id);
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Legacy token deletion has no generated hook.
-      const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens/${token.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Could not revoke API token');
-      if (apiTokens?.length === 1 && page > 1) setPage(page - 1);
-      else void loadTokens(page).catch(showLoadFailed);
+      await revokeApiToken({ id: token.id });
+      if (tokenPage?.data.length === 1 && page > 1) setPage(page - 1);
+      else void refetchTokens();
       showToast({ title: t('success.revoked'), type: 'success' });
     } catch {
       showToast({ title: t('errors.revokeFailed'), type: 'error' });
-    } finally {
-      setRevokingId(null);
     }
   };
 
@@ -153,7 +109,8 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     showToast({ title: t('success.copied'), type: 'success' });
   };
 
-  if (apiTokens === null) return <Skeleton className="w-full h-10" />;
+  if (isLoadingTokens) return <Skeleton className="w-full h-10" />;
+  const apiTokens = tokenPage?.data ?? [];
 
   return (
     <div className="flex flex-col gap-4" data-cy="api-tokens-card">
@@ -196,7 +153,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
                   <TableCell>{apiToken.lastUsedAt ? <DateTimeDisplay date={apiToken.lastUsedAt} /> : t('neverUsed')}</TableCell>
                   <TableCell>{apiToken.expiresAt ? <DateTimeDisplay date={apiToken.expiresAt} /> : t('neverExpires')}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" isIconOnly aria-label={t('actions.revoke', { name: apiToken.name })} onPress={() => revokeToken(apiToken)} isDisabled={revokingId !== null}>
+                    <Button variant="ghost" isIconOnly aria-label={t('actions.revoke', { name: apiToken.name })} onPress={() => revokeToken(apiToken)} isDisabled={isRevoking}>
                       <Trash2 size={16} className="text-danger" />
                     </Button>
                   </TableCell>
@@ -208,7 +165,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       </Table>
       <SimplePagination
         page={page}
-        total={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        total={Math.max(1, Math.ceil((tokenPage?.total ?? 0) / PAGE_SIZE))}
         onChange={setPage}
         showControls
         aria-label={t('title')}

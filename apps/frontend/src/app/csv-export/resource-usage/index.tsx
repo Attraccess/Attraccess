@@ -1,5 +1,6 @@
 import {
   ResourceUsage,
+  useAnalyticsServiceGetResourceOperatingDurations,
   useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
 } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
@@ -9,7 +10,6 @@ import de from './de.json';
 import en from './en.json';
 import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
 import { useQuery } from '@tanstack/react-query';
-import { getBaseUrl } from '../../../api';
 import {
   attributedDurationByResourceAndUsage,
   combinedOperatingDurationStatus,
@@ -33,6 +33,8 @@ export function ResourceUsageExport(props: ExportProps) {
   });
 
   const [fetchAll, setFetchAll] = useState(false);
+  const { mutateAsync: getResourceOperatingDurations } =
+    useAnalyticsServiceGetResourceOperatingDurations<Record<number, OperatingDurationSummary>>();
 
   const { data, status, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
     useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
@@ -62,24 +64,18 @@ export function ResourceUsageExport(props: ExportProps) {
   );
   const { data: operatingDurations, status: operatingDurationsStatus } = useQuery({
     queryKey: ['resource-operating-durations', resourceIds, props.start, props.end],
-    queryFn: async ({ signal }) => {
+    queryFn: async () => {
       const operatingDurations: Record<number, OperatingDurationSummary> = {};
       for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
         for (const range of operatingDurationRanges) {
-          // eslint-disable-next-line no-restricted-syntax -- The CSV export assembles a dynamic request body outside a generated operation.
-          const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
-            method: 'POST',
-            credentials: 'include',
-            signal,
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
+          const summaries = await getResourceOperatingDurations({
+            requestBody: {
               resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
               start: range.start.toISOString(),
               end: range.end.toISOString(),
-            }),
+            },
           });
-          if (!response.ok) throw new Error('Failed to load operating durations');
-          mergeOperatingDurationSummaries(operatingDurations, await response.json());
+          mergeOperatingDurationSummaries(operatingDurations, summaries);
         }
       }
       return operatingDurations;

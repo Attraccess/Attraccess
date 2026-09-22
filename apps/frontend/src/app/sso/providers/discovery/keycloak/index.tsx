@@ -18,8 +18,7 @@ import de from './de.json';
 import en from './en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
-import { getBaseUrl } from '../../../../../api';
-import { ApiError } from '@attraccess/react-query-client';
+import { ApiError, useAuthenticationServiceDiscoverKeycloakOidc } from '@attraccess/react-query-client';
 
 interface Props {
   onDiscovery: (settings: OpenIDConfiguration) => void;
@@ -45,6 +44,11 @@ export function KeycloakDiscoveryDialog(props: Props) {
   });
 
   const toast = useToastMessage();
+  const { refetch: discoverKeycloak } = useAuthenticationServiceDiscoverKeycloakOidc<OpenIDConfiguration>(
+    { host, realm },
+    undefined,
+    { enabled: false },
+  );
 
   const discover = useCallback(async () => {
     if (!host || !realm) {
@@ -54,22 +58,8 @@ export function KeycloakDiscoveryDialog(props: Props) {
     setIsDiscovering(true);
 
     try {
-      const baseUrl = getBaseUrl();
-      const params = new URLSearchParams({ host, realm });
-      // eslint-disable-next-line no-restricted-syntax -- Provider discovery must run before generated-client configuration is available.
-      const response = await fetch(`${baseUrl}/api/auth/sso/discovery/keycloak?${params.toString()}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch configuration: ${response.statusText}`);
-      }
-
-      const config: OpenIDConfiguration = await response.json();
+      const { data: config } = await discoverKeycloak();
+      if (!config) throw new Error('Failed to fetch configuration');
       onDiscovery(config);
       close();
       toast.success({ title: t('success.title'), description: t('success.description') });
@@ -83,7 +73,7 @@ export function KeycloakDiscoveryDialog(props: Props) {
     } finally {
       setIsDiscovering(false);
     }
-  }, [host, realm, toast, t, tExists, onDiscovery, close]);
+  }, [host, realm, toast, t, tExists, onDiscovery, close, discoverKeycloak]);
 
   return (
     <>

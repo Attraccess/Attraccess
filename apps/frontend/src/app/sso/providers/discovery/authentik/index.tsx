@@ -18,8 +18,7 @@ import de from './de.json';
 import en from './en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
-import { getBaseUrl } from '../../../../../api';
-import { ApiError } from '@attraccess/react-query-client';
+import { ApiError, useAuthenticationServiceDiscoverAuthentikOidc } from '@attraccess/react-query-client';
 
 interface Props {
   onDiscovery: (settings: OpenIDConfiguration) => void;
@@ -45,6 +44,11 @@ export function AuthentikDiscoveryDialog(props: Props) {
   });
 
   const toast = useToastMessage();
+  const { refetch: discoverAuthentik } = useAuthenticationServiceDiscoverAuthentikOidc<OpenIDConfiguration>(
+    { applicationName, host },
+    undefined,
+    { enabled: false },
+  );
 
   const discover = useCallback(async () => {
     if (!host || !applicationName) {
@@ -54,22 +58,8 @@ export function AuthentikDiscoveryDialog(props: Props) {
     setIsDiscovering(true);
 
     try {
-      const baseUrl = getBaseUrl();
-      const params = new URLSearchParams({ host, applicationName });
-      // eslint-disable-next-line no-restricted-syntax -- Provider discovery must run before generated-client configuration is available.
-      const response = await fetch(`${baseUrl}/api/auth/sso/discovery/authentik?${params.toString()}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch configuration: ${response.statusText}`);
-      }
-
-      const config: OpenIDConfiguration = await response.json();
+      const { data: config } = await discoverAuthentik();
+      if (!config) throw new Error('Failed to fetch configuration');
       onDiscovery(config);
       close();
       toast.success({ title: t('success.title'), description: t('success.description') });
@@ -83,7 +73,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
     } finally {
       setIsDiscovering(false);
     }
-  }, [host, applicationName, toast, t, tExists, onDiscovery, close]);
+  }, [host, applicationName, toast, t, tExists, onDiscovery, close, discoverAuthentik]);
 
   return (
     <>

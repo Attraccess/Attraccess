@@ -1,4 +1,4 @@
-import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceResolveNodeSchema } from '@attraccess/react-query-client';
 import {
   Button,
   DrawerBody,
@@ -13,7 +13,6 @@ import { Property, PropertyInput } from './property-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../../components/standardDrawer';
-import { getBaseUrl } from '../../../../../../api';
 import { initializeValue, isValueValid } from './property-input/schema-values';
 
 const configProperty = (schema: ResourceFlowNodeSchemaDto) =>
@@ -39,8 +38,9 @@ export function NodeEditor(props: Props) {
   const [resolvedSchema, setResolvedSchema] = useState(schema);
   const [schemaError, setSchemaError] = useState<string>();
   const [isResolvingSchema, setIsResolvingSchema] = useState(false);
+  const { mutateAsync: resolveNodeSchema } =
+    useResourceFlowsServiceResolveNodeSchema<ResourceFlowNodeSchemaDto>();
   const schemaRequest = useRef(0);
-  const schemaAbortController = useRef<AbortController | undefined>(undefined);
   const schemaResolutionTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dataRef = useRef(data);
 
@@ -48,7 +48,6 @@ export function NodeEditor(props: Props) {
   const invalidateRequest = useCallback(() => {
     canSave.current = false;
     schemaRequest.current += 1;
-    schemaAbortController.current?.abort();
     clearTimeout(schemaResolutionTimeout.current);
     schemaResolutionTimeout.current = undefined;
   }, []);
@@ -75,29 +74,16 @@ export function NodeEditor(props: Props) {
 
   const resolveSchema = useCallback(async (config: Record<string, unknown>) => {
     canSave.current = false;
-    schemaAbortController.current?.abort();
-    const abortController = new AbortController();
-    schemaAbortController.current = abortController;
     const request = ++schemaRequest.current;
     setIsResolvingSchema(true);
     setSchemaError(undefined);
 
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Node-schema loading requires a plugin-specific endpoint absent from the generated client.
-      const response = await fetch(
-        `${getBaseUrl()}/api/resources/${resourceId}/flow/node-schemas/${encodeURIComponent(schema.type)}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ config }),
-          credentials: 'include',
-          signal: abortController.signal,
-        },
-      );
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const nextSchema = (await response.json()) as ResourceFlowNodeSchemaDto;
+      const nextSchema = await resolveNodeSchema({
+        nodeType: schema.type,
+        requestBody: { config },
+        resourceId,
+      });
       if (request !== schemaRequest.current) return;
 
       setResolvedSchema(nextSchema);
@@ -109,14 +95,14 @@ export function NodeEditor(props: Props) {
       dataRef.current = nextData;
       setData(nextData);
       canSave.current = true;
-    } catch (error) {
-      if (request === schemaRequest.current && !(error instanceof Error && error.name === 'AbortError')) {
+    } catch {
+      if (request === schemaRequest.current) {
         setSchemaError('Unable to refresh this plugin configuration. Please try again.');
       }
     } finally {
       if (request === schemaRequest.current) setIsResolvingSchema(false);
     }
-  }, [resourceId, schema.type]);
+  }, [resourceId, resolveNodeSchema, schema.type]);
 
   const scheduleSchemaResolution = useCallback((config: Record<string, unknown>) => {
     invalidateRequest();
