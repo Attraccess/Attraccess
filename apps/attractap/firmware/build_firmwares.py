@@ -186,7 +186,7 @@ def main():
     active_variants = [
         "attractap-touch",
         "attractap-touch-v2",
-        # "attractap-lite",
+        # "attractap-lite-ethernet",
         # "attractap-touch-ethernet",
         # "attractap-touch-demo",
         # "attractap-touch-v2-demo",

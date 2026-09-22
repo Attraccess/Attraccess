@@ -142,8 +142,16 @@ int main(int argc, char **argv) {
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
         pump();
     };
+    lv_obj_t *drawerSettingsBeforeLogin = nullptr;
     auto login = [&] {
         nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
+        if (drawerSettingsBeforeLogin) {
+            assert(!lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
+            lv_obj_send_event(drawerSettingsBeforeLogin, LV_EVENT_CLICKED, nullptr);
+            pump();
+            assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+            drawerSettingsBeforeLogin = nullptr;
+        }
         list();
         server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})");
         pump(250); nfc.setPresent(0, false);
@@ -154,6 +162,12 @@ int main(int argc, char **argv) {
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     display.capture(output, "01-single-resource-list");
     list(false);
+    // A drawer opened before scanning must close as soon as authentication begins.
+    display.touch = {240, 10, true}; pump();
+    display.touch = {240, 140, true}; pump();
+    display.touch.pressed = false; pump();
+    assert(lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
+    drawerSettingsBeforeLogin = lv_obj_get_parent(label(lv_layer_top(), "Settings"));
     login();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Alex"));

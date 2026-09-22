@@ -68,6 +68,7 @@ lv_timer_t *Display::popupAutoCloseTimer = nullptr;
 lv_obj_t *Display::drawerBackdrop = nullptr;
 lv_obj_t *Display::drawerPanel = nullptr;
 bool Display::drawerOpen = false;
+lv_obj_t *Display::rebootConfirmOverlay = nullptr;
 std::function<void()> Display::onOpenSettingsCallback = nullptr;
 std::function<bool()> Display::drawerAvailableCallback = nullptr;
 bool Display::gestureCandidate = false;
@@ -360,6 +361,7 @@ bool Display::hasTouchInput()
 void Display::loop()
 {
 #ifdef ATTRACTAP_HOST
+    Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
     Display::advanceScreenRouter();
     return;
@@ -376,6 +378,7 @@ void Display::loop()
                                 "Touch panel not detected.\nCheck hardware and reboot.");
     }
 
+    Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
     Display::advanceScreenRouter();
 

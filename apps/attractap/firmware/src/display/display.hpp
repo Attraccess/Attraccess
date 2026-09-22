@@ -141,12 +141,15 @@ private:
     static void openDrawer();
     static void closeDrawer();
     static void showRebootConfirm();
+    static bool isDrawerAvailable();
+    static void updateDrawerAvailability();
     // Fed every touch sample from touchpad_read to detect the top-edge pull-down
     // gesture without intercepting touches destined for the active screen.
     static void handleGestureSample(int16_t x, int16_t y, bool pressed);
 
     static lv_obj_t *drawerBackdrop;
     static lv_obj_t *drawerPanel;
+    static lv_obj_t *rebootConfirmOverlay;
     static bool drawerOpen;
     static std::function<void()> onOpenSettingsCallback;
     static std::function<bool()> drawerAvailableCallback;
