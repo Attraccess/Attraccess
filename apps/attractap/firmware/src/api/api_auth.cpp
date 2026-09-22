@@ -117,6 +117,8 @@ void API::sendFirmwareInfo()
 void API::onReaderAuthenticated(JsonObject data)
 {
     logger.info("READER_AUTHENTICATED");
+    resourceListMessageCounter = resourceListRevision = 0;
+    cancelResourceAction();
 
     std::string deviceName = data["payload"]["name"].as<std::string>();
 

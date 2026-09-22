@@ -305,6 +305,50 @@ export class ResourceMaintenanceService {
   }
 
   /**
+   * Return every resource from a list whose maintenance a user may manage.
+   * One query covers both direct resource roles and roles inherited from groups.
+   */
+  async getMaintenanceManagedResourceIds(
+    user: User | AuthenticatedUser,
+    resourceIds: number[],
+    effectivePermissions?: Set<string>,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<Set<number>> {
+    if (resourceIds.length === 0) return new Set();
+
+    const permissions =
+      effectivePermissions ??
+      (user as AuthenticatedUser).effectivePermissions ??
+      (await this.rbacService.getEffectivePermissions(user.id));
+    if (permissions.has('resources.maintenance.manage')) return new Set(resourceIds);
+
+    try {
+      const resourceIntroducerRepository = transactionalEntityManager
+        ? transactionalEntityManager.getRepository(ResourceIntroducer)
+        : this.resourceIntroducerRepository;
+      const matches = await resourceIntroducerRepository
+        .createQueryBuilder('introducer')
+        .leftJoin('introducer.resource', 'resource')
+        .leftJoin('introducer.resourceGroup', 'resourceGroup')
+        .leftJoin('resourceGroup.resources', 'groupResource')
+        .select('resource.id', 'resourceId')
+        .addSelect('groupResource.id', 'groupResourceId')
+        .where('introducer.userId = :userId', { userId: user.id })
+        .andWhere('(resource.id IN (:...resourceIds) OR groupResource.id IN (:...resourceIds))', { resourceIds })
+        .getRawMany<{ resourceId: number | null; groupResourceId: number | null }>();
+
+      return new Set(
+        matches.flatMap((match) =>
+          [match.resourceId, match.groupResourceId].filter((id): id is number => id != null).map(Number),
+        ),
+      );
+    } catch (error) {
+      this.logger.error(`Error checking maintenance management permissions: ${error.message}`, error.stack);
+      return new Set();
+    }
+  }
+
+  /**
    * Check if a user can manage maintenance for a specific resource
    */
   async canManageMaintenance(

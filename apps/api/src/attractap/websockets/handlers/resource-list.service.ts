@@ -1,5 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceFlowNodeType, ResourceHealthStatus, ResourceIntroducerType } from '@attraccess/database-entities';
+import {
+  ResourceFlowNodeType,
+  ResourceHealthStatus,
+  ResourceIntroducerType,
+  SupervisionMode,
+} from '@attraccess/database-entities';
+import { UsersService } from '../../../users-and-auth/users/users.service';
+import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { WebsocketService } from '../websocket.service';
 import { AttractapService } from '../../attractap.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
@@ -35,6 +42,14 @@ export class ResourceListService {
 
   @Inject(ResourceIntroducersService)
   private resourceIntroducersService: ResourceIntroducersService;
+
+  @Inject(UsersService)
+  private usersService: UsersService;
+
+  @Inject(RbacService)
+  private rbacService: RbacService;
+
+  private resourceListRevision = 0;
 
   private readonly pendingSends = new Map<number, { timer: ReturnType<typeof setTimeout>; resourceIds: Set<number> }>();
 
@@ -86,15 +101,16 @@ export class ResourceListService {
 
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
-    onlyIfResourceMatches?: { resourceIds?: Set<number> },
+    onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
   ) {
     await this.sendResourceListToSockets([socket], onlyIfResourceMatches);
   }
 
   private async sendResourceListToSockets(
     sockets: AuthenticatedWebSocket[],
-    onlyIfResourceMatches?: { resourceIds?: Set<number> },
+    onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
   ) {
+    const revision = ++this.resourceListRevision;
     const reader = await this.attractapService.findReaderById(sockets[0].readerId);
     if (!reader) {
       throw new Error(`Reader not found: ${sockets[0].readerId}`);
@@ -110,15 +126,19 @@ export class ResourceListService {
     }
 
     const resourceIds = resources.map((resource) => resource.id);
-    const [introducersByResourceId, healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap] = await Promise.all([
-      this.resourceIntroducersService.getManyForResources(resourceIds, ResourceIntroducerType.INTRODUCER),
-      this.resourceHealthService.listForResources(resourceIds),
-      this.resourceUsageService.getActiveSessions(resourceIds),
-      this.resourceMaintenanceService.getActiveMaintenanceResourceIds(resourceIds),
-      this.resourceFlowsService.getNodesForResources(resourceIds, ResourceFlowNodeType.INPUT_BUTTON),
-    ]);
+    const [introducersByResourceId, healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap] =
+      await Promise.all([
+        this.resourceIntroducersService.getManyForResources(resourceIds, ResourceIntroducerType.INTRODUCER),
+        this.resourceHealthService.listForResources(resourceIds),
+        this.resourceUsageService.getActiveSessions(resourceIds),
+        this.resourceMaintenanceService.getActiveMaintenanceResourceIds(resourceIds),
+        this.resourceFlowsService.getNodesForResources(resourceIds, ResourceFlowNodeType.INPUT_BUTTON),
+      ]);
 
+    const requestId = onlyIfResourceMatches?.requestId;
     const resourceListPayload = {
+      revision,
+      ...(Number.isSafeInteger(requestId) && requestId > 0 ? { requestId } : {}),
       readerName: reader.name,
       ledBrightness: reader.ledBrightness,
       resources: resources.map((resource) => {
@@ -135,29 +155,64 @@ export class ResourceListService {
           description: resource.description,
           allowTakeOver: resource.allowTakeOver,
           introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
-            introducer.user ? [introducer.user.username] : []),
+            introducer.user ? [introducer.user.username] : [],
+          ),
           isUnderMaintenance: activeMaintenanceIds.has(resource.id),
           isHealthy: unhealthyEntries.length === 0,
           healthReason: this.buildHealthReason(unhealthyEntries),
           activeUsageSession: activeUsageSession
-          ? {
-            user: {
-              username: activeUsageSession.user.username,
-            },
-            startTime: activeUsageSession.startTime.toISOString(),
-            // Offset (minutes east of UTC) of the API's effective timezone for this
-            // specific instant, so the reader can render local wall-clock time without
-            // a tz database. Computed per-timestamp, so it stays DST-correct.
-            startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
-          }
-          : null,
+            ? {
+                user: {
+                  username: activeUsageSession.user.username,
+                },
+                startTime: activeUsageSession.startTime.toISOString(),
+                // Offset (minutes east of UTC) of the API's effective timezone for this
+                // specific instant, so the reader can render local wall-clock time without
+                // a tz database. Computed per-timestamp, so it stays DST-correct.
+                startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
+              }
+            : null,
           flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
         };
       }),
     };
+    // Share the expensive list queries, but never share one user's access with
+    // another socket. Reuse the existing authorization cache/retraining rules.
+    const payloadsByUser = new Map<number, Promise<typeof resourceListPayload & { authenticatedUsername: string }>>();
+    const forUser = async (userId: number) => {
+      const user = await this.usersService.findOne({ id: userId });
+      if (!user) return { ...resourceListPayload, authenticatedUsername: '' };
+      const permissions = await this.rbacService.getEffectivePermissions(userId);
+      const maintenanceManagedResourceIds = await this.resourceMaintenanceService.getMaintenanceManagedResourceIds(
+        user,
+        resourceIds,
+        permissions,
+      );
+      const personalized = await Promise.all(
+        resources.map(async (resource, index) => {
+          const hasIntroduction = await this.resourceUsageService.canControllResource(resource.id, user);
+          return {
+            ...resourceListPayload.resources[index],
+            hasIntroduction,
+            canManageMaintenance: maintenanceManagedResourceIds.has(resource.id),
+            isIntroducer: (introducersByResourceId.get(resource.id) ?? []).some((role) => role.userId === userId),
+            canManageResource: permissions.has('resources.update'),
+            requiresSupervisor:
+              resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
+              (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction),
+          };
+        }),
+      );
+      return { ...resourceListPayload, authenticatedUsername: user.username, resources: personalized };
+    };
     await Promise.all(
       sockets.map(async (socket) => {
-        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, resourceListPayload);
+        const userId = socket.state.lastAuthenticatedUserId;
+        if (userId != null && !payloadsByUser.has(userId)) payloadsByUser.set(userId, forUser(userId));
+        const payload = userId == null ? resourceListPayload : await payloadsByUser.get(userId);
+        // A different card may have been presented while the queries were pending.
+        if (socket.state.lastAuthenticatedUserId !== userId) return;
+        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, payload);
         this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
         await socket.sendMessage(resourceListResponse);
       }),

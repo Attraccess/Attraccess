@@ -75,6 +75,7 @@ describe('AttractapCardHandler', () => {
     rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
     audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
+    (handler as any).resourceListService = { sendResourceListToSocket: jest.fn().mockResolvedValue(undefined) };
     (handler as any).websocketService = websocketService;
     (handler as any).attractapService = attractapService;
     (handler as any).usersService = usersService;
@@ -674,6 +675,27 @@ describe('AttractapCardHandler', () => {
         username: 'carduser',
       },
     };
+
+    it.each(['pending', 'failed'])('authenticates while the supplemental resource list is %s', async (state) => {
+      const socket = createMockSocket();
+      const failure = new Error('Resource list unavailable');
+      attractapService.getNFCCardByUID.mockResolvedValueOnce(activeCard);
+      (handler as any).resourceListService.sendResourceListToSocket.mockImplementation(() =>
+        state === 'pending' ? new Promise(() => undefined) : Promise.reject(failure),
+      );
+
+      await handler.handleCardAuthenticationRequest(socket, {
+        payload: { uid: 'abc', resourceId: 10 },
+      } as AttractapEvent['data']);
+
+      expect(socket.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          type: AttractapEventType.CARD_AUTHENTICATION_DATA,
+          payload: expect.objectContaining({ key: activeCard.key, username: activeCard.user.username }),
+        }),
+      }));
+      if (state === 'failed') expect((handler as any).logger.error).toHaveBeenCalledWith(expect.any(String), failure);
+    });
 
     it('always increments attractapNfcTapsTotal', async () => {
       const socket = createMockSocket();

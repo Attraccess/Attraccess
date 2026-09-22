@@ -79,6 +79,7 @@ Administrators can:
 
 ## See Also
 
+- [Using the Reader](attractap/using-the-reader.md) – Sign in with your card and use machines or doors
 - [Overview](attractap/overview.md) -- What is Attractap?
 - [Setup](attractap/setup.md) -- Register and configure readers
 - [User Management](user-management/overview.md) -- Manage user accounts

@@ -244,10 +244,27 @@ private:
 
     uint8_t resourceCount;
     bool resourceIsSelected;
+    bool returnToListAfterAction = false;
+    bool waitingForResourceRefresh = false;
+    uint32_t resourceRefreshRequestId = 0;
+    std::string actionCompletionMessage;
+    bool cardAuthenticationPending = false;
+    uint32_t cardAuthenticationStartedAt = 0;
+    uint32_t authenticationResourceId = 0;
+    std::string pendingUiAction;
+    uint32_t pendingUiResourceId = 0;
+    uint32_t pendingUiStartedAt = 0;
+    void handleResourceListAction(const API::ResourceBrief &resource, ResourceListAction action);
+    void updateSelectedResourceDetails();
+    void showReaderActionProgress(const char *title);
+    void finishReaderAction(bool success);
+    void logoutReader();
+    void finishCardAuthentication(bool success);
+
 #else
     bool resourceIsDoor = false;
 #endif
-    uint32_t selectedResourceId;
+    uint32_t selectedResourceId = 0;
 
 #ifndef HAS_LVGL_DISPLAY
     bool cardDetected = false;
@@ -327,6 +344,7 @@ private:
 
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();
+    void clearSelectedProject();
     void handleProjectSelection(uint32_t projectId, const std::string &projectName);
     void handleFormsRequest(const API::ResourceUsageFormRequest &request);
     void handleFormFields(const API::ResourceUsageFormFieldsPage &page);
@@ -360,6 +378,7 @@ private:
         APPLICATION_STATE_NO_RESOURCES,
 #ifdef HAS_LVGL_DISPLAY
         APPLICATION_STATE_RESOURCE_LIST,
+        APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED,
         APPLICATION_STATE_UNLOCKED,
         APPLICATION_STATE_ENROLLMENT,
         APPLICATION_STATE_RESET,

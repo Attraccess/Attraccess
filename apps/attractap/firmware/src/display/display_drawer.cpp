@@ -50,6 +50,25 @@ void Display::setOnOpenSettingsCallback(std::function<void()> callback)
     Display::onOpenSettingsCallback = callback;
 }
 
+void Display::setDrawerAvailableCallback(std::function<bool()> callback)
+{
+    Display::drawerAvailableCallback = std::move(callback);
+}
+
+bool Display::isDrawerAvailable()
+{
+    return !Display::drawerAvailableCallback || Display::drawerAvailableCallback();
+}
+
+void Display::updateDrawerAvailability()
+{
+    if (Display::isDrawerAvailable())
+        return;
+    Display::closeDrawer();
+    if (Display::rebootConfirmOverlay)
+        lv_obj_delete(Display::rebootConfirmOverlay);
+}
+
 void Display::initDrawer()
 {
     lv_obj_t *top = lv_layer_top();
@@ -104,7 +123,7 @@ void Display::initDrawer()
     makeDrawerButton(row, LV_SYMBOL_SETTINGS, "Settings", DisplayTheme::primary(),
                      [](lv_event_t *e)
                      {
-                         if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+                         if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
                              return;
                          Display::logger.info("Drawer: open settings requested");
                          Display::closeDrawer();
@@ -115,7 +134,7 @@ void Display::initDrawer()
     makeDrawerButton(row, LV_SYMBOL_POWER, "Reboot", DisplayTheme::danger(),
                      [](lv_event_t *e)
                      {
-                         if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+                         if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
                              return;
                          Display::closeDrawer();
                          Display::showRebootConfirm();
@@ -137,6 +156,9 @@ void Display::initDrawer()
 void Display::openDrawer()
 {
     if (Display::drawerOpen || !Display::drawerPanel || !Display::drawerBackdrop)
+        return;
+    // This passive gesture bypasses LVGL hit testing and screen overlays.
+    if (!Display::isDrawerAvailable())
         return;
 
     Display::drawerOpen = true;
@@ -167,8 +189,12 @@ void Display::closeDrawer()
 
 void Display::showRebootConfirm()
 {
+    if (!Display::isDrawerAvailable() || Display::rebootConfirmOverlay)
+        return;
     lv_obj_t *top = lv_layer_top();
     lv_obj_t *overlay = lv_obj_create(top);
+    Display::rebootConfirmOverlay = overlay;
+    lv_obj_add_event_cb(overlay, [](lv_event_t *) { Display::rebootConfirmOverlay = nullptr; }, LV_EVENT_DELETE, nullptr);
     lv_obj_remove_style_all(overlay);
     lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
     lv_obj_set_align(overlay, LV_ALIGN_CENTER);
@@ -229,7 +255,7 @@ void Display::showRebootConfirm()
     lv_label_set_text(rebootLbl, "Reboot");
     lv_obj_add_event_cb(rebootBtn, [](lv_event_t *e)
                         {
-        if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+        if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
             return;
         Display::logger.info("Drawer: reboot confirmed, restarting");
 #ifndef ATTRACTAP_HOST

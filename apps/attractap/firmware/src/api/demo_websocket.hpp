@@ -52,12 +52,14 @@ private:
 
     // Context of the most recently authenticated card, so START/STOP can be
     // attributed to "the current user".
-    std::string _currentUser = "Demo";
+    std::string _currentUser;
+    bool _currentHasIntroduction = false;
     bool _currentCanManage = false;
 
     // Resource lists are only accepted by the client when messageId strictly
     // increases; bump this on every push.
     uint32_t _resourceListMsgId = 0;
+    uint32_t _actionRequestId = 0;
 
     // Draft answers for the CNC start form (fieldId -> value), like the real
     // server's per-socket form draft. Cleared once the session starts.
@@ -66,7 +68,7 @@ private:
     void enqueue(const std::string &msg);
     void processOutbound(const char *data, size_t len);
     void respondAuthenticated();
-    void respondResourceList();
+    void respondResourceList(uint32_t requestId = 0);
     void respondCardAuth(const std::string &uidHex, uint32_t resourceId);
     void respondActionSuccess(const std::string &type);
 

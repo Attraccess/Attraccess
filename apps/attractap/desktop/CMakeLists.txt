@@ -146,3 +146,12 @@ target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wp
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
 set_tests_properties(attractap-desktop-display-tests PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
+
+add_executable(attractap-reader-workflow-tests tests/reader_workflow.cpp)
+target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
+target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
+set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
+
+add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 180)

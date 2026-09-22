@@ -47,6 +47,7 @@ Siehe [Hardware](attractap/hardware.md) fuer detaillierte Spezifikationen jeder 
 
 ## Siehe auch
 
+- [Leser benutzen](attractap/using-the-reader.md) – Mit der Karte anmelden und Maschinen oder Türen nutzen
 - [Hardware](attractap/hardware.md) -- Hardware-Varianten und Komponenten
 - [Einrichtung](attractap/setup.md) -- Leser registrieren und konfigurieren
 - [NFC-Karten](attractap/nfc-cards.md) -- Benutzer-NFC-Karten verwalten

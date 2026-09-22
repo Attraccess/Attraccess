@@ -1,44 +1,45 @@
 #pragma once
 
 #include "../IScreen.hpp"
-#include <ArduinoJson.h>
-#include <functional>
-#include <string>
-#include "../../../logger/logger.hpp"
-#include "../../images/logo_40h.hpp"
-#include <map>
 #include "../../../api/api.hpp"
+#include "display/shared/sessionHeader.hpp"
+#include "display/shared/actionOverlay.hpp"
+#include "resourceListAction.hpp"
+#include <functional>
 
-class ResourceListScreen : public IScreen
-{
+class ResourceListScreen : public IScreen {
 public:
-    ResourceListScreen() : logger("ResourceListScreen") {}
-    void init();
-    void onScreenLeave();
+    void init() override;
+    void onScreenLeave() override;
     void loop() override;
-    lv_obj_t *getScreen() override;
-    std::string getName() override;
+    lv_obj_t *getScreen() override { return screen; }
+    std::string getName() override { return "ResourceListScreen"; }
     void destroy() override;
-
-    void setResourceList(const API::ResourceList &resourceList);
-    void setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback);
-
+    void setResourceList(const API::ResourceList &resources);
+    void setAuthenticatedUser(const std::string &username);
+    void setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback) { selectionCallback = std::move(callback); }
+    void setActionCallback(std::function<void(const API::ResourceBrief &, ResourceListAction)> callback) { actionCallback = std::move(callback); }
+    void setLogoutCallback(std::function<void()> callback) { logoutCallback = std::move(callback); }
+    void setSessionTimeoutTime(uint32_t deadline) { sessionHeader.setDeadline(deadline); }
+    void setSessionTimeoutPaused(bool paused) { sessionHeader.setPaused(paused); }
+    void extendSessionTimeoutBy(uint32_t delta) { sessionHeader.extend(delta); }
+    void showActionProgress(const char *title, const char *resource = "");
+    void hideActionProgress();
+    void showSuccessToast(const char *message);
 private:
-    Logger logger;
-    lv_obj_t *screen = nullptr;
-    lv_obj_t *resourceContainer = nullptr;
+    lv_obj_t *screen = nullptr, *logo = nullptr, *loginContainer = nullptr, *resourceContainer = nullptr, *footer = nullptr;
+    SessionHeader sessionHeader;
+    ActionOverlay overlay;
     API::ResourceList cachedResourceList{};
-    bool hasCachedResourceList = false;
-
-    std::function<void(const API::ResourceBrief &)> resourceSelectionCallback;
+    std::string username, actionTitle, actionResource, successMessage;
+    uint32_t successUntil = 0;
+    bool busy = false;
+    bool footerShowsSuccess = false;
+    std::function<void(const API::ResourceBrief &)> selectionCallback;
+    std::function<void(const API::ResourceBrief &, ResourceListAction)> actionCallback;
+    std::function<void()> logoutCallback;
+    void renderRows();
     void addResourceListItem(const API::ResourceBrief &resource);
-    void setNoResourcesMessage();
-    static void onResourceClicked(lv_event_t *e);
-    struct ResourceEventData
-    {
-        ResourceListScreen *self;
-        lv_obj_t *container;
-        API::ResourceBrief resource;
-    };
-    static void onContainerDelete(lv_event_t *e);
+    struct EventData { ResourceListScreen *self; uint32_t id; bool action; };
+    static void onClicked(lv_event_t *event);
 };

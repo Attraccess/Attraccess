@@ -25,72 +25,14 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *loginContainer = lv_obj_create(this->screen);
-   lv_obj_remove_style_all(loginContainer);
-   lv_obj_set_width(loginContainer, lv_pct(100));
-   lv_obj_set_height(loginContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(loginContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(loginContainer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(loginContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(loginContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(loginContainer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(loginContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(loginContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *logoutButton = lv_button_create(loginContainer);
-   lv_obj_set_width(logoutButton, 70);
-   lv_obj_set_height(logoutButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(logoutButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(logoutButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(logoutButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(logoutButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
-   lv_obj_add_event_cb(logoutButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOGOUT, {}});
-
-   lv_obj_t *labelForLogoutButton = lv_label_create(logoutButton);
-   lv_obj_set_width(labelForLogoutButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForLogoutButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForLogoutButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForLogoutButton, "Abmelden");
-   lv_obj_set_style_text_align(labelForLogoutButton, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(labelForLogoutButton, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *userAndTimeoutContainer = lv_obj_create(loginContainer);
-   lv_obj_remove_style_all(userAndTimeoutContainer);
-   lv_obj_set_width(userAndTimeoutContainer, 340);
-   lv_obj_set_height(userAndTimeoutContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(userAndTimeoutContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(userAndTimeoutContainer, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(userAndTimeoutContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(userAndTimeoutContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(userAndTimeoutContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->loginUserLabel = lv_label_create(userAndTimeoutContainer);
-   lv_obj_set_width(this->loginUserLabel, lv_pct(100));
-   lv_obj_set_height(this->loginUserLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->loginUserLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
-    lv_obj_set_style_text_font(this->loginUserLabel, &attractap_font_montserrat_latin1_10, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(this->loginUserLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(this->loginUserLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->sessionTimeoutIndicator = lv_bar_create(userAndTimeoutContainer);
-   lv_bar_set_mode(this->sessionTimeoutIndicator, LV_BAR_MODE_SYMMETRICAL);
-   lv_bar_set_range(this->sessionTimeoutIndicator, 0, 30);
-   lv_bar_set_value(this->sessionTimeoutIndicator, 25, LV_ANIM_OFF);
-   lv_bar_set_start_value(this->sessionTimeoutIndicator, 30, LV_ANIM_OFF);
-   lv_obj_set_height(this->sessionTimeoutIndicator, 10);
-   lv_obj_set_width(this->sessionTimeoutIndicator, lv_pct(100));
-   lv_obj_set_align(this->sessionTimeoutIndicator, LV_ALIGN_CENTER);
-
-   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, DisplayTheme::primarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->sessionTimeoutIndicator, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-
-   // Compensating for LVGL9.1 draw crash with bar/slider max value when top-padding is nonzero and right-padding is 0
-   if (lv_obj_get_style_pad_top(this->sessionTimeoutIndicator, LV_PART_MAIN) > 0)
-      lv_obj_set_style_pad_right(this->sessionTimeoutIndicator, lv_obj_get_style_pad_right(this->sessionTimeoutIndicator, LV_PART_MAIN) + 1, LV_PART_MAIN);
+   sessionHeader.create(this->screen, [this] {
+      if (!this->actionInProgress && this->buttonClickCallback)
+         this->buttonClickCallback({this, BUTTON_CLICK_TYPE_LOGOUT, {}});
+   }, [this] {
+      if (!this->actionInProgress && this->buttonClickCallback)
+         this->buttonClickCallback({this, BUTTON_CLICK_TYPE_BACK, {}});
+   });
+   sessionHeader.setUser(this->loginUsernameCache);
 
    lv_obj_t *header = lv_obj_create(this->screen);
    lv_obj_remove_style_all(header);
@@ -476,6 +418,7 @@ void ResourceDetailsScreen::init()
     lv_obj_set_style_text_font(this->healthReasonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->applyCachedState();
+   if (this->actionInProgress) this->showActionProgress(this->actionTitle.c_str());
 }
 void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief &resource)
 {
@@ -615,7 +558,8 @@ void ResourceDetailsScreen::refreshAccessState()
    }
 
    const UserDetails &user = this->userDetailsCache;
-   bool isMaintainer = user.isIntroducer || user.canManageResource;
+   bool isMaintainer = this->resourceCache.accessKnown ? this->resourceCache.canManageMaintenance
+                                                        : user.isIntroducer || user.canManageResource;
 
    // Resource is blocked when it is under maintenance or reporting an unhealthy state.
    bool blocked = underMaintenance || isUnhealthy;
@@ -637,7 +581,7 @@ void ResourceDetailsScreen::refreshAccessState()
                  supervisedStartAvailable || ownsActiveUsage;
    if (blocked)
    {
-      canUse = isMaintainer;
+      canUse = isMaintainer || ownsActiveUsage;
    }
    if (this->sessionControls)
    {
@@ -734,7 +678,8 @@ void ResourceDetailsScreen::destroy()
    }
 
    this->screen = nullptr;
-   this->loginUserLabel = nullptr;
+   sessionHeader.detach();
+   actionOverlay.detach();
    this->sessionDetailsContainer = nullptr;
    this->resourceName = nullptr;
    this->resourceDescription = nullptr;
@@ -772,7 +717,7 @@ void ResourceDetailsScreen::destroy()
    this->formsNextLabel = nullptr;
    this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
-   this->sessionTimeoutIndicator = nullptr;
+
    this->noIntroductionPanel = nullptr;
    this->introducersListLabel = nullptr;
    this->maintenancePanel = nullptr;
@@ -782,7 +727,6 @@ void ResourceDetailsScreen::destroy()
    this->activeActionButton = nullptr;
    this->activeActionLabel = nullptr;
    this->activeActionSpinner = nullptr;
-   this->actionInProgress = false;
    this->successToast = nullptr;
    this->formsModalMeta = nullptr;
    this->formsModalPage = nullptr;
@@ -795,10 +739,7 @@ void ResourceDetailsScreen::applyCachedState()
       return;
    }
 
-   if (this->loginUserLabel && this->loginUsernameCache.length() > 0)
-   {
-      lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
-   }
+   sessionHeader.setUser(this->loginUsernameCache);
 
    if (this->resourceCacheValid)
    {
@@ -868,20 +809,7 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
    this->userDetailsCache = userDetails;
    this->userDetailsInitialized = true;
 
-   if (!this->loginUserLabel)
-   {
-      return;
-   }
-
-   if (userDetails.username.length() == 0)
-   {
-      this->logger.debug("No login user label found");
-      lv_label_set_text(this->loginUserLabel, "???");
-      return;
-   }
-
-   this->logger.debugf("Setting login user label text: %s", userDetails.username.c_str());
-   lv_label_set_text(this->loginUserLabel, userDetails.username.c_str());
+   sessionHeader.setUser(userDetails.username);
 
    this->refreshAccessState();
 }

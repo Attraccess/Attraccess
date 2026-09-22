@@ -1,14 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ResourceListService } from './resource-list.service';
 import { AttractapEvent, AttractapEventType } from '../websocket.types';
-import { ResourceFlowNodeType, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceIntroducerType, SupervisionMode } from '@attraccess/database-entities';
 
 describe('ResourceListService', () => {
   let service: ResourceListService;
   let websocketService: { sockets: Map<string, any> };
   let attractapService: { findReaderById: jest.Mock };
-  let resourceUsageService: { getActiveSessions: jest.Mock };
-  let resourceMaintenanceService: { getActiveMaintenanceResourceIds: jest.Mock };
+  let resourceUsageService: { getActiveSessions: jest.Mock; canControllResource: jest.Mock };
+  let resourceMaintenanceService: {
+    getActiveMaintenanceResourceIds: jest.Mock;
+    getMaintenanceManagedResourceIds: jest.Mock;
+  };
   let resourceHealthService: { listForResources: jest.Mock };
   let resourceFlowsService: { getNodesForResources: jest.Mock };
   let resourceIntroducersService: { getManyForResources: jest.Mock };
@@ -55,17 +58,26 @@ describe('ResourceListService', () => {
       debug: jest.fn(),
     };
     (service as any).pendingSends = new Map();
+    (service as any).resourceListRevision = 0;
 
     websocketService = { sockets: new Map() };
     attractapService = { findReaderById: jest.fn() };
-    resourceUsageService = { getActiveSessions: jest.fn().mockResolvedValue(new Map([[10, null]])) };
-    resourceMaintenanceService = { getActiveMaintenanceResourceIds: jest.fn().mockResolvedValue(new Set()) };
+    resourceUsageService = {
+      canControllResource: jest.fn().mockResolvedValue(false),
+      getActiveSessions: jest.fn().mockResolvedValue(new Map([[10, null]])),
+    };
+    resourceMaintenanceService = {
+      getActiveMaintenanceResourceIds: jest.fn().mockResolvedValue(new Set()),
+      getMaintenanceManagedResourceIds: jest.fn().mockResolvedValue(new Set()),
+    };
     resourceHealthService = { listForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceFlowsService = { getNodesForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceIntroducersService = {
       getManyForResources: jest.fn().mockResolvedValue(new Map([[10, [{ user: { username: 'introducer-a' } }]]])),
     };
 
+    (service as any).usersService = { findOne: jest.fn(async ({ id }) => ({ id, username: `user-${id}` })) };
+    (service as any).rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set()) };
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;
     (service as any).resourceUsageService = resourceUsageService;
@@ -111,6 +123,93 @@ describe('ResourceListService', () => {
       expect(other.sendMessage).not.toHaveBeenCalled();
       expect(matchA.sendMessage.mock.calls[0][0]).not.toBe(matchB.sendMessage.mock.calls[0][0]);
       expect(matchA.sendMessage.mock.calls[0][0].data.payload).toBe(matchB.sendMessage.mock.calls[0][0].data.payload);
+    });
+  });
+
+  describe('per-resource card access', () => {
+    it('keeps users isolated while sharing list queries and same-user permission results', async () => {
+      const a = createMockSocket({ id: 'a', state: { lastAuthenticatedUserId: 1 } });
+      const b = createMockSocket({ id: 'b', state: { lastAuthenticatedUserId: 2 } });
+      const c = createMockSocket({ id: 'c', state: { lastAuthenticatedUserId: 1 } });
+      const guest = createMockSocket({ id: 'guest' });
+      for (const socket of [a, b, c, guest]) websocketService.sockets.set(socket.id, socket);
+      attractapService.findReaderById.mockResolvedValue(
+        createReaderFixture({
+          resources: [
+            { id: 10, name: 'Laser', supervisionMode: SupervisionMode.SUPERVISION_ALLOWED },
+            { id: 20, name: 'Printer', supervisionMode: SupervisionMode.SUPERVISION_REQUIRED },
+          ],
+        }),
+      );
+      resourceUsageService.canControllResource.mockImplementation(
+        async (resourceId, user) => resourceId === 10 && user.id === 1,
+      );
+      resourceMaintenanceService.getMaintenanceManagedResourceIds.mockImplementation(async (user) =>
+        user.id === 2 ? new Set([20]) : new Set(),
+      );
+      await service.sendResourceList(42);
+      const payload = (socket: any) => socket.sendMessage.mock.calls[0][0].data.payload;
+      expect(payload(a).authenticatedUsername).toBe('user-1');
+      expect(payload(b).authenticatedUsername).toBe('user-2');
+      expect(payload(c)).toBe(payload(a));
+      expect(payload(a).resources[0]).toMatchObject({ hasIntroduction: true, requiresSupervisor: false });
+      expect(payload(b).resources[0]).toMatchObject({ hasIntroduction: false, requiresSupervisor: true });
+      expect(payload(a).resources[1]).toMatchObject({
+        hasIntroduction: false,
+        requiresSupervisor: true,
+        canManageMaintenance: false,
+      });
+      expect(payload(b).resources[1]).toMatchObject({ canManageMaintenance: true });
+      expect(payload(guest).resources[0]).not.toHaveProperty('hasIntroduction');
+      expect(resourceUsageService.canControllResource).toHaveBeenCalledTimes(4);
+      expect(resourceUsageService.getActiveSessions).toHaveBeenCalledTimes(1);
+      expect(resourceMaintenanceService.getMaintenanceManagedResourceIds).toHaveBeenCalledTimes(2);
+      expect(resourceMaintenanceService.getMaintenanceManagedResourceIds).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1 }),
+        [10, 20],
+        expect.any(Set),
+      );
+    });
+
+    it('discards personalized results if another card arrives during authorization', async () => {
+      const socket = createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      resourceUsageService.canControllResource.mockImplementation(async () => {
+        socket.state.lastAuthenticatedUserId = 2;
+        return true;
+      });
+      await service.sendResourceListToSocket(socket);
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('correlates explicit refreshes and versions snapshots before asynchronous work', async () => {
+      const socket = createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      let release: () => void;
+      const held = new Promise<boolean>((resolve) => {
+        release = () => resolve(false);
+      });
+      resourceUsageService.canControllResource.mockReturnValueOnce(held).mockResolvedValue(true);
+      const oldBroadcast = service.sendResourceListToSocket(socket);
+      // Advance through reader/user/permission awaits to the held authorization.
+      while (!resourceUsageService.canControllResource.mock.calls.length) await Promise.resolve();
+      await service.sendResourceListToSocket(socket, { requestId: 880 });
+      release();
+      await oldBroadcast;
+      const [fresh, old] = socket.sendMessage.mock.calls.map(([event]) => event.data.payload);
+      expect(fresh).toMatchObject({ requestId: 880, revision: 2 });
+      expect(old.revision).toBe(1);
+      expect(old).not.toHaveProperty('requestId');
+    });
+
+    it('fails closed for a deleted user', async () => {
+      const socket = createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      (service as any).usersService.findOne.mockResolvedValue(null);
+      await service.sendResourceListToSocket(socket);
+      const payload = socket.sendMessage.mock.calls[0][0].data.payload;
+      expect(payload.authenticatedUsername).toBe('');
+      expect(payload.resources[0]).not.toHaveProperty('hasIntroduction');
     });
   });
 
@@ -212,9 +311,13 @@ describe('ResourceListService', () => {
     it('builds the full RESOURCE_LIST payload on the happy path', async () => {
       const startTime = new Date('2026-06-04T10:00:00.000Z');
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
-      resourceUsageService.getActiveSessions.mockResolvedValue(new Map([[10, { user: { username: 'active-user' }, startTime }]]));
+      resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([[10, { user: { username: 'active-user' }, startTime }]]),
+      );
       resourceMaintenanceService.getActiveMaintenanceResourceIds.mockResolvedValue(new Set([10]));
-      resourceFlowsService.getNodesForResources.mockResolvedValue(new Map([[10, [{ id: 'node-1', data: { label: 'Start' } }]]]));
+      resourceFlowsService.getNodesForResources.mockResolvedValue(
+        new Map([[10, [{ id: 'node-1', data: { label: 'Start' } }]]]),
+      );
 
       const socket = createMockSocket();
 
@@ -234,6 +337,7 @@ describe('ResourceListService', () => {
           data: expect.objectContaining({
             type: AttractapEventType.RESOURCE_LIST,
             payload: {
+              revision: 1,
               readerName: 'Front Door Reader',
               ledBrightness: 128,
               resources: [
@@ -290,11 +394,18 @@ describe('ResourceListService', () => {
 
     it('reports isHealthy=false with a combined reason when there are unhealthy entries', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
-      resourceHealthService.listForResources.mockResolvedValue(new Map([[10, [
-        { identifier: 'temp', status: 'unhealthy', reason: 'overheating' },
-        { identifier: '', status: 'unhealthy', reason: 'not connected' },
-        { identifier: 'idle', status: 'healthy', reason: null },
-      ]]]));
+      resourceHealthService.listForResources.mockResolvedValue(
+        new Map([
+          [
+            10,
+            [
+              { identifier: 'temp', status: 'unhealthy', reason: 'overheating' },
+              { identifier: '', status: 'unhealthy', reason: 'not connected' },
+              { identifier: 'idle', status: 'healthy', reason: null },
+            ],
+          ],
+        ]),
+      );
 
       const socket = createMockSocket();
 
@@ -309,7 +420,9 @@ describe('ResourceListService', () => {
 
     it('reports isHealthy=true with an empty reason when all entries are healthy', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
-      resourceHealthService.listForResources.mockResolvedValue(new Map([[10, [{ identifier: '', status: 'healthy', reason: null }]]]));
+      resourceHealthService.listForResources.mockResolvedValue(
+        new Map([[10, [{ identifier: '', status: 'healthy', reason: null }]]]),
+      );
 
       const socket = createMockSocket();
 
@@ -326,7 +439,9 @@ describe('ResourceListService', () => {
       // and a summer instant differ by the DST offset. Computing per-timestamp keeps both correct.
       const summer = new Date('2026-07-01T10:00:00.000Z');
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
-      resourceUsageService.getActiveSessions.mockResolvedValue(new Map([[10, { user: { username: 'active-user' }, startTime: summer }]]));
+      resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([[10, { user: { username: 'active-user' }, startTime: summer }]]),
+      );
 
       const socket = createMockSocket();
       await service.sendResourceListToSocket(socket);
@@ -351,7 +466,9 @@ describe('ResourceListService', () => {
 
     it('falls back to node.id for the flowButton label when data.label is empty', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
-      resourceFlowsService.getNodesForResources.mockResolvedValue(new Map([[10, [{ id: 'fallback-id', data: { label: '' } }]]]));
+      resourceFlowsService.getNodesForResources.mockResolvedValue(
+        new Map([[10, [{ id: 'fallback-id', data: { label: '' } }]]]),
+      );
 
       const socket = createMockSocket();
 

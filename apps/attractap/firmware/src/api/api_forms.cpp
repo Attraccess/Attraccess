@@ -71,6 +71,7 @@ void API::onResourceUsageFormRequest(JsonObject data)
     }
 
     ResourceUsageFormRequest &request = this->resourceFormsRequestScratch;
+    request.requestId = payload["requestId"] | 0u;
     request.resourceId = payload["resourceId"].is<uint32_t>() ? payload["resourceId"].as<uint32_t>() : 0;
     request.resourceName = "";
     if (payload["resourceName"].is<const char *>())

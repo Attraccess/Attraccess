@@ -30,7 +30,7 @@ inline std::string translateReaderError(const std::string &error) { return error
 class API {
 public:
     static constexpr size_t MAX_INTRODUCERS = 8;
-    static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_USERNAME_LEN = 33;
     struct SupervisionRequestResult {
         bool success = false;
         std::string error;

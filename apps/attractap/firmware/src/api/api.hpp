@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <atomic>
 
 #include <ArduinoJson.h>
 #include <string>
@@ -44,7 +45,7 @@ public:
     static constexpr size_t MAX_RESOURCES = 10;
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
     static constexpr size_t MAX_DESC_LEN = 128;
-    static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_USERNAME_LEN = 33; // 32 username characters plus the terminator.
     static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
     static constexpr size_t MAX_INTRODUCERS = 8;
     static constexpr size_t MAX_FLOW_BUTTONS = 7;
@@ -66,6 +67,12 @@ public:
         uint8_t type; // 0: machine, 1: door (encode from API strings)
         bool separateUnlockAndUnlatch;
         bool allowTakeOver;
+        bool accessKnown = false;
+        bool canManageMaintenance = false;
+        bool hasIntroduction = false;
+        bool isIntroducer = false;
+        bool canManageResource = false;
+        bool requiresSupervisor = false;
         char name[MAX_RESOURCE_NAME_LEN];
         char description[MAX_DESC_LEN];
         bool hasActiveUsage;
@@ -81,7 +88,9 @@ public:
     };
     struct ResourceList
     {
+        uint32_t requestId = 0;
         uint16_t count;
+        char authenticatedUsername[MAX_USERNAME_LEN] = {};
         ResourceBrief items[MAX_RESOURCES];
     };
     struct Project
@@ -161,6 +170,7 @@ public:
 
     struct ResourceUsageFormRequest
     {
+        uint32_t requestId = 0;
         uint32_t resourceId = 0;
         ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
         std::string resourceName;
@@ -217,6 +227,16 @@ public:
     };
 
     void setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback);
+    uint32_t requestResourceList();
+    void cancelResourceAction() { activeActionRequestId = 0; }
+    bool isCurrentResourceAction(uint32_t requestId) const { return !requestId || requestId == activeActionRequestId.load(); }
+    struct ActionResult {
+        std::string type;
+        bool success = false;
+        uint32_t requestId = 0;
+        std::string error;
+        bool sumUpEnabled = false;
+    };
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
 
     struct CardAuthenticationDetailsResponse
@@ -322,7 +342,7 @@ public:
     // Error callback for server responses carrying an error field
     void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
     // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)
-    void setActionResultCallback(std::function<void(const char *type, bool success)> callback);
+    void setActionResultCallback(std::function<void(const ActionResult &)> callback);
 
     // Special-case callback for insufficient balance with server-provided SumUp flag
     void setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback);
@@ -373,6 +393,10 @@ private:
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;
 
     uint32_t resourceListMessageCounter = 0;
+    uint32_t resourceListRevision = 0;
+    uint32_t nextRequestId = 0;
+    std::atomic<uint32_t> activeActionRequestId{0};
+    void sendResourceAction(const char *type, JsonObject payload);
 
     // Persistent scratch buffer to avoid large stack allocations when parsing resource lists
     ResourceList resourceListScratch;
@@ -428,7 +452,7 @@ private:
     void onResetNfcCard(JsonObject data);
 
     std::function<void(const char *title, const char *message)> errorCallback;
-    std::function<void(const char *type, bool success)> actionResultCallback;
+    std::function<void(const ActionResult &)> actionResultCallback;
     std::function<void(bool)> insufficientBalanceCallback;
 
     // Firmware update progress callback with status enum

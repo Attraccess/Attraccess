@@ -9,6 +9,7 @@ import { ResourceUsageService } from '../../../resources/usage/resourceUsage.ser
 import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
+import { ResourceListService } from './resource-list.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 import { AuditService } from '../../../audit/audit.service';
 
@@ -42,6 +43,9 @@ export class AttractapCardHandler {
 
   @Inject(AuditService)
   private audit: AuditService;
+
+  @Inject(ResourceListService)
+  private resourceListService: ResourceListService;
 
   public async startEnrollOfNewNfcCard(data: {
     readerId: number;
@@ -191,11 +195,16 @@ export class AttractapCardHandler {
       uid: cardUID,
     });
     if (socket.readerId) {
-      await this.audit.recordAttractap({
-        action: 'card.linked', actorId: auditPrincipal.userId, authenticationMethod: auditPrincipal.authenticationMethod,
-        ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-        subjectId: card.id, details: { readerId: socket.readerId, source: 'reader-enrollment' },
-      }).catch(() => undefined);
+      await this.audit
+        .recordAttractap({
+          action: 'card.linked',
+          actorId: auditPrincipal.userId,
+          authenticationMethod: auditPrincipal.authenticationMethod,
+          ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+          subjectId: card.id,
+          details: { readerId: socket.readerId, source: 'reader-enrollment' },
+        })
+        .catch(() => undefined);
     }
 
     if (socket.state.enrollNewCardData === cardData) {
@@ -303,12 +312,16 @@ export class AttractapCardHandler {
     // record so the (now blank) card is no longer recognised.
     const result = await this.attractapService.deleteNFCCard(cardId);
     if (result.affected && socket.readerId && auditPrincipal) {
-      await this.audit.recordAttractap({
-        action: 'card.unlinked', actorId: auditPrincipal.userId,
-        authenticationMethod: auditPrincipal.authenticationMethod,
-        ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-        subjectId: cardId, details: { readerId: socket.readerId, source: 'reader-reset' },
-      }).catch(() => undefined);
+      await this.audit
+        .recordAttractap({
+          action: 'card.unlinked',
+          actorId: auditPrincipal.userId,
+          authenticationMethod: auditPrincipal.authenticationMethod,
+          ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+          subjectId: cardId,
+          details: { readerId: socket.readerId, source: 'reader-reset' },
+        })
+        .catch(() => undefined);
     }
 
     if (socket.state.resetNfcCardData === reset) {
@@ -386,5 +399,10 @@ export class AttractapCardHandler {
         requiresSupervisor,
       }),
     );
+    // Supplemental list queries must neither delay nor prevent physical card
+    // verification. The reader keeps actions disabled until access arrives.
+    void this.resourceListService.sendResourceListToSocket(socket).catch((error) => {
+      this.logger.error(`Failed to refresh resources after card authentication for reader ${socket.readerId}`, error);
+    });
   }
 }
