@@ -1,22 +1,47 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class AddPluginRegistryDto {
-  @ApiProperty() name: string;
-  @ApiProperty() url: string;
-  @ApiPropertyOptional({ nullable: true }) token?: string | null;
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiProperty()
+  @IsString()
+  url: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  token?: string | null;
 }
 
 export class InstallPluginDto {
-  @ApiPropertyOptional() registryId?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  registryId?: string;
 }
 
 export class ReplaceInstalledPluginDto {
-  @ApiPropertyOptional({ type: [String] }) approvedPermissionAdditions?: string[];
-  @ApiPropertyOptional() approvedMajorVersion?: boolean;
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  approvedPermissionAdditions?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  approvedMajorVersion?: boolean;
 }
 
 export class UpdateInstalledPluginPolicyDto {
-  @ApiProperty() requestedSpec: string;
+  @ApiProperty()
+  @IsString()
+  requestedSpec: string;
+
   @ApiProperty({ enum: ['inherit', 'off', 'patch', 'minor', 'follow'] })
+  @IsIn(['inherit', 'off', 'patch', 'minor', 'follow'])
   updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow';
 }
