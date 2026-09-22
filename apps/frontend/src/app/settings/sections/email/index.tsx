@@ -7,6 +7,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   SmtpServiceType,
+  type SystemSettingsDto,
   useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetSystemSettingsKeyFn,
   useSettingsServiceUpdateSystemSettings,
@@ -47,13 +48,14 @@ export function EmailSection() {
   const [draft, setDraft] = useState<Partial<Record<Field, string | boolean>>>({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
-  const savedService =
-    settings?.smtp.service === SmtpServiceType.OUTLOOK365 ? SmtpServiceType.OUTLOOK365 : SmtpServiceType.SMTP;
-  const savedHost = settings?.smtp.host ?? '';
-  const savedPort = settings?.smtp.port != null ? String(settings.smtp.port) : '';
-  const savedSecure = settings?.smtp.secure ?? false;
-  const savedUser = settings?.smtp.user ?? '';
-  const savedFrom = settings?.smtp.from ?? '';
+  const {
+    service: savedService,
+    host: savedHost,
+    port: savedPort,
+    secure: savedSecure,
+    user: savedUser,
+    from: savedFrom,
+  } = getSavedSmtpFields(settings);
 
   const service = (draft.service as SmtpServiceType | undefined) ?? savedService;
   const isOutlook = service === SmtpServiceType.OUTLOOK365;
@@ -93,15 +95,7 @@ export function EmailSection() {
     from !== savedFrom ||
     pass !== '';
 
-  const hostError = !host.trim() ? t('inputs.host.errors.required') : null;
-  const portNumber = Number(port);
-  const portError = !port.trim()
-    ? t('inputs.port.errors.required')
-    : !Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535
-      ? t('inputs.port.errors.invalid')
-      : null;
-  const fromError = !from.trim() ? t('inputs.from.errors.required') : null;
-  const hasError = !!(hostError || portError || fromError);
+  const { hostError, portNumber, portError, fromError, hasError } = validateSmtpFields(host, port, from, t);
 
   const handleSave = () => {
     setHasAttemptedSave(true);
@@ -289,3 +283,34 @@ export function EmailSection() {
 }
 
 export default EmailSection;
+
+function getSavedSmtpFields(settings: SystemSettingsDto | undefined) {
+  const savedService =
+    settings?.smtp.service === SmtpServiceType.OUTLOOK365 ? SmtpServiceType.OUTLOOK365 : SmtpServiceType.SMTP;
+  const savedHost = settings?.smtp.host ?? '';
+  const savedPort = settings?.smtp.port != null ? String(settings.smtp.port) : '';
+  const savedSecure = settings?.smtp.secure ?? false;
+  const savedUser = settings?.smtp.user ?? '';
+  const savedFrom = settings?.smtp.from ?? '';
+  return {
+    service: savedService,
+    host: savedHost,
+    port: savedPort,
+    secure: savedSecure,
+    user: savedUser,
+    from: savedFrom,
+  };
+}
+
+function validateSmtpFields(host: string, port: string, from: string, t: (key: string) => string) {
+  const hostError = !host.trim() ? t('inputs.host.errors.required') : null;
+  const portNumber = Number(port);
+  const portError = !port.trim()
+    ? t('inputs.port.errors.required')
+    : !Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535
+      ? t('inputs.port.errors.invalid')
+      : null;
+  const fromError = !from.trim() ? t('inputs.from.errors.required') : null;
+  const hasError = !!(hostError || portError || fromError);
+  return { hostError, portNumber, portError, fromError, hasError };
+}

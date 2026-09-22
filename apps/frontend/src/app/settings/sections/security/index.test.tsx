@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -14,6 +14,12 @@ import {
 } from '@attraccess/react-query-client';
 import { SecuritySection } from './index';
 
+const feedback = vi.hoisted(() => ({
+  invalidate: vi.fn(() => Promise.resolve()),
+  cache: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
   TwoFactorPolicy: { OPTIONAL: 'optional', REQUIRED_FOR_PRIVILEGED: 'privileged', REQUIRED_FOR_ALL: 'all' },
   PasswordPolicyRole: { ADMIN: 'admin' },
@@ -43,10 +49,10 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
 }));
 vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn(() => Promise.resolve()), setQueryData: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries: feedback.invalidate, setQueryData: feedback.cache }),
 }));
 vi.mock('../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: vi.fn(), error: vi.fn(), apiError: vi.fn() }),
+  useToastMessage: () => ({ success: feedback.success, error: feedback.error, apiError: vi.fn() }),
 }));
 
 const POLICY = {
@@ -367,5 +373,50 @@ describe('SecuritySection', () => {
     rerender(<SecuritySection />);
 
     expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toHaveValue('7');
+  });
+  it('updates cached settings after saves and reports failures for each backend', async () => {
+    render(<SecuritySection />);
+    const cases = [
+      [
+        usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy,
+        POLICY,
+        ['policy'],
+        'savedToast.title',
+        'errorToast.title',
+      ],
+      [
+        useSettingsServiceUpdateAuthRateLimitSettings,
+        RATE_LIMIT,
+        ['rate-limit'],
+        'rateLimit.saved.title',
+        'rateLimit.error.title',
+      ],
+      [
+        useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
+        { policy: 'all' },
+        ['two-factor'],
+        'twoFactor.saved.title',
+        'twoFactor.error.title',
+      ],
+      [
+        useUsersServiceSetLocalSignupDomainWhitelist,
+        undefined,
+        ['domains'],
+        'domains.saved.title',
+        'domains.error.title',
+      ],
+    ] as const;
+    for (const [hook, data, key, successTitle, errorTitle] of cases) {
+      const options = vi.mocked(hook).mock.calls.at(-1)?.[0] as {
+        onSuccess: (data: unknown) => void;
+        onError: () => void;
+      };
+      await act(async () => options.onSuccess(data));
+      expect(feedback.success).toHaveBeenLastCalledWith(expect.objectContaining({ title: successTitle }));
+      if (data) expect(feedback.cache).toHaveBeenLastCalledWith(key, data);
+      else expect(feedback.invalidate).toHaveBeenCalledWith({ queryKey: key });
+      act(() => options.onError());
+      expect(feedback.error).toHaveBeenLastCalledWith(expect.objectContaining({ title: errorTitle }));
+    }
   });
 });

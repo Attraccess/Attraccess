@@ -131,8 +131,12 @@ export function SecuritySection() {
 
   const policyValue = <K extends keyof PasswordPolicyDto>(key: K): PasswordPolicyDto[K] =>
     (policyDraft[key] ?? policy?.[key]) as PasswordPolicyDto[K];
-  const rateValue = (key: RateLimitKey): number => rateDraft[key] ?? rateLimit?.[key] ?? NaN;
-  const exponentialBackoff = rateDraft.exponentialBackoff ?? rateLimit?.exponentialBackoff ?? false;
+  const {
+    value: rateValue,
+    exponentialBackoff,
+    isDirty: isRateDirty,
+    isSavable: isRateSavable,
+  } = getRateLimitDraft(rateLimit, rateDraft);
   const twoFactorValue = twoFactorDraft ?? twoFactor?.policy;
   // `savedDomains === undefined` means the whitelist has not arrived — loading, or the request
   // failed. It must not read as an empty list: PUT is a full replace, so staging one addition off
@@ -206,31 +210,11 @@ export function SecuritySection() {
     },
   });
 
-  const isRateDirty =
-    !!rateLimit &&
-    (RATE_LIMIT_NUMBERS.some((key) => !Object.is(rateValue(key), rateLimit[key])) ||
-      !Object.is(rateValue('backoffMultiplier'), rateLimit.backoffMultiplier) ||
-      exponentialBackoff !== rateLimit.exponentialBackoff);
-  // Clearing a NumberField yields NaN. That is still a departure from the saved value, so the bar
-  // stays mounted and Discard stays reachable — only Save is blocked.
-  //
-  // Integer, not merely finite: the three throttling counters and every policy number are `@IsInt()`
-  // on the API, and none of these steppers sets a `step`, so `2.5` is typeable. `Number.isFinite`
-  // let it through to a 400 rendered as a generic toast that names no field.
-  // `backoffMultiplier` is the one genuine `@IsNumber()`, so it only has to be finite and >= 1.
-  const isRateSavable =
-    RATE_LIMIT_NUMBERS.every((key) => Number.isInteger(rateValue(key)) && rateValue(key) >= 1) &&
-    Number.isFinite(rateValue('backoffMultiplier')) &&
-    rateValue('backoffMultiplier') >= 1;
   const isPolicySavable = POLICY_NUMBER_FIELDS.every(({ key }) => Number.isInteger(policyValue(key) as number));
 
   const isPolicyDirty = policyDiff.length > 0 || (!isPolicySavable && Object.keys(policyDraft).length > 0);
   const isTwoFactorDirty = twoFactorValue !== undefined && twoFactorValue !== twoFactor?.policy;
-  const isDomainsDirty =
-    areDomainsReady &&
-    domainsDraft !== undefined &&
-    (domainsDraft.length !== savedDomains.length ||
-      domainsDraft.some((domain, index) => domain !== savedDomains[index]));
+  const isDomainsDirty = domainsHaveChanged(savedDomains, domainsDraft);
 
   const isDirty = isRateDirty || isPolicyDirty || isTwoFactorDirty || isDomainsDirty;
   const isSaving = isSavingPolicy || isSavingRateLimit || isSavingTwoFactor || isSavingDomains;
@@ -356,78 +340,15 @@ export function SecuritySection() {
           </div>
         </SettingsRow>
 
-        <SettingsRow stacked label={t('domains.label')} hint={t('domains.hint')} data-testid="signup-domains-row">
-          {isDomainsLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <Spinner size="sm" />
-              {t('domains.loading')}
-            </div>
-          ) : !areDomainsReady ? (
-            // The list is unknown, not empty. Editing from here would stage a change against a
-            // fallback that is not the instance's state, and Save is a full replace.
-            <Alert status="danger">
-              <AlertStatusIcon status="danger" />
-              <AlertContent>
-                <AlertDescription>{t('domains.loadFailed')}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          ) : (
-            <div className="flex w-full flex-col gap-2">
-              {/* Wraps rather than clipping: on a tablet the content column is narrow enough that the
-                  button would otherwise be pushed past its right edge. */}
-              <div className="flex flex-wrap items-end gap-2">
-                <TextField
-                  className="min-w-[12rem] flex-1"
-                  value={domainToAdd}
-                  onChange={setDomainToAdd}
-                  aria-label={t('domains.addLabel')}
-                  data-testid="signup-domain-input"
-                >
-                  <Input
-                    placeholder={t('domains.addPlaceholder')}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        // There is no <form> here, but the browser still treats Enter in a lone text
-                        // input as a submit attempt — which would reload the page.
-                        event.preventDefault();
-                        addDomain();
-                      }
-                    }}
-                  />
-                </TextField>
-                <Button variant="secondary" size="sm" onPress={addDomain} isDisabled={!domainToAdd.trim()}>
-                  <PlusIcon size={16} />
-                  {t('domains.addButton')}
-                </Button>
-              </div>
-
-              {domains.length === 0 ? (
-                <p className="text-xs text-muted">{t('domains.empty')}</p>
-              ) : (
-                <ul className="flex flex-col">
-                  {domains.map((domain) => (
-                    <li
-                      key={domain}
-                      data-testid={`signup-domain-${domain}`}
-                      className="flex items-center justify-between gap-2 border-b border-separator py-1.5 last:border-b-0"
-                    >
-                      <span className="truncate font-mono text-sm text-foreground">{domain}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        isIconOnly
-                        aria-label={t('domains.remove', { domain })}
-                        onPress={() => setDomainsDraft(domains.filter((entry) => entry !== domain))}
-                      >
-                        <Trash2Icon size={14} />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </SettingsRow>
+        <SignupDomainsRow
+          isDomainsLoading={isDomainsLoading}
+          areDomainsReady={areDomainsReady}
+          domains={domains}
+          domainToAdd={domainToAdd}
+          setDomainToAdd={setDomainToAdd}
+          addDomain={addDomain}
+          setDomainsDraft={setDomainsDraft}
+        />
       </div>
 
       <SubHeading title={t('rateLimit.heading')} description={t('rateLimit.description')} />
@@ -669,3 +590,124 @@ export function SecuritySection() {
 }
 
 export default SecuritySection;
+
+function getRateLimitDraft(saved: AuthRateLimitSettingsDto | undefined, draft: Partial<AuthRateLimitSettingsDto>) {
+  const rateValue = (key: RateLimitKey): number => draft[key] ?? saved?.[key] ?? NaN;
+  const exponentialBackoff = draft.exponentialBackoff ?? saved?.exponentialBackoff ?? false;
+  const isRateDirty =
+    !!saved &&
+    (RATE_LIMIT_NUMBERS.some((key) => !Object.is(rateValue(key), saved[key])) ||
+      !Object.is(rateValue('backoffMultiplier'), saved.backoffMultiplier) ||
+      exponentialBackoff !== saved.exponentialBackoff);
+  // Clearing a NumberField yields NaN. That is still a departure from the saved value, so the bar
+  // stays mounted and Discard stays reachable — only Save is blocked.
+  //
+  // Integer, not merely finite: the three throttling counters and every policy number are `@IsInt()`
+  // on the API, and none of these steppers sets a `step`, so `2.5` is typeable. `Number.isFinite`
+  // let it through to a 400 rendered as a generic toast that names no field.
+  // `backoffMultiplier` is the one genuine `@IsNumber()`, so it only has to be finite and >= 1.
+  const isRateSavable =
+    RATE_LIMIT_NUMBERS.every((key) => Number.isInteger(rateValue(key)) && rateValue(key) >= 1) &&
+    Number.isFinite(rateValue('backoffMultiplier')) &&
+    rateValue('backoffMultiplier') >= 1;
+  return { value: rateValue, exponentialBackoff, isDirty: isRateDirty, isSavable: isRateSavable };
+}
+
+function SignupDomainsRow({
+  isDomainsLoading,
+  areDomainsReady,
+  domains,
+  domainToAdd,
+  setDomainToAdd,
+  addDomain,
+  setDomainsDraft,
+}: {
+  isDomainsLoading: boolean;
+  areDomainsReady: boolean;
+  domains: string[];
+  domainToAdd: string;
+  setDomainToAdd: (value: string) => void;
+  addDomain: () => void;
+  setDomainsDraft: (domains: string[]) => void;
+}) {
+  const { t } = useTranslations({ en, de });
+  return (
+    <SettingsRow stacked label={t('domains.label')} hint={t('domains.hint')} data-testid="signup-domains-row">
+      {isDomainsLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Spinner size="sm" />
+          {t('domains.loading')}
+        </div>
+      ) : !areDomainsReady ? (
+        // The list is unknown, not empty. Editing from here would stage a change against a
+        // fallback that is not the instance's state, and Save is a full replace.
+        <Alert status="danger">
+          <AlertStatusIcon status="danger" />
+          <AlertContent>
+            <AlertDescription>{t('domains.loadFailed')}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      ) : (
+        <div className="flex w-full flex-col gap-2">
+          {/* Wraps rather than clipping: on a tablet the content column is narrow enough that the
+                  button would otherwise be pushed past its right edge. */}
+          <div className="flex flex-wrap items-end gap-2">
+            <TextField
+              className="min-w-[12rem] flex-1"
+              value={domainToAdd}
+              onChange={setDomainToAdd}
+              aria-label={t('domains.addLabel')}
+              data-testid="signup-domain-input"
+            >
+              <Input
+                placeholder={t('domains.addPlaceholder')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    // There is no <form> here, but the browser still treats Enter in a lone text
+                    // input as a submit attempt — which would reload the page.
+                    event.preventDefault();
+                    addDomain();
+                  }
+                }}
+              />
+            </TextField>
+            <Button variant="secondary" size="sm" onPress={addDomain} isDisabled={!domainToAdd.trim()}>
+              <PlusIcon size={16} />
+              {t('domains.addButton')}
+            </Button>
+          </div>
+
+          {domains.length === 0 ? (
+            <p className="text-xs text-muted">{t('domains.empty')}</p>
+          ) : (
+            <ul className="flex flex-col">
+              {domains.map((domain) => (
+                <li
+                  key={domain}
+                  data-testid={`signup-domain-${domain}`}
+                  className="flex items-center justify-between gap-2 border-b border-separator py-1.5 last:border-b-0"
+                >
+                  <span className="truncate font-mono text-sm text-foreground">{domain}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    isIconOnly
+                    aria-label={t('domains.remove', { domain })}
+                    onPress={() => setDomainsDraft(domains.filter((entry) => entry !== domain))}
+                  >
+                    <Trash2Icon size={14} />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </SettingsRow>
+  );
+}
+
+function domainsHaveChanged(saved: string[] | undefined, draft: string[] | undefined): boolean {
+  if (saved === undefined || draft === undefined) return false;
+  return draft.length !== saved.length || draft.some((domain, index) => domain !== saved[index]);
+}
