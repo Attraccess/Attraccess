@@ -19,6 +19,7 @@ const subscribers = new Map<string, Set<Subscriber>>();
 
 async function consume(url: string, connection: SseConnection) {
   try {
+    // eslint-disable-next-line no-restricted-syntax -- SSE streams are consumed as raw responses.
     const res = await fetch(url, {
       method: 'GET',
       credentials: 'include',

@@ -71,6 +71,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const loadTokens = useCallback(async (requestedPage: number) => {
     const loadId = ++latestLoadId.current;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Legacy token pagination has no generated hook.
       const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens?page=${requestedPage}&limit=${PAGE_SIZE}`, {
         credentials: 'include',
       });
@@ -100,6 +101,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const createToken = async () => {
     setIsCreating(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Legacy token creation has no generated hook.
       const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens`, {
         method: 'POST',
         credentials: 'include',
@@ -129,6 +131,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const revokeToken = async (token: ApiToken) => {
     setRevokingId(token.id);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Legacy token deletion has no generated hook.
       const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens/${token.id}`, {
         method: 'DELETE',
         credentials: 'include',

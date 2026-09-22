@@ -252,6 +252,7 @@ export function PluginsSection() {
 
   useEffect(() => {
     if (!globalThis.fetch) return;
+    // eslint-disable-next-line no-restricted-syntax -- Existing marketplace state loading awaits a broader hook migration.
     void fetch(`${getBaseUrl()}/api/plugins/installed`, { credentials: 'include' })
       .then(async (response) => (response.ok ? (response.json() as Promise<InstalledNpmPlugin[]>) : []))
       .then((installed) => {
@@ -266,6 +267,7 @@ export function PluginsSection() {
   const loadRegistries = async () => {
     const request = ++registryRequest.current;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing registry loading awaits a broader hook migration.
       const response = await fetch(`${getBaseUrl()}/api/plugins/registries`, { credentials: 'include' });
       if (!response.ok) throw new Error();
       const result = (await response.json()) as unknown;
@@ -290,6 +292,7 @@ export function PluginsSection() {
     let result: { results: MarketplacePlugin[]; errors: string[] } = { results: [], errors: [] };
     let searchFailed = false;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing marketplace search awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/marketplace/search?query=${encodeURIComponent(query)}${selectedRegistryId ? `&registryId=${encodeURIComponent(selectedRegistryId)}` : ''}`,
         {
@@ -305,6 +308,7 @@ export function PluginsSection() {
     let directPackage: MarketplacePlugin | null = null;
     if (selectedRegistryId && query.trim()) {
       try {
+        // eslint-disable-next-line no-restricted-syntax -- Existing package lookup awaits a broader hook migration.
         const packageResponse = await fetch(
           `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(query.trim())}?registryId=${encodeURIComponent(selectedRegistryId)}`,
           { credentials: 'include' },
@@ -333,6 +337,7 @@ export function PluginsSection() {
   const addRegistry = async () => {
     setIsSavingRegistry(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing registry creation awaits a broader hook migration.
       const response = await fetch(`${getBaseUrl()}/api/plugins/registries`, {
         method: 'POST',
         credentials: 'include',
@@ -357,6 +362,7 @@ export function PluginsSection() {
     latestRegistryTest.current = request;
     setTestingRegistryId(registryId);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing registry testing awaits a broader hook migration.
       const response = await fetch(`${getBaseUrl()}/api/plugins/registries/${encodeURIComponent(registryId)}/test`, {
         method: 'POST',
         credentials: 'include',
@@ -375,6 +381,7 @@ export function PluginsSection() {
 
   const removeRegistry = async (registryId: string) => {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing registry deletion awaits a broader hook migration.
       const response = await fetch(`${getBaseUrl()}/api/plugins/registries/${encodeURIComponent(registryId)}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -401,6 +408,7 @@ export function PluginsSection() {
     const request = ++marketplaceDetailRequest.current;
     setIsLoadingMarketplaceDetail(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing package details loading awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(plugin.name)}?registryId=${encodeURIComponent(plugin.registry.id)}`,
         { credentials: 'include' },
@@ -422,6 +430,7 @@ export function PluginsSection() {
     if (!pluginToInstall?.version) return;
     setIsInstalling(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing package installation awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/npm/${encodeURIComponent(pluginToInstall.name)}/versions/${pluginToInstall.version}`,
         {
@@ -468,6 +477,7 @@ export function PluginsSection() {
     setUpdateOverride(installed?.updateOverride ?? 'inherit');
     setIsLoadingVersions(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing version loading awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(plugin.name)}/versions`,
         {
@@ -489,6 +499,7 @@ export function PluginsSection() {
     if (!versionPlugin || !selectedVersion) return;
     setIsReplacing(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing version replacement awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/versions/${selectedVersion.version}`,
         {
@@ -515,6 +526,7 @@ export function PluginsSection() {
   const saveVersionPolicy = async () => {
     if (!versionPlugin) return;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing update-policy saving awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/update-policy`,
         {

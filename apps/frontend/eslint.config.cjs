@@ -36,10 +36,14 @@ module.exports = [
       'no-restricted-syntax': [
         'error',
         {
-          selector:
-            "CallExpression[callee.name='fetch'] TemplateElement[value.raw=/\\/api\\/plugins\\/installed\\/check/]",
+          selector: "CallExpression[callee.name='fetch']",
           message:
-            'Use usePluginsServicePluginControllerCheckAllInstalledPackages from @attraccess/react-query-client instead of fetching this API directly.',
+            'Use a generated React Query hook instead of fetch(). If a direct request is necessary, disable this rule for that statement and explain why.',
+        },
+        {
+          selector: "CallExpression[callee.property.name='fetch']",
+          message:
+            'Use a generated React Query hook instead of fetch(). If a direct request is necessary, disable this rule for that statement and explain why.',
         },
       ],
       ...reactCompilerRulesAsWarn,

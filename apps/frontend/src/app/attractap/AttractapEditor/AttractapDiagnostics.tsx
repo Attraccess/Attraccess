@@ -72,6 +72,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
         return;
       }
       try {
+        // eslint-disable-next-line no-restricted-syntax -- Coredumps are streamed as binary downloads.
         const response = await fetch(
           `${OpenAPI.BASE}/api/attractap/readers/${props.readerId}/crash-reports/${reportId}/coredump`,
           { credentials: 'include' },

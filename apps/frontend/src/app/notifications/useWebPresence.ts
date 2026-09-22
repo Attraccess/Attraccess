@@ -5,6 +5,7 @@ import { getBaseUrl } from '../../api';
 
 async function reportPresence(present: boolean): Promise<void> {
   try {
+    // eslint-disable-next-line no-restricted-syntax -- Presence is deliberately best-effort and fire-and-forget.
     await fetch(`${getBaseUrl()}/api/notifications/web-presence`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

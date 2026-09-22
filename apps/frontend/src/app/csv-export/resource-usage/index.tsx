@@ -66,6 +66,7 @@ export function ResourceUsageExport(props: ExportProps) {
       const operatingDurations: Record<number, OperatingDurationSummary> = {};
       for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
         for (const range of operatingDurationRanges) {
+          // eslint-disable-next-line no-restricted-syntax -- The CSV export assembles a dynamic request body outside a generated operation.
           const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
             method: 'POST',
             credentials: 'include',

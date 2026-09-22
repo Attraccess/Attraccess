@@ -56,6 +56,7 @@ export function KeycloakDiscoveryDialog(props: Props) {
     try {
       const baseUrl = getBaseUrl();
       const params = new URLSearchParams({ host, realm });
+      // eslint-disable-next-line no-restricted-syntax -- Provider discovery must run before generated-client configuration is available.
       const response = await fetch(`${baseUrl}/api/auth/sso/discovery/keycloak?${params.toString()}`, {
         headers: {
           'Content-Type': 'application/json',

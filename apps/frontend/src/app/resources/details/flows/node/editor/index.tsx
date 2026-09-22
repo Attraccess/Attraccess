@@ -83,6 +83,7 @@ export function NodeEditor(props: Props) {
     setSchemaError(undefined);
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Node-schema loading requires a plugin-specific endpoint absent from the generated client.
       const response = await fetch(
         `${getBaseUrl()}/api/resources/${resourceId}/flow/node-schemas/${encodeURIComponent(schema.type)}`,
         {
