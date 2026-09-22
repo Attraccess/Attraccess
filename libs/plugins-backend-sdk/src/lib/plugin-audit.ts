@@ -101,15 +101,7 @@ const dottedName = (prefix: string, value: unknown, maxLength: number): boolean 
   return segments.length > 0 && segments.every((segment) => PLUGIN_AUDIT_SEGMENT_PATTERN.test(segment));
 };
 
-function validateFieldPolicy(path: string, policy: unknown): void {
-  if (!isPlainRecord(policy)) throw new Error(`${path}: field policy must be a plain object`);
-  const declared = policy.type;
-  if (declared !== 'string' && declared !== 'number' && declared !== 'boolean')
-    throw new Error(`${path}: field type must be 'string', 'number' or 'boolean'`);
-  const keys = Object.keys(policy);
-  for (const key of keys)
-    if (!['type', 'pattern', 'oneOf', 'min', 'max', 'integer', 'maxLength'].includes(key))
-      throw new Error(`${path}: unknown field policy property "${key}"`);
+function validateFieldChoices(path: string, policy: Record<string, unknown>, declared: string): void {
   if (policy.pattern !== undefined) {
     if (declared !== 'string') throw new Error(`${path}: pattern requires type 'string'`);
     if (typeof policy.pattern !== 'string' || policy.pattern.length > PLUGIN_AUDIT_LIMITS.patternLength)
@@ -130,6 +122,18 @@ function validateFieldPolicy(path: string, policy: unknown): void {
     )
       throw new Error(`${path}: oneOf must be 1-${PLUGIN_AUDIT_LIMITS.oneOfEntries} values of type '${declared}'`);
   }
+}
+
+function validateFieldPolicy(path: string, policy: unknown): void {
+  if (!isPlainRecord(policy)) throw new Error(`${path}: field policy must be a plain object`);
+  const declared = policy.type;
+  if (declared !== 'string' && declared !== 'number' && declared !== 'boolean')
+    throw new Error(`${path}: field type must be 'string', 'number' or 'boolean'`);
+  const keys = Object.keys(policy);
+  for (const key of keys)
+    if (!['type', 'pattern', 'oneOf', 'min', 'max', 'integer', 'maxLength'].includes(key))
+      throw new Error(`${path}: unknown field policy property "${key}"`);
+  validateFieldChoices(path, policy, declared);
   for (const bound of ['min', 'max'] as const)
     if (policy[bound] !== undefined) {
       if (declared !== 'number' || typeof policy[bound] !== 'number' || !Number.isFinite(policy[bound] as number))
@@ -147,7 +151,27 @@ function validateFieldPolicy(path: string, policy: unknown): void {
       policy.maxLength < 1 ||
       policy.maxLength > PLUGIN_AUDIT_LIMITS.maxLengthCeiling
     )
-      throw new Error(`${path}: maxLength requires an integer 1-${PLUGIN_AUDIT_LIMITS.maxLengthCeiling} and type 'string'`);
+      throw new Error(
+        `${path}: maxLength requires an integer 1-${PLUGIN_AUDIT_LIMITS.maxLengthCeiling} and type 'string'`,
+      );
+  }
+}
+
+function validateDomainLabels(declaration: PluginAuditDomainDeclaration, prefix: string): void {
+  if (declaration.labels !== undefined) {
+    if (!isPlainRecord(declaration.labels)) throw new Error(`Audit domain "${prefix}": labels must be a plain object`);
+    const locales = Object.keys(declaration.labels);
+    if (locales.length > PLUGIN_AUDIT_LIMITS.labelLocales)
+      throw new Error(`Audit domain "${prefix}": at most ${PLUGIN_AUDIT_LIMITS.labelLocales} label locales`);
+    for (const locale of locales) {
+      const label = declaration.labels[locale];
+      if (!/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(locale))
+        throw new Error(`Audit domain "${prefix}": invalid label locale "${locale}"`);
+      if (typeof label !== 'string' || label.trim().length === 0 || label.length > PLUGIN_AUDIT_LIMITS.labelLength)
+        throw new Error(
+          `Audit domain "${prefix}": label for "${locale}" must be 1-${PLUGIN_AUDIT_LIMITS.labelLength} characters`,
+        );
+    }
   }
 }
 
@@ -162,19 +186,7 @@ export function validatePluginAuditDomainDeclaration<T extends PluginAuditDomain
   if (typeof declaration.domain !== 'string' || !PLUGIN_AUDIT_DOMAIN_PATTERN.test(declaration.domain))
     throw new Error(`Audit domain "${where}": domain must match ${PLUGIN_AUDIT_DOMAIN_PATTERN.source}`);
   const prefix = declaration.domain;
-  if (declaration.labels !== undefined) {
-    if (!isPlainRecord(declaration.labels)) throw new Error(`Audit domain "${prefix}": labels must be a plain object`);
-    const locales = Object.keys(declaration.labels);
-    if (locales.length > PLUGIN_AUDIT_LIMITS.labelLocales)
-      throw new Error(`Audit domain "${prefix}": at most ${PLUGIN_AUDIT_LIMITS.labelLocales} label locales`);
-    for (const locale of locales) {
-      const label = declaration.labels[locale];
-      if (!/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(locale))
-        throw new Error(`Audit domain "${prefix}": invalid label locale "${locale}"`);
-      if (typeof label !== 'string' || label.trim().length === 0 || label.length > PLUGIN_AUDIT_LIMITS.labelLength)
-        throw new Error(`Audit domain "${prefix}": label for "${locale}" must be 1-${PLUGIN_AUDIT_LIMITS.labelLength} characters`);
-    }
-  }
+  validateDomainLabels(declaration, prefix);
   if (!Array.isArray(declaration.actions) || declaration.actions.length === 0)
     throw new Error(`Audit domain "${prefix}": actions must be a non-empty array`);
   if (declaration.actions.length > PLUGIN_AUDIT_LIMITS.actionsPerDomain)
@@ -212,7 +224,9 @@ export function validatePluginAuditDomainDeclaration<T extends PluginAuditDomain
         throw new Error(`Audit domain "${prefix}", action "${action}": details must be a plain object`);
       const fields = Object.keys(entry.details);
       if (fields.length > PLUGIN_AUDIT_LIMITS.fieldsPerAction)
-        throw new Error(`Audit domain "${prefix}", action "${action}": at most ${PLUGIN_AUDIT_LIMITS.fieldsPerAction} detail fields`);
+        throw new Error(
+          `Audit domain "${prefix}", action "${action}": at most ${PLUGIN_AUDIT_LIMITS.fieldsPerAction} detail fields`,
+        );
       for (const field of fields) {
         if (!PLUGIN_AUDIT_FIELD_PATTERN.test(field))
           throw new Error(

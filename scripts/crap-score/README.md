@@ -10,7 +10,7 @@ pnpm nx run frontend:crap-score                   # one project
 pnpm crap-score:affected --base=origin/main       # changed projects and dependents
 ```
 
-Each target runs the project's existing Jest and/or Vitest unit suite with JSON
+Each target runs the project's existing Jest, Vitest and Node unit suites with JSON
 coverage (Istanbul for Vitest), then writes `coverage/crap/<project>/crap-report.json`, `summary.json`,
 and `html/index.html`. The root project's directory is `@attraccess__source`.
 Nx caches the reports together with the task result. Coverage lives separately
@@ -28,13 +28,13 @@ unit-test run; ordinary tests and Docker/hardware acceptance remain independent.
 
 Every current JavaScript/TypeScript app, library and tool has a `crap-score`
 target, including plugin frontends, the companion renderer, WAGO runtime and
-TypeScript circuit designs. Root scripts, shared plugin/hardware scripts and
-examples belong to the root target. The C/C++ Attractap firmware and desktop
+TypeScript circuit designs. Files outside a nested Nx project, including standalone tools, root configuration,
+shared plugin/hardware scripts and examples, belong to the root target. The C/C++ Attractap firmware and desktop
 simulator cannot be analyzed by this JS/TS tool and retain their existing checks.
 
 Source discovery includes Git-tracked and unignored new JS/TS files. Tests,
 fixtures, declarations, generated clients and build output are excluded. Nested
-Nx projects are analyzed by their own target. Files absent from the unit-test
+Nx projects are analyzed by their own target. Configuration files remain in scope. Files and functions absent from the unit-test
 coverage report are instrumented with zero execution counts; this also covers
 projects without tests. Thus an untested file does not disappear from the report.
 E2E, shell and device tests do not contribute coverage to these unit reports.
@@ -67,3 +67,18 @@ Run the adapter's regression checks with:
 ```sh
 node --test scripts/crap-score/run.test.mjs
 ```
+
+## Node runners and source identity
+
+Owned `.test.mjs`/`.spec.mjs` files importing `node:test` run with a Node module
+hook that collects Istanbul coverage in `node/`. Child processes inherit the
+hook through `NODE_OPTIONS`. Tests that deliberately replace their environment
+forward only the coverage variables when this mode is active. Copied CLI scripts
+are attributed to their maintained source only when their complete contents
+match exactly one source file; fixture executables do not contribute coverage.
+The root Vitest suite also includes the port-allocation tests in `scripts/`.
+
+Original source function ranges canonicalize transformed function identities
+before deduplication. Missing functions receive zero counts without adding a
+second set of zero-count statements to functions already measured by a runner.
+Coverage from Node, Jest and Vitest is combined before scoring.

@@ -160,107 +160,135 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         message: 'logical channel profile must be a non-empty string',
       });
     }
-    const policy = channel?.disconnectPolicy;
-    if (
-      !policy ||
-      !['hold', 'immediate', 'watchdog'].includes(policy.mode) ||
-      (policy.mode === 'watchdog' && (!Number.isSafeInteger(policy.timeoutMs) || (policy.timeoutMs ?? 0) <= 0))
-    ) {
-      errors.push({
-        path: `${path}.disconnectPolicy`,
-        code: 'invalid_disconnect_policy',
-        message: 'every channel needs hold, immediate, or watchdog disconnect behavior',
-      });
-    }
-    const pulseError = pulseBehaviorError(capabilities, channel.pulse);
-    if (pulseError) errors.push({ path: `${path}.pulse`, code: 'invalid_pulse', message: pulseError });
-    if (channel.pulse) {
-      validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
-    }
-    const guardChannel = channel.guard ? channelsById.get(channel.guard.channelId) : undefined;
-    if (
-      channel?.guard &&
-      (!capabilities.includes('guard') ||
-        !Array.isArray(guardChannel?.capabilities) ||
-        !guardChannel.capabilities.includes('input') ||
-        !['on', 'off'].includes(channel.guard.when) ||
-        guardChannel.id === channel.id)
-    ) {
-      errors.push({
-        path: `${path}.guard`,
-        code: 'invalid_guard',
-        message: 'guard requires guard capability, another input channel, and on/off condition',
-      });
-    }
-    if (channel.guard) {
-      validateKeys(channel.guard as Record<string, unknown>, `${path}.guard`, ['channelId', 'when'], errors);
-    }
-    const feedbackChannel = channel.feedback ? channelsById.get(channel.feedback.channelId) : undefined;
-    if (
-      channel.feedback &&
-      (!capabilities.includes('feedback') ||
-        !feedbackChannel ||
-        feedbackChannel.id === channel.id ||
-        !Array.isArray(feedbackChannel.capabilities) ||
-        !feedbackChannel.capabilities.includes('input') ||
-        !['match', 'inverse'].includes(channel.feedback.expected) ||
-        !Number.isSafeInteger(channel.feedback.timeoutMs) ||
-        channel.feedback.timeoutMs <= 0)
-    ) {
-      errors.push({
-        path: `${path}.feedback`,
-        code: 'invalid_feedback',
-        message: 'feedback requires feedback capability, a channel, expectation, and positive timeout',
-      });
-    }
-    if (channel.feedback) {
-      validateKeys(
-        channel.feedback as Record<string, unknown>,
-        `${path}.feedback`,
-        ['channelId', 'expected', 'timeoutMs'],
-        errors,
-      );
-    }
-    if (
-      channel.range &&
-      (!['input', 'measurement'].some((capability) => capabilities.includes(capability)) ||
-        !Number.isFinite(channel.range.minimum) ||
-        !Number.isFinite(channel.range.maximum) ||
-        channel.range.minimum >= channel.range.maximum)
-    ) {
-      errors.push({
-        path: `${path}.range`,
-        code: 'invalid_range',
-        message: 'range requires input or measurement capability and finite ordered values',
-      });
-    }
-    if (channel.range) {
-      validateKeys(channel.range as Record<string, unknown>, `${path}.range`, ['minimum', 'maximum'], errors);
-    }
-    if (
-      channel.measurement &&
-      (!capabilities.includes('measurement') ||
-        !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
-        !Number.isFinite(channel.measurement.scale) ||
-        !Number.isFinite(channel.measurement.offset) ||
-        !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))
-    ) {
-      errors.push({
-        path: `${path}.measurement`,
-        code: 'invalid_measurement',
-        message: 'measurement requires capability, supported unit, and finite transform',
-      });
-    }
-    if (channel.measurement) {
-      validateKeys(
-        channel.measurement as Record<string, unknown>,
-        `${path}.measurement`,
-        ['unit', 'scale', 'offset', 'kind'],
-        errors,
-      );
-    }
+    validateDisconnectAndPulse(channel, capabilities, path, errors);
+    validateChannelInterlocks(channel, capabilities, path, errors, channelsById);
+    validateChannelMeasurements(channel, capabilities, path, errors);
   });
   return errors;
+}
+
+function validateDisconnectAndPulse(
+  channel: Snapshot['logicalChannels'][number],
+  capabilities: Snapshot['logicalChannels'][number]['capabilities'],
+  path: string,
+  errors: ValidationError[],
+): void {
+  const policy = channel?.disconnectPolicy;
+  if (
+    !policy ||
+    !['hold', 'immediate', 'watchdog'].includes(policy.mode) ||
+    (policy.mode === 'watchdog' && (!Number.isSafeInteger(policy.timeoutMs) || (policy.timeoutMs ?? 0) <= 0))
+  ) {
+    errors.push({
+      path: `${path}.disconnectPolicy`,
+      code: 'invalid_disconnect_policy',
+      message: 'every channel needs hold, immediate, or watchdog disconnect behavior',
+    });
+  }
+  const pulseError = pulseBehaviorError(capabilities, channel.pulse);
+  if (pulseError) errors.push({ path: `${path}.pulse`, code: 'invalid_pulse', message: pulseError });
+  if (channel.pulse) {
+    validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
+  }
+}
+
+function validateChannelInterlocks(
+  channel: Snapshot['logicalChannels'][number],
+  capabilities: Snapshot['logicalChannels'][number]['capabilities'],
+  path: string,
+  errors: ValidationError[],
+  channelsById: Map<string, Snapshot['logicalChannels'][number]>,
+): void {
+  const guardChannel = channel.guard ? channelsById.get(channel.guard.channelId) : undefined;
+  if (
+    channel?.guard &&
+    (!capabilities.includes('guard') ||
+      !Array.isArray(guardChannel?.capabilities) ||
+      !guardChannel.capabilities.includes('input') ||
+      !['on', 'off'].includes(channel.guard.when) ||
+      guardChannel.id === channel.id)
+  ) {
+    errors.push({
+      path: `${path}.guard`,
+      code: 'invalid_guard',
+      message: 'guard requires guard capability, another input channel, and on/off condition',
+    });
+  }
+  if (channel.guard) {
+    validateKeys(channel.guard as Record<string, unknown>, `${path}.guard`, ['channelId', 'when'], errors);
+  }
+  const feedbackChannel = channel.feedback ? channelsById.get(channel.feedback.channelId) : undefined;
+  if (
+    channel.feedback &&
+    (!capabilities.includes('feedback') ||
+      !feedbackChannel ||
+      feedbackChannel.id === channel.id ||
+      !Array.isArray(feedbackChannel.capabilities) ||
+      !feedbackChannel.capabilities.includes('input') ||
+      !['match', 'inverse'].includes(channel.feedback.expected) ||
+      !Number.isSafeInteger(channel.feedback.timeoutMs) ||
+      channel.feedback.timeoutMs <= 0)
+  ) {
+    errors.push({
+      path: `${path}.feedback`,
+      code: 'invalid_feedback',
+      message: 'feedback requires feedback capability, a channel, expectation, and positive timeout',
+    });
+  }
+  if (channel.feedback) {
+    validateKeys(
+      channel.feedback as Record<string, unknown>,
+      `${path}.feedback`,
+      ['channelId', 'expected', 'timeoutMs'],
+      errors,
+    );
+  }
+}
+
+function validateChannelMeasurements(
+  channel: Snapshot['logicalChannels'][number],
+  capabilities: Snapshot['logicalChannels'][number]['capabilities'],
+  path: string,
+  errors: ValidationError[],
+): void {
+  if (
+    channel.range &&
+    (!['input', 'measurement'].some((capability) => capabilities.includes(capability)) ||
+      !Number.isFinite(channel.range.minimum) ||
+      !Number.isFinite(channel.range.maximum) ||
+      channel.range.minimum >= channel.range.maximum)
+  ) {
+    errors.push({
+      path: `${path}.range`,
+      code: 'invalid_range',
+      message: 'range requires input or measurement capability and finite ordered values',
+    });
+  }
+  if (channel.range) {
+    validateKeys(channel.range as Record<string, unknown>, `${path}.range`, ['minimum', 'maximum'], errors);
+  }
+  if (
+    channel.measurement &&
+    (!capabilities.includes('measurement') ||
+      !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
+      !Number.isFinite(channel.measurement.scale) ||
+      !Number.isFinite(channel.measurement.offset) ||
+      !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))
+  ) {
+    errors.push({
+      path: `${path}.measurement`,
+      code: 'invalid_measurement',
+      message: 'measurement requires capability, supported unit, and finite transform',
+    });
+  }
+  if (channel.measurement) {
+    validateKeys(
+      channel.measurement as Record<string, unknown>,
+      `${path}.measurement`,
+      ['unit', 'scale', 'offset', 'kind'],
+      errors,
+    );
+  }
 }
 
 function validateKeys(

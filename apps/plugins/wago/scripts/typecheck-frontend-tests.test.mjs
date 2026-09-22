@@ -45,6 +45,10 @@ async function runCompilerFixture({ stdout = sample, stderr = '', status = 1 } =
       encoding: 'utf8',
       timeout: 10_000,
       env: {
+        ...(process.env.CRAP_NODE_MANIFEST ? {
+          CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,
+          NODE_OPTIONS: process.env.NODE_OPTIONS,
+        } : {}),
         PATH: directory,
         NPM_CONFIG_USERCONFIG: config,
         FIXTURE_STDOUT: stdout,
