@@ -1,12 +1,14 @@
+import { ApiError } from '@attraccess/react-query-client';
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationPreferencesForm } from './index';
 
 const hoisted = vi.hoisted(() => ({
   mutate: vi.fn(),
+  mutationOptions: {} as { onError: (error: unknown) => void },
   invalidateQueries: vi.fn(),
   subscribe: vi.fn(),
   unsubscribe: vi.fn(),
@@ -71,10 +73,10 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   UseNotificationsServiceNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],
   useNotificationsServiceNotificationsGetPreferences: () => ({ data: hoisted.preferences, isLoading: false }),
-  useNotificationsServiceNotificationsUpdatePreferences: () => ({
-    mutate: hoisted.mutate,
-    isPending: hoisted.isPending,
-  }),
+  useNotificationsServiceNotificationsUpdatePreferences: (options: typeof hoisted.mutationOptions) => {
+    hoisted.mutationOptions = options;
+    return { mutate: hoisted.mutate, isPending: hoisted.isPending };
+  },
   useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['maintenance'] } }),
 }));
 
@@ -295,4 +297,26 @@ describe('NotificationPreferencesForm', () => {
     );
     expect(hoisted.subscribe).toHaveBeenCalledTimes(2);
   });
+});
+
+it('shows single-category validation errors with a fallback for unusable server messages', () => {
+  renderForm();
+  const failure = (message: unknown) =>
+    Object.assign(
+      new ApiError(
+        { method: 'PATCH', url: '/preferences' },
+        { url: '/preferences', ok: false, status: 400, statusText: 'Bad Request', body: undefined },
+        'Rejected',
+      ),
+      { body: { message } },
+    );
+  for (const [error, title] of [
+    [failure(['Denied', 'Other']), 'Denied'],
+    [failure('Not permitted'), 'Not permitted'],
+    [failure('  '), 'Could not update notification preferences'],
+    [{}, 'Could not update notification preferences'],
+  ] as const) {
+    act(() => hoisted.mutationOptions.onError(error));
+    expect(hoisted.errorToast).toHaveBeenLastCalledWith({ title });
+  }
 });

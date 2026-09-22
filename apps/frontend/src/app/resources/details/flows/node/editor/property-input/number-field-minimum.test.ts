@@ -35,7 +35,24 @@ describe('getNumberFieldMinimum', () => {
   });
 
   it('advances integer multiples that round to the exclusive bound', () => {
-    expect(getNumberFieldMinimum({ type: 'integer', exclusiveMinimum: 9007199254740992, multipleOf: 1 }))
-      .toBe(9007199254740994);
+    expect(getNumberFieldMinimum({ type: 'integer', exclusiveMinimum: 9007199254740992, multipleOf: 1 })).toBe(
+      9007199254740994,
+    );
   });
+});
+
+it.each([
+  [0, Number.MIN_VALUE],
+  [1, 1 + Number.EPSILON],
+  [-1, -1 + Number.EPSILON / 2],
+  [Number.MAX_VALUE, Infinity],
+  [Infinity, Infinity],
+  [-Infinity, -Infinity],
+])('advances the representable numeric bound %s to %s without a step constraint', (bound, expected) => {
+  expect(getNumberFieldMinimum({ type: 'number', exclusiveMinimum: bound })).toBe(expected);
+});
+
+it('preserves an inclusive minimum and absence of a bound', () => {
+  expect(getNumberFieldMinimum({ type: 'number', minimum: -2 })).toBe(-2);
+  expect(getNumberFieldMinimum({ type: 'number' })).toBeUndefined();
 });
