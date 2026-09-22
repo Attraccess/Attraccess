@@ -367,6 +367,7 @@ test('re-export getters are excluded without dropping adjacent first-party funct
     const measured = completeCoverage([file], [])[file];
     const id = Object.keys(measured.fnMap)[0];
     measured.f[id] = 7;
+    measured.fnMap[id].loc.end.column = null;
     measured.fnMap.getter = {
       name: '(anonymous_getter)',
       decl: { start: { line: 1, column: 9 }, end: { line: 1, column: 17 } },

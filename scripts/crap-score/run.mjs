@@ -108,7 +108,14 @@ function removeExportGetters(coverage, file, source) {
   }));
   const position = (point) => ast.getPositionOfLineAndCharacter(point.line - 1, point.column ?? 0);
   for (const [id, fn] of Object.entries(coverage.fnMap)) {
-    if (ranges.some((range) => position(fn.loc.start) >= range.start && position(fn.loc.end) <= range.end)) {
+    if (
+      ranges.some(
+        (range) =>
+          position(fn.loc.start) >= range.start &&
+          position(fn.loc.start) < range.end &&
+          position(fn.loc.end) <= range.end,
+      )
+    ) {
       delete coverage.fnMap[id];
       delete coverage.f[id];
     }
