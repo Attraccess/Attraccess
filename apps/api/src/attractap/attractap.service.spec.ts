@@ -47,6 +47,7 @@ describe('AttractapService', () => {
       {} as CoredumpSymbolicationService,
       {} as AttractapFirmwareService,
       notifications as unknown as NotificationDispatchService,
+      {} as never,
     );
   });
 
@@ -134,5 +135,106 @@ describe('AttractapService', () => {
         dedupeKey: 'nfc-card-7-deleted',
       }),
     );
+  });
+});
+
+describe('AttractapService reader maintenance and crash reports', () => {
+  const setup = () => {
+    const reader = {
+      id: 4,
+      name: 'Reader',
+      firmware: { name: 'Reader', variant: 'standard', version: '1.0', capabilities: { resourceSelection: false } },
+      resources: [],
+    };
+    const readers = { findOne: jest.fn().mockResolvedValue(reader), save: jest.fn(async (value) => value) };
+    const reports = {
+      save: jest.fn(async (value) => ({ id: 7, ...value })),
+      update: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+    };
+    const events = { emit: jest.fn() };
+    const resources = { find: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]) };
+    const symbolication = {
+      symbolicate: jest.fn().mockResolvedValue({ buildId: 'build', status: 'completed', backtrace: 'task: main' }),
+    };
+    const firmware = { getFirmwareDefinition: jest.fn().mockReturnValue({ version: '2.0' }) };
+    const service = new AttractapService(
+      {} as never,
+      readers as never,
+      reports as never,
+      events as never,
+      resources as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      symbolication as never,
+      firmware as never,
+      {} as never,
+      {} as never,
+    );
+    return { service, readers, reader, reports, events, resources, symbolication, firmware };
+  };
+  it('updates reader settings, limits resources for unsupported firmware, and emits the saved reader', async () => {
+    const { service, readers, events } = setup();
+    const result = await service.updateReader(4, { name: 'Renamed', ledBrightness: 0, connectedResourceIds: [1, 2] });
+    expect(result).toMatchObject({ name: 'Renamed', ledBrightness: 0, resources: [{ id: 1 }] });
+    expect(readers.save).toHaveBeenCalledWith(result);
+    expect(events.emit).toHaveBeenCalledTimes(1);
+  });
+  it('allows resource selection when supported and can clear attachments without emitting an event', async () => {
+    const { service, reader, events } = setup();
+    reader.firmware.capabilities.resourceSelection = true;
+    expect((await service.updateReader(4, { connectedResourceIds: [1, 2] }, false)).resources).toHaveLength(2);
+    expect((await service.updateReader(4, { connectedResourceIds: [] }, false)).resources).toEqual([]);
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+  it('normalizes crash report metrics and avoids symbolication when no dump is provided', async () => {
+    const { service, reports, symbolication } = setup();
+    const report = await service.createCrashReport(4, {
+      resetReason: 'panic',
+      heapFreeBytes: 123.9,
+      largestFreeBlockBytes: NaN,
+      uptimeBeforeResetMs: Infinity,
+    } as never);
+    expect(report).toMatchObject({
+      heapFreeBytes: 123,
+      largestFreeBlockBytes: null,
+      uptimeBeforeResetMs: null,
+      coredump: null,
+      coredumpSize: null,
+      symbolicationStatus: null,
+    });
+    expect(reports.save).toHaveBeenCalledWith(
+      expect.objectContaining({ attractapId: 4, rebootReason: null, wsState: null }),
+    );
+    expect(symbolication.symbolicate).not.toHaveBeenCalled();
+  });
+  it('symbolicates the binary dump but omits its bytes from the response', async () => {
+    const { service, symbolication, reports } = setup();
+    const report = await service.createCrashReport(4, {
+      resetReason: 'panic',
+      coredumpBase64: Buffer.from('dump').toString('base64'),
+      rebootReason: 'watchdog',
+      firmwareVersion: '1.0',
+      wsState: 'connected',
+      wifiState: 'online',
+    } as never);
+    expect(symbolication.symbolicate).toHaveBeenCalledWith(Buffer.from('dump'), { variant: 'standard' });
+    expect(report).toMatchObject({
+      coredump: null,
+      coredumpSize: 4,
+      symbolicationStatus: 'completed',
+      symbolizedBacktrace: 'task: main',
+    });
+    expect(reports.update).toHaveBeenCalledWith(7, expect.objectContaining({ coredumpBuildId: 'build' }));
+  });
+  it('looks up installed and server firmware while listing crash reports', async () => {
+    const { service, firmware, readers } = setup();
+    expect(await service.getCrashReportsForReader(4)).toEqual([]);
+    expect(firmware.getFirmwareDefinition).toHaveBeenCalledWith('Reader', 'standard');
+    readers.findOne.mockResolvedValue(null);
+    firmware.getFirmwareDefinition.mockClear();
+    expect(await service.getCrashReportsForReader(99)).toEqual([]);
+    expect(firmware.getFirmwareDefinition).not.toHaveBeenCalled();
   });
 });

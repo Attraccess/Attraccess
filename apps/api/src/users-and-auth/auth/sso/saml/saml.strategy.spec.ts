@@ -1,3 +1,5 @@
+import { EncryptionService } from '../../../../encryption/encryption.service';
+import { PassportSamlConfig } from '@node-saml/passport-saml';
 import { ModuleRef } from '@nestjs/core';
 import { SSOProvider, SSOProviderSAMLConfiguration, SSOProviderType } from '@attraccess/database-entities';
 import { SSOSamlStrategy } from './saml.strategy';
@@ -32,6 +34,88 @@ describe('SSOSamlStrategy', () => {
       },
     } as SSOSamlRequest;
   };
+
+  it.each([
+    { custom: 'preferred@example.com', email: 'base@example.com' },
+    { custom: ['preferred@example.com'], email: 'base@example.com' },
+    { custom: 12, emails: ['preferred@example.com'] },
+    { attributes: { custom: 'preferred@example.com' } },
+    { attributes: { custom: ['preferred@example.com'] } },
+  ])('resolves SAML email shapes without losing custom attribute precedence: %j', async (attributes) => {
+    const usersService = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 9, authenticationDetails: [{}] }),
+    };
+    const strategy = new SSOSamlStrategy({ get: () => usersService } as unknown as ModuleRef);
+    const request = buildRequest(10, 'custom');
+    request.ssoSamlOptions.samlConfiguration.emailAttributeKeys = ['', 'custom'];
+    await expect(strategy.validate(request, { nameID: 'subject', ...attributes } as SamlProfile)).rejects.toMatchObject(
+      { email: 'preferred@example.com' },
+    );
+    expect(usersService.findOne).toHaveBeenLastCalledWith({ email: 'preferred@example.com' }, [
+      'authenticationDetails',
+    ]);
+  });
+
+  it('rejects assertions without any usable email before looking up an account', async () => {
+    const usersService = { findOne: jest.fn() };
+    const strategy = new SSOSamlStrategy({ get: () => usersService } as unknown as ModuleRef);
+    await expect(
+      strategy.validate(buildRequest(10, 'custom'), {
+        nameID: 'subject',
+        emails: [],
+        attributes: { custom: 12 },
+      } as SamlProfile),
+    ).rejects.toThrow('No email found');
+    expect(usersService.findOne).not.toHaveBeenCalled();
+  });
+
+  it.each(['available', 'missing', 'throws'] as const)(
+    'builds per-request passport signing configuration when encryption is %s',
+    (availability) => {
+      const decrypt = jest.fn((value: string) => {
+        expect(value).toBe('ciphertext');
+        if (availability === 'throws') throw new Error('key unavailable');
+        return 'private-key';
+      });
+      const moduleRef = {
+        get: jest.fn((token: unknown) =>
+          token === EncryptionService && availability !== 'missing' ? { decrypt } : undefined,
+        ),
+      } as unknown as ModuleRef;
+      const strategy = new SSOSamlStrategy(moduleRef);
+      const request = buildRequest(10, 'email');
+      Object.assign(request.ssoSamlOptions.samlConfiguration, {
+        signRequest: true,
+        spSigningKeyEncrypted: 'ciphertext',
+        spSigningCertificate: 'SIGNINGCERT',
+        audience: 'audience',
+      });
+      const callback = jest.fn();
+      // Exercise the request callback registered with Passport, without sending an IdP request.
+      const passport = strategy as unknown as {
+        _options: {
+          getSamlOptions: (
+            req: SSOSamlRequest,
+            done: (error: Error | null, config?: PassportSamlConfig) => void,
+          ) => void;
+        };
+      };
+      passport._options.getSamlOptions(request, callback);
+      expect(callback).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          issuer: 'https://sp.example.com',
+          audience: 'audience',
+          callbackUrl: request.ssoSamlOptions.callbackUrl,
+          idpCert: '-----BEGIN CERTIFICATE-----\nCERTIFICATE\n-----END CERTIFICATE-----',
+          privateKey: availability === 'available' ? 'private-key' : undefined,
+        }),
+      );
+    },
+  );
 
   it('uses per-request SAML configuration for parallel validations', async () => {
     const usersService = {
@@ -107,9 +191,7 @@ describe('SSOSamlStrategy', () => {
       ),
     };
     const moduleRef = {
-      get: jest.fn().mockImplementation((token: unknown) =>
-        token === RbacService ? null : usersService,
-      ),
+      get: jest.fn().mockImplementation((token: unknown) => (token === RbacService ? null : usersService)),
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
@@ -137,34 +219,115 @@ describe('SSOSamlStrategy', () => {
   });
 
   it('audits successful SAML user creation and the committed role delta', async () => {
-    const usersService = { findOne: jest.fn().mockResolvedValue(null), buildUsernameFromSSOClaim: jest.fn((value: string) => value), createOne: jest.fn().mockResolvedValue({ id: 101, username: 'User', email: 'user@example.com' }) };
-    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue({ added: ['user-manager'], removed: [], updated: [] }) };
+    const usersService = {
+      findOne: jest.fn().mockResolvedValue(null),
+      buildUsernameFromSSOClaim: jest.fn((value: string) => value),
+      createOne: jest.fn().mockResolvedValue({ id: 101, username: 'User', email: 'user@example.com' }),
+    };
+    const rbacService = {
+      syncSsoRoles: jest.fn().mockResolvedValue({ added: ['user-manager'], removed: [], updated: [] }),
+    };
     const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
-    const provider = { id: 30, name: 'Workforce', type: SSOProviderType.SAML, samlConfiguration: { entryPoint: 'https://idp.example.com/sso', issuer: 'https://app.example.com', audience: null, signRequest: false, wantAssertionsSigned: false, wantAuthnResponseSigned: true, forceAuthn: false, emailAttributeKeys: ['email'], roleMappings: { 'user-manager': ['admins'] } } } as SSOProvider;
-    const moduleRef = { get: jest.fn((token: unknown) => token === UsersService ? usersService : token === RbacService ? rbacService : token === SSOService ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) } : token === SsoAuditService ? audit : undefined) } as unknown as ModuleRef;
+    const provider = {
+      id: 30,
+      name: 'Workforce',
+      type: SSOProviderType.SAML,
+      samlConfiguration: {
+        entryPoint: 'https://idp.example.com/sso',
+        issuer: 'https://app.example.com',
+        audience: null,
+        signRequest: false,
+        wantAssertionsSigned: false,
+        wantAuthnResponseSigned: true,
+        forceAuthn: false,
+        emailAttributeKeys: ['email'],
+        roleMappings: { 'user-manager': ['admins'] },
+      },
+    } as unknown as SSOProvider;
+    const moduleRef = {
+      get: jest.fn((token: unknown) =>
+        token === UsersService
+          ? usersService
+          : token === RbacService
+            ? rbacService
+            : token === SSOService
+              ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) }
+              : token === SsoAuditService
+                ? audit
+                : undefined,
+      ),
+    } as unknown as ModuleRef;
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
 
-    await strategy.validate(request, { nameID: 'subject', email: 'user@example.com', groups: ['admins'] } as SamlProfile);
+    await strategy.validate(request, {
+      nameID: 'subject',
+      email: 'user@example.com',
+      groups: ['admins'],
+    } as SamlProfile);
 
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }));
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'sso.provisioning.permissions_synced', details: expect.objectContaining({ changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }) }) }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'sso.provisioning.permissions_synced',
+        details: expect.objectContaining({
+          changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }),
+        }),
+      }),
+    );
   });
 
   it('records a created user even when a later role sync fails', async () => {
-    const usersService = { findOne: jest.fn().mockResolvedValue(null), buildUsernameFromSSOClaim: jest.fn((value: string) => value), createOne: jest.fn().mockResolvedValue({ id: 101, username: 'User', email: 'user@example.com' }) };
+    const usersService = {
+      findOne: jest.fn().mockResolvedValue(null),
+      buildUsernameFromSSOClaim: jest.fn((value: string) => value),
+      createOne: jest.fn().mockResolvedValue({ id: 101, username: 'User', email: 'user@example.com' }),
+    };
     const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
-    const provider = { id: 30, name: 'Workforce', type: SSOProviderType.SAML, samlConfiguration: { entryPoint: 'https://idp.example.com/sso', issuer: 'https://app.example.com', audience: null, signRequest: false, wantAssertionsSigned: false, wantAuthnResponseSigned: true, forceAuthn: false, emailAttributeKeys: ['email'], roleMappings: { 'user-manager': ['admins'] } } } as SSOProvider;
-    const moduleRef = { get: jest.fn((token: unknown) => token === UsersService ? usersService : token === RbacService ? { syncSsoRoles: jest.fn().mockRejectedValue(new Error('role write failed')) } : token === SSOService ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) } : token === SsoAuditService ? audit : undefined) } as unknown as ModuleRef;
+    const provider = {
+      id: 30,
+      name: 'Workforce',
+      type: SSOProviderType.SAML,
+      samlConfiguration: {
+        entryPoint: 'https://idp.example.com/sso',
+        issuer: 'https://app.example.com',
+        audience: null,
+        signRequest: false,
+        wantAssertionsSigned: false,
+        wantAuthnResponseSigned: true,
+        forceAuthn: false,
+        emailAttributeKeys: ['email'],
+        roleMappings: { 'user-manager': ['admins'] },
+      },
+    } as unknown as SSOProvider;
+    const moduleRef = {
+      get: jest.fn((token: unknown) =>
+        token === UsersService
+          ? usersService
+          : token === RbacService
+            ? { syncSsoRoles: jest.fn().mockRejectedValue(new Error('role write failed')) }
+            : token === SSOService
+              ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) }
+              : token === SsoAuditService
+                ? audit
+                : undefined,
+      ),
+    } as unknown as ModuleRef;
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
 
-    await expect(strategy.validate(request, { nameID: 'subject', email: 'user@example.com', groups: ['admins'] } as SamlProfile)).rejects.toThrow('role write failed');
+    await expect(
+      strategy.validate(request, { nameID: 'subject', email: 'user@example.com', groups: ['admins'] } as SamlProfile),
+    ).rejects.toThrow('role write failed');
 
     expect(audit.record).toHaveBeenCalledTimes(1);
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }),
+    );
   });
 
   it('does not sync roles when profile has no role/group attributes (only email, name, etc.)', async () => {

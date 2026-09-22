@@ -142,3 +142,71 @@ describe('ResourceFormsService pagination + per-field validation', () => {
     expect(save).not.toHaveBeenCalled();
   });
 });
+
+describe('ResourceFormsService field updates', () => {
+  const defaults = {
+    name: 'Updated',
+    isRequiredOnResourceUsageStart: false,
+    isRequiredOnResourceUsageTakeOver: false,
+    isRequiredOnResourceUsageEnd: false,
+  };
+  const makeService = () => {
+    const form = { id: 7, resourceId: 5, name: 'Updated', fields: [] };
+    const fieldRepo = {
+      find: jest.fn().mockResolvedValue([{ id: 11 }, { id: 12 }]),
+      delete: jest.fn(),
+      update: jest.fn(),
+      insert: jest.fn(),
+    };
+    const formRepo = {
+      findOne: jest.fn().mockResolvedValue(form),
+      update: jest.fn(),
+      manager: { transaction: jest.fn() },
+    };
+    const manager = { getRepository: (entity: unknown) => (entity === Form ? formRepo : fieldRepo) };
+    formRepo.manager.transaction.mockImplementation((run) => run(manager));
+    const service = new ResourceFormsService(
+      formRepo as never,
+      fieldRepo as never,
+      {} as never,
+      { findOne: jest.fn().mockResolvedValue({ id: 5 }) } as never,
+    );
+    return { service, fieldRepo, formRepo };
+  };
+
+  it('reconciles retained, deleted and new fields within the form transaction', async () => {
+    const { service, fieldRepo, formRepo } = makeService();
+    const updated = await service.update(5, 7, {
+      ...defaults,
+      name: 'Updated',
+      fields: [
+        { id: 11, name: 'Retained', type: FormFieldType.TEXT, position: 0, isRequired: true },
+        { name: 'New', type: FormFieldType.BOOLEAN, position: 1, isRequired: false },
+      ],
+    });
+    expect(updated.name).toBe('Updated');
+    expect(formRepo.manager.transaction).toHaveBeenCalledTimes(1);
+    expect(fieldRepo.delete).toHaveBeenCalledWith([12]);
+    expect(fieldRepo.update).toHaveBeenCalledWith(11, expect.objectContaining({ name: 'Retained', isRequired: true }));
+    expect(fieldRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ formId: 7, name: 'New' }));
+  });
+
+  it('rejects an existing field belonging to a different form', async () => {
+    const { service, fieldRepo } = makeService();
+    await expect(
+      service.update(5, 7, {
+        ...defaults,
+        fields: [{ id: 99, name: 'Foreign', type: FormFieldType.TEXT, position: 0, isRequired: false }],
+      }),
+    ).rejects.toThrow('Form field #99 not found on this form');
+    expect(fieldRepo.update).not.toHaveBeenCalled();
+    expect(fieldRepo.insert).not.toHaveBeenCalled();
+  });
+
+  it('removes all fields when the update supplies an empty field list', async () => {
+    const { service, fieldRepo } = makeService();
+    await service.update(5, 7, { ...defaults, fields: [] });
+    expect(fieldRepo.delete).toHaveBeenCalledWith([11, 12]);
+    expect(fieldRepo.update).not.toHaveBeenCalled();
+  });
+});
