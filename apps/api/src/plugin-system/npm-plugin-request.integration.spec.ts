@@ -102,4 +102,13 @@ const npmPluginService = {
       expect.any(Object),
     );
   });
+
+  it.each(['true', 'false'])('rejects string major-version approval %s', async (approvedMajorVersion) => {
+    await request(app.getHttpServer())
+      .post('/api/plugins/installed/example/versions/2.0.0')
+      .send({ approvedMajorVersion })
+      .expect(400);
+
+    expect(npmPluginService.replaceInstalled).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsArray, IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class AddPluginRegistryDto {
@@ -32,6 +33,8 @@ export class ReplaceInstalledPluginDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  // Preserve the JSON value so global implicit conversion cannot turn "false" into true.
+  @Transform(({ obj, key }) => obj[key])
   @IsBoolean()
   approvedMajorVersion?: boolean;
 }
