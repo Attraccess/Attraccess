@@ -20,6 +20,7 @@ export enum AttractapEventType {
   READER_CRASH_REPORT = 'READER_CRASH_REPORT',
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
   RESOURCE_LIST = 'RESOURCE_LIST',
+  REQUEST_RESOURCE_LIST = 'REQUEST_RESOURCE_LIST',
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
   CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
   // Two-card supervision (ATT-493): a non-introduced user taps first, then a
@@ -200,6 +201,7 @@ export interface ResourceUsageFormMetaPayload {
 }
 
 export interface ResourceUsageFormRequestPayload {
+  requestId?: number;
   resourceId: number;
   resourceName?: string;
   action: ResourceFormAction;

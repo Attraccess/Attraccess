@@ -80,6 +80,17 @@ void Lockscreen::init()
     lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->updateUsageInfo();
+    auto *back = lv_button_create(this->screen);
+    DisplayTheme::secondaryButton(back);
+    lv_obj_set_size(back, 110, 42);
+    lv_obj_align(back, LV_ALIGN_BOTTOM_LEFT, 20, -30);
+    auto *backLabel = lv_label_create(back);
+    lv_label_set_text(backLabel, "< Liste");
+    lv_obj_center(backLabel);
+    lv_obj_add_event_cb(back, [](lv_event_t *event) {
+        auto *self = static_cast<Lockscreen *>(lv_event_get_user_data(event));
+        if (!self->authenticating && self->backCallback) self->backCallback();
+    }, LV_EVENT_CLICKED, this);
 }
 
 lv_obj_t *Lockscreen::getScreen()
@@ -147,6 +158,7 @@ void Lockscreen::updateUsageInfo()
 
 void Lockscreen::onScreenLeave()
 {
+    this->hideActionProgress();
 }
 
 void Lockscreen::destroy()
@@ -157,6 +169,7 @@ void Lockscreen::destroy()
     }
     lv_obj_del(this->screen);
     this->screen = nullptr;
+    overlay.detach();
     this->resourceNameLabel = nullptr;
     this->usageInfoLabel = nullptr;
 }

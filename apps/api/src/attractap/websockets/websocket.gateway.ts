@@ -496,6 +496,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
         // no-op on server; metadata-only event sent by server
         break;
+      case AttractapEventType.REQUEST_RESOURCE_LIST:
+        await this.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId });
+        break;
       case AttractapEventType.RESOURCE_LIST:
       case AttractapEventType.READER_UNAUTHORIZED:
       case AttractapEventType.READER_REQUEST_AUTHENTICATION:

@@ -75,6 +75,7 @@ describe('AttractapCardHandler', () => {
     rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
     audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
+    (handler as any).resourceListService = { sendResourceListToSocket: jest.fn().mockResolvedValue(undefined) };
     (handler as any).websocketService = websocketService;
     (handler as any).attractapService = attractapService;
     (handler as any).usersService = usersService;

@@ -279,11 +279,25 @@ describe('AttractapGateway', () => {
 
       await gateway.onHeartbeat(socket);
 
-      expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(JSON.stringify({ event: 'HEARTBEAT' }));
+      expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(
+        JSON.stringify({ event: 'HEARTBEAT' }),
+      );
     });
   });
 
   describe('onClientEvent', () => {
+    it('passes the resource refresh request identity to the list service', async () => {
+      const socket = createMockSocket({ readerId: 42 });
+      const refresh = jest
+        .spyOn(gateway['resourceListService'], 'sendResourceListToSocket')
+        .mockResolvedValue(undefined);
+      await gateway.onClientEvent(
+        { type: AttractapEventType.REQUEST_RESOURCE_LIST, payload: { requestId: 880 } },
+        socket,
+      );
+      expect(refresh).toHaveBeenCalledWith(socket, { requestId: 880 });
+    });
+
     it('rejects server-only event types from clients', async () => {
       const socket = createMockSocket({ id: 'ev-1', readerId: 1 });
 
@@ -299,9 +313,7 @@ describe('AttractapGateway', () => {
 
       for (const type of serverOnlyEvents) {
         const event = new AttractapEvent(type, {});
-        await expect(
-          gateway.onClientEvent(event.data, socket),
-        ).rejects.toThrow('THIS IS A SERVER SIDE ONLY EVENT');
+        await expect(gateway.onClientEvent(event.data, socket)).rejects.toThrow('THIS IS A SERVER SIDE ONLY EVENT');
       }
     });
 

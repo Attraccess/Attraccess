@@ -19,7 +19,7 @@ void Application::handleFormsRequest(
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
     expectedAction = API::ResourceUsageFormActionType::END;
   }
-  if (this->hasPendingFormRequest || this->formFlowSubmitted ||
+  if (!this->api.isCurrentResourceAction(request.requestId) || this->hasPendingFormRequest || this->formFlowSubmitted ||
       this->pendingActionType == PENDING_ACTION_NONE ||
       request.resourceId != this->pendingActionResourceId ||
       request.action != expectedAction) {
@@ -35,6 +35,13 @@ void Application::handleFormsRequest(
   this->formCursorOffset = 0;
   this->clearFormPageCache();
   this->awaitingFieldRender = false;
+  if (this->returnToListAfterAction) {
+    this->resourceIsSelected = true;
+    this->state = APPLICATION_STATE_UNLOCKED;
+    Display::resourceListScreen.hideActionProgress();
+    Display::transitionToScreen(&Display::resourceDetailsScreen);
+  }
+  Display::resourceDetailsScreen.hideActionProgress();
   Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
   this->requestCurrentFormField();
 }
@@ -199,11 +206,12 @@ void Application::finishFormFlow() {
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = true;
   Display::resourceDetailsScreen.hideFormsModal();
-  Display::resourceDetailsScreen.showActionProgress("Sende Formular");
+  this->pendingUiStartedAt = millis();
+  this->showReaderActionProgress("Sende Formular");
 
   if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
     this->api.startResourceUsageSession(this->pendingActionResourceId,
-                                        this->pendingActionProjectId);
+                                        this->pendingActionProjectId, this->pendingActionIsTakeover);
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
     this->api.stopResourceUsageSession(this->pendingActionResourceId);
   } else {
@@ -248,8 +256,9 @@ void Application::handleFormsCancel() {
   this->clearFormPageCache();
   this->awaitingFieldRender = false;
   Display::resourceDetailsScreen.hideFormsModal();
-  Display::resourceDetailsScreen.hideActionProgress();
-  this->endActionPause();
+  if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.hideActionProgress();
+  this->finishReaderAction(false);
+  if (!this->waitingForResourceRefresh) this->endActionPause();
 }
 
 void Application::onActionResult(const std::string &eventType) {

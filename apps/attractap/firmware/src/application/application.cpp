@@ -97,12 +97,9 @@ void Application::setup() {
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
 #ifdef HAS_LVGL_DISPLAY
-        struct ResourceListAsyncPayload {
-          Application *self;
-          API::ResourceList list;
-        };
-
+        lv_lock();
         this->handleResourceListUpdate(resourceList);
+        lv_unlock();
 #else
         if (resourceList.count > 0) {
           this->selectedResourceId = resourceList.items[0].id;
@@ -118,12 +115,19 @@ void Application::setup() {
 
   this->api.setCardAuthenticationDetailsResponseCallback(
       [this](API::CardAuthenticationDetailsResponse response) {
+#ifdef HAS_LVGL_DISPLAY
+        if (!this->cardAuthenticationPending || this->unlocked) return;
+#endif
         if (response.error.length() > 0) {
           this->logger.errorf("Authentication failed: %s",
                               response.error.c_str());
           this->beeper.errorBeep();
           this->nfc.enableCardDetection();
+#ifdef HAS_LVGL_DISPLAY
+          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
+#else
           this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+#endif
           return;
         }
 
@@ -131,7 +135,11 @@ void Application::setup() {
           this->logger.error("Invalid key bytes provided");
           this->beeper.errorBeep();
           this->nfc.enableCardDetection();
+#ifdef HAS_LVGL_DISPLAY
+          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
+#else
           this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+#endif
           return;
         }
 
@@ -167,7 +175,8 @@ void Application::setup() {
               delete p;
             return;
           }
-          p->self->endActionPause();
+          p->self->finishReaderAction(false);
+          p->self->handleFormsCancel();
           Display::resourceDetailsScreen.hideActionProgress();
           if (p->enabled) {
             Display::showInsufficientBalancePopup(
@@ -218,8 +227,9 @@ void Application::setup() {
               delete pl;
             return;
           }
-          pl->self->endActionPause();
-          Display::resourceDetailsScreen.hideActionProgress();
+          if (pl->self->cardAuthenticationPending) pl->self->finishCardAuthentication(false);
+          pl->self->finishReaderAction(false);
+          pl->self->handleFormsCancel();
           Display::showErrorPopup(pl->t, pl->m);
           if (pl && pl->self) {
             pl->self->pendingActionType = PENDING_ACTION_NONE;
@@ -235,39 +245,27 @@ void Application::setup() {
 
 #ifdef HAS_LVGL_DISPLAY
   // Generic action result handling: stop overlay and show success toast
-  this->api.setActionResultCallback([this](const char *type, bool success) {
-    struct ActionResultPayload {
-      Application *self;
-      bool ok;
-      std::string eventType;
-    };
-    ActionResultPayload *p = new ActionResultPayload();
-    if (!p) {
-      return;
-    }
-    p->self = this;
-    p->ok = success;
-    if (type) {
-      p->eventType = type;
-    }
-    Display::asyncCall(
-        [](void *u) {
-          ActionResultPayload *pl = static_cast<ActionResultPayload *>(u);
-          if (pl && pl->self) {
-            pl->self->endActionPause();
+  this->api.setActionResultCallback([this](const API::ActionResult &result) {
+    struct Payload { Application *self; API::ActionResult result; };
+    auto *payload = new Payload{this, result};
+    Display::asyncCall([](void *data) {
+      auto *payload = static_cast<Payload *>(data);
+      auto *self = payload->self;
+      const auto &result = payload->result;
+      if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
+        self->finishReaderAction(result.success);
+        if (result.success) self->onActionResult(result.type);
+        else {
+          self->handleFormsCancel();
+          if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
+            Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
+          } else {
+            Display::showErrorPopup("Aktion fehlgeschlagen", result.error.empty() ? "Bitte erneut versuchen." : translateReaderError(result.error));
           }
-          Display::resourceDetailsScreen.hideActionProgress();
-          if (pl && pl->ok) {
-            Display::resourceDetailsScreen.showSuccessToast("Erfolgreich");
-          }
-          if (pl && pl->self && pl->ok) {
-            pl->self->onActionResult(pl->eventType);
-          }
-          if (pl) {
-            delete pl;
-          }
-        },
-        p);
+        }
+      }
+      delete payload;
+    }, payload);
   });
 #endif
 
@@ -337,6 +335,11 @@ void Application::setup() {
   });
 
   // Hidden maintenance drawer (pull down from the top edge)
+  Display::setDrawerAvailableCallback([this]() {
+    return !this->cardAuthenticationPending && this->pendingUiAction.empty() &&
+           !this->waitingForResourceRefresh && !this->hasPendingFormRequest &&
+           this->state != APPLICATION_STATE_SUPERVISION;
+  });
   Display::setOnOpenSettingsCallback([this]() {
 #ifdef DEMO_MODE
     Display::transitionToScreen(&Display::demoSettingsScreen);
@@ -368,8 +371,19 @@ void Application::setup() {
 
   Display::resourceListScreen.setResourceSelectionCallback(
       [this](const API::ResourceBrief &resource) {
+        if (!this->pendingUiAction.empty() || this->waitingForResourceRefresh || this->cardAuthenticationPending) return;
+        this->returnToListAfterAction = false;
         this->selectResource(resource);
       });
+  Display::resourceListScreen.setActionCallback([this](const API::ResourceBrief &resource, ResourceListAction action) {
+    this->handleResourceListAction(resource, action);
+  });
+  Display::resourceListScreen.setLogoutCallback([this] { this->logoutReader(); });
+  Display::lockscreen.setBackCallback([this] {
+    if (this->cardAuthenticationPending) return;
+    this->resourceIsSelected = false;
+    this->selectedResourceId = 0;
+  });
 
   Display::setTouchCallback(
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
@@ -470,9 +484,10 @@ void Application::setup() {
         struct Payload {
           Application *self;
           uint32_t resourceId;
+          uint32_t requestId;
           API::ResourceUsageFormActionType action;
         };
-        Payload *payload = new Payload{this, request.resourceId, request.action};
+        Payload *payload = new Payload{this, request.resourceId, request.requestId, request.action};
         if (!payload) {
           return;
         }
@@ -483,8 +498,8 @@ void Application::setup() {
                 // The scratch buffer can hold a newer request by the time this
                 // runs, so only process the request represented by this payload.
                 const auto &request = payload->self->api.getFormRequestScratch();
-                if (request.resourceId == payload->resourceId &&
-                    request.action == payload->action) {
+                if (request.resourceId == payload->resourceId && request.requestId == payload->requestId &&
+                    request.action == payload->action && payload->self->api.isCurrentResourceAction(request.requestId)) {
                   payload->self->handleFormsRequest(request);
                 }
               }
@@ -547,13 +562,25 @@ void Application::setup() {
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED)
+    if (this->state == APPLICATION_STATE_LOCKED || this->state == APPLICATION_STATE_RESOURCE_LIST)
 #else
     if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
 #endif
     {
+#ifdef HAS_LVGL_DISPLAY
+      if (this->cardAuthenticationPending || this->resourceCount == 0) return;
+      this->cardAuthenticationPending = true;
+      this->cardAuthenticationStartedAt = millis();
+      this->authenticationResourceId = this->resourceIsSelected ? this->selectedResourceId : this->resourceList.items[0].id;
+      lv_lock();
+      if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
+      else Display::resourceListScreen.showActionProgress("Karte wird geprüft", "Einen Moment bitte ...");
+      lv_unlock();
+      this->api.requestCardAuthenticationData(uid, uidLength, this->authenticationResourceId);
+#else
       this->api.requestCardAuthenticationData(uid, uidLength,
                                               this->selectedResourceId);
+#endif
       return;
     }
 

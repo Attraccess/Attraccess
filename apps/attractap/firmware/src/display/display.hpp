@@ -78,6 +78,7 @@ public:
     // "Open Settings" and "Reboot" actions. The settings action is wired by the
     // application; reboot is handled internally (esp_restart after a confirm).
     static void setOnOpenSettingsCallback(std::function<void()> callback);
+    static void setDrawerAvailableCallback(std::function<bool()> callback);
 
     /**
      * Thread-safe lv_async_call: takes lv_lock() around the timer-list
@@ -148,6 +149,7 @@ private:
     static lv_obj_t *drawerPanel;
     static bool drawerOpen;
     static std::function<void()> onOpenSettingsCallback;
+    static std::function<bool()> drawerAvailableCallback;
     static bool gestureCandidate;
     static bool gesturePrevPressed;
     static int16_t gestureStartY;

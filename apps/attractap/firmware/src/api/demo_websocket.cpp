@@ -153,6 +153,12 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
         return;
     }
 
+    if (strcmp(type, "REQUEST_RESOURCE_LIST") == 0)
+    {
+        respondResourceList(doc["data"]["payload"]["requestId"] | 0u);
+        return;
+    }
+
     if (strcmp(type, "REQUEST_CARD_AUTHENTICATION_DATA") == 0)
     {
         const char *uid = doc["data"]["payload"]["uid"] | "";
@@ -166,6 +172,11 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
         respondProjects(doc["data"]["payload"]["page"] | 1u);
         return;
     }
+
+    if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(type, "LOCK_DOOR") == 0 || strcmp(type, "UNLOCK_DOOR") == 0 ||
+        strcmp(type, "UNLATCH_DOOR") == 0 || strcmp(type, "TRIGGER_FLOW_BUTTON") == 0)
+        _actionRequestId = doc["data"]["payload"]["requestId"] | 0u;
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0)
     {
@@ -224,12 +235,15 @@ void DemoWebsocket::respondAuthenticated()
     respondResourceList();
 }
 
-void DemoWebsocket::respondResourceList()
+void DemoWebsocket::respondResourceList(uint32_t requestId)
 {
     StaticJsonDocument<3072> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_LIST";
     doc["data"]["payload"]["messageId"] = ++_resourceListMsgId;
+    doc["data"]["payload"]["revision"] = _resourceListMsgId;
+    doc["data"]["payload"]["requestId"] = requestId;
+    doc["data"]["payload"]["authenticatedUsername"] = _currentUser;
     doc["data"]["payload"]["readerName"] = "Demo Gerät";
 
     // Introducers = enrolled admin cards (they can introduce others). Shown in
@@ -253,6 +267,13 @@ void DemoWebsocket::respondResourceList()
         obj["name"] = r.name;
         obj["description"] = "Demo Ressource";
         obj["type"] = (r.type == 1) ? "door" : "machine";
+        if (!_currentUser.empty()) {
+            obj["hasIntroduction"] = _currentHasIntroduction;
+            obj["canManageResource"] = _currentCanManage;
+            obj["isIntroducer"] = _currentCanManage;
+            obj["canManageMaintenance"] = _currentCanManage;
+            obj["requiresSupervisor"] = false;
+        }
         obj["isHealthy"] = true;
         obj["isUnderMaintenance"] = false;
         obj["separateUnlockAndUnlatch"] = false;
@@ -304,6 +325,8 @@ void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resource
     // Remember who tapped so START/STOP can be attributed to the current user.
     _currentUser = DemoStore::displayName(card);
     _currentCanManage = (card.role == DemoStore::UserRole::ADMIN);
+    _currentHasIntroduction = (card.role != DemoStore::UserRole::NO_PERMISSION);
+    respondResourceList();
 
     // Always return the factory key (all zeros) — demo cards are never physically enrolled.
     doc["data"]["payload"]["keyNo"] = 0;
@@ -327,6 +350,7 @@ void DemoWebsocket::respondActionSuccess(const std::string &type)
     doc["event"] = "EVENT";
     doc["data"]["type"] = type;
     doc["data"]["payload"]["success"] = true;
+    doc["data"]["payload"]["requestId"] = _actionRequestId;
 
     char buf[256];
     size_t n = serializeJson(doc, buf, sizeof(buf));
@@ -436,6 +460,7 @@ void DemoWebsocket::respondFormRequest(uint32_t resourceId)
     StaticJsonDocument<512> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_USAGE_FORM_REQUEST";
+    doc["data"]["payload"]["requestId"] = _actionRequestId;
     doc["data"]["payload"]["resourceId"] = resourceId;
     doc["data"]["payload"]["resourceName"] = "CNC Fräse";
     doc["data"]["payload"]["action"] = "start";

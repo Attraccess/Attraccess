@@ -48,3 +48,8 @@ pass an existing output directory:
 SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software \
   dist/apps/attractap-desktop/attractap-desktop-display-tests /path/to/screenshots
 ```
+
+The [reader workflow gallery](docs/reader-workflow/README.md) documents the
+authenticated resource list and its production application journeys. These
+tests run the real application, API parser, NFC verifier and screen router
+against a deterministic server transport, including real session timeouts.

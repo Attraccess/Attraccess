@@ -57,10 +57,12 @@ export class AttractapFormsHandler {
     socket,
     resourceId,
     action,
+    requestId,
   }: {
     socket: AuthenticatedWebSocket;
     resourceId: number;
     action: ResourceFormAction;
+    requestId?: number;
   }): Promise<FormSubmissionRequestDto[] | null> {
     const forms = await this.resourceFormsService.getFormsForAction(resourceId, action);
     if (!forms.length) {
@@ -96,6 +98,7 @@ export class AttractapFormsHandler {
     }
 
     const payload: ResourceUsageFormRequestPayload = {
+      ...(Number.isSafeInteger(requestId) && requestId > 0 ? { requestId } : {}),
       resourceId,
       resourceName,
       action,

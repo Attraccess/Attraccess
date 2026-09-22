@@ -50,6 +50,11 @@ void Display::setOnOpenSettingsCallback(std::function<void()> callback)
     Display::onOpenSettingsCallback = callback;
 }
 
+void Display::setDrawerAvailableCallback(std::function<bool()> callback)
+{
+    Display::drawerAvailableCallback = std::move(callback);
+}
+
 void Display::initDrawer()
 {
     lv_obj_t *top = lv_layer_top();
@@ -137,6 +142,9 @@ void Display::initDrawer()
 void Display::openDrawer()
 {
     if (Display::drawerOpen || !Display::drawerPanel || !Display::drawerBackdrop)
+        return;
+    // This passive gesture bypasses LVGL hit testing and screen overlays.
+    if (Display::drawerAvailableCallback && !Display::drawerAvailableCallback())
         return;
 
     Display::drawerOpen = true;

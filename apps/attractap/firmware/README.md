@@ -26,7 +26,7 @@ Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v
 
 NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
-Build every shipped variant (also what CI and `pnpm nx run attractap-firmware:build` run):
+Build the active `attractap-touch` and `attractap-touch-v2` variants (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
 
 ```bash
 python3 build_firmwares.py

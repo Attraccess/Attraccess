@@ -69,6 +69,7 @@ lv_obj_t *Display::drawerBackdrop = nullptr;
 lv_obj_t *Display::drawerPanel = nullptr;
 bool Display::drawerOpen = false;
 std::function<void()> Display::onOpenSettingsCallback = nullptr;
+std::function<bool()> Display::drawerAvailableCallback = nullptr;
 bool Display::gestureCandidate = false;
 bool Display::gesturePrevPressed = false;
 int16_t Display::gestureStartY = 0;

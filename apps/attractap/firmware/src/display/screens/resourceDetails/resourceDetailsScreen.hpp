@@ -7,6 +7,8 @@
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
 #include "display/theme.hpp"
+#include "display/shared/sessionHeader.hpp"
+#include "display/shared/actionOverlay.hpp"
 #include "../../../utils.hpp"
 #include "../../../api/api.hpp"
 
@@ -28,6 +30,7 @@ public:
         BUTTON_CLICK_TYPE_UNLATCH_DOOR,
         BUTTON_CLICK_TYPE_FLOW_BUTTON,
         BUTTON_CLICK_TYPE_LOGOUT,
+        BUTTON_CLICK_TYPE_BACK,
     };
 
     ResourceDetailsScreen() : logger("ResourceDetailsScreen"), loginUsernameCache("INITIAL_VALUE")
@@ -86,7 +89,9 @@ private:
     lv_obj_t *screen = nullptr;
 
     std::string loginUsernameCache;
-    lv_obj_t *loginUserLabel = nullptr;
+    SessionHeader sessionHeader;
+    ActionOverlay actionOverlay;
+    std::string actionTitle;
 
     lv_obj_t *sessionDetailsContainer = nullptr;
     time_t sessionStartTime = 0;
@@ -191,10 +196,7 @@ private:
     void updateElapsedTimeDisplay();
     lv_obj_t *elapsedTime = nullptr;
 
-    uint32_t sessionTimeoutTime = 0;
-    bool sessionTimeoutPaused = false;
-    uint32_t pauseFrozenAtMs = 0;
-    lv_obj_t *sessionTimeoutIndicator = nullptr;
+
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;

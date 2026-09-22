@@ -98,6 +98,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         mockSocket,
         10,
         AttractapEventType.START_RESOURCE_USAGE_SESSION,
+        undefined,
       );
       expect(mockFormsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
       expect(mockResourceUsageService.startSession).not.toHaveBeenCalled();
@@ -187,6 +188,22 @@ describe('AttractapSessionHandler – session + flow button', () => {
       );
     });
 
+    it('echoes the originating request id on success and error', async () => {
+      const request = { ...eventData, payload: { ...eventData.payload, requestId: 880 } };
+      await handler.handleStartResourceUsageSession(mockSocket, request);
+      expect(mockSocket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({ success: true, requestId: 880 });
+      expect(mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith(expect.objectContaining({ requestId: 880 }));
+      mockResourceUsageService.startSession.mockRejectedValueOnce(new Error('Start failed'));
+      await handler.handleStartResourceUsageSession(mockSocket, {
+        ...request,
+        payload: { ...request.payload, requestId: 881 },
+      });
+      expect(mockSocket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({
+        error: 'Start failed',
+        requestId: 881,
+      });
+    });
+
     describe('ResourceInUseError handling', () => {
       beforeEach(() => {
         jest.useFakeTimers();
@@ -196,20 +213,20 @@ describe('AttractapSessionHandler – session + flow button', () => {
         jest.useRealTimers();
       });
 
-      it('schedules a resource list refresh after 1000ms and sends no error message', async () => {
+      it('reports the occupied resource immediately and refreshes the list', async () => {
         mockResourceUsageService.startSession.mockRejectedValueOnce(new ResourceInUseError());
 
         await (handler as any).handleStartResourceUsageSession(mockSocket, eventData);
 
-        // No error message is sent to the socket and the draft is not cleared.
-        expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+        expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
+              payload: expect.objectContaining({ error: 'ResourceInUseError' }),
+            }),
+          }),
+        );
         expect(mockFormsHandler.clearFormDraft).not.toHaveBeenCalled();
-        expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
-
-        jest.advanceTimersByTime(1000);
-        // Flush the microtask queue so the async setTimeout callback runs.
-        await Promise.resolve();
-
         expect(mockResourceListService.sendResourceListToSocket).toHaveBeenCalledWith(mockSocket, {
           resourceIds: new Set([10]),
         });
@@ -281,7 +298,8 @@ describe('AttractapSessionHandler – session + flow button', () => {
       expect(mockResourceActionGuard.validateResourceAction).toHaveBeenCalledWith(
         mockSocket,
         10,
-        AttractapEventType.START_RESOURCE_USAGE_SESSION,
+        AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
+        undefined,
       );
       expect(mockFormsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
       expect(mockResourceUsageService.endSession).not.toHaveBeenCalled();
@@ -312,7 +330,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
+            type: AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
             payload: { error: 'USER_NOT_FOUND' },
           }),
         }),
@@ -325,9 +343,14 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
       await (handler as any).handleStopResourceUsageSession(mockSocket, eventData);
 
-      expect(mockResourceUsageService.endSession).toHaveBeenCalledWith(10, mockUser, { formSubmissions }, {
-        auditOrigin: { actorId: 1, authenticationMethod: null },
-      });
+      expect(mockResourceUsageService.endSession).toHaveBeenCalledWith(
+        10,
+        mockUser,
+        { formSubmissions },
+        {
+          auditOrigin: { actorId: 1, authenticationMethod: null },
+        },
+      );
       expect(mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(mockSocket, 10, ResourceFormAction.END);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -371,6 +394,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         mockSocket,
         10,
         AttractapEventType.TRIGGER_FLOW_BUTTON,
+        undefined,
       );
       expect(mockResourceFlowsExecutorService.pressButton).not.toHaveBeenCalled();
       expect(mockSocket.sendMessage).not.toHaveBeenCalled();

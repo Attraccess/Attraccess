@@ -85,6 +85,19 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
 
+    const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
+        strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
+        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
+    const bool isActionFormRequest = strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0;
+    const uint32_t requestId = inboundDoc["data"]["payload"]["requestId"] | 0u;
+    // A cancelled/timed-out request must not complete a later action, even on
+    // the same resource. Untagged replies remain compatible with older APIs.
+    if ((isActionResponse || isActionFormRequest) && !isCurrentResourceAction(requestId)) {
+        this->sendAck(eventType);
+        return;
+    }
+
     // Crash-report responses carry their own error codes (e.g. INVALID_CRASH_REPORT)
     // that must not surface as a user-facing error dialog; route them to the handler.
     bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
@@ -114,6 +127,11 @@ void API::processIncomingMessage(const char *buf, size_t len)
             std::string err = payload["error"].as<std::string>();
             if (err.length() > 0)
             {
+                if (isActionResponse && this->actionResultCallback) {
+                    this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
+                    this->sendAck(eventType);
+                    return;
+                }
                 // Special-case insufficient balance: propagate sumUpEnabled flag if present
                 if (err == "INSUFFICIENT_BALANCE")
                 {
@@ -217,7 +235,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
         }
         if (this->actionResultCallback)
         {
-            this->actionResultCallback(eventType, success);
+            this->actionResultCallback({eventType, success, requestId, {}, false});
         }
     }
     else if (strcmp(eventType, "READER_FIRMWARE_UPDATE_REQUIRED") == 0)
@@ -269,7 +287,7 @@ void API::setErrorCallback(std::function<void(const char *title, const char *mes
     this->errorCallback = callback;
 }
 
-void API::setActionResultCallback(std::function<void(const char *type, bool success)> callback)
+void API::setActionResultCallback(std::function<void(const ActionResult &)> callback)
 {
     this->actionResultCallback = callback;
 }
