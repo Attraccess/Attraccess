@@ -188,6 +188,47 @@ describe('PluginsSection', () => {
     expect(await screen.findByRole('button', { name: '1.2.4 Newer' })).toBeInTheDocument();
   });
 
+  it('reports failed package update checks', async () => {
+    hoisted.plugins = [makePlugin()];
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.3',
+      registryId: 'npm',
+      registryUrl: 'https://registry.npmjs.org',
+      classification: 'community',
+      classificationReason: 'Marketplace package',
+      requestedSpec: 'latest',
+      updateOverride: 'inherit',
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+      }),
+    );
+    hoisted.checkAllInstalledPackagesMock.mockResolvedValue([
+      {
+        ...installed,
+        updateCheck: {
+          checkedAt: '2026-09-22T12:00:00.000Z',
+          candidate: null,
+          state: 'failed',
+          error: 'Registry unavailable',
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(await screen.findByRole('button', { name: 'Check all now' }));
+
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledWith({ title: 'Could not check plugin updates' }));
+    expect(hoisted.successToast).not.toHaveBeenCalled();
+  });
+
   async function openMarketplace(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'Install plugin' }));
     await user.click(screen.getByText('Browse marketplace'));

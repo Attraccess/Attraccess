@@ -553,7 +553,11 @@ export function PluginsSection() {
         for (const plugin of installed) updated.set(plugin.name, plugin);
         return updated;
       });
-      toast.success({ title: t('updatePolicy.checked') });
+      if (installed.some((plugin) => plugin.updateCheck?.state === 'failed')) {
+        toast.error({ title: t('updatePolicy.checkError') });
+      } else {
+        toast.success({ title: t('updatePolicy.checked') });
+      }
     } catch {
       toast.error({ title: t('updatePolicy.checkError') });
     }
