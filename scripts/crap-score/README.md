@@ -20,8 +20,8 @@ The PR and merge-queue workflow runs affected targets and uploads
 `crap-score-reports` for 14 days. Test failures and reporting failures block the
 existing `precommit-check` gate. Scores themselves are **informational**: there
 is no baseline or arbitrary maximum that would immediately fail legacy code.
-The terminal and summary JSON show the number of functions above the upstream
-guideline of 30 and the highest score. This is an additional coverage-enabled
+The terminal and summary JSON (`atLeast30`) show the number of functions at or above
+30 and the highest score: the clean-baseline target is strictly below 30. This is an additional coverage-enabled
 unit-test run; ordinary tests and Docker/hardware acceptance remain independent.
 
 ## Scope
@@ -38,6 +38,12 @@ Nx projects are analyzed by their own target. Files absent from the unit-test
 coverage report are instrumented with zero execution counts; this also covers
 projects without tests. Thus an untested file does not disappear from the report.
 E2E, shell and device tests do not contribute coverage to these unit reports.
+
+The bundled third-party OpenSCAD runtime at
+`apps/frontend/public/openscad/openscad.wasm.js` is explicitly excluded; other
+maintained public scripts remain in scope. Duplicate function mappings are
+collapsed by their complete source range, retaining the maximum observed call
+count. Same-line anonymous callbacks and same-named methods remain distinct.
 
 The adapter merges backend and frontend coverage for plugins, limits coverage to
 the owning project, and assigns unique function identifiers because upstream
