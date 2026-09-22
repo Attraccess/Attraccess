@@ -17,7 +17,8 @@ function log(message) {
   console.log(`[dnsmasq] ${message}`);
 }
 
-const HOSTNAME_PATTERN = /^(\*\.)?(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+const HOSTNAME_PATTERN =
+  /^(\*\.)?(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 const IPV4_PATTERN = /^(25[0-5]|2[0-4]\d|[01]?\d?\d)(\.(25[0-5]|2[0-4]\d|[01]?\d?\d)){3}$/;
 const IPV6_PATTERN = /^[0-9a-fA-F:]+$/;
 
@@ -104,10 +105,12 @@ function generateDnsmasqConfig(settings, records) {
 }
 
 function generateHostsFile(records) {
-  return records
-    .filter((r) => r.hostname && r.ip)
-    .map((r) => `${r.ip} ${r.hostname}`)
-    .join('\n') + '\n';
+  return (
+    records
+      .filter((r) => r.hostname && r.ip)
+      .map((r) => `${r.ip} ${r.hostname}`)
+      .join('\n') + '\n'
+  );
 }
 
 function writeDnsmasqConfig(records, settings) {
@@ -233,6 +236,75 @@ function getDnsmasqStatus() {
   }
 }
 
+async function createRecord(req, res, helpers) {
+  const body = await helpers.readBody(req);
+  if (!body.hostname || !body.ip) {
+    helpers.sendJson(res, 400, { error: 'hostname and ip required' });
+    return true;
+  }
+  if (!isValidHostname(body.hostname) || !isValidIp(body.ip)) {
+    helpers.sendJson(res, 400, { error: 'invalid hostname or ip' });
+    return true;
+  }
+  const records = loadRecords();
+  const newRecord = { id: crypto.randomUUID(), hostname: body.hostname, ip: body.ip };
+  records.push(newRecord);
+  applyAndReload(records);
+  helpers.sendJson(res, 201, newRecord);
+  return true;
+}
+
+async function updateRecord(subParts, req, res, helpers) {
+  const id = subParts[1];
+  const body = await helpers.readBody(req);
+  const records = loadRecords();
+  const idx = records.findIndex((r) => r.id === id);
+  if (idx === -1) {
+    helpers.sendJson(res, 404, { error: 'record not found' });
+    return true;
+  }
+  if (body.hostname !== undefined && !isValidHostname(body.hostname)) {
+    helpers.sendJson(res, 400, { error: 'invalid hostname' });
+    return true;
+  }
+  if (body.ip !== undefined && !isValidIp(body.ip)) {
+    helpers.sendJson(res, 400, { error: 'invalid ip' });
+    return true;
+  }
+  if (body.hostname) records[idx].hostname = body.hostname;
+  if (body.ip) records[idx].ip = body.ip;
+  applyAndReload(records);
+  helpers.sendJson(res, 200, records[idx]);
+  return true;
+}
+
+async function deleteRecord(subParts, res, helpers) {
+  const id = subParts[1];
+  let records = loadRecords();
+  const before = records.length;
+  records = records.filter((r) => r.id !== id);
+  if (records.length === before) {
+    helpers.sendJson(res, 404, { error: 'record not found' });
+    return true;
+  }
+  applyAndReload(records);
+  helpers.sendJson(res, 200, { deleted: true });
+  return true;
+}
+
+async function updateSettings(req, res, helpers) {
+  const body = await helpers.readBody(req);
+  const settings = loadSettings();
+  if (body.upstream1 !== undefined) settings.upstream1 = body.upstream1;
+  if (body.upstream2 !== undefined) settings.upstream2 = body.upstream2;
+  if (body.localDomain !== undefined) settings.localDomain = body.localDomain;
+  if (body.logQueries !== undefined) settings.logQueries = Boolean(body.logQueries);
+  saveSettings(settings);
+  restartDnsmasq(loadRecords(), settings);
+  helpers.sendJson(res, 200, settings);
+  return true;
+}
+
 const dnsmasqModule = {
   id: 'dnsmasq',
   label: 'DNS Server',
@@ -265,59 +337,15 @@ const dnsmasqModule = {
     }
 
     if (method === 'POST' && subPath === '/records') {
-      const body = await helpers.readBody(req);
-      if (!body.hostname || !body.ip) {
-        helpers.sendJson(res, 400, { error: 'hostname and ip required' });
-        return true;
-      }
-      if (!isValidHostname(body.hostname) || !isValidIp(body.ip)) {
-        helpers.sendJson(res, 400, { error: 'invalid hostname or ip' });
-        return true;
-      }
-      const records = loadRecords();
-      const newRecord = { id: crypto.randomUUID(), hostname: body.hostname, ip: body.ip };
-      records.push(newRecord);
-      applyAndReload(records);
-      helpers.sendJson(res, 201, newRecord);
-      return true;
+      return createRecord(req, res, helpers);
     }
 
     if (method === 'PUT' && subParts[0] === 'records' && subParts[1]) {
-      const id = subParts[1];
-      const body = await helpers.readBody(req);
-      const records = loadRecords();
-      const idx = records.findIndex((r) => r.id === id);
-      if (idx === -1) {
-        helpers.sendJson(res, 404, { error: 'record not found' });
-        return true;
-      }
-      if (body.hostname !== undefined && !isValidHostname(body.hostname)) {
-        helpers.sendJson(res, 400, { error: 'invalid hostname' });
-        return true;
-      }
-      if (body.ip !== undefined && !isValidIp(body.ip)) {
-        helpers.sendJson(res, 400, { error: 'invalid ip' });
-        return true;
-      }
-      if (body.hostname) records[idx].hostname = body.hostname;
-      if (body.ip) records[idx].ip = body.ip;
-      applyAndReload(records);
-      helpers.sendJson(res, 200, records[idx]);
-      return true;
+      return updateRecord(subParts, req, res, helpers);
     }
 
     if (method === 'DELETE' && subParts[0] === 'records' && subParts[1]) {
-      const id = subParts[1];
-      let records = loadRecords();
-      const before = records.length;
-      records = records.filter((r) => r.id !== id);
-      if (records.length === before) {
-        helpers.sendJson(res, 404, { error: 'record not found' });
-        return true;
-      }
-      applyAndReload(records);
-      helpers.sendJson(res, 200, { deleted: true });
-      return true;
+      return deleteRecord(subParts, res, helpers);
     }
 
     if (method === 'GET' && subPath === '/settings') {
@@ -326,16 +354,7 @@ const dnsmasqModule = {
     }
 
     if (method === 'PUT' && subPath === '/settings') {
-      const body = await helpers.readBody(req);
-      const settings = loadSettings();
-      if (body.upstream1 !== undefined) settings.upstream1 = body.upstream1;
-      if (body.upstream2 !== undefined) settings.upstream2 = body.upstream2;
-      if (body.localDomain !== undefined) settings.localDomain = body.localDomain;
-      if (body.logQueries !== undefined) settings.logQueries = Boolean(body.logQueries);
-      saveSettings(settings);
-      restartDnsmasq(loadRecords(), settings);
-      helpers.sendJson(res, 200, settings);
-      return true;
+      return updateSettings(req, res, helpers);
     }
 
     return false;

@@ -407,120 +407,86 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
 
-    switch (eventData.type) {
-      case AttractapEventType.READER_REGISTER:
-        await this.authHandler.handleReaderRegister(socket, eventData);
-        break;
-      case AttractapEventType.READER_AUTHENTICATE:
-        await this.authHandler.handleAuthentication(socket, eventData);
-        break;
-      case AttractapEventType.READER_FIRMWARE_INFO:
-        await this.firmwareHandler.handleFirmwareInfo(socket, eventData);
-        break;
-      case AttractapEventType.READER_CRASH_REPORT:
-        await this.crashReportHandler.handleCrashReport(socket, eventData);
-        break;
-      case AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA:
-        await this.cardHandler.handleCardAuthenticationRequest(socket, eventData);
-        break;
-      case AttractapEventType.SUPERVISION_REQUEST:
-        await this.supervisionHandler.handleSupervisionRequest(socket, eventData);
-        break;
-      case AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA:
-        await this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData);
-        break;
-      case AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED:
-        await this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData);
-        break;
-      case AttractapEventType.SUPERVISION_CANCEL:
-        await this.supervisionHandler.handleSupervisionCancel(socket);
-        break;
-      case AttractapEventType.START_RESOURCE_USAGE_SESSION:
-        await this.sessionHandler.handleStartResourceUsageSession(socket, eventData);
-        break;
-      case AttractapEventType.STOP_RESOURCE_USAGE_SESSION:
-        await this.sessionHandler.handleStopResourceUsageSession(socket, eventData);
-        break;
-      case AttractapEventType.LOCK_DOOR:
-        await this.sessionHandler.handleLockDoor(socket, eventData);
-        break;
-      case AttractapEventType.UNLOCK_DOOR:
-        await this.sessionHandler.handleUnlockDoor(socket, eventData);
-        break;
-      case AttractapEventType.UNLATCH_DOOR:
-        await this.sessionHandler.handleUnlatchDoor(socket, eventData);
-        break;
-      case AttractapEventType.TRIGGER_FLOW_BUTTON:
-        await this.sessionHandler.handleTriggerFlowButton(socket, eventData);
-        break;
-      case AttractapEventType.BILLING_REQUEST_TOPUP:
-        await this.billingHandler.handleBillingRequestTopup(socket, eventData);
-        break;
-      case AttractapEventType.FIRMWARE_REQUEST_CHUNK:
-        await this.firmwareHandler.handleFirmwareChunkRequest(socket, eventData);
-        break;
-      case AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY:
-        await this.cardHandler.onEnrollNewCardRequestNFCKey(socket, eventData);
-        break;
-
-      case AttractapEventType.ENROLL_NEW_CARD:
-        await this.cardHandler.onEnrollNewCard(socket, eventData);
-        break;
-      case AttractapEventType.ENROLL_NEW_CARD_CANCEL:
-        await this.cardHandler.onEnrollNewCardCancel(socket);
-        break;
-
-      case AttractapEventType.RESET_NFC_CARD:
-        await this.cardHandler.onResetNfcCard(socket, eventData);
-        break;
-      case AttractapEventType.RESET_NFC_CARD_CANCEL:
-        await this.cardHandler.onResetNfcCardCancel(socket);
-        break;
-
-      case AttractapEventType.PROJECTS_OF_USER:
-        await this.projectsHandler.handleProjectsOfUserRequest(socket, eventData);
-        break;
-
-      case AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS:
-        await this.formsHandler.handleResourceUsageFormGetFields(socket, eventData);
-        break;
-
-      case AttractapEventType.RESOURCE_USAGE_FORM_SUBMIT_PAGE:
-        await this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData);
-        break;
-
-      case AttractapEventType.RESOURCE_USAGE_FORM_CANCEL:
-        this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
-        break;
-
-      case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
-        // no-op on server; metadata-only event sent by server
-        break;
-      case AttractapEventType.REQUEST_RESOURCE_LIST:
-        await this.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId });
-        break;
-      case AttractapEventType.RESOURCE_LIST:
-      case AttractapEventType.READER_UNAUTHORIZED:
-      case AttractapEventType.READER_REQUEST_AUTHENTICATION:
-      case AttractapEventType.READER_AUTHENTICATED:
-      case AttractapEventType.CARD_AUTHENTICATION_DATA:
-      case AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA:
-      case AttractapEventType.SUPERVISION_RESOLVED:
-      case AttractapEventType.SUPERVISION_START:
-      case AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO:
-      case AttractapEventType.RESOURCE_USAGE_FORM_REQUEST:
-      case AttractapEventType.RESOURCE_USAGE_FORM_FIELDS:
-      case AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT:
-        this.logger.error(
-          `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
-        );
-        throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
-      default: {
-        const exhaustiveCheck: never = eventData.type;
-        throw new Error(`Unknown event type: ${exhaustiveCheck}`);
-      }
-    }
+    if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
+    await this.eventHandlers[eventData.type](socket, eventData);
   }
+
+  private rejectServerEvent(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']): never {
+    this.logger.error(
+      `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
+    );
+    throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
+  }
+
+  private readonly eventHandlers: Record<
+    AttractapEventType,
+    (socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) => unknown
+  > = {
+    [AttractapEventType.READER_REGISTER]: (socket, eventData) =>
+      this.authHandler.handleReaderRegister(socket, eventData),
+    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) =>
+      this.authHandler.handleAuthentication(socket, eventData),
+    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
+      this.firmwareHandler.handleFirmwareInfo(socket, eventData),
+    [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
+      this.crashReportHandler.handleCrashReport(socket, eventData),
+    [AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.cardHandler.handleCardAuthenticationRequest(socket, eventData),
+    [AttractapEventType.SUPERVISION_REQUEST]: (socket, eventData) =>
+      this.supervisionHandler.handleSupervisionRequest(socket, eventData),
+    [AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData),
+    [AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
+      this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData),
+    [AttractapEventType.SUPERVISION_CANCEL]: (socket) => this.supervisionHandler.handleSupervisionCancel(socket),
+    [AttractapEventType.START_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
+      this.sessionHandler.handleStartResourceUsageSession(socket, eventData),
+    [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
+      this.sessionHandler.handleStopResourceUsageSession(socket, eventData),
+    [AttractapEventType.LOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleLockDoor(socket, eventData),
+    [AttractapEventType.UNLOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlockDoor(socket, eventData),
+    [AttractapEventType.UNLATCH_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlatchDoor(socket, eventData),
+    [AttractapEventType.TRIGGER_FLOW_BUTTON]: (socket, eventData) =>
+      this.sessionHandler.handleTriggerFlowButton(socket, eventData),
+    [AttractapEventType.BILLING_REQUEST_TOPUP]: (socket, eventData) =>
+      this.billingHandler.handleBillingRequestTopup(socket, eventData),
+    [AttractapEventType.FIRMWARE_REQUEST_CHUNK]: (socket, eventData) =>
+      this.firmwareHandler.handleFirmwareChunkRequest(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY]: (socket, eventData) =>
+      this.cardHandler.onEnrollNewCardRequestNFCKey(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD]: (socket, eventData) => this.cardHandler.onEnrollNewCard(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD_CANCEL]: (socket) => this.cardHandler.onEnrollNewCardCancel(socket),
+    [AttractapEventType.RESET_NFC_CARD]: (socket, eventData) => this.cardHandler.onResetNfcCard(socket, eventData),
+    [AttractapEventType.RESET_NFC_CARD_CANCEL]: (socket) => this.cardHandler.onResetNfcCardCancel(socket),
+    [AttractapEventType.PROJECTS_OF_USER]: (socket, eventData) =>
+      this.projectsHandler.handleProjectsOfUserRequest(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS]: (socket, eventData) =>
+      this.formsHandler.handleResourceUsageFormGetFields(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_SUBMIT_PAGE]: (socket, eventData) =>
+      this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_CANCEL]: (socket, eventData) => {
+      this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
+    },
+    [AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]: () => undefined,
+    [AttractapEventType.REQUEST_RESOURCE_LIST]: (socket, eventData) =>
+      this.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId }),
+    [AttractapEventType.RESOURCE_LIST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_UNAUTHORIZED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.SUPERVISION_RESOLVED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.SUPERVISION_START]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_REQUEST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_FIELDS]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+  };
 
   public async sendResourceList(readerId: number) {
     return this.resourceListService.sendResourceList(readerId);

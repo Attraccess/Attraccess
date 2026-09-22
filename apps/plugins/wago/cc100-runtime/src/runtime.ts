@@ -154,16 +154,8 @@ export class WagoRuntime {
         input.password.length > 4096
       )
         return;
-      const expiry = typeof input.expiresAt === 'string' ? Date.parse(input.expiresAt) : NaN;
-      if (
-        !Number.isFinite(expiry) ||
-        new Date(expiry).toISOString() !== input.expiresAt ||
-        expiry <= Date.now() ||
-        expiry - Date.now() > 30_000 ||
-        !this.state.credentials.credentialEpoch ||
-        input.credentialEpoch !== this.state.credentials.credentialEpoch
-      )
-        return;
+      const expiry = this.credentialRotationExpiry(input);
+      if (expiry === undefined) return;
       const previous = this.state.credentialRotation;
       if (
         previous &&
@@ -186,6 +178,20 @@ export class WagoRuntime {
     });
     this.credentialUpdates = update.catch(() => undefined);
     return update;
+  }
+
+  private credentialRotationExpiry(input: Record<string, unknown>): number | undefined {
+    const expiry = typeof input.expiresAt === 'string' ? Date.parse(input.expiresAt) : NaN;
+    if (
+      !Number.isFinite(expiry) ||
+      new Date(expiry).toISOString() !== input.expiresAt ||
+      expiry <= Date.now() ||
+      expiry - Date.now() > 30_000 ||
+      !this.state.credentials?.credentialEpoch ||
+      input.credentialEpoch !== this.state.credentials.credentialEpoch
+    )
+      return;
+    return expiry;
   }
 
   /** Call only after MQTT CONNECT succeeds with these credentials, including process restart. */

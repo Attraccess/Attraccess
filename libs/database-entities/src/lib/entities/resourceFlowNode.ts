@@ -2,7 +2,6 @@ import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn,
 import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
 import { Resource } from './resource.entity';
-import { EventNodeDataSchema } from '../entities-index';
 
 export enum ResourceFlowNodeType {
   INPUT_BUTTON = 'input.button',
@@ -87,8 +86,7 @@ export const HttpRequestNodeDataSchema = z
     }),
     timeoutSeconds: AcknowledgementTimeoutSecondsSchema,
     completionBehavior: CompletionBehaviorSchema.meta({
-      helpText:
-        'Dispatch continues after the HTTP request is initiated. Acknowledged waits for the HTTP response.',
+      helpText: 'Dispatch continues after the HTTP request is initiated. Acknowledged waits for the HTTP response.',
     }),
   })
   .extend(ExternalEffectPolicySchema.shape);
@@ -317,95 +315,45 @@ export const CompanionUsbDeviceNodeDataSchema = z.object({
   }),
 });
 
-// Helper function to get the appropriate schema for a node type
+const nodeDataSchemas = {
+  [ResourceFlowNodeType.INPUT_BUTTON]: ButtonNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED]: MqttMessageReceivedNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY]: InputResourceActivityNoActivityNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: BillingTransactionItemCreateSchema,
+  [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST]: HttpRequestNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: MqttSendMessageNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_WAIT]: WaitNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_IF]: IfNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_SET_PAYLOAD]: SetPayloadNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE]: MqttWaitForMessageNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_ERROR]: ErrorNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: ResourceUsageEndSessionNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: ResourceActivityTrackActivityNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING]: ResourceOperatingTransitionNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: ResourceOperatingTransitionNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT]: ResourceHealthHeartbeatNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET]: ResourceHealthSetNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_SET_VARIABLES]: SetVariablesNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_GET_VARIABLES]: GetVariablesNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED]: VariableChangedNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: CompanionLockNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: CompanionLockNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: CompanionIdleActiveNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: CompanionIdleActiveNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: CompanionForegroundAppNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED]: CompanionUsbDeviceNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED]: CompanionUsbDeviceNodeDataSchema,
+} satisfies Record<ResourceFlowNodeType, z.ZodType>;
+
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
-  switch (nodeType) {
-    case ResourceFlowNodeType.INPUT_BUTTON:
-      return ButtonNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-      return EventNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-      return MqttMessageReceivedNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
-      return InputResourceActivityNoActivityNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-      return BillingTransactionItemCreateSchema;
-
-    case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-      return HttpRequestNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-      return MqttSendMessageNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_WAIT:
-      return WaitNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_IF:
-      return IfNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
-      return SetPayloadNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
-      return MqttWaitForMessageNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_ERROR:
-      return ErrorNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
-      return ResourceUsageEndSessionNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
-      return ResourceActivityTrackActivityNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING:
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE:
-      return ResourceOperatingTransitionNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
-      return ResourceHealthHeartbeatNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
-      return ResourceHealthSetNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
-      return SetVariablesNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
-      return GetVariablesNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
-      return VariableChangedNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC:
-    case ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC:
-      return CompanionLockNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_COMPANION_IDLE:
-    case ResourceFlowNodeType.INPUT_COMPANION_ACTIVE:
-      return CompanionIdleActiveNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED:
-      return CompanionForegroundAppNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED:
-    case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED:
-      return CompanionUsbDeviceNodeDataSchema;
-
-    default: {
-      const exhaustiveCheck: never = nodeType;
-      throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-    }
-  }
+  if (!Object.hasOwn(nodeDataSchemas, nodeType)) throw new Error(`Unknown node type: ${nodeType}`);
+  return nodeDataSchemas[nodeType];
 }
 
 export class ResourceFlowNodePosition {
