@@ -90,7 +90,7 @@ public:
     {
         uint32_t requestId = 0;
         uint16_t count;
-        char authenticatedUsername[MAX_USERNAME_LEN] = {};
+        char authenticatedUsername[MAX_USERNAME_LEN + 1] = {};
         ResourceBrief items[MAX_RESOURCES];
     };
     struct Project

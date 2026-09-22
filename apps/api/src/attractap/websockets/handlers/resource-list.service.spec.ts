@@ -64,8 +64,8 @@ describe('ResourceListService', () => {
       getActiveSessions: jest.fn().mockResolvedValue(new Map([[10, null]])),
     };
     resourceMaintenanceService = {
-      canManageMaintenance: jest.fn().mockResolvedValue(false),
       getActiveMaintenanceResourceIds: jest.fn().mockResolvedValue(new Set()),
+      getMaintenanceManagedResourceIds: jest.fn().mockResolvedValue(new Set()),
     };
     resourceHealthService = { listForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceFlowsService = { getNodesForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
@@ -141,8 +141,8 @@ describe('ResourceListService', () => {
       resourceUsageService.canControllResource.mockImplementation(
         async (resourceId, user) => resourceId === 10 && user.id === 1,
       );
-      resourceMaintenanceService.canManageMaintenance.mockImplementation(
-        async (user, resourceId) => user.id === 2 && resourceId === 20,
+      resourceMaintenanceService.getMaintenanceManagedResourceIds.mockImplementation(async (user) =>
+        user.id === 2 ? new Set([20]) : new Set(),
       );
       await service.sendResourceList(42);
       const payload = (socket: any) => socket.sendMessage.mock.calls[0][0].data.payload;
@@ -160,6 +160,12 @@ describe('ResourceListService', () => {
       expect(payload(guest).resources[0]).not.toHaveProperty('hasIntroduction');
       expect(resourceUsageService.canControllResource).toHaveBeenCalledTimes(4);
       expect(resourceUsageService.getActiveSessions).toHaveBeenCalledTimes(1);
+      expect(resourceMaintenanceService.getMaintenanceManagedResourceIds).toHaveBeenCalledTimes(2);
+      expect(resourceMaintenanceService.getMaintenanceManagedResourceIds).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1 }),
+        [10, 20],
+        expect.any(Set),
+      );
     });
 
     it('discards personalized results if another card arrives during authorization', async () => {

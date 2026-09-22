@@ -183,13 +183,18 @@ export class ResourceListService {
       const user = await this.usersService.findOne({ id: userId });
       if (!user) return { ...resourceListPayload, authenticatedUsername: '' };
       const permissions = await this.rbacService.getEffectivePermissions(userId);
+      const maintenanceManagedResourceIds = await this.resourceMaintenanceService.getMaintenanceManagedResourceIds(
+        user,
+        resourceIds,
+        permissions,
+      );
       const personalized = await Promise.all(
         resources.map(async (resource, index) => {
           const hasIntroduction = await this.resourceUsageService.canControllResource(resource.id, user);
           return {
             ...resourceListPayload.resources[index],
             hasIntroduction,
-            canManageMaintenance: await this.resourceMaintenanceService.canManageMaintenance(user, resource.id),
+            canManageMaintenance: maintenanceManagedResourceIds.has(resource.id),
             isIntroducer: (introducersByResourceId.get(resource.id) ?? []).some((role) => role.userId === userId),
             canManageResource: permissions.has('resources.update'),
             requiresSupervisor:

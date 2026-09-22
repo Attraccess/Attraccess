@@ -301,7 +301,7 @@ void Application::processState() {
     this->handleFormsCancel();
     Display::showErrorPopup("Aktion nicht bestätigt", "Der Ressourcenstatus wird neu geladen. Bitte vor einem erneuten Versuch prüfen.");
   }
-  if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
+  if (this->waitingForResourceRefresh && millis() - this->pendingUiStartedAt > 30000) {
     this->logoutReader();
     Display::showErrorPopup("Status nicht verfügbar", "Bitte erneut anmelden, um den aktuellen Ressourcenstatus zu laden.");
   }

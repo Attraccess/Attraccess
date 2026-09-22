@@ -33,6 +33,8 @@ describe('MaintenanceService', () => {
   let maintenanceRepository: Repository<any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let resourceRepository: Repository<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let resourceIntroducerRepository: Repository<any>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -68,6 +70,7 @@ describe('MaintenanceService', () => {
           provide: getRepositoryToken(ResourceIntroducer),
           useValue: {
             findOne: jest.fn(),
+            createQueryBuilder: jest.fn(),
           },
         },
         {
@@ -90,6 +93,8 @@ describe('MaintenanceService', () => {
     maintenanceRepository = module.get<Repository<any>>(getRepositoryToken(ResourceMaintenance));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resourceRepository = module.get<Repository<any>>(getRepositoryToken(Resource));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resourceIntroducerRepository = module.get<Repository<any>>(getRepositoryToken(ResourceIntroducer));
   });
 
   it('should be defined', () => {
@@ -178,4 +183,30 @@ describe('MaintenanceService', () => {
     });
   });
 
+  describe('getMaintenanceManagedResourceIds', () => {
+    it('batches direct and group maintenance roles for a resource list', async () => {
+      const query = {
+        leftJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { resourceId: 10, groupResourceId: null },
+          { resourceId: null, groupResourceId: 20 },
+        ]),
+      };
+      jest.spyOn(resourceIntroducerRepository, 'createQueryBuilder').mockReturnValue(query as never);
+
+      await expect(service.getMaintenanceManagedResourceIds({ id: 7 } as never, [10, 20, 30])).resolves.toEqual(
+        new Set([10, 20]),
+      );
+
+      expect(resourceIntroducerRepository.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(query.andWhere).toHaveBeenCalledWith(
+        '(resource.id IN (:...resourceIds) OR groupResource.id IN (:...resourceIds))',
+        { resourceIds: [10, 20, 30] },
+      );
+    });
+  });
 });
