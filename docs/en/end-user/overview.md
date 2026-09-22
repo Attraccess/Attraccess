@@ -28,4 +28,5 @@ If you are new to Attraccess, follow these steps:
 - [Logging In](end-user/login.md) – How to sign in to Attraccess
 - [My Account](end-user/account.md) – Manage your profile and security settings
 - [Using Resources](end-user/using-resources.md) – How to use machines and tools
+- [Using the Reader](attractap/using-the-reader.md) – Sign in with your card and use machines or doors
 - [Mobile Usage (PWA)](end-user/mobile-pwa.md) – Install Attraccess on your phone

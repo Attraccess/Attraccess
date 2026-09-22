@@ -49,7 +49,25 @@ SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software \
   dist/apps/attractap-desktop/attractap-desktop-display-tests /path/to/screenshots
 ```
 
-The [reader workflow gallery](docs/reader-workflow/README.md) documents the
-authenticated resource list and its production application journeys. These
-tests run the real application, API parser, NFC verifier and screen router
-against a deterministic server transport, including real session timeouts.
+For reader operation, see the user guide in
+[English](../../../docs/en/attractap/using-the-reader.md) or
+[German](../../../docs/de/attractap/using-the-reader.md).
+
+## Reader workflow checks
+
+`pnpm nx test attractap-desktop` also runs the reader workflows against a
+deterministic server transport. These cover sign-in, resource actions, forms,
+supervision and recovery. The timeout test uses a real clock and takes about
+134 seconds. The tests exercise the application, API parser, NFC verifier and
+screen router; physical NFC, touch hardware and live-network behavior still
+need a device smoke test.
+
+To save packed RGBA8 framebuffers for conversion to PNG, pass an output path:
+
+```sh
+dist/apps/attractap-desktop/attractap-reader-workflow-tests /tmp/reader-flow
+apps/attractap/firmware/tests/display-theme/build/display-theme-host --output /tmp/reader-states
+```
+
+The user guide's screenshots are native display captures. The desktop transport
+and network badge use demonstration data.

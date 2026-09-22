@@ -55,6 +55,7 @@
 
 - **Attractap NFC Reader**
   - [Overview](attractap/overview.md)
+  - [Using the Reader](attractap/using-the-reader.md)
   - [Hardware](attractap/hardware.md)
   - [Setup](attractap/setup.md)
   - [NFC Cards](attractap/nfc-cards.md)

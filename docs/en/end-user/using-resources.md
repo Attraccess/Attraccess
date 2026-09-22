@@ -49,7 +49,7 @@ You may need a supervised session when:
 To start a supervised session:
 
 1. Open the resource detail page
-2. Choose the supervised start option, or tap your NFC card on a reader that asks for supervision
+2. Choose the supervised start option. At an Attractap touch reader, sign in with your card and tap **Aufsicht** next to the resource.
 3. Ask the supervisor to confirm the session when Attraccess prompts them
 4. Fill in any required form information
 5. Start the session once supervision has been confirmed
@@ -63,7 +63,7 @@ After you complete enough supervised sessions, Attraccess may automatically gran
 Once you are introduced to a resource, you can start a usage session:
 
 1. Open the resource detail page
-2. Click **Start Usage** (or tap your NFC card on the reader, if available)
+2. Click **Start Usage**. At an Attractap touch reader, scan your card to sign in, then tap **Start** next to the resource in the list.
 3. If the resource has a **form** attached, fill in the required information
 4. The session is now active
 
@@ -73,9 +73,9 @@ Once you are introduced to a resource, you can start a usage session:
 
 When you are done using the resource:
 
-1. Open the resource detail page (or tap your NFC card again)
-2. Click **End Usage**
-3. The session is recorded in your usage history
+1. Open the resource detail page. At an Attractap touch reader, scan your card to sign in if needed.
+2. Click **End Usage** in the app, or tap **Stop** next to the resource on the reader.
+3. Complete any required form and wait for the usage to end. The session is recorded in your usage history.
 
 > [!WARNING]
 > Always end your usage session when you are finished. Leaving a session open may prevent other users from starting the resource.
@@ -98,6 +98,7 @@ To see your past usage sessions:
 
 ## See Also
 
+- [Using the Reader](attractap/using-the-reader.md) – Sign in with your card and use machines or doors
 - [Overview](end-user/overview.md) – End user guide overview
 - [Logging In](end-user/login.md) – How to sign in
 - [Resources Overview](resources/overview.md) – What are resources? (admin perspective)
