@@ -11,6 +11,7 @@ interface DeleteOptions {
 
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
+  checkAllInstalledPackagesMock: vi.fn(),
   retryMutateAsyncMock: vi.fn(),
   statusRefetchMock: vi.fn(),
   successToast: vi.fn(),
@@ -34,6 +35,10 @@ vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServiceGetPluginSystemStatus: () => ({
     data: hoisted.pluginSystemStatus,
     refetch: hoisted.statusRefetchMock,
+  }),
+  usePluginsServicePluginControllerCheckAllInstalledPackages: () => ({
+    mutateAsync: hoisted.checkAllInstalledPackagesMock,
+    isPending: false,
   }),
   usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
   usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
@@ -64,6 +69,7 @@ function makePlugin(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   hoisted.deleteMutateMock.mockReset();
+  hoisted.checkAllInstalledPackagesMock.mockReset();
   hoisted.retryMutateAsyncMock.mockReset();
   hoisted.statusRefetchMock.mockReset();
   hoisted.successToast.mockReset();
@@ -73,6 +79,7 @@ beforeEach(() => {
   hoisted.deleteOptions = undefined;
   hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
   hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
+  hoisted.checkAllInstalledPackagesMock.mockResolvedValue([]);
   vi.stubGlobal(
     'fetch',
     vi.fn((input: { url?: string } | string) => {
@@ -150,8 +157,6 @@ describe('PluginsSection', () => {
     };
     const fetchMock = vi.fn((input: { url?: string } | string, _init?: RequestInit) => {
       const url = typeof input === 'string' ? input : (input.url ?? '');
-      if (url.endsWith('/api/plugins/installed/check'))
-        return Promise.resolve({ ok: true, json: async () => [checked] });
       if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
       if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/installed/Cool%20Plugin/versions'))
@@ -165,6 +170,7 @@ describe('PluginsSection', () => {
       return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
     });
     vi.stubGlobal('fetch', fetchMock);
+    hoisted.checkAllInstalledPackagesMock.mockResolvedValue([checked]);
     const user = userEvent.setup();
     render(<PluginsSection />);
 
@@ -175,10 +181,7 @@ describe('PluginsSection', () => {
         '1 installed marketplace plugin can be updated. Review the available version before applying it.',
       ),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/plugins/installed/check'),
-      expect.objectContaining({ method: 'POST' }),
-    );
+    expect(hoisted.checkAllInstalledPackagesMock).toHaveBeenCalledOnce();
 
     await user.click(screen.getByRole('button', { name: 'Review updates' }));
     expect(await screen.findByRole('heading', { name: 'Manage Cool Plugin version' })).toBeInTheDocument();

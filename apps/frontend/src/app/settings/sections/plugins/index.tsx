@@ -44,6 +44,7 @@ import {
   Upload,
 } from 'lucide-react';
 import {
+  usePluginsServicePluginControllerCheckAllInstalledPackages,
   usePluginsServiceDeletePlugin,
   usePluginsServiceGetPluginSystemStatus,
   usePluginsServiceGetPlugins,
@@ -186,6 +187,10 @@ export function PluginsSection() {
 
   const { data: plugins } = usePluginsServiceGetPlugins();
   const { data: pluginSystemStatus, refetch: refetchPluginSystemStatus } = usePluginsServiceGetPluginSystemStatus();
+  const {
+    mutateAsync: checkAllInstalledPackages,
+    isPending: isCheckingForUpdates,
+  } = usePluginsServicePluginControllerCheckAllInstalledPackages<InstalledNpmPlugin[]>();
   const { mutateAsync: retryFailedPlugin } = usePluginsServiceRetryPlugin();
   const pluginsDisabled = pluginSystemStatus?.disabled === true;
   const [failedPlugin, setFailedPlugin] = useState<{ id: string; name: string; error: string } | null>(null);
@@ -198,7 +203,6 @@ export function PluginsSection() {
   const [permissionApproved, setPermissionApproved] = useState(false);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
-  const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
   const [npmPluginNames, setNpmPluginNames] = useState<Set<string>>(new Set());
   const [installedNpmPlugins, setInstalledNpmPlugins] = useState<Map<string, InstalledNpmPlugin>>(new Map());
   const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
@@ -530,20 +534,16 @@ export function PluginsSection() {
   };
 
   const checkForUpdates = async () => {
-    setIsCheckingForUpdates(true);
     try {
-      const response = await fetch(`${getBaseUrl()}/api/plugins/installed/check`, {
-        method: 'POST',
-        credentials: 'include',
+      const installed = await checkAllInstalledPackages();
+      setInstalledNpmPlugins((current) => {
+        const updated = new Map(current);
+        for (const plugin of installed) updated.set(plugin.name, plugin);
+        return updated;
       });
-      if (!response.ok) throw new Error();
-      const installed = (await response.json()) as InstalledNpmPlugin[];
-      setInstalledNpmPlugins(new Map(installed.map((plugin) => [plugin.name, plugin] as const)));
       toast.success({ title: t('updatePolicy.checked') });
     } catch {
       toast.error({ title: t('updatePolicy.checkError') });
-    } finally {
-      setIsCheckingForUpdates(false);
     }
   };
 

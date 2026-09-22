@@ -33,6 +33,15 @@ module.exports = [
     ignores: ['**/*.json'],
     rules: {
       'no-console': ['error', { allow: ['warn', 'error', 'info', 'debug', 'trace'] }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.name='fetch'] TemplateElement[value.raw=/\\/api\\/plugins\\/installed\\/check/]",
+          message:
+            'Use usePluginsServicePluginControllerCheckAllInstalledPackages from @attraccess/react-query-client instead of fetching this API directly.',
+        },
+      ],
       ...reactCompilerRulesAsWarn,
     },
   },
