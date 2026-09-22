@@ -387,9 +387,6 @@ export class AttractapCardHandler {
       supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
       (supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction);
 
-    // Send per-resource access before the key response so the authenticated list
-    // can render immediately after the reader verifies the physical NFC card.
-    await this.resourceListService.sendResourceListToSocket(socket);
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
         keyNo: nfcCard.keyNo,
@@ -402,5 +399,10 @@ export class AttractapCardHandler {
         requiresSupervisor,
       }),
     );
+    // Supplemental list queries must neither delay nor prevent physical card
+    // verification. The reader keeps actions disabled until access arrives.
+    void this.resourceListService.sendResourceListToSocket(socket).catch((error) => {
+      this.logger.error(`Failed to refresh resources after card authentication for reader ${socket.readerId}`, error);
+    });
   }
 }

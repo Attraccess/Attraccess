@@ -184,6 +184,17 @@ describe('MaintenanceService', () => {
   });
 
   describe('getMaintenanceManagedResourceIds', () => {
+    it('returns all requested resources for global maintenance permission without role queries', async () => {
+      await expect(
+        service.getMaintenanceManagedResourceIds(
+          { id: 7 } as never,
+          [10, 20],
+          new Set(['resources.maintenance.manage']),
+        ),
+      ).resolves.toEqual(new Set([10, 20]));
+      expect(resourceIntroducerRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
     it('batches direct and group maintenance roles for a resource list', async () => {
       const query = {
         leftJoin: jest.fn().mockReturnThis(),

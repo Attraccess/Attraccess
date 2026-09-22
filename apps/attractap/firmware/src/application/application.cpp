@@ -573,6 +573,12 @@ void Application::setup() {
       this->cardAuthenticationStartedAt = millis();
       this->authenticationResourceId = this->resourceIsSelected ? this->selectedResourceId : this->resourceList.items[0].id;
       lv_lock();
+      // A repeated scan by the same user must not reuse access from an earlier
+      // login while the new personalized list is still loading.
+      this->resourceList.authenticatedUsername[0] = '\0';
+      for (uint16_t i = 0; i < this->resourceList.count; ++i) this->resourceList.items[i].accessKnown = false;
+      this->resourceListUpdated = true;
+      this->selectedResourceChanged = true;
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
       else Display::resourceListScreen.showActionProgress("Karte wird geprüft", "Einen Moment bitte ...");
       lv_unlock();

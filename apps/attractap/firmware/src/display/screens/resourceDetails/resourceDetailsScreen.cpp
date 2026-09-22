@@ -28,19 +28,11 @@ void ResourceDetailsScreen::init()
    sessionHeader.create(this->screen, [this] {
       if (!this->actionInProgress && this->buttonClickCallback)
          this->buttonClickCallback({this, BUTTON_CLICK_TYPE_LOGOUT, {}});
+   }, [this] {
+      if (!this->actionInProgress && this->buttonClickCallback)
+         this->buttonClickCallback({this, BUTTON_CLICK_TYPE_BACK, {}});
    });
    sessionHeader.setUser(this->loginUsernameCache);
-   auto *back = lv_button_create(this->screen);
-   DisplayTheme::secondaryButton(back);
-   lv_obj_set_size(back, 92, 36);
-   auto *backLabel = lv_label_create(back);
-   lv_label_set_text(backLabel, "< Liste");
-   lv_obj_center(backLabel);
-   lv_obj_add_event_cb(back, [](lv_event_t *event) {
-      auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(event));
-      if (!self->actionInProgress && self->buttonClickCallback)
-         self->buttonClickCallback({self, BUTTON_CLICK_TYPE_BACK, {}});
-   }, LV_EVENT_CLICKED, this);
 
    lv_obj_t *header = lv_obj_create(this->screen);
    lv_obj_remove_style_all(header);

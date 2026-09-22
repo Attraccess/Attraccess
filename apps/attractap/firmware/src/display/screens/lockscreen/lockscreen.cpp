@@ -1,6 +1,7 @@
 #include "lockscreen.hpp"
 #include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
+#include "display/shared/headerButton.hpp"
 #include "display/images/lockscreen_background_image.hpp"
 #include <string>
 
@@ -15,6 +16,7 @@ void Lockscreen::init()
     this->screen = lv_obj_create(NULL);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
     DisplayTheme::applyScreen(this->screen);
+    lv_obj_set_style_pad_all(this->screen, 20, 0);
     lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
 
     lv_obj_t *label = lv_label_create(this->screen);
@@ -31,18 +33,17 @@ void Lockscreen::init()
     lv_obj_t *header = lv_obj_create(this->screen);
     lv_obj_remove_style_all(header);
     lv_obj_set_width(header, lv_pct(100));
-    lv_obj_set_height(header, LV_SIZE_CONTENT);
-    lv_obj_set_x(header, 0);
-    lv_obj_set_y(header, -170);
-    lv_obj_set_align(header, LV_ALIGN_CENTER);
+    lv_obj_set_height(header, 46);
+    lv_obj_set_align(header, LV_ALIGN_TOP_LEFT);
     lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
     lv_obj_remove_flag(header, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_pad_left(header, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_right(header, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_top(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_bottom(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_column(header, 12, 0);
+    ReaderHeader::createBackButton(header, [](lv_event_t *event) {
+        auto *self = static_cast<Lockscreen *>(lv_event_get_user_data(event));
+        if (!self->authenticating && self->backCallback) self->backCallback();
+    }, this);
 
     lv_obj_t *logo = lv_image_create(header);
     lv_image_set_src(logo, &logo_40h);
@@ -55,17 +56,19 @@ void Lockscreen::init()
 
     lv_obj_t *resourceInfo = lv_obj_create(header);
     lv_obj_remove_style_all(resourceInfo);
-    lv_obj_set_width(resourceInfo, LV_SIZE_CONTENT);
-    lv_obj_set_height(resourceInfo, LV_SIZE_CONTENT);
+    lv_obj_set_width(resourceInfo, 0);
+    lv_obj_set_flex_grow(resourceInfo, 1);
+    lv_obj_set_height(resourceInfo, 46);
     lv_obj_set_align(resourceInfo, LV_ALIGN_CENTER);
     lv_obj_set_flex_flow(resourceInfo, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(resourceInfo, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(resourceInfo, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START);
     lv_obj_remove_flag(resourceInfo, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(resourceInfo, LV_OBJ_FLAG_SCROLLABLE);
 
     this->resourceNameLabel = lv_label_create(resourceInfo);
-    lv_obj_set_width(this->resourceNameLabel, 250);
-    lv_label_set_long_mode(this->resourceNameLabel, LV_LABEL_LONG_SCROLL);
+    lv_obj_set_width(this->resourceNameLabel, lv_pct(100));
+    lv_obj_set_style_pad_right(this->resourceNameLabel, 76, 0);
+    lv_label_set_long_mode(this->resourceNameLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->resourceNameLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
     lv_label_set_text(this->resourceNameLabel, "???");
@@ -73,24 +76,15 @@ void Lockscreen::init()
     lv_obj_set_style_text_font(this->resourceNameLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->usageInfoLabel = lv_label_create(resourceInfo);
-    lv_obj_set_width(this->usageInfoLabel, LV_SIZE_CONTENT);
+    lv_obj_set_width(this->usageInfoLabel, lv_pct(100));
+    lv_label_set_long_mode(this->usageInfoLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->usageInfoLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->usageInfoLabel, LV_ALIGN_CENTER);
     lv_label_set_text(this->usageInfoLabel, "???");
     lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    lv_obj_update_layout(this->screen);
     this->updateUsageInfo();
-    auto *back = lv_button_create(this->screen);
-    DisplayTheme::secondaryButton(back);
-    lv_obj_set_size(back, 110, 42);
-    lv_obj_align(back, LV_ALIGN_BOTTOM_LEFT, 20, -30);
-    auto *backLabel = lv_label_create(back);
-    lv_label_set_text(backLabel, "< Liste");
-    lv_obj_center(backLabel);
-    lv_obj_add_event_cb(back, [](lv_event_t *event) {
-        auto *self = static_cast<Lockscreen *>(lv_event_get_user_data(event));
-        if (!self->authenticating && self->backCallback) self->backCallback();
-    }, LV_EVENT_CLICKED, this);
 }
 
 lv_obj_t *Lockscreen::getScreen()

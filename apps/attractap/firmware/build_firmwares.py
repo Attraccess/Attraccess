@@ -183,13 +183,15 @@ def main():
 
     generate_certificates(python_cmd)
 
-    variants = []
-    for path in sorted(glob.glob(os.path.join("variants", "*.cmake"))):
-        name = os.path.splitext(os.path.basename(path))[0]
-        if name.endswith("-debug"):
-            print(f"Skipping development variant: {name}")
-            continue
-        variants.append((name, path))
+    active_variants = [
+        "attractap-touch",
+        "attractap-touch-v2",
+        # "attractap-lite-ethernet",
+        # "attractap-touch-ethernet",
+        # "attractap-touch-demo",
+        # "attractap-touch-v2-demo",
+    ]
+    variants = [(name, os.path.join("variants", name + ".cmake")) for name in active_variants]
 
     if not variants:
         print("Error: No variant files found in variants/")

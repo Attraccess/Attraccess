@@ -117,10 +117,12 @@ int main(int argc, char **argv) {
         if (!found) throw std::runtime_error(std::string("Missing button: ") + text);
         assert(!lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED));
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_PRESSED, nullptr);
+        lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_RELEASED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_CLICKED, nullptr);
         pump();
     };
     unsigned listVersion = 0;
+    std::string username = "Alex";
     bool active = false, supervised = false;
     auto list = [&](bool signedIn = true, bool onlyOne = false, bool correlate = true) {
         JsonDocument doc;
@@ -128,7 +130,7 @@ int main(int argc, char **argv) {
         doc["revision"] = listVersion;
         if (correlate && server.count("REQUEST_RESOURCE_LIST"))
             doc["requestId"] = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
-        doc["authenticatedUsername"] = signedIn ? "Alex" : "";
+        doc["authenticatedUsername"] = signedIn ? username : "";
         auto resources = doc["resources"].to<JsonArray>();
         for (int id = 1; id <= (onlyOne ? 1 : 3); ++id) {
             auto r = resources.add<JsonObject>();
@@ -137,13 +139,13 @@ int main(int argc, char **argv) {
             r["type"] = id == 3 ? "door" : "machine";
             r["isHealthy"] = true;
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
-            if (id == 1 && active) { r["activeUsageSession"]["user"]["username"] = "Alex"; r["activeUsageSession"]["startTime"] = "2026-09-22T07:00:00Z"; }
+            if (id == 1 && active) { r["activeUsageSession"]["user"]["username"] = username; r["activeUsageSession"]["startTime"] = "2026-09-22T07:00:00Z"; }
         }
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
         pump();
     };
     lv_obj_t *drawerSettingsBeforeLogin = nullptr;
-    auto login = [&] {
+    auto login = [&](bool refresh = true) {
         nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
         if (drawerSettingsBeforeLogin) {
             assert(!lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
@@ -152,9 +154,9 @@ int main(int argc, char **argv) {
             assert(lv_screen_active() == Display::resourceListScreen.getScreen());
             drawerSettingsBeforeLogin = nullptr;
         }
-        list();
-        server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})");
+        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
         pump(250); nfc.setPresent(0, false);
+        if (refresh) list();
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
         pump();
     };
@@ -198,13 +200,29 @@ int main(int argc, char **argv) {
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
     assert(label(lv_screen_active(), "Alex"));
     display.capture(output, "05-details-running");
-    click("< Liste");
+    auto *backButton = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
+    auto *logoutButton = lv_obj_get_parent(label(lv_screen_active(), "Abmelden"));
+    assert(lv_obj_get_parent(backButton) == lv_obj_get_parent(logoutButton));
+    assert(lv_obj_get_child(lv_obj_get_parent(backButton), 0) == backButton);
+    lv_obj_add_state(backButton, LV_STATE_PRESSED);
+    lv_obj_add_state(logoutButton, LV_STATE_PRESSED);
+    pump(200);
+    for (auto *button : {backButton, logoutButton}) {
+        lv_area_t bounds, parent; lv_obj_get_coords(button, &bounds); lv_obj_get_coords(lv_obj_get_parent(button), &parent);
+        assert(bounds.y1 == 20 && bounds.y1 >= parent.y1 && bounds.y2 <= parent.y2);
+        assert(lv_obj_get_style_transform_width(button, LV_PART_MAIN) == 0);
+        assert(lv_obj_get_style_transform_height(button, LV_PART_MAIN) == 0);
+    }
+    display.capture(output, "05b-header-pressed");
+    lv_obj_remove_state(backButton, LV_STATE_PRESSED);
+    lv_obj_remove_state(logoutButton, LV_STATE_PRESSED);
+    click(LV_SYMBOL_LEFT);
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Alex"));
     // Going back must keep the fetched project catalogue.
     click("Lasercutter"); click("Projekt wählen");
     assert(label(lv_layer_top(), "Werkstattprojekt"));
-    click("Werkstattprojekt", true); click("< Liste");
+    click("Werkstattprojekt", true); click(LV_SYMBOL_LEFT);
     click("Stop");
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["resourceId"].as<int>() == 1);
     server.push("RESOURCE_USAGE_FORM_REQUEST", R"({"resourceId":1,"action":"end","forms":[{"id":8,"name":"Check","fieldCount":1}]})");
@@ -248,7 +266,7 @@ int main(int argc, char **argv) {
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
     assert(label(lv_screen_active(), "CNC Fräse"));
     display.capture(output, "09-restricted-details");
-    click("< Liste");
+    click(LV_SYMBOL_LEFT);
     click("Öffnen");
     assert(server.last("UNLOCK_DOOR")["data"]["payload"]["resourceId"].as<int>() == 3);
     server.push("UNLOCK_DOOR", R"({"error":"Denied by test"})"); pump(); list();
@@ -297,6 +315,28 @@ int main(int argc, char **argv) {
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
     display.capture(output, "12-reconnected-signed-out");
+    // Both the personalized identity and usage owner retain all 32 characters.
+    username = "abcdefghijklmnopqrstuvwxyz012345";
+    login();
+    assert(label(lv_screen_active(), "Stop"));
+    click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
+    active = false; list();
+    assert(label(lv_screen_active(), "Start"));
+    assert(!lv_obj_is_visible(label(lv_screen_active(), "Status wird geladen")));
+    click("Abmelden"); username = "Alex"; active = true; list(false);
+    login(); click("Abmelden");
+    login(false);
+    assert(label(lv_screen_active(), "Laden ..."));
+    assert(!label(lv_screen_active(), "Stop"));
+    list(); assert(label(lv_screen_active(), "Stop")); click("Abmelden");
+    // Resource-first supervision works before the background list arrives.
+    active = false; supervised = true; list(false); click("Lasercutter"); login(false);
+    const auto unsupervisedStarts = server.count("START_RESOURCE_USAGE_SESSION");
+    click("Ressource verwenden");
+    assert(lv_screen_active() == Display::supervisionScreen.getScreen());
+    assert(server.count("START_RESOURCE_USAGE_SESSION") == unsupervisedStarts);
+    pump(1100); click("Abbrechen"); list(); click(LV_SYMBOL_LEFT); click("Abmelden");
+    supervised = false; active = true; list(false);
     if (timeouts) {
         login();
         const auto stopsBeforeTimeout = server.count("STOP_RESOURCE_USAGE_SESSION");
@@ -308,7 +348,12 @@ int main(int argc, char **argv) {
         pump(31050);
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(label(lv_screen_active(), "Pausiert"));
-        server.push("START_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump(); active = true; list();
+        // An unconfirmed action gets a fresh 30-second status-refresh window.
+        pump(30500);
+        assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(label(lv_screen_active(), "Status wird geladen"));
+        assert(label(lv_layer_top(), "Aktion nicht bestätigt"));
+        Display::hidePopup(); active = true; list();
         assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
         std::cout << "PASS action pauses the real 30-second login timeout" << std::endl;
         click("Abmelden");

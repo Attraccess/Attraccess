@@ -8,7 +8,10 @@ describe('ResourceListService', () => {
   let websocketService: { sockets: Map<string, any> };
   let attractapService: { findReaderById: jest.Mock };
   let resourceUsageService: { getActiveSessions: jest.Mock; canControllResource: jest.Mock };
-  let resourceMaintenanceService: { getActiveMaintenanceResourceIds: jest.Mock; canManageMaintenance: jest.Mock };
+  let resourceMaintenanceService: {
+    getActiveMaintenanceResourceIds: jest.Mock;
+    getMaintenanceManagedResourceIds: jest.Mock;
+  };
   let resourceHealthService: { listForResources: jest.Mock };
   let resourceFlowsService: { getNodesForResources: jest.Mock };
   let resourceIntroducersService: { getManyForResources: jest.Mock };

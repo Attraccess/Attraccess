@@ -6,6 +6,11 @@ on the right. A reader with one resource still shows the list. The shared list
 and details header shows the user, logout and the remaining 30-second login.
 Reader logout does not end machine usage.
 
+Details and the NFC prompt place an icon-only back control at the far left of
+the header. Header buttons retain their bounds when pressed, so their rounded
+corners stay visible. Usernames truncate independently of the countdown and
+network badge.
+
 Tapping a resource before scanning instead opens the NFC prompt and then that
 resource's details. Returning to the list retains the login. Quick start uses no
 project; the details screen retains project selection and explicit takeover.
@@ -51,6 +56,7 @@ They are native framebuffer captures, not browser or physical-device photos.
 | Pending start, blocked input and paused timer | ![Pending start](03-pending-start.png) |
 | Successful start | ![Started list](04-started-list.png) |
 | Running usage details with shared header | ![Running details](05-details-running.png) |
+| Pressed back and logout controls retain their complete outlines | ![Pressed header controls](05b-header-pressed.png) |
 | Required end form loading | ![Form loading](06-required-end-form.png) |
 | Required end form ready | ![Form ready](06b-required-form-ready.png) |
 | Completed form and stop | ![Stopped usage](06c-form-completed-stop.png) |
@@ -89,13 +95,17 @@ pnpm precommit
 python3 apps/attractap/firmware/build_firmwares.py
 ```
 
-The desktop tests include a real-clock timeout test (about 103 seconds), covering
+The desktop tests include a real-clock timeout test (about 134 seconds), covering
 idle logout without stopping usage, pausing the login timeout during a pending
-action, and recovery after lifting the NFC card during authentication. The normal
+action, the separate refresh deadline after an action timeout, and recovery
+after lifting the NFC card during authentication. The normal
 journey also covers required-form cancellation/submission, supervision
 cancellation, duplicate taps, delayed responses, out-of-order resource refreshes
-and reconnect cleanup. API tests cover personalized resource permissions,
-per-resource supervision, correlation and authorization failures.
+and reconnect cleanup. It exercises full-length usernames and authentication
+arriving before the personalized list, including same-user relogin and
+resource-first supervision. API tests cover personalized resource permissions,
+batched maintenance grants, per-resource supervision, correlation, authorization
+failures, and supplemental list failures during authentication.
 
 To save fresh packed RGBA8 framebuffers for conversion to PNG:
 

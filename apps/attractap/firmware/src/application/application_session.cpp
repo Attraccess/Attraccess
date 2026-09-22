@@ -156,9 +156,13 @@ void Application::handleResourceDetailsButtonClick(
       }
     }
 
-    bool requiresSupervisor = false;
+    // Resource-first authentication can finish before its personalized list.
+    // Match the same verified-card fallback used by the details screen.
+    bool requiresSupervisor = this->authenticationResourceId == this->selectedResourceId &&
+                              this->cardAuthenticationData.requiresSupervisor;
     for (uint16_t i = 0; i < this->resourceList.count; ++i)
-      if (this->resourceList.items[i].id == this->selectedResourceId)
+      if (this->resourceList.items[i].id == this->selectedResourceId && this->resourceList.items[i].accessKnown &&
+          this->cardAuthenticationData.username == this->resourceList.authenticatedUsername)
         requiresSupervisor = this->resourceList.items[i].requiresSupervisor;
     if (requiresSupervisor && !isTakeover) {
       this->beginActionPause();

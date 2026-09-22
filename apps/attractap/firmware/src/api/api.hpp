@@ -45,7 +45,7 @@ public:
     static constexpr size_t MAX_RESOURCES = 10;
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
     static constexpr size_t MAX_DESC_LEN = 128;
-    static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_USERNAME_LEN = 33; // 32 username characters plus the terminator.
     static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
     static constexpr size_t MAX_INTRODUCERS = 8;
     static constexpr size_t MAX_FLOW_BUTTONS = 7;
@@ -90,7 +90,7 @@ public:
     {
         uint32_t requestId = 0;
         uint16_t count;
-        char authenticatedUsername[MAX_USERNAME_LEN + 1] = {};
+        char authenticatedUsername[MAX_USERNAME_LEN] = {};
         ResourceBrief items[MAX_RESOURCES];
     };
     struct Project

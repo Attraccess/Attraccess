@@ -685,6 +685,14 @@ void testBackgroundScreens(Renderer &renderer)
         ScreenGuard guard(lock.getScreen(), &lock);
         lock.setUsageInfo(false, "", false);
         auto *resourceName = requireObject(guard.root, &lv_label_class, "CNC Fräse");
+        auto *backIcon = requireObject(guard.root, &lv_label_class, LV_SYMBOL_LEFT);
+        auto *backButton = lv_obj_get_parent(backIcon);
+        lv_obj_update_layout(guard.root);
+        lv_area_t backBounds; lv_obj_get_coords(backButton, &backBounds);
+        expect(backBounds.x1 == 20 && backBounds.y1 == 20, "Icon-only back control occupies the far-left header position");
+        lv_font_glyph_dsc_t iconGlyph{};
+        expect(lv_font_get_glyph_dsc(lv_obj_get_style_text_font(backIcon, LV_PART_MAIN), &iconGlyph, 0xf053, 0),
+               "Back control uses the real bundled chevron icon glyph");
         expect(lv_obj_get_style_text_font(resourceName, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
                "Lockscreen resource name uses a Latin-1 font");
         expectBackground(renderer, guard.root, "lockscreen-available");
@@ -751,6 +759,11 @@ void testAuthenticatedList(Renderer &renderer)
     ScreenGuard guard(list.getScreen(), &list);
     renderer.capture("att-880-authenticated-list");
     auto *logout = lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Abmelden"));
+    setState(logout, LV_STATE_PRESSED);
+    expect(lv_obj_get_style_transform_width(logout, LV_PART_MAIN) == 0 &&
+           lv_obj_get_style_transform_height(logout, LV_PART_MAIN) == 0,
+           "Pressed logout stays inside the header without clipping");
+    setState(logout, LV_STATE_DEFAULT);
     auto *time = requireObject(guard.root, &lv_label_class, "30 s");
     expect(lv_obj_get_y(logout) == lv_obj_get_y(lv_obj_get_parent(time)), "Logout and countdown share one header row");
     auto *logo = requireObject(guard.root, &lv_image_class);
