@@ -248,3 +248,29 @@ it('shows pending setup before save and copies the protocol-specific callback af
   expect(state.success).toHaveBeenLastCalledWith(expect.stringContaining('/api/auth/sso/SAML/8/callback*'));
   expect(screen.queryByText('authentikRedirectRegex')).toBeNull();
 });
+
+it('copies setup values and reports unsupported or rejected clipboard operations', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  try {
+    const { result } = renderHook(() => useSSOProviderForm());
+    await act(() => result.current.copyValue(''));
+    expect(writeText).not.toHaveBeenCalled();
+    await act(() => result.current.copyValue('https://app.example/callback'));
+    expect(writeText).toHaveBeenCalledWith('https://app.example/callback');
+    expect(state.success).toHaveBeenCalledWith({ title: 'copySuccessTitle' });
+    writeText.mockRejectedValueOnce(new Error('Permission denied'));
+    await act(() => result.current.copyValue('secret'));
+    expect(state.error).toHaveBeenLastCalledWith({ title: 'copyFailedTitle', description: 'Permission denied' });
+    writeText.mockRejectedValueOnce('unavailable');
+    await act(() => result.current.copyValue('secret'));
+    expect(state.error).toHaveBeenLastCalledWith({ title: 'copyFailedTitle', description: 'copyFailedDesc' });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    await act(() => result.current.copyValue('secret'));
+    expect(state.error).toHaveBeenLastCalledWith({ title: 'copyFailedTitle', description: 'copyUnsupported' });
+  } finally {
+    if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor);
+    else Reflect.deleteProperty(navigator, 'clipboard');
+  }
+});
