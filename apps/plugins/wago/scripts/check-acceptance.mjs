@@ -36,15 +36,7 @@ export function checkWagoAcceptance(evidence) {
   for (const key of ['hardwareId', 'startingState', 'wiringEvidence']) {
     if (!text(evidence.controller?.[key])) errors.push(`controller.${key} is required.`);
   }
-  for (const key of ['pluginCommit', 'runtimeCommit']) {
-    if (typeof evidence.build?.[key] !== 'string' || !/^[a-f0-9]{40}$/.test(evidence.build[key])) errors.push(`build.${key} must be a full commit SHA.`);
-  }
-  for (const key of ['frontendDigest', 'backendDigest', 'runtimeDigest']) {
-    if (typeof evidence.build?.[key] !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(evidence.build[key])) errors.push(`build.${key} must be a SHA-256 digest.`);
-  }
-  for (const key of ['protocolVersion', 'signedBundleEvidence', 'visualArtifactProvisioningEvidence']) {
-    if (!text(evidence.build?.[key])) errors.push(`build.${key} is required.`);
-  }
+  checkBuild(evidence.build, errors);
   for (const key of ['model', 'transport', 'profileVersion', 'qualificationEvidence']) {
     if (!text(evidence.modbus?.[key])) errors.push(`modbus.${key} is required; no unqualified support claims.`);
   }
@@ -62,7 +54,24 @@ export function checkWagoAcceptance(evidence) {
   if (evidence.safeFixtureConfirmed !== true) errors.push('Confirm qualified wiring, low-voltage fixtures and independent safety circuits.');
   if (!Array.isArray(evidence.blockers) || evidence.blockers.length) errors.push('blockers must be an explicitly empty array.');
   if (!Array.isArray(evidence.obstacles)) errors.push('Record participant obstacles, including an empty array if none.');
-  const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
+  checkObservations(evidence.checks, errors);
+  return errors;
+}
+
+function checkBuild(build, errors) {
+  for (const key of ['pluginCommit', 'runtimeCommit']) {
+    if (typeof build?.[key] !== 'string' || !/^[a-f0-9]{40}$/.test(build[key])) errors.push(`build.${key} must be a full commit SHA.`);
+  }
+  for (const key of ['frontendDigest', 'backendDigest', 'runtimeDigest']) {
+    if (typeof build?.[key] !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(build[key])) errors.push(`build.${key} must be a SHA-256 digest.`);
+  }
+  for (const key of ['protocolVersion', 'signedBundleEvidence', 'visualArtifactProvisioningEvidence']) {
+    if (!text(build?.[key])) errors.push(`build.${key} is required.`);
+  }
+}
+
+function checkObservations(entries, errors) {
+  const checks = Array.isArray(entries) ? entries : [];
   if (checks.some((check) => !record(check) || !requiredChecks.includes(check.id))) errors.push('checks contains an unknown or malformed entry.');
   for (const id of requiredChecks) {
     const matches = checks.filter((check) => check?.id === id);
@@ -76,7 +85,6 @@ export function checkWagoAcceptance(evidence) {
       errors.push(`${id}: observed result, evidence reference and recording timestamp are required.`);
     }
   }
-  return errors;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

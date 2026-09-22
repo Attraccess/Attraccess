@@ -329,3 +329,32 @@ test('null-ended nested statements retain their measured count when filling oute
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('repaired statement ranges merge covered and uncovered copies from different runners', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'crap-multi-runner-'));
+  try {
+    const file = path.join(dir, 'source.ts');
+    writeFileSync(file, 'export function choose(flag: boolean) { if (flag) return 1; return 2; }\n');
+    const measured = completeCoverage([file], [])[file];
+    for (const id of Object.keys(measured.s)) measured.s[id] = 1;
+    for (const id of Object.keys(measured.f)) measured.f[id] = 1;
+    const unexecuted = JSON.parse(JSON.stringify(measured));
+    for (const [id, statement] of Object.entries(unexecuted.statementMap)) {
+      unexecuted.s[id] = 0;
+      statement.end.column = null;
+    }
+    for (const id of Object.keys(unexecuted.f)) unexecuted.f[id] = 0;
+    for (const reports of [
+      [{ [file]: measured }, { [file]: unexecuted }],
+      [{ [file]: unexecuted }, { [file]: measured }],
+    ]) {
+      const completed = completeCoverage([file], reports);
+      assert.equal(Object.keys(completed[file].statementMap).length, Object.keys(measured.statementMap).length);
+      assert.ok(Object.values(completed[file].s).every((count) => count > 0));
+      const report = await getCrapReport({ testCoverage: completed });
+      assert.equal(Object.values(report).flatMap(Object.values)[0].statements.crap, 2);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

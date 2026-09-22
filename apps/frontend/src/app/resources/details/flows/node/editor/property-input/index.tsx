@@ -388,7 +388,7 @@ function ObjectPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
                   );
                 }}
                 isRequired
-                className="flex-1"
+                className="min-w-0 flex-1"
               >
                 <Input placeholder="Header name" />
               </TextField>
@@ -396,7 +396,7 @@ function ObjectPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
                 value={currentValueOfKey as string}
                 onChange={(newValueOfKey) => onChange({ ...value, [key]: newValueOfKey })}
                 isRequired
-                className="flex-1"
+                className="min-w-0 flex-1"
               >
                 <Input placeholder="Header value" />
               </TextField>

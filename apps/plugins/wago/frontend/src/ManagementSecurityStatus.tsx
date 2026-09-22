@@ -104,65 +104,7 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
     <section className="wg:space-y-3" aria-label="Management security">
       <h3>Management security</h3>
       <div className="wg:space-y-3">
-        <p role="status">
-          {status?.hardened ? 'Management baseline verified' : 'Management baseline not verified'} ·{' '}
-          {status?.state ?? 'Inspection required'} · {status?.support ?? 'qualification_required'}
-        </p>
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>
-              Automatic FW31 management hardening is not implemented. Missing operations are a restricted management
-              account, root/password restrictions, WBM and service restrictions, and recovery that survives reboot. The
-              FW31 vendor procedure for applying, restoring and persisting these changes is still needed. Key enrollment
-              supports an existing non-root OpenSSH account or a detected Dropbear 2025.88 account. The new key disables
-              forwarding and PTY allocation; account privileges and existing access remain enabled. Exceptions never
-              count as hardened. Physical hardware verification is separate.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-        {status?.inspection && (
-          <dl>
-            <dt>Firmware / SSH / service control</dt>
-            <dd>
-              {status.inspection.firmware} / {status.inspection.ssh} / {status.inspection.serviceControl}
-            </dd>
-            {status.inspection.ssh === 'dropbear' && (
-              <>
-                <dt>Connected SSH peer version</dt>
-                <dd>{status.inspection.dropbearVersion ?? 'unknown'}</dd>
-              </>
-            )}
-            <dt>Possible WBM listeners (HTTP/HTTPS)</dt>
-            <dd>{status.inspection.wbm}</dd>
-            <dt>Other management listeners</dt>
-            <dd>{status.inspection.otherManagement}</dd>
-            <dt>Password / default access</dt>
-            <dd>
-              {status.inspection.passwordAccess} / {status.inspection.defaultAccess}
-            </dd>
-          </dl>
-        )}
-        <p>Socket observations do not verify firewall reachability, WBM credentials or TLS.</p>
-        {status?.keyFingerprint && (
-          <p>
-            Generated management key: <code className="wg:break-all">{status.keyFingerprint}</code>
-          </p>
-        )}
-        {status?.failure && (
-          <p role="alert">
-            {status.failure === 'rollback_failed'
-              ? 'Rollback could not be verified. The recovery journal and encrypted key are retained.'
-              : 'The transition failed; check the saved recovery state.'}
-          </p>
-        )}
-        {recovery && (
-          <p>
-            Recovery restores saved management access. Enter fresh credentials for the original account. After
-            interruption, recovery may remain busy until the five-minute operation lease expires. If SSH is unavailable,
-            use the locally qualified USB-C/WBM recovery procedure.
-          </p>
-        )}
+        <ManagementSummary status={status} recovery={recovery} />
         <Form ref={form} onSubmit={(event) => event.preventDefault()} aria-label="Management security actions">
           <TextField key={`username-${credentialGeneration}`} name="managementUsername" isRequired isDisabled={pending}>
             <Label>Temporary SSH username</Label>
@@ -266,5 +208,77 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
         )}
       </div>
     </section>
+  );
+}
+
+function ManagementSummary({
+  status,
+  recovery,
+}: {
+  status: ManagementPublicStatus | null;
+  recovery: boolean | undefined;
+}) {
+  return (
+    <>
+      <p role="status">
+        {status?.hardened ? 'Management baseline verified' : 'Management baseline not verified'} ·{' '}
+        {status?.state ?? 'Inspection required'} · {status?.support ?? 'qualification_required'}
+      </p>
+      <Alert status="warning">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Description>
+            Automatic FW31 management hardening is not implemented. Missing operations are a restricted management
+            account, root/password restrictions, WBM and service restrictions, and recovery that survives reboot. The
+            FW31 vendor procedure for applying, restoring and persisting these changes is still needed. Key enrollment
+            supports an existing non-root OpenSSH account or a detected Dropbear 2025.88 account. The new key disables
+            forwarding and PTY allocation; account privileges and existing access remain enabled. Exceptions never count
+            as hardened. Physical hardware verification is separate.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
+      {status?.inspection && (
+        <dl>
+          <dt>Firmware / SSH / service control</dt>
+          <dd>
+            {status.inspection.firmware} / {status.inspection.ssh} / {status.inspection.serviceControl}
+          </dd>
+          {status.inspection.ssh === 'dropbear' && (
+            <>
+              <dt>Connected SSH peer version</dt>
+              <dd>{status.inspection.dropbearVersion ?? 'unknown'}</dd>
+            </>
+          )}
+          <dt>Possible WBM listeners (HTTP/HTTPS)</dt>
+          <dd>{status.inspection.wbm}</dd>
+          <dt>Other management listeners</dt>
+          <dd>{status.inspection.otherManagement}</dd>
+          <dt>Password / default access</dt>
+          <dd>
+            {status.inspection.passwordAccess} / {status.inspection.defaultAccess}
+          </dd>
+        </dl>
+      )}
+      <p>Socket observations do not verify firewall reachability, WBM credentials or TLS.</p>
+      {status?.keyFingerprint && (
+        <p>
+          Generated management key: <code className="wg:break-all">{status.keyFingerprint}</code>
+        </p>
+      )}
+      {status?.failure && (
+        <p role="alert">
+          {status.failure === 'rollback_failed'
+            ? 'Rollback could not be verified. The recovery journal and encrypted key are retained.'
+            : 'The transition failed; check the saved recovery state.'}
+        </p>
+      )}
+      {recovery && (
+        <p>
+          Recovery restores saved management access. Enter fresh credentials for the original account. After
+          interruption, recovery may remain busy until the five-minute operation lease expires. If SSH is unavailable,
+          use the locally qualified USB-C/WBM recovery procedure.
+        </p>
+      )}
+    </>
   );
 }

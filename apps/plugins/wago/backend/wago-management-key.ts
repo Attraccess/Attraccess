@@ -36,10 +36,11 @@ export function generateManagementKey(): ManagementKey {
     field(inner),
   ]);
   seed.fill(0);
-  const encoded = bytes
-    .toString('base64')
-    .match(/.{1,70}/g)
-    ?.join('\n') ?? '';
+  const encoded =
+    bytes
+      .toString('base64')
+      .match(/.{1,70}/g)
+      ?.join('\n') ?? '';
   return {
     privateKey: `-----BEGIN OPENSSH PRIVATE KEY-----\n${encoded}\n-----END OPENSSH PRIVATE KEY-----\n`,
     publicKey: `${algorithm} ${publicBlob(pub).toString('base64')}`,
@@ -83,40 +84,44 @@ export function assertManagementKey(key: ManagementKey): void {
     const inner = read();
     if (offset !== bytes.length || inner.length % 8 || !inner.subarray(0, 4).equals(inner.subarray(4, 8)))
       throw new Error();
-    let cursor = 8;
-    const part = () => {
-      const length = inner.readUInt32BE(cursor);
-      cursor += 4;
-      if (length > inner.length - cursor) throw new Error();
-      const value = inner.subarray(cursor, cursor + length);
-      cursor += length;
-      return value;
-    };
-    if (part().toString() !== algorithm) throw new Error();
-    const pub = part(),
-      priv = part();
-    if (
-      pub.length !== 32 ||
-      priv.length !== 64 ||
-      !priv.subarray(32).equals(pub) ||
-      !publicBlob(pub).equals(blob) ||
-      part().length
-    )
-      throw new Error();
-    const derived = createPublicKey(
-      createPrivateKey({
-        key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), priv.subarray(0, 32)]),
-        format: 'der',
-        type: 'pkcs8',
-      }),
-    ).export({ format: 'jwk' });
-    if (typeof derived.x !== 'string' || !Buffer.from(derived.x, 'base64url').equals(pub)) throw new Error();
-    const padding = inner.subarray(cursor);
-    if (!padding.length || padding.length > 8 || !padding.every((value, index) => value === index + 1))
-      throw new Error();
+    assertPrivateKeyPayload(inner, blob);
   } catch {
     throw new Error('invalid_key');
   }
+}
+
+/** Check the private payload against both encoded and cryptographically derived public keys. */
+function assertPrivateKeyPayload(inner: Buffer, blob: Buffer): void {
+  let cursor = 8;
+  const part = () => {
+    const length = inner.readUInt32BE(cursor);
+    cursor += 4;
+    if (length > inner.length - cursor) throw new Error();
+    const value = inner.subarray(cursor, cursor + length);
+    cursor += length;
+    return value;
+  };
+  if (part().toString() !== algorithm) throw new Error();
+  const pub = part(),
+    priv = part();
+  if (
+    pub.length !== 32 ||
+    priv.length !== 64 ||
+    !priv.subarray(32).equals(pub) ||
+    !publicBlob(pub).equals(blob) ||
+    part().length
+  )
+    throw new Error();
+  const derived = createPublicKey(
+    createPrivateKey({
+      key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), priv.subarray(0, 32)]),
+      format: 'der',
+      type: 'pkcs8',
+    }),
+  ).export({ format: 'jwk' });
+  if (typeof derived.x !== 'string' || !Buffer.from(derived.x, 'base64url').equals(pub)) throw new Error();
+  const padding = inner.subarray(cursor);
+  if (!padding.length || padding.length > 8 || !padding.every((value, index) => value === index + 1)) throw new Error();
 }
 
 /** Restore only the key corresponding to persisted public metadata, never an arbitrary decrypted payload. */

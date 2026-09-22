@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
-import { DataSource, EntityManager, Repository, UpdateResult } from 'typeorm';
+import { AuthenticationDetail, ResourceUsage, Role, Session, User } from '@attraccess/database-entities';
+import { DataSource, EntityManager, QueryFailedError, Repository, UpdateResult } from 'typeorm';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
@@ -22,6 +22,7 @@ const mockMetricsService = {
 const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
   assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
+  getEffectivePermissions: jest.fn().mockResolvedValue(new Set()),
   isLastAdministrator: jest.fn().mockResolvedValue(false),
 };
 
@@ -29,7 +30,7 @@ describe('UsersService', () => {
   let service: UsersService;
   let userRepository: jest.Mocked<Repository<User>>;
   let dataSource: jest.Mocked<DataSource>;
-  let emailService: { sendUsernameChangedEmail: jest.Mock };
+  let emailService: { sendUsernameChangedEmail: jest.Mock; sendVerificationEmail: jest.Mock };
 
   beforeEach(async () => {
     mockRbacService.assignRoleByKey.mockClear();
@@ -50,6 +51,7 @@ describe('UsersService', () => {
           provide: EmailService,
           useValue: {
             sendUsernameChangedEmail: jest.fn(),
+            sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -115,7 +117,10 @@ describe('UsersService', () => {
     service = module.get<UsersService>(UsersService);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
     dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
-    emailService = module.get(EmailService) as unknown as { sendUsernameChangedEmail: jest.Mock };
+    emailService = module.get(EmailService) as unknown as {
+      sendUsernameChangedEmail: jest.Mock;
+      sendVerificationEmail: jest.Mock;
+    };
   });
 
   it('should be defined', () => {
@@ -398,17 +403,17 @@ describe('UsersService', () => {
       await service.findMany({ page: 1, limit: 10 });
 
       expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
-     });
+    });
 
-     it('should filter users by role assignment', async () => {
-       userRepository.findAndCount.mockResolvedValue([[], 0]);
+    it('should filter users by role assignment', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
 
       await service.findMany({ page: 1, limit: 10, roleId: 42 });
 
       expect(userRepository.findAndCount).toHaveBeenCalledWith(
-         expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
-       );
-     });
+        expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
+      );
+    });
 
     it('should retain the role assignment filter when searching', async () => {
       userRepository.findAndCount.mockResolvedValue([[], 0]);
@@ -885,6 +890,147 @@ describe('UsersService', () => {
           deleteAccountTokenExpiresAt: expect.anything(),
           deleteAccountRequestedAt: expect.anything(),
         }),
+      );
+    });
+  });
+  describe('email changes', () => {
+    const actor = Object.assign(new User(), { id: 1, email: 'old@example.com' });
+    beforeEach(() => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(actor).mockResolvedValue(null);
+    });
+    it('changes and reverifies an email inside the transaction', async () => {
+      const updated = Object.assign(new User(), { id: 1, email: 'new@example.com' });
+      jest
+        .mocked(service.findOne)
+        .mockReset()
+        .mockResolvedValueOnce(actor)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(updated);
+      const manager = new EntityManager(dataSource);
+      jest.spyOn(manager, 'getRepository').mockReturnValue(userRepository);
+      dataSource.transaction.mockImplementation(async (workOrIsolation, work) => {
+        const callback = typeof workOrIsolation === 'function' ? workOrIsolation : work;
+        if (!callback) throw new Error('Missing transaction callback');
+        return callback(manager);
+      });
+      expect(await service.changeEmail(1, ' new@example.com ', actor)).toBe(updated);
+      expect(userRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          email: 'new@example.com',
+          isEmailVerified: false,
+          emailVerificationToken: expect.any(String),
+          emailVerificationTokenExpiresAt: expect.any(Date),
+        }),
+      );
+      expect(service.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
+    });
+    it('leaves an unchanged email verified without a transaction', async () => {
+      expect(await service.changeEmail(1, ' old@example.com ', actor)).toBe(actor);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+    it.each(['', 'invalid'])('rejects invalid email %p before reading users', async (email) => {
+      await expect(service.changeEmail(1, email, actor)).rejects.toThrow(BadRequestException);
+      expect(service.findOne).not.toHaveBeenCalled();
+    });
+    it('rejects editing another user without permission', async () => {
+      await expect(service.changeEmail(2, 'new@example.com', actor)).rejects.toThrow(ForbiddenException);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+    it.each(['23505', 'SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT_UNIQUE', 'ER_DUP_ENTRY', 1062])(
+      'translates a concurrent unique constraint failure (%p)',
+      async (code) => {
+        dataSource.transaction.mockRejectedValue(
+          new QueryFailedError('UPDATE users', [], Object.assign(new Error('duplicate'), { code })),
+        );
+        await expect(service.changeEmail(1, 'new@example.com', actor)).rejects.toThrow('Email already exists');
+      },
+    );
+    it.each([
+      [
+        new QueryFailedError('UPDATE users', [], new Error('UNIQUE constraint failed: user.email')),
+        'Email already exists',
+      ],
+      [new QueryFailedError('UPDATE users', [], new Error('database unavailable')), 'database unavailable'],
+      [new Error('mail delivery failed'), 'mail delivery failed'],
+    ])('preserves unrelated failures and recognizes email uniqueness by message', async (error, message) => {
+      dataSource.transaction.mockRejectedValue(error);
+      await expect(service.changeEmail(1, 'new@example.com', actor)).rejects.toThrow(message);
+    });
+  });
+
+  describe('bulk user role assignment', () => {
+    function managerForImport(totalExisting = 0, rolePermissions = ['resources.view']) {
+      const roleRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValue({ rolePermissions: rolePermissions.map((permissionKey) => ({ permissionKey })) }),
+      };
+      const repo = {
+        count: jest.fn().mockResolvedValue(totalExisting),
+        create: jest.fn(() => new User()),
+        save: jest.fn(async (users: User[]) => users.map((user, index) => Object.assign(user, { id: index + 1 }))),
+      };
+      const manager = {
+        getRepository: jest.fn((entity) => (entity === Role ? roleRepo : repo)),
+      } as unknown as EntityManager;
+      return { manager, repo, roleRepo };
+    }
+    it('bootstraps one administrator and assigns defaults to remaining normalized users', async () => {
+      const { manager } = managerForImport();
+      const users = await service.createMany(
+        [
+          { username: ' FIRST ', email: ' first@example.com ', locale: ' de ' },
+          { username: 'second', email: 'second@example.com', locale: ' ' },
+        ],
+        { manager, grantAllPermissionsToFirst: true },
+      );
+      expect(users).toEqual([
+        expect.objectContaining({
+          username: 'first',
+          email: 'first@example.com',
+          locale: 'de',
+          externalIdentifier: null,
+        }),
+        expect.objectContaining({ username: 'second', locale: 'en' }),
+      ]);
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', manager);
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledTimes(1);
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(2, manager);
+    });
+    it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
+      const { manager } = managerForImport(3);
+      mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
+      await service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'viewer' }], {
+        manager,
+        grantAllPermissionsToFirst: true,
+        actorId: 9,
+      });
+      expect(mockRbacService.getEffectivePermissions).toHaveBeenCalledWith(9);
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, manager);
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'viewer', manager);
+      expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(1, 'administrator', manager);
+    });
+    it('refuses an import role above the actor privilege ceiling', async () => {
+      const { manager } = managerForImport(1, ['users.update']);
+      mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
+      await expect(
+        service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'admin' }], {
+          manager,
+          actorId: 9,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
+    });
+    it('rejects an unknown role and an empty email', async () => {
+      const { manager, roleRepo } = managerForImport();
+      roleRepo.findOne.mockResolvedValue(null);
+      await expect(
+        service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'missing' }], { manager }),
+      ).rejects.toThrow("Role with key 'missing' not found");
+      await expect(service.createMany([{ username: 'member', email: ' ' }], { manager })).rejects.toThrow(
+        'Email is required',
       );
     });
   });

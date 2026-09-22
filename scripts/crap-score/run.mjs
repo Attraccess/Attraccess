@@ -52,6 +52,7 @@ export function completeCoverage(files, reports) {
       repairStatementLocations(coverage.fileCoverageFor(file).statementMap, original.statementMap);
       fillMissingFunctions(coverage.fileCoverageFor(file), original);
     }
+    deduplicateStatements(coverage.fileCoverageFor(file));
     deduplicateFunctions(coverage.fileCoverageFor(file));
   }
   const result = coverage.toJSON();
@@ -145,6 +146,29 @@ export function deduplicateFunctions(file) {
     file.f[existing] = Math.max(file.f[existing], file.f[id]);
     delete file.fnMap[id];
     delete file.f[id];
+  }
+}
+
+// Runners can map the same statement with a concrete end column or an
+// end-of-line sentinel. Repairing those ranges after merging must not leave a
+// second, uncovered copy of a statement another runner already exercised.
+export function deduplicateStatements(file) {
+  const locations = new Map();
+  for (const [id, statement] of Object.entries(file.statementMap)) {
+    const key = JSON.stringify([
+      statement.start.line,
+      statement.start.column,
+      statement.end.line,
+      statement.end.column,
+    ]);
+    const existing = locations.get(key);
+    if (existing === undefined) {
+      locations.set(key, id);
+      continue;
+    }
+    file.s[existing] = Math.max(file.s[existing], file.s[id]);
+    delete file.statementMap[id];
+    delete file.s[id];
   }
 }
 

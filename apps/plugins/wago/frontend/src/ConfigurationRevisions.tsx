@@ -134,7 +134,6 @@ export function ConfigurationRevisions({
   }, [generation]);
   const review = actions.review.data;
   const preview = actions.preview.data;
-  const reviewedHash = review?.draft.reviewedHash;
   const reviewNames = {
     ...readMetadata(review?.previous?.presetProvenance ?? null).names,
     ...readMetadata(review?.draft.presetProvenance ?? null).names,
@@ -176,30 +175,21 @@ export function ConfigurationRevisions({
             Review saved draft
           </Button>
           {review && (
-            <>
-              <ConfigurationChanges
-                changes={review.diff}
-                before={review.previous ? JSON.parse(review.previous.snapshot) : null}
-                after={JSON.parse(review.draft.snapshot)}
-                names={reviewNames}
-              />
-              <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={reviewNames} />
-              <ImpactWarning impacts={review.impacts} names={reviewNames} acknowledged={force} onChange={setForce} />
-              <Button
-                isDisabled={disabled || busy || !hasSavedDraft || !reviewedHash || (!!review.impacts.length && !force)}
-                isPending={actions.publish.isPending}
-                onPress={() =>
-                  void run(async () => {
-                    if (!reviewedHash) return;
-                    await actions.publish.mutateAsync({ force, reviewedHash });
-                    actions.review.reset();
-                    setOffset(0);
-                  })
-                }
-              >
-                Publish reviewed draft
-              </Button>
-            </>
+            <ReviewedDraft
+              review={review}
+              names={reviewNames}
+              disabled={disabled || busy || !hasSavedDraft}
+              force={force}
+              onForceChange={setForce}
+              publishing={actions.publish.isPending}
+              onPublish={(reviewedHash) =>
+                void run(async () => {
+                  await actions.publish.mutateAsync({ force, reviewedHash });
+                  actions.review.reset();
+                  setOffset(0);
+                })
+              }
+            />
           )}
           {actions.publish.data && (
             <p role="status">
@@ -350,5 +340,46 @@ export function ConfigurationRevisions({
       </div>
       {error && <p role="alert">{error}</p>}
     </section>
+  );
+}
+
+function ReviewedDraft({
+  review,
+  names,
+  disabled,
+  force,
+  onForceChange,
+  publishing,
+  onPublish,
+}: {
+  review: NonNullable<ReturnType<typeof useConfigurationActions>['review']['data']>;
+  names: Record<string, string>;
+  disabled: boolean;
+  force: boolean;
+  onForceChange: (force: boolean) => void;
+  publishing: boolean;
+  onPublish: (reviewedHash: string) => void;
+}) {
+  const reviewedHash = review.draft.reviewedHash;
+  return (
+    <>
+      <ConfigurationChanges
+        changes={review.diff}
+        before={review.previous ? JSON.parse(review.previous.snapshot) : null}
+        after={JSON.parse(review.draft.snapshot)}
+        names={names}
+      />
+      <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={names} />
+      <ImpactWarning impacts={review.impacts} names={names} acknowledged={force} onChange={onForceChange} />
+      <Button
+        isDisabled={disabled || !reviewedHash || (!!review.impacts.length && !force)}
+        isPending={publishing}
+        onPress={() => {
+          if (reviewedHash) onPublish(reviewedHash);
+        }}
+      >
+        Publish reviewed draft
+      </Button>
+    </>
   );
 }

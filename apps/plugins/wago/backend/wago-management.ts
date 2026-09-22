@@ -211,22 +211,7 @@ export class WagoManagementService {
           await this.adapter.installKey(tx, input.temporarySsh, key.publicKey);
           await this.step(record, owner, 'verifying_key');
           await this.verify(record, key.privateKey);
-          if (record.mode === 'baseline') {
-            await this.step(record, owner, 'restricting_access');
-            await this.adapter.restrictAccess(tx, input.temporarySsh, key.privateKey);
-            await this.step(record, owner, 'verifying_baseline');
-            // Verify a THIRD fresh key connection after changing policy/reloading the service.
-            await this.verify(record, key.privateKey);
-            const result = await this.adapter.verifyBaseline(tx, key.privateKey);
-            if (
-              !result.passwordDisabled ||
-              !result.defaultAccessDisabled ||
-              !result.minimumPrivileges ||
-              (!result.wbmSecure && !record.exceptions.includes('wbm_exposed')) ||
-              (!result.otherManagementSecure && !record.exceptions.includes('other_services_exposed'))
-            )
-              throw new Error();
-          }
+          if (record.mode === 'baseline') await this.enforceBaseline(record, owner, input.temporarySsh, key.privateKey);
           await this.step(record, owner, 'committing');
           await this.adapter.commit(tx, input.temporarySsh, key.privateKey);
           record.state = record.mode === 'baseline' && record.exceptions.length === 0 ? 'hardened' : 'key_enrolled';
@@ -243,6 +228,29 @@ export class WagoManagementService {
       },
       assertOwned,
     );
+  }
+
+  private async enforceBaseline(
+    record: ManagementRecord,
+    owner: ManagementOwner,
+    credential: SessionCredential,
+    privateKey: string,
+  ): Promise<void> {
+    const tx = record.transaction!;
+    await this.step(record, owner, 'restricting_access');
+    await this.adapter.restrictAccess(tx, credential, privateKey);
+    await this.step(record, owner, 'verifying_baseline');
+    // Verify a THIRD fresh key connection after changing policy/reloading the service.
+    await this.verify(record, privateKey);
+    const result = await this.adapter.verifyBaseline(tx, privateKey);
+    if (
+      !result.passwordDisabled ||
+      !result.defaultAccessDisabled ||
+      !result.minimumPrivileges ||
+      (!result.wbmSecure && !record.exceptions.includes('wbm_exposed')) ||
+      (!result.otherManagementSecure && !record.exceptions.includes('other_services_exposed'))
+    )
+      throw new Error();
   }
 
   async recover(
