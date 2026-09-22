@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { getCrapReport } from 'crap-score';
-import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage } from './run.mjs';
+import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run } from './run.mjs';
 
 test('source selection includes apps and scripts but excludes tests and generated clients', () => {
   for (const file of [
@@ -356,5 +356,26 @@ test('repaired statement ranges merge covered and uncovered copies from differen
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runs an Nx library suite and writes consistent JSON, HTML, and summary artifacts', async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'attraccess-crap-integration-'));
+  try {
+    await run('libs/env', directory);
+    const summary = JSON.parse(readFileSync(path.join(directory, 'summary.json'), 'utf8'));
+    const report = JSON.parse(readFileSync(path.join(directory, 'crap-report.json'), 'utf8'));
+    const functions = Object.values(report).flatMap((file) => Object.values(file));
+    assert.equal(summary.project, 'env');
+    assert.ok(summary.files > 0);
+    assert.ok(summary.functions > 0);
+    assert.deepEqual(summarizeScores(functions), {
+      functions: summary.functions,
+      atLeast30: summary.atLeast30,
+      max: summary.max,
+    });
+    assert.ok(existsSync(path.join(directory, 'html/index.html')));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });

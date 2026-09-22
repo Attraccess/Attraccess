@@ -303,10 +303,10 @@ export function suites(root) {
   return result;
 }
 
-export async function run(root) {
+export async function run(root, outputDirectory) {
   process.chdir(workspace);
   const project = JSON.parse(readFileSync(path.join(root, 'project.json'), 'utf8'));
-  const output = path.join(workspace, 'coverage/crap', project.name.replaceAll('/', '__'));
+  const output = outputDirectory ?? path.join(workspace, 'coverage/crap', project.name.replaceAll('/', '__'));
   rmSync(output, { recursive: true, force: true });
   mkdirSync(output, { recursive: true });
   const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {

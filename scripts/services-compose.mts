@@ -5,7 +5,7 @@ import { execFile } from 'child_process';
 import { existsSync } from 'fs';
 import path from 'path';
 import { promisify } from 'util';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const execFileAsync = promisify(execFile);
 const h = React.createElement;
@@ -63,7 +63,7 @@ async function getComposeServices(): Promise<string[]> {
     .filter(Boolean);
 }
 
-function resolveSelectedServices(tokens: string[], allServices: string[]): string[] {
+export function resolveSelectedServices(tokens: string[], allServices: string[]): string[] {
   if (tokens.includes('all')) {
     return [...allServices];
   }
@@ -95,7 +95,7 @@ function buildStopList(allServices: string[], selectedServices: string[]): strin
   return allServices.filter((service) => !selected.has(service));
 }
 
-async function handleAction(action: Action, tokens: string[]): Promise<string> {
+export async function handleAction(action: Action, tokens: string[]): Promise<string> {
   if (!existsSync(composeFile)) {
     throw new Error(`Compose file not found: ${composeFile}`);
   }
@@ -263,7 +263,7 @@ function OutputScreen({
   );
 }
 
-function App() {
+export function App() {
   const [action, setAction] = useState<Action | null>(null);
   const [selectedSets, setSelectedSets] = useState<string[] | null>(null);
   const [output, setOutput] = useState<string>('');
@@ -355,7 +355,7 @@ async function runCli(): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   if (!existsSync(composeFile)) {
     console.error(`Compose file not found: ${composeFile}`);
     process.exitCode = 1;
@@ -376,4 +376,4 @@ async function main(): Promise<void> {
   render(h(App, null));
 }
 
-void main();
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) void main();

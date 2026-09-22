@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import path from 'node:path';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
@@ -19,6 +19,8 @@ export default defineConfig({
   },
   test: {
     root: __dirname,
+    // This CLI integration suite runs with node:test, including in the CRAP runner.
+    exclude: [...configDefaults.exclude, 'extract-dependencies.test.mjs'],
     globals: true,
     environment: 'happy-dom',
     setupFiles: [path.join(__dirname, 'src/test-utils/setup.ts')],
