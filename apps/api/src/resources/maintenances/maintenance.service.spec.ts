@@ -97,6 +97,40 @@ describe('MaintenanceService', () => {
     resourceIntroducerRepository = module.get<Repository<any>>(getRepositoryToken(ResourceIntroducer));
   });
 
+  it('creates scheduled maintenance with deferred notifications in a transaction', async () => {
+    jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(mockResource);
+    jest.spyOn(maintenanceRepository, 'create').mockReturnValue(mockMaintenance);
+    jest.spyOn(maintenanceRepository, 'save').mockResolvedValue(mockMaintenance);
+    const manager = {
+      getRepository: (entity: unknown) => (entity === Resource ? resourceRepository : maintenanceRepository),
+    };
+    const emit = jest.spyOn(service, 'emitScheduledMaintenanceCreated');
+    expect(await service.createMaintenanceFromSchedule(1, 8, 'Due', manager as never, false)).toBe(mockMaintenance);
+    expect(maintenanceRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ maintenanceSchedule: { id: 8 }, endTime: null, reason: 'Due' }),
+    );
+    expect(emit).not.toHaveBeenCalled();
+    await service.createMaintenanceFromSchedule(1, 8, 'Due');
+    expect(emit).toHaveBeenCalledWith(1, 1);
+    jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(null);
+    await expect(service.createMaintenanceFromSchedule(99, 8, 'Due')).rejects.toThrow('not found');
+  });
+
+  it('checks active maintenance by resource or schedule through the supplied transaction', async () => {
+    const query = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(mockMaintenance),
+    };
+    jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(query as never);
+    expect(await service.hasActiveMaintenance(1)).toBe(true);
+    expect(query.where).toHaveBeenCalledWith('maintenance.resourceId = :resourceId', { resourceId: 1 });
+    query.getOne.mockResolvedValue(null);
+    const manager = { getRepository: () => maintenanceRepository };
+    expect(await service.hasActiveMaintenance({ resourceId: 1, scheduleId: 8 }, manager as never)).toBe(false);
+    expect(query.andWhere).toHaveBeenCalledWith('maintenance.maintenanceScheduleId = :scheduleId', { scheduleId: 8 });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });

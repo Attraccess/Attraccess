@@ -4,6 +4,10 @@ import { randomUUID } from 'crypto';
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { lookup } from 'dns/promises';
+import type { LookupAddress } from 'dns';
+const lookupAll = lookup as unknown as jest.MockedFunction<
+  (host: string, options: { all: true; verbatim: true }) => Promise<LookupAddress[]>
+>;
 import { tmpdir } from 'os';
 import { join } from 'path';
 import * as tar from 'tar';
@@ -154,6 +158,51 @@ describe('NpmPluginService', () => {
     },
   );
 
+  it('pins tarball DNS on every same-origin redirect and returns archive bytes', async () => {
+    const service = new NpmPluginService({} as never) as unknown as {
+      download: (url: string, registry: { url: string; token: string | null }) => Promise<Buffer>;
+    };
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    const get = jest
+      .spyOn(axios, 'get')
+      .mockResolvedValueOnce({ status: 302, headers: { location: '/archive.tgz' } })
+      .mockResolvedValueOnce({ status: 200, data: Buffer.from('archive') });
+    expect(
+      await service.download('https://registry.npmjs.org/start', {
+        url: 'https://registry.npmjs.org',
+        token: 'test-token',
+      }),
+    ).toEqual(Buffer.from('archive'));
+    expect(get).toHaveBeenNthCalledWith(
+      2,
+      'https://registry.npmjs.org/archive.tgz',
+      expect.objectContaining({ maxRedirects: 0, headers: { authorization: 'Bearer test-token' } }),
+    );
+    const options = get.mock.calls[0][1];
+    const callback = jest.fn();
+    if (!options?.lookup) throw new Error('Missing pinned lookup');
+    options.lookup('registry.npmjs.org', {}, callback);
+    expect(callback).toHaveBeenCalledWith(null, '1.1.1.1', 4);
+    options.lookup('other.example', {}, callback);
+    expect(callback).toHaveBeenLastCalledWith(expect.any(Error), '', 4);
+    expect(options.validateStatus?.(200)).toBe(true);
+    expect(options.validateStatus?.(404)).toBe(false);
+  });
+
+  it('rejects tarball redirects without destinations, across origins, or beyond the limit', async () => {
+    const service = new NpmPluginService({} as never) as unknown as {
+      download: (url: string, registry: { url: string; token: string | null }) => Promise<Buffer>;
+    };
+    const registry = { url: 'https://registry.npmjs.org', token: null };
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    const get = jest.spyOn(axios, 'get').mockResolvedValueOnce({ status: 302, headers: {} });
+    await expect(service.download(registry.url, registry)).rejects.toThrow('no destination');
+    get.mockResolvedValueOnce({ status: 302, headers: { location: 'https://other.example/archive' } });
+    await expect(service.download(registry.url, registry)).rejects.toThrow('configured registry origin');
+    get.mockResolvedValue({ status: 302, headers: { location: '/again' } });
+    await expect(service.download(registry.url, registry)).rejects.toThrow('redirect limit');
+  });
+
   it('pins metadata requests to public registry addresses and limits their size', async () => {
     const settings: SettingsMock = {
       getPlainSetting: jest.fn(),
@@ -163,7 +212,7 @@ describe('NpmPluginService', () => {
     };
     const service = new NpmPluginService(settings as unknown as never);
     const axiosGet = jest.spyOn(axios, 'get').mockResolvedValue({ data: { versions: {} } });
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
 
     await service.packageMetadata('example');
 
@@ -184,7 +233,7 @@ describe('NpmPluginService', () => {
     } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [
@@ -226,7 +275,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [{ package: { name: '@example/plugin', version: '1.2.3' } }],
@@ -291,7 +340,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [
@@ -335,7 +384,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [{ package: { name: '@example/stale' } }, { package: { name: '@example/plugin' } }],
@@ -470,7 +519,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService(settings as unknown as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     const axiosGet = jest.spyOn(axios, 'get').mockResolvedValue({
       data: { objects: [{ package: { name: '@private/plugin' } }] },
     });
@@ -519,7 +568,7 @@ describe('NpmPluginService', () => {
     };
     const service = new NpmPluginService(settings as unknown as never);
     const axiosGet = jest.spyOn(axios, 'get');
-    jest.mocked(lookup).mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    lookupAll.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
 
     await expect(service.packageMetadata('example', 'private')).rejects.toThrow('public addresses');
     expect(axiosGet).not.toHaveBeenCalled();
@@ -1235,7 +1284,13 @@ describe('NpmPluginService', () => {
           _npmUser: { name: 'unapproved-publisher' },
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
-          attraccess: { displayName: 'Example', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
+          attraccess: {
+            displayName: 'Example',
+            host: '*',
+            backend: 'index.js',
+            permissions: [],
+            sdk: { backend: '*' },
+          },
         },
       },
     });

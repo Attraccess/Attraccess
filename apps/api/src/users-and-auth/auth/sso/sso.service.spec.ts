@@ -110,7 +110,7 @@ describe('SsoService', () => {
             isEncrypted: jest.fn((value: string) => value.startsWith('enc:')),
             encryptIfPlain: jest.fn((value: string) => (value.startsWith('enc:') ? value : `enc:${value}`)),
             decryptIfEncrypted: jest.fn((value: string) =>
-              value?.startsWith('enc:') ? value.replace(/^enc:/, '') : value
+              value?.startsWith('enc:') ? value.replace(/^enc:/, '') : value,
             ),
           },
         },
@@ -123,15 +123,16 @@ describe('SsoService', () => {
     samlConfigRepository = module.get<Repository<SSOProviderSAMLConfiguration>>(SSOProviderSAMLConfigurationRepository);
     Object.assign(ssoProviderRepository, {
       manager: {
-        transaction: jest.fn((callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) =>
-          callback({
-            getRepository: (entity) =>
-              entity === SSOProvider
-                ? ssoProviderRepository
-                : entity === SSOProviderOIDCConfiguration
-                  ? oidcConfigRepository
-                  : samlConfigRepository,
-          }),
+        transaction: jest.fn(
+          (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) =>
+            callback({
+              getRepository: (entity) =>
+                entity === SSOProvider
+                  ? ssoProviderRepository
+                  : entity === SSOProviderOIDCConfiguration
+                    ? oidcConfigRepository
+                    : samlConfigRepository,
+            }),
         ),
       },
     });
@@ -205,10 +206,20 @@ describe('SsoService', () => {
     it('rolls back provider creation when the committed provider cannot be reloaded', async () => {
       jest.spyOn(ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
 
-      await expect(service.createProvider({
-        name: 'New Provider', type: SSOProviderType.OIDC,
-        oidcConfiguration: { issuer: 'https://new-issuer.com', authorizationURL: 'https://new-issuer.com/auth', tokenURL: 'https://new-issuer.com/token', userInfoURL: 'https://new-issuer.com/userinfo', clientId: 'new-client-id', clientSecret: 'new-client-secret' },
-      })).rejects.toThrow('Provider not found after create');
+      await expect(
+        service.createProvider({
+          name: 'New Provider',
+          type: SSOProviderType.OIDC,
+          oidcConfiguration: {
+            issuer: 'https://new-issuer.com',
+            authorizationURL: 'https://new-issuer.com/auth',
+            tokenURL: 'https://new-issuer.com/token',
+            userInfoURL: 'https://new-issuer.com/userinfo',
+            clientId: 'new-client-id',
+            clientSecret: 'new-client-secret',
+          },
+        }),
+      ).rejects.toThrow('Provider not found after create');
       expect(ssoProviderRepository.manager.transaction).toHaveBeenCalled();
     });
   });
@@ -228,15 +239,22 @@ describe('SsoService', () => {
     it('does not commit a provider update when its configuration write fails', async () => {
       oidcConfigRepository.update.mockRejectedValueOnce(new Error('configuration write failed'));
 
-      await expect(service.updateProvider(1, { oidcConfiguration: { issuer: 'https://changed.example.com' } })).rejects.toThrow('configuration write failed');
+      await expect(
+        service.updateProvider(1, { oidcConfiguration: { issuer: 'https://changed.example.com' } }),
+      ).rejects.toThrow('configuration write failed');
       expect(ssoProviderRepository.manager.transaction).toHaveBeenCalled();
       expect(ssoProviderRepository.update).not.toHaveBeenCalled();
     });
 
     it('rolls back a provider update when the committed provider cannot be reloaded', async () => {
-      jest.spyOn(ssoProviderRepository, 'findOne').mockResolvedValueOnce(mockSSOProviderWithOIDCConfig).mockResolvedValueOnce(null);
+      jest
+        .spyOn(ssoProviderRepository, 'findOne')
+        .mockResolvedValueOnce(mockSSOProviderWithOIDCConfig)
+        .mockResolvedValueOnce(null);
 
-      await expect(service.updateProvider(1, { name: 'Changed Provider' })).rejects.toThrow('Provider not found after update');
+      await expect(service.updateProvider(1, { name: 'Changed Provider' })).rejects.toThrow(
+        'Provider not found after update',
+      );
       expect(ssoProviderRepository.manager.transaction).toHaveBeenCalled();
     });
   });
@@ -395,11 +413,73 @@ describe('SsoService', () => {
       );
     });
 
+    it('updates all SAML options and can explicitly clear sensitive signing material', async () => {
+      jest
+        .mocked(samlConfigRepository.findOne)
+        .mockResolvedValue({ ...baseSamlConfig, spSigningKeyEncrypted: 'enc:old-key' } as SSOProviderSAMLConfiguration);
+      const update = (
+        service as unknown as { updateSAMLConfiguration: (id: number, config: object) => Promise<unknown> }
+      ).updateSAMLConfiguration.bind(service);
+      await update(1, {
+        entryPoint: 'https://new-idp.example/sso',
+        issuer: 'new-issuer',
+        certificate: '-----BEGIN CERTIFICATE-----IDPCERT-----END CERTIFICATE-----',
+        audience: 'audience',
+        signRequest: true,
+        wantAssertionsSigned: true,
+        wantAuthnResponseSigned: true,
+        forceAuthn: true,
+        emailAttributeKeys: ['mail'],
+        provisioningSecret: ' provisioning-secret ',
+        roleMappings: { operator: ['staff'] },
+        spSigningCertificate: '-----BEGIN CERTIFICATE-----SPCERT-----END CERTIFICATE-----',
+        spSigningPrivateKey: '-----BEGIN PRIVATE KEY-----new-secret-----END PRIVATE KEY-----',
+      });
+      expect(samlConfigRepository.update).toHaveBeenCalledWith(
+        { ssoProviderId: 1 },
+        expect.objectContaining({
+          entryPoint: 'https://new-idp.example/sso',
+          issuer: 'new-issuer',
+          certificate: 'IDPCERT',
+          audience: 'audience',
+          signRequest: true,
+          wantAssertionsSigned: true,
+          wantAuthnResponseSigned: true,
+          forceAuthn: true,
+          emailAttributeKeys: ['mail'],
+          roleMappings: { operator: ['staff'] },
+          spSigningCertificate: 'SPCERT',
+          spSigningKeyEncryptionKeyId: 'default',
+        }),
+      );
+      expect(encryptionService.encrypt).toHaveBeenCalledWith('provisioning-secret');
+      await update(1, {
+        signRequest: false,
+        provisioningSecret: '',
+        roleMappings: null,
+        spSigningCertificate: '',
+        spSigningPrivateKey: '',
+      });
+      expect(samlConfigRepository.update).toHaveBeenLastCalledWith(
+        { ssoProviderId: 1 },
+        {
+          signRequest: false,
+          provisioningSecret: null,
+          roleMappings: null,
+          spSigningCertificate: null,
+          spSigningKeyEncrypted: null,
+          spSigningKeyEncryptionKeyId: null,
+        },
+      );
+      jest.mocked(samlConfigRepository.findOne).mockResolvedValue(null);
+      await expect(update(1, {})).rejects.toThrow('SAML configuration not found');
+    });
+
     it('does not re-encrypt a canonical-equivalent signing key', async () => {
-      samlConfigRepository.findOne.mockResolvedValue({
+      jest.mocked(samlConfigRepository.findOne).mockResolvedValue({
         ...baseSamlConfig,
         spSigningKeyEncrypted: 'enc:-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----',
-      });
+      } as SSOProviderSAMLConfiguration);
 
       await (
         service as unknown as {

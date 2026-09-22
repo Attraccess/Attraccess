@@ -121,3 +121,47 @@ describe('saving MQTT flow subscriptions', () => {
     expect(events.emit).not.toHaveBeenCalled();
   });
 });
+
+describe('plugin node configuration schemas', () => {
+  const resources = createMock<Repository<Resource>>();
+  const service = new ResourceFlowsService(
+    createMock<Repository<ResourceFlowNode>>(),
+    createMock<Repository<ResourceFlowEdge>>(),
+    resources,
+    createMock<MqttClientService>(),
+    new EventEmitter2(),
+  );
+  it('resolves dynamic schemas with resource context and falls back to static schemas', async () => {
+    resources.findOne.mockResolvedValue({ id: 1 } as Resource);
+    const schema = { type: 'object', properties: { channelId: { type: 'string' } } };
+    const resolve = jest.fn().mockResolvedValue(schema);
+    registerPluginFlowNodes('schema-test', [
+      {
+        type: 'plugin.schema-test.dynamic',
+        label: 'Dynamic',
+        isInput: true,
+        inputs: [],
+        outputs: ['output'],
+        resolveConfigSchema: resolve,
+      },
+      {
+        type: 'plugin.schema-test.static',
+        label: 'Static',
+        isInput: true,
+        inputs: [],
+        outputs: ['output'],
+        configSchema: schema,
+      },
+      { type: 'plugin.schema-test.empty', label: 'Empty', isInput: true, inputs: [], outputs: ['output'] },
+    ]);
+    expect(await service.resolveNodeSchema(1, 'plugin.schema-test.dynamic', { controllerId: 7 })).toMatchObject({
+      configSchema: schema,
+    });
+    expect(resolve).toHaveBeenCalledWith({ controllerId: 7 }, { resourceId: 1 });
+    expect(await service.resolveNodeSchema(1, 'plugin.schema-test.static', {})).toMatchObject({ configSchema: schema });
+    await expect(service.resolveNodeSchema(1, 'plugin.schema-test.empty', {})).rejects.toThrow('does not provide');
+    await expect(service.resolveNodeSchema(1, 'plugin.schema-test.missing', {})).rejects.toThrow('not found');
+    resources.findOne.mockResolvedValue(null);
+    await expect(service.resolveNodeSchema(99, 'plugin.schema-test.static', {})).rejects.toThrow();
+  });
+});
