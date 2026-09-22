@@ -9,7 +9,9 @@
     "prepare": "husky",
     "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin'",
     "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
-    "services": "node --experimental-strip-types scripts/services-compose.mts"
+    "services": "node --experimental-strip-types scripts/services-compose.mts",
+    "crap-score": "nx run-many -t crap-score --parallel=2",
+    "crap-score:affected": "nx affected -t crap-score --parallel=2"
   },
   "private": true,
   "dependencies": {
@@ -206,8 +208,10 @@
     "@types/w3c-web-serial": "^1.0.8",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
+    "@typescript-eslint/parser": "8.64.0",
     "@typescript/typescript6": "^6.0.0",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-istanbul": "4.1.10",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.10",
     "autoprefixer": "10.5.4",
@@ -215,6 +219,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "buffer": "^6.0.3",
     "core-js": "^3.49.0",
+    "crap-score": "1.2.1",
     "electron": "^34.0.0",
     "electron-builder": "^25.0.0",
     "esbuild": "^0.28.1",
@@ -227,6 +232,8 @@
     "happy-dom": "^20.11.0",
     "husky": "^9.1.7",
     "ink": "^7.1.1",
+    "istanbul-lib-coverage": "3.2.2",
+    "istanbul-lib-instrument": "6.0.3",
     "jest": "30.4.2",
     "jest-environment-jsdom": "30.4.1",
     "jest-environment-node": "^30.4.1",

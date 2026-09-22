@@ -111,6 +111,12 @@
         "cwd": "apps/plugins/shelly",
         "command": "node ../scripts/publish-plugin.mjs package dist"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/shelly"
+      }
     }
   }
 }

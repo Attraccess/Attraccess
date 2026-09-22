@@ -26,6 +26,12 @@
       "options": {
         "command": "pnpm exec tsc --noEmit -p libs/plugins-frontend-ui/tsconfig.spec.json"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/plugins-frontend-ui"
+      }
     }
   }
 }

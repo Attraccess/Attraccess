@@ -27,6 +27,12 @@
       "options": {
         "lintFilePatterns": ["libs/ui/**/*.ts", "libs/ui/**/*.tsx"]
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/ui"
+      }
     }
   }
 }

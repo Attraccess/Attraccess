@@ -78,6 +78,15 @@
         }
       ],
       "outputs": ["{workspaceRoot}/coverage/libs/api-client"]
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/api-client"
+      },
+      "dependsOn": [
+        "generate"
+      ]
     }
   }
 }

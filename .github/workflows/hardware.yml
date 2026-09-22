@@ -4,6 +4,8 @@ on:
   pull_request:
     types: [opened, synchronize]
     paths:
+      - 'apps/attractap/desktop/**'
+      - 'apps/attractap/firmware/**'
       - 'apps/attractap/hardware/**'
       - 'libs/attractap-hw-shared/**'
       - '.github/workflows/hardware.yml'
@@ -44,22 +46,22 @@ jobs:
         run: pnpm --filter @attraccess/attractap-hw-beeper exec playwright install --with-deps chromium
 
       - name: Typecheck hardware libs
-        run: pnpm nx run-many --target=typecheck --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=typecheck --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
       - name: Test hardware libs
-        run: pnpm nx run-many --target=test --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=test --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
       - name: Check generated docs in sync
-        run: pnpm nx run-many --target=doc-check --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=doc-check --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
 
       - name: Lint hardware (DRC/ERC)
-        run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
       - name: Build hardware (circuit JSON)
-        run: pnpm nx run-many --target=build --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=build --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
       - name: Export fab files (gerbers, BOM, CPL)
-        run: pnpm nx run-many --target=export --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=export --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
       - name: Render previews (PCB + schematic + assembly)
-        run: pnpm nx run-many --target=render --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=render --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
       - name: Render 3D (GLB + STEP)
-        run: pnpm nx run-many --target=render-3d --parallel=3 --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=render-3d --parallel=3 --projects=tag:scope:hardware --exclude=attractap-desktop
 
       - name: Upload 3D renders
         uses: actions/upload-artifact@v4
@@ -193,3 +195,19 @@ jobs:
         with:
           header: hardware-renders
           message: ${{ steps.comment-body.outputs.body }}
+
+  desktop-tests:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install native desktop dependencies
+        run: brew install sdl3 curl cmake
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test native desktop
+        run: pnpm nx run attractap-desktop:test

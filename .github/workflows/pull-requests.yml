@@ -68,6 +68,7 @@ jobs:
       [
         lint-and-typecheck,
         test,
+        crap-score,
         build-companion,
         plugins,
         attractap-firmware-version,
@@ -139,6 +140,28 @@ jobs:
           esp-idf: 'false'
       - name: Test affected projects
         run: pnpm nx affected --target=test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
+
+  crap-score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Test CRAP reporting integration
+        run: node --test scripts/crap-score/run.test.mjs
+      - name: Report change risk for affected JS/TS projects
+        run: pnpm crap-score:affected --base=${{ env.NX_AFFECTED_BASE }}
+      - name: Upload CRAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crap-score-reports
+          path: coverage/crap/
+          if-no-files-found: ignore
+          retention-days: 14
 
   plugins:
     # RabbitMQ plugin E2E tests use Testcontainers and require Docker, which is

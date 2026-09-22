@@ -58,6 +58,12 @@
       "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "nx:run-commands",
       "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "tsc --noEmit -p tsconfig.json" }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/wago/cc100-runtime"
+      }
     }
   }
 }
