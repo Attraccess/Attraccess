@@ -134,6 +134,39 @@ describe('BillingService', () => {
     auditService = module.get(AuditService);
   });
 
+  it.each([100, -100])('creates an opposite-sign refund for transaction amount %s', async (amount) => {
+    const original = { id: 4, userId: 7, amount } as BillingTransaction;
+    const refund = {
+      id: 5,
+      userId: 7,
+      amount: amount > 0 ? -25 : 25,
+      status: BillingTransactionStatus.Completed,
+    } as BillingTransaction;
+    jest.spyOn(service, 'getTransaction').mockResolvedValueOnce(original).mockResolvedValueOnce(refund);
+    billingTransactionRepository.save.mockResolvedValue(refund);
+    expect(await service.refundTransaction(9, 4, { amount: 25 })).toBe(refund);
+    expect(billingTransactionRepository.save).toHaveBeenCalledWith({
+      userId: 7,
+      initiatorId: 9,
+      amount: refund.amount,
+      status: BillingTransactionStatus.Completed,
+      refundOfId: 4,
+    });
+    expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(original);
+    expect(auditService.recordBillingTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ transactionId: 5, source: 'refund', amount: refund.amount }),
+    );
+  });
+
+  it('rejects absent transactions and invalid refund amounts before writing', async () => {
+    const get = jest.spyOn(service, 'getTransaction').mockResolvedValue(null);
+    await expect(service.refundTransaction(9, 4, { amount: 25 })).rejects.toThrow();
+    get.mockResolvedValue({ id: 4, amount: -100 } as BillingTransaction);
+    await expect(service.refundTransaction(9, 4, { amount: 0 })).rejects.toThrow('Amount must be greater than 0');
+    await expect(service.refundTransaction(9, 4, { amount: 101 })).rejects.toThrow();
+    expect(billingTransactionRepository.save).not.toHaveBeenCalled();
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
@@ -1118,7 +1151,8 @@ describe('BillingService', () => {
 
     it('validates a tentative start without creating billing records', async () => {
       jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
-        creditsPerUsage: 10, creditsPerMinute: 2,
+        creditsPerUsage: 10,
+        creditsPerMinute: 2,
       } as ResourceBillingConfiguration);
       jest.spyOn(service, 'isBillingEnabled').mockResolvedValue(true);
       jest.spyOn(service, 'getBalance').mockResolvedValue(12);

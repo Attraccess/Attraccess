@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  type OperatingStateDto,
   useResourcesServiceResourceOperatingDiagnosticsGetDataQuality,
   useResourcesServiceResourceOperatingDiagnosticsGetState,
   useResourcesServiceResourceOperatingDiagnosticsGetTransitions,
@@ -92,35 +93,7 @@ export function ResourceDiagnosticsTab() {
 
   return (
     <div className="flex flex-col gap-4 pb-8" data-testid="resource-diagnostics-tab">
-      <FlatSection icon={<ActivityIcon className="w-4 h-4" />} title={t('state.title')}>
-        {isLoadingState ? (
-          <Spinner size="sm" />
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <Chip
-              size="sm"
-              color={state?.state === 'operating' ? 'success' : 'default'}
-              data-testid="diagnostics-state-chip"
-            >
-              {state?.state === 'operating' ? t('state.operating') : t('state.idle')}
-            </Chip>
-            {state?.openInterval && (
-              <span className="text-sm text-muted">
-                {t('state.openSince')}: <DateTimeDisplay date={new Date(state.openInterval.startTime)} />
-              </span>
-            )}
-            <span className="text-sm text-muted">
-              {state?.lastTransitionAt ? (
-                <>
-                  {t('state.lastTransition')}: <DateTimeDisplay date={new Date(state.lastTransitionAt)} />
-                </>
-              ) : (
-                t('state.never')
-              )}
-            </span>
-          </div>
-        )}
-      </FlatSection>
+      <OperatingStateSection state={state} isLoadingState={isLoadingState} />
 
       <FlatSection icon={<AlertTriangleIcon className="w-4 h-4" />} title={t('dataQuality.title')}>
         {isLoadingDataQuality ? (
@@ -335,3 +308,44 @@ export function ResourceDiagnosticsTab() {
 }
 
 export default ResourceDiagnosticsTab;
+
+function OperatingStateSection({
+  state,
+  isLoadingState,
+}: {
+  state: OperatingStateDto | undefined;
+  isLoadingState: boolean;
+}) {
+  const { t } = useTranslations({ en, de });
+  return (
+    <FlatSection icon={<ActivityIcon className="w-4 h-4" />} title={t('state.title')}>
+      {isLoadingState ? (
+        <Spinner size="sm" />
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Chip
+            size="sm"
+            color={state?.state === 'operating' ? 'success' : 'default'}
+            data-testid="diagnostics-state-chip"
+          >
+            {state?.state === 'operating' ? t('state.operating') : t('state.idle')}
+          </Chip>
+          {state?.openInterval && (
+            <span className="text-sm text-muted">
+              {t('state.openSince')}: <DateTimeDisplay date={new Date(state.openInterval.startTime)} />
+            </span>
+          )}
+          <span className="text-sm text-muted">
+            {state?.lastTransitionAt ? (
+              <>
+                {t('state.lastTransition')}: <DateTimeDisplay date={new Date(state.lastTransitionAt)} />
+              </>
+            ) : (
+              t('state.never')
+            )}
+          </span>
+        </div>
+      )}
+    </FlatSection>
+  );
+}

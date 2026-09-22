@@ -93,7 +93,7 @@ describe('RbacService', () => {
       save: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
-      create: jest.fn((data) => ({ ...data } as UserRole)),
+      create: jest.fn((data) => ({ ...data }) as UserRole),
       createQueryBuilder: jest.fn().mockReturnValue(mockQb),
       manager: { transaction: mockTransaction },
     } as unknown as jest.Mocked<Repository<UserRole>>;
@@ -111,7 +111,7 @@ describe('RbacService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       save: jest.fn((data) => Promise.resolve({ id: 42, ...data } as Role)),
-      create: jest.fn((data) => ({ ...data } as Role)),
+      create: jest.fn((data) => ({ ...data }) as Role),
       existsBy: jest.fn().mockResolvedValue(false),
       manager: {
         transaction: jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(roleManager)),
@@ -129,7 +129,7 @@ describe('RbacService', () => {
 
     rolePermissionRepo = {
       save: jest.fn(),
-      create: jest.fn((data) => ({ ...data } as RolePermission)),
+      create: jest.fn((data) => ({ ...data }) as RolePermission),
     } as unknown as jest.Mocked<Repository<RolePermission>>;
     eventEmitter = { emit: jest.fn() };
 
@@ -146,6 +146,43 @@ describe('RbacService', () => {
     }).compile();
 
     service = module.get<RbacService>(RbacService);
+  });
+
+  it('detects the last active administrator and handles absent role assignments', async () => {
+    roleRepo.findOne.mockResolvedValue(null);
+    expect(await service.isLastAdministrator(10)).toBe(false);
+    roleRepo.findOne.mockResolvedValue(makeRole({ id: 1, key: 'administrator' }));
+    userRoleRepo.findOne.mockResolvedValue(null);
+    expect(await service.isLastAdministrator(10)).toBe(false);
+    userRoleRepo.findOne.mockResolvedValue(makeUserRole());
+    const query = createMockQueryBuilder();
+    userRoleRepo.createQueryBuilder.mockReturnValue(query as never);
+    expect(await service.isLastAdministrator(10)).toBe(true);
+    expect(query.innerJoin).toHaveBeenCalledWith('ur.user', 'u', 'u.deletedAt IS NULL');
+    query.getCount.mockResolvedValue(1);
+    const manager = {
+      getRepository: (entity) => (entity === Role ? roleRepo : userRoleRepo),
+      createQueryBuilder: () => query,
+    };
+    expect(await service.isLastAdministrator(10, manager as never)).toBe(false);
+  });
+
+  it('assigns a role by key idempotently and supports a containing transaction', async () => {
+    roleRepo.findOne.mockResolvedValue(null);
+    expect(await service.assignRoleByKey(10, 'missing')).toBeNull();
+    roleRepo.findOne.mockResolvedValue(makeRole());
+    const existing = makeUserRole();
+    userRoleRepo.findOne.mockResolvedValue(existing);
+    expect(await service.assignRoleByKey(10, 'member')).toBe(existing);
+    expect(userRoleRepo.save).not.toHaveBeenCalled();
+    userRoleRepo.findOne.mockResolvedValue(null);
+    userRoleRepo.save.mockResolvedValue(existing);
+    await service.assignRoleByKey(10, 'member');
+    expect(userRoleRepo.create).toHaveBeenCalledWith({ userId: 10, roleId: 1, source: UserRoleSource.MANUAL });
+    eventEmitter.emit.mockClear();
+    const manager = { getRepository: (entity) => (entity === Role ? roleRepo : userRoleRepo) };
+    await service.assignRoleByKey(10, 'member', manager as never);
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {
@@ -317,7 +354,9 @@ describe('RbacService', () => {
         createQueryBuilder: jest.fn().mockReturnValue(mockQb),
         delete: jest.fn(),
       };
-      (userRoleRepo.manager as any).transaction = jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
+      (userRoleRepo.manager as any).transaction = jest
+        .fn()
+        .mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
 
       await expect(service.revokeRole(10, 1, new Set(['system.admin']))).rejects.toThrow(ForbiddenException);
     });
@@ -360,7 +399,9 @@ describe('RbacService', () => {
         createQueryBuilder: jest.fn().mockReturnValue(mockQb),
         delete: jest.fn().mockResolvedValue({ affected: 1, raw: [] }),
       };
-      (userRoleRepo.manager as any).transaction = jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
+      (userRoleRepo.manager as any).transaction = jest
+        .fn()
+        .mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
 
       await expect(service.revokeRole(10, 1, new Set(['system.admin']))).resolves.toBeUndefined();
       expect(mockManager.delete).toHaveBeenCalled();
@@ -381,16 +422,16 @@ describe('RbacService', () => {
       userRoleRepo.findOne.mockResolvedValue(null);
       userRoleRepo.save.mockRejectedValue(new Error('write failed'));
 
-      await expect(service.syncSsoRoles(10, [{ roleKey: 'manager' }], SSO_TYPE, SSO_ID)).rejects.toThrow('write failed');
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'manager' }], SSO_TYPE, SSO_ID)).rejects.toThrow(
+        'write failed',
+      );
       expect(userRoleRepo.manager.transaction).toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('removes SSO roles no longer in the target set', async () => {
       const droppedRole = makeRole({ key: 'member' });
-      const currentSsoRoles = [
-        makeUserRole({ id: 5, source: UserRoleSource.SSO, role: droppedRole }),
-      ];
+      const currentSsoRoles = [makeUserRole({ id: 5, source: UserRoleSource.SSO, role: droppedRole })];
       userRoleRepo.find.mockResolvedValue(currentSsoRoles);
       userRoleRepo.delete.mockResolvedValue({ affected: 1, raw: [] });
 
@@ -402,9 +443,7 @@ describe('RbacService', () => {
 
     it('skips administrator role removal when it is the last administrator', async () => {
       const administratorRole = makeRole({ key: 'administrator' });
-      const currentSsoRoles = [
-        makeUserRole({ id: 7, source: UserRoleSource.SSO, role: administratorRole }),
-      ];
+      const currentSsoRoles = [makeUserRole({ id: 7, source: UserRoleSource.SSO, role: administratorRole })];
       userRoleRepo.find.mockResolvedValue(currentSsoRoles);
 
       // otherAdministratorCount = 0 — this is the last administrator, skip removal
@@ -419,9 +458,7 @@ describe('RbacService', () => {
 
     it('removes administrator role when other administrators exist', async () => {
       const administratorRole = makeRole({ key: 'administrator' });
-      const currentSsoRoles = [
-        makeUserRole({ id: 7, source: UserRoleSource.SSO, role: administratorRole }),
-      ];
+      const currentSsoRoles = [makeUserRole({ id: 7, source: UserRoleSource.SSO, role: administratorRole })];
       userRoleRepo.find.mockResolvedValue(currentSsoRoles);
 
       // Another administrator exists
@@ -465,9 +502,7 @@ describe('RbacService', () => {
 
     it('skips adding a role when already present in currentSsoRoles', async () => {
       const existingRole = makeRole({ key: 'manager' });
-      const currentSsoRoles = [
-        makeUserRole({ source: UserRoleSource.SSO, role: existingRole }),
-      ];
+      const currentSsoRoles = [makeUserRole({ source: UserRoleSource.SSO, role: existingRole })];
       userRoleRepo.find.mockResolvedValue(currentSsoRoles);
 
       await service.syncSsoRoles(10, [{ roleKey: 'manager', externalValue: 'idp_manager' }], SSO_TYPE, SSO_ID);
@@ -488,7 +523,9 @@ describe('RbacService', () => {
 
       // Should NOT throw
       await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toEqual({
-        added: [], removed: [], updated: [],
+        added: [],
+        removed: [],
+        updated: [],
       });
     });
 
@@ -504,7 +541,9 @@ describe('RbacService', () => {
       userRoleRepo.save.mockRejectedValue(sqliteViolation);
 
       await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toEqual({
-        added: [], removed: [], updated: [],
+        added: [],
+        removed: [],
+        updated: [],
       });
     });
 
@@ -519,7 +558,9 @@ describe('RbacService', () => {
       });
       userRoleRepo.save.mockRejectedValue(fkError);
 
-      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).rejects.toThrow(QueryFailedError);
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).rejects.toThrow(
+        QueryFailedError,
+      );
     });
 
     it('rethrows non-unique-constraint errors', async () => {
@@ -533,7 +574,9 @@ describe('RbacService', () => {
       });
       userRoleRepo.save.mockRejectedValue(otherError);
 
-      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).rejects.toThrow(QueryFailedError);
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).rejects.toThrow(
+        QueryFailedError,
+      );
     });
 
     it('silently skips roles that do not exist in the database', async () => {
@@ -541,7 +584,9 @@ describe('RbacService', () => {
       roleRepo.findOne.mockResolvedValue(null); // unknown role key
 
       await expect(service.syncSsoRoles(10, [{ roleKey: 'unknown-role' }], SSO_TYPE, SSO_ID)).resolves.toEqual({
-        added: [], removed: [], updated: [],
+        added: [],
+        removed: [],
+        updated: [],
       });
       expect(userRoleRepo.save).not.toHaveBeenCalled();
     });
@@ -599,7 +644,14 @@ describe('RbacService', () => {
   // ───────────────────────── role CRUD (ATT-728) ─────────────────────────────
 
   const makePermission = (key: string): Permission =>
-    ({ key, label: key, description: key, category: key.split('.')[0], createdAt: new Date(), updatedAt: new Date() }) as Permission;
+    ({
+      key,
+      label: key,
+      description: key,
+      category: key.split('.')[0],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }) as Permission;
 
   describe('getRolesWithUsage', () => {
     it('merges user counts into roles', async () => {
@@ -817,7 +869,10 @@ describe('RbacService', () => {
         .mockResolvedValueOnce(makeRole({ id: 5 }))
         .mockResolvedValueOnce(makeRole({ id: 6, rolePermissions: [] }));
       setAdministratorEquivalentCounts(1, 1);
-      roleManager.find.mockResolvedValue([makeUserRole({ userId: 10, roleId: 5 }), makeUserRole({ id: 2, userId: 11, roleId: 5 })]);
+      roleManager.find.mockResolvedValue([
+        makeUserRole({ userId: 10, roleId: 5 }),
+        makeUserRole({ id: 2, userId: 11, roleId: 5 }),
+      ]);
       roleManager.findOne.mockResolvedValue(null);
 
       await service.deleteRole(5, new Set(), 6);

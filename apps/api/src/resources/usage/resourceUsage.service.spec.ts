@@ -424,6 +424,49 @@ describe('ResourceUsageService', () => {
     mockRbacService.getEffectivePermissions.mockResolvedValue(new Set<string>());
   });
 
+  it('assigns and clears a completed session project through the owning user', async () => {
+    const usage = {
+      id: 8,
+      resourceId: 1,
+      userId: 7,
+      endTime: new Date(),
+      usageAction: ResourceUsageAction.Usage,
+    } as ResourceUsage;
+    resourceUsageRepository.findOne.mockResolvedValue(usage);
+    const user = { id: 7 } as User;
+    expect(await service.updateSessionProject(1, 8, user, { projectId: 9 })).toBe(usage);
+    expect(projectsService.findOneById).toHaveBeenCalledWith(7, 9);
+    expect(resourceUsageRepository.save).toHaveBeenCalledWith(expect.objectContaining({ projectId: 9 }));
+    await service.updateSessionProject(1, 8, user, { projectId: null });
+    expect(resourceUsageRepository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ projectId: null, project: null }),
+    );
+  });
+
+  it('rejects invalid or unauthorized project assignments without writing the session', async () => {
+    const user = { id: 7 } as User;
+    resourceUsageRepository.findOne.mockResolvedValue(null);
+    await expect(service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow('not found');
+    const usage = {
+      id: 8,
+      resourceId: 1,
+      userId: 7,
+      endTime: null,
+      usageAction: ResourceUsageAction.Usage,
+    } as ResourceUsage;
+    resourceUsageRepository.findOne.mockResolvedValue(usage);
+    await expect(service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow('still active');
+    usage.endTime = new Date();
+    usage.usageAction = ResourceUsageAction.DoorUnlock;
+    await expect(service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow('Only usage sessions');
+    usage.usageAction = ResourceUsageAction.Usage;
+    usage.userId = 99;
+    await expect(service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow('not authorized');
+    usage.userId = 7;
+    await expect(service.updateSessionProject(1, 8, user, {} as never)).rejects.toThrow('required');
+    expect(resourceUsageRepository.save).not.toHaveBeenCalled();
+  });
+
   describe('startSession', () => {
     const mockUser: User = { id: 1 } as User;
     const mockResource: Resource = {

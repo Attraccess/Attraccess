@@ -113,19 +113,4 @@ export class RabbitmqManagementClient {
       return null;
     }
   }
-
-  private describeNetworkError(error: unknown): string {
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return `no response within ${REQUEST_TIMEOUT_MS}ms`;
-      }
-      // Node's fetch wraps the interesting part (ECONNREFUSED etc.) in `cause`.
-      const cause = (error as { cause?: unknown }).cause;
-      if (cause instanceof Error && cause.message) {
-        return cause.message;
-      }
-      return error.message;
-    }
-    return 'unknown network error';
-  }
 }

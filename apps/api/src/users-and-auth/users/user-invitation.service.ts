@@ -119,30 +119,7 @@ export class UserInvitationService {
 
         const rowErrors: CsvInviteRowErrorDto[] = [];
 
-        const email = (rowData[config.emailKey] ?? '').trim();
-        if (!email) {
-          rowErrors.push({ row: rowNumber, field: 'email', message: 'REQUIRED' });
-        } else if (!isEmail(email)) {
-          rowErrors.push({ row: rowNumber, field: 'email', message: 'INVALID', value: email });
-        }
-
-        const usernameOriginal = (rowData[config.usernameKey] ?? '').trim();
-        let normalizedUsername = '';
-        if (!usernameOriginal) {
-          rowErrors.push({ row: rowNumber, field: 'username', message: 'REQUIRED' });
-        } else {
-          normalizedUsername = this.usersService.cleanupUsername(usernameOriginal);
-          try {
-            this.usersService.validateUsernameOrThrow(normalizedUsername);
-          } catch (error) {
-            rowErrors.push({
-              row: rowNumber,
-              field: 'username',
-              message: (error as Error).message ?? 'INVALID',
-              value: usernameOriginal,
-            });
-          }
-        }
+        const { email, normalizedUsername } = this.validateCsvIdentity(rowData, config, rowNumber, rowErrors);
 
         const emailKey = email.toLowerCase();
         if (email && seenEmails.has(emailKey)) {
@@ -195,6 +172,39 @@ export class UserInvitationService {
     });
 
     return { candidates, errors, emailRowMap, usernameRowMap };
+  }
+
+  private validateCsvIdentity(
+    rowData: Record<string, string>,
+    config: CsvInviteConfigDto,
+    rowNumber: number,
+    rowErrors: CsvInviteRowErrorDto[],
+  ): { email: string; normalizedUsername: string } {
+    const email = (rowData[config.emailKey] ?? '').trim();
+    if (!email) {
+      rowErrors.push({ row: rowNumber, field: 'email', message: 'REQUIRED' });
+    } else if (!isEmail(email)) {
+      rowErrors.push({ row: rowNumber, field: 'email', message: 'INVALID', value: email });
+    }
+
+    const usernameOriginal = (rowData[config.usernameKey] ?? '').trim();
+    let normalizedUsername = '';
+    if (!usernameOriginal) {
+      rowErrors.push({ row: rowNumber, field: 'username', message: 'REQUIRED' });
+    } else {
+      normalizedUsername = this.usersService.cleanupUsername(usernameOriginal);
+      try {
+        this.usersService.validateUsernameOrThrow(normalizedUsername);
+      } catch (error) {
+        rowErrors.push({
+          row: rowNumber,
+          field: 'username',
+          message: (error as Error).message ?? 'INVALID',
+          value: usernameOriginal,
+        });
+      }
+    }
+    return { email, normalizedUsername };
   }
 
   public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {

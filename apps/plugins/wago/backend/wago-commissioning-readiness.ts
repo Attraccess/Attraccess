@@ -14,6 +14,21 @@ export interface CommissioningRuntimeState {
   ready: boolean;
 }
 
+function isReadiness(
+  value: unknown,
+): value is Pick<CommissioningRuntimeState, 'configurationAccepted' | 'hardwareAvailable' | 'ready'> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'configurationAccepted' in value &&
+    typeof value.configurationAccepted === 'boolean' &&
+    'hardwareAvailable' in value &&
+    typeof value.hardwareAvailable === 'boolean' &&
+    'ready' in value &&
+    typeof value.ready === 'boolean'
+  );
+}
+
 /** Only a bounded, current software probe. This is never physical qualification evidence. */
 @Injectable()
 export class WagoCommissioningReadiness implements OnModuleDestroy {
@@ -68,14 +83,7 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
             if (
               timestamp > now ||
               (event.contentHash !== null && !/^[a-f0-9]{64}$/i.test(event.contentHash)) ||
-              !readiness ||
-              typeof readiness !== 'object' ||
-              !('configurationAccepted' in readiness) ||
-              typeof readiness.configurationAccepted !== 'boolean' ||
-              !('hardwareAvailable' in readiness) ||
-              typeof readiness.hardwareAvailable !== 'boolean' ||
-              !('ready' in readiness) ||
-              typeof readiness.ready !== 'boolean'
+              !isReadiness(readiness)
             ) {
               current.state = undefined;
               return;

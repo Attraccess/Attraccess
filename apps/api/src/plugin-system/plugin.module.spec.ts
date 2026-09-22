@@ -1,3 +1,4 @@
+import { dataSourceConfig } from '../database/datasource';
 import 'reflect-metadata';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -53,6 +54,33 @@ describe('PluginModule', () => {
   });
 
   describe('forRoot', () => {
+    it.each([false, true])('registers unique declared entities only with database access: %s', (allowed) => {
+      const registry = dataSourceConfig.entities as unknown[];
+      const previous = [...registry];
+      try {
+        mkdirSync(join(root, 'entities/dist'), { recursive: true });
+        writeFileSync(
+          join(root, 'entities/plugin.json'),
+          JSON.stringify({
+            name: 'entities',
+            version: '1.0.0',
+            main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+            permissions: allowed ? [PluginPermission.DATABASE_ACCESS] : [],
+            attraccessVersion: { min: '1.0.0' },
+          }),
+        );
+        writeFileSync(
+          join(root, 'entities/dist/index.js'),
+          'class Widget {} class WidgetModule {} module.exports = { default: { entities: [Widget, Widget], register: () => ({ module: WidgetModule }) } };',
+        );
+        PluginModule.forRoot();
+        expect(registry.length).toBe(previous.length + (allowed ? 1 : 0));
+        if (allowed) expect((registry.at(-1) as { name: string }).name).toBe('Widget');
+      } finally {
+        registry.splice(0, registry.length, ...previous);
+      }
+    });
+
     it('exposes only the host providers and controller when plugins are disabled', () => {
       PluginModule.configure({ DISABLE_PLUGINS: true });
       const module = PluginModule.forRoot();
@@ -199,11 +227,16 @@ describe('PluginModule', () => {
       (moduleRef.get as jest.Mock).mockImplementation((token: unknown) =>
         token === PLUGIN_AUDIT_HOST_PROVIDER ? { record } : undefined,
       );
-      await expect(build([]).audit.record({
-        action: 'demo.claim', operationId: 'operation-id', outcome: 'succeeded',
-        principal: { userId: 7, authenticationMethod: 'session' },
-        subject: { type: 'demo.device', id: 2 }, details: {},
-      })).resolves.toEqual({ status: 'recorded' });
+      await expect(
+        build([]).audit.record({
+          action: 'demo.claim',
+          operationId: 'operation-id',
+          outcome: 'succeeded',
+          principal: { userId: 7, authenticationMethod: 'session' },
+          subject: { type: 'demo.device', id: 2 },
+          details: {},
+        }),
+      ).resolves.toEqual({ status: 'recorded' });
       expect(record).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'plugin-id' }));
       expect(moduleRef.get).toHaveBeenCalledWith(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false });
     });
@@ -232,7 +265,9 @@ describe('PluginModule', () => {
       );
 
       await build([PluginPermission.TRIGGER_FLOWS]).flows.trigger('plugin.test.trigger', () => true, { event: 'x' });
-      expect(triggerPluginFlows).toHaveBeenCalledWith('ctx-plugin', 'plugin.test.trigger', expect.any(Function), { event: 'x' });
+      expect(triggerPluginFlows).toHaveBeenCalledWith('ctx-plugin', 'plugin.test.trigger', expect.any(Function), {
+        event: 'x',
+      });
     });
   });
 

@@ -134,7 +134,6 @@ export function ConfigurationRevisions({
   }, [generation]);
   const review = actions.review.data;
   const preview = actions.preview.data;
-  const reviewedHash = review?.draft.reviewedHash;
   const reviewNames = {
     ...readMetadata(review?.previous?.presetProvenance ?? null).names,
     ...readMetadata(review?.draft.presetProvenance ?? null).names,
@@ -176,30 +175,21 @@ export function ConfigurationRevisions({
             Review saved draft
           </Button>
           {review && (
-            <>
-              <ConfigurationChanges
-                changes={review.diff}
-                before={review.previous ? JSON.parse(review.previous.snapshot) : null}
-                after={JSON.parse(review.draft.snapshot)}
-                names={reviewNames}
-              />
-              <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={reviewNames} />
-              <ImpactWarning impacts={review.impacts} names={reviewNames} acknowledged={force} onChange={setForce} />
-              <Button
-                isDisabled={disabled || busy || !hasSavedDraft || !reviewedHash || (!!review.impacts.length && !force)}
-                isPending={actions.publish.isPending}
-                onPress={() =>
-                  void run(async () => {
-                    if (!reviewedHash) return;
-                    await actions.publish.mutateAsync({ force, reviewedHash });
-                    actions.review.reset();
-                    setOffset(0);
-                  })
-                }
-              >
-                Publish reviewed draft
-              </Button>
-            </>
+            <ReviewedDraft
+              review={review}
+              names={reviewNames}
+              disabled={disabled || busy || !hasSavedDraft}
+              force={force}
+              onForceChange={setForce}
+              publishing={actions.publish.isPending}
+              onPublish={(reviewedHash) =>
+                void run(async () => {
+                  await actions.publish.mutateAsync({ force, reviewedHash });
+                  actions.review.reset();
+                  setOffset(0);
+                })
+              }
+            />
           )}
           {actions.publish.data && (
             <p role="status">
@@ -294,61 +284,126 @@ export function ConfigurationRevisions({
             </Button>
           </div>
           {preview && (
-            <>
-              <h3>Restore revision {preview.revision.revision} as a new revision</h3>
-              <p>This replaces the saved draft and publishes a new revision. The historical revision is retained.</p>
-              <ConfigurationChanges
-                changes={preview.diff}
-                before={preview.current ? JSON.parse(preview.current.snapshot) : null}
-                after={JSON.parse(preview.revision.snapshot)}
-                names={rollbackNames}
-              />
-              <ConfigurationMetadataChanges changes={preview.metadataDiff ?? []} names={rollbackNames} />
-              <ImpactWarning
-                impacts={preview.impacts}
-                names={rollbackNames}
-                acknowledged={rollbackForce}
-                onChange={setRollbackForce}
-              />
-              <Button
-                variant="danger"
-                isDisabled={disabled || busy || (!!preview.impacts.length && !rollbackForce)}
-                onPress={() =>
-                  void run(async () => {
-                    setReconciling(true);
-                    let failure: unknown;
-                    try {
-                      await actions.rollback.mutateAsync({
-                        revision: preview.revision.revision,
-                        force: rollbackForce,
-                        sourceHash: preview.revision.contentHash,
-                        currentHash: preview.current?.contentHash ?? null,
-                        draftHash: preview.draftHash,
-                      });
-                    } catch (error) {
-                      failure = error;
-                    }
-                    try {
-                      actions.review.reset();
-                      actions.preview.reset();
-                      setOffset(0);
-                      await onRollback(failure);
-                    } finally {
-                      setReconciling(false);
-                    }
-                  })
-                }
-              >
-                Publish rollback as new revision
-              </Button>
-              <Button variant="secondary" isDisabled={busy} onPress={() => actions.preview.reset()}>
-                Cancel rollback
-              </Button>
-            </>
+            <RollbackReview
+              preview={preview}
+              names={rollbackNames}
+              force={rollbackForce}
+              onForceChange={setRollbackForce}
+              disabled={disabled || busy}
+              busy={busy}
+              onCancel={() => actions.preview.reset()}
+              onPublish={() =>
+                void run(async () => {
+                  setReconciling(true);
+                  let failure: unknown;
+                  try {
+                    await actions.rollback.mutateAsync({
+                      revision: preview.revision.revision,
+                      force: rollbackForce,
+                      sourceHash: preview.revision.contentHash,
+                      currentHash: preview.current?.contentHash ?? null,
+                      draftHash: preview.draftHash,
+                    });
+                  } catch (error) {
+                    failure = error;
+                  }
+                  try {
+                    actions.review.reset();
+                    actions.preview.reset();
+                    setOffset(0);
+                    await onRollback(failure);
+                  } finally {
+                    setReconciling(false);
+                  }
+                })
+              }
+            />
           )}
         </div>
       </div>
       {error && <p role="alert">{error}</p>}
     </section>
+  );
+}
+
+function ReviewedDraft({
+  review,
+  names,
+  disabled,
+  force,
+  onForceChange,
+  publishing,
+  onPublish,
+}: {
+  review: NonNullable<ReturnType<typeof useConfigurationActions>['review']['data']>;
+  names: Record<string, string>;
+  disabled: boolean;
+  force: boolean;
+  onForceChange: (force: boolean) => void;
+  publishing: boolean;
+  onPublish: (reviewedHash: string) => void;
+}) {
+  const reviewedHash = review.draft.reviewedHash;
+  return (
+    <>
+      <ConfigurationChanges
+        changes={review.diff}
+        before={review.previous ? JSON.parse(review.previous.snapshot) : null}
+        after={JSON.parse(review.draft.snapshot)}
+        names={names}
+      />
+      <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={names} />
+      <ImpactWarning impacts={review.impacts} names={names} acknowledged={force} onChange={onForceChange} />
+      <Button
+        isDisabled={disabled || !reviewedHash || (!!review.impacts.length && !force)}
+        isPending={publishing}
+        onPress={() => {
+          if (reviewedHash) onPublish(reviewedHash);
+        }}
+      >
+        Publish reviewed draft
+      </Button>
+    </>
+  );
+}
+
+function RollbackReview({
+  preview,
+  names,
+  force,
+  onForceChange,
+  disabled,
+  busy,
+  onPublish,
+  onCancel,
+}: {
+  preview: NonNullable<ReturnType<typeof useConfigurationActions>['preview']['data']>;
+  names: Record<string, string>;
+  force: boolean;
+  onForceChange: (force: boolean) => void;
+  disabled: boolean;
+  busy: boolean;
+  onPublish: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <>
+      <h3>Restore revision {preview.revision.revision} as a new revision</h3>
+      <p>This replaces the saved draft and publishes a new revision. The historical revision is retained.</p>
+      <ConfigurationChanges
+        changes={preview.diff}
+        before={preview.current ? JSON.parse(preview.current.snapshot) : null}
+        after={JSON.parse(preview.revision.snapshot)}
+        names={names}
+      />
+      <ConfigurationMetadataChanges changes={preview.metadataDiff ?? []} names={names} />
+      <ImpactWarning impacts={preview.impacts} names={names} acknowledged={force} onChange={onForceChange} />
+      <Button variant="danger" isDisabled={disabled || (!!preview.impacts.length && !force)} onPress={onPublish}>
+        Publish rollback as new revision
+      </Button>
+      <Button variant="secondary" isDisabled={busy} onPress={onCancel}>
+        Cancel rollback
+      </Button>
+    </>
   );
 }

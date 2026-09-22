@@ -286,6 +286,11 @@ describe('CC100 packed digital I/O', () => {
       }
       await publish(topic, payload, options);
     });
+    const outputs = runtime['outputs'];
+    const shutdown = jest.spyOn(
+      outputs as unknown as { writePulseShutdown: (typeof outputs)['writePulseShutdown'] },
+      'writePulseShutdown',
+    );
     const action = command('DO1', true, 'pulse', 'pulse');
     await started.promise;
     try {
@@ -294,6 +299,9 @@ describe('CC100 packed digital I/O', () => {
     } finally {
       release.resolve();
       await action;
+      // A cleared output precedes the asynchronous state save and publication.
+      await Promise.all(shutdown.mock.results.map((result) => result.value));
+      shutdown.mockRestore();
       await runtime.pollInputs();
     }
   });

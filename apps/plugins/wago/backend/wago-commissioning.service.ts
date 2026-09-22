@@ -684,21 +684,30 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     );
   }
 
-  private async deliverWhileLocked(
-    id: number,
-    input: DeliveryInput,
-    principal: CommissioningPrincipal | null = null,
-  ): Promise<CommissioningSessionResponse> {
+  private async loadDeliverableSession(id: number): Promise<WagoCommissioningSession> {
     const session = await this.sessions.findOneBy({ id });
     if (!session) throw new NotFoundException('commissioning session not found');
     if (
       !['awaiting_delivery', 'delivering', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state)
     )
       throw new ConflictException('commissioning session cannot be delivered in its current state');
-    const credential = requireDeliveryCredentials(input);
-    if (principal) session.initiatingPrincipal = JSON.stringify(principal);
+    return session;
+  }
+
+  private async requireRuntimeArtifact(session: WagoCommissioningSession): Promise<void> {
     if (!isRuntimeArtifactConfigured() && !session.runtimeArtifactDigest && !(await this.artifacts?.has()))
       throw new ConflictException('Import a signed CC100 runtime release before installation.');
+  }
+
+  private async deliverWhileLocked(
+    id: number,
+    input: DeliveryInput,
+    principal: CommissioningPrincipal | null = null,
+  ): Promise<CommissioningSessionResponse> {
+    const session = await this.loadDeliverableSession(id);
+    const credential = requireDeliveryCredentials(input);
+    if (principal) session.initiatingPrincipal = JSON.stringify(principal);
+    await this.requireRuntimeArtifact(session);
 
     let pairingCode: string;
     try {

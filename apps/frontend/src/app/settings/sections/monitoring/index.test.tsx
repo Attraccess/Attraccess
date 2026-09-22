@@ -20,12 +20,17 @@ vi.mock('@attraccess/react-query-client', () => ({
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key }),
 }));
-const { setQueryData } = vi.hoisted(() => ({ setQueryData: vi.fn() }));
+const { setQueryData, invalidateQueries, success, error } = vi.hoisted(() => ({
+  setQueryData: vi.fn(),
+  invalidateQueries: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+}));
 vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData }),
+  useQueryClient: () => ({ invalidateQueries, setQueryData }),
 }));
 vi.mock('../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: vi.fn(), error: vi.fn() }),
+  useToastMessage: () => ({ success, error }),
 }));
 
 const TOGGLES = { http: true, ws: false, cron: true, db: false, external: true, sse: false, flow: true };
@@ -143,5 +148,27 @@ describe('MonitoringSection', () => {
 
     expect(screen.getByLabelText('slowQueryThreshold.label')).toHaveValue('5');
     expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+  });
+  it('shows generated keys and refreshes settings after generation, removal and toggle updates', async () => {
+    render(<MonitoringSection />);
+    const generate = vi.mocked(useSettingsServiceGenerateMetricsApiKey).mock.calls.at(-1)?.[0] as {
+      onSuccess: (data: { apiKey: string }) => void;
+    };
+    const remove = vi.mocked(useSettingsServiceDeleteMetricsApiKey).mock.calls.at(-1)?.[0] as { onSuccess: () => void };
+    const toggle = vi.mocked(useSettingsServiceUpdateMetricsSettings).mock.calls[0][0] as {
+      onSuccess: () => void;
+      onError: () => void;
+    };
+    act(() => generate.onSuccess({ apiKey: 'generated-secret' }));
+    expect(screen.getByDisplayValue('generated-secret')).toBeInTheDocument();
+    expect(success).toHaveBeenLastCalledWith({ title: 'keyGenerated.title', description: 'keyGenerated.description' });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['metrics'] });
+    act(() => remove.onSuccess());
+    expect(screen.queryByDisplayValue('generated-secret')).toBeNull();
+    expect(success).toHaveBeenLastCalledWith({ title: 'keyRemoved.title', description: 'keyRemoved.description' });
+    act(() => toggle.onSuccess());
+    expect(success).toHaveBeenLastCalledWith({ title: 'toggles.savedTitle', description: 'toggles.savedDescription' });
+    act(() => toggle.onError());
+    expect(error).toHaveBeenLastCalledWith({ title: 'toggles.errorTitle', description: 'toggles.errorDescription' });
   });
 });

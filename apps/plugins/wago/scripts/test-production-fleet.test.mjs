@@ -63,6 +63,10 @@ for (const scenario of [
         exec(process.execPath, [runner], {
           timeout: 10_000,
           env: {
+            ...(process.env.CRAP_NODE_MANIFEST ? {
+              CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,
+              NODE_OPTIONS: process.env.NODE_OPTIONS,
+            } : {}),
             PATH: directory,
             TMPDIR: temporary,
             FIXTURE_STATE: stateFile,

@@ -20,25 +20,30 @@ export function normalizeFederationFsUrlsPlugin(): Plugin {
   };
 }
 
+function configuredPort(name: string, fallback: number): number {
+  return Number(process.env[name]) || fallback;
+}
+
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
+  const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000';
 
   return {
     root: __dirname,
     cacheDir: '../../node_modules/.vite/apps/frontend',
     server: {
-      port: Number(process.env.VITE_PORT) || 4200,
+      port: configuredPort('VITE_PORT', 4200),
       host: '0.0.0.0',
       ...(isDev
         ? {
             proxy: {
               '/api': {
-                target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+                target: apiProxyTarget,
                 changeOrigin: true,
                 ws: true,
               },
               '/cdn': {
-                target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+                target: apiProxyTarget,
                 changeOrigin: true,
               },
             },
@@ -46,7 +51,7 @@ export default defineConfig(({ command }) => {
         : {}),
     },
     preview: {
-      port: Number(process.env.VITE_PREVIEW_PORT) || 4300,
+      port: configuredPort('VITE_PREVIEW_PORT', 4300),
       host: '0.0.0.0',
     },
     plugins: [

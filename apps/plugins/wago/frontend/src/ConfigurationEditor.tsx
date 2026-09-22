@@ -206,78 +206,30 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
           {diagnostics.data && <Chip variant="soft">Runtime {diagnostics.data.runtimeVersion}</Chip>}
         </div>
       </header>
-      <div className="wg:sticky wg:top-0 wg:z-10 wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-3 wg:rounded-xl wg:border wg:border-border wg:bg-surface wg:p-4">
-        <div>
-          <p role="status" className="wg:font-medium">
-            {dirty
-              ? 'Unsaved local edits'
-              : draft.data
-                ? 'Draft is saved'
-                : baseline.data
-                  ? `Starting from applied revision ${baseline.data.revision}`
-                  : 'No saved draft yet'}
-          </p>
-          <p className="wg:text-sm wg:text-muted">
-            {snapshot.logicalChannels.length} channels · {snapshot.modbus?.devices.length ?? 0} external devices
-          </p>
-        </div>
-        <div className="wg:flex wg:flex-wrap wg:gap-2">
-          <Button
-            variant="secondary"
-            isDisabled={editingDisabled || modbusErrors.length > 0}
-            isPending={save.isPending || validate.isPending}
-            onPress={() => void saveDraft()}
-          >
-            Save draft
-          </Button>
-          <Button isDisabled={busy || !initialized} onPress={() => setSection('review')}>
-            Review changes <ArrowRight className="wg:size-4" />
-          </Button>
-        </div>
-      </div>
-      {draft.isPending && <p role="status">Loading draft…</p>}
-      {draft.isError && (
-        <p role="alert">
-          Could not load draft: {draft.error.message}{' '}
-          <Button variant="secondary" onPress={() => void draft.refetch()}>
-            Retry loading draft
-          </Button>
-        </p>
-      )}
-      {draft.data === null && baseline.isPending && <p role="status">Loading applied configuration…</p>}
-      {draft.data === null && baseline.isError && (
-        <p role="alert">
-          Could not load applied configuration: {baseline.error.message}{' '}
-          <Button variant="secondary" onPress={() => void baseline.refetch()}>
-            Retry loading configuration
-          </Button>
-        </p>
-      )}
-      {draftConflict && (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Saved draft changed</Alert.Title>
-            <Alert.Description>
-              Another editor saved a newer draft. Your local edits are preserved here. Reload the saved draft before
-              editing or publishing.
-            </Alert.Description>
-            <Button variant="secondary" onPress={reloadSavedDraft}>
-              Reload saved draft
-            </Button>
-          </Alert.Content>
-        </Alert>
-      )}
-      {(error || validate.error) && <p role="alert">{error ?? validate.error?.message}</p>}
-      {notice && <p role="status">{notice}</p>}
-      {validate.data && !validate.data.valid && (
-        <Alert status="danger">
-          <Alert.Content>
-            <Alert.Title>Resolve these configuration fields</Alert.Title>
-            <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
-          </Alert.Content>
-        </Alert>
-      )}
+      <ConfigurationToolbar
+        snapshot={snapshot}
+        dirty={dirty}
+        draft={draft.data}
+        baseline={baseline.data}
+        editingDisabled={editingDisabled}
+        hasErrors={modbusErrors.length > 0}
+        saving={save.isPending || validate.isPending}
+        busy={busy}
+        initialized={initialized}
+        onSave={() => void saveDraft()}
+        onReview={() => setSection('review')}
+      />
+      <DraftFeedback
+        draft={draft}
+        baseline={baseline}
+        draftConflict={draftConflict}
+        reloadSavedDraft={reloadSavedDraft}
+        error={error}
+        notice={notice}
+        validate={validate}
+        snapshot={snapshot}
+        metadata={metadata}
+      />
       <nav
         className="wg:flex wg:flex-wrap wg:gap-2 wg:border-b wg:border-border wg:pb-3"
         aria-label="Controller configuration sections"
@@ -383,34 +335,15 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
             </Card>
           )}
           <div hidden={section !== 'review'} className="wg:space-y-4">
-            <Card>
-              <Card.Header>
-                <Card.Title>Check, save, then publish</Card.Title>
-                <Card.Description>
-                  Your edits reach the controller only after you publish a reviewed draft.
-                </Card.Description>
-              </Card.Header>
-              <Card.Content className="wg:flex wg:flex-col wg:gap-3">
-                {dirty && <p>Save your local edits before reviewing the draft.</p>}
-                {!draft.data && !dirty && <p>Save this configuration as a draft to review and publish it.</p>}
-                <Button
-                  variant="secondary"
-                  isDisabled={busy || draftConflict}
-                  onPress={() => {
-                    setError(null);
-                    void validate.mutateAsync(snapshot).catch((error) => setError(error.message));
-                  }}
-                >
-                  Validate local edits
-                </Button>
-                {validate.data?.valid && (
-                  <div role="status">
-                    {validate.data.valid ? 'Configuration contract is valid.' : 'Resolve these configuration fields:'}
-                    <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
-                  </div>
-                )}
-              </Card.Content>
-            </Card>
+            <LocalDraftReview
+              dirty={dirty}
+              hasDraft={!!draft.data}
+              disabled={busy || draftConflict}
+              validate={validate}
+              snapshot={snapshot}
+              metadata={metadata}
+              setError={setError}
+            />
           </div>
           <div hidden={section !== 'review' && section !== 'history'}>
             <Card>
@@ -489,5 +422,175 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
         </Modal.Backdrop>
       </Modal>
     </main>
+  );
+}
+
+function DraftFeedback({
+  draft,
+  baseline,
+  draftConflict,
+  reloadSavedDraft,
+  error,
+  notice,
+  validate,
+  snapshot,
+  metadata,
+}: {
+  draft: ReturnType<typeof useDraftQuery>;
+  baseline: ReturnType<typeof useConfigurationBaselineQuery>;
+  draftConflict: boolean;
+  reloadSavedDraft: () => void;
+  error: string | null;
+  notice: string;
+  validate: ReturnType<typeof useConfigurationActions>['validate'];
+  snapshot: WagoConfigurationSnapshot;
+  metadata: ConfigurationEditorMetadata;
+}) {
+  return (
+    <>
+      {draft.isPending && <p role="status">Loading draft…</p>}
+      {draft.isError && (
+        <p role="alert">
+          Could not load draft: {draft.error.message}{' '}
+          <Button variant="secondary" onPress={() => void draft.refetch()}>
+            Retry loading draft
+          </Button>
+        </p>
+      )}
+      {draft.data === null && baseline.isPending && <p role="status">Loading applied configuration…</p>}
+      {draft.data === null && baseline.isError && (
+        <p role="alert">
+          Could not load applied configuration: {baseline.error.message}{' '}
+          <Button variant="secondary" onPress={() => void baseline.refetch()}>
+            Retry loading configuration
+          </Button>
+        </p>
+      )}
+      {draftConflict && (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Saved draft changed</Alert.Title>
+            <Alert.Description>
+              Another editor saved a newer draft. Your local edits are preserved here. Reload the saved draft before
+              editing or publishing.
+            </Alert.Description>
+            <Button variant="secondary" onPress={reloadSavedDraft}>
+              Reload saved draft
+            </Button>
+          </Alert.Content>
+        </Alert>
+      )}
+      {(error || validate.error) && <p role="alert">{error ?? validate.error?.message}</p>}
+      {notice && <p role="status">{notice}</p>}
+      {validate.data && !validate.data.valid && (
+        <Alert status="danger">
+          <Alert.Content>
+            <Alert.Title>Resolve these configuration fields</Alert.Title>
+            <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
+          </Alert.Content>
+        </Alert>
+      )}
+    </>
+  );
+}
+
+function LocalDraftReview({
+  dirty,
+  hasDraft,
+  disabled,
+  validate,
+  snapshot,
+  metadata,
+  setError,
+}: {
+  dirty: boolean;
+  hasDraft: boolean;
+  disabled: boolean;
+  validate: ReturnType<typeof useConfigurationActions>['validate'];
+  snapshot: WagoConfigurationSnapshot;
+  metadata: ConfigurationEditorMetadata;
+  setError: (error: string | null) => void;
+}) {
+  return (
+    <Card>
+      <Card.Header>
+        <Card.Title>Check, save, then publish</Card.Title>
+        <Card.Description>Your edits reach the controller only after you publish a reviewed draft.</Card.Description>
+      </Card.Header>
+      <Card.Content className="wg:flex wg:flex-col wg:gap-3">
+        {dirty && <p>Save your local edits before reviewing the draft.</p>}
+        {!hasDraft && !dirty && <p>Save this configuration as a draft to review and publish it.</p>}
+        <Button
+          variant="secondary"
+          isDisabled={disabled}
+          onPress={() => {
+            setError(null);
+            void validate.mutateAsync(snapshot).catch((error) => setError(error.message));
+          }}
+        >
+          Validate local edits
+        </Button>
+        {validate.data?.valid && (
+          <div role="status">
+            {validate.data.valid ? 'Configuration contract is valid.' : 'Resolve these configuration fields:'}
+            <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
+          </div>
+        )}
+      </Card.Content>
+    </Card>
+  );
+}
+
+function ConfigurationToolbar({
+  snapshot,
+  dirty,
+  draft,
+  baseline,
+  editingDisabled,
+  hasErrors,
+  saving,
+  busy,
+  initialized,
+  onSave,
+  onReview,
+}: {
+  snapshot: WagoConfigurationSnapshot;
+  dirty: boolean;
+  draft: ReturnType<typeof useDraftQuery>['data'];
+  baseline: ReturnType<typeof useConfigurationBaselineQuery>['data'];
+  editingDisabled: boolean;
+  hasErrors: boolean;
+  saving: boolean;
+  busy: boolean;
+  initialized: boolean;
+  onSave: () => void;
+  onReview: () => void;
+}) {
+  return (
+    <div className="wg:sticky wg:top-0 wg:z-10 wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-3 wg:rounded-xl wg:border wg:border-border wg:bg-surface wg:p-4">
+      <div>
+        <p role="status" className="wg:font-medium">
+          {dirty
+            ? 'Unsaved local edits'
+            : draft
+              ? 'Draft is saved'
+              : baseline
+                ? `Starting from applied revision ${baseline.revision}`
+                : 'No saved draft yet'}
+        </p>
+        <p className="wg:text-sm wg:text-muted">
+          {snapshot.logicalChannels.length} channels · {snapshot.modbus?.devices.length ?? 0} external devices
+        </p>
+      </div>
+      <div className="wg:flex wg:flex-wrap wg:gap-2">
+        <Button variant="secondary" isDisabled={editingDisabled || hasErrors} isPending={saving} onPress={onSave}>
+          Save draft
+        </Button>
+        <Button isDisabled={busy || !initialized} onPress={onReview}>
+          Review changes <ArrowRight className="wg:size-4" />
+        </Button>
+      </div>
+    </div>
   );
 }

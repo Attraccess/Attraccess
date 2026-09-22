@@ -9,6 +9,66 @@ import { freshness } from './diagnostics-store';
 import { safeValidationSummaries } from './diagnostics-validation';
 import type { WagoDiagnostics, WagoResourceDiagnostics } from '../diagnostics-types';
 
+function hasDraftChanges(draft: WagoConfigurationDraft | null, latest: WagoConfigurationRevision | null): boolean {
+  return (
+    !!draft &&
+    (!latest ||
+      configurationHash(JSON.parse(draft.snapshot)) !== latest.contentHash ||
+      configurationHash({ metadata: draft.presetProvenance ? JSON.parse(draft.presetProvenance) : null }) !==
+        configurationHash({ metadata: latest.presetProvenance ? JSON.parse(latest.presetProvenance) : null }))
+  );
+}
+
+function configurationRejections(
+  latest: WagoConfigurationRevision | null,
+  runtime: ReturnType<WagoService['diagnostics']['read']>,
+) {
+  return latest?.rejectionErrors
+    ? safeValidationSummaries(JSON.parse(latest.rejectionErrors))
+    : latest && runtime.rejection?.revision === latest.revision && runtime.rejection.contentHash === latest.contentHash
+      ? runtime.rejection.errors
+      : [];
+}
+
+function configurationSummary(
+  draft: WagoConfigurationDraft | null,
+  latest: WagoConfigurationRevision | null,
+  applied: WagoConfigurationRevision | null,
+  runtime: ReturnType<WagoService['diagnostics']['read']>,
+  revisionMismatch: boolean,
+): WagoDiagnostics['configuration'] {
+  const validationErrors = draft ? validateSnapshot(JSON.parse(draft.snapshot)) : [];
+  return {
+    draftUpdatedAt: draft?.updatedAt ?? null,
+    draftChanged: hasDraftChanges(draft, latest),
+    validationErrorCount: validationErrors.length,
+    // Codes originate in our validator. Omit messages and dynamic paths, which can include arbitrary draft values.
+    validationCodes: [...new Set(validationErrors.map((error) => error.code))].slice(0, 50),
+    validationErrors: safeValidationSummaries(validationErrors),
+    rejectionErrors: configurationRejections(latest, runtime),
+    publishedRevision: latest?.revision ?? null,
+    publishedState: latest?.state ?? null,
+    appliedRevision: applied?.revision ?? null,
+    reportedRevision: runtime.revision ?? null,
+    revisionMismatch,
+    rejected: latest?.state === 'rejected',
+  };
+}
+
+function runtimeStreamSummary(runtime: ReturnType<WagoService['diagnostics']['read']>) {
+  return {
+    sequenceGaps: runtime.activeStream ? runtime.sequenceGaps : null,
+    activeStream: runtime.activeStream ?? null,
+    trackingExhausted: runtime.trackingExhausted,
+    stateConnected: runtime.connected ?? null,
+    stateHardwareAvailable: runtime.hardwareAvailable ?? null,
+    stateSourceAt: runtime.stateSourceAt ?? null,
+    sequenceExplanation: runtime.activeStream
+      ? 'Gaps are scoped to boot stream ID and message category; duplicates and retired streams are ignored.'
+      : 'Legacy payloads have no source envelope; sequence gaps and source freshness are unavailable.',
+  };
+}
+
 function own<T>(values: Record<string, T>, key: string): T | undefined {
   return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined;
 }
@@ -212,7 +272,6 @@ export class WagoDiagnosticsService {
       applied?.revision ?? null,
       Object.fromEntries(appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? []),
     );
-    const validationErrors = draft ? validateSnapshot(JSON.parse(draft.snapshot)) : [];
     return {
       controllerId,
       generatedAt: new Date().toISOString(),
@@ -231,41 +290,8 @@ export class WagoDiagnosticsService {
       protocolVersion: controller.protocolVersion,
       capabilities: (JSON.parse(controller.capabilities) as string[]).slice(0, 64),
       incompatible: !!controller.compatibilityError,
-      sequenceGaps: runtime.activeStream ? runtime.sequenceGaps : null,
-      activeStream: runtime.activeStream ?? null,
-      trackingExhausted: runtime.trackingExhausted,
-      stateConnected: runtime.connected ?? null,
-      stateHardwareAvailable: runtime.hardwareAvailable ?? null,
-      stateSourceAt: runtime.stateSourceAt ?? null,
-      sequenceExplanation: runtime.activeStream
-        ? 'Gaps are scoped to boot stream ID and message category; duplicates and retired streams are ignored.'
-        : 'Legacy payloads have no source envelope; sequence gaps and source freshness are unavailable.',
-      configuration: {
-        draftUpdatedAt: draft?.updatedAt ?? null,
-        draftChanged:
-          !!draft &&
-          (!latest ||
-            configurationHash(JSON.parse(draft.snapshot)) !== latest.contentHash ||
-            configurationHash({ metadata: draft.presetProvenance ? JSON.parse(draft.presetProvenance) : null }) !==
-              configurationHash({ metadata: latest.presetProvenance ? JSON.parse(latest.presetProvenance) : null })),
-        validationErrorCount: validationErrors.length,
-        // Codes originate in our validator. Omit messages and dynamic paths, which can include arbitrary draft values.
-        validationCodes: [...new Set(validationErrors.map((error) => error.code))].slice(0, 50),
-        validationErrors: safeValidationSummaries(validationErrors),
-        rejectionErrors: latest?.rejectionErrors
-          ? safeValidationSummaries(JSON.parse(latest.rejectionErrors))
-          : latest &&
-              runtime.rejection?.revision === latest.revision &&
-              runtime.rejection.contentHash === latest.contentHash
-            ? runtime.rejection.errors
-            : [],
-        publishedRevision: latest?.revision ?? null,
-        publishedState: latest?.state ?? null,
-        appliedRevision: applied?.revision ?? null,
-        reportedRevision: runtime.revision ?? null,
-        revisionMismatch,
-        rejected: latest?.state === 'rejected',
-      },
+      ...runtimeStreamSummary(runtime),
+      configuration: configurationSummary(draft, latest, applied, runtime, revisionMismatch),
       hardwareReadiness: 'unknown' as const,
       hardwareReadinessReason:
         'Reported hardware availability is shown when supplied; it does not prove physical I/O readiness. Applied configuration and cached output state are not physical proof.',

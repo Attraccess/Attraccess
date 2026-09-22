@@ -271,3 +271,45 @@ describe('audit admin workflows', () => {
     expect(await screen.findByRole('button', { name: 'View event #52' })).toBeInTheDocument();
   });
 });
+
+it('exports filtered audit entries as CSV and revokes the download URL', async () => {
+  list.mockResolvedValue({ items: [entry], nextCursor: null });
+  const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:audit-export');
+  const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    expect(this.download).toMatch(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(this.href).toBe('blob:audit-export');
+  });
+  try {
+    mount();
+    await screen.findAllByText('Laser cutter');
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => expect(download).toHaveBeenCalledOnce());
+    const blob = createUrl.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe('text/csv;charset=utf-8');
+    const csv = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(blob);
+    });
+    expect(csv).toContain('maintenance_schedule.updated');
+    expect(csv).toContain('Workshop admin');
+    expect(csv).toContain('Laser cutter');
+    expect(revokeUrl).toHaveBeenCalledWith('blob:audit-export');
+  } finally {
+    createUrl.mockRestore();
+    revokeUrl.mockRestore();
+    download.mockRestore();
+  }
+});
+
+it('reports an export failure and allows retry without downloading partial data', async () => {
+  mount();
+  await screen.findAllByText('Laser cutter');
+  list.mockRejectedValue(new Error('Offline'));
+  await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+  expect(await screen.findByText('Export failed. Please try again.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Export CSV' })).not.toBeDisabled();
+});

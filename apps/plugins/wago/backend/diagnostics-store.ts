@@ -74,6 +74,72 @@ function identifier(value: unknown): value is string {
     !Array.from(value).some((character) => character.charCodeAt(0) < 32)
   );
 }
+function isObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+function validStatePayload(data: Record<string, unknown>, kind: string, canonical: boolean): boolean {
+  if (
+    canonical &&
+    kind === 'state' &&
+    data.readiness !== undefined &&
+    (!isObject(data.readiness) ||
+      (data.readiness.hardwareAvailable !== undefined && typeof data.readiness.hardwareAvailable !== 'boolean'))
+  )
+    return false;
+  if (
+    canonical &&
+    kind === 'state' &&
+    !(data.contentHash === null || (typeof data.contentHash === 'string' && /^[0-9a-f]{64}$/i.test(data.contentHash)))
+  )
+    return false;
+  if (
+    canonical &&
+    kind === 'state' &&
+    (typeof data.connected !== 'boolean' ||
+      !(data.revision === null || (Number.isSafeInteger(data.revision) && (data.revision as number) >= 0)) ||
+      !isObject(data.outputs) ||
+      (data.inputs !== undefined && !isObject(data.inputs)) ||
+      ![...Object.values(data.outputs), ...Object.values(isObject(data.inputs) ? data.inputs : {})].every(
+        (value) => typeof value === 'boolean',
+      ))
+  )
+    return false;
+  return true;
+}
+function validEventPayload(data: Record<string, unknown>, kind: string, canonical: boolean): boolean {
+  if (
+    canonical &&
+    kind === 'configuration/reported' &&
+    (!Number.isSafeInteger(data.revision) ||
+      (data.revision as number) < 1 ||
+      typeof data.contentHash !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(data.contentHash) ||
+      !Array.isArray(data.errors))
+  )
+    return false;
+  if (
+    kind === 'measurements' &&
+    (!identifier(data.channelId) ||
+      typeof data.value !== 'number' ||
+      !Number.isFinite(data.value) ||
+      (canonical
+        ? !Number.isSafeInteger(data.value) ||
+          !CANONICAL_UNITS.includes(data.unit as string) ||
+          !['live', 'cumulative'].includes(data.kind as string)
+        : !['ampere', 'volt', 'watt', 'percent'].includes(data.unit as string)))
+  )
+    return false;
+  if (kind === 'faults' && !identifier(data.channelId)) return false;
+  if (
+    kind === 'acknowledgements' &&
+    (!identifier(data.id) || !['accepted', 'duplicate', 'rejected'].includes(data.status as string))
+  )
+    return false;
+  return true;
+}
+
+type SampleMetadata = Pick<DiagnosticSample, 'sourceAt' | 'receivedAt' | 'streamId' | 'sequence'>;
+
 export class WagoDiagnosticsStore {
   private readonly controllers = new Map<number, RuntimeDiagnostics>();
   private readonly commands = new Map<string, { controllerId: number; channelId: string; at: number }>();
@@ -169,68 +235,47 @@ export class WagoDiagnosticsStore {
     if (!DIAGNOSTIC_CATEGORIES.includes(kind)) return false;
     const canonical = canonicalEnvelope(data, kind);
     if (canonical && !validEnvelope(data, this.now())) return false;
-    const isObject = (value: unknown): value is Record<string, unknown> =>
-      !!value && typeof value === 'object' && !Array.isArray(value);
-    if (
-      canonical &&
-      kind === 'state' &&
-      data.readiness !== undefined &&
-      (!isObject(data.readiness) ||
-        (data.readiness.hardwareAvailable !== undefined && typeof data.readiness.hardwareAvailable !== 'boolean'))
-    )
-      return false;
-    if (
-      canonical &&
-      kind === 'state' &&
-      !(data.contentHash === null || (typeof data.contentHash === 'string' && /^[0-9a-f]{64}$/i.test(data.contentHash)))
-    )
-      return false;
-    if (
-      canonical &&
-      kind === 'configuration/reported' &&
-      (!Number.isSafeInteger(data.revision) ||
-        (data.revision as number) < 1 ||
-        typeof data.contentHash !== 'string' ||
-        !/^[0-9a-f]{64}$/i.test(data.contentHash) ||
-        !Array.isArray(data.errors))
-    )
-      return false;
-    if (
-      canonical &&
-      kind === 'state' &&
-      (typeof data.connected !== 'boolean' ||
-        !(data.revision === null || (Number.isSafeInteger(data.revision) && (data.revision as number) >= 0)) ||
-        !isObject(data.outputs) ||
-        (data.inputs !== undefined && !isObject(data.inputs)) ||
-        ![...Object.values(data.outputs), ...Object.values(isObject(data.inputs) ? data.inputs : {})].every(
-          (value) => typeof value === 'boolean',
-        ))
-    )
-      return false;
-    if (
-      kind === 'measurements' &&
-      (!identifier(data.channelId) ||
-        typeof data.value !== 'number' ||
-        !Number.isFinite(data.value) ||
-        (canonical
-          ? !Number.isSafeInteger(data.value) ||
-            !CANONICAL_UNITS.includes(data.unit as string) ||
-            !['live', 'cumulative'].includes(data.kind as string)
-          : !['ampere', 'volt', 'watt', 'percent'].includes(data.unit as string)))
-    )
-      return false;
-    if (kind === 'faults' && !identifier(data.channelId)) return false;
-    if (
-      kind === 'acknowledgements' &&
-      (!identifier(data.id) || !['accepted', 'duplicate', 'rejected'].includes(data.status as string))
-    )
-      return false;
+    if (!validStatePayload(data, kind, canonical) || !validEventPayload(data, kind, canonical)) return false;
     // Never evict active stream tombstones to admit another controller within their retention window.
     const oldest = [...this.controllers].find(([, value]) => !value.activeStream)?.[0];
     if (!this.controllers.has(id) && this.controllers.size >= MAX_CONTROLLERS && oldest === undefined) return false;
     if (!this.controllers.has(id) && this.controllers.size >= MAX_CONTROLLERS && oldest !== undefined)
       this.controllers.delete(oldest);
     const state = this.read(id);
+    if (!this.admitIncoming(id, state, kind, data, canonical)) return false;
+    state.touched = this.now();
+    const receivedAt = new Date(this.now()).toISOString();
+    const metadata = {
+      sourceAt: canonical ? (data.timestamp as string) : null,
+      receivedAt,
+      streamId: canonical ? (state.activeStream as string) : null,
+      sequence: canonical ? (data.sequence as number) : null,
+    };
+    if (kind === 'heartbeat') state.heartbeatAt = canonical ? (data.timestamp as string) : receivedAt;
+    if (kind === 'state') this.applyState(state, data, canonical, metadata);
+    this.applyEvents(id, state, kind, data, canonical, metadata);
+    for (const collection of [
+      state.cumulativeMeasurements,
+      state.inputs,
+      state.outputs,
+      state.measurements,
+      state.faults,
+      state.acknowledgements,
+    ]) {
+      while (Object.keys(collection).length > MAX_CHANNELS) delete collection[Object.keys(collection)[0]];
+    }
+    state.events.push({ kind, receivedAt });
+    state.events = state.events.slice(-50);
+    this.controllers.set(id, state);
+    return true;
+  }
+  private admitIncoming(
+    id: number,
+    state: RuntimeDiagnostics,
+    kind: string,
+    data: Record<string, unknown>,
+    canonical: boolean,
+  ): boolean {
     if (!canonical && kind === 'heartbeat' && typeof data.sequence === 'number') {
       if (data.sequence < (state.legacyHeartbeatSequence ?? 0)) return false;
       state.legacyHeartbeatSequence = data.sequence;
@@ -275,52 +320,61 @@ export class WagoDiagnosticsStore {
       }
       return false;
     }
-    state.touched = this.now();
-    const receivedAt = new Date(this.now()).toISOString();
-    const metadata = {
-      sourceAt: canonical ? (data.timestamp as string) : null,
-      receivedAt,
-      streamId: canonical ? (state.activeStream as string) : null,
-      sequence: canonical ? (data.sequence as number) : null,
-    };
-    if (kind === 'heartbeat') state.heartbeatAt = canonical ? (data.timestamp as string) : receivedAt;
-    if (kind === 'state') {
-      const contentHash =
-        typeof data.contentHash === 'string' && /^[0-9a-f]{64}$/i.test(data.contentHash) ? data.contentHash : undefined;
-      const hardwareAvailable =
-        isObject(data.readiness) && typeof data.readiness.hardwareAvailable === 'boolean'
-          ? data.readiness.hardwareAvailable
-          : undefined;
-      if (
-        state.connected !== data.connected ||
-        state.revision !== data.revision ||
-        state.contentHash !== contentHash ||
-        state.hardwareAvailable !== hardwareAvailable
-      ) {
-        if (state.stateSourceAt || (canonical && state.connected === false))
-          state.measurementAfter = canonical ? (sourceTime(data.timestamp) as number) : this.now();
-        state.measurements = Object.create(null);
-        state.cumulativeMeasurements = Object.create(null);
-      }
-      state.inputs = Object.create(null);
-      state.outputs = Object.create(null);
-      if (typeof data.connected === 'boolean') state.connected = data.connected;
-      state.revision = Number.isSafeInteger(data.revision) ? (data.revision as number) : undefined;
-      state.contentHash = contentHash;
-      state.hardwareAvailable = hardwareAvailable;
-      state.stateSourceAt = canonical ? (data.timestamp as string) : undefined;
-      if (data.outputs && typeof data.outputs === 'object' && !Array.isArray(data.outputs)) {
-        for (const [channelId, value] of Object.entries(data.outputs).slice(0, MAX_CHANNELS)) {
-          if (identifier(channelId) && typeof value === 'boolean')
-            state.outputs[channelId] = { kind: 'output', value, ...metadata };
-        }
-      }
-      if (isObject(data.inputs))
-        for (const [channelId, value] of Object.entries(data.inputs).slice(0, MAX_CHANNELS)) {
-          if (identifier(channelId) && typeof value === 'boolean')
-            state.inputs[channelId] = { kind: 'input', value, ...metadata };
-        }
+    return true;
+  }
+
+  private applyState(
+    state: RuntimeDiagnostics,
+    data: Record<string, unknown>,
+    canonical: boolean,
+    metadata: SampleMetadata,
+  ): void {
+    const contentHash =
+      typeof data.contentHash === 'string' && /^[0-9a-f]{64}$/i.test(data.contentHash) ? data.contentHash : undefined;
+    const hardwareAvailable =
+      isObject(data.readiness) && typeof data.readiness.hardwareAvailable === 'boolean'
+        ? data.readiness.hardwareAvailable
+        : undefined;
+    if (
+      state.connected !== data.connected ||
+      state.revision !== data.revision ||
+      state.contentHash !== contentHash ||
+      state.hardwareAvailable !== hardwareAvailable
+    ) {
+      if (state.stateSourceAt || (canonical && state.connected === false))
+        state.measurementAfter = canonical ? (sourceTime(data.timestamp) as number) : this.now();
+      state.measurements = Object.create(null);
+      state.cumulativeMeasurements = Object.create(null);
     }
+    state.inputs = Object.create(null);
+    state.outputs = Object.create(null);
+    if (typeof data.connected === 'boolean') state.connected = data.connected;
+    state.revision = Number.isSafeInteger(data.revision) ? (data.revision as number) : undefined;
+    state.contentHash = contentHash;
+    state.hardwareAvailable = hardwareAvailable;
+    state.stateSourceAt = canonical ? (data.timestamp as string) : undefined;
+    if (data.outputs && typeof data.outputs === 'object' && !Array.isArray(data.outputs)) {
+      for (const [channelId, value] of Object.entries(data.outputs).slice(0, MAX_CHANNELS)) {
+        if (identifier(channelId) && typeof value === 'boolean')
+          state.outputs[channelId] = { kind: 'output', value, ...metadata };
+      }
+    }
+    if (isObject(data.inputs))
+      for (const [channelId, value] of Object.entries(data.inputs).slice(0, MAX_CHANNELS)) {
+        if (identifier(channelId) && typeof value === 'boolean')
+          state.inputs[channelId] = { kind: 'input', value, ...metadata };
+      }
+  }
+
+  private applyEvents(
+    id: number,
+    state: RuntimeDiagnostics,
+    kind: string,
+    data: Record<string, unknown>,
+    canonical: boolean,
+    metadata: SampleMetadata,
+  ): void {
+    const { receivedAt } = metadata;
     if (
       kind === 'measurements' &&
       identifier(data.channelId) &&
@@ -368,19 +422,5 @@ export class WagoDiagnosticsStore {
         receivedAt,
         errors: safeValidationSummaries(data.errors),
       };
-    for (const collection of [
-      state.cumulativeMeasurements,
-      state.inputs,
-      state.outputs,
-      state.measurements,
-      state.faults,
-      state.acknowledgements,
-    ]) {
-      while (Object.keys(collection).length > MAX_CHANNELS) delete collection[Object.keys(collection)[0]];
-    }
-    state.events.push({ kind, receivedAt });
-    state.events = state.events.slice(-50);
-    this.controllers.set(id, state);
-    return true;
   }
 }

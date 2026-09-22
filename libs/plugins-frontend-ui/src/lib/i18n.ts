@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { get } from 'lodash-es';
 import * as Handlebars from 'handlebars';
@@ -72,15 +72,10 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
 
   // Keep a stable reference to the provided translations so callers
   // can safely pass inline objects without causing re-renders.
-  const translationsRef = useRef(translations);
+  const [initialTranslations] = useState(translations);
 
-  const activeTranslations = useMemo(() => {
-    return translationsRef.current[language];
-  }, [language]);
-
-  const fallbackTranslations = useMemo(() => {
-    return translationsRef.current['en'];
-  }, []);
+  const activeTranslations = initialTranslations[language];
+  const fallbackTranslations = initialTranslations.en;
 
   const getTranslationRaw = useCallback(
     (key: string) => {
@@ -152,7 +147,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
     }
 
     const keyLangMap = new Map<string, Set<string>>();
-    Object.entries(translationsRef.current).forEach(([lang, translations]) => {
+    Object.entries(initialTranslations).forEach(([lang, translations]) => {
       const keys = nestedObjectToDotNotatedKeys(translations);
       keys.forEach((key) => {
         let keySet = keyLangMap.get(key);
@@ -165,7 +160,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       });
     });
 
-    const expectedLangs = Object.keys(translationsRef.current);
+    const expectedLangs = Object.keys(initialTranslations);
 
     // log keys that are not in all languages together with the languages that are missing them
     keyLangMap.forEach((keySet, key) => {
@@ -176,7 +171,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       const missingLangs = expectedLangs.filter((lang) => !keySet.has(lang));
       console.error('Missing i18n Translation Key:', key, 'in languages:', missingLangs);
     });
-  }, []);
+  }, [initialTranslations]);
 
   return {
     t,

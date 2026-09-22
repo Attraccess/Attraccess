@@ -16,6 +16,35 @@ const event: AdministrationAuditEvent = {
 };
 
 describe('administration audit policy', () => {
+  it('rejects malformed operation identity, unsupported outcomes and incomplete setting deltas', () => {
+    for (const override of [
+      { operationId: 'not-a-uuid' },
+      { operationId: 5 },
+      { outcome: 'pending' },
+      { authenticationMethod: 'unknown' },
+    ]) {
+      expect(projectAdministrationAuditEvent({ ...event, ...override } as never)).toBeNull();
+    }
+    for (const details of [
+      { settingKey: 'smtp.port', before: '25' },
+      { settingKey: 'smtp.port', after: '587' },
+      { before: '25', after: '587' },
+    ]) {
+      expect(
+        projectAdministrationAuditEvent({ ...event, action: 'settings.updated', subjectType: 'setting', details }),
+      ).toBeNull();
+    }
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        operationId: '12345678-1234-1234-1234-123456789abc',
+        authenticationMethod: undefined,
+        apiTokenId: undefined,
+        outcome: 'failed',
+      }),
+    ).not.toBeNull();
+  });
+
   it('preserves API-token attribution and clones only approved own scalar values', () => {
     const result = projectAdministrationAuditEvent(event);
     expect(result).toEqual(event);

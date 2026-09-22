@@ -73,6 +73,17 @@ describe('WagoRuntime', () => {
     await runtime.start();
   });
 
+  it.each(['{', 'null', '{}', '{"id":"bad","channelId":"load","action":"unexpected"}'])(
+    'ignores malformed command %s without performing device writes',
+    async (payload) => {
+      const write = jest.spyOn(device, 'write');
+      const before = transport.published.length;
+      await expect(runtime.receiveCommand(Buffer.from(payload))).resolves.toBeUndefined();
+      expect(write).not.toHaveBeenCalled();
+      expect(transport.published).toHaveLength(before);
+    },
+  );
+
   it('applies a complete valid retained snapshot and reports its revision', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     expect(transport.published).toContainEqual(

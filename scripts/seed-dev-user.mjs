@@ -157,7 +157,18 @@ async function assignRole(db, username, roleKey) {
 }
 
 async function applyFixture(db, fixture) {
-  for (const group of fixture.resourceGroups ?? []) {
+  await applyResourceGroups(db, fixture.resourceGroups ?? []);
+  await applyResources(db, fixture.resources ?? []);
+  await applyRoles(db, fixture.roles ?? []);
+  for (const assignment of fixture.userRoles ?? []) {
+    if (!assignment.username || !assignment.roleKey)
+      throw new Error('Every user role assignment requires username and roleKey');
+    await assignRole(db, assignment.username, assignment.roleKey);
+  }
+}
+
+async function applyResourceGroups(db, entries) {
+  for (const group of entries) {
     if (!group.name) throw new Error('Every resource group requires a name');
     const existing = await get(db, 'SELECT id FROM resource_group WHERE name = ?', [group.name]);
     if (existing) {
@@ -171,8 +182,10 @@ async function applyFixture(db, fixture) {
       ]);
     }
   }
+}
 
-  for (const resource of fixture.resources ?? []) {
+async function applyResources(db, entries) {
+  for (const resource of entries) {
     if (!resource.name || !['machine', 'door'].includes(resource.type)) {
       throw new Error('Every resource requires a name and a type of machine or door');
     }
@@ -206,8 +219,10 @@ async function applyFixture(db, fixture) {
       );
     }
   }
+}
 
-  for (const role of fixture.roles ?? []) {
+async function applyRoles(db, entries) {
+  for (const role of entries) {
     if (!role.key || !role.name || !Array.isArray(role.permissions)) {
       throw new Error('Every role requires key, name, and permissions');
     }
@@ -246,12 +261,6 @@ async function applyFixture(db, fixture) {
       if (!grant)
         await run(db, 'INSERT INTO role_permission (roleId, permissionKey) VALUES (?, ?)', [roleId, permissionKey]);
     }
-  }
-
-  for (const assignment of fixture.userRoles ?? []) {
-    if (!assignment.username || !assignment.roleKey)
-      throw new Error('Every user role assignment requires username and roleKey');
-    await assignRole(db, assignment.username, assignment.roleKey);
   }
 }
 

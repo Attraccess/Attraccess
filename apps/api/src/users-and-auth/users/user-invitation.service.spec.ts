@@ -72,3 +72,90 @@ describe('UserInvitationService – parseCsvFile', () => {
     );
   });
 });
+
+describe('CSV invitations', () => {
+  const config = { emailKey: 'email', usernameKey: 'username', roleKeyColumn: 'role' };
+  const file = (csv: string) => ({ buffer: Buffer.from(csv) }) as FileUpload;
+  const setup = () => {
+    const manager = {};
+    const users = {
+      cleanupUsername: jest.fn((value: string) => value.toLowerCase()),
+      validateUsernameOrThrow: jest.fn(),
+      findByEmailsOrUsernames: jest.fn().mockResolvedValue([]),
+      ensureLicenseForNewUsers: jest.fn(),
+      withTransaction: jest.fn(async (run) => run(manager)),
+      createMany: jest.fn().mockResolvedValue([{ id: 7, username: 'alex', email: 'alex@example.com' }]),
+    };
+    const auth = { generateEmailVerificationToken: jest.fn().mockResolvedValue('verification-token') };
+    const email = { sendUserInvitationEmail: jest.fn() };
+    const service = new UserInvitationService(users as never, auth as never, email as never);
+    return { service, users, auth, email, manager };
+  };
+  it('parses the config and sends invitations in the user creation transaction', async () => {
+    const { service, users, auth, email, manager } = setup();
+    const result = await service.inviteUsersFromCsv(
+      file('email,username,role\nalex@example.com,Alex,operator\n'),
+      JSON.stringify(config),
+      'de',
+      9,
+    );
+    expect(result).toEqual([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
+    expect(users.ensureLicenseForNewUsers).toHaveBeenCalledWith(1);
+    expect(users.createMany).toHaveBeenCalledWith(
+      [{ email: 'alex@example.com', username: 'alex', row: 1, roleKey: 'operator', locale: 'de' }],
+      { grantAllPermissionsToFirst: true, manager, actorId: 9 },
+    );
+    expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);
+    expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token', manager);
+  });
+  it('reports database email and username collisions at their source row', async () => {
+    const { service, users } = setup();
+    users.findByEmailsOrUsernames.mockResolvedValue([{ email: 'ALEX@example.com', username: 'Alex' }]);
+    await expect(
+      service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'DUPLICATE_IN_DB',
+        errors: expect.arrayContaining([
+          expect.objectContaining({ row: 1, field: 'email' }),
+          expect.objectContaining({ row: 1, field: 'username' }),
+        ]),
+      },
+    });
+    expect(users.createMany).not.toHaveBeenCalled();
+  });
+  it('rejects invalid config and CSV rows before creating accounts', async () => {
+    const { service, users } = setup();
+    const csv = file('email,username,role\ninvalid,Alex,\n');
+    await expect(service.inviteUsersFromCsv(csv, '{')).rejects.toThrow('Invalid config payload');
+    await expect(service.inviteUsersFromCsv(csv, { ...config, ignoredRows: ['invalid'] } as never)).rejects.toThrow();
+    await expect(service.inviteUsersFromCsv(csv, config)).rejects.toMatchObject({
+      response: { message: 'INVALID_CSV' },
+    });
+    await expect(service.inviteUsersFromCsv(csv, { ...config, ignoredRows: [1] })).rejects.toMatchObject({
+      response: { message: 'NO_CANDIDATES_IN_CSV' },
+    });
+    expect(users.createMany).not.toHaveBeenCalled();
+  });
+  it('collects missing, invalid and duplicate identity errors without accepting those rows', async () => {
+    const { service, users } = setup();
+    users.validateUsernameOrThrow.mockImplementation((value) => {
+      if (value === 'bad') throw new Error('INVALID_USERNAME');
+    });
+    const parsed = await service.parseCsvFile(
+      file('email,username,role\n,Alex,\ninvalid,Bad,\nvalid@example.com,Alex,\nother@example.com,,\n,,\n'),
+      config,
+    );
+    expect(parsed.candidates).toEqual([]);
+    expect(parsed.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ row: 1, field: 'email', message: 'REQUIRED' }),
+        expect.objectContaining({ row: 2, field: 'email', message: 'INVALID' }),
+        expect.objectContaining({ row: 2, field: 'username', message: 'INVALID_USERNAME' }),
+        expect.objectContaining({ row: 3, field: 'username', message: 'DUPLICATE_IN_CSV' }),
+        expect.objectContaining({ row: 4, field: 'username', message: 'REQUIRED' }),
+        expect.objectContaining({ row: 5, message: 'Row is empty' }),
+      ]),
+    );
+  });
+});

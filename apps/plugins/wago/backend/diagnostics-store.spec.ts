@@ -93,3 +93,37 @@ describe('WAGO bounded diagnostics', () => {
     ).toBe(false);
   });
 });
+
+describe('diagnostic payload admission', () => {
+  it.each([
+    ['configuration/reported', { revision: 0, contentHash: 'a'.repeat(64), errors: [] }],
+    ['configuration/reported', { revision: 1, contentHash: 'invalid', errors: [] }],
+    ['configuration/reported', { revision: 1, contentHash: 'a'.repeat(64), errors: null }],
+    ['measurements', { channelId: 'meter', value: 1.5, unit: 'milliwatt', kind: 'live' }],
+    ['measurements', { channelId: 'meter', value: 1, unit: 'invalid', kind: 'live' }],
+    ['measurements', { channelId: 'meter', value: 1, unit: 'milliwatt', kind: 'invalid' }],
+    ['faults', { channelId: '' }],
+    ['acknowledgements', { id: 'command', status: 'invalid' }],
+    ['acknowledgements', { id: '', status: 'accepted' }],
+  ])('rejects invalid %s payloads without mutating stream state', (kind, fields) => {
+    const now = Date.parse('2026-09-05T12:00:00Z');
+    const store = new WagoDiagnosticsStore(() => now);
+    const envelope = {
+      timestamp: new Date(now).toISOString(),
+      streamId: '00000000-0000-4000-8000-000000000001',
+      sequence: 1,
+    };
+    expect(
+      store.ingest(
+        1,
+        'state',
+        Buffer.from(
+          JSON.stringify({ ...envelope, connected: true, revision: 1, contentHash: 'a'.repeat(64), outputs: {} }),
+        ),
+      ),
+    ).toBe(true);
+    const before = store.read(1);
+    expect(store.ingest(1, kind, Buffer.from(JSON.stringify({ ...envelope, ...fields })))).toBe(false);
+    expect(store.read(1)).toEqual(before);
+  });
+});

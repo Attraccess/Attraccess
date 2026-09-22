@@ -31,18 +31,12 @@ export function isValueValid(schema: Property<unknown>, value: unknown, required
   if (choices && !choices.some((choice) => String(choice) === String(value))) return false;
   if (schema.type === 'boolean' && typeof value !== 'boolean') return false;
   if (schema.type === 'string' && typeof value !== 'string') return false;
-  if (schema.type === 'number' || schema.type === 'integer') {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return false;
-    if (schema.type === 'integer' && !Number.isInteger(numeric)) return false;
-    if (schema.minimum !== undefined && numeric < schema.minimum) return false;
-    if (schema.maximum !== undefined && numeric > schema.maximum) return false;
-    if (schema.exclusiveMinimum !== undefined && numeric <= schema.exclusiveMinimum) return false;
-  }
+  if (schema.type === 'number' || schema.type === 'integer') return isNumericValueValid(schema, value);
   if (schema.type === 'object' && schema.properties) {
     if (typeof value !== 'object' || Array.isArray(value)) return false;
     const object = value as Record<string, unknown>;
-    if (schema.required?.some((name) => object[name] === undefined || object[name] === null || object[name] === '')) return false;
+    if (schema.required?.some((name) => object[name] === undefined || object[name] === null || object[name] === ''))
+      return false;
     return Object.entries(schema.properties).every(([name, property]) =>
       isValueValid(property, object[name], schema.required?.includes(name)),
     );
@@ -51,5 +45,15 @@ export function isValueValid(schema: Property<unknown>, value: unknown, required
   if (schema.type === 'array' && schema.items && Array.isArray(value)) {
     return value.every((item) => isValueValid(schema.items as Property<unknown>, item, true));
   }
+  return true;
+}
+
+function isNumericValueValid(schema: Property<unknown>, value: unknown): boolean {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return false;
+  if (schema.type === 'integer' && !Number.isInteger(numeric)) return false;
+  if (schema.minimum !== undefined && numeric < schema.minimum) return false;
+  if (schema.maximum !== undefined && numeric > schema.maximum) return false;
+  if (schema.exclusiveMinimum !== undefined && numeric <= schema.exclusiveMinimum) return false;
   return true;
 }

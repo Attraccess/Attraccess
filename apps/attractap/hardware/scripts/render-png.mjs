@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 // Convert tscircuit SVG exports into PNG renders for PR previews
 // FEATURE: hardware/render — shared SVG → PNG step for every board's render target
 
@@ -8,7 +9,7 @@ import sharp from 'sharp';
 
 const DEFAULT_DENSITY = 200;
 
-function parseArgs(args) {
+export function parseArgs(args) {
   const opts = { inputs: [], outDir: null, density: DEFAULT_DENSITY };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -46,7 +47,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`${err.message}\n`);
-  exit(1);
-});
+if (argv[1] && import.meta.url === pathToFileURL(resolve(argv[1])).href) {
+  main().catch((err) => {
+    process.stderr.write(`${err.message}\n`);
+    exit(1);
+  });
+}

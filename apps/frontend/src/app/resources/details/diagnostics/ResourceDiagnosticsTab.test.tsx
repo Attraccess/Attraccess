@@ -198,4 +198,53 @@ describe('ResourceDiagnosticsTab', () => {
       expect.objectContaining({ enabled: false }),
     );
   });
+  it('shows loading placeholders without displaying unavailable results prematurely', () => {
+    getState.mockReturnValue({ data: undefined, isLoading: true });
+    getTransitions.mockReturnValue({ data: undefined, isLoading: true });
+    getDataQuality.mockReturnValue({ data: undefined, isLoading: true });
+    useOperatingDurationMock.mockReturnValue({ data: undefined, isLoading: true });
+    render(<ResourceDiagnosticsTab />);
+    expect(screen.queryByTestId('diagnostics-state-chip')).toBeNull();
+    expect(screen.queryByTestId('diagnostics-data-quality')).toBeNull();
+    expect(screen.queryByTestId('diagnostics-transitions')).toBeNull();
+    expect(screen.queryByTestId('diagnostics-unattributed-unavailable')).toBeNull();
+    expect(screen.getByTestId('diagnostics-run-verification')).toBeInTheDocument();
+  });
+
+  it('reports clean tracking, empty history and an inconsistent verification result', () => {
+    getState.mockReturnValue({ data: { state: 'idle' }, isLoading: false });
+    getTransitions.mockReturnValue({ data: { items: [], totalIntervals: 0 }, isLoading: false });
+    getDataQuality.mockReturnValue({ data: { trackingConfigured: true, issues: [] }, isLoading: false });
+    verifyTimeline.mockReturnValue({
+      data: {
+        consistent: false,
+        recomputedOperatingDurationMs: MINUTE,
+        reportedOperatingDurationMs: 0,
+        intervalCount: 1,
+        checks: [{ name: 'operating-duration-matches', passed: false, detail: 'Duration mismatch' }],
+      },
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    render(<ResourceDiagnosticsTab />);
+    expect(screen.getByTestId('diagnostics-state-chip')).toHaveTextContent('Idle');
+    expect(screen.getByTestId('diagnostics-data-quality')).toHaveTextContent(
+      'No data-quality issues found in the scanned window.',
+    );
+    expect(screen.getByTestId('diagnostics-verification')).toHaveTextContent('Duration mismatch');
+    expect(screen.queryByTestId('diagnostics-transitions')).toBeNull();
+  });
+  it('pages through transitions and changes the attribution range', async () => {
+    const user = userEvent.setup();
+    render(<ResourceDiagnosticsTab />);
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(getTransitions).toHaveBeenLastCalledWith({ resourceId: 11, page: 2, limit: 10 });
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(getTransitions).toHaveBeenLastCalledWith({ resourceId: 11, page: 1, limit: 10 });
+    await user.click(screen.getByRole('button', { name: /Range$/ }));
+    await user.click(await screen.findByRole('option', { name: 'Last 7 days' }));
+    const bounds = useOperatingDurationMock.mock.calls.at(-1)?.[2];
+    expect(bounds.end.getTime() - bounds.start.getTime()).toBe(7 * 24 * 60 * MINUTE);
+    expect(verifyTimeline).toHaveBeenLastCalledWith(expect.anything(), undefined, { enabled: false });
+  });
 });

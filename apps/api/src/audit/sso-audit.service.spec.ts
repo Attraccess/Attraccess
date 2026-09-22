@@ -25,6 +25,53 @@ describe('SSO audit policy', () => {
   const delta = JSON.stringify({ added: ['user-manager'], removed: [], updated: [] });
   const providerChanges = JSON.stringify({ changed: ['configuration.issuer'], rotated: [] });
 
+  it.each([
+    ['sso.provisioning.sessions_revoked', 'sessionsRevoked'],
+    ['sso.provisioning.user_created', 'userCreated'],
+    ['sso.provisioning.user_deleted', 'userDeleted'],
+  ])('validates the exact provisioning change for %s', (action, key) => {
+    const event = {
+      action,
+      operationId: randomUUID(),
+      actorId: null,
+      authenticationMethod: null,
+      subject: { type: 'user' as const, id: 9 },
+      details: { provider, changes: JSON.stringify({ [key]: true }) },
+    };
+    expect(projectSsoAuditEvent(event)).not.toBeNull();
+    for (const changes of ['{', '{}', JSON.stringify({ [key]: false }), JSON.stringify({ [key]: true, extra: true })]) {
+      expect(projectSsoAuditEvent({ ...event, details: { provider, changes } })).toBeNull();
+    }
+  });
+
+  it('bounds the total encoded OIDC snapshot when individually valid fields exceed the envelope', () => {
+    const url = 'https://example.test/' + 'a'.repeat(68);
+    const strings = ['"'.repeat(18), '"'.repeat(18)];
+    const snapshot = JSON.parse(
+      ssoAuditSnapshot({
+        id: 4,
+        type: SSOProviderType.OIDC,
+        name: '"'.repeat(40),
+        oidcConfiguration: {
+          issuer: url,
+          authorizationURL: url,
+          tokenURL: url,
+          userInfoURL: url,
+          clientId: '"'.repeat(40),
+          scopes: strings,
+          usernameClaimPaths: strings,
+          emailClaimPaths: strings,
+          roleMappings: { member: ['group'] },
+        },
+      } as never),
+    );
+    expect(snapshot.configuration.issuer).toBe('');
+    expect(snapshot.configuration.scopes).toBeNull();
+    expect(snapshot.configuration.omitted.issuer).toEqual({ byteLength: 89 });
+    expect(snapshot.configuration.omitted.scopes.count).toBe(2);
+    expect(Buffer.byteLength(JSON.stringify(JSON.stringify(snapshot)))).toBeLessThanOrEqual(1300);
+  });
+
   it('projects a safe provider lifecycle snapshot', () => {
     expect(
       projectSsoAuditEvent({

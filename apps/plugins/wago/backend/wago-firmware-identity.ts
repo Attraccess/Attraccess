@@ -50,15 +50,15 @@ export function wagoFw31IdentityRead(withRoot = false): string {
     .join(' && ')} && printf 'complete\\n'; }`;
 }
 
-export function isCc100Fw31Identity(output: string): boolean {
+function parseIdentityFrames(output: string): number[][] | null {
   // Decimal framing stays below the commissioning transport's 64 KiB cap.
-  if (output.length + (output.endsWith('\n') ? 0 : 1) > 50000) return false;
+  if (output.length + (output.endsWith('\n') ? 0 : 1) > 50000) return null;
   const chunks: number[][] = [[], [], []];
   let source = -1;
   let bytes = 0;
   let complete = false;
   for (const line of (output.endsWith('\n') ? output.slice(0, -1) : output).split('\n')) {
-    if (complete) return false;
+    if (complete) return null;
     if (line === `source${source + 1}` && source < 2) {
       source++;
       continue;
@@ -68,25 +68,37 @@ export function isCc100Fw31Identity(output: string): boolean {
       continue;
     }
     if (source >= 0 && /^ *$/.test(line)) continue;
-    if (source < 0 || !/^ *[0-9]+(?: +[0-9]+)* *$/.test(line)) return false;
+    if (source < 0 || !/^ *[0-9]+(?: +[0-9]+)* *$/.test(line)) return null;
     for (const token of line.trim().split(/ +/)) {
       const byte = Number(token);
-      if (++bytes > 8192 || byte > 255) return false;
+      if (++bytes > 8192 || byte > 255) return null;
       chunks[source].push(byte);
     }
   }
-  if (!complete) return false;
+  if (!complete) return null;
+  return chunks;
+}
+
+function parseIdentityFields(text: string): Map<string, string> | null {
+  if (/[^\n\x20-\x7e]/.test(text)) return null;
+  const fields = new Map<string, string>();
+  for (const line of text.split('\n')) {
+    if (line === '' || line.startsWith('#')) continue;
+    const match = /^([A-Z][A-Z0-9_]*)=(?:"([^"\\]*)"|([^"\\\s]+))$/.exec(line);
+    if (!match || fields.has(match[1])) return null;
+    fields.set(match[1], match[2] ?? match[3]);
+  }
+  return fields;
+}
+
+export function isCc100Fw31Identity(output: string): boolean {
+  const chunks = parseIdentityFrames(output);
+  if (!chunks) return false;
   const texts = chunks.map((chunk) => Buffer.from(chunk).toString('latin1'));
   if (texts[2] !== 'CC100-751-9301\0') return false;
   for (let i = 0; i < 2; i++) {
-    if (/[^\n\x20-\x7e]/.test(texts[i])) return false;
-    const fields = new Map<string, string>();
-    for (const line of texts[i].split('\n')) {
-      if (line === '' || line.startsWith('#')) continue;
-      const match = /^([A-Z][A-Z0-9_]*)=(?:"([^"\\]*)"|([^"\\\s]+))$/.exec(line);
-      if (!match || fields.has(match[1])) return false;
-      fields.set(match[1], match[2] ?? match[3]);
-    }
+    const fields = parseIdentityFields(texts[i]);
+    if (!fields) return false;
     if (i === 0) {
       if (!['PTXDIST_PLATFORM_NAME', 'VERSION', 'VERSION_ID'].every((key) => fields.has(key))) return false;
       for (const [key, value] of fields) {

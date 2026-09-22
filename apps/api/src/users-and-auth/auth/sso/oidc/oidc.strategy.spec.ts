@@ -58,6 +58,58 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     return new SSOOIDCStrategy(moduleRef, { ...baseConfig, ...config }, callbackURL, mockStateStore);
   }
 
+  it('rejects missing subject or email before account creation and handles an unsuccessful create', async () => {
+    const users = {
+      findOne: jest.fn().mockResolvedValue(null),
+      createOne: jest.fn().mockResolvedValue(null),
+      buildUsernameFromSSOClaim: jest.fn((value) => value),
+    };
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
+    const strategy = createStrategy({}, users, auth);
+    await expect(strategy.validate('issuer', {} as Profile)).rejects.toThrow('No user ID');
+    await expect(strategy.validate('issuer', { id: 'subject' } as Profile)).rejects.toThrow('No email');
+    expect(users.createOne).not.toHaveBeenCalled();
+    await expect(
+      strategy.validate('issuer', { id: 'subject', emails: [{ value: 'user@example.com' }] } as Profile),
+    ).rejects.toThrow('Unauthorized');
+    expect(auth.addAuthenticationDetails).not.toHaveBeenCalled();
+  });
+
+  it('maps role strings, arrays and object-valued claims while ignoring non-string entries', async () => {
+    const user = { id: 7 } as User;
+    const users = { findOne: jest.fn().mockResolvedValue(user) };
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(7) };
+    const rbac = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+    const strategy = createStrategy(
+      {
+        roleMappings: { operator: ['staff'], supervisor: ['leads'], member: ['members'] },
+        emailClaimPaths: ['missing.path'],
+      },
+      users,
+      auth,
+      rbac,
+    );
+    await strategy.validate('issuer', {
+      id: 'subject',
+      emails: [{ value: 'user@example.com' }],
+      _json: {
+        roles: { direct: 'staff', nested: ['leads', 4], ignored: 99 },
+        groups: 'members',
+        permissions: ['staff', null],
+      },
+    } as unknown as Profile);
+    expect(rbac.syncSsoRoles).toHaveBeenCalledWith(
+      7,
+      expect.arrayContaining([
+        expect.objectContaining({ roleKey: 'operator' }),
+        expect.objectContaining({ roleKey: 'supervisor' }),
+        expect.objectContaining({ roleKey: 'member' }),
+      ]),
+      SSOProviderType.OIDC,
+      1,
+    );
+  });
+
   it('resolves username using configured usernameClaimPaths', async () => {
     const usersService = {
       findOne: jest.fn(async () => null),

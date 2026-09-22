@@ -830,7 +830,68 @@ describe('SsoController', () => {
     });
   });
 
+  it.each(['discoverAuthentik', 'discoverKeycloak'] as const)(
+    'builds and validates %s discovery requests',
+    async (method) => {
+      const fetchMock = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue({ ok: true, json: async () => ({ issuer: 'https://idp.example' }) } as never);
+      try {
+        expect(await controller[method]('idp.example/', 'team name')).toEqual({ issuer: 'https://idp.example' });
+        const route = method === 'discoverAuthentik' ? 'application/o' : 'realms';
+        expect(fetchMock).toHaveBeenCalledWith(
+          `http://idp.example/${route}/team%20name/.well-known/openid-configuration`,
+          { headers: { Accept: 'application/json' } },
+        );
+        await controller[method]('https://idp.example', 'team');
+        expect(fetchMock).toHaveBeenLastCalledWith(
+          `https://idp.example/${route}/team/.well-known/openid-configuration`,
+          expect.any(Object),
+        );
+        fetchMock.mockResolvedValue({ ok: false, status: 503, statusText: 'Unavailable' } as never);
+        await expect(controller[method]('https://idp.example', 'team')).rejects.toThrow('503 Unavailable');
+        await expect(controller[method]('', 'team')).rejects.toThrow('Missing required');
+        await expect(controller[method]('idp.example', '')).rejects.toThrow('Missing required');
+      } finally {
+        fetchMock.mockRestore();
+      }
+    },
+  );
+
   describe('sso provisioning endpoints', () => {
+    it('resolves OIDC users by email only when they belong to the requested provider', async () => {
+      const users = module.get<UsersService>(UsersService);
+      const request = { headers: { authorization: 'Bearer test-client-secret' } } as unknown as Request;
+      (users.findOne as jest.Mock).mockResolvedValue({
+        id: 55,
+        authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 1 }],
+      });
+      expect(await controller.oidcLogout('1', request, { email: ' user@example.com ' })).toEqual({ OK: true });
+      expect(users.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, ['authenticationDetails']);
+      (users.findOne as jest.Mock).mockResolvedValue({
+        id: 55,
+        authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 99 }],
+      });
+      await expect(controller.oidcLogout('1', request, { email: 'user@example.com' })).rejects.toThrow(
+        'SSO_USER_NOT_FOUND',
+      );
+      await expect(controller.oidcLogout('1', request, { subject: ' ', email: ' ' })).rejects.toThrow(
+        'SSO_SUBJECT_OR_EMAIL_REQUIRED',
+      );
+    });
+
+    it('requires an external identity for SAML email fallback', async () => {
+      const users = module.get<UsersService>(UsersService);
+      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue(mockSamlProvider);
+      const request = { headers: { authorization: 'Bearer saml-secret' } } as unknown as Request;
+      (users.findOne as jest.Mock).mockResolvedValue({ id: 55, externalIdentifier: 'saml-subject' });
+      expect(await controller.samlLogout('2', request, { email: 'user@example.com' })).toEqual({ OK: true });
+      (users.findOne as jest.Mock).mockResolvedValue({ id: 55, externalIdentifier: null });
+      await expect(controller.samlLogout('2', request, { email: 'user@example.com' })).rejects.toThrow(
+        'SSO_USER_NOT_FOUND',
+      );
+    });
+
     it('revokes sessions for oidc logout requests', async () => {
       const usersService = module.get<UsersService>(UsersService);
       const sessionService = module.get<SessionService>(SessionService);

@@ -285,10 +285,8 @@ export function AuditLogSection() {
     },
   });
   const domainLabel = (domain: string) =>
-    pluginDomainLabel(
-      pluginDomainEntries.find((entry) => entry.id === domain)?.labels,
-      language,
-    ) ?? (Object.hasOwn(en.domains, domain) ? t(`domains.${domain}`) : humanize(domain));
+    pluginDomainLabel(pluginDomainEntries.find((entry) => entry.id === domain)?.labels, language) ??
+    (Object.hasOwn(en.domains, domain) ? t(`domains.${domain}`) : humanize(domain));
   const updateFilter = (key: keyof AuditFilters, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
   const clearFilters = () => {
@@ -355,18 +353,7 @@ export function AuditLogSection() {
           {exporting ? t('exporting') : t('export')}
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
-        <ShieldCheckIcon size={16} className={settings.data?.enabled ? 'text-success' : 'text-muted'} />
-        <span>{settings.data ? t(settings.data.enabled ? 'enabled' : 'disabled') : t('unknownSettings')}</span>
-        {settings.data && (
-          <>
-            <span aria-hidden>·</span>
-            <span>
-              {settings.data.retention_days} {t('retainedDays')}
-            </span>
-          </>
-        )}
-      </div>
+      <AuditSettingsSummary settings={settings.data} />
       <Tabs defaultSelectedKey="activity">
         <Tabs.ListContainer>
           <Tabs.List aria-label={t('title')}>
@@ -623,135 +610,198 @@ export function AuditLogSection() {
           )}
         </Tabs.Panel>
         {canManage && (
-          <Tabs.Panel id="settings" className="max-w-3xl space-y-5 pt-5">
-            <p className="text-sm text-muted">{t('settingsDescription')}</p>
-            {settings.isPending ? (
-              <Spinner />
-            ) : settings.isError ? (
-              <Notice title={t('settingsError')} />
-            ) : (
-              currentSettings && (
-                <>
-                  <Card variant="secondary">
-                    <Card.Content>
-                      <LabeledSwitch
-                        isSelected={currentSettings.enabled}
-                        isDisabled={saveSettings.isPending}
-                        onChange={(enabled) => editSettings({ ...currentSettings, enabled })}
-                      >
-                        <div>
-                          <p className="font-medium">{t('master')}</p>
-                          <p className="mt-1 text-sm text-muted">{t('masterHint')}</p>
-                        </div>
-                      </LabeledSwitch>
-                    </Card.Content>
-                  </Card>
-                  <section className="space-y-4">
-                    <div>
-                      <h3 className="font-semibold">{t('domainsTitle')}</h3>
-                      <p className="mt-1 text-sm text-muted">{t('domainsHint')}</p>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {coreAuditDomains.map((domain) => (
-                        <LabeledSwitch
-                          key={domain}
-                          isSelected={currentSettings.domains.includes(domain)}
-                          isDisabled={saveSettings.isPending}
-                          onChange={(enabled) =>
-                            editSettings({
-                              ...currentSettings,
-                              domains: toggleDomain(currentSettings.domains, domain, enabled),
-                            })
-                          }
-                        >
-                          {domainLabel(domain)}
-                        </LabeledSwitch>
-                      ))}
-                      {pluginDomainEntries.map((domain) => (
-                        <LabeledSwitch
-                          key={domain.id}
-                          isSelected={!currentSettings.plugin_domains_disabled.includes(domain.id)}
-                          isDisabled={saveSettings.isPending}
-                          onChange={(enabled) =>
-                            editSettings({
-                              ...currentSettings,
-                              plugin_domains_disabled: togglePluginDomain(
-                                currentSettings.plugin_domains_disabled,
-                                domain.id,
-                                enabled,
-                              ),
-                            })
-                          }
-                        >
-                          {domainLabel(domain.id)}
-                        </LabeledSwitch>
-                      ))}
-                    </div>
-                  </section>
-                  <NumberField
-                    className="max-w-sm"
-                    value={currentSettings.retention_days}
-                    minValue={1}
-                    maxValue={3650}
-                    isDisabled={saveSettings.isPending}
-                    onChange={(retention_days) => editSettings({ ...currentSettings, retention_days })}
-                  >
-                    <Label>{t('retention')}</Label>
-                    <NumberFieldGroup>
-                      <NumberFieldInput />
-                    </NumberFieldGroup>
-                  </NumberField>
-                  <p className="text-sm text-muted">{t('retentionHint')}</p>
-                  {saveSettings.isError && <Notice title={t('saveError')} />}
-                  {saved && <Notice status="success" title={t('saved')} />}
-                  <SettingsSaveBar
-                    isDirty={dirty}
-                    isSaving={saveSettings.isPending}
-                    isSaveDisabled={
-                      !Number.isInteger(currentSettings.retention_days) ||
-                      currentSettings.retention_days < 1 ||
-                      currentSettings.retention_days > 3650
-                    }
-                    onSave={() => saveSettings.mutate({ requestBody: currentSettings })}
-                    onDiscard={() => {
-                      setDraft(undefined);
-                      saveSettings.reset();
-                    }}
-                  />
-                </>
-              )
-            )}
-          </Tabs.Panel>
+          <AuditSettingsPanel
+            settings={settings}
+            currentSettings={currentSettings}
+            saveSettings={saveSettings}
+            editSettings={editSettings}
+            pluginDomainEntries={pluginDomainEntries}
+            domainLabel={domainLabel}
+            saved={saved}
+            dirty={dirty}
+            onDiscard={() => {
+              setDraft(undefined);
+              saveSettings.reset();
+            }}
+          />
         )}
       </Tabs>
-      <Drawer
-        isOpen={!!selected}
-        onOpenChange={(open) => {
-          if (!open) setSelected(null);
-        }}
-      >
-        <Drawer.Backdrop>
-          <Drawer.Content placement="right">
-            <Drawer.Dialog className="w-full max-w-xl">
-              <Drawer.CloseTrigger />
-              <Drawer.Header>
-                <Drawer.Heading>
-                  {selected ? auditLabel('events', selected.action, t) : t('eventDetails')}
-                </Drawer.Heading>
-                <p className="text-xs text-muted">
-                  {t('eventDetails')} #{selected?.id}
-                </p>
-              </Drawer.Header>
-              <Drawer.Body>{selected && <EntryDetails entry={selected} t={t} />}</Drawer.Body>
-              <Drawer.Footer>
-                <Button variant="secondary" slot="close">
-                  {t('close')}
-                </Button>
-              </Drawer.Footer>
-            </Drawer.Dialog>
-          </Drawer.Content>
-        </Drawer.Backdrop>
-      </Drawer>
+      <AuditEntryDrawer selected={selected} onClose={() => setSelected(null)} />
     </div>
+  );
+}
+
+function AuditSettingsSummary({ settings }: { settings: AuditSettingsDto | undefined }) {
+  const { t } = useTranslations({ en, de });
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+      <ShieldCheckIcon size={16} className={settings?.enabled ? 'text-success' : 'text-muted'} />
+      <span>{settings ? t(settings.enabled ? 'enabled' : 'disabled') : t('unknownSettings')}</span>
+      {settings && (
+        <>
+          <span aria-hidden>·</span>
+          <span>
+            {settings.retention_days} {t('retainedDays')}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AuditEntryDrawer({ selected, onClose }: { selected: AuditEntryDto | null; onClose: () => void }) {
+  const { t } = useTranslations({ en, de });
+  return (
+    <Drawer
+      isOpen={!!selected}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <Drawer.Backdrop>
+        <Drawer.Content placement="right">
+          <Drawer.Dialog className="w-full max-w-xl">
+            <Drawer.CloseTrigger />
+            <Drawer.Header>
+              <Drawer.Heading>{selected ? auditLabel('events', selected.action, t) : t('eventDetails')}</Drawer.Heading>
+              <p className="text-xs text-muted">
+                {t('eventDetails')} #{selected?.id}
+              </p>
+            </Drawer.Header>
+            <Drawer.Body>{selected && <EntryDetails entry={selected} t={t} />}</Drawer.Body>
+            <Drawer.Footer>
+              <Button variant="secondary" slot="close">
+                {t('close')}
+              </Button>
+            </Drawer.Footer>
+          </Drawer.Dialog>
+        </Drawer.Content>
+      </Drawer.Backdrop>
+    </Drawer>
+  );
+}
+
+function AuditSettingsPanel({
+  settings,
+  currentSettings,
+  saveSettings,
+  editSettings,
+  pluginDomainEntries,
+  domainLabel,
+  saved,
+  dirty,
+  onDiscard,
+}: {
+  settings: { isPending: boolean; isError: boolean };
+  currentSettings: AuditSettingsDto | undefined;
+  saveSettings: Pick<
+    ReturnType<typeof useSettingsServiceSettingsControllerUpdateAuditSettings>,
+    'isPending' | 'isError' | 'mutate'
+  >;
+  editSettings: (next: AuditSettingsDto) => void;
+  pluginDomainEntries: ReturnType<typeof pluginDomains>;
+  domainLabel: (domain: string) => string;
+  saved: boolean;
+  dirty: boolean;
+  onDiscard: () => void;
+}) {
+  const { t } = useTranslations({ en, de });
+  return (
+    <Tabs.Panel id="settings" className="max-w-3xl space-y-5 pt-5">
+      <p className="text-sm text-muted">{t('settingsDescription')}</p>
+      {settings.isPending ? (
+        <Spinner />
+      ) : settings.isError ? (
+        <Notice title={t('settingsError')} />
+      ) : (
+        currentSettings && (
+          <>
+            <Card variant="secondary">
+              <Card.Content>
+                <LabeledSwitch
+                  isSelected={currentSettings.enabled}
+                  isDisabled={saveSettings.isPending}
+                  onChange={(enabled) => editSettings({ ...currentSettings, enabled })}
+                >
+                  <div>
+                    <p className="font-medium">{t('master')}</p>
+                    <p className="mt-1 text-sm text-muted">{t('masterHint')}</p>
+                  </div>
+                </LabeledSwitch>
+              </Card.Content>
+            </Card>
+            <section className="space-y-4">
+              <div>
+                <h3 className="font-semibold">{t('domainsTitle')}</h3>
+                <p className="mt-1 text-sm text-muted">{t('domainsHint')}</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {coreAuditDomains.map((domain) => (
+                  <LabeledSwitch
+                    key={domain}
+                    isSelected={currentSettings.domains.includes(domain)}
+                    isDisabled={saveSettings.isPending}
+                    onChange={(enabled) =>
+                      editSettings({
+                        ...currentSettings,
+                        domains: toggleDomain(currentSettings.domains, domain, enabled),
+                      })
+                    }
+                  >
+                    {domainLabel(domain)}
+                  </LabeledSwitch>
+                ))}
+                {pluginDomainEntries.map((domain) => (
+                  <LabeledSwitch
+                    key={domain.id}
+                    isSelected={!currentSettings.plugin_domains_disabled.includes(domain.id)}
+                    isDisabled={saveSettings.isPending}
+                    onChange={(enabled) =>
+                      editSettings({
+                        ...currentSettings,
+                        plugin_domains_disabled: togglePluginDomain(
+                          currentSettings.plugin_domains_disabled,
+                          domain.id,
+                          enabled,
+                        ),
+                      })
+                    }
+                  >
+                    {domainLabel(domain.id)}
+                  </LabeledSwitch>
+                ))}
+              </div>
+            </section>
+            <NumberField
+              className="max-w-sm"
+              value={currentSettings.retention_days}
+              minValue={1}
+              maxValue={3650}
+              isDisabled={saveSettings.isPending}
+              onChange={(retention_days) => editSettings({ ...currentSettings, retention_days })}
+            >
+              <Label>{t('retention')}</Label>
+              <NumberFieldGroup>
+                <NumberFieldInput />
+              </NumberFieldGroup>
+            </NumberField>
+            <p className="text-sm text-muted">{t('retentionHint')}</p>
+            {saveSettings.isError && <Notice title={t('saveError')} />}
+            {saved && <Notice status="success" title={t('saved')} />}
+            <SettingsSaveBar
+              isDirty={dirty}
+              isSaving={saveSettings.isPending}
+              isSaveDisabled={
+                !Number.isInteger(currentSettings.retention_days) ||
+                currentSettings.retention_days < 1 ||
+                currentSettings.retention_days > 3650
+              }
+              onSave={() => saveSettings.mutate({ requestBody: currentSettings })}
+              onDiscard={onDiscard}
+            />
+          </>
+        )
+      )}
+    </Tabs.Panel>
   );
 }

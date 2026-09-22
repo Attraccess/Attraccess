@@ -52,6 +52,35 @@ const purposes = [
 ] as const;
 type Purpose = (typeof purposes)[number]['id'];
 
+function canAddChannel(
+  {
+    name,
+    purpose,
+    pulseMs,
+    guardId,
+    disconnect,
+    timeoutMs,
+  }: {
+    name: string;
+    purpose: Purpose;
+    pulseMs: number;
+    guardId: string;
+    disconnect: string;
+    timeoutMs: number;
+  },
+  hasTerminal: boolean,
+  inputs: Channel[],
+): boolean {
+  return (
+    hasTerminal &&
+    !!name.trim() &&
+    name.trim().length <= 120 &&
+    (purpose !== 'pulse' || (Number.isInteger(pulseMs) && pulseMs > 0)) &&
+    (purpose !== 'guard' || inputs.some((item) => item.id === guardId)) &&
+    (purpose === 'input' || disconnect !== 'watchdog' || (Number.isInteger(timeoutMs) && timeoutMs > 0))
+  );
+}
+
 /** The wizard holds its own proposal. Nothing enters the working draft until confirmation. */
 function AddChannel({
   snapshot,
@@ -80,13 +109,8 @@ function AddChannel({
   const terminals = availableDigitalTerminals(snapshot, direction);
   const selectedTerminal = terminals.find((item) => item.channel === assignment) ?? terminals[0];
   const inputs = snapshot.logicalChannels.filter((item) => item.capabilities.includes('input'));
-  const valid =
-    !!selectedTerminal &&
-    !!name.trim() &&
-    name.trim().length <= 120 &&
-    (purpose !== 'pulse' || (Number.isInteger(pulseMs) && pulseMs > 0)) &&
-    (purpose !== 'guard' || inputs.some((item) => item.id === guardId)) &&
-    (direction === 'input' || disconnect !== 'watchdog' || (Number.isInteger(timeoutMs) && timeoutMs > 0));
+  const valid = canAddChannel({ name, purpose, pulseMs, guardId, disconnect, timeoutMs }, !!selectedTerminal, inputs);
+
   function create() {
     if (!valid || !selectedTerminal) return;
     const next = addDigitalChannel(snapshot, direction);

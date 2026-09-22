@@ -16,6 +16,7 @@ const mockMetricsService = {
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
+  hash: jest.fn().mockResolvedValue('hashed-password'),
 }));
 
 const AuthenticationDetailRepository = getRepositoryToken(AuthenticationDetail);
@@ -43,6 +44,7 @@ describe('AuthService', () => {
           useValue: {
             findOne: jest.fn(),
             count: jest.fn(),
+            save: jest.fn(async (value) => value),
             update: jest.fn(),
           },
         },
@@ -78,6 +80,74 @@ describe('AuthService', () => {
 
     // Reset all mocks before each test
     jest.clearAllMocks();
+  });
+
+  it('stores local password hashes and SSO subjects in the selected transaction', async () => {
+    const local = await authService.addAuthenticationDetails(7, {
+      type: AuthenticationType.LOCAL_PASSWORD,
+      details: { password: 'secret' },
+    });
+    expect(local).toMatchObject({ userId: 7, password: 'hashed-password', type: AuthenticationType.LOCAL_PASSWORD });
+    expect(bcrypt.hash).toHaveBeenCalledWith('secret', expect.any(Number));
+    const manager = { save: jest.fn(async (value) => value) };
+    const sso = await authService.addAuthenticationDetails(
+      7,
+      {
+        type: AuthenticationType.SSO,
+        details: { providerType: SSOProviderType.SAML, providerId: 3, subject: 'external-subject' },
+      },
+      manager as never,
+    );
+    expect(sso).toMatchObject({
+      userId: 7,
+      providerId: 3,
+      providerType: SSOProviderType.SAML,
+      ssoSubject: 'external-subject',
+    });
+    (bcrypt.hash as jest.Mock).mockClear();
+    const prehashed = await authService.addAuthenticationDetails(
+      7,
+      { type: AuthenticationType.LOCAL_PASSWORD, details: { password: 'unused' } },
+      manager as never,
+      'prepared-hash',
+    );
+    expect(prehashed.password).toBe('prepared-hash');
+    expect(bcrypt.hash).not.toHaveBeenCalled();
+  });
+
+  it.each(['hashed:token', 'token'])(
+    'consumes valid current and legacy email verification tokens: %s',
+    async (stored) => {
+      jest.spyOn(usersService, 'findOne').mockResolvedValue({
+        id: 7,
+        emailVerificationToken: stored,
+        emailVerificationTokenExpiresAt: new Date(Date.now() + 60000),
+      } as User);
+      await authService.verifyEmail('user@example.com', 'token');
+      expect(usersService.updateOne).toHaveBeenCalledWith(7, {
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+      });
+    },
+  );
+
+  it('rejects missing users, invalid tokens and expired verification links without modifying the account', async () => {
+    jest.spyOn(usersService, 'findOne').mockResolvedValue(null);
+    await expect(authService.verifyEmail('user@example.com', 'token')).rejects.toThrow();
+    jest.spyOn(usersService, 'findOne').mockResolvedValue({
+      id: 7,
+      emailVerificationToken: 'other',
+      emailVerificationTokenExpiresAt: new Date(Date.now() + 60000),
+    } as User);
+    await expect(authService.verifyEmail('user@example.com', 'token')).rejects.toThrow();
+    jest.spyOn(usersService, 'findOne').mockResolvedValue({
+      id: 7,
+      emailVerificationToken: 'hashed:token',
+      emailVerificationTokenExpiresAt: new Date(0),
+    } as User);
+    await expect(authService.verifyEmail('user@example.com', 'token')).rejects.toThrow();
+    expect(usersService.updateOne).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {

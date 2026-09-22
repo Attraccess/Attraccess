@@ -1,3 +1,4 @@
+import type { NodeProcessingResult } from './node-executors';
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
@@ -44,6 +45,7 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
 }
 
 describe('ResourceFlowsExecutorService.runFlow', () => {
+  let errorShapeIndex = 0;
   let service: ResourceFlowsExecutorService;
 
   // Repositories and dependencies
@@ -178,6 +180,102 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       } as unknown as CompanionGatewayService,
       operatingIntervals as never,
     );
+  });
+
+  it('subscribes valid MQTT triggers and waits, preserving QoS and tolerating a failed subscription', async () => {
+    initialNodes = [
+      createNode({ type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, data: { serverId: 1, topic: 'events' } }),
+      createNode({ type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, data: { topic: 'missing-server' } }),
+      createNode({
+        type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
+        data: { serverId: 2, topic: 'reply', subscribeQos: 2 },
+      }),
+      createNode({ type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE, data: { serverId: 2 } }),
+    ];
+    mqttClientService.subscribe = jest.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
+    await service.onModuleInit();
+    expect(mqttClientService.subscribe).toHaveBeenCalledTimes(2);
+    expect(mqttClientService.subscribe).toHaveBeenNthCalledWith(1, 1, 'events', undefined);
+    expect(mqttClientService.subscribe).toHaveBeenNthCalledWith(2, 2, 'reply', 2);
+  });
+
+  it.each(['connected', 'disconnected'] as const)(
+    'matches companion USB %s filters before starting flows',
+    async (kind) => {
+      const type =
+        kind === 'connected'
+          ? ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED
+          : ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED;
+      const filters = [
+        { deviceId: 7 },
+        { deviceId: 7, vendorId: 10 },
+        { deviceId: 7, productId: 20 },
+        { deviceId: 7, vendorId: 10, productId: 20 },
+        { deviceId: 7, vendorId: 99 },
+        { deviceId: 7, productId: 99 },
+        { deviceId: 8 },
+        {},
+      ];
+      initialNodes = filters.map((data, index) => createNode({ id: String(index), type, data }));
+      const start = jest
+        .spyOn(service as never as { startFlow: (...args: unknown[]) => Promise<void> }, 'startFlow')
+        .mockResolvedValue(undefined);
+      const event = { deviceId: 7, payload: { vendorId: 10, productId: 20 } };
+      if (kind === 'connected') await service.handleCompanionUsbConnected(event);
+      else await service.handleCompanionUsbDisconnected(event);
+      expect(start).toHaveBeenCalledWith(initialNodes.slice(0, 4), { payload: event.payload });
+    },
+  );
+
+  it('allows flow buttons only for the active session owner and rejects missing buttons', async () => {
+    const start = jest
+      .spyOn(service as never as { startFlow: (...args: unknown[]) => Promise<void> }, 'startFlow')
+      .mockResolvedValue(undefined);
+    resourceUsageService.getActiveSession = jest.fn().mockResolvedValue({ userId: 7 });
+    await expect(service.pressButton(1, 'button', 0)).rejects.toThrow('not allowed');
+    await expect(service.pressButton(1, 'button', 8)).rejects.toThrow('not allowed');
+    await expect(service.pressButton(1, 'button', 7)).rejects.toThrow('UNKNOWN_BUTTON_ID');
+    const button = createNode({ id: 'button' });
+    nodesById.button = button;
+    await service.pressButton(1, 'button', 7);
+    expect(start).toHaveBeenCalledWith(button, { payload: {} });
+  });
+
+  it.each([
+    [new Error(''), 'Error'],
+    ['failure text', 'failure text'],
+    ['', 'Unknown error'],
+    [{ message: 'remote error' }, 'remote error'],
+    [{ message: '' }, 'Unknown error'],
+    [null, 'null'],
+    [{}, 'Unknown error'],
+    [undefined, 'Unknown error'],
+    [42, '42'],
+  ])('records useful descriptions for plugin errors: %#', async (error, message) => {
+    const type = `plugin.error-shape.${errorShapeIndex++}`;
+    registerPluginFlowNodes('error-shape', [
+      {
+        type,
+        label: 'Error shape',
+        configSchema: {},
+        inputs: ['input'],
+        outputs: ['output'],
+        execute: async () => {
+          throw error;
+        },
+      },
+    ]);
+    const input = createNode({ id: 'input', type: ResourceFlowNodeType.INPUT_BUTTON });
+    const output = createNode({ id: 'output', type: type as ResourceFlowNodeType });
+    initialNodes = [input];
+    nodesById = { input, output };
+    edgesBySourceAndHandle['input|'] = [{ source: 'input', target: 'output' }];
+    flowLogs.start(1);
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {}).catch(() => undefined);
+    const failure = flowLogs
+      .getLogs(1)
+      .logs.find((log) => log.nodeId === 'output' && log.type === 'node.processing.failed');
+    expect(JSON.parse(failure?.payload ?? '{}')).toMatchObject({ error: message, failureKind: 'node-failure' });
   });
 
   it('preserves an external-effect failure when another branch rejects first', async () => {

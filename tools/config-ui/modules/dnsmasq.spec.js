@@ -12,7 +12,9 @@ function buildFsMock({ files = {} } = {}) {
       if (files[p] !== undefined) return files[p];
       throw new Error(`ENOENT: ${p}`);
     }),
-    writeFileSync: jest.fn((p, content) => { writes[p] = content; }),
+    writeFileSync: jest.fn((p, content) => {
+      writes[p] = content;
+    }),
     mkdirSync: jest.fn(),
   };
   return { mockFs, writes };
@@ -221,7 +223,7 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     expect(spawn).toHaveBeenCalledWith(
       'dnsmasq',
       expect.arrayContaining(['--conf-dir=/etc/dnsmasq.d/,*.conf']),
-      expect.anything()
+      expect.anything(),
     );
   });
 
@@ -236,7 +238,9 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         kill: jest.fn(),
-        on: (event, cb) => { handlers[event] = cb; },
+        on: (event, cb) => {
+          handlers[event] = cb;
+        },
         emit: (event, arg) => handlers[event](arg),
       };
       procs.push(proc);
@@ -300,7 +304,9 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
         stdout: undefined,
         stderr: undefined,
         kill: jest.fn(),
-        on: (event, cb) => { handlers[event] = cb; },
+        on: (event, cb) => {
+          handlers[event] = cb;
+        },
         emit: (event, arg) => handlers[event](arg),
       };
       procs.push(proc);
@@ -386,5 +392,38 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     restore();
 
     expect(Object.keys(writes)).toHaveLength(0);
+  });
+});
+
+describe('updating DNS records', () => {
+  const record = { id: 'existing', hostname: 'old.local', ip: '192.0.2.1' };
+  it.each([
+    [{ hostname: 'bad host' }, 400, 'invalid hostname'],
+    [{ ip: '999.1.1.1' }, 400, 'invalid ip'],
+    [{ hostname: 'new.local', ip: '192.0.2.2' }, 200, undefined],
+    [{}, 200, undefined],
+  ])('validates and persists updates %j', async (update, expectedStatus, error) => {
+    const { mod, writes, restore } = loadModule({}, { files: { '/data/dns-records.json': JSON.stringify([record]) } });
+    try {
+      const response = await invokeHandler(mod, 'PUT', '/records/existing', ['records', 'existing'], update);
+      expect(response.status).toBe(expectedStatus);
+      if (error) {
+        expect(response.body.error).toBe(error);
+        expect(writes['/data/dns-records.json']).toBeUndefined();
+      } else {
+        expect(response.body).toEqual({ ...record, ...update });
+        expect(JSON.parse(writes['/data/dns-records.json'])).toEqual([{ ...record, ...update }]);
+      }
+    } finally {
+      restore();
+    }
+  });
+  it('rejects updates for a missing record', async () => {
+    const { mod, restore } = loadModule();
+    try {
+      expect((await invokeHandler(mod, 'PUT', '/records/missing', ['records', 'missing'], {})).status).toBe(404);
+    } finally {
+      restore();
+    }
   });
 });
