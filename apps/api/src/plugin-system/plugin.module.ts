@@ -63,6 +63,13 @@ export class PluginModule {
     PluginModule.moduleRef = moduleRef;
   }
 
+  /** Discard host instances when the temporary configuration app is closed. */
+  public static resetHostReferences(): void {
+    PluginModule.dataSourceRef = null;
+    PluginModule.eventsRef = null;
+    PluginModule.moduleRef = null;
+  }
+
   public static configure(config: { DISABLE_PLUGINS: boolean }): void {
     PluginModule.DISABLE_PLUGINS_FLAG = config.DISABLE_PLUGINS;
     PluginModule.logger.log(`PluginModule configured. DisablePlugins: ${PluginModule.DISABLE_PLUGINS_FLAG}`);
@@ -252,7 +259,14 @@ export class PluginModule {
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {
         subscribe(serverId, topicFilter, handler) {
-          return PluginModule.pluginMqtt().subscribe(manifest.id, manifest.name, base.logger, serverId, topicFilter, handler);
+          return PluginModule.pluginMqtt().subscribe(
+            manifest.id,
+            manifest.name,
+            base.logger,
+            serverId,
+            topicFilter,
+            handler,
+          );
         },
         publish(serverId, topic, payload, options) {
           return PluginModule.pluginMqtt().publish(serverId, topic, payload, options);
@@ -268,17 +282,34 @@ export class PluginModule {
         ) as unknown as PluginContext['dataSource'];
       },
       getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> {
-        // Nest may construct plugin providers before the PluginModule constructor
-        // receives the host DataSource. Older plugins retain repositories in their
-        // constructors, so resolve the repository when it is first used instead.
+        const resolveRepository = (): Repository<T> =>
+          PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource').getRepository(
+            entity as never,
+          ) as unknown as Repository<T>;
+        if (PluginModule.dataSourceRef) return resolveRepository();
+
+        // Nest constructs plugin providers before it constructs PluginModule and
+        // injects the host DataSource. Older shipped plugins retain repositories
+        // in their constructors; defer only the repository's use until the host
+        // reference is ready. Bind methods to the real TypeORM Repository.
+        let resolved: Repository<T> | undefined;
+        const repository = (): Repository<T> => {
+          if (!resolved) {
+            // The initial sandbox check may have fallen back to DATABASE_ACCESS
+            // because metadata was unavailable before host injection. Resolve
+            // the entity permission again against the live DataSource.
+            PluginSandboxService.assertRepositoryPermission(base, manifest.permissions ?? [], entity);
+            resolved = resolveRepository();
+          }
+          return resolved;
+        };
         return new Proxy({} as Repository<T>, {
-          get(_target, property) {
-            const repository = PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource').getRepository(
-              entity as never,
-            ) as Repository<T>;
-            const value = Reflect.get(repository, property);
-            return typeof value === 'function' ? value.bind(repository) : value;
+          get: (_, property) => {
+            const actual = repository();
+            const value = Reflect.get(actual, property, actual);
+            return typeof value === 'function' ? value.bind(actual) : value;
           },
+          set: (_, property, value) => Reflect.set(repository(), property, value),
         });
       },
       get<T>(token: Type<T> | string | symbol): T {
@@ -304,15 +335,21 @@ export class PluginModule {
         );
       },
       get flows(): PluginFlowsContext {
-        const executor = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(ResourceFlowsExecutorService, {
-          strict: false,
-        });
+        const executor = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(
+          ResourceFlowsExecutorService,
+          {
+            strict: false,
+          },
+        );
         return {
-          trigger: (nodeType, matches, payload) => executor.triggerPluginFlows(manifest.name, nodeType, matches, payload),
+          trigger: (nodeType, matches, payload) =>
+            executor.triggerPluginFlows(manifest.name, nodeType, matches, payload),
         };
       },
       get secrets(): PluginSecretsContext {
-        const encryption = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(EncryptionService, { strict: false });
+        const encryption = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(EncryptionService, {
+          strict: false,
+        });
         return {
           encrypt: (plaintext) => encryption.encryptForPlugin(manifest.id, plaintext),
           decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),

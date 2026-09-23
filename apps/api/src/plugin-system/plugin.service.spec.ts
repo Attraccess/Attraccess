@@ -48,22 +48,24 @@ describe('PluginService', () => {
     mockSpawn.mockClear();
     capturedRestart = null;
     root = newPluginDir();
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation((((() => {
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit');
-    }) as unknown) as never));
+    }) as unknown as never);
     restartSpy = jest
       .spyOn(PluginService.prototype as unknown as { restartApp: () => void }, 'restartApp')
       .mockImplementation(() => undefined);
     const realSetTimeout = global.setTimeout;
-    jest
-      .spyOn(global, 'setTimeout')
-      .mockImplementation(((fn: (...a: unknown[]) => void, delay?: number, ...args: unknown[]) => {
-        if (delay === 1000) {
-          capturedRestart = () => fn();
-          return 0 as unknown as NodeJS.Timeout;
-        }
-        return realSetTimeout(fn, delay as number, ...args);
-      }) as unknown as typeof setTimeout);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((
+      fn: (...a: unknown[]) => void,
+      delay?: number,
+      ...args: unknown[]
+    ) => {
+      if (delay === 1000) {
+        capturedRestart = () => fn();
+        return 0 as unknown as NodeJS.Timeout;
+      }
+      return realSetTimeout(fn, delay as number, ...args);
+    }) as unknown as typeof setTimeout);
   });
 
   afterEach(() => {
@@ -238,6 +240,25 @@ describe('PluginService', () => {
 
       const [plugin] = PluginService.getPlugins();
       expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it.each(['SIGINT', 'SIGTERM'] as const)('does not quarantine plugins when startup is stopped by %s', (signal) => {
+      writePlugin(root, 'installed-plugin', {
+        name: 'installed-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      jest.spyOn(process, 'kill').mockImplementation(() => true);
+      const existing = new Set(process.listeners(signal));
+      PluginService.beginBootGuard();
+      const handler = process.listeners(signal).find((listener) => !existing.has(listener));
+      expect(handler).toBeDefined();
+      handler?.();
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
     });
 
     it('creates a configured plugin directory before writing boot guard state', () => {
@@ -432,15 +453,18 @@ describe('PluginService', () => {
       expect(readdirSync(root).filter((entry) => entry.startsWith('.uploaded-plugin-'))).toEqual([]);
     });
 
-    it.each(['../outside-plugin', 'nested/plugin', '..\\outside-plugin'])('rejects a plugin name that escapes its directory: %s', async (name) => {
-      const service = new PluginService();
-      const manifest = { ...VALID_MANIFEST, name };
+    it.each(['../outside-plugin', 'nested/plugin', '..\\outside-plugin'])(
+      'rejects a plugin name that escapes its directory: %s',
+      async (name) => {
+        const service = new PluginService();
+        const manifest = { ...VALID_MANIFEST, name };
 
-      await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
-        'Plugin name must be a visible single path segment',
-      );
-      expect(existsSync(join(root, 'outside-plugin'))).toBe(false);
-    });
+        await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
+          'Plugin name must be a visible single path segment',
+        );
+        expect(existsSync(join(root, 'outside-plugin'))).toBe(false);
+      },
+    );
 
     it('rejects a dot-prefixed plugin name that discovery would skip', async () => {
       const service = new PluginService();
@@ -518,7 +542,11 @@ describe('PluginService', () => {
       restartSpy.mockRestore();
       PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: false });
       expect(() => (new PluginService() as unknown as { restartApp: () => void }).restartApp()).toThrow('process.exit');
-      expect(mockSpawn).toHaveBeenCalledWith(process.argv[0], process.argv.slice(1), expect.objectContaining({ detached: true }));
+      expect(mockSpawn).toHaveBeenCalledWith(
+        process.argv[0],
+        process.argv.slice(1),
+        expect.objectContaining({ detached: true }),
+      );
       expect(exitSpy).toHaveBeenCalled();
     });
   });

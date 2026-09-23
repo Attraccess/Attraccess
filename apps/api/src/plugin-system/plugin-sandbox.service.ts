@@ -74,6 +74,18 @@ function permissionForEntity<T extends ObjectLiteral>(base: PluginContext, entit
 export class PluginSandboxService {
   private static readonly logger = new Logger(PluginSandboxService.name);
 
+  /** Also called when a repository retained during bootstrap is first resolved. */
+  public static assertRepositoryPermission(
+    base: PluginContext,
+    declared: PluginPermission[],
+    entity: EntityTarget<ObjectLiteral>,
+  ): void {
+    const permission = permissionForEntity(base, entity);
+    if (!declared.includes(permission)) {
+      throw new PluginPermissionError(base.manifest.name, `getRepository(${entityLabel(entity)})`, permission);
+    }
+  }
+
   /**
    * Validates the permissions declared in a manifest. Returns the parsed set or
    * throws guidance on the first unknown value.
@@ -141,8 +153,7 @@ export class PluginSandboxService {
         return base.dataSource;
       },
       getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>) {
-        const permission = permissionForEntity(base, entity);
-        require(permission, `getRepository(${entityLabel(entity)})`);
+        PluginSandboxService.assertRepositoryPermission(base, declared, entity);
         return base.getRepository(entity);
       },
       get<T>(token: Type<T> | string | symbol): T {
