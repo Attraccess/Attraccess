@@ -32,16 +32,13 @@ interface SettingsDirectoryProps {
 export function SettingsDirectory({ groups, searchLabel, emptyMessage, className }: SettingsDirectoryProps) {
   const [query, setQuery] = useState('');
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [visitedKeys, setVisitedKeys] = useState<Set<string>>(() => new Set());
   const id = useId();
   const normalizedQuery = normalize(query.trim());
-  const visibleGroups = groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) =>
-        normalize([group.label, item.title, item.description, ...(item.searchTerms ?? [])].join(' ')).includes(normalizedQuery),
-      ),
-    }))
-    .filter((group) => group.items.length > 0);
+  const matches = (group: SettingsDirectoryGroup, item: SettingsDirectoryItem) =>
+    normalize([group.label, item.title, item.description, ...(item.searchTerms ?? [])].join(' ')).includes(normalizedQuery);
+  const populatedGroups = groups.filter((group) => group.items.length > 0);
+  const hasMatches = populatedGroups.some((group) => group.items.some((item) => matches(group, item)));
 
   return (
     <div className={cn('mx-auto w-full max-w-3xl', className)}>
@@ -54,15 +51,16 @@ export function SettingsDirectory({ groups, searchLabel, emptyMessage, className
         </SearchField.Group>
       </SearchField>
 
-      {visibleGroups.length === 0 && <p className="py-8 text-center text-sm text-muted">{emptyMessage}</p>}
+      {!hasMatches && <p className="py-8 text-center text-sm text-muted">{emptyMessage}</p>}
 
-      {visibleGroups.map((group) => (
-        <section key={group.key} className="mb-8">
+      {populatedGroups.map((group) => (
+        <section key={group.key} hidden={!group.items.some((item) => matches(group, item))} className="mb-8">
           <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{group.label}</h2>
           <div className="overflow-hidden rounded-xl border border-separator bg-surface">
             {group.items.map((item) => {
               const rowKey = `${group.key}:${item.key}`;
               const isOpen = openKey === rowKey;
+              const hasVisited = visitedKeys.has(rowKey);
               const panelId = `${id}-${group.key}-${item.key}-panel`;
               const rowContent = (
                 <>
@@ -77,7 +75,7 @@ export function SettingsDirectory({ groups, searchLabel, emptyMessage, className
               const rowClassName = 'flex w-full items-center gap-4 p-4 text-left hover:bg-default-100 focus-visible:outline-2 focus-visible:outline-accent sm:p-5';
 
               return (
-                <div key={item.key} className="border-b border-separator last:border-b-0">
+                <div key={item.key} hidden={!matches(group, item)} className="border-b border-separator last:border-b-0">
                   {item.to ? (
                     <Link to={item.to} className={rowClassName}>{rowContent}</Link>
                   ) : (
@@ -86,12 +84,15 @@ export function SettingsDirectory({ groups, searchLabel, emptyMessage, className
                         type="button"
                         aria-expanded={isOpen}
                         aria-controls={panelId}
-                        onClick={() => setOpenKey(isOpen ? null : rowKey)}
+                        onClick={() => {
+                          setOpenKey(isOpen ? null : rowKey);
+                          if (!isOpen) setVisitedKeys((previous) => new Set(previous).add(rowKey));
+                        }}
                         className={rowClassName}
                       >
                         {rowContent}
                       </button>
-                      {isOpen && <div id={panelId} className="min-w-0 border-t border-separator bg-default-50 p-4 sm:p-6">{item.content}</div>}
+                      {hasVisited && <div id={panelId} hidden={!isOpen} className="min-w-0 border-t border-separator bg-default-50 p-4 sm:p-6">{item.content}</div>}
                     </>
                   )}
                 </div>

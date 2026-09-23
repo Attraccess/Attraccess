@@ -11,7 +11,7 @@ it('filters translated groups and opens only the selected inline editor', () => 
         searchLabel="Find a setting"
         emptyMessage="No matching settings"
         groups={[
-          { key: 'identity', label: 'Identity', items: [{ key: 'profile', title: 'Profile', description: 'Email and name', content: <p>Profile editor</p> }] },
+          { key: 'identity', label: 'Identity', items: [{ key: 'profile', title: 'Profile', description: 'Email and name', content: <label>Profile editor<input aria-label="Draft name" /></label> }] },
           { key: 'access', label: 'Access', items: [{ key: 'password', title: 'Password', description: 'Sign-in secret', content: <p>Password editor</p> }] },
         ]}
       />
@@ -21,9 +21,12 @@ it('filters translated groups and opens only the selected inline editor', () => 
   expect(screen.queryByText('Profile editor')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Profile/ }));
   expect(screen.getByText('Profile editor')).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Draft name' }), { target: { value: 'Unfinished edit' } });
   fireEvent.click(screen.getByRole('button', { name: /Password/ }));
-  expect(screen.queryByText('Profile editor')).not.toBeInTheDocument();
+  expect(screen.getByText('Profile editor')).not.toBeVisible();
   expect(screen.getByText('Password editor')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Profile/ }));
+  expect(screen.getByRole('textbox', { name: 'Draft name' })).toHaveValue('Unfinished edit');
 
   fireEvent.change(screen.getByRole('searchbox', { name: 'Find a setting' }), { target: { value: 'email' } });
   expect(screen.getByRole('button', { name: /Profile/ })).toBeInTheDocument();
