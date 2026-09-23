@@ -6,9 +6,6 @@ import {
   AlertDescription,
   AlertTitle,
   Chip,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -61,7 +58,6 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
 import { StandardModal } from '../../../../components/standardModal';
-import { StandardDrawer } from '../../../../components/standardDrawer';
 import { EmptyState } from '../../../../components/emptyState';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { UploadPluginModal } from '../../../plugins/UploadPluginModal';
@@ -1053,7 +1049,7 @@ export function PluginsSection() {
         </StandardModal>
       </div>
 
-      <StandardDrawer
+      <StandardModal
         isOpen={pluginToInstall !== null}
         onOpenChange={(open) => {
           if (!open && !isInstalling) {
@@ -1062,16 +1058,16 @@ export function PluginsSection() {
             setInstallFailure(null);
           }
         }}
-        contentProps={{ placement: 'right' }}
+        size="md"
       >
-        <DrawerHeader>
-          <h2 className="text-lg font-semibold">
+        <ModalHeader>
+          <ModalHeading>
             {t('marketplace.installTitle', {
               pluginName: pluginToInstall?.displayName ?? pluginToInstall?.name ?? '',
             })}
-          </h2>
-        </DrawerHeader>
-        <DrawerBody>
+          </ModalHeading>
+        </ModalHeader>
+        <ModalBody>
           {pluginToInstall ? (
             <div className="flex flex-col gap-3">
               <PluginClassificationBadge classification={pluginToInstall.classification} />
@@ -1102,8 +1098,8 @@ export function PluginsSection() {
               ) : null}
             </div>
           ) : null}
-        </DrawerBody>
-        <DrawerFooter>
+        </ModalBody>
+        <ModalFooter>
           <Button
             variant="ghost"
             onPress={() => {
@@ -1123,8 +1119,8 @@ export function PluginsSection() {
           >
             {t('marketplace.confirmInstall')}
           </Button>
-        </DrawerFooter>
-      </StandardDrawer>
+        </ModalFooter>
+      </StandardModal>
 
       <StandardModal
         isOpen={pluginToDelete !== null}
