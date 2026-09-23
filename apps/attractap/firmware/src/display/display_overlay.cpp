@@ -95,7 +95,7 @@ void Display::updateNetworkQualityOverlay()
     switch (qualityState.quality)
     {
     case State::NETWORK_QUALITY_GOOD:
-        lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_label_set_text(Display::networkQualityLabel, "OK NET");
         break;

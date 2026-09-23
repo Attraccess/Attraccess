@@ -44,7 +44,6 @@ public:
     void processIncomingMessage(const char *buf, size_t len);
     static constexpr size_t MAX_RESOURCES = 10;
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
-    static constexpr size_t MAX_DESC_LEN = 128;
     static constexpr size_t MAX_USERNAME_LEN = 33; // 32 username characters plus the terminator.
     static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
     static constexpr size_t MAX_INTRODUCERS = 8;
@@ -74,7 +73,7 @@ public:
         bool canManageResource = false;
         bool requiresSupervisor = false;
         char name[MAX_RESOURCE_NAME_LEN];
-        char description[MAX_DESC_LEN];
+        std::string description;
         bool hasActiveUsage;
         bool isUnderMaintenance;
         bool isHealthy;

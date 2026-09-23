@@ -97,6 +97,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     };
     auto *details = makeButton(false, DisplayTheme::surfaceSecondary());
     auto *name = text(details, resource.name, &attractap_font_montserrat_latin1_20, DisplayTheme::text());
+    lv_obj_set_height(name, 26);
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
     std::string status = resource.description;
     if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser ? "Von dir verwendet" : std::string("In Verwendung: ") + resource.activeUser;
@@ -105,6 +106,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     else if (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource) status = "Einweisung fehlt";
     else if (status.empty()) status = "Verfügbar";
     auto *description = text(details, status.c_str(), &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
+    lv_obj_set_height(description, 18);
     lv_obj_align(description, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     if (!signedIn) {
         lv_obj_set_style_border_side(details, LV_BORDER_SIDE_RIGHT, 0);

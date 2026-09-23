@@ -108,14 +108,7 @@ void API::onResourceList(JsonObject data)
         {
             dst.name[0] = '\0';
         }
-        if (desc)
-        {
-            strlcpy(dst.description, desc, sizeof(dst.description));
-        }
-        else
-        {
-            dst.description[0] = '\0';
-        }
+        dst.description = desc ? desc : "";
 
         dst.isUnderMaintenance = resource["isUnderMaintenance"].is<bool>() ? resource["isUnderMaintenance"].as<bool>() : false;
 
