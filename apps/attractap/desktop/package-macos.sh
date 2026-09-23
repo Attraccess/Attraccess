@@ -32,7 +32,7 @@ minimum_os="$(otool -l "$binary" | awk '/LC_BUILD_VERSION/ { in_version=1 } in_v
 
 while IFS= read -r -d '' dylib; do
   codesign --force --sign - "$dylib"
-done < <(find "$staging/$app_name/Contents/Frameworks" -type f -name '*.dylib' -print0)
+done < <(find "$staging/$app_name/Contents" -type f -name '*.dylib' -print0)
 codesign --force --sign - "$staging/$app_name"
 codesign --verify --deep --strict --verbose=2 "$staging/$app_name"
 
