@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SystemPermission } from '@attraccess/shared';
@@ -67,6 +67,9 @@ describe('SettingsIndexPage', () => {
     expect(screen.queryByText('general page')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /sections\.general/ })).toHaveAttribute('href', '/settings/general');
     expect(screen.getByRole('link', { name: /sections\.monitoring/ })).toHaveAttribute('href', '/settings/monitoring');
+    fireEvent.change(screen.getByRole('searchbox', { name: 'search' }), { target: { value: 'monitoring' } });
+    expect(screen.queryByRole('link', { name: /sections\.general/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sections\.monitoring/ })).toBeInTheDocument();
   });
 
   it('renders no section list at all when the operator may open none of them', () => {
