@@ -380,7 +380,7 @@ describe('PluginsSection', () => {
 
   it('installs an exact private package version from its selected registry', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn((input: { url?: string } | string, init?: RequestInit) => {
+    const fetchMock = vi.fn((input: { url?: string } | string) => {
       const url = typeof input === 'string' ? input : (input.url ?? '');
       if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/registries'))
@@ -424,6 +424,28 @@ describe('PluginsSection', () => {
         requestBody: { registryId: 'private' },
       }),
     );
+  });
+
+  it('keeps the install failure and compatibility remedy visible in the drawer', async () => {
+    hoisted.installPackageMock.mockRejectedValue({
+      status: 400,
+      body: { message: 'Plugin is not compatible with Attraccess 1.9.0' },
+    });
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+    await user.click(await screen.findByText('Example'));
+    await user.click(await screen.findByRole('button', { name: 'Install' }));
+    await user.click(screen.getByRole('checkbox'));
+    const dialog = screen.getByRole('heading', { name: 'Install Example?' }).closest('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    await user.click(within(dialog as HTMLElement).getByRole('button', { name: 'Install plugin' }));
+
+    expect(
+      await within(dialog as HTMLElement).findByText(/Plugin is not compatible with Attraccess 1.9.0/),
+    ).toBeInTheDocument();
+    expect(within(dialog as HTMLElement).getByText(/Choose a plugin version compatible/)).toBeInTheDocument();
+    expect(within(dialog as HTMLElement).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
   });
 
   it('shows only the configured state for registry tokens', async () => {

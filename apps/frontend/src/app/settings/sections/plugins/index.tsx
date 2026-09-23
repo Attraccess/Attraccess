@@ -226,6 +226,7 @@ export function PluginsSection() {
   const [marketplacePlugin, setMarketplacePlugin] = useState<MarketplacePlugin | null>(null);
   const [pluginToInstall, setPluginToInstall] = useState<MarketplacePlugin | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [installFailure, setInstallFailure] = useState<string | null>(null);
   const [requestedSpec, setRequestedSpec] = useState('');
   const [updateOverride, setUpdateOverride] = useState<InstalledNpmPlugin['updateOverride']>('inherit');
   const [majorApproved, setMajorApproved] = useState(false);
@@ -426,6 +427,7 @@ export function PluginsSection() {
   const installMarketplacePlugin = async () => {
     if (!pluginToInstall?.version) return;
     setIsInstalling(true);
+    setInstallFailure(null);
     try {
       await installPluginPackage({
         packageName: pluginToInstall.name,
@@ -436,7 +438,29 @@ export function PluginsSection() {
       setTimeout(() => window.location.reload(), 5000);
       setPluginToInstall(null);
       setInstallApproved(false);
-    } catch {
+    } catch (error) {
+      const response = error && typeof error === 'object' ? (error as { status?: number; body?: unknown }) : null;
+      const body =
+        response?.body && typeof response.body === 'object' ? (response.body as { message?: unknown }) : null;
+      const reason =
+        typeof body?.message === 'string'
+          ? body.message
+          : Array.isArray(body?.message) && body.message.every((item) => typeof item === 'string')
+            ? body.message.join('; ')
+            : null;
+      const nextStep =
+        response?.status === 401 || response?.status === 403
+          ? t('marketplace.installPermissionHelp')
+          : reason?.startsWith('Cannot POST')
+            ? t('marketplace.installRouteHelp')
+            : reason?.includes('not compatible') || reason?.includes('compatible peer dependency')
+              ? t('marketplace.installCompatibilityHelp')
+              : response?.status === 404
+                ? t('marketplace.installVersionHelp')
+                : response?.status === 500
+                  ? t('marketplace.installServerHelp')
+                  : t('marketplace.installRetryHelp');
+      setInstallFailure([reason, nextStep].filter(Boolean).join(' '));
       toast.error({ title: t('marketplace.installError') });
     } finally {
       setIsInstalling(false);
@@ -1035,6 +1059,7 @@ export function PluginsSection() {
           if (!open && !isInstalling) {
             setPluginToInstall(null);
             setInstallApproved(false);
+            setInstallFailure(null);
           }
         }}
         contentProps={{ placement: 'right' }}
@@ -1067,6 +1092,14 @@ export function PluginsSection() {
                 {t('marketplace.installApproval')}
               </label>
               <p className="text-warning text-sm">{t('marketplace.restartWarning')}</p>
+              {installFailure ? (
+                <Alert status="danger">
+                  <AlertContent>
+                    <AlertTitle>{t('marketplace.installError')}</AlertTitle>
+                    <AlertDescription>{installFailure}</AlertDescription>
+                  </AlertContent>
+                </Alert>
+              ) : null}
             </div>
           ) : null}
         </DrawerBody>
@@ -1076,6 +1109,7 @@ export function PluginsSection() {
             onPress={() => {
               setPluginToInstall(null);
               setInstallApproved(false);
+              setInstallFailure(null);
             }}
             isDisabled={isInstalling}
           >

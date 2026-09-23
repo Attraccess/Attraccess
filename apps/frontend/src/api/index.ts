@@ -1,3 +1,5 @@
+import { OpenAPI } from '@attraccess/react-query-client';
+
 function normalizeUrl<TUrl extends string | undefined>(url: TUrl): TUrl {
   if (typeof url !== 'string') {
     return undefined as TUrl;
@@ -24,6 +26,11 @@ function normalizeUrl<TUrl extends string | undefined>(url: TUrl): TUrl {
 
 export function getBaseUrl() {
   return normalizeUrl(window.location.href);
+}
+
+export function configureApiClient() {
+  OpenAPI.BASE = getBaseUrl();
+  OpenAPI.ENCODE_PATH = encodeURIComponent;
 }
 
 export function filenameToUrl(name?: string) {
