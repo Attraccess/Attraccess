@@ -85,7 +85,13 @@
     "cancel": "Cancel",
     "confirmInstall": "Install plugin",
     "installSuccess": "Plugin installed. The app will restart in a few seconds to activate it.",
-    "installError": "The plugin was not installed. Please try again."
+    "installError": "The plugin was not installed.",
+    "installPermissionHelp": "Sign in with a role that can manage plugins, then try again.",
+    "installRouteHelp": "Reload Attraccess to pick up the latest client. If this persists, check that the frontend and API are running the same version.",
+    "installCompatibilityHelp": "Choose a plugin version compatible with this Attraccess version.",
+    "installVersionHelp": "Refresh the marketplace and choose an available version.",
+    "installServerHelp": "Check the API server logs for the install error, then retry.",
+    "installRetryHelp": "Check the registry connection and try again."
   },
   "columns": {
     "name": "Name",

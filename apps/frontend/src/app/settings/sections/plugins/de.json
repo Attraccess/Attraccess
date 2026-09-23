@@ -85,7 +85,13 @@
     "cancel": "Abbrechen",
     "confirmInstall": "Plugin installieren",
     "installSuccess": "Plugin installiert. Die App startet in wenigen Sekunden zur Aktivierung neu.",
-    "installError": "Das Plugin wurde nicht installiert. Bitte erneut versuchen."
+    "installError": "Das Plugin wurde nicht installiert.",
+    "installPermissionHelp": "Melden Sie sich mit einer Rolle an, die Plugins verwalten darf, und versuchen Sie es erneut.",
+    "installRouteHelp": "Laden Sie Attraccess neu, um den aktuellen Client zu verwenden. Falls der Fehler bleibt, prüfen Sie, ob Frontend und API dieselbe Version haben.",
+    "installCompatibilityHelp": "Wählen Sie eine Plugin-Version, die mit dieser Attraccess-Version kompatibel ist.",
+    "installVersionHelp": "Aktualisieren Sie den Marketplace und wählen Sie eine verfügbare Version.",
+    "installServerHelp": "Prüfen Sie die API-Serverprotokolle auf den Installationsfehler und versuchen Sie es erneut.",
+    "installRetryHelp": "Prüfen Sie die Verbindung zur Registry und versuchen Sie es erneut."
   },
   "columns": {
     "name": "Name",

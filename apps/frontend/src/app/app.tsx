@@ -7,7 +7,6 @@ import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
-import { OpenAPI } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { hasRequiredPermissions } from './routes/routeAccess';
 import PullToRefresh from 'react-simple-pull-to-refresh';
@@ -21,7 +20,7 @@ import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AccessDenied } from './unauthorized/accessDenied';
-import { getBaseUrl } from '../api';
+import { configureApiClient } from '../api';
 import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
@@ -211,7 +210,7 @@ export function App() {
   const { isInitialized } = useAuth();
   useLocaleSync();
 
-  OpenAPI.BASE = getBaseUrl();
+  configureApiClient();
 
   return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
 }
