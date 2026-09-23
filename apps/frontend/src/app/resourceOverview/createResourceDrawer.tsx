@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, FieldError, Input, Label, TextField } from '@heroui/react';
+import {
+  Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  FieldError,
+  Input,
+  Label,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ResourceType,
@@ -121,25 +132,29 @@ export function CreateResourceDrawer({
         </TextField>
         <div>
           <p className="mb-2 text-sm font-medium">{t('type')}</p>
-          <div className="flex gap-2">
+          <ToggleButtonGroup
+            aria-label={t('type')}
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[type]}
+            onSelectionChange={(keys) => setType(keys.has(ResourceType.DOOR) ? ResourceType.DOOR : ResourceType.MACHINE)}
+            isDisabled={createResource.isPending}
+            fullWidth
+            isDetached
+          >
             {([ResourceType.MACHINE, ResourceType.DOOR] as const).map((option) => {
-              const selected = type === option;
               const Icon = option === ResourceType.MACHINE ? Shapes : DoorOpen;
               return (
-                <button
+                <ToggleButton
                   key={option}
-                  type="button"
-                  onClick={() => setType(option)}
-                  aria-pressed={selected}
-                  className={`flex flex-1 items-center gap-3 rounded-xl border p-4 text-left transition-colors ${selected ? 'border-accent bg-accent-soft text-accent-soft-foreground' : 'border-separator bg-surface hover:bg-default-100'}`}
-                  disabled={createResource.isPending}
+                  id={option}
                 >
                   <Icon size={20} />
-                  <strong>{t(option === ResourceType.MACHINE ? 'machine' : 'door')}</strong>
-                </button>
+                  {t(option === ResourceType.MACHINE ? 'machine' : 'door')}
+                </ToggleButton>
               );
             })}
-          </div>
+          </ToggleButtonGroup>
         </div>
         <p className="text-sm text-muted">{t('later')}</p>
       </DrawerBody>

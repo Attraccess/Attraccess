@@ -64,13 +64,13 @@ function openDrawer() {
 it('creates another resource with only name and type, then resets the open form', () => {
   openDrawer();
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Laser' } });
-  fireEvent.click(screen.getByRole('button', { name: 'door' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'door' }));
   fireEvent.click(screen.getByRole('button', { name: 'createAnother' }));
   expect(state.create).toHaveBeenCalledWith({ formData: { name: 'Laser', type: 'door' } });
 
   act(() => state.createOptions.onSuccess({ id: 4, name: 'Laser' } as Resource));
   expect(screen.getByRole('textbox')).toHaveValue('');
-  expect(screen.getByRole('button', { name: 'machine' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('radio', { name: 'machine' })).toHaveAttribute('aria-checked', 'true');
   expect(state.navigate).not.toHaveBeenCalled();
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
 });
