@@ -33,4 +33,6 @@ it('filters translated groups and opens only the selected inline editor', () => 
   expect(screen.queryByRole('button', { name: /Password/ })).not.toBeInTheDocument();
   fireEvent.change(screen.getByRole('searchbox', { name: 'Find a setting' }), { target: { value: 'absent' } });
   expect(screen.getByText('No matching settings')).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Find a setting' }), { target: { value: 'identity' } });
+  expect(screen.getByRole('button', { name: /Profile/ })).toBeInTheDocument();
 });
