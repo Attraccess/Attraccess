@@ -426,7 +426,7 @@ describe('PluginsSection', () => {
     );
   });
 
-  it('keeps the install failure and compatibility remedy visible in the drawer', async () => {
+  it('keeps the install failure and compatibility remedy visible in the install confirmation modal', async () => {
     hoisted.installPackageMock.mockRejectedValue({
       status: 400,
       body: { message: 'Plugin is not compatible with Attraccess 1.9.0' },
