@@ -117,9 +117,13 @@ target_compile_options(attractap-desktop-runtime PRIVATE "$<$<COMPILE_LANGUAGE:C
 add_executable(attractap-desktop MACOSX_BUNDLE src/main.cpp)
 target_link_libraries(attractap-desktop PRIVATE attractap-desktop-runtime attractap-production-host)
 set_target_properties(attractap-desktop PROPERTIES
-    MACOSX_BUNDLE_BUNDLE_NAME "Attractap Desktop"
+    MACOSX_BUNDLE_BUNDLE_NAME "Attractap Simulator"
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.attraccess.attractap-desktop")
 if(APPLE)
+    enable_language(OBJCXX)
+    target_sources(attractap-desktop PRIVATE src/endpoint_prompt.mm)
+    target_compile_options(attractap-desktop PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+    target_link_libraries(attractap-desktop PRIVATE "-framework Cocoa")
     target_sources(attractap-desktop PRIVATE assets/attractap.icns)
     set_source_files_properties(assets/attractap.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     set_target_properties(attractap-desktop PROPERTIES MACOSX_BUNDLE_ICON_FILE attractap.icns)

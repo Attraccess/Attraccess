@@ -4,6 +4,28 @@ The native SDL app runs the production LVGL screens inside the device's CAD
 render. It requires SDL **3.4 or newer** (for PNG loading), CMake 3.24+, and
 libcurl 8.7+ with WebSocket support. On macOS, the build prefers Homebrew curl.
 
+## Download for macOS
+
+Nightly CI produces separate Apple Silicon (`arm64`) and Intel (`x86_64`) DMGs in
+the **Build Attractap Desktop for macOS** artifacts of the main-branch nightly
+run. Each published GitHub Release also has the two DMGs as release assets.
+The CI downloads target macOS 15 or newer and bundle their libraries, so
+Homebrew and a source checkout are not needed on the user's Mac.
+
+Open the DMG, drag **Attractap Simulator.app** to Applications, then open it.
+Enter the Attraccess server URL in the first-launch dialog. For the imec demo,
+use `https://detlef.apps.attraccess.org`. The dialog remembers that address on
+later launches. Since the current CI has no Apple Developer ID signing or
+notarization credentials, macOS may block the first launch. After trying to
+open it, go to **System Settings → Privacy & Security → Open Anyway** and
+confirm. The app includes the same steps in `START HERE.txt` on the DMG.
+
+To produce a DMG locally on macOS after building:
+
+```sh
+apps/attractap/desktop/package-macos.sh
+```
+
 ```sh
 pnpm nx build attractap-desktop
 open -n dist/apps/attractap-desktop/attractap-desktop.app
@@ -15,7 +37,8 @@ the previous simulator before restarting it. On macOS, `open` without `-n`
 only activates an already-running instance, even after its executable has been
 rebuilt, so it can keep displaying an older version of the UI.
 
-To choose an API endpoint and reader profile, launch the executable directly:
+To bypass the first-launch dialog and choose an API endpoint and reader profile,
+launch the executable directly:
 
 ```sh
 dist/apps/attractap-desktop/attractap-desktop.app/Contents/MacOS/attractap-desktop https://your-server.example 42
