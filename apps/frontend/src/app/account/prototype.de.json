@@ -1,0 +1,30 @@
+{
+  "title": "Dein Konto",
+  "prototypeLabel": "Designprototyp · Änderungen werden nicht gespeichert",
+  "allSettings": "Alle Kontoeinstellungen",
+  "loading": "Konto wird geladen…",
+  "navigation": "Kontoeinstellungen",
+  "search": "Einstellung suchen…",
+  "switcher": "Prototypvarianten",
+  "previous": "Vorheriger Entwurf",
+  "next": "Nächster Entwurf",
+  "previewNotice": "Dies ist eine Layoutvorschau. Die echte Funktion wird im fertigen Entwurf hier geöffnet.",
+  "variants": {
+    "A": { "name": "Übersicht", "description": "Ein ruhiger Einstieg mit jeweils einer Aufgabe im Fokus." },
+    "B": { "name": "Seitennavigation", "description": "Alle Bereiche bleiben bei der Bearbeitung direkt erreichbar." },
+    "C": { "name": "Suchen und öffnen", "description": "Kurze Einträge durchsuchen und nur das Nötige öffnen." }
+  },
+  "groups": { "identity": "Identität", "access": "Anmeldung und Zugriff", "preferences": "Einstellungen", "advanced": "Erweitert" },
+  "topics": {
+    "profile": { "title": "Persönliche Daten", "description": "E-Mail-Adresse und Benutzername", "group": "identity" },
+    "password": { "title": "Passwort", "description": "Anmeldepasswort ändern", "group": "access" },
+    "twoFactor": { "title": "Zwei-Faktor-Authentifizierung", "description": "Authenticator-App hinzufügen", "group": "access" },
+    "passkeys": { "title": "Passkeys", "description": "Passwortlose Anmeldung verwalten", "group": "access" },
+    "notifications": { "title": "Benachrichtigungen", "description": "Auswählen, was dich wo erreicht", "group": "preferences" },
+    "tokens": { "title": "API-Tokens", "description": "Zugriff für Integrationen verwalten", "group": "advanced" },
+    "delete": { "title": "Konto löschen", "description": "Dauerhafte Kontolöschung anfordern", "group": "advanced" }
+  },
+  "fields": {
+    "email": "E-Mail-Adresse", "username": "Benutzername", "password": "Passwort festlegen", "twoFactor": "Authenticator einrichten und wiederherstellen", "passkeys": "Registrierte Passkeys", "notificationChannels": "E-Mail, Push und App-Benachrichtigungen", "notificationCategories": "Benachrichtigungsthemen", "tokens": "Bestehende Tokens", "tokenPermissions": "Token mit Berechtigungen erstellen", "delete": "Löschlink anfordern"
+  }
+}

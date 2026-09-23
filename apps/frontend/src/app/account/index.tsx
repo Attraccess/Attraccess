@@ -19,8 +19,21 @@ import { useToastMessage } from '../../components/toastProvider';
 import { FlatSection } from '../../components/flatSection';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
+import { useSearchParams } from 'react-router-dom';
+import { AccountPagePrototype } from './prototype';
 
 export default function AccountPage() {
+  const [searchParams] = useSearchParams();
+  const prototypeVariant = import.meta.env.DEV ? searchParams.get('variant') : null;
+
+  if (prototypeVariant === 'A' || prototypeVariant === 'B' || prototypeVariant === 'C') {
+    return <AccountPagePrototype variant={prototypeVariant} />;
+  }
+
+  return <CurrentAccountPage />;
+}
+
+function CurrentAccountPage() {
   const { t, tExists } = useTranslations({
     en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },

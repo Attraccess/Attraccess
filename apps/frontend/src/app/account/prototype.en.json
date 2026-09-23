@@ -1,0 +1,30 @@
+{
+  "title": "Your account",
+  "prototypeLabel": "Design prototype · changes are not saved",
+  "allSettings": "All account settings",
+  "loading": "Loading account…",
+  "navigation": "Account settings",
+  "search": "Find a setting…",
+  "switcher": "Prototype variants",
+  "previous": "Previous design",
+  "next": "Next design",
+  "previewNotice": "This is a layout preview. The live control will open here in the finished design.",
+  "variants": {
+    "A": { "name": "Overview hub", "description": "A calm starting point with one focused task at a time." },
+    "B": { "name": "Settings rail", "description": "Every section stays one click away while you work." },
+    "C": { "name": "Find and expand", "description": "Scan short rows, search, and open only what you need." }
+  },
+  "groups": { "identity": "Identity", "access": "Sign-in and access", "preferences": "Preferences", "advanced": "Advanced" },
+  "topics": {
+    "profile": { "title": "Personal details", "description": "Email address and username", "group": "identity" },
+    "password": { "title": "Password", "description": "Change your sign-in password", "group": "access" },
+    "twoFactor": { "title": "Two-factor authentication", "description": "Add an authenticator app", "group": "access" },
+    "passkeys": { "title": "Passkeys", "description": "Manage passwordless sign-in", "group": "access" },
+    "notifications": { "title": "Notifications", "description": "Choose what reaches you and where", "group": "preferences" },
+    "tokens": { "title": "API tokens", "description": "Manage access for integrations", "group": "advanced" },
+    "delete": { "title": "Delete account", "description": "Request permanent account removal", "group": "advanced" }
+  },
+  "fields": {
+    "email": "Email address", "username": "Username", "password": "Set password", "twoFactor": "Authenticator setup and recovery", "passkeys": "Registered passkeys", "notificationChannels": "Email, push, and in-app channels", "notificationCategories": "Notification topics", "tokens": "Existing tokens", "tokenPermissions": "Create token with permissions", "delete": "Request deletion link"
+  }
+}
