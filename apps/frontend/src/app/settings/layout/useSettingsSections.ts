@@ -9,7 +9,7 @@ export interface SettingsGroup {
 
 /**
  * The registry narrowed to what this operator may open, in group order. Groups that end up empty
- * drop out, so the rail never shows a heading with nothing under it.
+ * drop out, so the directory never shows a heading with nothing under it.
  *
  * Kept out of `settingsSections.ts` so the registry stays a plain module the spec can import
  * without dragging in auth and react-query.

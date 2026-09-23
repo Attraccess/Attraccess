@@ -1,38 +1,42 @@
-import { Navigate } from 'react-router-dom';
-import { Settings2Icon } from 'lucide-react';
+import { ActivityIcon, FileClockIcon, InfoIcon, LockKeyholeIcon, MailIcon, MessageSquareIcon, PlugIcon, Settings2Icon, ShieldIcon, UsersIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import { useSettingsSections } from './useSettingsSections';
 import en from './en.json';
 import de from './de.json';
-import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { SettingsDirectory, type SettingsDirectoryGroup } from '../../../components/settingsDirectory';
 
-/**
- * `/settings` itself. On a desktop it is a redirect — the rail is the navigation, so a landing page
- * beside it would be a second one. On a phone there is no rail, so this *is* the navigation.
- *
- * The redirect targets the first *permitted* section rather than General: an operator without that
- * permission would otherwise land on a 403 the moment they opened Settings.
- */
+const sectionIcons = {
+  general: Settings2Icon,
+  email: MailIcon,
+  messaging: MessageSquareIcon,
+  about: InfoIcon,
+  security: LockKeyholeIcon,
+  roles: UsersIcon,
+  sso: ShieldIcon,
+  monitoring: ActivityIcon,
+  auditLog: FileClockIcon,
+  plugins: PlugIcon,
+} as const;
+
+/** The same searchable directory as personal account settings, filtered by section permissions. */
 export function SettingsIndexPage() {
   const { t } = useTranslations({ en, de });
-  const isDesktop = useIsDesktop();
-  const { sections, groups } = useSettingsSections();
-
-  if (isDesktop && sections.length > 0) {
-    return <Navigate to={sections[0].path} replace />;
-  }
+  const { groups } = useSettingsSections();
 
   const directoryGroups: SettingsDirectoryGroup[] = groups.map((group) => ({
     key: group.key,
     label: t(`groups.${group.key}`),
-    items: group.sections.map((section) => ({
-      key: section.key,
-      title: t(`sections.${section.key}.label`),
-      description: t(`sections.${section.key}.description`),
-      to: section.path,
-    })),
+    items: group.sections.map((section) => {
+      const Icon = sectionIcons[section.key as keyof typeof sectionIcons];
+      return {
+        key: section.key,
+        title: t(`sections.${section.key}.label`),
+        description: t(`sections.${section.key}.description`),
+        icon: Icon && <Icon size={19} />,
+        to: section.path,
+      };
+    }),
   }));
 
   return (
