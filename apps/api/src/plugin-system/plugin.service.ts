@@ -22,12 +22,14 @@ export class PluginService {
   private static loadedPlugins: Set<string> = new Set();
   private static pluginLoadErrors: Map<string, Error> = new Map();
   private static pluginFailures: Map<string, PluginFailure> = new Map();
+  private static bootGuardSignalHandlers: Partial<Record<'SIGINT' | 'SIGTERM', () => void>> = {};
   private static logger = new Logger(PluginService.name);
   private static readonly pluginUploadLocks = new Map<string, Promise<void>>();
   public static PLUGIN_PATH: string;
   private static RESTART_BY_EXIT_FLAG: boolean;
 
   public static configure(config: { PLUGIN_DIR: string; RESTART_BY_EXIT: boolean }): void {
+    PluginService.removeBootGuardSignalHandlers();
     PluginService.PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     PluginService.RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
     PluginService.plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
@@ -120,6 +122,7 @@ export class PluginService {
 
   /** Marks active plugins only while Nest is running their lifecycle hooks. */
   public static beginBootGuard(): void {
+    PluginService.removeBootGuardSignalHandlers();
     const previous = PluginService.readBootGuard();
     if (previous.length > 0) {
       for (const pluginDirectory of previous) {
@@ -138,6 +141,18 @@ export class PluginService {
       .filter((manifest) => !PluginService.pluginFailures.has(manifest.pluginDirectory))
       .map((manifest) => manifest.pluginDirectory);
     PluginService.writeBootGuard(active);
+    // A dev watcher or operator may stop the process during migrations or app.init().
+    // That is an intentional shutdown, not evidence that every plugin crashed.
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+      const handler = () => {
+        PluginService.clearBootGuard();
+        // Before Nest registers shutdown hooks, removing our listener restores
+        // Node's normal signal termination. Once Nest is listening, let it close.
+        if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+      };
+      PluginService.bootGuardSignalHandlers[signal] = handler;
+      process.once(signal, handler);
+    }
   }
 
   /**
@@ -165,8 +180,17 @@ export class PluginService {
   }
 
   public static clearBootGuard(): void {
+    PluginService.removeBootGuardSignalHandlers();
     const path = join(PluginService.PLUGIN_PATH, PLUGIN_BOOT_GUARD_FILE);
     if (existsSync(path)) rmSync(path, { force: true });
+  }
+
+  private static removeBootGuardSignalHandlers(): void {
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+      const handler = PluginService.bootGuardSignalHandlers[signal];
+      if (handler) process.removeListener(signal, handler);
+    }
+    PluginService.bootGuardSignalHandlers = {};
   }
 
   public static clearPluginQuarantine(pluginDirectory: string): void {
