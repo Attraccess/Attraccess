@@ -10,10 +10,11 @@ import en from './en.json';
 interface Props {
   hasResources: boolean;
   onClearFilterAndSearch: () => void;
+  onOpenCreate: () => void;
 }
 
 export function NoResourcesFound(props: Props) {
-  const { onClearFilterAndSearch, hasResources } = props;
+  const { onClearFilterAndSearch, hasResources, onOpenCreate } = props;
   const { hasPermission } = useAuth();
   const canCreateResources = hasPermission('resources.create');
   const { t } = useTranslations({
@@ -45,7 +46,7 @@ export function NoResourcesFound(props: Props) {
           {t('alert.clear')}
         </Button>
       ) : canCreateResources ? (
-        <CreateResourceButton />
+        <CreateResourceButton onOpen={onOpenCreate} />
       ) : null}
     </div>
   );

@@ -23,14 +23,24 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({ useDebounce: (value: unknown
 vi.mock('./toolbar/toolbar', () => ({ Toolbar: () => null }));
 vi.mock('./resourceGroupCard', () => ({ ResourceGroupCard: () => null }));
 vi.mock('./activeUsageSessionsBanner', () => ({ ActiveUsageSessionsBanner: () => null }));
+vi.mock('./createResourceDrawer', () => ({
+  CreateResourceDrawer: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen && <div role="dialog" aria-label="Create another" />,
+}));
 vi.mock('./noResourcesFound', () => ({
   NoResourcesFound: ({
     hasResources,
     onClearFilterAndSearch,
+    onOpenCreate,
   }: {
     hasResources: boolean;
     onClearFilterAndSearch: () => void;
-  }) => <button onClick={onClearFilterAndSearch}>{hasResources ? 'Reset filters' : 'First resource'}</button>,
+    onOpenCreate: () => void;
+  }) => (
+    <button onClick={hasResources ? onClearFilterAndSearch : onOpenCreate}>
+      {hasResources ? 'Reset filters' : 'First resource'}
+    </button>
+  ),
 }));
 
 function renderOverview(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
@@ -124,5 +134,19 @@ describe('ResourceOverview empty-state selection', () => {
     });
     expect(await screen.findByRole('button', { name: 'Reset filters' })).toBeInTheDocument();
     expect(state.getExistence).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps creation open when the empty state disappears after a resource is created', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderOverview(client);
+    fireEvent.click(await screen.findByRole('button', { name: 'First resource' }));
+    expect(screen.getByRole('dialog', { name: 'Create another' })).toBeInTheDocument();
+
+    state.resources = [{ id: 10, groupId: 1, permitted: true }];
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+    });
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'First resource' })).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: 'Create another' })).toBeInTheDocument();
   });
 });

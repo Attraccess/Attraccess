@@ -3,14 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateResourceButton } from './createResourceButton';
 
-const state = vi.hoisted(() => ({ permissions: ['resources.create'], open: vi.fn(), navigate: vi.fn() }));
+const state = vi.hoisted(() => ({ permissions: ['resources.create'], open: vi.fn() }));
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => state.permissions.includes(permission) }),
 }));
-vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }));
-vi.mock('../resources/editModal/resourceEditModal', () => ({
-  ResourceEditModal: ({ children }: { children: (open: () => void) => React.ReactNode }) => children(state.open),
-}));
+vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: () => 'Create resource' }) }));
 
 describe('CreateResourceButton permission', () => {
   beforeEach(() => {
@@ -19,14 +16,14 @@ describe('CreateResourceButton permission', () => {
   });
 
   it('allows create-only roles to open creation', () => {
-    render(<CreateResourceButton />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add Resource' }));
+    render(<CreateResourceButton onOpen={state.open} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create resource' }));
     expect(state.open).toHaveBeenCalledOnce();
   });
 
   it('does not offer creation to update-only roles', () => {
     state.permissions = ['resources.update'];
-    render(<CreateResourceButton />);
+    render(<CreateResourceButton onOpen={state.open} />);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

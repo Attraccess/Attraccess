@@ -4,7 +4,6 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceTabsLayout } from './ResourceTabsLayout';
 import { createMockResource } from '../../../../test-utils/fixtures';
-import type { ResourceEditModal } from '../../editModal/resourceEditModal';
 import type { ResourceQrCode } from '../qrcode';
 const state = vi.hoisted(() => ({
   update: true,
@@ -15,7 +14,6 @@ const state = vi.hoisted(() => ({
   success: vi.fn(),
   showError: vi.fn(),
   invalidate: vi.fn(),
-  edit: vi.fn(),
   qr: vi.fn(),
 }));
 vi.mock('../../../../hooks/useAuth', () => ({
@@ -38,10 +36,6 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
 }));
 vi.mock('../useQrCodeAction', () => ({ useQrCodeAction: vi.fn() }));
 vi.mock('../health-state', () => ({ ResourceHealthWarning: () => null }));
-vi.mock('../../editModal/resourceEditModal', () => ({
-  ResourceEditModal: ({ children }: ComponentProps<typeof ResourceEditModal>) =>
-    typeof children === 'function' ? children(state.edit) : children,
-}));
 vi.mock('../qrcode', () => ({
   ResourceQrCode: ({ renderTrigger }: ComponentProps<typeof ResourceQrCode>) => renderTrigger?.(state.qr),
 }));
@@ -64,6 +58,7 @@ function mount(path = '/resources/7') {
     <MemoryRouter initialEntries={[path]}>
       <Location />
       <Routes>
+        <Route path="/resources/:id/settings" element={<p>Resource settings</p>} />
         <Route path="/resources/:id/*" element={<ResourceTabsLayout />}>
           <Route path="*" element={<p>Resource content</p>} />
         </Route>
@@ -77,8 +72,8 @@ async function action(label: string) {
   fireEvent.click(await screen.findByRole('menuitem', { name: label }));
 }
 it('keeps nested tabs selected and supports tab and compact-picker navigation', async () => {
-  mount('/resources/7/forms/11');
-  expect(screen.getByRole('tab', { name: 'Forms' })).toHaveAttribute('aria-selected', 'true');
+  mount('/resources/7/history/11');
+  expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
   expect(screen.getByText('Resource content')).toBeTruthy();
   fireEvent.click(screen.getByRole('tab', { name: 'History' }));
   expect(screen.getByRole('status')).toHaveTextContent('/resources/7/history');
@@ -87,10 +82,12 @@ it('keeps nested tabs selected and supports tab and compact-picker navigation', 
   expect(screen.getByRole('status')).toHaveTextContent('/resources/7');
   expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
 });
-it('opens edit and QR actions and confirms resource deletion with cache refresh', async () => {
+it('navigates to settings, opens QR actions and confirms resource deletion with cache refresh', async () => {
+  const view = mount();
+  await action('Settings');
+  expect(screen.getByRole('status')).toHaveTextContent('/resources/7/settings');
+  view.unmount();
   mount();
-  await action('Edit');
-  expect(state.edit).toHaveBeenCalledOnce();
   await action('QR Code');
   expect(state.qr).toHaveBeenCalledOnce();
   await action('Delete');

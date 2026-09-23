@@ -10,6 +10,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useDebounce } from '@attraccess/plugins-frontend-ui';
 import { NoResourcesFound } from './noResourcesFound';
 import { ActiveUsageSessionsBanner } from './activeUsageSessionsBanner';
+import { CreateResourceDrawer } from './createResourceDrawer';
 
 enum PersistedFilterProps {
   onlyInUseByMe = 'onlyInUseByMe',
@@ -29,6 +30,7 @@ function getValueFromLocalStorage(filter: PersistedFilterProps, defaultValue: bo
 }
 
 export function ResourceOverview() {
+  const [createOpen, setCreateOpen] = useState(false);
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
   const [searchValue, setSearchValue] = useState('');
@@ -111,6 +113,7 @@ export function ResourceOverview() {
   return (
     <div>
       <Toolbar
+        onOpenCreate={() => setCreateOpen(true)}
         search={searchValue}
         onSearchChanged={setSearchValue}
         onlyInUseByMe={filterByOnlyInUseByMe}
@@ -128,6 +131,7 @@ export function ResourceOverview() {
       <div className="flex flex-row flex-wrap gap-4">
         {showEmptyState && (
           <NoResourcesFound
+            onOpenCreate={() => setCreateOpen(true)}
             hasResources={hasResources}
             onClearFilterAndSearch={() => {
               setFilterByOnlyInUseByMe(false);
@@ -152,6 +156,7 @@ export function ResourceOverview() {
           />
         ))}
       </div>
+      <CreateResourceDrawer isOpen={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

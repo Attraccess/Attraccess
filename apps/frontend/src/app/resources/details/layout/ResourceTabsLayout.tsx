@@ -6,17 +6,13 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../components/toastProvider';
 import {
   ArrowLeft,
-  FolderIcon,
   Gauge,
   History as HistoryIcon,
-  ListChecks,
-  PenSquareIcon,
+  Settings2Icon,
   QrCodeIcon,
   ShapesIcon,
-  StethoscopeIcon,
   Trash,
   Users,
-  WorkflowIcon,
   WrenchIcon,
 } from 'lucide-react';
 import { memo, ReactNode, useMemo, useRef } from 'react';
@@ -30,7 +26,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader, PageAction } from '../../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
-import { ResourceEditModal } from '../../editModal/resourceEditModal';
 import { ResourceQrCode } from '../qrcode';
 import { useQrCodeAction } from '../useQrCodeAction';
 import { filenameToUrl } from '../../../../api';
@@ -44,11 +39,7 @@ const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   overview: <Gauge className="w-4 h-4" />,
   history: <HistoryIcon className="w-4 h-4" />,
   people: <Users className="w-4 h-4" />,
-  groups: <FolderIcon className="w-4 h-4" />,
   maintenance: <WrenchIcon className="w-4 h-4" />,
-  flows: <WorkflowIcon className="w-4 h-4" />,
-  forms: <ListChecks className="w-4 h-4" />,
-  diagnostics: <StethoscopeIcon className="w-4 h-4" />,
 };
 
 function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
@@ -84,7 +75,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   const deleteResource = useResourcesServiceDeleteOneResource();
 
-  const editOpenRef = useRef<() => void>(() => undefined);
   const qrOpenRef = useRef<() => void>(() => undefined);
 
   const { tabs } = useResourceTabs(resourceId);
@@ -149,9 +139,9 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
     {
       key: 'edit',
       label: t('actions.edit'),
-      icon: <PenSquareIcon className="w-4 h-4" />,
+      icon: <Settings2Icon className="w-4 h-4" />,
       isHidden: !canUpdateResources,
-      onPress: () => editOpenRef.current(),
+      onPress: () => navigate(`/resources/${resourceId}/settings`),
       dataCy: 'edit-resource-button',
     },
     {
@@ -233,12 +223,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
             itemName={resource.name}
             data-cy="delete-confirmation-modal"
           />
-          <ResourceEditModal resourceId={resourceId} closeOnSuccess>
-            {(onOpen) => {
-              editOpenRef.current = onOpen;
-              return null;
-            }}
-          </ResourceEditModal>
           <ResourceQrCode
             resourceId={resourceId}
             renderTrigger={(onOpen) => {
