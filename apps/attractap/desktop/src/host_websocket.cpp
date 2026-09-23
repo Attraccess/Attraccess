@@ -4,6 +4,7 @@
 
 #include <curl/curl.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <stdexcept>
@@ -30,7 +31,7 @@ bool isWebsocketFrame(const curl_ws_frame *frame)
 
 int cancelWhenStopping(void *client, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
 {
-    return static_cast<std::stop_token *>(client)->stop_requested() ? 1 : 0;
+    return static_cast<std::atomic_bool *>(client)->load() ? 1 : 0;
 }
 }
 
@@ -95,7 +96,8 @@ void HostWebsocket::start()
         std::lock_guard lock(mutex);
         callbackLifetime = std::make_shared<std::atomic_bool>(true);
     }
-    worker = std::jthread([this](std::stop_token stopToken) { run(stopToken); });
+    stopRequested.store(false);
+    worker = std::thread([this] { run(); });
 }
 
 void HostWebsocket::stop()
@@ -106,7 +108,7 @@ void HostWebsocket::stop()
         std::lock_guard lock(mutex);
         callbackLifetime->store(false);
     }
-    worker.request_stop();
+    stopRequested.store(true);
     worker.join();
 
     StateCallback callback;
@@ -199,12 +201,12 @@ void HostWebsocket::publishMessage(std::string message)
                      });
 }
 
-void HostWebsocket::run(std::stop_token stopToken)
+void HostWebsocket::run()
 {
     using namespace std::chrono_literals;
     std::chrono::seconds reconnectDelay{1};
 
-    while (!stopToken.stop_requested())
+    while (!stopRequested.load())
     {
         publishState(State::Connecting);
         CURL *connection = curl_easy_init();
@@ -219,17 +221,17 @@ void HostWebsocket::run(std::stop_token stopToken)
         curl_easy_setopt(connection, CURLOPT_CONNECTTIMEOUT_MS, 5000L);
         curl_easy_setopt(connection, CURLOPT_NOPROGRESS, 0L);
         curl_easy_setopt(connection, CURLOPT_XFERINFOFUNCTION, cancelWhenStopping);
-        curl_easy_setopt(connection, CURLOPT_XFERINFODATA, &stopToken);
+        curl_easy_setopt(connection, CURLOPT_XFERINFODATA, &stopRequested);
         // TLS verification is deliberately explicit: a simulator must never weaken reader authentication.
         curl_easy_setopt(connection, CURLOPT_SSL_VERIFYPEER, 1L);
         curl_easy_setopt(connection, CURLOPT_SSL_VERIFYHOST, 2L);
         const CURLcode connected = curl_easy_perform(connection);
         if (connected != CURLE_OK)
         {
-            if (!stopToken.stop_requested())
+            if (!stopRequested.load())
                 publishError(curl_easy_strerror(connected));
             curl_easy_cleanup(connection);
-            for (auto slept = 0ms; slept < reconnectDelay && !stopToken.stop_requested(); slept += 100ms)
+            for (auto slept = 0ms; slept < reconnectDelay && !stopRequested.load(); slept += 100ms)
                 std::this_thread::sleep_for(100ms);
             reconnectDelay = std::min(reconnectDelay * 2, 30s);
             continue;
@@ -241,7 +243,7 @@ void HostWebsocket::run(std::stop_token stopToken)
         bool inboundIsText = false;
         std::array<char, 4096> buffer{};
         bool open = true;
-        while (open && !stopToken.stop_requested())
+        while (open && !stopRequested.load())
         {
             std::string outboundMessage;
             {
@@ -255,7 +257,7 @@ void HostWebsocket::run(std::stop_token stopToken)
             if (!outboundMessage.empty())
             {
                 size_t offset = 0;
-                while (offset < outboundMessage.size() && !stopToken.stop_requested())
+                while (offset < outboundMessage.size() && !stopRequested.load())
                 {
                     size_t sent = 0;
                     const CURLcode sentResult = curl_ws_send(connection, outboundMessage.data() + offset,
@@ -326,7 +328,7 @@ void HostWebsocket::run(std::stop_token stopToken)
 
         curl_easy_cleanup(connection);
         publishState(State::Disconnected);
-        for (auto slept = 0ms; slept < reconnectDelay && !stopToken.stop_requested(); slept += 100ms)
+        for (auto slept = 0ms; slept < reconnectDelay && !stopRequested.load(); slept += 100ms)
             std::this_thread::sleep_for(100ms);
         reconnectDelay = std::min(reconnectDelay * 2, 30s);
     }

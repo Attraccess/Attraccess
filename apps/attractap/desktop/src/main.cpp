@@ -9,6 +9,9 @@
 #include "settings/settings.hpp"
 #include "state/state.hpp"
 #include "virtual_nfc.hpp"
+#ifdef __APPLE__
+#include "endpoint_prompt.hpp"
+#endif
 
 #include <chrono>
 #include <limits>
@@ -30,7 +33,20 @@ uint32_t parseReaderId(const char *value)
 
 int main(int argc, char **argv)
 {
-    const std::string endpoint = argc > 1 ? argv[1] : "https://localhost";
+    std::string endpoint;
+    if (argc > 1)
+        endpoint = argv[1];
+#ifdef __APPLE__
+    else
+    {
+        endpoint = promptForEndpoint();
+        if (endpoint.empty())
+            return 0;
+    }
+#else
+    else
+        endpoint = "https://localhost";
+#endif
     const uint32_t readerId = argc > 2 ? parseReaderId(argv[2]) : 0;
     ProfileStore profile(endpoint, readerId);
     if (profile.get("api.host").empty())
