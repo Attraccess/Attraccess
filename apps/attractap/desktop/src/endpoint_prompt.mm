@@ -4,6 +4,7 @@
 #include "api_endpoint.hpp"
 
 #include <exception>
+#include <stdexcept>
 #include <string>
 
 std::string promptForEndpoint()

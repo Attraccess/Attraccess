@@ -13,8 +13,8 @@ The CI downloads target macOS 15 or newer and bundle their libraries, so
 Homebrew and a source checkout are not needed on the user's Mac.
 
 Open the DMG, drag **Attractap Simulator.app** to Applications, then open it.
-Enter the Attraccess server URL in the first-launch dialog. For the imec demo,
-use `https://detlef.apps.attraccess.org`. The dialog remembers that address on
+Enter the Attraccess server URL in the launch dialog. For the imec demo,
+use `https://detlef.apps.attraccess.org`. The dialog pre-fills that address on
 later launches. Since the current CI has no Apple Developer ID signing or
 notarization credentials, macOS may block the first launch. After trying to
 open it, go to **System Settings → Privacy & Security → Open Anyway** and
@@ -37,7 +37,7 @@ the previous simulator before restarting it. On macOS, `open` without `-n`
 only activates an already-running instance, even after its executable has been
 rebuilt, so it can keep displaying an older version of the UI.
 
-To bypass the first-launch dialog and choose an API endpoint and reader profile,
+To bypass the launch dialog and choose an API endpoint and reader profile,
 launch the executable directly:
 
 ```sh
