@@ -46,7 +46,7 @@ function mockViewport(isDesktop: boolean) {
 
 /**
  * The real `/settings` route, run through the real router gate. Section elements are stubbed —
- * what is under test is who gets past the gate and where `/settings` sends them, not what the SSO
+ * what is under test is who gets past the gate and which sections `/settings` lists, not what the SSO
  * screen renders.
  */
 function RouterHarness() {
@@ -105,10 +105,11 @@ describe('/settings access', () => {
       expect(byCy('sidebar-nav-settings')).toHaveAttribute('href', '/settings');
     });
 
-    it('is let into /settings and redirected to their section', () => {
+    it('is let into /settings and sees only their section', () => {
       renderSettingsRoute();
 
-      expect(screen.getByText('sso section')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Single sign-on/ })).toHaveAttribute('href', '/settings/sso');
+      expect(screen.queryByRole('link', { name: /General/ })).not.toBeInTheDocument();
       expect(byCy('access-denied-go-home-button')).toBeNull();
     });
   });

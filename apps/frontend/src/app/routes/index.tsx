@@ -286,10 +286,10 @@ const coreRoutes: RouteConfig[] = [
   },
   // Settings shell (ATT-864). Section routes are flat and wrap their own layout, as RouteConfig
   // has no nested-route form; the registry in settings/layout/settingsSections.ts is what keeps
-  // these paths and the rail in agreement.
+  // these paths and the directory in agreement.
   // Any one of the section permissions gets in: the shell is the only route to SSO and Plugins now,
   // so gating it on `system.settings.manage` alone would lock out the operators those sections
-  // exist for. The index page then redirects to the first section they may actually open.
+  // exist for. The index page lists only the sections they may actually open.
   {
     path: '/settings',
     element: <SettingsIndexPage />,
@@ -323,8 +323,7 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'system.settings.manage',
   },
   // Templates and the shared layout are sub-routes of Email rather than sections of their own: both
-  // are full-screen editors, and neither is redesigned here. The rail keeps Email highlighted while
-  // one is open.
+  // are full-screen editors, and neither is redesigned here.
   {
     path: '/settings/email/templates',
     element: (

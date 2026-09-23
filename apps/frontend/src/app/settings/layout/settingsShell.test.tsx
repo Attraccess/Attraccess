@@ -33,7 +33,7 @@ function mockViewport(isDesktop: boolean) {
   })) as unknown as typeof window.matchMedia;
 }
 
-/** Renders `/settings` inside a router that also serves the section paths, so a redirect is visible. */
+/** Renders the directory with a section destination for navigation checks. */
 function renderIndex() {
   return render(
     <MemoryRouter initialEntries={['/settings']}>
@@ -49,16 +49,19 @@ function renderIndex() {
 describe('SettingsIndexPage', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('redirects to the first permitted section on desktop', () => {
+  it('shows the shared directory on desktop and opens a section', () => {
     mockPermissions(['system.settings.manage']);
     mockViewport(true);
 
     renderIndex();
 
+    expect(screen.getByRole('searchbox', { name: 'search' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sections\.general/ })).toHaveAttribute('href', '/settings/general');
+    fireEvent.click(screen.getByRole('link', { name: /sections\.general/ }));
     expect(screen.getByText('general page')).toBeInTheDocument();
   });
 
-  it('lists the sections instead of redirecting on a phone', () => {
+  it('lists and filters the sections on a phone', () => {
     mockPermissions(['system.settings.manage']);
     mockViewport(false);
 
@@ -73,7 +76,6 @@ describe('SettingsIndexPage', () => {
   });
 
   it('renders no section list at all when the operator may open none of them', () => {
-    // The redirect must not fire either — there is nowhere permitted to send them.
     mockPermissions([]);
     mockViewport(true);
 
@@ -83,13 +85,13 @@ describe('SettingsIndexPage', () => {
   });
 });
 
-describe('SettingsLayout rail', () => {
+describe('SettingsLayout back navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockViewport(true);
   });
 
-  function renderRail(at: string) {
+  function renderSection(at: string) {
     return render(
       <MemoryRouter initialEntries={[at]}>
         <SettingsLayout>
@@ -99,22 +101,21 @@ describe('SettingsLayout rail', () => {
     );
   }
 
-  it('marks the active section with aria-current', () => {
+  it('links back to the directory on desktop', () => {
     mockPermissions(['system.settings.manage']);
 
-    renderRail('/settings/monitoring');
+    renderSection('/settings/monitoring');
 
-    expect(screen.getByRole('link', { name: 'sections.monitoring.label' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'sections.general.label' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'backToSettings' })).toHaveAttribute('href', '/settings');
+    expect(screen.getByText('section body')).toBeInTheDocument();
   });
 
-  it('hides sections the operator lacks permission for, and their now-empty group', () => {
+  it('keeps the back link on a section with narrower permissions', () => {
     mockPermissions([]);
 
-    renderRail('/settings/general');
+    renderSection('/settings/general');
 
-    expect(screen.queryByRole('link', { name: 'sections.general.label' })).not.toBeInTheDocument();
-    expect(screen.queryByText('groups.instance')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'backToSettings' })).toBeInTheDocument();
     expect(screen.getByText('section body')).toBeInTheDocument();
   });
 });

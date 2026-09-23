@@ -108,7 +108,10 @@ export async function bootstrap() {
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
   const { AppModule } = await import('./app/app.module');
 
-  const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, { logger: initialLogLevels });
+  const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: initialLogLevels,
+    abortOnError: false,
+  });
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
@@ -155,6 +158,7 @@ export async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: initialLogLevels,
     httpsOptions,
+    abortOnError: false,
   });
   bootstrapLogger.log('Main application instance created.');
 
