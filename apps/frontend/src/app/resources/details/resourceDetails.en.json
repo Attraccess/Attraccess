@@ -18,7 +18,7 @@
     "mobilePickerLabel": "Section"
   },
   "actions": {
-    "edit": "Edit",
+    "edit": "Settings",
     "delete": "Delete",
     "documentation": "Documentation",
     "maintenance": "Maintenance",

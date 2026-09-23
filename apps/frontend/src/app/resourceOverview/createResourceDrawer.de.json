@@ -1,0 +1,18 @@
+{
+  "title": "Ressource erstellen",
+  "name": "Name",
+  "namePlaceholder": "z. B. Lasercutter",
+  "type": "Ressourcentyp",
+  "machine": "Maschine",
+  "door": "Tür",
+  "later": "Zugang, Formulare, Flows und weitere Optionen können danach in den Ressourceneinstellungen eingerichtet werden.",
+  "cancel": "Abbrechen",
+  "createAndOpen": "Erstellen und öffnen",
+  "createAnother": "Erstellen und weitere hinzufügen",
+  "createOptions": "Weitere Erstelloptionen",
+  "nameRequired": "Geben Sie einen Ressourcennamen ein.",
+  "successTitle": "Ressource erstellt",
+  "successDescription": "{{name}} wurde erstellt.",
+  "errorTitle": "Ressource konnte nicht erstellt werden",
+  "errorDescription": "Bitte versuchen Sie es erneut. {{message}}"
+}

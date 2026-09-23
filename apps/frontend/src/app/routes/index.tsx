@@ -29,6 +29,8 @@ import FlowsPage from '../resources/details/flows';
 import { MaintenanceHubPage } from '../resources/details/maintenance-hub';
 import { FormEditorPage, FormListPage } from '../resources/details/forms';
 import { ResourceDiagnosticsTab } from '../resources/details/diagnostics/ResourceDiagnosticsTab';
+import { ResourceSettingsPage } from '../resources/settings/ResourceSettingsPage';
+import { ResourceSettingsSection } from '../resources/settings/ResourceSettingsSection';
 import AccountPage from '../account';
 import { ConfirmDeleteAccount } from '../confirm-delete-account';
 import ChangelogPage from '../changelog/ChangelogPage';
@@ -148,29 +150,34 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
   {
+    path: '/resources/:id/settings',
+    element: <ResourceSettingsPage />,
+    authRequired: 'resources.update',
+  },
+  {
     path: '/resources/:id/groups',
     element: (
-      <ResourceTabsLayout>
+      <ResourceSettingsSection topic="groups">
         <ResourceGroupsTab />
-      </ResourceTabsLayout>
+      </ResourceSettingsSection>
     ),
     authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/flows',
     element: (
-      <ResourceTabsLayout>
+      <ResourceSettingsSection topic="flows">
         <FlowsPage />
-      </ResourceTabsLayout>
+      </ResourceSettingsSection>
     ),
-    authRequired: true,
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/forms',
     element: (
-      <ResourceTabsLayout>
+      <ResourceSettingsSection topic="forms">
         <FormListPage />
-      </ResourceTabsLayout>
+      </ResourceSettingsSection>
     ),
     authRequired: 'resources.update',
   },
@@ -182,9 +189,9 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/resources/:id/diagnostics',
     element: (
-      <ResourceTabsLayout>
+      <ResourceSettingsSection topic="diagnostics">
         <ResourceDiagnosticsTab />
-      </ResourceTabsLayout>
+      </ResourceSettingsSection>
     ),
     authRequired: 'resources.update',
   },

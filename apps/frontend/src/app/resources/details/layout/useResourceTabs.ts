@@ -5,15 +5,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 
-export type ResourceTabKey =
-  | 'overview'
-  | 'history'
-  | 'people'
-  | 'groups'
-  | 'maintenance'
-  | 'flows'
-  | 'forms'
-  | 'diagnostics';
+export type ResourceTabKey = 'overview' | 'history' | 'people' | 'maintenance';
 
 export interface ResourceTabDescriptor {
   key: ResourceTabKey;
@@ -56,17 +48,8 @@ export function useResourceTabs(resourceId: number): {
     if (isIntroducer || canManageAccess || canUpdateResources) {
       list.push({ key: 'people', path: 'people', translationKey: 'tabs.people' });
     }
-    if (canUpdateResources) {
-      list.push({ key: 'groups', path: 'groups', translationKey: 'tabs.groups' });
-    }
     if (canManageMaintenance) {
       list.push({ key: 'maintenance', path: 'maintenance', translationKey: 'tabs.maintenance' });
-    }
-    if (canUpdateResources) {
-      list.push({ key: 'flows', path: 'flows', translationKey: 'tabs.flows' });
-      list.push({ key: 'forms', path: 'forms', translationKey: 'tabs.forms' });
-      // Operating-timeline diagnostics (ATT-1024) are an admin surface, gated like flows/forms.
-      list.push({ key: 'diagnostics', path: 'diagnostics', translationKey: 'tabs.diagnostics' });
     }
     return list;
   }, [isIntroducer, canManageAccess, canUpdateResources, canManageMaintenance]);

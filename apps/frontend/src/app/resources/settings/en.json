@@ -1,0 +1,20 @@
+{
+  "title": "Settings · {{name}}",
+  "subtitle": "Choose what you want to configure.",
+  "search": "Find a setting…",
+  "noResults": "No matching settings",
+  "save": "Save changes",
+  "notFound": "Resource not found",
+  "groups": { "general": "General", "access": "Access and usage", "automation": "Automation and support" },
+  "topics": {
+    "details": { "title": "Details", "description": "Name, description and image" },
+    "behavior": { "title": "Resource type and behavior", "description": "Machine or door options" },
+    "metadata": { "title": "Metadata", "description": "Values for integrations and flows" },
+    "retraining": { "title": "Retraining", "description": "When introductions expire" },
+    "supervision": { "title": "Supervision", "description": "Who may start a usage session" },
+    "groups": { "title": "Groups", "description": "Assign the resource to groups" },
+    "forms": { "title": "Forms", "description": "Configure usage forms" },
+    "flows": { "title": "Flows", "description": "Configure resource automation" },
+    "diagnostics": { "title": "Diagnostics", "description": "Inspect operating and flow diagnostics" }
+  }
+}

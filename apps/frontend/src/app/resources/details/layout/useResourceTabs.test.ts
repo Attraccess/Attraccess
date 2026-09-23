@@ -40,7 +40,7 @@ it.each([
     permissions: ['resources.update'],
     introducer: false,
     maintenance: true,
-    expected: ['overview', 'history', 'people', 'groups', 'maintenance', 'flows', 'forms', 'diagnostics'],
+    expected: ['overview', 'history', 'people', 'maintenance'],
   },
 ])(
   'exposes exactly the tabs allowed by $permissions, introducer=$introducer, maintenance=$maintenance',
