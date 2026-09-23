@@ -246,6 +246,32 @@ describe('PluginModule', () => {
       expect(() => build([]).dataSource).toThrow(PluginPermissionError);
     });
 
+    it('lets a plugin retain a repository before the host DataSource is injected', () => {
+      const refs = PluginModule as unknown as { dataSourceRef: DataSource | null };
+      const previous = refs.dataSourceRef;
+      const entity = class Widget {};
+      const findOneBy = jest.fn().mockResolvedValue(null);
+      const repository = { findOneBy };
+      const host = { getRepository: jest.fn(() => repository) } as unknown as DataSource;
+      try {
+        refs.dataSourceRef = null;
+        const context = (
+          PluginModule as unknown as {
+            createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+          }
+        ).createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+        const retained = context.getRepository(entity);
+        expect(() => retained.findOneBy({})).toThrow(/accessed before bootstrap completed/);
+
+        refs.dataSourceRef = host;
+        void retained.findOneBy({});
+        expect(host.getRepository).toHaveBeenCalledWith(entity);
+        expect(findOneBy).toHaveBeenCalledWith({});
+      } finally {
+        refs.dataSourceRef = previous;
+      }
+    });
+
     it('resolves host providers through the ModuleRef when permitted', () => {
       const ctx = build([PluginPermission.RESOLVE_HOST_PROVIDERS]);
       ctx.get('SOME_TOKEN');

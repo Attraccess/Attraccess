@@ -116,6 +116,16 @@ describe('API bootstrap ordering and configuration', () => {
     expect(PluginModule.configure).toHaveBeenCalledWith({ DISABLE_PLUGINS: false });
     expect(NpmPluginService.recoverBackups).toHaveBeenCalled();
     expect(PluginService.beginBootGuard).toHaveBeenCalled();
+    expect(NestFactory.create).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ abortOnError: false }),
+    );
+    expect(NestFactory.create).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ abortOnError: false }),
+    );
     expect(PluginMigrationService.runPendingUpMigrationsForAllPlugins).toHaveBeenCalled();
     const migrationOrder = jest.mocked(PluginMigrationService.runPendingUpMigrationsForAllPlugins).mock
       .invocationCallOrder[0];

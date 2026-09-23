@@ -268,9 +268,18 @@ export class PluginModule {
         ) as unknown as PluginContext['dataSource'];
       },
       getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> {
-        return PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource').getRepository(
-          entity as never,
-        ) as unknown as Repository<T>;
+        // Nest may construct plugin providers before the PluginModule constructor
+        // receives the host DataSource. Older plugins retain repositories in their
+        // constructors, so resolve the repository when it is first used instead.
+        return new Proxy({} as Repository<T>, {
+          get(_target, property) {
+            const repository = PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource').getRepository(
+              entity as never,
+            ) as Repository<T>;
+            const value = Reflect.get(repository, property);
+            return typeof value === 'function' ? value.bind(repository) : value;
+          },
+        });
       },
       get<T>(token: Type<T> | string | symbol): T {
         return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<T>(token, { strict: false });
