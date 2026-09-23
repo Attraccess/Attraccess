@@ -1,6 +1,7 @@
 # Mein Konto
 
 Verwalten Sie Ihre persönlichen Kontoeinstellungen in Attraccess. Sie erreichen Ihre Kontoeinstellungen, indem Sie auf Ihr Profilsymbol in der oberen rechten Ecke klicken.
+Suchen Sie eine Einstellung über das Suchfeld und öffnen Sie dann den zugehörigen Eintrag. Die Einstellungen sind nach Identität, Anmeldung und Zugriff, Einstellungen sowie erweiterten Aktionen gruppiert.
 
 <!-- TODO: Screenshot der Kontoeinstellungen -->
 
@@ -9,7 +10,7 @@ Verwalten Sie Ihre persönlichen Kontoeinstellungen in Attraccess. Sie erreichen
 ### E-Mail-Adresse ändern
 
 1. Navigieren Sie zu **Mein Konto**
-2. Finden Sie das Feld **E-Mail**
+2. Öffnen Sie **Persönliche Daten** und finden Sie das Feld **E-Mail**
 3. Geben Sie Ihre neue E-Mail-Adresse ein
 4. Speichern Sie die Änderungen
 5. Möglicherweise müssen Sie die neue E-Mail-Adresse bestätigen
@@ -17,7 +18,7 @@ Verwalten Sie Ihre persönlichen Kontoeinstellungen in Attraccess. Sie erreichen
 ### Passwort ändern
 
 1. Navigieren Sie zu **Mein Konto**
-2. Finden Sie den Abschnitt **Passwort**
+2. Öffnen Sie **Passwort** unter **Anmeldung und Zugriff**
 3. Geben Sie Ihr aktuelles Passwort ein
 4. Geben Sie Ihr neues Passwort ein
 5. Bestätigen Sie das neue Passwort
@@ -33,7 +34,7 @@ Verwalten Sie Ihre persönlichen Kontoeinstellungen in Attraccess. Sie erreichen
 Die Zwei-Faktor-Authentifizierung fügt Ihrem Konto eine zusätzliche Sicherheitsebene hinzu.
 
 1. Navigieren Sie zu **Mein Konto**
-2. Finden Sie den Abschnitt **Zwei-Faktor-Authentifizierung**
+2. Öffnen Sie **Zwei-Faktor-Authentifizierung** unter **Anmeldung und Zugriff**
 3. Klicken Sie auf **Aktivieren**
 4. Scannen Sie den angezeigten **QR-Code** mit Ihrer Authenticator-App (z. B. Google Authenticator, Microsoft Authenticator, Authy)
 5. Geben Sie den **sechsstelligen Code** aus der App zur Bestätigung ein
@@ -42,7 +43,7 @@ Die Zwei-Faktor-Authentifizierung fügt Ihrem Konto eine zusätzliche Sicherheit
 ### Zwei-Faktor-Authentifizierung deaktivieren
 
 1. Navigieren Sie zu **Mein Konto**
-2. Finden Sie den Abschnitt **Zwei-Faktor-Authentifizierung**
+2. Öffnen Sie **Zwei-Faktor-Authentifizierung** unter **Anmeldung und Zugriff**
 3. Klicken Sie auf **Deaktivieren**
 4. Geben Sie Ihren aktuellen TOTP-Code zur Bestätigung ein
 
@@ -67,7 +68,7 @@ Wenn Ihre Werkstatt Attractap-NFC-Leser verwendet, können Sie die mit Ihrem Kon
 Wenn Sie Ihr Konto dauerhaft löschen möchten:
 
 1. Navigieren Sie zu **Mein Konto**
-2. Scrollen Sie zum Ende der Seite
+2. Öffnen Sie **Konto löschen** unter **Erweitert**
 3. Klicken Sie auf **Konto löschen**
 4. Bestätigen Sie die Löschung
 

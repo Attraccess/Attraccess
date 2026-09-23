@@ -60,22 +60,29 @@ function open() {
 }
 it('shows profile settings and gates account security tools on the current user and permissions', () => {
   const view = open();
+  expect(screen.queryByText('Email form')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /topics.profile.title/ }));
   expect(screen.getByText('Email form')).toBeTruthy();
-  expect(screen.queryByText('Passkey settings')).toBeNull();
+  expect(screen.queryByRole('button', { name: /topics.passkeys.title/ })).toBeNull();
   view.unmount();
   state.user = { id: 7, username: 'member', effectivePermissions: ['resources.view'] };
   const userView = open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.password.title/ }));
   expect(screen.getByText('Password for member #7')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /topics.twoFactor.title/ }));
   expect(screen.getByText('Two-factor settings')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /topics.passkeys.title/ }));
   expect(screen.getByText('Passkey settings')).toBeTruthy();
-  expect(screen.queryByText(/Token permissions/)).toBeNull();
+  expect(screen.queryByRole('button', { name: /topics.tokens.title/ })).toBeNull();
   userView.unmount();
   state.permission = true;
   open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.tokens.title/ }));
   expect(screen.getByText('Token permissions: resources.view')).toBeTruthy();
 });
 it('requires confirmation for deletion, allows cancellation and closes after a successful request', async () => {
   open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.delete.title/ }));
   fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.request' }));
   expect(await screen.findByText('deleteAccount.modal.description')).toBeTruthy();
   expect(state.request).not.toHaveBeenCalled();
@@ -93,6 +100,7 @@ it('requires confirmation for deletion, allows cancellation and closes after a s
 });
 it('retains deletion confirmation and reports an unsuccessful request', async () => {
   open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.delete.title/ }));
   fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.request' }));
   await screen.findByText('deleteAccount.modal.description');
   const failure = new Error('Unavailable');
