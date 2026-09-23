@@ -21,7 +21,9 @@ jest.mock('./plugin-system/plugin.service', () => ({
     recordBootFailure: jest.fn(),
   },
 }));
-jest.mock('./plugin-system/plugin.module', () => ({ PluginModule: { configure: jest.fn() } }));
+jest.mock('./plugin-system/plugin.module', () => ({
+  PluginModule: { configure: jest.fn(), resetHostReferences: jest.fn() },
+}));
 jest.mock('./plugin-system/npm-plugin.service', () => ({ NpmPluginService: { recoverBackups: jest.fn() } }));
 jest.mock('./plugin-system/plugin-migration.service', () => ({
   PluginMigrationService: { runPendingUpMigrationsForAllPlugins: jest.fn() },
@@ -121,6 +123,7 @@ describe('API bootstrap ordering and configuration', () => {
       .invocationCallOrder[0];
     expect(migrationOrder).toBeLessThan(jest.mocked(NestFactory.create).mock.invocationCallOrder[0]);
     expect(early.close).toHaveBeenCalled();
+    expect(PluginModule.resetHostReferences).toHaveBeenCalled();
     expect(datasource.initialize).toHaveBeenCalled();
     expect(datasource.runMigrations).toHaveBeenCalled();
     expect(app.set).toHaveBeenCalledWith('trust proxy', 1);

@@ -116,6 +116,9 @@ export async function bootstrap() {
     ? appConfig.ATTRACCESS_URL
     : await appForConfig.get(SettingsService).getUrl();
   await appForConfig.close();
+  // AppModule is constructed again below. Plugin providers in that application
+  // must not receive repositories from the closed configuration DataSource.
+  PluginModule.resetHostReferences();
 
   let httpsOptions: undefined | HttpsOptions = undefined;
 

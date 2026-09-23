@@ -246,6 +246,48 @@ describe('PluginModule', () => {
       expect(() => build([]).dataSource).toThrow(PluginPermissionError);
     });
 
+    it('lets a plugin constructor retain a repository before the host DataSource is injected', async () => {
+      class Widget {}
+      const find = jest.fn(async () => [new Widget()]);
+      const repository = { find };
+      const host = { getRepository: jest.fn(() => repository) } as unknown as DataSource;
+      const internals = PluginModule as unknown as {
+        dataSourceRef: DataSource | null;
+        createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+      };
+      internals.dataSourceRef = null;
+
+      const context = internals.createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+      const retained = context.getRepository(Widget);
+      expect(host.getRepository).not.toHaveBeenCalled();
+
+      new PluginModule(host, events, moduleRef);
+      await expect(retained.find()).resolves.toEqual([expect.any(Widget)]);
+      expect(host.getRepository).toHaveBeenCalledWith(Widget);
+      expect(find).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not hand the second application a repository from the closed configuration application', async () => {
+      class Widget {}
+      const first = { getRepository: jest.fn(() => ({ find: async () => ['closed'] })) } as unknown as DataSource;
+      const find = jest.fn(async () => ['live']);
+      const second = { getRepository: jest.fn(() => ({ find })) } as unknown as DataSource;
+      const internals = PluginModule as unknown as {
+        resetHostReferences(): void;
+        createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+      };
+      new PluginModule(first, events, moduleRef);
+      internals.resetHostReferences();
+
+      const context = internals.createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+      const retained = context.getRepository(Widget);
+      new PluginModule(second, events, moduleRef);
+
+      await expect(retained.find()).resolves.toEqual(['live']);
+      expect(first.getRepository).not.toHaveBeenCalled();
+      expect(second.getRepository).toHaveBeenCalledWith(Widget);
+    });
+
     it('resolves host providers through the ModuleRef when permitted', () => {
       const ctx = build([PluginPermission.RESOLVE_HOST_PROVIDERS]);
       ctx.get('SOME_TOKEN');
