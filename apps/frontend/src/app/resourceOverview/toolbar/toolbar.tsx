@@ -11,12 +11,14 @@ import { cn } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 
 interface ToolbarProps {
+  onOpenCreate: () => void;
   searchIsLoading?: boolean;
   highlightSearch?: boolean;
   highlightFilter?: boolean;
 }
 
 export function Toolbar({
+  onOpenCreate,
   searchIsLoading,
   highlightSearch,
   highlightFilter,
@@ -68,7 +70,7 @@ export function Toolbar({
             </Button>
           )}
         </ResourceScanner>
-        <CreateResourceButton testId="toolbar-open-create-resource-modal-button" />
+        <CreateResourceButton testId="toolbar-open-create-resource-modal-button" onOpen={onOpenCreate} />
       </div>
     </div>
   );

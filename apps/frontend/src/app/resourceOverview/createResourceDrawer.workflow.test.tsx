@@ -58,8 +58,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 function openDrawer() {
-  render(<CreateResourceDrawer />);
-  fireEvent.click(screen.getByRole('button', { name: 'title' }));
+  render(<CreateResourceDrawer isOpen onOpenChange={state.navigate} />);
 }
 
 it('creates another resource with only name and type, then resets the open form', () => {
@@ -86,6 +85,6 @@ it('opens the created resource from the default action and keeps invalid names i
   fireEvent.click(screen.getByRole('button', { name: 'createAndOpen' }));
   expect(state.create).toHaveBeenCalledWith({ formData: { name: 'Saw', type: 'machine' } });
   act(() => state.createOptions.onSuccess({ id: 5, name: 'Saw' } as Resource));
+  expect(state.navigate).toHaveBeenCalledWith(false);
   expect(state.navigate).toHaveBeenCalledWith('/resources/5');
-  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 });

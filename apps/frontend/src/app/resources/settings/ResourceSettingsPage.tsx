@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Button, Spinner } from '@heroui/react';
 import { FolderIcon, Gauge, ListChecks, Settings2Icon, StethoscopeIcon, WorkflowIcon, WrenchIcon } from 'lucide-react';
@@ -64,12 +64,15 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
   const [selectedImage, setSelectedImage] = useState<File | null>();
   const [deleteImage, setDeleteImage] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const editRevision = useRef(0);
+  const submittedRevision = useRef(0);
 
   useEffect(() => {
     if (resource && !dirty) setFormData(fromResource(resource));
   }, [resource, dirty]);
 
   const setField = useCallback(<T extends keyof FormData>(field: T, value: FormData[T]) => {
+    editRevision.current += 1;
     setFormData((previous) => previous && { ...previous, [field]: value });
     setDirty(true);
   }, []);
@@ -83,10 +86,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
       queryClient.setQueryData(UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }), updated);
       queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
       queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
-      setFormData(fromResource(updated));
-      setSelectedImage(undefined);
-      setDeleteImage(false);
-      setDirty(false);
+      if (editRevision.current === submittedRevision.current) {
+        setFormData(fromResource(updated));
+        setSelectedImage(undefined);
+        setDeleteImage(false);
+        setDirty(false);
+      }
     },
     onError: (updateError) =>
       toast.error({
@@ -96,10 +101,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
   });
 
   const save = () => {
+    if (updateResource.isPending) return;
     if (!formData || !formData.name?.trim()) {
       toast.error({ title: t('inputs.name.required') });
       return;
     }
+    submittedRevision.current = editRevision.current;
     updateResource.mutate({
       id: resourceId,
       formData: { ...formData, name: formData.name.trim(), image: selectedImage ?? undefined, deleteImage },
@@ -143,6 +150,7 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
               <SharedDataTab
                 {...editorProps}
                 onImageSelected={(file) => {
+                  editRevision.current += 1;
                   setSelectedImage(file);
                   setDeleteImage(file === null);
                   setDirty(true);

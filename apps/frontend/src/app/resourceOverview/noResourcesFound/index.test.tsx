@@ -29,7 +29,7 @@ describe.each([
   });
 
   it('offers first-resource creation instead of resetting an empty installation', () => {
-    render(<NoResourcesFound hasResources={false} onClearFilterAndSearch={vi.fn()} />);
+    render(<NoResourcesFound hasResources={false} onClearFilterAndSearch={vi.fn()} onOpenCreate={vi.fn()} />);
     expect(screen.getByRole('heading', { name: translations.firstResource.title })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create resource' })).toBeInTheDocument();
     expect(screen.queryByText(translations.alert.clear)).not.toBeInTheDocument();
@@ -37,14 +37,14 @@ describe.each([
 
   it('directs update-only users without creation permission to an administrator', () => {
     state.permissions = ['resources.update'];
-    render(<NoResourcesFound hasResources={false} onClearFilterAndSearch={vi.fn()} />);
+    render(<NoResourcesFound hasResources={false} onClearFilterAndSearch={vi.fn()} onOpenCreate={vi.fn()} />);
     expect(screen.getByText(translations.firstResource.noPermission)).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('preserves filter recovery when resources exist', () => {
     const reset = vi.fn();
-    render(<NoResourcesFound hasResources onClearFilterAndSearch={reset} />);
+    render(<NoResourcesFound hasResources onClearFilterAndSearch={reset} onOpenCreate={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: translations.alert.clear }));
     expect(reset).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: 'Create resource' })).not.toBeInTheDocument();
