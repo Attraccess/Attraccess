@@ -46,7 +46,7 @@ public:
         lv_obj_remove_style_all(identity);
         lv_obj_set_size(identity, lv_pct(100), 24);
         lv_obj_remove_flag(identity, LV_OBJ_FLAG_SCROLLABLE);
-        // Reserve space for the persistent network badge, including paused text.
+        // Reserve space so a network warning never covers the identity or countdown.
         lv_obj_set_style_pad_right(identity, 76, 0);
         lv_obj_set_style_pad_column(identity, 8, 0);
         lv_obj_set_flex_flow(identity, LV_FLEX_FLOW_ROW);

@@ -718,7 +718,7 @@ void testBackgroundScreens(Renderer &renderer)
         for (int i = 0; i < 3; ++i) {
             resources.items[i].id = i + 1;
             std::strcpy(resources.items[i].name, names[i]);
-            std::strcpy(resources.items[i].description, "Werkstatt");
+            resources.items[i].description = "Werkstatt";
         }
         resources.items[1].hasActiveUsage = true;
         resources.items[2].isUnderMaintenance = true;
@@ -743,7 +743,7 @@ void testAuthenticatedList(Renderer &renderer)
         auto &resource = resources.items[i];
         resource.id = i + 1;
         std::strcpy(resource.name, names[i]);
-        std::strcpy(resource.description, "Werkstatt");
+        resource.description = "Werkstatt";
         resource.isHealthy = true;
         resource.accessKnown = true;
         resource.hasIntroduction = true;

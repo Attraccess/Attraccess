@@ -430,7 +430,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       return;
    }
    lv_label_set_text(this->resourceName, resource.name);
-   lv_label_set_text(this->resourceDescription, resource.description);
+   lv_label_set_text(this->resourceDescription, resource.description.c_str());
 
    // Update introducer/maintainer panel lists (same set of allowed users)
    std::string introducersText = this->buildIntroducersText(resource);

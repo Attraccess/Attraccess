@@ -106,7 +106,10 @@ int main(int argc, char **argv) {
     State::setWifiState(true, {}, "Test");
     State::setWebsocketState(true, "reader.test", 80, false);
     State::setApiState(true, "Test reader");
-    State::setNetworkQualityState(State::NETWORK_QUALITY_GOOD, 0, 0, 0, 0, 0, 0, 20, 20, 0, 0, 0, 0);
+    auto setQuality = [](State::NetworkQuality quality) {
+        State::setNetworkQualityState(quality, 0, 0, 0, 0, 0, 0, 20, 20, 0, 0, 0, 0);
+    };
+    setQuality(State::NETWORK_QUALITY_GOOD);
     auto pump = [&](uint32_t duration = 60) {
         const auto end = millis() + duration;
         do { application.loop(); lv_timer_handler(); std::this_thread::sleep_for(std::chrono::milliseconds(5)); }
@@ -124,6 +127,11 @@ int main(int argc, char **argv) {
     unsigned listVersion = 0;
     std::string username = "Alex";
     bool active = false, supervised = false;
+    std::string longDescription =
+        "RFI 5-2 · Angstrom Engineering · Åmod · evaporation tool with a long description that must remain readable in details. ";
+    while (longDescription.size() < 600)
+        longDescription += "Operating notes, preparation, ventilation, and cleaning instructions remain available to the reader. ";
+    longDescription += "Final inspection and shutdown steps.";
     auto list = [&](bool signedIn = true, bool onlyOne = false, bool correlate = true) {
         JsonDocument doc;
         doc["messageId"] = ++listVersion;
@@ -136,6 +144,7 @@ int main(int argc, char **argv) {
             auto r = resources.add<JsonObject>();
             r["id"] = id;
             r["name"] = id == 1 ? "Lasercutter" : id == 2 ? "CNC Fräse" : "Werkstatttür";
+            if (id == 1) r["description"] = longDescription;
             r["type"] = id == 3 ? "door" : "machine";
             r["isHealthy"] = true;
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
@@ -162,6 +171,29 @@ int main(int argc, char **argv) {
     };
     list(false, true); pump(2100);
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+    auto *networkBadge = lv_obj_get_parent(label(lv_layer_top(), "OK NET"));
+    assert(lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
+    setQuality(State::NETWORK_QUALITY_DEGRADED); pump();
+    assert(label(lv_layer_top(), "! NET") && !lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
+    display.capture(output, "01a-net-degraded");
+    setQuality(State::NETWORK_QUALITY_OFFLINE); pump();
+    assert(label(lv_layer_top(), "x NET") && !lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
+    display.capture(output, "01b-net-offline");
+    setQuality(State::NETWORK_QUALITY_GOOD); pump();
+    assert(label(lv_layer_top(), "OK NET") && lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
+    auto *listName = label(lv_screen_active(), "Lasercutter");
+    assert(listName);
+    auto *listDescription = lv_obj_get_child(lv_obj_get_parent(listName), 1);
+    assert(lv_obj_check_type(listDescription, &lv_label_class));
+    assert(std::strlen(lv_label_get_text(listDescription)) < longDescription.size());
+    lv_obj_update_layout(lv_screen_active());
+    lv_area_t nameBounds, descriptionBounds, rowBounds;
+    lv_obj_get_coords(listName, &nameBounds);
+    lv_obj_get_coords(listDescription, &descriptionBounds);
+    lv_obj_get_coords(lv_obj_get_parent(lv_obj_get_parent(listName)), &rowBounds);
+    assert(nameBounds.y2 < descriptionBounds.y1);
+    assert(descriptionBounds.y2 <= rowBounds.y2);
+    assert(lv_obj_get_height(listDescription) <= 20);
     display.capture(output, "01-single-resource-list");
     list(false);
     // A drawer opened before scanning must close as soon as authentication begins.
@@ -199,7 +231,22 @@ int main(int argc, char **argv) {
     click("Lasercutter");
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
     assert(label(lv_screen_active(), "Alex"));
+    auto *fullDescription = label(lv_screen_active(), longDescription.c_str());
+    assert(fullDescription);
+    lv_obj_update_layout(lv_screen_active());
+    assert(lv_label_get_long_mode(fullDescription) == LV_LABEL_LONG_SCROLL);
+    assert(lv_obj_get_height(fullDescription) == 28);
+    lv_area_t fullDescriptionBounds;
+    lv_obj_get_coords(fullDescription, &fullDescriptionBounds);
     display.capture(output, "05-details-running");
+    const auto beforeMarquee = display.pixels;
+    pump(1200);
+    display.capture(output, "05a-details-marquee");
+    bool marqueeMoved = false;
+    for (int y = fullDescriptionBounds.y1; y <= fullDescriptionBounds.y2; ++y)
+        for (int x = fullDescriptionBounds.x1; x <= fullDescriptionBounds.x2; ++x)
+            marqueeMoved |= beforeMarquee[y * 480 + x] != display.pixels[y * 480 + x];
+    assert(marqueeMoved);
     auto *backButton = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
     auto *logoutButton = lv_obj_get_parent(label(lv_screen_active(), "Abmelden"));
     assert(lv_obj_get_parent(backButton) == lv_obj_get_parent(logoutButton));
