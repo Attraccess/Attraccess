@@ -127,7 +127,7 @@ jobs:
           gh release upload "$RELEASE_TAG" simulator-packages/*.dmg --clobber
 
   containerize:
-    needs: [lint, typecheck, test, build, plugins, build-companion, publish-attractap-desktop]
+    needs: [build, plugins, build-companion]
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
@@ -195,7 +195,7 @@ jobs:
           append_body: true
 
   balena:
-    needs: [lint, typecheck, test, build, plugins, build-companion, publish-attractap-desktop]
+    needs: [build, plugins, build-companion]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

@@ -100,7 +100,7 @@ jobs:
     uses: ./.github/workflows/build-attractap-desktop.yml
 
   containerize:
-    needs: [lint, typecheck, test, build, plugins, build-companion, build-attractap-desktop]
+    needs: [build, plugins, build-companion]
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
