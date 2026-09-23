@@ -293,7 +293,16 @@ export class PluginModule {
         // in their constructors; defer only the repository's use until the host
         // reference is ready. Bind methods to the real TypeORM Repository.
         let resolved: Repository<T> | undefined;
-        const repository = (): Repository<T> => (resolved ??= resolveRepository());
+        const repository = (): Repository<T> => {
+          if (!resolved) {
+            // The initial sandbox check may have fallen back to DATABASE_ACCESS
+            // because metadata was unavailable before host injection. Resolve
+            // the entity permission again against the live DataSource.
+            PluginSandboxService.assertRepositoryPermission(base, manifest.permissions ?? [], entity);
+            resolved = resolveRepository();
+          }
+          return resolved;
+        };
         return new Proxy({} as Repository<T>, {
           get: (_, property) => {
             const actual = repository();

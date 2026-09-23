@@ -6,6 +6,7 @@ import { join } from 'path';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
+import { User } from '@attraccess/database-entities';
 import { PluginPermission, PluginPermissionError, PLUGIN_AUDIT_HOST_PROVIDER } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from './plugin.module';
 import { PluginService } from './plugin.service';
@@ -265,6 +266,36 @@ describe('PluginModule', () => {
       await expect(retained.find()).resolves.toEqual([expect.any(Widget)]);
       expect(host.getRepository).toHaveBeenCalledWith(Widget);
       expect(find).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechecks entity metadata permissions before resolving a retained repository', async () => {
+      const find = jest.fn(async () => [new User()]);
+      const host = {
+        getMetadata: jest.fn(() => ({ target: User })),
+        getRepository: jest.fn(() => ({ find })),
+      } as unknown as DataSource;
+      const internals = PluginModule as unknown as {
+        resetHostReferences(): void;
+        createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+      };
+      internals.resetHostReferences();
+
+      const denied = internals.createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+      const retained = denied.getRepository('user');
+      new PluginModule(host, events, moduleRef);
+
+      expect(() => retained.find()).toThrow(/READ_USERS/);
+      expect(host.getRepository).not.toHaveBeenCalled();
+      expect(find).not.toHaveBeenCalled();
+
+      internals.resetHostReferences();
+      const allowed = internals.createPluginContext(
+        manifest({ permissions: [PluginPermission.DATABASE_ACCESS, PluginPermission.READ_USERS] }),
+      );
+      const permitted = allowed.getRepository('user');
+      new PluginModule(host, events, moduleRef);
+      await expect(permitted.find()).resolves.toEqual([expect.any(User)]);
+      expect(host.getRepository).toHaveBeenCalledWith('user');
     });
 
     it('does not hand the second application a repository from the closed configuration application', async () => {
