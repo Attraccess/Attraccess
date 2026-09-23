@@ -51,23 +51,26 @@ function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
   return named.options?.name ?? named.name ?? 'UnknownEntity';
 }
 
-function permissionForEntity<T extends ObjectLiteral>(base: PluginContext, entity: EntityTarget<T>): PluginPermission {
+function permissionForEntity<T extends ObjectLiteral>(
+  base: PluginContext,
+  entity: EntityTarget<T>,
+): { permission: PluginPermission; metadataResolved: boolean } {
   const direct = ENTITY_PERMISSIONS.find((candidate) => candidate.target === entity);
   if (direct) {
-    return direct.permission;
+    return { permission: direct.permission, metadataResolved: true };
   }
 
   try {
     const resolved = base.dataSource.getMetadata(entity).target;
     const match = ENTITY_PERMISSIONS.find((candidate) => candidate.target === resolved);
     if (match) {
-      return match.permission;
+      return { permission: match.permission, metadataResolved: true };
     }
   } catch {
-    return PluginPermission.DATABASE_ACCESS;
+    return { permission: PluginPermission.DATABASE_ACCESS, metadataResolved: false };
   }
 
-  return PluginPermission.DATABASE_ACCESS;
+  return { permission: PluginPermission.DATABASE_ACCESS, metadataResolved: true };
 }
 
 @Injectable()
@@ -92,7 +95,7 @@ export class PluginSandboxService {
       if (typeof value !== 'string' || !isPluginPermission(value)) {
         throw new Error(
           `Plugin "${pluginName}" declares unknown permission "${String(value)}". ` +
-            `Valid permissions are: ${Object.values(PluginPermission).join(', ')}.`
+            `Valid permissions are: ${Object.values(PluginPermission).join(', ')}.`,
         );
       }
       if (!result.includes(value)) {
@@ -141,9 +144,32 @@ export class PluginSandboxService {
         return base.dataSource;
       },
       getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>) {
-        const permission = permissionForEntity(base, entity);
-        require(permission, `getRepository(${entityLabel(entity)})`);
-        return base.getRepository(entity);
+        const capability = `getRepository(${entityLabel(entity)})`;
+        const initial = permissionForEntity(base, entity);
+        require(initial.permission, capability);
+        const repository = base.getRepository(entity);
+        if (initial.metadataResolved) return repository;
+
+        // Metadata may be unavailable while Nest constructs plugin providers.
+        // Recheck it before exposing a retained repository; otherwise a string
+        // alias such as "user" could pass DATABASE_ACCESS during construction
+        // and bypass READ_USERS once the host DataSource is initialized.
+        const requireResolvedPermission = () => {
+          const current = permissionForEntity(base, entity);
+          if (!current.metadataResolved) throw new Error(`Entity metadata is not available for ${capability}`);
+          require(current.permission, capability);
+        };
+        return new Proxy({} as typeof repository, {
+          get: (_, property) => {
+            requireResolvedPermission();
+            const value = Reflect.get(repository, property, repository);
+            return typeof value === 'function' ? value.bind(repository) : value;
+          },
+          set: (_, property, value) => {
+            requireResolvedPermission();
+            return Reflect.set(repository, property, value, repository);
+          },
+        });
       },
       get<T>(token: Type<T> | string | symbol): T {
         require(PluginPermission.RESOLVE_HOST_PROVIDERS, `get(${String(token)})`);
@@ -179,7 +205,7 @@ export class PluginSandboxService {
   private static guardEvents(
     base: PluginContext,
     pluginName: string,
-    require: (permission: PluginPermission, capability: string) => void
+    require: (permission: PluginPermission, capability: string) => void,
   ): PluginContext['events'] {
     const holder: { proxy: PluginContext['events'] | null } = { proxy: null };
 
@@ -203,7 +229,7 @@ export class PluginSandboxService {
         const permission = EVENT_METHOD_PERMISSIONS.get(property);
         if (!permission) {
           throw new Error(
-            `Plugin "${pluginName}" attempted to use "events.${property}", which the plugin sandbox does not expose.`
+            `Plugin "${pluginName}" attempted to use "events.${property}", which the plugin sandbox does not expose.`,
           );
         }
 
