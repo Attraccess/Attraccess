@@ -261,6 +261,7 @@ describe('PluginModule', () => {
       const context = internals.createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
       const retained = context.getRepository(Widget);
       expect(host.getRepository).not.toHaveBeenCalled();
+      expect(() => retained.find()).toThrow(/accessed before bootstrap completed/);
 
       new PluginModule(host, events, moduleRef);
       await expect(retained.find()).resolves.toEqual([expect.any(Widget)]);
