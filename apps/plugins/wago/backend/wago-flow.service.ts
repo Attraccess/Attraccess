@@ -44,6 +44,12 @@ type OperationalStream = {
   sequences: Map<WagoOperationalMessage['category'], number>;
 };
 
+class FlowSubscriptionError extends Error {
+  constructor(readonly mqttError: unknown) {
+    super(String(mqttError));
+  }
+}
+
 @Injectable()
 export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   // Plugin registration precedes the host datasource; resolve repositories only when used.
@@ -76,7 +82,12 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   async onModuleInit(): Promise<void> {
-    await this.refresh();
+    try {
+      await this.refresh();
+    } catch (error) {
+      if (!(error instanceof FlowSubscriptionError)) throw error;
+      this.context.logger.warn(`Could not refresh WAGO flow subscriptions during startup: ${String(error.mqttError)}`);
+    }
     // Claims and settings are managed by another service; periodically reconcile this shared subscription.
     this.refreshTimer = setInterval(
       () =>
@@ -145,7 +156,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         );
     } catch (error) {
       replacements.forEach((subscription) => subscription.unsubscribe());
-      throw error;
+      throw new FlowSubscriptionError(error);
     }
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
     this.subscriptions.push(...replacements);

@@ -57,6 +57,27 @@ describe('WagoFlowService', () => {
     return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
   }
 
+  it('starts with an unavailable MQTT broker and retries flow subscriptions', async () => {
+    const { service, context } = createService();
+    const subscribe = context.mqtt.subscribe as jest.Mock;
+    subscribe.mockRejectedValueOnce(new Error('broker unavailable'));
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+    expect(context.logger.warn).toHaveBeenCalledWith(expect.stringContaining('broker unavailable'));
+
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(subscribe).toHaveBeenCalledTimes(2);
+    service.onModuleDestroy();
+  });
+
+  it('still fails startup when flow settings cannot be read', async () => {
+    const { service, context } = createService();
+    const settings = context.getRepository(WagoSettings) as unknown as { findOneBy: jest.Mock };
+    settings.findOneBy.mockRejectedValueOnce(new Error('settings unavailable'));
+
+    await expect(service.onModuleInit()).rejects.toThrow('settings unavailable');
+  });
+
   it('registers the plugin before the host datasource is available', () => {
     const { context } = createService();
     const getRepository = jest.spyOn(context, 'getRepository').mockImplementation(() => {

@@ -139,6 +139,36 @@ describe('PluginProvider', () => {
     );
   });
 
+  it('loads a recovered plugin when the tab regains focus without reinstalling loaded plugins', async () => {
+    const recovered = {
+      name: '@attraccess/plugin-wago',
+      version: '1.0.0',
+      main: { frontend: { entryPoint: 'remoteEntry.js' } },
+    };
+    const healthy = {
+      name: '@attraccess/plugin-rabbitmq',
+      version: '1.0.0',
+      main: { frontend: { entryPoint: 'remoteEntry.js' } },
+    };
+    hoisted.refetchMock
+      .mockResolvedValueOnce({ data: [{ ...recovered, status: 'error', error: 'incomplete startup' }, healthy] })
+      .mockResolvedValue({ data: [{ ...recovered, status: 'loaded', error: null }, healthy] });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(2));
+    expect(hoisted.getRemoteMock).toHaveBeenCalledTimes(2);
+    expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1);
+  });
+
   it('unwraps the default export when the remote returns one', async () => {
     primeManifest();
     render(<PluginProvider />);
