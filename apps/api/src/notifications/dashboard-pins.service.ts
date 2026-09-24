@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DashboardPin, Resource } from '@attraccess/database-entities';
 import { In, Repository } from 'typeorm';
 
-export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string };
+export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string; resourceName?: string };
 
 @Injectable()
 export class DashboardPinsService {
@@ -15,11 +15,15 @@ export class DashboardPinsService {
   async get(userId: number): Promise<DashboardPinItem[]> {
     const entries = await this.pins.find({ where: { userId }, order: { position: 'ASC' } });
     const resourceIds = entries.filter((pin) => pin.itemType === 'resource').map((pin) => Number(pin.itemId));
-    const activeResources = resourceIds.length ? await this.resources.find({ where: { id: In(resourceIds) } }) : [];
-    const activeIds = new Set(activeResources.map((resource) => String(resource.id)));
-    const valid = entries.filter((pin) => pin.itemType !== 'resource' || activeIds.has(pin.itemId));
-    if (valid.length !== entries.length) await this.replace(userId, valid.map(({ itemType, itemId }) => ({ itemType, itemId })));
-    return valid.map(({ itemType, itemId }) => ({ itemType, itemId }));
+    const activeResources = resourceIds.length ? await this.resources.find({ select: { id: true, name: true }, where: { id: In(resourceIds) } }) : [];
+    const activeById = new Map(activeResources.map((resource) => [String(resource.id), resource.name]));
+    const valid = entries.filter((pin) => pin.itemType !== 'resource' || activeById.has(pin.itemId));
+    const validIds = new Set(valid.map((pin) => pin.id));
+    const staleIds = entries.filter((pin) => !validIds.has(pin.id)).map((pin) => pin.id);
+    if (staleIds.length) await this.pins.delete({ userId, id: In(staleIds) });
+    return valid.map(({ itemType, itemId }) => itemType === 'resource'
+      ? { itemType, itemId, resourceName: activeById.get(itemId) }
+      : { itemType, itemId });
   }
 
   async replace(userId: number, items: DashboardPinItem[]): Promise<DashboardPinItem[]> {
@@ -29,7 +33,10 @@ export class DashboardPinsService {
     const keys = items.map((item) => `${item.itemType}:${item.itemId}`);
     if (new Set(keys).size !== keys.length) throw new BadRequestException('Dashboard pins must be unique');
     const resourceIds = items.filter((item) => item.itemType === 'resource').map((item) => Number(item.itemId));
-    if (resourceIds.some((id) => !Number.isSafeInteger(id) || id < 1)) throw new BadRequestException('Invalid resource pin');
+    if (items.some((item) => item.itemType === 'resource' &&
+      (!Number.isSafeInteger(Number(item.itemId)) || Number(item.itemId) < 1 || String(Number(item.itemId)) !== item.itemId))) {
+      throw new BadRequestException('Invalid resource pin');
+    }
     if (resourceIds.length) {
       const found = await this.resources.find({ where: { id: In(resourceIds) } });
       if (found.length !== resourceIds.length) throw new BadRequestException('Resource does not exist');

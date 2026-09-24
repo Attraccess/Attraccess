@@ -10,9 +10,6 @@ import { SIDEBAR_ITEMS, useSidebarItems, buildSidebarEndItems } from '../layout/
 import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
-import { ResourceUsageSession } from '../resources/usage/components/ResourceUsageSession';
-import { StatusChip } from '../resourceOverview/resourceGroupCard/statusChip';
 import usePluginState from '../plugins/plugin.state';
 
 function Landing() {
@@ -78,13 +75,9 @@ function DashboardPage() {
 
 function ResourcePinCard({ pin, openLabel, resourceLabel, unpinLabel, onUnpin, onReorder, onDragStart }: { pin: Pin; openLabel: string; resourceLabel: string; unpinLabel: string; onUnpin: () => void; onReorder: (target: string) => void; onDragStart: () => void }) {
   const id = Number(pin.itemId);
-  const { data: resource, isLoading, isError } = useResourcesServiceGetOneResourceById({ id }, undefined, { enabled: Number.isSafeInteger(id) && id > 0, retry: false });
-  if (isLoading) return <Card className="p-4">Loading {resourceLabel.toLowerCase()}…</Card>;
-  if (isError || !resource) return null;
+  const name = pin.resourceName ?? resourceLabel;
   return <div onDragOver={(event) => event.preventDefault()} onDrop={() => onReorder(`resource:${pin.itemId}`)} className="flex flex-col gap-3 rounded-xl border border-default-200 bg-content1 p-4">
-    <Card className="flex flex-row items-center justify-between p-3"><span draggable title="Drag to reorder" onDragStart={onDragStart} className="cursor-grab text-muted"><GripVerticalIcon size={18} /></span><h2 className="font-semibold">{resource.name}</h2><button aria-label={`${unpinLabel} ${resource.name}`} onClick={onUnpin}>★</button></Card>
-    <div className="flex justify-end"><StatusChip resourceId={id} /></div>
-    <ResourceUsageSession resourceId={id} resource={resource} />
+    <Card className="flex flex-row items-center justify-between p-3"><span draggable title="Drag to reorder" onDragStart={onDragStart} className="cursor-grab text-muted"><GripVerticalIcon size={18} /></span><h2 className="font-semibold">{name}</h2><button aria-label={`${unpinLabel} ${name}`} onClick={onUnpin}>★</button></Card>
     <Link className="mt-3 inline-block underline" to={`/resources/${id}`}>{openLabel}</Link>
   </div>;
 }

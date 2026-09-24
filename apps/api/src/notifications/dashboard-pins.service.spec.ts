@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { DashboardPin, Resource } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DashboardPinsService } from './dashboard-pins.service';
 
 describe('DashboardPinsService', () => {
@@ -15,6 +15,7 @@ describe('DashboardPinsService', () => {
   beforeEach(async () => {
     pinRepository = {
       find: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue({ affected: 0 }),
       manager: { transaction: jest.fn(async (callback: (manager: { getRepository: () => { delete: typeof deletePins; insert: typeof insertPins } }) => Promise<void>) => callback({ getRepository: () => ({ delete: deletePins, insert: insertPins }) })) } as never,
     };
     resourceRepository = { find: jest.fn().mockResolvedValue([]) };
@@ -51,11 +52,25 @@ describe('DashboardPinsService', () => {
 
   it('cleans pins for soft-deleted resources when reading the persisted list', async () => {
     (pinRepository.find as jest.Mock).mockResolvedValue([
-      { userId: 5, itemType: 'page', itemId: '/projects', position: 0 },
-      { userId: 5, itemType: 'resource', itemId: '42', position: 1 },
+      { id: 1, userId: 5, itemType: 'page', itemId: '/projects', position: 0 },
+      { id: 2, userId: 5, itemType: 'resource', itemId: '42', position: 1 },
     ]);
     (resourceRepository.find as jest.Mock).mockResolvedValue([]);
     expect(await service.get(5)).toEqual([{ itemType: 'page', itemId: '/projects' }]);
-    expect(deletePins).toHaveBeenCalledWith({ userId: 5 });
+    expect(pinRepository.delete).toHaveBeenCalledWith({ userId: 5, id: In([2]) });
+    expect(deletePins).not.toHaveBeenCalled();
+  });
+
+  it('rejects noncanonical resource IDs before touching saved pins', async () => {
+    for (const itemId of ['007', '7.0', '7e0', ' 7', '+7', '9007199254740992']) {
+      await expect(service.replace(5, [{ itemType: 'resource', itemId }])).rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(deletePins).not.toHaveBeenCalled();
+  });
+
+  it('returns resource names in the pin list without per-card lookups', async () => {
+    (pinRepository.find as jest.Mock).mockResolvedValue([{ id: 3, userId: 5, itemType: 'resource', itemId: '7', position: 0 }]);
+    (resourceRepository.find as jest.Mock).mockResolvedValue([{ id: 7, name: 'Printer' }]);
+    expect(await service.get(5)).toEqual([{ itemType: 'resource', itemId: '7', resourceName: 'Printer' }]);
   });
 });
