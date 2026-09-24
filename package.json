@@ -7,11 +7,11 @@
     "seed:dev": "node scripts/seed-dev-user.mjs",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
-    "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin'",
-    "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
+    "precommit": "node scripts/crap-score/check-staged.mjs && pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin' && node scripts/crap-score/affected.mjs --uncommitted --nxBail",
+    "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e && pnpm crap-score",
     "services": "node --experimental-strip-types scripts/services-compose.mts",
-    "crap-score": "nx run-many -t crap-score --parallel=2",
-    "crap-score:affected": "nx affected -t crap-score --parallel=2"
+    "crap-score": "node scripts/crap-score/affected.mjs --all",
+    "crap-score:affected": "node scripts/crap-score/affected.mjs"
   },
   "private": true,
   "dependencies": {

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { getCrapReport } from 'crap-score';
-import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run } from './run.mjs';
+import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run, enforceScores, workspace } from './run.mjs';
+import { isSharedChange, verifyReports } from './affected.mjs';
 
 test('source selection includes apps and scripts but excludes tests and generated clients', () => {
   for (const file of [
@@ -30,13 +33,93 @@ test('only the vendored OpenSCAD runtime is excluded, not maintained public scri
   assert.ok(isSource('apps/frontend/public/openscad/adapter.js'));
 });
 
-test('the strict target counts scores exactly equal to 30', () => {
+test('shared checker, root tooling and dependency configuration select every CRAP target', () => {
+  for (const file of [
+    'scripts/crap-score/run.mjs',
+    'scripts/standalone-tool.ts',
+    'package.json',
+    'pnpm-lock.yaml',
+    'nx.json',
+    'jest.preset.js',
+    'tsconfig.base.json',
+    'apps/frontend/project.json',
+    'apps/frontend/vitest.config.ts',
+  ])
+    assert.ok(isSharedChange([file]), file);
+  for (const file of ['apps/attractap/hardware/nfc/src/a.ts', 'apps/companion/renderer/App.tsx', 'libs/shared/src/a.ts', 'tools/config-ui/main.ts'])
+    assert.ok(!isSharedChange([file]), file);
+});
+
+test('project report validation distinguishes complete zero-function reports from omitted and malformed output', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-report-validation-'));
+  const output = path.join(directory, 'coverage/crap/demo');
+  const source = '/repo/demo/empty.ts';
+  try {
+    mkdirSync(path.join(output, 'html'), { recursive: true });
+    writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: { statementMap: {}, s: {}, fnMap: {}, f: {}, branchMap: {}, b: {} } }));
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', files: 1, sourceFiles: [source], functions: 0, violations: 0, max: 0 }));
+    assert.doesNotThrow(() => verifyReports(['demo'], directory), 'empty-function project is valid');
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({}));
+    assert.throws(() => verifyReports(['demo'], directory), /Incomplete analysis report/);
+    writeFileSync(path.join(output, 'crap-report.json'), '{');
+    assert.throws(() => verifyReports(['demo'], directory), /Malformed CRAP report/);
+    rmSync(path.join(output, 'coverage-final.json'));
+    assert.throws(() => verifyReports(['demo'], directory), /Missing CRAP report/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('commit validation accepts staged source and rejects partial stages without changing either snapshot', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'crap-staged-'));
+  const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
+  const check = () =>
+    spawnSync(process.execPath, [path.join(workspace, 'scripts/crap-score/check-staged.mjs')], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+  try {
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    writeFileSync(path.join(dir, 'source.ts'), 'export const value = 1;\n');
+    git('add', 'source.ts');
+    git('commit', '-qm', 'baseline');
+
+    writeFileSync(path.join(dir, 'source.ts'), 'export const value = 2;\n');
+    git('add', 'source.ts');
+    assert.equal(check().status, 0, 'fully staged JS/TS must validate');
+
+    writeFileSync(path.join(dir, 'source.ts'), 'export const value = 3;\n');
+    const indexBefore = execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8' });
+    const worktreeBefore = readFileSync(path.join(dir, 'source.ts'), 'utf8');
+    const status = check();
+    assert.equal(status.status, 1);
+    assert.match(status.stderr, /Unstaged JS\/TS paths: source\.ts/);
+    assert.equal(execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8' }), indexBefore);
+    assert.equal(readFileSync(path.join(dir, 'source.ts'), 'utf8'), worktreeBefore);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the inclusive maximum passes 30 and fails above 30 without rounding', () => {
   assert.deepEqual(summarizeScores([29.99, 30, 30.01].map((crap) => ({ statements: { crap } }))), {
     functions: 3,
-    atLeast30: 2,
+    violations: 1,
     max: 30.01,
   });
-  assert.deepEqual(summarizeScores([]), { functions: 0, atLeast30: 0, max: 0 });
+  assert.deepEqual(summarizeScores([]), { functions: 0, violations: 0, max: 0 });
+  const fn = (crap) => ({ functionDescriptor: 'example', start: { line: 7 }, complexity: 6, statements: { crap, coverage: 0.5 } });
+  assert.doesNotThrow(() => enforceScores('demo', { '/repo/example.ts': { ok: fn(29.99), boundary: fn(30) } }));
+  assert.throws(
+    () => enforceScores('demo', { '/repo/example.ts': { violation: fn(30.0001) } }),
+    /demo: .*example\.ts:7 example — CRAP 30\.0001 \(complexity 6, coverage 50\.00%\)/,
+  );
+  assert.doesNotThrow(() => enforceScores('empty', {}));
+  assert.throws(() => enforceScores('malformed', { '/repo/a.ts': { bad: { statements: {} } } }), /Malformed CRAP function/);
 });
 
 test('duplicate source locations collapse without losing same-line anonymous functions', async () => {
@@ -427,7 +510,7 @@ test('runs an Nx library suite and writes consistent JSON, HTML, and summary art
     assert.ok(summary.functions > 0);
     assert.deepEqual(summarizeScores(functions), {
       functions: summary.functions,
-      atLeast30: summary.atLeast30,
+      violations: summary.violations,
       max: summary.max,
     });
     assert.ok(existsSync(path.join(directory, 'html/index.html')));
