@@ -4,6 +4,7 @@
 #include "card_menu.hpp"
 
 #include <SDL3/SDL.h>
+#include <filesystem>
 #include <functional>
 
 class SdlDisplay final : public IDisplayDriver
@@ -22,6 +23,7 @@ public:
     void flush(const lv_area_t *area, uint8_t *pxMap) override;
     bool readTouch(TouchPoint &point) override;
     bool pollEvents();
+    bool saveScreenshot(const std::filesystem::path &path) const;
     void setCardPresenceCallback(std::function<void(size_t, bool)> callback) { cardMenu.setCardPresenceCallback(std::move(callback)); }
     void setClearCardCallback(std::function<void(size_t)> callback) { cardMenu.setClearCardCallback(std::move(callback)); }
 

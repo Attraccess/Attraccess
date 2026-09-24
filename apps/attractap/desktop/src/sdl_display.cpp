@@ -91,6 +91,15 @@ bool SdlDisplay::readTouch(TouchPoint &point)
     return point.pressed;
 }
 
+bool SdlDisplay::saveScreenshot(const std::filesystem::path &path) const
+{
+    SDL_Surface *frame = SDL_RenderReadPixels(renderer, nullptr);
+    if (!frame) return false;
+    const bool saved = SDL_SavePNG(frame, path.c_str());
+    SDL_DestroySurface(frame);
+    return saved;
+}
+
 bool SdlDisplay::pollEvents()
 {
     SDL_Event event;
