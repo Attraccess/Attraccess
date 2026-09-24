@@ -120,6 +120,7 @@ export function PeopleManagement(
   const header = (
     <PeopleHeader
       t={t}
+      targetType={target.type}
       canManageIntroducers={canManageIntroducers}
       canManageIntroductions={canManageIntroductions}
       onAdd={handleAddOpen}

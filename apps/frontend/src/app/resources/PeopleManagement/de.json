@@ -1,6 +1,9 @@
 {
   "title": "Personen & Berechtigungen",
-  "subtitle": "Einweiser, Wartende und Einweisungen für diese Ressource verwalten",
+  "subtitle": {
+    "resource": "Einweiser, Wartende und Einweisungen für diese Ressource verwalten",
+    "group": "Einweiser, Wartende und Einweisungen für diese Gruppe verwalten"
+  },
   "addPerson": "Person hinzufügen",
   "addOptions": {
     "introducer": "Als Einweiser ernennen",
