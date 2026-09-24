@@ -14,6 +14,11 @@ CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+# Free internal SRAM for the LVGL pool / stack by pushing WiFi + lwIP buffers
+# to PSRAM, and cap always-internal mallocs at 8 KB (default 16 KB)
+# (PERFORMANCE_ANALYSIS.md quick win Q6).
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=8192
 
 # --- Partition table (dual-OTA 16 MB layout, byte-identical to fielded devices) ---
 CONFIG_PARTITION_TABLE_CUSTOM=y
