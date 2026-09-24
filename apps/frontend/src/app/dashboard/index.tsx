@@ -18,8 +18,9 @@ import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-
 function Landing() {
   const { data, isLoading, isError } = useDashboardPins();
   const { isLoading: isLicenseLoading } = useLicenseServiceGetLicenseInformation();
+  const pluginsInitialized = usePluginState((state) => state.isInitialized);
   const entries = usePageEntries(data ?? []);
-  if (isLoading || isLicenseLoading) return null;
+  if (isLoading || isLicenseLoading || !pluginsInitialized) return null;
   if (isError) return <p className="p-6">Could not load your dashboard.</p>;
   return data?.some((pin) => pin.itemType === 'resource' || entries.some((entry) => entry.pin.itemId === pin.itemId))
     ? <DashboardPage /> : <Navigate to="/resources" replace />;
