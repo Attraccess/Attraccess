@@ -62,3 +62,8 @@ bool DesktopSimulator::authenticated() const
 {
     return State::getApiState().authenticated;
 }
+
+uint32_t DesktopSimulator::authenticationGeneration() const
+{
+    return api->authenticationGeneration();
+}

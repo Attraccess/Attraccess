@@ -24,6 +24,7 @@ public:
     void tick();
     void reconnect();
     bool authenticated() const;
+    uint32_t authenticationGeneration() const;
     VirtualNfc &nfc() { return virtualNfc; }
     SdlDisplay &display() { return sdlDisplay; }
 

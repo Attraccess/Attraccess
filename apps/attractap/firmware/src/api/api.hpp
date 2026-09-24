@@ -311,6 +311,7 @@ public:
     void requestBillingTopup(uint32_t amountCents);
 
     void onDeviceName(std::function<void(std::string)> callback);
+    uint32_t authenticationGeneration() const { return authenticationCount; }
     void setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback);
 
     void disableConnectionAttempts();
@@ -360,6 +361,7 @@ private:
     void onSupervisionResolved(JsonObject data);
 
     std::function<void(std::string)> deviceNameCallback;
+    uint32_t authenticationCount = 0;
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
 
     uint32_t lastRequestedProjectsOfUserPage = -1;

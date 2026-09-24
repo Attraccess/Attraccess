@@ -121,6 +121,7 @@ void API::onReaderAuthenticated(JsonObject data)
     std::string deviceName = data["payload"]["name"].as<std::string>();
 
     State::setApiState(true, deviceName);
+    ++authenticationCount;
 
     if (this->deviceNameCallback != nullptr)
     {

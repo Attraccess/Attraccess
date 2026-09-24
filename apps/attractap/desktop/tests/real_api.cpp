@@ -68,11 +68,12 @@ int main(int argc, char **argv)
     simulator.tick();
     if (!simulator.display().saveScreenshot(screenshots / "resource-list.png")) return 1;
 
+    const auto initialAuthentication = simulator.authenticationGeneration();
     simulator.reconnect();
-    // Give the old transport time to stop before checking the next authenticated
-    // connection. State remains authenticated until the API handshake completes.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-    if (!waitFor([&] { return simulator.authenticated(); }, simulator, std::chrono::seconds(15)))
+    // The authenticated flag may remain true while the transport restarts. Require
+    // a new READER_AUTHENTICATED response from the server instead.
+    if (!waitFor([&] { return simulator.authenticationGeneration() > initialAuthentication && simulator.authenticated(); },
+                 simulator, std::chrono::seconds(15)))
     {
         std::cerr << "desktop simulator did not reconnect\n";
         return 1;
