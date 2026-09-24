@@ -3,17 +3,15 @@ name: WAGO CC100 Runtime
 on:
   pull_request:
     paths:
-      - 'apps/plugins/wago/cc100-runtime/**'
-      - 'apps/plugins/wago/backend/protocol.ts'
-      - 'apps/plugins/wago/backend/wago.service.ts'
+      - 'apps/plugins/wago/**'
+      - 'apps/plugins/wago/project.json'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
       - '.github/workflows/wago-cc100-runtime.yml'
   push:
     branches: [main]
     paths:
-      - 'apps/plugins/wago/cc100-runtime/**'
-      - 'apps/plugins/wago/backend/protocol.ts'
-      - 'apps/plugins/wago/backend/wago.service.ts'
+      - 'apps/plugins/wago/**'
+      - 'apps/plugins/wago/project.json'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
       - '.github/workflows/wago-cc100-runtime.yml'
 
@@ -29,9 +27,9 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - run: pnpm nx run wago-cc100-runtime:typecheck
-      - run: pnpm nx run wago-cc100-runtime:test
-      - run: pnpm nx run wago-cc100-runtime:build
+      - run: pnpm nx run plugin-wago:typecheck-cc100-runtime
+      - run: pnpm nx run plugin-wago:test-cc100-runtime
+      - run: pnpm nx run plugin-wago:build-cc100-runtime
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest

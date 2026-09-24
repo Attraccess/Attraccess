@@ -32,15 +32,6 @@ module.exports = [
           enforceBuildableLibDependency: true,
           allow: [
             '^.*/eslint(\\.base)?\\.config\\.[cm]?js$',
-            // A plugin may be split into several nx projects inside its own directory
-            // (e.g. a device-runtime container built and shipped separately from the
-            // plugin server bundle). Those family projects share the parent plugin's
-            // contract modules through relative paths. Any cross-plugin or
-            // plugin-to-core path necessarily contains another project segment
-            // ("../../<other-plugin>/...", "../../api/...") and therefore never
-            // matches these patterns.
-            '^(\\.\\./)+(modbus|backend)/',
-            '^(\\.\\./)+(channel-behavior|measurement-contract)$',
           ],
           depConstraints: [
             // Plugins are encapsulated, separately shipped products. They may build
