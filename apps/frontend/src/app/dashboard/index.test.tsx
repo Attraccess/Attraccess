@@ -49,6 +49,31 @@ describe('Dashboard', () => {
     expect(await screen.findByRole('button', { name: 'Unpin /uninstalled-plugin' })).toBeInTheDocument();
   });
 
+  it('falls back for empty pins without waiting for plugin discovery', async () => {
+    usePluginState.setState({ isInitialized: false });
+    getPins.mockResolvedValue([]);
+    mount(<Routes><Route path="/" element={<DashboardLanding />} /><Route path="/resources" element={<span>Resources landing</span>} /></Routes>);
+    expect(await screen.findByText('Resources landing')).toBeInTheDocument();
+  });
+
+  it('shows pin loading errors without waiting for plugin discovery', async () => {
+    usePluginState.setState({ isInitialized: false });
+    getPins.mockRejectedValue(new Error('Could not fetch pins'));
+    mount(<DashboardLanding />);
+    expect(await screen.findByText('Could not load your dashboard.')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['resource', [{ itemType: 'resource', itemId: '1' }]],
+    ['core page', [page('/projects'), page('/plugin-report')]],
+  ])('shows the dashboard for a resolved %s pin while plugins are pending', async (_kind, pins) => {
+    usePluginState.setState({ isInitialized: false });
+    getPins.mockResolvedValue(pins);
+    mount(<Routes><Route path="/" element={<DashboardLanding />} /><Route path="/resources" element={<span>Resources landing</span>} /></Routes>);
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
+  });
+
   it('waits for plugin discovery before deciding a plugin-only pin is unavailable', async () => {
     usePluginState.setState({ isInitialized: false });
     getPins.mockResolvedValue([page('/plugin-report')]);

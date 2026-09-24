@@ -20,10 +20,14 @@ function Landing() {
   const { isLoading: isLicenseLoading } = useLicenseServiceGetLicenseInformation();
   const pluginsInitialized = usePluginState((state) => state.isInitialized);
   const entries = usePageEntries(data ?? []);
-  if (isLoading || isLicenseLoading || !pluginsInitialized) return null;
+  if (isLoading) return null;
   if (isError) return <p className="p-6">Could not load your dashboard.</p>;
-  return data?.some((pin) => pin.itemType === 'resource' || entries.some((entry) => entry.pin.itemId === pin.itemId))
-    ? <DashboardPage /> : <Navigate to="/resources" replace />;
+  if (!data?.length) return <Navigate to="/resources" replace />;
+  if (data.some((pin) => pin.itemType === 'resource')) return <DashboardPage />;
+  if (isLicenseLoading) return null;
+  if (entries.length) return <DashboardPage />;
+  if (!pluginsInitialized) return null;
+  return <Navigate to="/resources" replace />;
 }
 
 type NavEntry = { path: string; title: string; icon?: React.ComponentType<{ size?: number }>; badgeCount?: number };
