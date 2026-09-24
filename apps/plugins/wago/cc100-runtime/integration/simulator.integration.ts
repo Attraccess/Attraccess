@@ -206,7 +206,7 @@ describe('isolated broker / executable simulator', () => {
       logger: { warn: () => undefined },
     } as unknown as PluginContext;
     service = new WagoService(context);
-    await service.onModuleInit();
+    await service.onApplicationBootstrap();
   });
 
   async function stop() {
