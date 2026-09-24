@@ -172,6 +172,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
         actions={overflowActions}
         maxVisibleActions={0}
         moreActionsLabel={t('actions.moreLabel')}
+        dashboardPin={{ path: String(resourceId), label: resource.name, itemType: 'resource' }}
         noMargin
       />
 

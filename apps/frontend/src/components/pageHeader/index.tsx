@@ -1,8 +1,10 @@
 import { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button, cn } from '@heroui/react';
 import { PageAction, PageHeaderActions } from './actions';
+import { DashboardPinToggle } from '../../app/dashboard/pins';
+import { SIDEBAR_ITEMS } from '../../app/layout/sidebarItems';
 
 export type {
   PageAction,
@@ -25,6 +27,7 @@ interface PageHeaderProps {
   noMargin?: boolean;
   thumbnailSrc?: string;
   thumbnailAlt?: string;
+  dashboardPin?: { path: string; label: string; itemType?: 'page' | 'resource' };
 }
 
 export function PageHeader({
@@ -39,10 +42,15 @@ export function PageHeader({
   noMargin,
   thumbnailSrc,
   thumbnailAlt,
+  dashboardPin,
 }: Readonly<PageHeaderProps>) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const hasActions = !!actions && actions.some((a) => !a.isHidden);
+  const dashboardEntry = [...SIDEBAR_ITEMS.flatMap((item) => 'items' in item ? item.items : [item]), ...['/dependencies', '/changelog', '/printables'].map((path) => ({ path, isExternal: false }))]
+    .find((item) => item.path === location.pathname && !item.isExternal && item.path !== '/dashboard');
+  const pin = dashboardPin ?? (dashboardEntry ? { path: dashboardEntry.path, label: typeof title === 'string' ? title : dashboardEntry.path } : undefined);
 
   return (
     <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-4', noMargin && 'mb-0')}>
@@ -90,13 +98,14 @@ export function PageHeader({
         </div>
       </div>
 
-      {hasActions && (
+      {(hasActions || pin) && (
         <div className="flex items-center gap-2 flex-wrap">
-          <PageHeaderActions
+          {hasActions && <PageHeaderActions
             actions={actions as PageAction[]}
             maxVisible={maxVisibleActions}
             moreLabel={moreActionsLabel}
-          />
+          />}
+          {pin && <DashboardPinToggle itemType={pin.itemType ?? 'page'} itemId={pin.path} label={pin.label} />}
         </div>
       )}
     </div>
