@@ -169,6 +169,34 @@ describe('PluginProvider', () => {
     expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1);
   });
 
+  it('replaces a plugin instance when its version changes on focus', async () => {
+    const name = '@attraccess/plugin-wago';
+    const manifest = { name, version: '1.0.0', main: { frontend: { entryPoint: 'remoteEntry.js' } } };
+    hoisted.refetchMock
+      .mockResolvedValueOnce({ data: [manifest] })
+      .mockResolvedValue({ data: [{ ...manifest, version: '2.0.0' }] });
+    hoisted.getRemoteMock.mockImplementation(async () => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    const previous = usePluginState.getState().plugins[0].plugin;
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(usePluginState.getState().plugins[0].version).toBe('2.0.0'));
+    expect(usePluginState.getState().plugins).toHaveLength(1);
+    expect(usePluginState.getState().plugins[0].plugin).not.toBe(previous);
+    expect(hoisted.getRemoteMock).toHaveBeenCalledTimes(2);
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(hoisted.refetchMock).toHaveBeenCalledTimes(3));
+    expect(hoisted.getRemoteMock).toHaveBeenCalledTimes(2);
+    expect(usePluginState.getState().plugins).toHaveLength(1);
+  });
+
   it('unwraps the default export when the remote returns one', async () => {
     primeManifest();
     render(<PluginProvider />);

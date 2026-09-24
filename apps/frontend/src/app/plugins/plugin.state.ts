@@ -15,9 +15,9 @@ interface PluginState {
 const usePluginState = create<PluginState>((set, get) => ({
   plugins: [],
   addPlugin: (plugin) =>
-    set((state) => {
-      return { plugins: [...state.plugins, plugin] };
-    }),
+    set((state) => ({
+      plugins: [...state.plugins.filter((installed) => installed.name !== plugin.name), plugin],
+    })),
   isInstalled: (pluginName) => get().plugins.some((plugin) => plugin.plugin.getPluginName() === pluginName),
 }));
 

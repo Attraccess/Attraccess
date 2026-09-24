@@ -78,6 +78,15 @@ describe('WagoFlowService', () => {
     await expect(service.onModuleInit()).rejects.toThrow('settings unavailable');
   });
 
+  it('rejects an invalid operational prefix before attempting MQTT subscriptions', async () => {
+    const { service, context } = createService();
+    const settings = context.getRepository(WagoSettings) as unknown as { findOneBy: jest.Mock };
+    settings.findOneBy.mockResolvedValueOnce({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'bad/#' });
+
+    await expect(service.onModuleInit()).rejects.toThrow();
+    expect(context.mqtt.subscribe).not.toHaveBeenCalled();
+  });
+
   it('registers the plugin before the host datasource is available', () => {
     const { context } = createService();
     const getRepository = jest.spyOn(context, 'getRepository').mockImplementation(() => {
