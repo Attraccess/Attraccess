@@ -81,11 +81,16 @@ describe('DashboardPinsService', () => {
   });
 
   it('validates additions and limits the resulting list', async () => {
-    for (const itemId of ['/dashboard', '/resources/123', '//plugin-report', '/not-a-sidebar-route']) {
+    for (const itemId of ['/dashboard', '/kiosk', '/kiosk/display', '/resources/123', '//plugin-report', 'https://example.com']) {
       await expect(service.update(5, { kind: 'add', item: page(itemId) })).rejects.toBeInstanceOf(BadRequestException);
     }
-    await service.update(5, { kind: 'add', item: page('/settings/plugin-report') });
-    await service.update(5, { kind: 'remove', item: page('/settings/plugin-report') });
+    for (const itemId of ['/resources', '/settings/plugin-report', '/plugin-report', '/hello-world']) {
+      await service.update(5, { kind: 'add', item: page(itemId) });
+    }
+    expect((await service.get(5)).map(({ itemId }) => itemId)).toEqual(['/resources', '/settings/plugin-report', '/plugin-report', '/hello-world']);
+    for (const itemId of ['/resources', '/settings/plugin-report', '/plugin-report', '/hello-world']) {
+      await service.update(5, { kind: 'remove', item: page(itemId) });
+    }
     for (const itemId of ['007', '7.0', '7e0', ' 7']) {
       await expect(service.update(5, { kind: 'add', item: { itemType: 'resource', itemId } })).rejects.toBeInstanceOf(BadRequestException);
     }

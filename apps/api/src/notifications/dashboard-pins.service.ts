@@ -5,23 +5,15 @@ import { In, Repository } from 'typeorm';
 import { UpdateDashboardPinsDto } from './dtos/dashboard-pins.dto';
 
 export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string; resourceName?: string };
-const PINNABLE_PAGE_PATHS = new Set([
-  '/resources', '/projects', '/messages', '/attractap/nfc-cards', '/billing', '/csv-export', '/users',
-  '/attractap/readers', '/devices/mqtt/servers', '/devices/companion', '/balena', '/settings',
-  '/dependencies', '/changelog', '/printables', '/shelly', '/rabbitmq', '/wago',
-]);
-// Plugin sidebar entries under Settings are defined by frontend modules and cannot be
-// enumerated by the API. Other application paths stay restricted to the explicit list above.
-const PLUGIN_ROOT_PATHS = new Set(['/hello-world']);
 function isEligiblePagePath(path: string): boolean {
-  if (PINNABLE_PAGE_PATHS.has(path)) return true;
   if (!/^\/[a-z][a-z0-9-]*(?:\/[a-z0-9-]+)*$/.test(path)) return false;
-  const segments = path.slice(1).split('/');
-  const root = segments[0];
-  // Plugin routes can live inside a core namespace (notably /settings). The
-  // frontend still only renders paths present in its permitted sidebar registry.
-  if (root === 'settings' && segments.length > 1) return true;
-  return PLUGIN_ROOT_PATHS.has(path);
+  // Plugin sidebar routes are registered in the frontend at runtime, so the API
+  // cannot maintain a closed list of their paths. Restrict the stored value to a
+  // same-origin route shape and reserve routes that must never be dashboard cards.
+  // The dashboard renderer resolves a pin against the current permitted sidebar
+  // and route registries before it creates a card.
+  return path !== '/dashboard' && !path.startsWith('/kiosk/') && path !== '/kiosk' &&
+    !path.startsWith('/resources/');
 }
 
 @Injectable()
