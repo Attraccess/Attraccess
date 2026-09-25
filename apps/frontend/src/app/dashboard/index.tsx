@@ -57,7 +57,7 @@ function usePageEntries(pins: Pin[]): PageEntry[] {
       if (!item || (builtInPaths.has(pin.itemId) && !sidebarItems.some((group) => ('items' in group ? group.items : [group]).some((entry) => entry.path === pin.itemId)))) return [];
       const route = routes.find((candidate) => candidate.path === pin.itemId);
       if (!route || (route.authRequired && route.authRequired !== true && !hasRequiredPermissions(route.authRequired, hasPermission))) return [];
-      if (pin.itemId.startsWith('/kiosk') || pin.itemId === '/dashboard' || /^https?:/.test(pin.itemId)) return [];
+      if (pin.itemId === '/kiosk/companion' || /^\/kiosk\/resources\/\d+$/.test(pin.itemId) || pin.itemId === '/dashboard' || /^https?:/.test(pin.itemId)) return [];
       if ('isExternal' in item && item.isExternal) return [];
       return [{ path: pin.itemId, title: item.title, icon: item.icon ?? <LayoutDashboardIcon size={22} />, badgeCount: 'badgeCount' in item ? item.badgeCount : undefined, pin }];
     });

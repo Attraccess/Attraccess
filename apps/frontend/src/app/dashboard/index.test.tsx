@@ -184,6 +184,23 @@ describe('Dashboard', () => {
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
   });
 
+  it('shows a permitted plugin page whose path starts with the kiosk prefix', async () => {
+    usePluginState.setState({
+      plugins: [{
+        plugin: {
+          getSidebarItems: () => [{ path: '/kiosk-guide', label: 'Kiosk guide' }],
+          getRoutes: () => [{ path: '/kiosk-guide', authRequired: true }],
+        },
+      } as never],
+      isInitialized: true,
+    });
+    getPins.mockResolvedValue([page('/kiosk-guide')]);
+
+    mount(<DashboardPage />);
+
+    expect(await screen.findByRole('link', { name: 'Kiosk guide' })).toHaveAttribute('href', '/kiosk-guide');
+  });
+
   it('keeps landing on the dashboard after plugin discovery cannot resolve a persisted pin', async () => {
     usePluginState.setState({ isInitialized: false });
     getPins.mockResolvedValue([page('/uninstalled-plugin')]);
