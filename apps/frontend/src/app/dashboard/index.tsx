@@ -20,17 +20,12 @@ import { CSS } from '@dnd-kit/utilities';
 
 function Landing() {
   const { data, isLoading, isError, refetch } = useDashboardPins();
-  const { isLoading: isLicenseLoading } = useLicenseServiceGetLicenseInformation();
-  const pluginsInitialized = usePluginState((state) => state.isInitialized);
-  const entries = usePageEntries(data ?? []);
+  useLicenseServiceGetLicenseInformation();
   if (isLoading) return null;
   if (isError) return <div className="p-6"><p>Could not load your dashboard.</p><button onClick={() => void refetch()}>Retry loading pins</button></div>;
   if (!data?.length) return <Navigate to="/resources" replace />;
   if (data.some((pin) => pin.itemType === 'resource')) return <DashboardPage />;
-  if (isLicenseLoading) return null;
-  if (entries.length) return <DashboardPage />;
-  if (!pluginsInitialized) return null;
-  return <Navigate to="/resources" replace />;
+  return <DashboardPage />;
 }
 
 type PageEntry = { pin: Pin; path: string; title: string; icon?: React.ReactNode; badgeCount?: number };
@@ -67,7 +62,6 @@ function DashboardPage() {
   const { t } = useTranslations({ en, de });
   const { data: pins = [], isLoading, isError, refetch } = useDashboardPins();
   const entries = usePageEntries(pins);
-  const unavailable = pins.filter((pin) => pin.itemType === 'page' && !entries.some((entry) => entry.pin.itemId === pin.itemId));
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }));
 
   const reorder = (from: string, to: string) => {
@@ -84,7 +78,7 @@ function DashboardPage() {
   return <section className="p-6">
     <header className="mb-6 flex items-center gap-3"><LayoutDashboardIcon /><div><h1 className="text-2xl font-semibold">{t('title')}</h1><p className="text-sm text-muted">{t('subtitle')}</p></div></header>
     {isError ? <Card className="p-6"><p>Could not load your dashboard.</p><button onClick={() => void refetch()}>{t('retry')}</button></Card> : null}
-    {!isLoading && !isError && pins.length === unavailable.length ? <Card className="p-6"><h2 className="text-lg font-semibold">{t('emptyTitle')}</h2><p className="mt-2">{t('emptyDescription')}</p><Link className="mt-3 underline" to="/resources">{t('resources')}</Link></Card> : null}
+    {!isLoading && !isError && entries.length === 0 && !pins.some((pin) => pin.itemType === 'resource') ? <Card className="p-6"><h2 className="text-lg font-semibold">{t('emptyTitle')}</h2><p className="mt-2">{t('emptyDescription')}</p><Link className="mt-3 underline" to="/resources">{t('resources')}</Link></Card> : null}
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={({ active, over }) => { if (over) reorder(String(active.id), String(over.id)); }}>
     <SortableContext items={pins.map((pin) => `${pin.itemType}:${pin.itemId}`)} strategy={rectSortingStrategy}>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -101,7 +95,6 @@ function DashboardPage() {
       })() : <ResourcePinCard key={`resource:${pin.itemId}`} pin={pin} openLabel={t('open')} resourceLabel={t('resource')} unpinLabel={t('unpin')} onUnpin={() => removePin(pin)} />)}
     </div>
     </SortableContext></DndContext>
-    {!isError && !!unavailable.length && <div className="mt-6"><h2 className="mb-3 font-semibold">{t('unavailable')}</h2>{unavailable.map((pin) => <Card key={pin.itemId} className="mb-2 flex items-center justify-between p-4"><span>{pin.itemId}</span><button aria-label={`${t('unpin')} ${pin.itemId}`} onClick={() => removePin(pin)}>★</button></Card>)}</div>}
   </section>;
 }
 

@@ -63,7 +63,7 @@ describe('Dashboard', () => {
     expect(screen.getByRole('link', { name: '3D Models' })).toBeInTheDocument();
   });
 
-  it('falls back to resources when the only pin cannot be resolved, but lets users remove it on the dashboard', async () => {
+  it('keeps the dashboard as the landing for an unresolved persisted pin and hides its card', async () => {
     getPins.mockResolvedValue([page('/uninstalled-plugin')]);
     mount(
       <Routes>
@@ -71,13 +71,13 @@ describe('Dashboard', () => {
         <Route path="/resources" element={<span>Resources landing</span>} />
       </Routes>,
     );
-    expect(await screen.findByText('Resources landing')).toBeInTheDocument();
-    mount(<DashboardPage />);
-    expect(await screen.findByRole('button', { name: 'Unpin /uninstalled-plugin' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unpin /uninstalled-plugin' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No available shortcuts' })).toBeInTheDocument();
   });
 
-  it('falls back to resources when the only pinned page requires a revoked permission', async () => {
+  it('keeps the dashboard for a revoked permission pin while hiding its card', async () => {
     hasPermission.mockReturnValue(false);
     getPins.mockResolvedValue([page('/users')]);
     mount(
@@ -86,7 +86,9 @@ describe('Dashboard', () => {
         <Route path="/resources" element={<span>Resources landing</span>} />
       </Routes>,
     );
-    expect(await screen.findByText('Resources landing')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
     expect(hasPermission).toHaveBeenCalledWith('users.read');
   });
 
@@ -175,7 +177,7 @@ describe('Dashboard', () => {
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
   });
 
-  it('falls back only after plugin discovery finishes without resolving the pin', async () => {
+  it('keeps landing on the dashboard after plugin discovery cannot resolve a persisted pin', async () => {
     usePluginState.setState({ isInitialized: false });
     getPins.mockResolvedValue([page('/uninstalled-plugin')]);
     const { client } = mount(
@@ -188,7 +190,8 @@ describe('Dashboard', () => {
     await waitFor(() => expect(client.getQueryData(['dashboard', 'pins'])).toEqual([page('/uninstalled-plugin')]));
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
     usePluginState.setState({ isInitialized: true });
-    expect(await screen.findByText('Resources landing')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
   });
 
   it('sends individual removal operations without replacing other pins', async () => {
