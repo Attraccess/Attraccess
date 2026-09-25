@@ -8,22 +8,14 @@ import { TestWrapper } from '../../../test-utils/wrappers';
 const locale = vi.hoisted(() => ({ current: 'en' }));
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = locale.current === 'de' ? {
-        title: 'Passwort zurücksetzen',
-        goBackButton: 'Zurück zur Anmeldung',
-        mainButton: 'Passwort zurücksetzen',
-        emailLabel: 'E-Mail-Adresse',
-      } : {
-        title: 'Password Reset',
-        goBackButton: 'Back to sign in',
-        mainButton: 'Reset password',
-        emailLabel: 'Email address',
-      };
-      return translations[key] ?? key;
-    },
-  }),
+  useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+    const translations = locales[locale.current];
+    const t = (key: string) => key.split('.').reduce<unknown>(
+      (value, part) => value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+      translations,
+    ) ?? key;
+    return { t };
+  },
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

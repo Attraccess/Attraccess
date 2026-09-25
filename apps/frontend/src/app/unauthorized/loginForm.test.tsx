@@ -14,49 +14,21 @@ let resendOnSuccess: (() => void) | undefined;
 let resendOnError: ((error: unknown) => void) | undefined;
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => {
-    const translations: Record<string, string> = locale.current === 'de' ? {
-      title: 'Willkommen zurück, Maker!',
-      noAccount: 'Noch kein Konto?',
-      signUpButton: 'Konto erstellen',
-      username: 'Benutzername',
-      password: 'Passwort',
-      twoFactorCode: 'Authenticator-Code',
-      twoFactorHelper: 'Nur eingeben, wenn du 2FA bereits eingerichtet hast.',
-      forgotPassword: 'Passwort vergessen?',
-      signInButton: 'Anmelden',
-      signingIn: 'Anmelden...',
-      'accordion.title': 'Anmelden mit E-Mail und Passwort',
-      'resendVerification.prompt': 'Verifizierungs-E-Mail nicht erhalten?',
-      'resendVerification.emailLabel': 'E-Mail-Adresse',
-      'resendVerification.button': 'Verifizierungsmail erneut senden',
-      'resendVerification.successTitle': 'E-Mail gesendet!',
-      'resendVerification.successMessage': 'Ein neuer Verifizierungslink wurde gesendet.',
-    } : {
-      title: 'Welcome back, maker!',
-      noAccount: "Don't have an account?",
-      signUpButton: 'Create an account',
-      username: 'Username',
-      password: 'Password',
-      twoFactorCode: 'Authenticator code',
-      twoFactorHelper: 'Enter the code if you already set up 2FA.',
-      forgotPassword: 'Forgot password?',
-      signInButton: 'Sign in',
-      signingIn: 'Signing in...',
-      'accordion.title': 'Sign in with email and password',
-      'api.UserEmailNotVerifiedException.title': 'Email not verified',
-      'api.UserEmailNotVerifiedException.description': 'Please verify your email before signing in.',
-      'api.generic.title': 'Server Error',
-      'api.generic.description': '{{error}}',
-      'resendVerification.prompt': "Didn't receive the verification email?",
-      'resendVerification.emailLabel': 'Email address',
-      'resendVerification.button': 'Resend verification email',
-      'resendVerification.successTitle': 'Email sent!',
-      'resendVerification.successMessage': 'A new verification link has been sent.',
+  useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+    const translations = locales[locale.current];
+    const lookup = (key: string) => key.split('.').reduce<unknown>(
+      (value, part) => value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+      translations,
+    );
+    const t = (key: string, vars?: Record<string, unknown>) => {
+      const value = lookup(key);
+      if (typeof value !== 'string') return key;
+      return Object.entries(vars ?? {}).reduce(
+        (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, String(replacement)),
+        value,
+      );
     };
-
-    const t = (key: string) => translations[key] ?? key;
-    const tExists = (key: string) => Boolean(translations[key]);
+    const tExists = (key: string) => lookup(key) !== undefined;
     return { t, tExists };
   },
 }));
@@ -159,7 +131,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    expect(screen.getByText("Didn't receive the verification email?")).toBeInTheDocument();
+    expect(screen.getByText("Didn't receive the verification email or link expired? Enter your email to get a new one.")).toBeInTheDocument();
     expect(screen.getByTestId('resend-email-input')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument();
   });

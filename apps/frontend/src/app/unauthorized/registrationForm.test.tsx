@@ -11,58 +11,21 @@ const onHasAccountMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => {
-    const translations: Record<string, string> = locale.current === 'de' ? {
-      title: 'Bereit zum Gestalten?',
-      hasAccount: 'Hast du bereits ein Konto?',
-      signInButton: 'Anmelden',
-      username: 'Benutzername',
-      usernameDescription: '3-32 Zeichen.',
-      'usernameValidation.length': 'Ungültige Länge.',
-      'usernameValidation.format': 'Ungültiges Format.',
-      email: 'E-Mail-Adresse',
-      password: 'Passwort',
-      passwordConfirmation: 'Bestätige dein Passwort',
-      createAccountButton: 'Konto erstellen',
-      creatingAccount: 'Dein Konto wird erstellt...',
-      generatePassword: 'Starkes Passwort generieren',
-      'validationError.passwordsDoNotMatch': 'Die Passwörter stimmen nicht überein',
-      'success.title': 'Konto erfolgreich erstellt!',
-      'success.message': 'Aktivierungs-E-Mail an {email} gesendet.',
-      'success.closeButton': 'Verstanden',
-    } : {
-      title: 'Ready to create?',
-      hasAccount: 'Already have an account?',
-      signInButton: 'Sign in',
-      username: 'Username',
-      usernameDescription: '3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.',
-      'usernameValidation.length': 'Username must be between 3 and 32 characters.',
-      'usernameValidation.format': 'Only letters, numbers, underscores, hyphens, and dots are allowed.',
-      email: 'Email address',
-      password: 'Password',
-      passwordConfirmation: 'Confirm your password',
-      createAccountButton: 'Create account',
-      creatingAccount: 'Creating your account...',
-      generatePassword: 'Generate strong password',
-      'validationError.passwordsDoNotMatch': 'The passwords do not match',
-      'success.title': 'Account Created Successfully!',
-      'success.message':
-        'We have sent an activation email to {email}. Please check your inbox and click the activation link to complete your registration.',
-      'success.closeButton': 'Got it',
-    };
-
+  useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+    const translations = locales[locale.current];
+    const lookup = (key: string) => key.split('.').reduce<unknown>(
+      (value, part) => value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+      translations,
+    );
     const t = (key: string, vars?: Record<string, unknown>) => {
-      let value = translations[key] ?? key;
-      if (vars) {
-        Object.entries(vars).forEach(([varKey, varValue]) => {
-          value = value.replace(`{{${varKey}}}`, String(varValue));
-        });
-      }
-      return value;
+      const value = lookup(key);
+      if (typeof value !== 'string') return key;
+      return Object.entries(vars ?? {}).reduce(
+        (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, String(replacement)),
+        value,
+      );
     };
-
-    const tExists = (key: string) => Boolean(translations[key]);
-
+    const tExists = (key: string) => lookup(key) !== undefined;
     return { t, tExists };
   },
 }));
