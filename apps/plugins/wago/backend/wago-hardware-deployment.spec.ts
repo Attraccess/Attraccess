@@ -315,11 +315,12 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(fixture.containers()[0].running).toBe(false);
   });
 
-  it('bounds both complete gate entry points to 300 seconds with a five-second kill grace', () => {
+  it('allows start to cover complete gates and bounded supervisor handoff phases', () => {
     const script = wagoRuntimeBootScript();
-    expect(script).toContain('observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&-)');
-    expect(script).toContain('if timeout -k 5 300 "$hook" "$action-checked"; then');
-    expect(script.match(/timeout -k 5 300 "\$hook"/g)).toHaveLength(2);
+    expect(script).toContain('observation=$(timeout -k 5 600 "$hook" "$cycle" 8>&-)');
+    expect(script).toContain('if timeout -k 5 1500 "$hook" "$action-checked"; then');
+    expect(script.match(/timeout -k 5 600 "\$hook"/g)).toHaveLength(1);
+    expect(script.match(/timeout -k 5 1500 "\$hook"/g)).toHaveLength(1);
   });
 
   it.each(['start', 'supervise'])(

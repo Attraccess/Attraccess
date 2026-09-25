@@ -155,7 +155,7 @@ console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
     'bin/timeout',
     `
 const args=process.argv.slice(2);
-if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300'].includes(args[2]))process.exit(99);
+if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300','600','1500'].includes(args[2]))process.exit(99);
 if(process.env.FAULT==='gate-timeout'&&args[3].endsWith('/S99_zz_attraccess_wago'))process.exit(124);
 const root=process.env.FIXTURE_ROOT;
 const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';
@@ -397,7 +397,7 @@ if(args[0]==='container'&&args[1]==='ls'){
         mkdirSync(join(root, path, 'fd'), { recursive: true });
       }
     },
-    run: (script: string, fault = '', input?: Buffer, timeout = 60000) => {
+    run: (script: string, fault = '', input?: Buffer, timeout = 300000) => {
       if (fault === 'codesys2' && read('plc') === 'running') file('proc/77/comm', 'plclinux_rt\n');
       return spawnSync('/bin/sh', ['-c', `${script}\nstatus=$?\nexit "$status"`], {
         input,

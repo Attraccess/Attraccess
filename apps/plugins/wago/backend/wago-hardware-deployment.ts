@@ -258,8 +258,8 @@ test "$(stat -c '%u:%g:%a' "$root${WAGO_DIN}")" = 10001:10001:400 &&
 /** Docker cannot restart this writer. Every boot, explicit start and bounded
  * crash retry passes the host gate. The supervisor also withdraws a running
  * writer when its periodic observation detects a conflict or cannot complete.
- * The 300s gate budget accommodates the observed FW31 172543ms hardware check
- * (161064ms host IO, 8995ms CODESYS), within the 30-minute operation limit.
+ * The 600s gate budget accommodates its two required FW31 host-I/O scans
+ * (161064ms each) and CODESYS check, within the 30-minute operation limit.
  * This timing allowance is not safety certification or physical qualification.
  */
 export function wagoRuntimeBootScript(testRoot = ''): string {
@@ -315,7 +315,7 @@ case "$action" in
       set -- "$config"/supervisor-start.*
       cycle=cycle
       test "$retries" -lt 5 || cycle=watch
-      if observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&-); then
+      if observation=$(timeout -k 5 600 "$hook" "$cycle" 8>&-); then
         busy=0
         case "$observation" in
           started) retries=$((retries + 1)) ;;
@@ -340,9 +340,9 @@ case "$action" in
     test -f "$hook" && test ! -L "$hook" && test "$(stat -c '%u:%g:%a:%h' "$hook")" = 0:0:700:1 || fail 'Unsafe runtime boot hook'
     exec 9>&-
     supervisor_owner=1
-    # Bound the complete gate, including host /proc and filesystem observations.
-    # The outer owner contains a timeout even if the child cannot run its trap.
-    if timeout -k 5 300 "$hook" "$action-checked"; then
+    # Start performs a complete 600s gate, then waits for the supervisor's
+    # separate 600s gate and 300s install-lock reacquisition.
+    if timeout -k 5 1500 "$hook" "$action-checked"; then
       exit 0
     else
       status=$?

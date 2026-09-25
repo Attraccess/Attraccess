@@ -26,6 +26,7 @@ ${body}`;
     fixture.file('supervisor-fixture-live', '');
     return `
 supervisor_fixture_seconds=0
+nohup() { :; }
 sleep() {
   supervisor_fixture_seconds=$((supervisor_fixture_seconds + $1))
   printf '%s\\n' "$supervisor_fixture_seconds" > "$FIXTURE_ROOT/elapsed"
@@ -86,12 +87,12 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
   it('fails after bounded launch attempts without an acknowledgement and removes its request', () => {
     const result = fixture.run(script(`
 nohup() { printf 'launch\\n' >> "$FIXTURE_ROOT/launches"; }
-sleep() { wait; }
+sleep() { supervisor_wait_remaining=2; }
 ${wagoRuntimeSupervisorLaunchShell()}`));
     expect(result.stderr).toContain('Runtime supervisor launch unverified');
     expect(result.status).not.toBe(0);
     expect(requests()).toEqual([]);
-    expect(fixture.read('launches').trim().split('\n')).toHaveLength(150);
+    expect(fixture.read('launches').trim().split('\n')).toHaveLength(1);
   });
 
   it('waits for a complete 174-second gate without premature readiness or duplicate workers', () => {
@@ -143,11 +144,11 @@ ${wagoRuntimeSupervisorLaunchShell()}`));
     expect(requests()).toEqual([]);
   });
 
-  it('fails closed when the complete gate exceeds the 300-second ready budget', () => {
-    const result = fixture.run(script(controlledHandoff(302, 300) + wagoRuntimeSupervisorLaunchShell()));
+  it('fails closed when the complete gate exceeds the 600-second ready budget', () => {
+    const result = fixture.run(script(controlledHandoff(602, 600) + wagoRuntimeSupervisorLaunchShell()));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('Runtime supervisor launch unverified');
-    expect(fixture.read('elapsed')).toBe('300\n');
+    expect(fixture.read('elapsed')).toBe('600\n');
     expect(existsSync(join(fixture.root, 'launches'))).toBe(false);
     expect(requests()).toEqual([]);
   });

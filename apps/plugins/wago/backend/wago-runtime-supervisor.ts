@@ -20,9 +20,9 @@ launch_runtime_supervisor() {
   # Defer a catchable interruption until rollback can again own install.lock.
   trap 'supervisor_interrupted=1' HUP INT TERM
   exec 9>&-
-  # FW31's complete gate has measured 173s. Allow 300s of polling for each
-  # handoff phase, without changing the supervisor's lease/recovery policy.
-  supervisor_wait_remaining=300
+  # A complete FW31 gate includes two required host-I/O scans. Allow 600s for
+  # readiness, without changing the supervisor's lease/recovery policy.
+  supervisor_wait_remaining=600
   supervisor_candidate=
   supervisor_acknowledged=0
   while test "$supervisor_wait_remaining" -gt 0 && test "$supervisor_interrupted" = 0; do
