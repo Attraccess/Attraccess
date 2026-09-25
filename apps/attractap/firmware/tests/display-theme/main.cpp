@@ -868,6 +868,7 @@ int main(int argc, char **argv)
         Renderer renderer(output);
         unsigned passed = 0, failed = 0;
         const auto test = [&](const char *name, auto run) {
+            Fixtures::activeLanguage = "de";
             Fixtures::nowMs = 1000;
             Fixtures::network = {};
             Fixtures::websocket = {};
@@ -894,6 +895,18 @@ int main(int argc, char **argv)
         test("screen/boot", [&] { testBoot(renderer); });
         test("screen/init", [&] { testInit(renderer); });
         test("screen/enrollment", [&] { testCard<EnrollmentScreen>(renderer, "enrollment", "Karte wird beschrieben...\nbitte nicht bewegen", "Karte registriert!"); });
+        test("i18n/enrollment-locale-transition", [&] {
+            EnrollmentScreen card;
+            card.init();
+            ScreenGuard screen(card.getScreen(), &card);
+            requireObject(screen.root, &lv_label_class, "Karte an den Leser halten");
+            Fixtures::activeLanguage = "en";
+            card.loop();
+            requireObject(screen.root, &lv_label_class, "Hold card to reader");
+            requireObject(screen.root, &lv_label_class, "Register new card");
+            card.setStatus(EnrollmentScreen::STATUS_WRITING);
+            requireObject(screen.root, &lv_label_class, "Writing card...\nplease keep it still");
+        });
         test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurückgesetzt...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });

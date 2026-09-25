@@ -3,6 +3,7 @@
 #include "display/theme.hpp"
 #include "display/shared/headerButton.hpp"
 #include "display/images/lockscreen_background_image.hpp"
+#include "state/state.hpp"
 #include <string>
 
 #include <cstring>
@@ -20,12 +21,16 @@ void Lockscreen::init()
     lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
 
     lv_obj_t *label = lv_label_create(this->screen);
+    this->signInPromptLabel = label;
     lv_obj_set_width(label, LV_SIZE_CONTENT);
     lv_obj_set_height(label, LV_SIZE_CONTENT);
     lv_obj_set_x(label, 12);
     lv_obj_set_y(label, -57);
     lv_obj_set_align(label, LV_ALIGN_CENTER);
-    lv_label_set_text(label, "Bitte mit NFC \n        Karte/Tag anmelden");
+    this->renderedLanguage = State::getActiveLanguage();
+    lv_label_set_text(label, this->renderedLanguage == "en"
+        ? "Tap your NFC \n        card/tag to sign in"
+        : "Bitte mit NFC \n        Karte/Tag anmelden");
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -94,6 +99,14 @@ lv_obj_t *Lockscreen::getScreen()
 
 void Lockscreen::loop()
 {
+    const std::string language = State::getActiveLanguage();
+    if (this->signInPromptLabel && language != this->renderedLanguage)
+    {
+        this->renderedLanguage = language;
+        lv_label_set_text(this->signInPromptLabel, language == "en"
+            ? "Tap your NFC \n        card/tag to sign in"
+            : "Bitte mit NFC \n        Karte/Tag anmelden");
+    }
 }
 
 std::string Lockscreen::getName()

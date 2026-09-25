@@ -46,6 +46,9 @@ private:
     lv_obj_t *userNameLabel = nullptr;
     lv_obj_t *statusLabel = nullptr;
     lv_obj_t *cancelButton = nullptr;
+    lv_obj_t *titleLabel = nullptr;
+    lv_obj_t *cancelLabel = nullptr;
+    std::string renderedLanguage;
     std::string userNameCache;
     std::string statusMessageOverride;
     Status status = STATUS_WAITING;

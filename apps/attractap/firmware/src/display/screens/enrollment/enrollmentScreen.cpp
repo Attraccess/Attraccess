@@ -5,6 +5,7 @@
 #include <functional>
 
 #include "platform.hpp"
+#include "state/state.hpp"
 
 void EnrollmentScreen::init()
 {
@@ -40,9 +41,10 @@ void EnrollmentScreen::init()
 
    // Title
    lv_obj_t *title = lv_label_create(this->screen);
+   this->titleLabel = title;
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   lv_label_set_text(title, "Neue Karte registrieren");
+   lv_label_set_text(title, State::getActiveLanguage() == "en" ? "Register new card" : "Neue Karte registrieren");
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -75,8 +77,9 @@ void EnrollmentScreen::init()
    lv_obj_add_event_cb(this->cancelButton, &EnrollmentScreen::onCancelButtonEvent, LV_EVENT_CLICKED, this);
 
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
+   this->cancelLabel = cancelLabel;
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(cancelLabel, "Abbrechen");
+   lv_label_set_text(cancelLabel, State::getActiveLanguage() == "en" ? "Cancel" : "Abbrechen");
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -87,6 +90,14 @@ void EnrollmentScreen::init()
 void EnrollmentScreen::loop()
 {
    this->updateTimeoutBar();
+   const std::string language = State::getActiveLanguage();
+   if (language != this->renderedLanguage)
+   {
+      this->renderedLanguage = language;
+      if (this->titleLabel) lv_label_set_text(this->titleLabel, language == "en" ? "Register new card" : "Neue Karte registrieren");
+      if (this->cancelLabel) lv_label_set_text(this->cancelLabel, language == "en" ? "Cancel" : "Abbrechen");
+      this->applyStatus();
+   }
 }
 
 void EnrollmentScreen::updateTimeoutBar()
@@ -115,24 +126,25 @@ void EnrollmentScreen::applyStatus()
       return;
    }
 
+   const bool english = State::getActiveLanguage() == "en";
    const char *text = "";
    lv_color_t color = DisplayTheme::text();
    switch (this->status)
    {
    case STATUS_WAITING:
-      text = "Karte an den Leser halten";
+      text = english ? "Hold card to reader" : "Karte an den Leser halten";
       color = DisplayTheme::text();
       break;
    case STATUS_WRITING:
-      text = "Karte wird beschrieben...\nbitte nicht bewegen";
+      text = english ? "Writing card...\nplease keep it still" : "Karte wird beschrieben...\nbitte nicht bewegen";
       color = DisplayTheme::warning();
       break;
    case STATUS_SUCCESS:
-      text = "Karte registriert!";
+      text = english ? "Card registered!" : "Karte registriert!";
       color = DisplayTheme::success();
       break;
    case STATUS_ERROR:
-      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : "Fehler";
+      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : (english ? "Error" : "Fehler");
       color = DisplayTheme::danger();
       break;
    }

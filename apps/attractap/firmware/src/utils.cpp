@@ -388,7 +388,8 @@ std::string translateReaderError(const std::string &errorKey)
     if (errorKey == "SUMUP_TOPUP_FAILED")
         return english ? "Top-up failed" : "Aufladung fehlgeschlagen";
 
-    // Unknown key or free-form server message: surface the raw value so the
-    // information is not lost (e.g. door errors sent as free-form text).
-    return errorKey;
+    // Unknown keys and free-form server errors have no reliable locale. Keep
+    // them out of user-facing text and use the documented English fallback;
+    // callers retain the original value in their diagnostic/event state.
+    return "Something went wrong. Please try again.";
 }

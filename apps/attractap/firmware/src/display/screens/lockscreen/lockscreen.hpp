@@ -37,6 +37,8 @@ private:
 
     lv_obj_t *resourceNameLabel = nullptr;
     lv_obj_t *usageInfoLabel = nullptr;
+    lv_obj_t *signInPromptLabel = nullptr;
+    std::string renderedLanguage;
 
     char resourceName[API::MAX_RESOURCE_NAME_LEN];
     char username[API::MAX_USERNAME_LEN];
