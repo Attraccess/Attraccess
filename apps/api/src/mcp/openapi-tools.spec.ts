@@ -39,7 +39,10 @@ describe('generateMcpTools', () => {
       if (!operation || typeof operation !== 'object' || !('operationId' in operation)) continue;
       const id = operation.operationId as string;
       const choice = overrides[id] ?? { decision: 'deny' as const, reason: 'Reviewed fixture operation.' };
-      result[id] = { ...choice, shape: operationShape(method, path, operation) };
+      result[id] = {
+        ...choice,
+        shape: operationShape(method, path, operation, item.parameters ?? [], doc.components?.schemas ?? {}),
+      };
     }
     return result;
   };
@@ -141,5 +144,11 @@ describe('generateMcpTools', () => {
   it('lets operation parameters override shared parameters at matching name and location', () => {
     const doc: OpenApiDocument = { paths: { '/things/{id}': { parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], get: { operationId: 'getThing', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { content: { 'application/json': {} } } } } } } };
     expect(generateMcpTools(doc, manifest(doc, { getThing: { decision: 'allow', reason: 'Reviewed.' } }))[0].inputSchema.properties.id).toEqual({ type: 'integer' });
+
+    const changedSharedParameter = structuredClone(doc);
+    const shared = changedSharedParameter.paths?.['/things/{id}']?.parameters;
+    if (!Array.isArray(shared)) throw new Error('Test fixture is missing its shared path parameter');
+    shared[0] = { name: 'id', in: 'path', required: true, schema: { type: 'number' } };
+    expect(() => generateMcpTools(changedSharedParameter, manifest(doc, { getThing: { decision: 'allow', reason: 'Reviewed.' } }))).toThrow('shape drift');
   });
 });

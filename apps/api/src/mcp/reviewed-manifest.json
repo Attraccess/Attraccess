@@ -1,0 +1,1537 @@
+{
+  "getLogo": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "6af226ae"
+  },
+  "info": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "1845ffc3"
+  },
+  "rebootHost": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "06220de9"
+  },
+  "shutdownHost": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9bcd2bd9"
+  },
+  "getLocalSignupDomainWhitelist": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "6c45d01a"
+  },
+  "setLocalSignupDomainWhitelist": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0599e124"
+  },
+  "createOneUser": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "001d91f0"
+  },
+  "findMany": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "36f4c8cd"
+  },
+  "isLocalSignupEnabled": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "6e934e34"
+  },
+  "verifyEmail": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d8e79866"
+  },
+  "resendVerificationEmail": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9d21f055"
+  },
+  "acceptInvitation": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d0042379"
+  },
+  "requestPasswordReset": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "15f780d8"
+  },
+  "changePasswordViaResetToken": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "73567842"
+  },
+  "inviteUser": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4873003b"
+  },
+  "inviteUsersFromCsv": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "cadf837e"
+  },
+  "getCurrent": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "6c0c7074"
+  },
+  "requestDeleteAccount": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "e96bdf70"
+  },
+  "confirmDeleteAccount": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4301f5cd"
+  },
+  "changeMyUsername": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "cfe69923"
+  },
+  "changeMyEmail": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "ced73e55"
+  },
+  "updateMyLocale": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9f44eda6"
+  },
+  "getOneUserById": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "cf85bcdf"
+  },
+  "deleteUser": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "255a7bef"
+  },
+  "setUserPassword": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "00d5836f"
+  },
+  "changeUserUsername": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0d494658"
+  },
+  "changeUserEmail": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "14ce430d"
+  },
+  "changeUserBillingFactor": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d4f41499"
+  },
+  "getUserRoleAssignments": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "33c56767"
+  },
+  "assignRoleToUser": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "95c7d770"
+  },
+  "revokeRoleFromUser": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "3d56845c"
+  },
+  "createSession": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0453dbb4"
+  },
+  "refreshSession": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "7e6e27f7"
+  },
+  "endSession": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7870ec2f"
+  },
+  "getTwoFactorStatus": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "03d6cb1b"
+  },
+  "setupTwoFactor": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "050fb0b4"
+  },
+  "verifyTwoFactor": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "11aa7601"
+  },
+  "disableTwoFactor": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "114ada45"
+  },
+  "getTwoFactorPolicy": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "4af3023c"
+  },
+  "setTwoFactorPolicy": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "6378ddfb"
+  },
+  "listPasskeys": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "20943dff"
+  },
+  "getPasskeyRegistrationOptions": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b23d13de"
+  },
+  "verifyPasskeyRegistration": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4b7275ec"
+  },
+  "renamePasskey": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b81ca282"
+  },
+  "deletePasskey": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "2271ffdf"
+  },
+  "getPasskeyAuthenticationOptions": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "cdc48272"
+  },
+  "createSessionWithPasskey": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "adc59c5f"
+  },
+  "listApiTokens": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "960fd8c3"
+  },
+  "createApiToken": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "96bce766"
+  },
+  "updateApiToken": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c7282746"
+  },
+  "revokeApiToken": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "1999bb9d"
+  },
+  "getAllSSOProviders": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "a0956326"
+  },
+  "createOneSsoProvider": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "332e53fa"
+  },
+  "linkUserToExternalAccount": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7af9cdf3"
+  },
+  "getOneSSOProviderById": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "f02f931c"
+  },
+  "updateOneSSOProvider": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "5ffbf400"
+  },
+  "deleteOneSSOProvider": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7d7e3507"
+  },
+  "discoverAuthentikOidc": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "df888319"
+  },
+  "discoverKeycloakOidc": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d488e68d"
+  },
+  "ssoOidcLogout": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4df2a000"
+  },
+  "ssoSamlLogout": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "46a1f326"
+  },
+  "ssoOidcDeleteUser": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "bf75b0fd"
+  },
+  "ssoSamlDeleteUser": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0cdec4e7"
+  },
+  "ssoOidcUpdatePermissions": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "899eac1d"
+  },
+  "ssoSamlUpdatePermissions": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "68e04d8d"
+  },
+  "loginWithOidc": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "1ae15cfb"
+  },
+  "oidcLoginCallback": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "dfd90606"
+  },
+  "loginWithSaml": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "207c27be"
+  },
+  "samlLoginCallback": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "28c615ac"
+  },
+  "listRoles": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "bcc36b85"
+  },
+  "createRole": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4b6c94fd"
+  },
+  "listPermissions": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "bb35b943"
+  },
+  "updateRole": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d2e9a7db"
+  },
+  "deleteRole": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "fae392be"
+  },
+  "EmailTemplateController_findAll": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "e838bbc9"
+  },
+  "EmailTemplateController_findOne": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "4241699d"
+  },
+  "EmailTemplateController_update": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "63b74b21"
+  },
+  "EmailTemplateController_resetToDefault": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "dc8b5212"
+  },
+  "EmailTemplateController_getTranslations": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "cf144547"
+  },
+  "EmailTemplateController_setTranslations": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "fefac5d0"
+  },
+  "EmailTemplateController_deleteTranslations": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "409a9464"
+  },
+  "EmailLayoutController_findGlobal": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "4fb6cfa8"
+  },
+  "EmailLayoutController_update": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b23067e4"
+  },
+  "EmailLayoutController_previewLayout": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c78ae009"
+  },
+  "EmailLayoutController_resetToDefault": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "bbd694b8"
+  },
+  "SettingsController_getAuditSettings": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "be3e508e"
+  },
+  "SettingsController_updateAuditSettings": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "07bf0c11"
+  },
+  "getSystemSettings": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "a2703943"
+  },
+  "updateSystemSettings": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9e50c73f"
+  },
+  "getFirstTimeSetupStatus": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "7b590ccf"
+  },
+  "applyFirstTimeSetupSettings": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "5690e681"
+  },
+  "getMetricsSettings": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "21a43e0b"
+  },
+  "updateMetricsSettings": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "8ccc1285"
+  },
+  "generateMetricsApiKey": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c4b9d052"
+  },
+  "deleteMetricsApiKey": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "444d2052"
+  },
+  "getAuthRateLimitSettings": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "448cb70b"
+  },
+  "updateAuthRateLimitSettings": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "173daa31"
+  },
+  "getMessagingRateLimitSettings": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "a3c89efb"
+  },
+  "updateMessagingRateLimitSettings": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "e40cae09"
+  },
+  "getLicenseInformation": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "2ae18a0f"
+  },
+  "getPublicPasswordPolicy": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "66007a57"
+  },
+  "getAdminPasswordPolicy": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "fe829fad"
+  },
+  "updateAdminPasswordPolicy": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "6fec45a7"
+  },
+  "previewAdminPasswordPolicy": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "f25d2a7a"
+  },
+  "listPasswordPolicyOverrides": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "ff6b59c6"
+  },
+  "getPasswordPolicyOverride": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "18ae8e3a"
+  },
+  "upsertPasswordPolicyOverride": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "1f83ecd2"
+  },
+  "deletePasswordPolicyOverride": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "93c58819"
+  },
+  "notificationsLive": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "26f68414"
+  },
+  "notificationsGetPreferences": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "89d9a076"
+  },
+  "notificationsUpdatePreferences": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "8b4f620d"
+  },
+  "notificationsUpdateWebPresence": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "3bd82705"
+  },
+  "pushGetVapidPublicKey": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "ac168db5"
+  },
+  "pushGetVapidConfig": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "3ca4ba50"
+  },
+  "pushReplaceVapidKeys": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "6a1e531f"
+  },
+  "pushUpsertSubscription": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c14f09ab"
+  },
+  "pushDeleteSubscription": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "03d1ebe7"
+  },
+  "AuditController_meta": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "924980a6"
+  },
+  "AuditController_list": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "ce48407b"
+  },
+  "createOneResource": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "5aef29bb"
+  },
+  "getAllResources": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "ec729dc1"
+  },
+  "getAllResourcesInUse": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "65d2a12e"
+  },
+  "getOneResourceById": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "53b32aa7"
+  },
+  "updateOneResource": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9d2eb750"
+  },
+  "deleteOneResource": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "2ec2a73d"
+  },
+  "mqttServersGetAll": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "4d73f022"
+  },
+  "mqttServersCreateOne": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "5feb7c11"
+  },
+  "mqttServersGetOneById": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "04b053fc"
+  },
+  "mqttServersUpdateOne": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b4f61e56"
+  },
+  "mqttServersDeleteOne": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "77a1068c"
+  },
+  "SSEController_streamEvents": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9c75b86b"
+  },
+  "resourceGroupsCreateOne": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "3a33ab54"
+  },
+  "resourceGroupsGetMany": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "08d8e875"
+  },
+  "resourceGroupsResourcesExist": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "c4dfc784"
+  },
+  "resourceGroupsGetOne": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "fe5516fa"
+  },
+  "resourceGroupsUpdateOne": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "984200e7"
+  },
+  "resourceGroupsAddResource": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "ff6754e3"
+  },
+  "resourceGroupsRemoveResource": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0bed37f8"
+  },
+  "resourceGroupsDeleteOne": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9f357a7a"
+  },
+  "resourceGroupIntroductionsGetMany": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "e11f696d"
+  },
+  "resourceGroupIntroductionsGetHistory": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "fc407982"
+  },
+  "resourceGroupIntroductionsGrant": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "82fdc5a0"
+  },
+  "resourceGroupIntroductionsRevoke": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4eb4cb34"
+  },
+  "resourceGroupIntroducersGetMany": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "20d18cab"
+  },
+  "resourceGroupIntroducersIsIntroducer": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "7ccd3a20"
+  },
+  "resourceGroupIntroducersGrant": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "09456266"
+  },
+  "resourceGroupIntroducersRevoke": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "6cb8c83d"
+  },
+  "resourceRetrainingGetStatus": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "62f62251"
+  },
+  "resourceUsageStartSession": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "e91f78ea"
+  },
+  "resourceUsageEndSession": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0e5ac688"
+  },
+  "resourceUsageUpdateSessionProject": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "623ad6ed"
+  },
+  "lockDoor": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "de0f9741"
+  },
+  "unlockDoor": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "caf17703"
+  },
+  "unlatchDoor": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "601f9cd6"
+  },
+  "resourceUsageGetHistory": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "2a9b9bcf"
+  },
+  "resourceUsageGetActiveSession": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "1daf8c1a"
+  },
+  "resourceUsageCanControl": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "484a87f4"
+  },
+  "resourceIntroducersIsIntroducer": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "2b267db9"
+  },
+  "resourceIntroducersGetMany": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "27480b69"
+  },
+  "resourceIntroducersGrant": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "f0cdda54"
+  },
+  "resourceIntroducersRevoke": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "124a81cb"
+  },
+  "resourceIntroductionsGetMany": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "939c2987"
+  },
+  "resourceIntroductionsGrant": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "2373fdbe"
+  },
+  "resourceIntroductionsRevoke": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0b910ba4"
+  },
+  "resourceIntroductionsGetHistory": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "29252b6c"
+  },
+  "canManageMaintenance": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "4a73cf1b"
+  },
+  "createMaintenance": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "eb13268a"
+  },
+  "findMaintenances": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "5f7e8a85"
+  },
+  "getMaintenance": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "a6a7e44b"
+  },
+  "finishMaintenance": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "e2543fc6"
+  },
+  "findMaintenanceSchedules": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "3d8447af"
+  },
+  "createMaintenanceSchedule": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "a433a1b2"
+  },
+  "getMaintenanceSchedule": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "3df2f4ee"
+  },
+  "updateMaintenanceSchedule": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b5793150"
+  },
+  "deleteMaintenanceSchedule": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c8bb34d3"
+  },
+  "createMaintenanceRequest": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "8df06d7f"
+  },
+  "listMaintenanceRequests": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "a6398aeb"
+  },
+  "resolveMaintenanceRequest": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "ff7d3f2e"
+  },
+  "getBillingBalance": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "675203da"
+  },
+  "getBillingTransactions": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "d15ef740"
+  },
+  "createManualTransaction": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "f36364c4"
+  },
+  "getBillingTransaction": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "07d762a8"
+  },
+  "getResourceBillingConfiguration": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "90af4f6c"
+  },
+  "updateResourceBillingConfiguration": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "176d97ef"
+  },
+  "setSumUpApiKey": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "5aa5c3f0"
+  },
+  "setBillingConfiguration": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "8e3d2d79"
+  },
+  "getBillingConfiguration": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "4ce85d94"
+  },
+  "getSumUpConfiguration": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "7513bc4f"
+  },
+  "getSumUpReaders": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "9c4989a2"
+  },
+  "pairSumUpReader": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "28034595"
+  },
+  "removeSumUpReader": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "baf85f1e"
+  },
+  "topUpWithSumUpReader": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "19af174f"
+  },
+  "sumUpTopUpCallback": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "db454943"
+  },
+  "BillingController_streamEvents": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "90d55199"
+  },
+  "refundTransaction": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "ae8fc140"
+  },
+  "getNodeSchemas": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "ed253c1d"
+  },
+  "resolveNodeSchema": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c9c2fa9e"
+  },
+  "getResourceFlow": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "944a4a0d"
+  },
+  "saveResourceFlow": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "a6a4a326"
+  },
+  "getResourceFlowLogs": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "c046d35e"
+  },
+  "getFlowLogRecordingStatus": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "e7e2441d"
+  },
+  "startFlowLogRecording": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "6ded8bb7"
+  },
+  "stopFlowLogRecording": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c9449ea8"
+  },
+  "ResourceFlowsController_streamEvents": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7751f597"
+  },
+  "pressButton": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b7ddae1a"
+  },
+  "getButtons": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "f7d75fbd"
+  },
+  "listFlowVariables": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "1d193bf9"
+  },
+  "upsertFlowVariable": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0e067041"
+  },
+  "deleteFlowVariable": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "cac6aa87"
+  },
+  "getResourceHealth": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "c1ef3fbf"
+  },
+  "clearResourceHealthEntry": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b40bb2e8"
+  },
+  "listCompanionDevices": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "cfc47f62"
+  },
+  "getCompanionDevice": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "2d98aa80"
+  },
+  "renameCompanionDevice": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "47332399"
+  },
+  "deleteCompanionDevice": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9b03ad6a"
+  },
+  "getCompanionDeviceResources": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "1ba66e29"
+  },
+  "getCompanionVersions": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "df286ac7"
+  },
+  "downloadCompanionBinary": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "ee349315"
+  },
+  "resourceOperatingAttributionGet": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "f152fa90"
+  },
+  "resourceOperatingDiagnosticsGetState": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "b5496c22"
+  },
+  "resourceOperatingDiagnosticsGetTransitions": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "d7e08153"
+  },
+  "resourceOperatingDiagnosticsGetDataQuality": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "3b59990b"
+  },
+  "resourceOperatingDiagnosticsVerifyTimeline": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "041ed5b5"
+  },
+  "findManyProjects": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "c3b1fa68"
+  },
+  "createProject": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "e5e4cba2"
+  },
+  "findOneProject": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "348aef7d"
+  },
+  "deleteOneProject": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "f6e638ec"
+  },
+  "updateProject": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d8cacf81"
+  },
+  "archiveProject": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "57eaa8c6"
+  },
+  "unarchiveProject": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7e585e5c"
+  },
+  "getProjectUsageHistory": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "18269a82"
+  },
+  "getProjectUsageStats": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "0786ddf3"
+  },
+  "listProjectMembers": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "dfbd8334"
+  },
+  "removeProjectMember": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0710cdb5"
+  },
+  "listProjectInvitations": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "eab6f77e"
+  },
+  "createProjectInvitation": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0e1b49b6"
+  },
+  "resendProjectInvitation": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "55bbec9f"
+  },
+  "cancelProjectInvitation": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "a18991e8"
+  },
+  "listMyProjectInvitations": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "45a92604"
+  },
+  "acceptProjectInvitation": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7a1fe3bd"
+  },
+  "declineProjectInvitation": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "3769cfcb"
+  },
+  "resourceFormsList": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "f7bf8849"
+  },
+  "resourceFormsCreate": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "6e9d3f9a"
+  },
+  "resourceFormsGetRequirements": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "c2622510"
+  },
+  "resourceFormsGetOne": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "8d1dff3d"
+  },
+  "resourceFormsUpdate": {
+    "decision": "deny",
+    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "394965c4"
+  },
+  "resourceFormsDelete": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "12de36e7"
+  },
+  "resourceUsageRequestSupervisedSession": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b6a5ca08"
+  },
+  "supervisionListPendingRequests": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "55dddb26"
+  },
+  "supervisionLive": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "18550d2f"
+  },
+  "supervisionApproveRequest": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "060752af"
+  },
+  "supervisionRejectRequest": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7c420466"
+  },
+  "getCurrentVersion": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "b21e134d"
+  },
+  "getSystemInfo": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "43203346"
+  },
+  "getUpdateStatus": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "b3f111e8"
+  },
+  "PluginController_listRegistries": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "2725ea30"
+  },
+  "PluginController_addRegistry": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "dccb00bf"
+  },
+  "PluginController_testRegistry": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "adb3fa2a"
+  },
+  "PluginController_removeRegistry": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "894f967c"
+  },
+  "PluginController_packageMetadata": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9a9923d3"
+  },
+  "PluginController_packageVersions": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "fcfa1a6f"
+  },
+  "PluginController_searchMarketplace": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "8124905b"
+  },
+  "PluginController_marketplacePackage": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "fa7c82c9"
+  },
+  "PluginController_installPackage": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "f3157b29"
+  },
+  "PluginController_installPackageSpec": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "b21f113e"
+  },
+  "PluginController_removeInstalledPackage": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d6dfbde8"
+  },
+  "PluginController_installedPackages": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "16d2d73d"
+  },
+  "PluginController_updatePolicy": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "cb1e84a3"
+  },
+  "PluginController_setUpdatePolicy": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "95ceae39"
+  },
+  "PluginController_checkAllInstalledPackages": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "7d8f6b97"
+  },
+  "PluginController_checkInstalledPackage": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "cdb48a26"
+  },
+  "PluginController_updateInstalledPackageSpec": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4a397049"
+  },
+  "PluginController_updateInstalledPackageOverride": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "ee8fc953"
+  },
+  "PluginController_updateInstalledPackagePolicy": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "3a773a62"
+  },
+  "PluginController_installedPackageVersions": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0102ccc4"
+  },
+  "PluginController_replaceInstalledPackage": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "0f082f5a"
+  },
+  "getPlugins": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "45a48be9"
+  },
+  "uploadPlugin": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "35395a84"
+  },
+  "getPluginSystemStatus": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "7b234301"
+  },
+  "retryPlugin": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "a54ea0df"
+  },
+  "getFrontendPluginFile": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "be98ef8b"
+  },
+  "deletePlugin": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "dbb60b03"
+  },
+  "enrollNfcCard": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "77b4d81c"
+  },
+  "resetNfcCard": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "4ea1c19c"
+  },
+  "updateReader": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "826af2f3"
+  },
+  "getReaderById": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "47f4bdef"
+  },
+  "deleteReader": {
+    "decision": "deny",
+    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "dcd5958c"
+  },
+  "getReaders": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "b79bbf3e"
+  },
+  "getReaderCrashReports": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "cbe5a59d"
+  },
+  "getReaderCrashReportCoredump": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "caef1ae7"
+  },
+  "getAppKeyByUid": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "5f00e8fa"
+  },
+  "getAllCards": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "2d9dc44b"
+  },
+  "toggleCardActive": {
+    "decision": "deny",
+    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "1ca93042"
+  },
+  "getFirmwares": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "34c3876b"
+  },
+  "downloadFirmwareBinary": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "fc267031"
+  },
+  "getFirmwareBinary": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "88c2202f"
+  },
+  "getResourceUsageHoursInDateRange": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "5514e4f6"
+  },
+  "getResourceOperatingDurations": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "c616a27a"
+  },
+  "getBillingTransactionsInDateRange": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "f19a7f48"
+  },
+  "messagingLive": {
+    "decision": "deny",
+    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "1455a7a3"
+  },
+  "messagingContactUser": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "365358b4"
+  },
+  "messagingContactResourceHolder": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "9a537852"
+  },
+  "messagingListConversations": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "24d06cd4"
+  },
+  "messagingGetUnreadCount": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "3766a95d"
+  },
+  "messagingMarkConversationRead": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "91e66e9c"
+  },
+  "messagingListMessages": {
+    "decision": "allow",
+    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "shape": "d30ea045"
+  },
+  "messagingSendMessage": {
+    "decision": "deny",
+    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "shape": "d041fabd"
+  }
+}

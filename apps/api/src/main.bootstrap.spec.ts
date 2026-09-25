@@ -28,6 +28,8 @@ jest.mock('./plugin-system/npm-plugin.service', () => ({ NpmPluginService: { rec
 jest.mock('./plugin-system/plugin-migration.service', () => ({
   PluginMigrationService: { runPendingUpMigrationsForAllPlugins: jest.fn() },
 }));
+jest.mock('./mcp/mcp-http', () => ({ registerMcpHttpEndpoints: jest.fn() }));
+jest.mock('./mcp/mcp-oauth', () => ({ registerMcpOAuthEndpoints: jest.fn(() => jest.fn()) }));
 jest.mock('fs', () => {
   const actual = jest.requireActual<typeof import('fs')>('fs');
   return { ...actual, existsSync: jest.fn(actual.existsSync) };
@@ -95,6 +97,7 @@ describe('API bootstrap ordering and configuration', () => {
     jest.spyOn(NestFactory, 'createApplicationContext').mockResolvedValue(early as never);
     jest.spyOn(NestFactory, 'create').mockResolvedValue(app as never);
     jest.spyOn(SwaggerModule, 'setup').mockImplementation(() => undefined);
+    jest.spyOn(SwaggerModule, 'createDocument').mockReturnValue({ openapi: '3.0.0', paths: {} } as never);
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);

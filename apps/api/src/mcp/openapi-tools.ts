@@ -18,12 +18,15 @@ export type McpTool = {
   description: string;
   method: string;
   path: string;
+  pathParameters: string[];
+  queryParameters: string[];
+  bodyProperties: string[];
   inputSchema: { type: 'object'; properties: Record<string, unknown>; required: string[]; additionalProperties: false };
 };
 
 const methods = new Set(['get', 'post', 'put', 'patch', 'delete']);
 const pathItemKeys = new Set(['parameters', 'servers', 'summary', 'description', '$ref']);
-const incompatibleOperation = /(?:callback|webhook|stream|live|subscribe|binary|download|upload|firmware|restart|shutdown|host.?lifecycle)/i;
+const incompatibleOperation = /(?:callback|webhook|stream|live|subscribe|binary|download|upload|firmware|restart|shutdown|host.?lifecycle|auth\/sso)/i;
 
 function resolveSchema(schema: Record<string, unknown> | undefined, schemas: Record<string, unknown>, stack = new Set<string>()): Record<string, unknown> {
   if (!schema) throw new Error('Operation has an input without a schema');
@@ -55,8 +58,14 @@ function resolveSchema(schema: Record<string, unknown> | undefined, schemas: Rec
 export type McpManifestEntry = { decision: 'allow' | 'deny'; reason: string; shape: string };
 
 /** Stable digest of the operation contract which the reviewer approved. */
-export function operationShape(method: string, path: string, operation: OpenApiOperation): string {
-  const canonical = JSON.stringify({ method: method.toUpperCase(), path, operation });
+export function operationShape(
+  method: string,
+  path: string,
+  operation: OpenApiOperation,
+  sharedParameters: unknown = [],
+  schemas: Record<string, unknown> = {},
+): string {
+  const canonical = JSON.stringify({ method: method.toUpperCase(), path, operation, sharedParameters, schemas });
   // FNV-1a is used as a review drift marker, not as a security primitive.
   let hash = 0x811c9dc5;
   for (let i = 0; i < canonical.length; i++) hash = Math.imul(hash ^ canonical.charCodeAt(i), 0x01000193) >>> 0;
@@ -86,7 +95,10 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
   for (const [id, entry] of operations) {
     const review = manifest[id];
     if (!review.reason.trim()) throw new Error(`Manifest operation ${id} has no review reason`);
-    if (review.shape !== operationShape(entry.method, entry.path, entry.operation)) throw new Error(`Reviewed operation shape drift for ${id}`);
+    const reviewedSharedParameters = document.paths?.[entry.path]?.parameters ?? [];
+    if (review.shape !== operationShape(entry.method, entry.path, entry.operation, reviewedSharedParameters, schemas)) {
+      throw new Error(`Reviewed operation shape drift for ${id}`);
+    }
     if (review.decision !== 'allow' && review.decision !== 'deny') throw new Error(`Invalid manifest decision for ${id}`);
     if (review.decision === 'deny') continue;
     if (
@@ -96,8 +108,11 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
     ) throw new Error(`Incompatible endpoint ${entry.method} ${entry.path} cannot be allowed (${id})`);
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
-      const pathParameters = document.paths?.[entry.path]?.parameters;
-    const sharedParameters = Array.isArray(pathParameters) ? pathParameters as OpenApiOperation['parameters'] : [];
+    const pathParameters: string[] = [];
+    const queryParameters: string[] = [];
+    const bodyProperties: string[] = [];
+    const sharedPathParameters = document.paths?.[entry.path]?.parameters;
+    const sharedParameters = Array.isArray(sharedPathParameters) ? sharedPathParameters as OpenApiOperation['parameters'] : [];
     const mergedParameters = new Map<string, NonNullable<OpenApiOperation['parameters']>[number]>();
     for (const parameter of sharedParameters ?? []) mergedParameters.set(`${parameter.in}:${parameter.name}`, parameter);
     for (const parameter of entry.operation.parameters ?? []) mergedParameters.set(`${parameter.in}:${parameter.name}`, parameter);
@@ -105,6 +120,8 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
       if (!['path', 'query'].includes(parameter.in)) throw new Error(`Unsupported ${parameter.in} parameter in ${id}`);
       if (Object.prototype.hasOwnProperty.call(properties, parameter.name)) throw new Error(`Duplicate input ${parameter.name} in ${id}`);
       properties[parameter.name] = resolveSchema(parameter.schema, schemas);
+      if (parameter.in === 'path') pathParameters.push(parameter.name);
+      if (parameter.in === 'query') queryParameters.push(parameter.name);
       if (parameter.required || parameter.in === 'path') required.push(parameter.name);
     }
     const body = entry.operation.requestBody;
@@ -115,16 +132,18 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
       const json = jsonMediaType ? body.content?.[jsonMediaType] : undefined;
       if (!json?.schema) throw new Error(`Unsupported request media type for ${id}`);
       const bodySchema = resolveSchema(json.schema, schemas);
-      const bodyProperties = bodySchema.properties as Record<string, unknown> | undefined;
-      if (bodySchema.type === 'object' && bodyProperties && Object.keys(bodyProperties).length > 0) {
-        for (const [name, schema] of Object.entries(bodyProperties)) {
+      const schemaBodyProperties = bodySchema.properties as Record<string, unknown> | undefined;
+      if (bodySchema.type === 'object' && schemaBodyProperties && Object.keys(schemaBodyProperties).length > 0) {
+        for (const [name, schema] of Object.entries(schemaBodyProperties)) {
           if (properties[name]) throw new Error(`Request body conflicts with parameter ${name} in ${id}`);
           properties[name] = schema;
+          bodyProperties.push(name);
         }
         if (body.required) required.push(...((bodySchema.required as string[] | undefined) ?? []));
       } else {
         if (properties.body) throw new Error(`Request body conflicts with input body in ${id}`);
         properties.body = bodySchema;
+        bodyProperties.push('body');
         if (body.required) required.push('body');
       }
     }
@@ -143,6 +162,9 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
       description: entry.operation.summary ?? `${entry.method} ${entry.path}`,
       method: entry.method,
       path: entry.path,
+      pathParameters,
+      queryParameters,
+      bodyProperties,
       inputSchema: { type: 'object', properties, required: [...new Set(required)], additionalProperties: false },
     });
   }

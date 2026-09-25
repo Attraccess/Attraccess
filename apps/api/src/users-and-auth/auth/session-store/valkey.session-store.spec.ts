@@ -28,6 +28,7 @@ describe('ValkeySessionStore', () => {
     del: jest.fn(),
     expire: jest.fn(),
     scan: jest.fn(),
+    eval: jest.fn(),
   };
   const users = { findOne: jest.fn() },
     hash = { hashToken: jest.fn((token: string) => `hashed-${token}`) };
@@ -97,5 +98,17 @@ describe('ValkeySessionStore', () => {
     expect(pipeline.srem).toHaveBeenCalledWith('user_sessions:7', 'hashed-old');
     expect(pipeline.sadd).toHaveBeenCalledWith('user_sessions:7', 'new-hash');
     expect(pipeline.exec).toHaveBeenCalledTimes(1);
+  });
+
+  it('atomically consumes a refresh session and removes its user index entry', async () => {
+    client.eval.mockResolvedValue(1);
+    expect(await store.consumeSession('refresh-token')).toBe(true);
+    expect(client.eval).toHaveBeenCalledWith(expect.stringContaining("redis.call('DEL', KEYS[1])"), 1, 'session:hashed-refresh-token', 'hashed-refresh-token');
+  });
+
+  it('atomically consumes a refresh session and removes its user index entry', async () => {
+    client.eval.mockResolvedValue(1);
+    expect(await store.consumeSession('refresh-token')).toBe(true);
+    expect(client.eval).toHaveBeenCalledWith(expect.stringContaining("redis.call('DEL', KEYS[1])"), 1, 'session:hashed-refresh-token', 'hashed-refresh-token');
   });
 });

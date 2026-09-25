@@ -13,6 +13,7 @@ export interface SessionStore {
   validateSession(token: string): Promise<User | null>;
   rotateSession(token: string, newHashedToken: string, newExpiresAt: Date): Promise<boolean>;
   revokeSession(token: string): Promise<boolean>; // true = was active
+  consumeSession(token: string): Promise<boolean>; // atomic one-time active-session removal
   revokeAllUserSessions(userId: number): Promise<number>; // count of active sessions removed
   cleanupExpired(): Promise<{ remainingActive: number } | null>; // null = TTL-managed, no cleanup needed
   getUserSessions(userId: number): Promise<Session[]>;
