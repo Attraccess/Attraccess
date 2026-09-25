@@ -92,11 +92,17 @@ public:
     };
     static WebsocketState getWebsocketState();
 
-    static void setApiState(bool authenticated, std::string deviceName);
+    static void setApiState(bool authenticated, std::string deviceName, std::string defaultLanguage = "de");
+    static void setUserLanguage(std::string language);
+    static void setDefaultLanguage(std::string language);
+    static std::string getActiveLanguage();
     struct ApiState
     {
         bool authenticated;
         std::string deviceName;
+        std::string defaultLanguage;
+        std::string userLanguage;
+        bool userAuthenticated;
     };
     static ApiState getApiState();
 

@@ -58,6 +58,9 @@ bool State::websocket_cert_locked = false;
 int State::websocket_next_attempt_seconds = 0;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
+static std::string active_default_language = "de";
+static std::string active_user_language = "en";
+static bool user_authenticated = false;
 
 void State::setEthernetState(bool connected, esp_ip4_addr_t ip)
 {
@@ -189,11 +192,17 @@ State::WebsocketState State::getWebsocketState()
     return state;
 }
 
-void State::setApiState(bool authenticated, std::string deviceName)
+void State::setApiState(bool authenticated, std::string deviceName, std::string defaultLanguage)
 {
     StateLock lock(state_mutex);
     api_authenticated = authenticated;
     api_device_name = deviceName;
+    if (defaultLanguage == "en" || defaultLanguage == "de") active_default_language = defaultLanguage;
+    if (!authenticated)
+    {
+        active_user_language = "en";
+        user_authenticated = false;
+    }
 }
 
 State::ApiState State::getApiState()
@@ -202,6 +211,28 @@ State::ApiState State::getApiState()
     ApiState state;
     state.authenticated = api_authenticated;
     state.deviceName = api_device_name;
+    state.defaultLanguage = active_default_language;
+    state.userLanguage = active_user_language;
+    state.userAuthenticated = user_authenticated;
 
     return state;
+}
+
+void State::setUserLanguage(std::string language)
+{
+    StateLock lock(state_mutex);
+    user_authenticated = !language.empty();
+    active_user_language = language == "de" ? "de" : "en";
+}
+
+void State::setDefaultLanguage(std::string language)
+{
+    StateLock lock(state_mutex);
+    active_default_language = language == "de" ? "de" : "en";
+}
+
+std::string State::getActiveLanguage()
+{
+    StateLock lock(state_mutex);
+    return user_authenticated ? active_user_language : active_default_language;
 }

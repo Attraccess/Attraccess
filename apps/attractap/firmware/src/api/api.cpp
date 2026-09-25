@@ -169,6 +169,11 @@ void API::processIncomingMessage(const char *buf, size_t len)
     {
         this->onReaderAuthenticated(inboundDoc["data"].as<JsonObject>());
     }
+    else if (strcmp(eventType, "READER_LANGUAGE") == 0)
+    {
+        const char *language = inboundDoc["data"]["payload"]["language"].as<const char *>();
+        State::setDefaultLanguage(language && strcmp(language, "de") == 0 ? "de" : "en");
+    }
     else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
     {
         this->sendAuthenticationRequest();

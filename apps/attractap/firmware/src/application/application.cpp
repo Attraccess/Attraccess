@@ -2,6 +2,7 @@
 // FEATURE: application
 
 #include "application.hpp"
+#include "../state/state.hpp"
 #include "../serial/serialCommandHandler.hpp"
 #include "platform.hpp"
 #include <cstring>
@@ -119,6 +120,7 @@ void Application::setup() {
         if (!this->cardAuthenticationPending || this->unlocked) return;
 #endif
         if (response.error.length() > 0) {
+          State::setUserLanguage("");
           this->logger.errorf("Authentication failed: %s",
                               response.error.c_str());
           this->beeper.errorBeep();

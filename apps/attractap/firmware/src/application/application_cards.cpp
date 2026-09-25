@@ -2,6 +2,7 @@
 // FEATURE: application-card-flow
 
 #include "application.hpp"
+#include "../state/state.hpp"
 
 void Application::processCardAuthenticationData() {
   this->logger.infof("Trying to authenticate with keyNo: %u",
@@ -51,6 +52,7 @@ void Application::processCardAuthenticationData() {
   this->externalState = EXTERNAL_STATE_NONE;
 
   this->unlocked = true;
+  State::setUserLanguage(this->cardAuthenticationData.language);
 #ifdef HAS_LVGL_DISPLAY
   this->finishCardAuthentication(true);
 #endif

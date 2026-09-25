@@ -40,6 +40,7 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
 import { SupervisionModule } from '../resources/supervision/supervision.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { AuditModule } from '../audit/audit.module';
     SupervisionModule,
     NotificationsModule,
     AuditModule,
+    SettingsModule,
   ],
   providers: [
     AttractapService,

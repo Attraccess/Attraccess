@@ -44,7 +44,7 @@ it('loads existing URLs and preserves the stored license when the secret field i
   fireEvent.change(screen.getByLabelText('inputs.publicInternetUrl.label'), { target: { value: '' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
-    requestBody: { app: { url: 'https://app.example', publicInternetUrl: undefined, licenseKey: undefined } },
+    requestBody: { app: { url: 'https://app.example', publicInternetUrl: undefined, licenseKey: undefined, attractapLanguage: 'de' } },
   });
 });
 it('submits a new license and clears it only after successful save', () => {
@@ -53,7 +53,7 @@ it('submits a new license and clears it only after successful save', () => {
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
     requestBody: {
-      app: { url: 'https://app.example', publicInternetUrl: 'https://public.example', licenseKey: 'new-license' },
+      app: { url: 'https://app.example', publicInternetUrl: 'https://public.example', licenseKey: 'new-license', attractapLanguage: 'de' },
     },
   });
   act(() => state.options.onError(new Error('failed')));
@@ -75,7 +75,7 @@ it('validates the wizard URL and advances after first-time setup succeeds', () =
   expect(state.setup).toHaveBeenCalledWith(
     expect.objectContaining({
       requestBody: {
-        app: { url: 'https://configured.example', publicInternetUrl: window.location.origin, licenseKey: undefined },
+        app: { url: 'https://configured.example', publicInternetUrl: window.location.origin, licenseKey: undefined, attractapLanguage: 'en' },
       },
     }),
   );

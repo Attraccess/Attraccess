@@ -121,8 +121,9 @@ void API::onReaderAuthenticated(JsonObject data)
     cancelResourceAction();
 
     std::string deviceName = data["payload"]["name"].as<std::string>();
+    std::string language = data["payload"]["language"].is<const char *>() ? data["payload"]["language"].as<std::string>() : "de";
 
-    State::setApiState(true, deviceName);
+    State::setApiState(true, deviceName, language);
 
     if (this->deviceNameCallback != nullptr)
     {

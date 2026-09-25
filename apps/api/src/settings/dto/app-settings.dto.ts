@@ -20,4 +20,7 @@ export class AppSettingsDto {
     example: true,
   })
   licenseKeyConfigured!: boolean;
+
+  @ApiProperty({ description: 'Default Attractap device language', enum: ['en', 'de'], example: 'de' })
+  attractapLanguage!: 'en' | 'de';
 }
