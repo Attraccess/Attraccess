@@ -29,6 +29,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceBillingConfigurationChangedEvent } from './events/resource-billing-configuration-changed.event';
 import { MetricsService } from '../metrics/metrics.service';
 import { AuditService } from '../audit/audit.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 @Injectable()
 export class BillingService {
@@ -151,6 +152,7 @@ export class BillingService {
     initiatorId: number,
     amount: number,
     failOnInsufficientBalance = true,
+    authenticatedUser?: Pick<AuthenticatedUser, 'authenticationMethod' | 'apiTokenId'>,
   ): Promise<BillingTransaction> {
     const user = await this.userRepository.findOneBy({ id: userId });
     if (!user) {
@@ -181,6 +183,8 @@ export class BillingService {
       transactionId: transaction.id,
       userId,
       initiatorId,
+      authenticationMethod: authenticatedUser?.authenticationMethod,
+      apiTokenId: authenticatedUser?.apiTokenId,
       amount,
       status: BillingTransactionStatus.Completed,
       source: 'manual',
@@ -451,7 +455,12 @@ export class BillingService {
     return false;
   }
 
-  public async refundTransaction(executingUserId: number, transactionId: number, data: RefundTransactionDto) {
+  public async refundTransaction(
+    executingUserId: number,
+    transactionId: number,
+    data: RefundTransactionDto,
+    authenticatedUser?: Pick<AuthenticatedUser, 'authenticationMethod' | 'apiTokenId'>,
+  ) {
     const transaction = await this.getTransaction(transactionId);
 
     if (!transaction) {
@@ -481,6 +490,8 @@ export class BillingService {
       transactionId: refundTransaction.id,
       userId: refundTransaction.userId,
       initiatorId: executingUserId,
+      authenticationMethod: authenticatedUser?.authenticationMethod,
+      apiTokenId: authenticatedUser?.apiTokenId,
       amount: refundTransaction.amount,
       status: refundTransaction.status,
       source: 'refund',

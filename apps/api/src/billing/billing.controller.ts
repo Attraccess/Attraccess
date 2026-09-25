@@ -116,7 +116,7 @@ export class BillingController {
     @Req() request: AuthenticatedRequest,
     @Body() body: ModifyBalanceDto,
   ): Promise<BillingTransaction> {
-    return await this.billingService.createManualTransaction(userId, request.user.id, body.amount);
+    return await this.billingService.createManualTransaction(userId, request.user.id, body.amount, true, request.user);
   }
 
   @Get('/resources/:resourceId/billing/configuration')
@@ -261,7 +261,7 @@ export class BillingController {
     @Body() body: SumupTopUpDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<BillingTransaction> {
-    return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount);
+    return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount, request.user);
   }
 
   @Post('/billing/top-up/sumup/callback')
@@ -303,6 +303,6 @@ export class BillingController {
     @Param('transactionId', ParseIntPipe) transactionId: number,
     @Body() data: RefundTransactionDto,
   ) {
-    return await this.billingService.refundTransaction(request.user.id, transactionId, data);
+    return await this.billingService.refundTransaction(request.user.id, transactionId, data, request.user);
   }
 }

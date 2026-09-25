@@ -181,7 +181,10 @@ describe('BillingService', () => {
       userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 5 } as User);
       billingTransactionRepository.save.mockResolvedValue({ id: 123 } as BillingTransaction);
 
-      const result = await service.createManualTransaction(1, 2, 100);
+      const result = await service.createManualTransaction(1, 2, 100, true, {
+        authenticationMethod: 'api-token',
+        apiTokenId: 4,
+      });
 
       expect(billingTransactionRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 1, initiatorId: 2, amount: 100 }),
@@ -192,6 +195,8 @@ describe('BillingService', () => {
         transactionId: 123,
         userId: 1,
         initiatorId: 2,
+        authenticationMethod: 'api-token',
+        apiTokenId: 4,
         amount: 100,
         status: BillingTransactionStatus.Completed,
         source: 'manual',

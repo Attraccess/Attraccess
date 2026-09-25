@@ -135,6 +135,8 @@ describe('durable audit SQLite', () => {
         transactionId: 7,
         userId: 42,
         initiatorId: 9,
+        authenticationMethod: 'api-token',
+        apiTokenId: 17,
         amount: 500,
         status: 'pending',
         source: 'sumup-topup',
@@ -148,6 +150,8 @@ describe('durable audit SQLite', () => {
       subjectType: 'billing.transaction',
       subjectId: 7,
       actorId: 9,
+      authenticationMethod: 'api-token',
+      apiTokenId: 17,
       details: { amount: 500, status: 'pending', source: 'sumup-topup' },
     });
     expect(

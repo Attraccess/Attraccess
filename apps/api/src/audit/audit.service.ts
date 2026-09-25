@@ -24,6 +24,8 @@ export interface BillingTransactionAuditEvent {
   transactionId: number;
   userId: number;
   initiatorId?: number | null;
+  authenticationMethod?: 'session' | 'api-token';
+  apiTokenId?: number | null;
   amount: number;
   status: string;
   previousStatus?: string;
@@ -135,8 +137,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         action: event.previousStatus === undefined ? 'billing.transaction.created' : 'billing.transaction.updated',
         operationId: `billing-transaction-${event.transactionId}`,
         actorId,
-        authenticationMethod: 'session',
-        apiTokenId: null,
+        authenticationMethod: event.authenticationMethod ?? 'session',
+        apiTokenId: event.apiTokenId ?? null,
         outcome: 'succeeded',
         subjectType: 'billing.transaction',
         subjectId: event.transactionId,

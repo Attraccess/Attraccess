@@ -3,7 +3,7 @@ import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { ForbiddenException } from '@nestjs/common';
 import { BillingTransaction, User } from '@attraccess/database-entities';
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { DeepPartial } from 'typeorm';
 import { TransactionsDto } from './dto/transactions.dto';
 import { SumUpService } from './sumup.service';
@@ -18,7 +18,10 @@ import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { Observable, Subject } from 'rxjs';
 import { LicenseService } from '../license/license.service';
 
-const baseReq = (userOverrides: DeepPartial<User> & { effectivePermissions?: Set<string> } = {}) =>
+const baseReq = (
+  userOverrides: DeepPartial<User> &
+    Pick<AuthenticatedUser, 'authenticationMethod' | 'apiTokenId' | 'effectivePermissions'> = {},
+) =>
   ({
     user: {
       id: 1,
@@ -32,6 +35,7 @@ describe('BillingController', () => {
     getBalance: jest.Mock;
     getHistory: jest.Mock;
     createManualTransaction: jest.Mock;
+    refundTransaction: jest.Mock;
     getResourceBillingConfiguration: jest.Mock;
     updateResourceBillingConfiguration: jest.Mock;
     setConfiguration: jest.Mock;
@@ -57,6 +61,7 @@ describe('BillingController', () => {
       getBalance: jest.fn(),
       getHistory: jest.fn(),
       createManualTransaction: jest.fn(),
+      refundTransaction: jest.fn(),
       getResourceBillingConfiguration: jest.fn(),
       updateResourceBillingConfiguration: jest.fn(),
       setConfiguration: jest.fn(),
@@ -159,12 +164,12 @@ describe('BillingController', () => {
   });
 
   describe('createManualTransaction', () => {
-    it('delegates to service with initiator id and amount', async () => {
+    it('delegates to service with initiator id, amount, and authentication provenance', async () => {
       const tx = { id: 123 } as BillingTransaction;
       service.createManualTransaction.mockResolvedValue(tx);
-      const req = baseReq();
+      const req = baseReq({ authenticationMethod: 'api-token', apiTokenId: 4 });
       const res = await controller.createManualTransaction(5, req, { amount: 25 });
-      expect(service.createManualTransaction).toHaveBeenCalledWith(5, 1, 25);
+      expect(service.createManualTransaction).toHaveBeenCalledWith(5, 1, 25, true, req.user);
       expect(res).toBe(tx);
     });
   });
@@ -257,12 +262,12 @@ describe('BillingController', () => {
   });
 
   describe('topUpWithSumUpReader', () => {
-    it('uses request.user.id and delegates to sumUpService', async () => {
+    it('uses request.user authentication provenance and delegates to sumUpService', async () => {
       const tx = { id: 999 } as BillingTransaction;
       sumUp.topUpWithReader.mockResolvedValue(tx);
-      const req = baseReq({ id: 55 });
+      const req = baseReq({ id: 55, authenticationMethod: 'api-token', apiTokenId: 4 });
       const res = await controller.topUpWithSumUpReader({ readerId: 'r-22', amount: 2500 }, req);
-      expect(sumUp.topUpWithReader).toHaveBeenCalledWith(55, 'r-22', 2500);
+      expect(sumUp.topUpWithReader).toHaveBeenCalledWith(55, 'r-22', 2500, req.user);
       expect(res).toBe(tx);
     });
   });
@@ -274,6 +279,15 @@ describe('BillingController', () => {
       const res = await controller.sumUpTopUpCallback(data as unknown as SumupTransactionCallbackDto);
       expect(sumUp.handleTransactionCallback).toHaveBeenCalledWith(data);
       expect(res).toEqual({ message: 'OK' });
+    });
+  });
+
+  describe('refundTransaction', () => {
+    it('passes authentication provenance to the billing service', async () => {
+      const req = baseReq({ authenticationMethod: 'api-token', apiTokenId: 4 });
+      const data = { amount: 25 };
+      await controller.refundTransaction(req, 123, data);
+      expect(service.refundTransaction).toHaveBeenCalledWith(1, 123, data, req.user);
     });
   });
 

@@ -17,6 +17,7 @@ import { BillingService } from './billing.service';
 import { CronTimer } from '../metrics/instrumentation/cron/cron.helper';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 import { AuditService } from '../audit/audit.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
@@ -155,7 +156,12 @@ export class SumUpService {
     });
   }
 
-  async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransaction> {
+  async topUpWithReader(
+    userId: number,
+    readerId: string,
+    amount: number,
+    authenticatedUser?: Pick<AuthenticatedUser, 'authenticationMethod' | 'apiTokenId'>,
+  ): Promise<BillingTransaction> {
     if (amount % 1 !== 0) {
       throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
     }
@@ -197,6 +203,8 @@ export class SumUpService {
       void this.auditService.recordBillingTransaction({
         transactionId: transaction.id,
         userId: transaction.userId,
+        authenticationMethod: authenticatedUser?.authenticationMethod,
+        apiTokenId: authenticatedUser?.apiTokenId,
         amount: transaction.amount,
         status: transaction.status,
         source: 'sumup-topup',

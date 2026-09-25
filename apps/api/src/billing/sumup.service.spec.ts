@@ -296,7 +296,10 @@ describe('SumUpService', () => {
       mockReadersCreateCheckout.mockResolvedValue({ data: { client_transaction_id: 'tx123' } });
       billingTransactionRepository.save.mockImplementation(async (t: BillingTransaction) => ({ id: 1, ...t }));
 
-      const tx = await service.topUpWithReader(42, 'reader-1', 500);
+      const tx = await service.topUpWithReader(42, 'reader-1', 500, {
+        authenticationMethod: 'api-token',
+        apiTokenId: 4,
+      });
 
       expect(mockReadersCreateCheckout).toHaveBeenCalledWith(
         merchantCode,
@@ -317,6 +320,8 @@ describe('SumUpService', () => {
       expect(mockAuditService.recordBillingTransaction).toHaveBeenCalledWith({
         transactionId: 1,
         userId: 42,
+        authenticationMethod: 'api-token',
+        apiTokenId: 4,
         amount: 500,
         status: BillingTransactionStatus.Pending,
         source: 'sumup-topup',
