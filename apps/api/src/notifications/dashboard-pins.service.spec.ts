@@ -56,21 +56,21 @@ describe('DashboardPinsService', () => {
   it('merges writes from separate sessions against the stored list', async () => {
     await service.update(5, { kind: 'add', item: page('/projects') });
     const first = service.update(5, { kind: 'add', item: page('/messages') });
-    const second = service.update(5, { kind: 'add', item: page('/settings/plugin-report') });
+    const second = service.update(5, { kind: 'add', item: page('/shelly') });
     await Promise.all([first, second]);
-    expect(await service.get(5)).toEqual([page('/projects'), page('/messages'), page('/settings/plugin-report')]);
+    expect(await service.get(5)).toEqual([page('/projects'), page('/messages'), page('/shelly')]);
     expect(userLock).toHaveBeenCalledWith({ where: { id: 5 }, lock: { mode: 'pessimistic_write' } });
     await service.update(5, { kind: 'remove', item: page('/projects') });
-    expect(await service.get(5)).toEqual([page('/messages'), page('/settings/plugin-report')]);
+    expect(await service.get(5)).toEqual([page('/messages'), page('/shelly')]);
     await service.update(5, { kind: 'remove', item: page('/messages') });
-    await service.update(5, { kind: 'remove', item: page('/settings/plugin-report') });
+    await service.update(5, { kind: 'remove', item: page('/shelly') });
     expect(await service.get(5)).toEqual([]);
   });
 
   it('moves a pin while retaining pins added in another session', async () => {
-    for (const itemId of ['/projects', '/messages', '/settings/plugin-report']) await service.update(5, { kind: 'add', item: page(itemId) });
-    await service.update(5, { kind: 'move', item: page('/settings/plugin-report'), before: page('/messages') });
-    expect(await service.get(5)).toEqual([page('/projects'), page('/settings/plugin-report'), page('/messages')]);
+    for (const itemId of ['/projects', '/messages', '/shelly']) await service.update(5, { kind: 'add', item: page(itemId) });
+    await service.update(5, { kind: 'move', item: page('/shelly'), before: page('/messages') });
+    expect(await service.get(5)).toEqual([page('/projects'), page('/shelly'), page('/messages')]);
   });
 
   it('acquires a SQLite writer lock before reading the current pins', async () => {
@@ -81,20 +81,20 @@ describe('DashboardPinsService', () => {
   });
 
   it('validates additions and limits the resulting list', async () => {
-    for (const itemId of ['/dashboard', '/kiosk', '/kiosk/display', '/resources/123', '//plugin-report', 'https://example.com']) {
+    for (const itemId of ['/dashboard', '/kiosk', '/kiosk/display', '/resources/123', '//plugin-report', 'https://example.com', '/made-up']) {
       await expect(service.update(5, { kind: 'add', item: page(itemId) })).rejects.toBeInstanceOf(BadRequestException);
     }
-    for (const itemId of ['/resources', '/settings/plugin-report', '/plugin-report', '/hello-world']) {
+    for (const itemId of ['/resources', '/shelly', '/wago', '/rabbitmq']) {
       await service.update(5, { kind: 'add', item: page(itemId) });
     }
-    expect((await service.get(5)).map(({ itemId }) => itemId)).toEqual(['/resources', '/settings/plugin-report', '/plugin-report', '/hello-world']);
-    for (const itemId of ['/resources', '/settings/plugin-report', '/plugin-report', '/hello-world']) {
+    expect((await service.get(5)).map(({ itemId }) => itemId)).toEqual(['/resources', '/shelly', '/wago', '/rabbitmq']);
+    for (const itemId of ['/resources', '/shelly', '/wago', '/rabbitmq']) {
       await service.update(5, { kind: 'remove', item: page(itemId) });
     }
     for (const itemId of ['007', '7.0', '7e0', ' 7']) {
       await expect(service.update(5, { kind: 'add', item: { itemType: 'resource', itemId } })).rejects.toBeInstanceOf(BadRequestException);
     }
-    stored = Array.from({ length: 200 }, (_, index) => ({ id: index + 1, userId: 5, position: index, ...page(`/plugin-${index}`) }));
+    stored = Array.from({ length: 200 }, (_, index) => ({ id: index + 1, userId: 5, position: index, ...page('/shelly') }));
     await expect(service.update(5, { kind: 'add', item: page('/projects') })).rejects.toBeInstanceOf(BadRequestException);
     expect(stored).toHaveLength(200);
   });

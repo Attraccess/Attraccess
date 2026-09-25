@@ -5,15 +5,16 @@ import { In, Repository } from 'typeorm';
 import { UpdateDashboardPinsDto } from './dtos/dashboard-pins.dto';
 
 export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string; resourceName?: string };
+// The API only stores page pins for destinations the application exposes in
+// its navigation. Keep plugin roots here as well as in the frontend registry:
+// the API must not turn arbitrary same-origin paths into persistent pins.
+const eligiblePagePaths = new Set([
+  '/resources', '/projects', '/messages', '/attractap/nfc-cards', '/billing', '/csv-export', '/users',
+  '/attractap/readers', '/devices/mqtt/servers', '/devices/companion', '/balena', '/settings',
+  '/dependencies', '/changelog', '/printables', '/shelly', '/wago', '/rabbitmq',
+]);
 function isEligiblePagePath(path: string): boolean {
-  if (!/^\/[a-z][a-z0-9-]*(?:\/[a-z0-9-]+)*$/.test(path)) return false;
-  // Plugin sidebar routes are registered in the frontend at runtime, so the API
-  // cannot maintain a closed list of their paths. Restrict the stored value to a
-  // same-origin route shape and reserve routes that must never be dashboard cards.
-  // The dashboard renderer resolves a pin against the current permitted sidebar
-  // and route registries before it creates a card.
-  return path !== '/dashboard' && !path.startsWith('/kiosk/') && path !== '/kiosk' &&
-    !path.startsWith('/resources/');
+  return eligiblePagePaths.has(path);
 }
 
 @Injectable()
