@@ -69,6 +69,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly subscriptions: PluginMqttSubscription[] = [];
   private readonly dispatches: Array<{ state: CachedState; previous?: CachedState }> = [];
   private readonly lastDispatchAtByNode = new Map<string, number>();
+  private readonly messageQueues = new Map<number, Promise<void>>();
   private dispatching = false;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -271,6 +272,23 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       this.context.logger.warn(`Ignoring future-dated WAGO event for ${controller.hardwareId}`);
       return;
     }
+    await this.enqueueMessage(controller.id, () => this.processMessage(controller, event, eventTime));
+  }
+  private async enqueueMessage(controllerId: number, message: () => Promise<void>): Promise<void> {
+    const previous = this.messageQueues.get(controllerId) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(message);
+    this.messageQueues.set(controllerId, current);
+    try {
+      await current;
+    } finally {
+      if (this.messageQueues.get(controllerId) === current) this.messageQueues.delete(controllerId);
+    }
+  }
+  private async processMessage(
+    controller: WagoController,
+    event: WagoOperationalMessage,
+    eventTime: number,
+  ): Promise<void> {
     // Resolve configuration before mutating stream/cache state, then process the entire snapshot atomically.
     const channels = await this.channels(controller.id);
     let stream = this.streams.get(controller.id);
