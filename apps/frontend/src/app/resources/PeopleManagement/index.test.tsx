@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { PeopleManagement } from './index';
 import type { AddPersonDrawer } from './AddPersonDrawer';
 import type { IntroductionCommentModal } from './IntroductionCommentModal';
@@ -130,6 +131,8 @@ beforeEach(() => {
     state[name].mockResolvedValue(undefined);
 });
 afterEach(cleanup);
+const originalLanguage = useTranslationState.getState().language;
+afterEach(() => useTranslationState.getState().setLanguage(originalLanguage));
 function mount(props: Partial<ComponentProps<typeof PeopleManagement>> = {}) {
   return render(
     <MemoryRouter>
@@ -137,6 +140,25 @@ function mount(props: Partial<ComponentProps<typeof PeopleManagement>> = {}) {
     </MemoryRouter>,
   );
 }
+it.each([
+  ['en', 'resource', false, 'Manage introducers, maintainers and introductions for this resource'],
+  ['en', 'resource', true, 'Manage introducers, maintainers and introductions for this resource'],
+  ['en', 'group', false, 'Manage introducers, maintainers and introductions for this group'],
+  ['en', 'group', true, 'Manage introducers, maintainers and introductions for this group'],
+  ['de', 'resource', false, 'Einweiser, Wartende und Einweisungen für diese Ressource verwalten'],
+  ['de', 'resource', true, 'Einweiser, Wartende und Einweisungen für diese Ressource verwalten'],
+  ['de', 'group', false, 'Einweiser, Wartende und Einweisungen für diese Gruppe verwalten'],
+  ['de', 'group', true, 'Einweiser, Wartende und Einweisungen für diese Gruppe verwalten'],
+] as const)('renders the %s %s subtitle (actions=%s)', (language, targetType, hasActions, subtitle) => {
+  useTranslationState.getState().setLanguage(language);
+  mount({ target: { type: targetType, id: 7 }, canManageIntroducers: hasActions, canManageIntroductions: false });
+  expect(screen.getByText(subtitle)).toBeTruthy();
+});
+it('does not render a subtitle when the header is hidden', () => {
+  mount({ target: { type: 'group', id: 7 }, hideHeader: true });
+  expect(screen.queryByText('Manage introducers, maintainers and introductions for this group')).toBeNull();
+  expect(screen.queryByText('People & Permissions')).toBeNull();
+});
 it('renders people, limits inherited-role removal, and handles history and introduction changes', async () => {
   mount();
   expect(screen.getByText('Alex')).toBeTruthy();

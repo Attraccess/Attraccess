@@ -1,6 +1,9 @@
 {
   "title": "People & Permissions",
-  "subtitle": "Manage introducers, maintainers and introductions for this resource",
+  "subtitle": {
+    "resource": "Manage introducers, maintainers and introductions for this resource",
+    "group": "Manage introducers, maintainers and introductions for this group"
+  },
   "addPerson": "Add person",
   "addOptions": {
     "introducer": "Appoint as introducer",
