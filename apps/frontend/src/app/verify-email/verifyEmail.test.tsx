@@ -8,9 +8,12 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../components/toastProvider';
 import { Providers } from '@attraccess/ui';
+import en from './en.json';
+import de from './de.json';
 
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
+const locale = vi.hoisted(() => ({ current: 'en' }));
 let verifyOnError: ((error: unknown) => void) | undefined;
 let verifyOnSuccess: (() => void) | undefined;
 let resendOnSuccess: (() => void) | undefined;
@@ -21,28 +24,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
   );
   return {
     ...actual,
-    useTranslations: () => {
-      const translations: Record<string, string> = {
-        'success.title': 'Email Verified!',
-        'success.message': 'Your email has been successfully verified.',
-        'success.goToLogin': 'Go to Login',
-        'error.title': 'Verification Failed',
-        'error.tryAgain': 'Try Again',
-        'error.backToLogin': 'Back to Login',
-        'error.errorTitle': 'Error',
-        'resend.prompt': 'Need a new verification link?',
-        'resend.emailLabel': 'Email address',
-        'resend.button': 'Resend verification email',
-        'resend.successTitle': 'Email sent!',
-        'resend.successMessage': 'A new verification link has been sent.',
-        'apiErrors.UserEmailInvalidVerificationTokenException': 'Invalid verification token.',
-        'apiErrors.UserEmailVerificationTokenExpiredException': 'Your verification link has expired.',
-        'apiErrors.invalidLink': 'Invalid verification link.',
-        'apiErrors.unexpectedError': 'An unexpected error occurred',
-      };
-
-      const t = (key: string) => translations[key] ?? key;
-      const tExists = (key: string) => Boolean(translations[key]);
+    useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+      const translations = locales[locale.current];
+      const lookup = (key: string) => key.split('.').reduce<unknown>(
+        (value, part) => value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+        translations,
+      );
+      const t = (key: string) => lookup(key) ?? key;
+      const tExists = (key: string) => lookup(key) !== undefined;
       return { t, tExists };
     },
   };
@@ -95,6 +84,7 @@ describe('VerifyEmail', () => {
     verifyOnError = undefined;
     verifyOnSuccess = undefined;
     resendOnSuccess = undefined;
+    locale.current = 'en';
   });
 
   it('calls verifyEmail mutation with token and email from URL params', () => {
@@ -110,8 +100,8 @@ describe('VerifyEmail', () => {
     act(() => verifyOnSuccess?.());
 
     await waitFor(() => {
-      expect(screen.getByText('Email Verified!')).toBeInTheDocument();
-      expect(screen.getByText('Go to Login')).toBeInTheDocument();
+      expect(screen.getByText(en.success.title)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to sign in' })).toBeInTheDocument();
     });
   });
 
@@ -120,10 +110,20 @@ describe('VerifyEmail', () => {
     act(() => verifyOnError?.(new Error('expired')));
 
     await waitFor(() => {
-      expect(screen.getByText('Verification Failed')).toBeInTheDocument();
-      expect(screen.getByText('Need a new verification link?')).toBeInTheDocument();
+      expect(screen.getByText(en.error.title)).toBeInTheDocument();
+      expect(screen.getByText(en.resend.prompt)).toBeInTheDocument();
       expect(screen.getByTestId('resend-email-input')).toBeInTheDocument();
-      expect(screen.getByTestId('resend-verification-button')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument();
+    });
+  });
+
+  it('shows the German success action after successful verification', async () => {
+    locale.current = 'de';
+    renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+    act(() => verifyOnSuccess?.());
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Zur Anmeldung' })).toBeInTheDocument();
     });
   });
 
@@ -132,7 +132,7 @@ describe('VerifyEmail', () => {
     act(() => verifyOnError?.(new Error('bad')));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Email address')).toHaveValue('prefilled@example.com');
+      expect(screen.getByLabelText(en.resend.emailLabel)).toHaveValue('prefilled@example.com');
     });
   });
 
@@ -166,7 +166,7 @@ describe('VerifyEmail', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();
-      expect(screen.getByText('Email sent!')).toBeInTheDocument();
+      expect(screen.getByText(en.resend.successTitle)).toBeInTheDocument();
     });
   });
 
@@ -176,13 +176,26 @@ describe('VerifyEmail', () => {
     expect(verifyMutateMock).not.toHaveBeenCalled();
   });
 
-  it('shows Try Again and Back to Login buttons on error', async () => {
+  it('shows Try Again and Back to sign in buttons on error', async () => {
     renderWithRoute('/verify-email?email=test%40example.com&token=bad');
     act(() => verifyOnError?.(new Error('bad')));
 
     await waitFor(() => {
-      expect(screen.getByText('Try Again')).toBeInTheDocument();
-      expect(screen.getByText('Back to Login')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verify email again' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back to sign in' })).toBeInTheDocument();
+    });
+  });
+
+  it('renders German verification and resend controls with descriptive names', async () => {
+    locale.current = 'de';
+    renderWithRoute('/verify-email?email=test%40example.com&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'E-Mail erneut verifizieren' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Zurück zur Anmeldung' })).toBeInTheDocument();
+      expect(screen.getByLabelText(de.resend.emailLabel)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
     });
   });
 
