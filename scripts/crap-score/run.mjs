@@ -1,5 +1,6 @@
 /* eslint-disable no-console -- CLI progress and diagnostics are intentional. */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -303,7 +304,16 @@ export function nodeCoverage(files, tests, output) {
   if (!tests.length) return [];
   mkdirSync(output, { recursive: true });
   const manifest = path.join(output, 'manifest.json');
-  writeFileSync(manifest, JSON.stringify({ files: files.map((file) => path.resolve(workspace, file)), output }));
+  const sourceCopies = {};
+  for (const file of files) {
+    const absolute = path.resolve(workspace, file);
+    const hash = createHash('sha256').update(readFileSync(absolute)).digest('hex');
+    (sourceCopies[hash] ??= []).push(absolute);
+  }
+  writeFileSync(
+    manifest,
+    JSON.stringify({ files: files.map((file) => path.resolve(workspace, file)), sourceCopies, output }),
+  );
   const loader = path.join(workspace, 'scripts/crap-score/node-coverage.mjs');
   const env = {
     ...process.env,

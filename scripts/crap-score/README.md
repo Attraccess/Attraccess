@@ -15,8 +15,12 @@ pnpm precommit:all                                # full-workspace checks, inclu
 Each target runs the project's existing Jest, Vitest and Node unit suites with JSON
 coverage (Istanbul for Vitest), then writes `coverage/crap/<project>/crap-report.json`, `summary.json`,
 and `html/index.html`. The root project's directory is `@attraccess__source`.
-Nx caches the reports together with the task result. Coverage lives separately
-from ordinary test/e2e output, so those tasks cannot overwrite it.
+Successful Nx runs cache the reports together with the task result. Coverage
+lives separately from ordinary test/e2e output, so those tasks cannot overwrite
+it. The affected runner removes old project reports before asking Nx to run or
+restore each target, then validates every report against the current threshold.
+A threshold failure keeps that run's coverage, JSON, HTML, and summary reports
+on disk for CI artifact upload.
 
 The PR and merge-queue workflow runs affected targets and uploads
 `crap-score-reports` for 14 days. Test failures and reporting failures block the
@@ -66,9 +70,9 @@ suite, add its existing configuration to `suites()` in `run.mjs`. Add any requir
 code-generation dependencies to the target as with the ordinary test target.
 Hardware TypeScript, companion, plugins, and root tooling are part of the scorer;
 the local exclusions for other checks do not exclude their CRAP targets. Native
-C/C++ remains outside this JavaScript/TypeScript check. Nx caches the complete
-reports with task success or failure, and hashes the shared runner in every
-target so cache restores preserve enforcement.
+C/C++ remains outside this JavaScript/TypeScript check. Nx hashes the shared
+runner in every target, so scorer changes invalidate project cache entries;
+restored reports are rechecked against the current limit before the gate passes.
 
 `pnpm precommit` selects affected projects from Nx's local uncommitted change set.
 Before running checks it rejects unstaged or untracked JS/TS files and CRAP

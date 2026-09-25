@@ -157,11 +157,15 @@ test('restored project reports are checked against the current inclusive limit',
 
 test('commit validation accepts staged source, rejects partial edits and ignores generated caches', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'crap-staged-'));
-  const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
+  // Git hooks export their repository paths and alternate index. These fixture
+  // repositories must use their own metadata and index, never the caller's.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const git = (...args) => execFileSync('git', args, { cwd: dir, env, stdio: 'ignore' });
   const check = () =>
     spawnSync(process.execPath, [path.join(workspace, 'scripts/crap-score/check-staged.mjs')], {
       cwd: dir,
       encoding: 'utf8',
+      env,
     });
   try {
     git('init', '-q');
@@ -176,24 +180,24 @@ test('commit validation accepts staged source, rejects partial edits and ignores
     assert.equal(check().status, 0, 'fully staged JS/TS must validate');
 
     writeFileSync(path.join(dir, 'source.ts'), 'export const value = 3;\n');
-    const indexBefore = execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8' });
+    const indexBefore = execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8', env });
     const worktreeBefore = readFileSync(path.join(dir, 'source.ts'), 'utf8');
     const status = check();
     assert.equal(status.status, 1);
     assert.match(status.stderr, /Unstaged relevant paths: source\.ts/);
-    assert.equal(execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8' }), indexBefore);
+    assert.equal(execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8', env }), indexBefore);
     assert.equal(readFileSync(path.join(dir, 'source.ts'), 'utf8'), worktreeBefore);
 
     git('checkout', '--', 'source.ts');
     writeFileSync(path.join(dir, '.swcrc'), '{"jsc":{}}\n');
     git('add', '.swcrc');
     writeFileSync(path.join(dir, '.swcrc'), '{"jsc":{"target":"es2022"}}\n');
-    const configIndexBefore = execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8' });
+    const configIndexBefore = execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8', env });
     const configWorktreeBefore = readFileSync(path.join(dir, '.swcrc'), 'utf8');
     const configStatus = check();
     assert.equal(configStatus.status, 1);
     assert.match(configStatus.stderr, /Unstaged relevant paths: \.swcrc/);
-    assert.equal(execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8' }), configIndexBefore);
+    assert.equal(execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8', env }), configIndexBefore);
     assert.equal(readFileSync(path.join(dir, '.swcrc'), 'utf8'), configWorktreeBefore);
 
     git('checkout', '--', '.swcrc');
