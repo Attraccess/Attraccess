@@ -7,7 +7,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { getCrapReport } from 'crap-score';
 import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run, enforceScores, workspace } from './run.mjs';
-import { affectedSelection, isSharedChange, projectSourceManifest, verifyReports } from './affected.mjs';
+import { affectedSelection, isSharedChange, projectSourceManifest, selectProjects, validateSupportedTargets, verifyReports } from './affected.mjs';
 
 test('source selection includes apps and scripts but excludes tests and generated clients', () => {
   for (const file of [
@@ -53,10 +53,12 @@ test('shared checker, root tooling and dependency configuration select every CRA
     'apps/plugins/custom/vite.config.mts',
     'libs/demo/.babelrc',
     'pnpm-workspace.yaml',
+    'patches/crap-score@1.2.1.patch',
   ])
     assert.ok(isSharedChange([file]), file);
   for (const file of ['apps/attractap/hardware/nfc/src/a.ts', 'apps/companion/renderer/App.tsx', 'libs/shared/src/a.ts', 'tools/config-ui/main.ts'])
     assert.ok(!isSharedChange([file]), file);
+  assert.ok(isSharedChange(['patches/crap-score@1.2.1.patch']));
 });
 
 test('affected selection expands shared changes and uses Nx base or worktree selectors', () => {
@@ -66,6 +68,20 @@ test('affected selection expands shared changes and uses Nx base or worktree sel
   assert.deepEqual(affectedSelection(['--base=origin/main', '--head=feature'], false), ['--base=origin/main', '--head=feature']);
   assert.deepEqual(affectedSelection(['--uncommitted'], false), ['--uncommitted']);
   assert.deepEqual(affectedSelection([], false), ['--uncommitted']);
+});
+
+test('supported projects cannot disappear when a crap-score target is omitted', () => {
+  assert.doesNotThrow(() => validateSupportedTargets(['frontend', 'plugin-wago'], ['frontend', 'plugin-wago']));
+  assert.throws(
+    () => validateSupportedTargets(['frontend', 'new-project'], ['frontend']),
+    /Supported JS\/TS projects missing crap-score targets: new-project/,
+  );
+});
+
+test('full selection validates the live Nx JS/TS inventory before returning targets', () => {
+  const projects = selectProjects(['--all'], []);
+  assert.equal(projects.length, 23);
+  assert.ok(projects.includes('plugin-wago'));
 });
 
 test('source manifests include only maintained files owned by each configured project', () => {
@@ -101,6 +117,8 @@ test('project report validation distinguishes complete zero-function reports fro
   });
   try {
     mkdirSync(path.join(output, 'html'), { recursive: true });
+    mkdirSync(path.dirname(source), { recursive: true });
+    writeFileSync(source, 'export const value = 1;\n');
     writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
     writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: coverageEntry() }));
     writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
@@ -115,6 +133,25 @@ test('project report validation distinguishes complete zero-function reports fro
     assert.throws(() => verifyReports(['demo'], directory), /Malformed coverage data/);
     rmSync(path.join(output, 'coverage-final.json'));
     assert.throws(() => verifyReports(['demo'], directory), /Missing CRAP report/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('empty analysis is rejected when source contains a function', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-empty-analysis-'));
+  const output = path.join(directory, 'coverage/crap/demo');
+  const source = path.join(directory, 'demo/source.ts');
+  try {
+    mkdirSync(path.join(output, 'html'), { recursive: true });
+    mkdirSync(path.dirname(source), { recursive: true });
+    writeFileSync(source, 'export function work() { return 1; }\n');
+    writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
+    const coverageEntry = { path: source, statementMap: {}, s: {}, fnMap: {}, f: {}, branchMap: {}, b: {} };
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: coverageEntry }));
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 0, violations: 0, max: 0 }));
+    assert.throws(() => verifyReports(['demo'], directory), /source contains functions/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -626,6 +663,42 @@ test('runs an Nx library suite and writes consistent JSON, HTML, and summary art
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a controlled above-limit project fails with retained reports and passes after reducing complexity', async () => {
+  const projectRoot = `apps/__crap-score-fixture-${process.pid}`;
+  const fixturePath = path.join(workspace, projectRoot);
+  const output = mkdtempSync(path.join(os.tmpdir(), 'attraccess-crap-gate-'));
+  try {
+    mkdirSync(fixturePath, { recursive: true });
+    writeFileSync(path.join(fixturePath, 'project.json'), JSON.stringify({ name: 'crap-gate-fixture', root: projectRoot }));
+    const source = path.join(fixturePath, 'source.ts');
+    writeFileSync(source, [
+      'export function controlled(value: number) {',
+      ...Array.from({ length: 8 }, (_, index) => `  if (value === ${index}) return ${index};`),
+      '  return -1;',
+      '}',
+    ].join('\n'));
+    const invoke = () => spawnSync(process.execPath, [
+      '--input-type=module', '-e',
+      `import { run } from ${JSON.stringify(new URL('./run.mjs', import.meta.url).href)}; await run(${JSON.stringify(projectRoot)}, ${JSON.stringify(output)});`,
+    ], { cwd: workspace, encoding: 'utf8' });
+    const failing = invoke();
+    assert.equal(failing.status, 1, failing.stderr);
+    assert.match(failing.stderr, /CRAP score limit 30 exceeded/);
+    assert.ok(existsSync(path.join(output, 'coverage-final.json')));
+    assert.ok(existsSync(path.join(output, 'crap-report.json')));
+    assert.ok(existsSync(path.join(output, 'summary.json')));
+    assert.ok(existsSync(path.join(output, 'html/index.html')));
+    assert.ok(JSON.parse(readFileSync(path.join(output, 'summary.json'), 'utf8')).max > 30);
+    writeFileSync(source, 'export function controlled(value: number) { return value; }\n');
+    const passing = invoke();
+    assert.equal(passing.status, 0, passing.stderr);
+    assert.ok(JSON.parse(readFileSync(path.join(output, 'summary.json'), 'utf8')).max <= 30);
+  } finally {
+    rmSync(fixturePath, { recursive: true, force: true });
+    rmSync(output, { recursive: true, force: true });
   }
 });
 

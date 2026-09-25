@@ -195,6 +195,7 @@
         "{workspaceRoot}/.swcrc",
         "{workspaceRoot}/package.json",
         "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/patches/**/*",
         {
           "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version + '-' + process.cwd()\""
         }

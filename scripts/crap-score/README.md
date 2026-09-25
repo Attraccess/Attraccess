@@ -73,6 +73,11 @@ the local exclusions for other checks do not exclude their CRAP targets. Native
 C/C++ remains outside this JavaScript/TypeScript check. Nx hashes the shared
 runner in every target, so scorer changes invalidate project cache entries;
 restored reports are rechecked against the current limit before the gate passes.
+Before selecting targets, the affected runner discovers every Nx project with
+maintained JS/TS source and fails if any lacks a `crap-score` target. Shared
+dependency patches are treated as workspace-wide changes and are included in
+the Nx target cache inputs, so changing the pinned scorer patch selects all
+targets and invalidates restored reports.
 
 `pnpm precommit` selects affected projects from Nx's local uncommitted change set.
 Before running checks it rejects unstaged or untracked JS/TS files and CRAP
