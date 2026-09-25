@@ -4,12 +4,8 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PasswordResetForm } from './passwordResetForm';
 import { TestWrapper } from '../../../test-utils/wrappers';
-import en from './en.json';
-import de from './de.json';
 
 const locale = vi.hoisted(() => ({ current: 'en' }));
-const labels = { en, de };
-
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: (locales: Record<string, Record<string, unknown>>) => {
     const translations = locales[locale.current];
@@ -34,8 +30,11 @@ describe('PasswordResetForm labels', () => {
     locale.current = language;
     render(<PasswordResetForm onGoBack={vi.fn()} />, { wrapper: TestWrapper });
 
-    expect(screen.getByRole('button', { name: labels[language].goBackButton })).toBeInTheDocument();
-    expect(screen.getByLabelText(labels[language].emailLabel)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: labels[language].mainButton })).toBeInTheDocument();
+    const expectedLabels = language === 'en'
+      ? { back: 'Back to sign in', email: 'Email address', submit: 'Reset password' }
+      : { back: 'Zurück zur Anmeldung', email: 'E-Mail-Adresse', submit: 'Passwort zurücksetzen' };
+    expect(screen.getByRole('button', { name: expectedLabels.back })).toBeInTheDocument();
+    expect(screen.getByLabelText(expectedLabels.email)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: expectedLabels.submit })).toBeInTheDocument();
   });
 });

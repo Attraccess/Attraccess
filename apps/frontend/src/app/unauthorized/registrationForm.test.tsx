@@ -75,8 +75,8 @@ describe('RegistrationForm', () => {
   it('shows username guidance text', async () => {
     renderForm();
 
-    expect(screen.getByRole('button', { name: labels.en.signInButton })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: labels.en.createAccountButton })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
     expect(
       screen.getByText('3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.'),
     ).toBeInTheDocument();
@@ -87,12 +87,12 @@ describe('RegistrationForm', () => {
     renderForm();
 
     expect(screen.getByText(labels.de.hasAccount)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: labels.de.signInButton })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
     expect(screen.getByLabelText(labels.de.username)).toBeInTheDocument();
     expect(screen.getByLabelText(labels.de.email)).toBeInTheDocument();
     expect(screen.getByLabelText(labels.de.password)).toBeInTheDocument();
     expect(screen.getByLabelText(labels.de.passwordConfirmation)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: labels.de.createAccountButton })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Konto erstellen' })).toBeInTheDocument();
   });
 
   it('blocks invalid usernames and surfaces validation message', async () => {

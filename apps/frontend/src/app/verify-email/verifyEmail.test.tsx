@@ -101,7 +101,7 @@ describe('VerifyEmail', () => {
 
     await waitFor(() => {
       expect(screen.getByText(en.success.title)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: en.success.goToLogin })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to sign in' })).toBeInTheDocument();
     });
   });
 
@@ -113,7 +113,17 @@ describe('VerifyEmail', () => {
       expect(screen.getByText(en.error.title)).toBeInTheDocument();
       expect(screen.getByText(en.resend.prompt)).toBeInTheDocument();
       expect(screen.getByTestId('resend-email-input')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: en.resend.button })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument();
+    });
+  });
+
+  it('shows the German success action after successful verification', async () => {
+    locale.current = 'de';
+    renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+    act(() => verifyOnSuccess?.());
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Zur Anmeldung' })).toBeInTheDocument();
     });
   });
 
@@ -171,8 +181,8 @@ describe('VerifyEmail', () => {
     act(() => verifyOnError?.(new Error('bad')));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: en.error.tryAgain })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: en.error.backToLogin })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verify email again' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back to sign in' })).toBeInTheDocument();
     });
   });
 
@@ -182,10 +192,10 @@ describe('VerifyEmail', () => {
     act(() => verifyOnError?.(new Error('bad')));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: de.error.tryAgain })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: de.error.backToLogin })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'E-Mail erneut verifizieren' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Zurück zur Anmeldung' })).toBeInTheDocument();
       expect(screen.getByLabelText(de.resend.emailLabel)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: de.resend.button })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
     });
   });
 
