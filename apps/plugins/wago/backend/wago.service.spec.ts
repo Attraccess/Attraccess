@@ -70,7 +70,7 @@ describe('WagoService', () => {
       },
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
-    return { service: new WagoService(context), controllerRepository, enrollmentRepository, context, subscriptions };
+    return { service: new WagoService(context), controllerRepository, enrollmentRepository, settingsRepository, context, subscriptions };
   }
 
   it('does not expose physical-verification secrets in controller listings', async () => {
@@ -80,6 +80,13 @@ describe('WagoService', () => {
 
     expect(listed).not.toHaveProperty('fingerprint');
     expect(listed).not.toHaveProperty('pairingCodeHash');
+  });
+
+  it('creates default settings when none have been persisted', async () => {
+    const { service, settingsRepository } = createService();
+    settingsRepository.findOneBy.mockResolvedValue(null);
+    settingsRepository.save.mockResolvedValue({ id: 1, defaultMqttServerId: null });
+    await expect(service.getSettings()).resolves.toEqual({ id: 1, defaultMqttServerId: null });
   });
 
   it('requires a non-empty matching fingerprint', () => {
@@ -178,6 +185,17 @@ describe('WagoService', () => {
 
     expect(enrollment).toMatchObject({ username: 'manual-$&', password: 'secret' });
     expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user named manual-$& manually.']);
+  });
+
+  it.each(['cc100/+1', 'cc100/#1'])('rejects MQTT wildcard characters in hardware IDs', async (hardwareId) => {
+    const { service } = createService();
+    await expect(service.createEnrollment(hardwareId)).rejects.toThrow('without MQTT separators or wildcards');
+  });
+
+  it('does not treat revoked enrollments as active', () => {
+    const { service } = createService();
+    const isActiveEnrollment = Reflect.get(service, 'isActiveEnrollment') as (item: WagoEnrollment) => boolean;
+    expect(isActiveEnrollment({ ...({} as WagoEnrollment), expiresAt: '2099-01-01T00:00:00.000Z', revokedAt: '2026-01-01T00:00:00.000Z', consumedAt: null })).toBe(false);
   });
 
   it('keeps replacement subscriptions inert until they replace the active generation', async () => {
