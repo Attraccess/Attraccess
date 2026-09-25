@@ -1,0 +1,159 @@
+{
+  "pathNormalization": "node_modules symlink roots and generated Vite content-hash filenames only",
+  "inventories": {
+    "baseline": {
+      "files": 14,
+      "unpackedBytes": 2986528,
+      "records": [
+        {
+          "path": "dist/index.js",
+          "bytes": 2606910,
+          "sha256": "1714e6257bbf4131e4cdabbd1df6688d1ff734d6cfd412c134c2512cdb93095c"
+        },
+        {
+          "path": "dist/migrations.js",
+          "bytes": 19517,
+          "sha256": "5c02bf25827dfd2c2d7f9edf39c5b25b6fa2c141f6d03874df3f271f392ed94e"
+        },
+        {
+          "path": "dist/signing-public-key.pub",
+          "bytes": 81,
+          "sha256": "5570b5bfa5b6822f0f485f3b03b7c2161567fba19a30bf81018af3cbc7e24841"
+        },
+        {
+          "path": "frontend/__federation_expose_Plugin-CLU15ldF.js",
+          "bytes": 312330,
+          "sha256": "6e18db4ab1dadc07c8df322c9b62f95c5316602fff67984e04c5a919f37c444f"
+        },
+        {
+          "path": "frontend/__federation_fn_import-Iq0vzNT_.js",
+          "bytes": 246,
+          "sha256": "53af9f15a7ea0f12f8d6f72280d8a5bdf5e0fd696120fa6e6776b95ed6e61c7d"
+        },
+        {
+          "path": "frontend/_virtual___federation_fn_import-B8Lh10O_.js",
+          "bytes": 11616,
+          "sha256": "7f4356f7bf6c62bae8391312f2d6664a40a9b5b848b704380bf6313138a07c2a"
+        },
+        {
+          "path": "frontend/index.html",
+          "bytes": 162,
+          "sha256": "6cf65d05e104c37699039a1540bd4e6d798f7a55f04ef0a05e18f06577c4175d"
+        },
+        {
+          "path": "frontend/jsx-runtime-CYVbqwEp.js",
+          "bytes": 1526,
+          "sha256": "cc750812c47fc30008b788615cd03e92fd6043165d774cf1569b31521192f65b"
+        },
+        {
+          "path": "frontend/preload-helper-DxWiKyOd.js",
+          "bytes": 2185,
+          "sha256": "081be6c5f119d1ececa8725807f0bf2d9f1a4ae18328e120137e91eab6e83458"
+        },
+        {
+          "path": "frontend/react-D5HgnfBV.js",
+          "bytes": 15791,
+          "sha256": "b85d61aed8ecf694d0844232012f1ce892e81b9b112cb5117a2563051e99ec92"
+        },
+        {
+          "path": "frontend/remoteEntry.js",
+          "bytes": 2978,
+          "sha256": "494b9c0ef392cb4367b14b0f497c45ce27fc71e1907ab3767157854d5d5f5300"
+        },
+        {
+          "path": "frontend/rolldown-runtime-DC62tzP2.js",
+          "bytes": 1445,
+          "sha256": "f74ce63fe4684f55be3ea69da3a4528da464f9d5f63cda903b76eb13e92d1954"
+        },
+        {
+          "path": "frontend/style.css",
+          "bytes": 10589,
+          "sha256": "0a50c215ab9ab8c9e3d9aaa9c7cd59f226673e82f9a8caf9e4698677e49c7eb2"
+        },
+        {
+          "path": "package.json",
+          "bytes": 1152,
+          "sha256": "326e0ee37588211aff06f00fdf9a6ea52bf26868937ab8da09de13cce562a39f"
+        }
+      ]
+    },
+    "current": {
+      "files": 14,
+      "unpackedBytes": 2974390,
+      "records": [
+        {
+          "path": "dist/index.js",
+          "bytes": 2594842,
+          "sha256": "7652fdc300daa42def47becd8a6453528745e092cc2746d0918b033031ad74ab"
+        },
+        {
+          "path": "dist/migrations.js",
+          "bytes": 19517,
+          "sha256": "5c02bf25827dfd2c2d7f9edf39c5b25b6fa2c141f6d03874df3f271f392ed94e"
+        },
+        {
+          "path": "dist/signing-public-key.pub",
+          "bytes": 81,
+          "sha256": "5570b5bfa5b6822f0f485f3b03b7c2161567fba19a30bf81018af3cbc7e24841"
+        },
+        {
+          "path": "frontend/__federation_expose_Plugin-BoHSTQq7.js",
+          "bytes": 312330,
+          "sha256": "3a58807605c4c2a5005785b9dfdf39a61dad3566530eb280c1fbdf66e44e9cde"
+        },
+        {
+          "path": "frontend/__federation_fn_import-DAGm_xmC.js",
+          "bytes": 246,
+          "sha256": "1b011dd0192645bbc90bb27bc9f81d088edc85ea2fe5e67c55fae3f93d63f827"
+        },
+        {
+          "path": "frontend/_virtual___federation_fn_import-BXODRNto.js",
+          "bytes": 11602,
+          "sha256": "d9d03a9069e11cbc4ae11c774b924cac2783adb9634611346126da1e061b9343"
+        },
+        {
+          "path": "frontend/index.html",
+          "bytes": 162,
+          "sha256": "6cf65d05e104c37699039a1540bd4e6d798f7a55f04ef0a05e18f06577c4175d"
+        },
+        {
+          "path": "frontend/jsx-runtime-DFPsoQIN.js",
+          "bytes": 1498,
+          "sha256": "0d77cd4f103cf96102e3c548bf92a41f4fdc8d57af98eeed9a66440d4f21ec7b"
+        },
+        {
+          "path": "frontend/preload-helper-DxWiKyOd.js",
+          "bytes": 2185,
+          "sha256": "081be6c5f119d1ececa8725807f0bf2d9f1a4ae18328e120137e91eab6e83458"
+        },
+        {
+          "path": "frontend/react-Cr_hTkIJ.js",
+          "bytes": 15763,
+          "sha256": "23a278daff939212262285af89b34ed7be76ffd1772ea5d9fc8f23fbb3c8639a"
+        },
+        {
+          "path": "frontend/remoteEntry.js",
+          "bytes": 2978,
+          "sha256": "08b57451e5593eb1d0f8cc9fcd11848b472490add90281dce052e7ab15d66845"
+        },
+        {
+          "path": "frontend/rolldown-runtime-DC62tzP2.js",
+          "bytes": 1445,
+          "sha256": "f74ce63fe4684f55be3ea69da3a4528da464f9d5f63cda903b76eb13e92d1954"
+        },
+        {
+          "path": "frontend/style.css",
+          "bytes": 10589,
+          "sha256": "0a50c215ab9ab8c9e3d9aaa9c7cd59f226673e82f9a8caf9e4698677e49c7eb2"
+        },
+        {
+          "path": "package.json",
+          "bytes": 1152,
+          "sha256": "326e0ee37588211aff06f00fdf9a6ea52bf26868937ab8da09de13cce562a39f"
+        }
+      ]
+    }
+  },
+  "normalizedContentEquivalent": true,
+  "differences": []
+}

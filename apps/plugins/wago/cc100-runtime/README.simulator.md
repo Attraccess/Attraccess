@@ -63,7 +63,7 @@ Pulse and guard behavior are configured through the desired configuration and ar
 ## Isolated broker integration tests (no Docker required)
 
 ```sh
-pnpm nx run wago-cc100-runtime:test-simulator-integration
+pnpm nx run plugin-wago:test-cc100-simulator-integration
 ```
 
 This builds the executable simulator, installs pinned Aedes 0.51.3 into a fresh

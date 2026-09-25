@@ -38,17 +38,21 @@ async function snapshot(ref, label, directories) {
 try {
   const backend = 'apps/plugins/wago/backend';
   const measurementContract = 'apps/plugins/wago/measurement-contract.ts';
+  const channelBehavior = 'apps/plugins/wago/channel-behavior.ts';
+  const modbus = 'apps/plugins/wago/modbus';
   const runtime = 'apps/plugins/wago/cc100-runtime';
   const flowRoot = argument('flow-ref')
-    ? await snapshot(argument('flow-ref'), 'flow', [backend, measurementContract])
+    ? await snapshot(argument('flow-ref'), 'flow', [backend, measurementContract, channelBehavior, modbus])
     : root;
   const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [
     runtime,
     backend,
     measurementContract,
+    channelBehavior,
+    modbus,
   ]);
   const runtimeRoot = argument('runtime-ref')
-    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, measurementContract])
+    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, measurementContract, channelBehavior, modbus])
     : root;
   for (const stagedRoot of [mainRoot, ...(runtimeRoot !== root ? [runtimeRoot] : [])]) {
     await symlink(join(root, 'node_modules'), join(stagedRoot, 'node_modules'), 'dir');

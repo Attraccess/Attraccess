@@ -1,0 +1,23 @@
+{
+  "baseline": {
+    "sourceCommit": "54d2d508c2644eca90d02194a3da4199881a4008",
+    "platformRequested": "linux/arm/v7",
+    "ociManifestSha256": "6749fb2f028316d598f062ba09b3eb87994b29d04fe6d653d812748f47b62018",
+    "imageConfigSha256": "9733f7f9307b8a87d071f4c950821a76dd1573b151b1d74fe06dfccd757ac356",
+    "inspectedConfig": { "platform": "linux/arm", "user": "runtime", "workdir": "/app", "cmd": ["node", "main.cjs"], "volume": "/var/lib/attraccess-wago" },
+    "appFiles": {
+      "main.cjs": "3c012dd1446ee8c83e779dc83b4b2a3e19aa63acc448649914662cf20d1c5510",
+      "package.json": "b79a0fc71ec4522f0596031e8382e91479faaad5e5bd0910866cfb2dbb01df91",
+      "pnpm-lock.yaml": "6b6f9972b732478b083840885816e9fd4e17fbec322a13d0a275c271da1c71c2",
+      "manifest.json": "b18db5ffa6c744debd8c89cf4f02698080a37966d88663c5dc517e383697fd96"
+    }
+  },
+  "current": {
+    "sourceCommit": "4c0069e36e7c8821cebb5ca9f594cef8ae59179f",
+    "platformRequested": "linux/arm/v7",
+    "ociManifestSha256": "6749fb2f028316d598f062ba09b3eb87994b29d04fe6d653d812748f47b62018",
+    "imageConfigSha256": "9733f7f9307b8a87d071f4c950821a76dd1573b151b1d74fe06dfccd757ac356",
+    "equivalentToBaseline": true
+  },
+  "simulatorIntegration": "8 tests passed at current source head"
+}

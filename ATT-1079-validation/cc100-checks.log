@@ -1,0 +1,193 @@
+(node:256) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ NX   Running targets lint-cc100-runtime, test-cc100-runtime, typecheck-cc100-runtime, build-cc100-runtime, build-cc100-simulator, test-cc100-simulator-integration for project plugin-wago and 8 tasks it depends on:
+
+- plugin-wago
+
+
+
+> nx run database-entities:build
+
+(node:450) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Compiling TypeScript files for project "database-entities"...
+Done compiling TypeScript files for project "database-entities".
+
+> nx run plugins-frontend-sdk:build
+
+> vite build
+
+(node:489) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:22:9). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+vite v8.2.1 building client environment for production...
+[2Ktransforming...[32m✓[0m 6 modules transformed.
+rendering chunks...
+
+[unplugin:dts] Start generate declaration files...
+[unplugin:dts] Declaration files built in 1227ms.
+
+computing gzip size...
+[2m../../dist/libs/plugins-frontend-sdk/[0m[36mindex.js  [0m[1;2m1.91 kB[0m[2m │ gzip: 1.00 kB[0m
+
+✓ built in 1.41s
+
+> nx run shared:build
+
+(node:581) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Compiling TypeScript files for project "shared"...
+Done compiling TypeScript files for project "shared".
+
+> nx run plugins-backend-sdk:build
+
+(node:607) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Compiling TypeScript files for project "plugins-backend-sdk"...
+Done compiling TypeScript files for project "plugins-backend-sdk".
+
+> nx run api:copy-companion-into-assets
+
+> node apps/api/copy-companion-into-assets.js
+
+Cleared and recreated assets directory: /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/api/src/assets/companion-app
+Warning: companion_win_x64.exe not found in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/companion/dist, skipping
+Copied: companion_mac_universal.dmg (181210519 bytes, sha256: 72de7d0e7bed2255…)
+Warning: companion_linux_x86_64.AppImage not found in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/companion/dist, skipping
+Warning: companion_linux_arm64.AppImage not found in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/companion/dist, skipping
+Created companions.json with 1 platform(s)
+Companion asset copying completed successfully!
+
+> nx run api:build
+
+> webpack-cli build node-env=production
+
+(node:660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:725) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:727) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+webpack compiled [1m[32msuccessfully[39m[22m (3c3eb29c8e63f211)
+
+> nx run plugin-wago:build-cc100-runtime-esbuild
+
+(node:835) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+> nx run plugin-wago:build-cc100-simulator-esbuild
+
+(node:871) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+> nx run plugin-wago:lint-cc100-runtime
+
+> eslint apps/plugins/wago/cc100-runtime/src --max-warnings=0 && prettier --check apps/plugins/wago/cc100-runtime/src
+
+(node:897) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:968) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Checking formatting...
+All matched files use Prettier code style!
+
+> nx run plugin-wago:test-cc100-runtime
+
+(node:988) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1036) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1035) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1034) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1038) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1032) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1037) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1033) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+
+[1mTest Suites: [22m[1m[32m13 passed[39m[22m, 13 total
+[1mTests:       [22m[1m[32m256 passed[39m[22m, 256 total
+[1mSnapshots:   [22m0 total
+[1mTime:[22m        5.592 s, estimated 6 s
+[2mRan all test suites[22m[2m.[22m
+
+> nx run plugin-wago:typecheck-cc100-runtime
+
+> tsc --noEmit -p tsconfig.json
+
+
+> nx run plugin-wago:test-cc100-simulator-integration
+
+> node apps/plugins/wago/cc100-runtime/integration/run.mjs
+
+Testing committed main source 2ac64af66566d54e90e95bc7bf62b5c83fa84cc0 (read-only)
+(node:4745) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+(node:4764) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 50 packages in 3s
+(node:4843) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4846) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+(node:4846) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 message listeners added to [MqttClient]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:4846) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 message listeners added to [MqttClient]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:4846) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 message listeners added to [MqttClient]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+[1mTest Suites: [22m[1m[32m1 passed[39m[22m, 1 total
+[1mTests:       [22m[1m[32m8 passed[39m[22m, 8 total
+[1mSnapshots:   [22m0 total
+[1mTime:[22m        6.138 s
+[2mRan all test suites[22m[2m.[22m
+
+> nx run plugin-wago:build-cc100-runtime
+
+> node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-runtime ./main.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-runtime/
+
+
+> nx run plugin-wago:build-cc100-simulator
+
+> node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-simulator ./simulator.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-simulator/
+
+
+
+
+ NX   Successfully ran targets lint-cc100-runtime, test-cc100-runtime, typecheck-cc100-runtime, build-cc100-runtime, build-cc100-simulator, test-cc100-simulator-integration for project plugin-wago and 8 tasks it depends on
+
+

@@ -1,0 +1,530 @@
+#0 building with "att1079-local" instance using docker-container driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 951B 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:22-bookworm-slim
+#2 DONE 0.6s
+
+#3 [internal] load metadata for docker.io/library/node:24-bookworm-slim
+#3 DONE 0.6s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 721B 0.0s done
+#4 DONE 0.1s
+
+#5 [stage-1 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#5 resolve docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c 0.0s done
+#5 DONE 0.0s
+
+#6 [build 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+#6 resolve docker.io/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 0.1s done
+#6 DONE 0.1s
+
+#7 [internal] load build context
+#7 transferring context: 278.01MB 4.9s
+#7 transferring context: 864.16MB 27.6s
+#7 transferring context: 1.04GB 28.6s done
+#7 DONE 29.1s
+
+#8 [build 2/4] WORKDIR /workspace
+#8 CACHED
+
+#9 [build 3/4] COPY . .
+#9 DONE 3.7s
+
+#10 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx run plugin-wago:build-cc100-runtime
+#10 0.350 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.34.5.tgz
+#10 1.432 Scope: all 4 workspace projects
+#10 1.542 Lockfile is up to date, resolution step is skipped
+#10 1.621 Progress: resolved 1, reused 0, downloaded 0, added 0
+#10 1.752 Packages: +3884
+#10 1.752 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#10 2.625 Progress: resolved 3884, reused 0, downloaded 60, added 0
+#10 3.121 
+#10 3.121    ╭──────────────────────────────────────────────╮
+#10 3.121    │                                              │
+#10 3.121    │     Update available! 10.34.5 → 12.6.0.      │
+#10 3.121    │     Changelog: https://pnpm.io/v/12.6.0      │
+#10 3.121    │   To update, run: corepack use pnpm@12.6.0   │
+#10 3.121    │                                              │
+#10 3.121    ╰──────────────────────────────────────────────╯
+#10 3.121 
+#10 3.624 Progress: resolved 3884, reused 0, downloaded 159, added 34
+#10 4.625 Progress: resolved 3884, reused 0, downloaded 264, added 57
+#10 5.626 Progress: resolved 3884, reused 0, downloaded 323, added 77
+#10 6.627 Progress: resolved 3884, reused 0, downloaded 350, added 85
+#10 7.630 Progress: resolved 3884, reused 0, downloaded 460, added 130
+#10 8.633 Progress: resolved 3884, reused 0, downloaded 561, added 242
+#10 9.635 Progress: resolved 3884, reused 0, downloaded 572, added 248
+#10 10.64 Progress: resolved 3884, reused 0, downloaded 587, added 253
+#10 11.64 Progress: resolved 3884, reused 0, downloaded 613, added 264
+#10 12.64 Progress: resolved 3884, reused 0, downloaded 618, added 266
+#10 13.65 Progress: resolved 3884, reused 0, downloaded 622, added 268
+#10 14.65 Progress: resolved 3884, reused 0, downloaded 626, added 270
+#10 15.65 Progress: resolved 3884, reused 0, downloaded 641, added 274
+#10 16.99 Progress: resolved 3884, reused 0, downloaded 642, added 274
+#10 18.05 Progress: resolved 3884, reused 0, downloaded 681, added 288
+#10 19.05 Progress: resolved 3884, reused 0, downloaded 818, added 372
+#10 20.05 Progress: resolved 3884, reused 0, downloaded 879, added 409
+#10 21.05 Progress: resolved 3884, reused 0, downloaded 903, added 415
+#10 22.05 Progress: resolved 3884, reused 0, downloaded 1068, added 452
+#10 23.05 Progress: resolved 3884, reused 0, downloaded 1153, added 483
+#10 24.07 Progress: resolved 3884, reused 0, downloaded 1256, added 554
+#10 25.07 Progress: resolved 3884, reused 0, downloaded 1265, added 560
+#10 26.07 Progress: resolved 3884, reused 0, downloaded 1278, added 561
+#10 27.07 Progress: resolved 3884, reused 0, downloaded 1335, added 577
+#10 28.07 Progress: resolved 3884, reused 0, downloaded 1385, added 592
+#10 29.07 Progress: resolved 3884, reused 0, downloaded 1410, added 596
+#10 30.31 Progress: resolved 3884, reused 0, downloaded 1410, added 597
+#10 31.31 Progress: resolved 3884, reused 0, downloaded 1514, added 605
+#10 32.31 Progress: resolved 3884, reused 0, downloaded 1580, added 610
+#10 33.31 Progress: resolved 3884, reused 0, downloaded 1617, added 617
+#10 34.31 Progress: resolved 3884, reused 0, downloaded 1618, added 618
+#10 35.31 Progress: resolved 3884, reused 0, downloaded 1661, added 624
+#10 36.31 Progress: resolved 3884, reused 0, downloaded 1723, added 633
+#10 37.31 Progress: resolved 3884, reused 0, downloaded 1788, added 643
+#10 38.32 Progress: resolved 3884, reused 0, downloaded 1789, added 643
+#10 39.32 Progress: resolved 3884, reused 0, downloaded 1859, added 650
+#10 40.32 Progress: resolved 3884, reused 0, downloaded 1983, added 661
+#10 41.33 Progress: resolved 3884, reused 0, downloaded 2072, added 674
+#10 42.33 Progress: resolved 3884, reused 0, downloaded 2080, added 676
+#10 43.33 Progress: resolved 3884, reused 0, downloaded 2190, added 729
+#10 44.33 Progress: resolved 3884, reused 0, downloaded 2296, added 745
+#10 45.33 Progress: resolved 3884, reused 0, downloaded 2374, added 762
+#10 46.33 Progress: resolved 3884, reused 0, downloaded 2393, added 772
+#10 47.34 Progress: resolved 3884, reused 0, downloaded 2442, added 781
+#10 48.34 Progress: resolved 3884, reused 0, downloaded 2470, added 787
+#10 49.35 Progress: resolved 3884, reused 0, downloaded 2528, added 803
+#10 50.52 Progress: resolved 3884, reused 0, downloaded 2595, added 813
+#10 51.69 Progress: resolved 3884, reused 0, downloaded 2596, added 813
+#10 52.69 Progress: resolved 3884, reused 0, downloaded 2730, added 853
+#10 53.69 Progress: resolved 3884, reused 0, downloaded 2776, added 871
+#10 54.69 Progress: resolved 3884, reused 0, downloaded 2828, added 880
+#10 55.69 Progress: resolved 3884, reused 0, downloaded 2877, added 886
+#10 56.72 Progress: resolved 3884, reused 0, downloaded 2878, added 886
+#10 57.71 Progress: resolved 3884, reused 0, downloaded 2971, added 902
+#10 58.71 Progress: resolved 3884, reused 0, downloaded 3101, added 945
+#10 59.72 Progress: resolved 3884, reused 0, downloaded 3160, added 975
+#10 60.72 Progress: resolved 3884, reused 0, downloaded 3215, added 985
+#10 61.72 Progress: resolved 3884, reused 0, downloaded 3267, added 995
+#10 62.72 Progress: resolved 3884, reused 0, downloaded 3318, added 1004
+#10 63.72 Progress: resolved 3884, reused 0, downloaded 3320, added 1004
+#10 64.77 Progress: resolved 3884, reused 0, downloaded 3401, added 1044
+#10 65.76 Progress: resolved 3884, reused 0, downloaded 3478, added 1074
+#10 66.77 Progress: resolved 3884, reused 0, downloaded 3527, added 1091
+#10 67.78 Progress: resolved 3884, reused 0, downloaded 3529, added 1091
+#10 72.70 Progress: resolved 3884, reused 0, downloaded 3530, added 1091
+#10 73.70 Progress: resolved 3884, reused 0, downloaded 3569, added 1103
+#10 74.71 Progress: resolved 3884, reused 0, downloaded 3601, added 1114
+#10 75.71 Progress: resolved 3884, reused 0, downloaded 3643, added 1126
+#10 76.72 Progress: resolved 3884, reused 0, downloaded 3673, added 1136
+#10 77.72 Progress: resolved 3884, reused 0, downloaded 3697, added 1141
+#10 78.72 Progress: resolved 3884, reused 0, downloaded 3741, added 1152
+#10 79.73 Progress: resolved 3884, reused 0, downloaded 3753, added 1209
+#10 80.73 Progress: resolved 3884, reused 0, downloaded 3753, added 1239
+#10 82.69 Progress: resolved 3884, reused 0, downloaded 3753, added 1240
+#10 83.69 Progress: resolved 3884, reused 0, downloaded 3753, added 1342
+#10 84.69 Progress: resolved 3884, reused 0, downloaded 3753, added 1415
+#10 85.69 Progress: resolved 3884, reused 0, downloaded 3753, added 1563
+#10 86.69 Progress: resolved 3884, reused 0, downloaded 3753, added 1677
+#10 87.70 Progress: resolved 3884, reused 0, downloaded 3753, added 1811
+#10 88.70 Progress: resolved 3884, reused 0, downloaded 3753, added 1911
+#10 89.72 Progress: resolved 3884, reused 0, downloaded 3753, added 1968
+#10 90.73 Progress: resolved 3884, reused 0, downloaded 3753, added 2131
+#10 91.73 Progress: resolved 3884, reused 0, downloaded 3753, added 2238
+#10 92.74 Progress: resolved 3884, reused 0, downloaded 3753, added 2497
+#10 93.75 Progress: resolved 3884, reused 0, downloaded 3753, added 2751
+#10 94.76 Progress: resolved 3884, reused 0, downloaded 3753, added 3067
+#10 95.76 Progress: resolved 3884, reused 0, downloaded 3753, added 3402
+#10 96.76 Progress: resolved 3884, reused 0, downloaded 3753, added 3591
+#10 97.78 Progress: resolved 3884, reused 0, downloaded 3753, added 3678
+#10 98.78 Progress: resolved 3884, reused 0, downloaded 3753, added 3872
+#10 99.78 Progress: resolved 3884, reused 0, downloaded 3753, added 3883
+#10 99.91 Progress: resolved 3884, reused 0, downloaded 3753, added 3884, done
+#10 101.1 .../node_modules/@swc/core postinstall$ node postinstall.js
+#10 101.1 .../node_modules/@balena/compose-parser postinstall$ node scripts/fetch-binary.js || npm run build:go
+#10 101.1 .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+#10 101.2 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#10 101.3 .../node_modules/@balena/compose-parser postinstall: Downloading binary from: https://github.com/balena-io-modules/balena-compose-parser/releases/download/v0.3.0/balena-compose-parser-linux-arm64.tar.gz
+#10 101.4 .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+#10 101.4 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#10 101.5 .../node_modules/@nestjs/core postinstall$ opencollective || exit 0
+#10 101.5 .../node_modules/electron postinstall$ node install.js
+#10 101.5 .../esbuild@0.20.2/node_modules/esbuild postinstall$ node install.js
+#10 101.6 .../esbuild@0.20.2/node_modules/esbuild postinstall: Done
+#10 101.7 .../sqlite3@5.1.7/node_modules/sqlite3 install$ prebuild-install -r napi || node-gyp rebuild
+#10 101.7 .../node_modules/@nestjs/core postinstall:                            Thanks for installing nest 
+#10 101.7 .../node_modules/@nestjs/core postinstall:                  Please consider donating to our open collective
+#10 101.7 .../node_modules/@nestjs/core postinstall:                         to help us maintain this package.
+#10 101.7 .../node_modules/@nestjs/core postinstall:                                          
+#10 101.7 .../node_modules/@nestjs/core postinstall:                         Number of contributors: undefined
+#10 101.7 .../node_modules/@nestjs/core postinstall:                              Number of backers: 1220
+#10 101.8 .../node_modules/@balena/compose-parser postinstall: Extracting binary to /workspace/node_modules/.pnpm/@balena+compose-parser@0.3.0/node_modules/@balena/compose-parser/bin/
+#10 101.8 .../node_modules/@nestjs/core postinstall:                              Annual budget: $128,793
+#10 101.8 .../node_modules/@nestjs/core postinstall:                              Current balance: $15,294
+#10 101.8 .../node_modules/@nestjs/core postinstall:                                          
+#10 101.8 .../node_modules/@nestjs/core postinstall:              Become a partner: https://opencollective.com/nest/donate
+#10 101.8 .../node_modules/@nestjs/core postinstall:                                          
+#10 101.8 .../node_modules/@nestjs/core postinstall: Done
+#10 101.9 .../sqlite3@5.1.7/node_modules/sqlite3 install: (node:131) [DEP0176] DeprecationWarning: fs.R_OK is deprecated, use fs.constants.R_OK instead
+#10 101.9 .../sqlite3@5.1.7/node_modules/sqlite3 install: (Use `node --trace-deprecation ...` to show where the warning was created)
+#10 101.9 .../node_modules/@balena/compose-parser postinstall: Binary successfully installed at /workspace/node_modules/.pnpm/@balena+compose-parser@0.3.0/node_modules/@balena/compose-parser/bin/balena-compose-parser
+#10 101.9 .../node_modules/@balena/compose-parser postinstall: Done
+#10 102.0 .../bcrypt@6.0.0/node_modules/bcrypt install$ node-gyp-build
+#10 102.0 .../sharp@0.32.6/node_modules/sharp install$ (node install/libvips && node install/dll-copy && prebuild-install) || (node install/can-compile && node-gyp rebuild && node install/dll-copy)
+#10 102.1 .../bcrypt@6.0.0/node_modules/bcrypt install: Done
+#10 102.1 .../sharp@0.32.6/node_modules/sharp install: sharp: Downloading https://github.com/lovell/sharp-libvips/releases/download/v8.14.5/libvips-8.14.5-linux-arm64v8.tar.br
+#10 102.4 .../node_modules/@swc/core postinstall: Done
+#10 102.9 .../sqlite3@5.1.7/node_modules/sqlite3 install: Done
+#10 108.4 .../sharp@0.32.6/node_modules/sharp install: sharp: Integrity check passed for linux-arm64v8
+#10 108.5 .../sharp@0.32.6/node_modules/sharp install: (node:176) [DEP0176] DeprecationWarning: fs.R_OK is deprecated, use fs.constants.R_OK instead
+#10 108.5 .../sharp@0.32.6/node_modules/sharp install: (Use `node --trace-deprecation ...` to show where the warning was created)
+#10 109.0 .../sharp@0.32.6/node_modules/sharp install: Done
+#10 115.5 .../node_modules/electron postinstall: Done
+#10 119.2 .../node_modules/nx postinstall$ node -e "try{require('./dist/bin/post-install')}catch(e){}"
+#10 119.5 .../node_modules/nx postinstall: Done
+#10 120.9 
+#10 120.9 dependencies:
+#10 120.9 + @7nohe/openapi-react-query-codegen 1.6.2
+#10 120.9 + @dagrejs/dagre 3.1.1
+#10 120.9 + @dnd-kit/core 6.3.1
+#10 120.9 + @dnd-kit/sortable 10.0.0
+#10 120.9 + @dnd-kit/utilities 3.2.2
+#10 120.9 + @eslint/js 9.39.5
+#10 120.9 + @golevelup/ts-jest 3.0.0
+#10 120.9 + @heroui/react 3.2.2
+#10 120.9 + @heroui/styles 3.2.4
+#10 120.9 + @hookform/resolvers 5.7.1
+#10 120.9 + @icons-pack/react-simple-icons 13.13.0
+#10 120.9 + @internationalized/date 3.12.3
+#10 120.9 + @khmyznikov/pwa-install 0.6.4
+#10 120.9 + @licenso/client 1.2.0
+#10 120.9 + @million/lint 1.0.14
+#10 120.9 + @monaco-editor/react 4.7.0
+#10 120.9 + @nestjs-modules/mailer 2.3.7
+#10 120.9 + @nestjs/common 11.1.28
+#10 120.9 + @nestjs/config 4.0.4
+#10 120.9 + @nestjs/core 11.1.28
+#10 120.9 + @nestjs/event-emitter 3.1.0
+#10 120.9 + @nestjs/jwt 11.0.2
+#10 120.9 + @nestjs/passport 11.0.5
+#10 120.9 + @nestjs/platform-express 11.1.28
+#10 120.9 + @nestjs/platform-ws 11.1.28
+#10 120.9 + @nestjs/schedule 6.1.3
+#10 120.9 + @nestjs/schematics 11.1.0
+#10 120.9 + @nestjs/serve-static 5.0.5
+#10 120.9 + @nestjs/swagger 11.4.4
+#10 120.9 + @nestjs/testing 11.1.28
+#10 120.9 + @nestjs/typeorm 11.0.3
+#10 120.9 + @nestjs/websockets 11.1.28
+#10 120.9 + @node-saml/passport-saml 5.1.0
+#10 120.9 + @nx/devkit 22.7.8
+#10 120.9 + @react-stately/data 3.16.1
+#10 120.9 + @rollup/plugin-replace 6.0.3
+#10 120.9 + @simplewebauthn/browser 13.3.0
+#10 120.9 + @simplewebauthn/server 13.3.2
+#10 120.9 + @sumup/sdk 0.1.8
+#10 120.9 + @tailwindcss/typography 0.5.20
+#10 120.9 + @tailwindcss/vite 4.3.3
+#10 120.9 + @tanstack/react-query 5.101.4
+#10 120.9 + @types/decompress 4.2.7
+#10 120.9 + @types/multer 2.2.0
+#10 120.9 + @types/uuid 11.0.0
+#10 120.9 + @xyflow/react 12.11.2
+#10 120.9 + @yudiel/react-qr-scanner 2.6.0
+#10 120.9 + @zxcvbn-ts/core 4.1.2
+#10 120.9 + @zxcvbn-ts/language-common 3.0.4
+#10 120.9 + @zxcvbn-ts/language-de 3.0.2
+#10 120.9 + @zxcvbn-ts/language-en 3.0.2
+#10 120.9 + async-mutex 0.5.0
+#10 120.9 + axios 1.19.0
+#10 120.9 + balena-sdk 23.2.14
+#10 120.9 + bcrypt 6.0.0
+#10 120.9 + class-transformer 0.5.1
+#10 120.9 + class-validator 0.15.1
+#10 120.9 + clsx 2.1.1
+#10 120.9 + cookie-parser 1.4.7
+#10 120.9 + cookie-session 2.1.1
+#10 120.9 + csv 6.6.3
+#10 120.9 + csv-parse 6.2.1
+#10 120.9 + date-fns 4.4.0
+#10 120.9 + decompress 4.2.1
+#10 120.9 + decompress-targz 4.1.1
+#10 120.9 + docsify-cli 4.4.4
+#10 120.9 + esptool-js 0.6.1
+#10 120.9 + express 4.22.2
+#10 120.9 + express-session 1.19.0
+#10 120.9 + fetch-event-stream 0.1.6
+#10 120.9 + fflate 0.8.3
+#10 120.9 + glob 13.0.6
+#10 120.9 + grapesjs 0.23.4
+#10 120.9 + grapesjs-mjml 1.0.8
+#10 120.9 + handlebars 4.7.9
+#10 120.9 + identity-obj-proxy 3.0.0
+#10 120.9 + intl-pluralrules 2.0.1
+#10 120.9 + ioredis 5.11.1
+#10 120.9 + ipaddr.js 2.4.0
+#10 120.9 + jdenticon 3.3.0
+#10 120.9 + js-confetti 0.13.1
+#10 120.9 + lodash-es 4.18.1
+#10 120.9 + lucide-react 1.30.0
+#10 120.9 + mjml 5.4.0
+#10 120.9 + mjml-react 2.0.8
+#10 120.9 + mkcert 3.2.0
+#10 120.9 + mqtt 5.15.2
+#10 120.9 + nanoid 3.3.18
+#10 120.9 + nestjs-asyncapi 1.4.0
+#10 120.9 + new-github-issue-url 1.1.0
+#10 120.9 + nodemailer 9.0.5
+#10 120.9 + otplib 13.4.1
+#10 120.9 + parcel 2.16.4
+#10 120.9 + passport 0.7.0
+#10 120.9 + passport-custom 1.2.1
+#10 120.9 + passport-jwt 4.0.1
+#10 120.9 + passport-local 1.0.0
+#10 120.9 + passport-openidconnect 0.1.2
+#10 120.9 + prom-client 15.1.3
+#10 120.9 + react 19.2.8
+#10 120.9 + react-dom 19.2.8
+#10 120.9 + react-intersection-observer 10.1.0
+#10 120.9 + react-markdown 10.1.0
+#10 120.9 + react-pluggable 0.4.3
+#10 120.9 + react-qrcode-logo 3.0.0
+#10 120.9 + react-router-dom 7.18.2
+#10 120.9 + react-simple-pull-to-refresh 1.3.4
+#10 120.9 + react-toastify 11.1.0
+#10 120.9 + recharts 3.10.1
+#10 120.9 + reflect-metadata 0.2.2
+#10 120.9 + remark-gfm 4.0.1
+#10 120.9 + rxjs 7.8.2
+#10 120.9 + semver 7.8.5
+#10 120.9 + sharp 0.35.3
+#10 120.9 + sonner 2.0.7
+#10 120.9 + spark-md5 3.0.2
+#10 120.9 + sqlite3 5.1.7
+#10 120.9 + swagger-typescript-api 13.12.6
+#10 120.9 + tailwind-merge 3.6.0
+#10 120.9 + tailwindcss 4.3.3
+#10 120.9 + tar 7.5.22
+#10 120.9 + three 0.185.1
+#10 120.9 + tslib 2.8.1
+#10 120.9 + tw-animate-css 1.4.0
+#10 120.9 + typeorm 0.3.31
+#10 120.9 + usb 2.18.0
+#10 120.9 + uuid 14.0.1
+#10 120.9 + web-push 3.6.7
+#10 120.9 + workbox-core 7.4.1
+#10 120.9 + workbox-expiration 7.4.1
+#10 120.9 + workbox-precaching 7.4.1
+#10 120.9 + workbox-routing 7.4.1
+#10 120.9 + workbox-strategies 7.4.1
+#10 120.9 + workbox-window 7.4.1
+#10 120.9 + ws 8.21.3
+#10 120.9 + zod 4.4.3
+#10 120.9 + zustand 5.0.14
+#10 120.9 
+#10 120.9 devDependencies:
+#10 120.9 + @babel/core 7.29.7
+#10 120.9 + @babel/preset-react 7.29.7
+#10 120.9 + @balena/compose-parser 0.3.0
+#10 120.9 + @commitlint/cli 19.8.1
+#10 120.9 + @commitlint/config-conventional 21.2.0
+#10 120.9 + @cyclonedx/cdxgen 12.8.3
+#10 120.9 + @nx/esbuild 22.7.8
+#10 120.9 + @nx/eslint 22.7.8
+#10 120.9 + @nx/eslint-plugin 22.7.8
+#10 120.9 + @nx/jest 22.7.8
+#10 120.9 + @nx/js 22.7.8
+#10 120.9 + @nx/nest 22.7.8
+#10 120.9 + @nx/node 22.7.8
+#10 120.9 + @nx/plugin 22.7.8
+#10 120.9 + @nx/react 22.7.8
+#10 120.9 + @nx/rollup 22.7.8
+#10 120.9 + @nx/vite 22.7.8
+#10 120.9 + @nx/web 22.7.8
+#10 120.9 + @nx/webpack 22.7.8
+#10 120.9 + @nx/workspace 22.7.8
+#10 120.9 + @originjs/vite-plugin-federation 1.4.1
+#10 120.9 + @rolldown/plugin-babel 0.2.4
+#10 120.9 + @rollup/plugin-url 8.0.2
+#10 120.9 + @surma/rollup-plugin-off-main-thread 2.2.3
+#10 120.9 + @svgr/rollup 8.1.0
+#10 120.9 + @swc-node/register 1.12.1
+#10 120.9 + @swc/cli 0.8.1
+#10 120.9 + @swc/core 1.15.47
+#10 120.9 + @swc/helpers 0.5.23
+#10 120.9 + @testing-library/dom 10.4.1
+#10 120.9 + @testing-library/jest-dom 6.9.1
+#10 120.9 + @testing-library/react 16.3.2
+#10 120.9 + @testing-library/user-event 14.6.3
+#10 120.9 + @types/bcrypt 6.0.0
+#10 120.9 + @types/express 4.17.25
+#10 120.9 + @types/express-session 1.19.0
+#10 120.9 + @types/jest 30.0.0
+#10 120.9 + @types/lodash 4.17.25
+#10 120.9 + @types/lodash-es 4.17.12
+#10 120.9 + @types/mjml 5.0.0
+#10 120.9 + @types/node 25.9.5
+#10 120.9 + @types/nodemailer 8.0.1
+#10 120.9 + @types/passport-jwt 4.0.1
+#10 120.9 + @types/passport-local 1.0.38
+#10 120.9 + @types/passport-openidconnect 0.1.3
+#10 120.9 + @types/react 19.2.18
+#10 120.9 + @types/react-dom 19.2.4
+#10 120.9 + @types/semver 7.8.0
+#10 120.9 + @types/spark-md5 3.0.5
+#10 120.9 + @types/supertest 7.2.1
+#10 120.9 + @types/three 0.185.4
+#10 120.9 + @types/w3c-web-serial 1.0.8
+#10 120.9 + @types/web-push 3.6.4
+#10 120.9 + @types/ws 8.18.1
+#10 120.9 + @typescript-eslint/parser 8.64.0
+#10 120.9 + @typescript/typescript6 6.0.2
+#10 120.9 + @vitejs/plugin-react 6.0.5
+#10 120.9 + @vitest/coverage-istanbul 4.1.10
+#10 120.9 + @vitest/coverage-v8 4.1.10
+#10 120.9 + @vitest/ui 4.1.10
+#10 120.9 + autoprefixer 10.5.4
+#10 120.9 + babel-jest 30.4.1
+#10 120.9 + babel-plugin-react-compiler 1.0.0
+#10 120.9 + buffer 6.0.3
+#10 120.9 + core-js 3.50.0
+#10 120.9 + crap-score 1.2.1
+#10 120.9 + electron 34.5.8
+#10 120.9 + electron-builder 25.1.8
+#10 120.9 + esbuild 0.28.2
+#10 120.9 + eslint 9.39.5
+#10 120.9 + eslint-config-prettier 10.1.8
+#10 120.9 + eslint-plugin-import 2.32.0
+#10 120.9 + eslint-plugin-jsx-a11y 6.10.2
+#10 120.9 + eslint-plugin-react 7.37.5
+#10 120.9 + eslint-plugin-react-hooks 7.1.1
+#10 120.9 + happy-dom 20.11.1
+#10 120.9 + husky 9.1.7
+#10 120.9 + ink 7.1.1
+#10 120.9 + istanbul-lib-coverage 3.2.2
+#10 120.9 + istanbul-lib-instrument 6.0.3
+#10 120.9 + jest 30.4.2
+#10 120.9 + jest-environment-jsdom 30.4.1
+#10 120.9 + jest-environment-node 30.4.1
+#10 120.9 + jest-util 30.4.1
+#10 120.9 + jiti 2.7.0
+#10 120.9 + jsdom 29.1.1
+#10 120.9 + jsonc-eslint-parser 3.3.0
+#10 120.9 + lodash 4.18.1
+#10 120.9 + nx 22.7.8
+#10 120.9 + prettier 3.9.6
+#10 120.9 + rollup 4.62.4
+#10 120.9 + stream-browserify 3.0.0
+#10 120.9 + supertest 7.2.2
+#10 120.9 + testcontainers 10.28.0
+#10 120.9 + ts-jest 29.4.12
+#10 120.9 + ts-loader 9.6.2
+#10 120.9 + ts-morph 28.0.0
+#10 120.9 + ts-node 10.9.2
+#10 120.9 + typescript 7.0.2
+#10 120.9 + typescript-eslint 8.64.0
+#10 120.9 + util 0.12.5
+#10 120.9 + verdaccio 6.9.2
+#10 120.9 + vite 8.2.1
+#10 120.9 + vite-plugin-dts 5.0.3
+#10 120.9 + vite-plugin-pwa 1.3.0
+#10 120.9 + vitest 4.1.10
+#10 120.9 + webpack-cli 7.2.2
+#10 120.9 
+#10 121.0 . prepare$ husky
+#10 121.0 . prepare: .git can't be found
+#10 121.0 . prepare: Done
+#10 121.0 ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+#10 121.0 │                                                                              │
+#10 121.0 │   Ignored build scripts: @parcel/watcher@2.5.6, @scarf/scarf@1.4.0,          │
+#10 121.0 │   core-js@2.6.12, core-js@3.50.0, cpu-features@0.0.10, docsify@4.13.1,       │
+#10 121.0 │   es5-ext@0.10.64, less@4.5.1, lmdb@2.8.5, msgpackr-extract@3.0.3,           │
+#10 121.0 │   protobufjs@7.6.4, puppeteer@14.4.1, ssh2@1.17.0, unrs-resolver@1.12.2,     │
+#10 121.0 │   usb@2.18.0.                                                                │
+#10 121.0 │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+#10 121.0 │   to run scripts.                                                            │
+#10 121.0 │                                                                              │
+#10 121.0 ╰──────────────────────────────────────────────────────────────────────────────╯
+#10 121.0 Done in 1m 59.9s using pnpm v10.34.5
+#10 130.4 
+#10 130.4  NX   Running target build-cc100-runtime for project plugin-wago and 5 tasks it depends on:
+#10 130.4 
+#10 130.4 
+#10 138.0 
+#10 138.0 > nx run shared:build
+#10 138.0 
+#10 138.0 Compiling TypeScript files for project "shared"...
+#10 138.0 Done compiling TypeScript files for project "shared".
+#10 140.3 
+#10 140.3 > nx run database-entities:build
+#10 140.3 
+#10 140.3 Compiling TypeScript files for project "database-entities"...
+#10 140.3 Done compiling TypeScript files for project "database-entities".
+#10 141.9 
+#10 141.9 > nx run plugins-backend-sdk:build
+#10 141.9 
+#10 141.9 Compiling TypeScript files for project "plugins-backend-sdk"...
+#10 141.9 Done compiling TypeScript files for project "plugins-backend-sdk".
+#10 142.9 
+#10 142.9 > nx run plugins-frontend-sdk:build
+#10 142.9 
+#10 142.9 > vite build
+#10 142.9 
+#10 142.9 [33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+#10 142.9   - `__dirname` (vite.config.ts:22:9). Use `import.meta.dirname` instead
+#10 142.9 Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+#10 142.9 [36mvite v8.2.1 [32mbuilding client environment for production...[36m[39m
+#10 142.9 [2Ktransforming...[32m✓[0m 6 modules transformed.
+#10 142.9 rendering chunks...
+#10 142.9 
+#10 142.9 [unplugin:dts] Start generate declaration files...
+#10 142.9 [unplugin:dts] Declaration files built in 1826ms.
+#10 142.9 
+#10 142.9 computing gzip size...
+#10 142.9 [2m../../dist/libs/plugins-frontend-sdk/[0m[36mindex.js  [0m[1;2m1.91 kB[0m[2m │ gzip: 1.00 kB[0m
+#10 142.9 
+#10 142.9 [32m✓ built in 2.07s[39m
+#10 142.9 
+#10 142.9 > nx run plugin-wago:build-cc100-runtime-esbuild
+#10 142.9 
+#10 144.5 
+#10 144.5 > nx run plugin-wago:build-cc100-runtime
+#10 144.5 
+#10 144.5 > node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-runtime ./main.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-runtime/
+#10 144.5 
+#10 144.6 
+#10 144.6 
+#10 144.6 
+#10 144.6  NX   Successfully ran target build-cc100-runtime for project plugin-wago and 5 tasks it depends on
+#10 144.6 
+#10 144.6 
+#10 DONE 147.2s
+
+#11 [stage-1 2/6] WORKDIR /app
+#11 CACHED
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 CACHED
+
+#13 [stage-1 4/6] COPY --from=build /workspace/dist/apps/wago-cc100-runtime ./
+#13 CACHED
+
+#14 [stage-1 5/6] COPY --from=build /workspace/apps/plugins/wago/cc100-runtime/manifest.json ./manifest.json
+#14 CACHED
+
+#15 [stage-1 6/6] RUN chown -R runtime:runtime /app /var/lib/attraccess-wago
+#15 CACHED
+
+#16 exporting to oci image format
+#16 exporting layers done
+#16 exporting manifest sha256:6749fb2f028316d598f062ba09b3eb87994b29d04fe6d653d812748f47b62018 done
+#16 exporting config sha256:9733f7f9307b8a87d071f4c950821a76dd1573b151b1d74fe06dfccd757ac356 done
+#16 sending tarball
+#16 sending tarball 2.2s done
+#16 DONE 2.3s
+
+#17 importing to docker
+#17 DONE 0.0s
