@@ -60,7 +60,7 @@ import { SecuritySection } from '../settings/sections/security';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 import { DashboardLanding, DashboardPage } from '../dashboard';
-import { DashboardPinToggle } from '../dashboard/pins';
+import { PageHeader } from '../../components/pageHeader';
 
 const CompanionSettingsPage = lazy(() => import('../settings/companion'));
 const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
@@ -519,23 +519,20 @@ function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): RouteConfi
     console.error(`Attraccess Plugin System: getSidebarItems() of plugin "${pluginName}" threw`, error);
   }
 
-  // Wrap plugin routes to isolate errors and expose pinning on plugin sidebar pages.
+  // Wrap plugin routes to isolate errors. Shared PageHeader reads the plugin
+  // sidebar registry and places the pin action alongside its other actions.
   return routes.map((route) => {
     const sidebarItem = sidebarItems.find((item) => item.path === route.path);
     return {
       ...route,
       element: (
         <PluginRouteBoundary pluginName={pluginName}>
-          {sidebarItem && <PluginPagePin path={sidebarItem.path} label={sidebarItem.label} />}
+          {sidebarItem && <PageHeader title={sidebarItem.label} />}
           {route.element}
         </PluginRouteBoundary>
       ),
     };
   });
-}
-
-function PluginPagePin({ path, label }: { path: string; label: string }) {
-  return <div className="flex justify-end px-4 pt-3"><DashboardPinToggle itemType="page" itemId={path} label={label} /></div>;
 }
 
 export function useAllRoutes() {

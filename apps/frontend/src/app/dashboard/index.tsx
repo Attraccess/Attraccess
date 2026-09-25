@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useMemo } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { Card } from '@heroui/react';
@@ -20,6 +21,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { ResourceUsageSession } from '../resources/usage/resourceUsageSession';
 import { StatusChip } from '../resourceOverview/resourceGroupCard/statusChip';
+import { SessionTimer } from '../resources/usage/components/SessionTimer';
+import { useResourcesServiceResourceUsageGetActiveSession } from '@attraccess/react-query-client';
 
 function Landing() {
   const { data, isLoading, isError, refetch } = useDashboardPins();
@@ -56,7 +59,7 @@ function usePageEntries(pins: Pin[]): PageEntry[] {
       if (!route || (route.authRequired && route.authRequired !== true && !hasRequiredPermissions(route.authRequired, hasPermission))) return [];
       if (pin.itemId.startsWith('/kiosk') || pin.itemId === '/dashboard' || /^https?:/.test(pin.itemId)) return [];
       if ('isExternal' in item && item.isExternal) return [];
-      return [{ path: pin.itemId, title: item.title, icon: item.icon, badgeCount: 'badgeCount' in item ? item.badgeCount : undefined, pin }];
+      return [{ path: pin.itemId, title: item.title, icon: item.icon ?? <LayoutDashboardIcon size={22} />, badgeCount: 'badgeCount' in item ? item.badgeCount : undefined, pin }];
     });
   }, [pins, routes, hasPermission, sidebarT, plugins, sidebarItems]);
 }
@@ -65,7 +68,7 @@ function DashboardPage() {
   const { t } = useTranslations({ en, de });
   const { data: pins = [], isLoading, isError, refetch } = useDashboardPins();
   const entries = usePageEntries(pins);
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }));
 
   const reorder = (from: string, to: string) => {
     const source = pins.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === from);
@@ -88,12 +91,13 @@ function DashboardPage() {
       {!isError && pins.map((pin) => pin.itemType === 'page' ? (() => {
         const entry = entries.find((item) => item.pin.itemId === pin.itemId);
         if (!entry) return null;
-        return <SortablePageCard key={entry.pin.itemId} id={`page:${entry.pin.itemId}`} className="flex flex-row items-center gap-3 p-4">
-        <GripVerticalIcon size={18} className="touch-none cursor-grab text-muted" />
-        {entry.icon}
-        <Link className="min-w-0 flex-1 font-medium hover:underline" to={entry.path}>{entry.title}</Link>
-        {!!entry.badgeCount && <span className="rounded-full bg-default-100 px-2 py-1 text-xs">{entry.badgeCount}</span>}
-        <button aria-label={`${t('unpin')} ${entry.title}`} onClick={() => removePin(entry.pin)}>★</button>
+        return <SortablePageCard key={entry.pin.itemId} id={`page:${entry.pin.itemId}`} className="relative flex flex-row items-center gap-3 p-4">
+        <Link aria-label={entry.title} className="absolute inset-0 z-0 rounded-xl" to={entry.path} />
+        <GripVerticalIcon size={18} className="relative z-10 touch-none cursor-grab text-muted" />
+        <span className="pointer-events-none relative z-10">{entry.icon}</span>
+        <span className="pointer-events-none relative z-10 min-w-0 flex-1 font-medium">{entry.title}</span>
+        {!!entry.badgeCount && <span className="pointer-events-none relative z-10 rounded-full bg-default-100 px-2 py-1 text-xs">{entry.badgeCount}</span>}
+        <button className="relative z-10" aria-label={`${t('unpin')} ${entry.title}`} onClick={() => removePin(entry.pin)}>★</button>
       </SortablePageCard>;
       })() : <ResourcePinCard key={`resource:${pin.itemId}`} pin={pin} openLabel={t('open')} resourceLabel={t('resource')} unpinLabel={t('unpin')} onUnpin={() => removePin(pin)} />)}
     </div>
@@ -103,16 +107,30 @@ function DashboardPage() {
 
 function SortablePageCard({ id, className, children }: { id: string; className?: string; children: React.ReactNode }) {
   const { setNodeRef, attributes, listeners, transform, transition } = useSortable({ id });
-  return <Card ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} {...attributes} {...listeners} className={className}>{children}</Card>;
+  return <Card ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={className}>{attachDragHandle(children, { attributes, listeners })}</Card>;
+}
+
+function attachDragHandle(children: React.ReactNode, drag: Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>): React.ReactNode {
+  return React.Children.map(children, (child) => {
+    if (!React.isValidElement(child)) return child;
+    if (child.type === GripVerticalIcon) return React.cloneElement(child as React.ReactElement<React.SVGProps<SVGSVGElement>>, { ...drag.attributes, ...drag.listeners });
+    const element = child as React.ReactElement<{ children?: React.ReactNode }>;
+    if (element.props && 'children' in element.props) {
+      return React.cloneElement(element, { children: attachDragHandle(element.props.children, drag) });
+    }
+    return child;
+  });
 }
 
 function ResourcePinCard({ pin, openLabel, resourceLabel, unpinLabel, onUnpin }: { pin: Pin; openLabel: string; resourceLabel: string; unpinLabel: string; onUnpin: () => void }) {
   const id = Number(pin.itemId);
   const name = pin.resourceName ?? resourceLabel;
   const { data: resource } = useResourcesServiceGetOneResourceById({ id }, undefined, { enabled: Number.isSafeInteger(id) && id > 0, retry: false });
+  const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId: id }, undefined, { enabled: Number.isSafeInteger(id) && id > 0, retry: false });
   return <SortableResourceCard id={`resource:${pin.itemId}`} className="flex flex-col gap-3 rounded-xl border border-default-200 bg-content1 p-4">
     <div className="flex flex-row items-center justify-between p-3"><GripVerticalIcon size={18} className="touch-none cursor-grab text-muted" /><h2 className="font-semibold">{name}</h2><button aria-label={`${unpinLabel} ${name}`} onClick={onUnpin}>★</button></div>
     <div className="flex justify-end"><StatusChip resourceId={id} /></div>
+    {activeSession?.usage?.startTime && <SessionTimer startTime={activeSession.usage.startTime} />}
     {resource && <ResourceUsageSession resourceId={id} resource={resource} />}
     <Link className="mt-3 inline-block underline" to={`/resources/${id}`}>{openLabel}</Link>
   </SortableResourceCard>;
@@ -120,7 +138,7 @@ function ResourcePinCard({ pin, openLabel, resourceLabel, unpinLabel, onUnpin }:
 
 function SortableResourceCard({ id, className, children }: { id: string; className?: string; children: React.ReactNode }) {
   const { setNodeRef, attributes, listeners, transform, transition } = useSortable({ id });
-  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} {...attributes} {...listeners} className={className}>{children}</div>;
+  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={className}>{attachDragHandle(children, { attributes, listeners })}</div>;
 }
 
 export { Landing as DashboardLanding, DashboardPage };

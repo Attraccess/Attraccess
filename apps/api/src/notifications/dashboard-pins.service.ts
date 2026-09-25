@@ -5,16 +5,23 @@ import { In, Repository } from 'typeorm';
 import { UpdateDashboardPinsDto } from './dtos/dashboard-pins.dto';
 
 export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string; resourceName?: string };
-// The API only stores page pins for destinations the application exposes in
-// its navigation. Keep plugin roots here as well as in the frontend registry:
-// the API must not turn arbitrary same-origin paths into persistent pins.
+// Built-in destinations are explicit. Plugins are installed independently of
+// the API, so their internal sidebar paths cannot be enumerated here.
 const eligiblePagePaths = new Set([
   '/resources', '/projects', '/messages', '/attractap/nfc-cards', '/billing', '/csv-export', '/users',
   '/attractap/readers', '/devices/mqtt/servers', '/devices/companion', '/balena', '/settings',
   '/dependencies', '/changelog', '/printables', '/shelly', '/wago', '/rabbitmq',
 ]);
 function isEligiblePagePath(path: string): boolean {
-  return eligiblePagePaths.has(path);
+  if (eligiblePagePaths.has(path)) return true;
+  // Accept canonical, single-origin plugin routes while excluding routes that
+  // must never be pinned and path tricks that could escape the app router.
+  return path.startsWith('/') && !path.startsWith('//') && !/[?#\\\s]/.test(path) &&
+    !path.split('/').some((segment) => segment === '.' || segment === '..') &&
+    path !== '/kiosk' && path !== '/kiosk/display' && path !== '/dashboard' &&
+    // Resource details are not sidebar pages. Match the route boundary so a
+    // plugin page such as /resources/report remains pinnable.
+    !/^\/resources\/\d+(?:\/|$)/.test(path);
 }
 
 @Injectable()
