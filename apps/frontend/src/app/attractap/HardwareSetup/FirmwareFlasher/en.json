@@ -9,6 +9,12 @@
     "flash": "Install Now",
     "retryFlash": "Retry Installation"
   },
+  "options": {
+    "erase": {
+      "label": "Erase device completely (factory reset)",
+      "description": "Deletes all stored settings (WiFi, server, PIN). When disabled, settings are kept across the update."
+    }
+  },
   "errors": {
     "NO_PORT_SELECTED": "No port selected",
     "CONNECTION_FAILED": "Connection failed",

@@ -179,6 +179,11 @@ private:
 
     void processState();
 
+    // Leave the on-device connection configuration screen and hand back to the
+    // generic screen routing — used when the web config tool takes over the
+    // setup so the screen doesn't stick around with stale inputs (ATT-556).
+    void exitConfigurationScreen();
+
     // Persistent boot/crash diagnostics stored in NVS. The record describes the
     // currently running session and is refreshed periodically so the last value
     // before a freeze/crash survives the reboot.

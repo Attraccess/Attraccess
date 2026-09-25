@@ -2,6 +2,20 @@
 // FEATURE: application-state
 
 #include "application.hpp"
+#include "../serial/serialCommandHandler.hpp"
+
+void Application::exitConfigurationScreen() {
+  // Mirrors the config screen's cancel callback (application.cpp): back to the
+  // init screen, re-enable API connection attempts, let the generic routing in
+  // processState() pick the correct screen on the next iteration.
+#ifdef HAS_LVGL_DISPLAY
+  this->state = APPLICATION_STATE_BOOT;
+  Display::transitionToScreen(&Display::initScreen);
+#else
+  this->state = APPLICATION_STATE_INIT;
+#endif
+  this->api.enableConnectionAttempts();
+}
 
 void Application::processState() {
 #ifdef HAS_WS2812_LED
@@ -13,8 +27,24 @@ void Application::processState() {
                                 attraccessApiConfig.hostname != "" &&
                                 attraccessApiConfig.port > 0;
 
+  // The web config tool is driving setup over USB serial. Don't show (or keep
+  // showing) the on-device config screen: its input fields would go stale
+  // while settings change underneath it, with no way to leave it (ATT-556).
+  bool webConfigActive = SerialCommandHandler::isWebConfigSessionActive();
+
     if (!connectionIsConfigured)
     {
+        if (webConfigActive)
+        {
+            if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
+            {
+                this->logger.debug("Web config session active, leaving config screen");
+                this->exitConfigurationScreen();
+            }
+
+            return;
+        }
+
         if (this->state != APPLICATION_STATE_CONFIGURATION_REQUIRED)
         {
             this->logger.debug("Connection not configured, showing config screen");
@@ -31,6 +61,15 @@ void Application::processState() {
 
     if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
     {
+        // Configured now (e.g. via the web config tool while the screen was
+        // open): leave the stale config screen instead of sticking on it
+        // until a power cycle (ATT-556).
+        if (webConfigActive)
+        {
+            this->logger.debug("Configuration arrived via web config tool, leaving config screen");
+            this->exitConfigurationScreen();
+        }
+
         return;
     }
 
@@ -45,8 +84,11 @@ void Application::processState() {
     return;
   }
 
+  // Suppress the on-device PIN screen while the web config tool is active —
+  // the PIN gets set over serial and the screen's state would go stale
+  // (ATT-556). If it is already showing, the generic routing below moves on.
   bool pinIsSet = Settings::getDeviceConfig().passCode != "0000";
-  if (!pinIsSet) {
+  if (!pinIsSet && !webConfigActive) {
     if (this->state == APPLICATION_STATE_PIN_NOT_SET) {
       return;
     }

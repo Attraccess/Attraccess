@@ -26,6 +26,11 @@ export interface Command {
 
 export interface ConnectionStateEvent {
   connected: boolean;
+  /**
+   * True while the device dropped off the bus (e.g. it rebooted after flashing
+   * and is re-enumerating on USB) and we are trying to re-attach automatically.
+   */
+  reconnecting: boolean;
   timestamp: number;
 }
 
@@ -53,9 +58,22 @@ export class ESPTools {
   private _transportMutex = new Mutex();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _eventListeners: Map<string, Set<EventListener<any>>> = new Map();
+  private _lastPortInfo: SerialPortInfo | null = null;
+  private _isReconnecting = false;
+
+  private static readonly RECONNECT_TIMEOUT_MS = 30_000;
+  private static readonly RECONNECT_POLL_INTERVAL_MS = 1_000;
 
   public get isConnected(): boolean {
     return !!this._transport;
+  }
+
+  /**
+   * True while the transport mutex is held (a flash or command is in flight).
+   * Used by polling UIs to avoid queueing commands behind long operations.
+   */
+  public get isBusy(): boolean {
+    return this._transportMutex.isLocked();
   }
 
   private emit<TEvent extends ESPToolsEvent>(event: TEvent, data: ESPToolsEventData[TEvent]): void {
@@ -89,11 +107,115 @@ export class ESPTools {
     }
   }
 
-  private setConnectionState(connected: boolean): void {
+  private setConnectionState(connected: boolean, reconnecting = false): void {
     this.emit('connectionState', {
       connected,
+      reconnecting,
       timestamp: Date.now(),
     } as ConnectionStateEvent);
+  }
+
+  /**
+   * The device rebooted or was power-cycled and dropped off the USB bus.
+   * Since the user already granted permission for the port, we can re-attach
+   * without a new picker dialog once the device re-enumerates (ATT-556).
+   */
+  private async tryAutoReconnect(): Promise<void> {
+    if (this._isReconnecting) {
+      return;
+    }
+    this._isReconnecting = true;
+    this.setConnectionState(false, true);
+
+    try {
+      const deadline = Date.now() + ESPTools.RECONNECT_TIMEOUT_MS;
+      while (!this._transport && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, ESPTools.RECONNECT_POLL_INTERVAL_MS));
+        if (this._transport) {
+          return;
+        }
+
+        let ports: SerialPort[] = [];
+        try {
+          ports = await navigator.serial.getPorts();
+        } catch (err) {
+          console.debug('Failed to enumerate serial ports during reconnect', err);
+          continue;
+        }
+
+        const match = ports.find((candidate) => {
+          if (!this._lastPortInfo) {
+            return true;
+          }
+          const info = candidate.getInfo();
+          return (
+            info.usbVendorId === this._lastPortInfo.usbVendorId &&
+            info.usbProductId === this._lastPortInfo.usbProductId
+          );
+        });
+
+        if (!match) {
+          continue;
+        }
+
+        try {
+          await this.openTransport(match);
+          console.debug('Auto-reconnected to device after disconnect');
+          return;
+        } catch (err) {
+          console.debug('Reconnect attempt failed, retrying', err);
+        }
+      }
+
+      if (!this._transport) {
+        // Give up — surface the disconnect so the UI can offer manual reconnect.
+        this.setConnectionState(false, false);
+      }
+    } finally {
+      this._isReconnecting = false;
+    }
+  }
+
+  // Single stable handler so re-attaching to the same SerialPort instance on
+  // reconnect does not stack duplicate listeners (EventTarget dedupes by ref).
+  private readonly _onPortDisconnect = () => {
+    this._transport = null;
+    this.tryAutoReconnect().catch((err) => console.error('Auto-reconnect failed', err));
+  };
+
+  private async openTransport(port: SerialPort, baudRate = 115200): Promise<void> {
+    port.addEventListener('disconnect', this._onPortDisconnect);
+
+    this._lastPortInfo = port.getInfo();
+
+    // Open once with ESP-specific settings to validate the port, then hand it
+    // to the esptool-js Transport (which opens it again itself).
+    await port.open({
+      baudRate,
+      bufferSize: 8192,
+    });
+
+    try {
+      await port.close();
+    } catch (err) {
+      console.error(err);
+    }
+
+    const transport = new Transport(port);
+    try {
+      await transport.connect(baudRate);
+    } catch (err) {
+      // Leave the port closed so a later attempt can re-open it cleanly.
+      try {
+        await port.close();
+      } catch {
+        // already closed
+      }
+      throw err;
+    }
+
+    this._transport = transport;
+    this.setConnectionState(true);
   }
 
   private async useTransport<TResult = unknown>(
@@ -165,17 +287,8 @@ export class ESPTools {
       // Request port from user
       const port = await navigator.serial.requestPort();
 
-      port.addEventListener('disconnect', () => {
-        this._transport = null;
-        this.setConnectionState(false);
-      });
-
       try {
-        // Open connection with ESP-specific settings
-        await port.open({
-          baudRate: 115200,
-          bufferSize: 8192,
-        });
+        await this.openTransport(port, baudRate);
       } catch (err) {
         const error = err as Error;
         console.error(error);
@@ -185,16 +298,6 @@ export class ESPTools {
           data: null,
         };
       }
-
-      try {
-        await port.close();
-      } catch (err) {
-        console.error(err);
-      }
-
-      this._transport = new Transport(port);
-      await this._transport.connect(baudRate);
-      this.setConnectionState(true);
     } catch (err) {
       const error = err as Error;
       if (error.name === 'NotFoundError') {
@@ -218,6 +321,38 @@ export class ESPTools {
     };
   }
 
+  /**
+   * NVS region of the merged firmware image. Matches
+   * apps/attractap/firmware/partitions.csv (nvs @ 0x9000, size 0x5000).
+   * The merged binary pads this gap with 0xFF, so writing it would wipe the
+   * device configuration (wifi credentials, server config, PIN) on every
+   * flash. When eraseFlash is false we skip this region to preserve settings
+   * (ATT-556). The otadata region right after (0xE000-0x10000) IS written
+   * (0xFF = invalidated) so the bootloader boots the freshly flashed app0
+   * instead of a stale OTA slot.
+   */
+  private static readonly NVS_OFFSET = 0x9000;
+  private static readonly NVS_END = 0xe000;
+
+  private buildFlashFileArray(firmwareData: Uint8Array, preserveNvs: boolean): { data: Uint8Array; address: number }[] {
+    if (!preserveNvs || firmwareData.length <= ESPTools.NVS_END) {
+      return [{ data: firmwareData, address: 0 }];
+    }
+
+    const nvsRegion = firmwareData.subarray(ESPTools.NVS_OFFSET, ESPTools.NVS_END);
+    const nvsRegionIsPadding = nvsRegion.every((byte) => byte === 0xff);
+    if (!nvsRegionIsPadding) {
+      // Image actually carries data in the NVS region — flash it as-is.
+      console.warn('Firmware image contains data in the NVS region, flashing full image');
+      return [{ data: firmwareData, address: 0 }];
+    }
+
+    return [
+      { data: firmwareData.subarray(0, ESPTools.NVS_OFFSET), address: 0 },
+      { data: firmwareData.subarray(ESPTools.NVS_END), address: ESPTools.NVS_END },
+    ];
+  }
+
   public async flashFirmware(options: {
     firmware: Blob;
     terminal?: IEspLoaderTerminal;
@@ -225,8 +360,13 @@ export class ESPTools {
     flashMode?: FlashModeValues;
     flashFreq?: FlashFreqValues;
     flashSize?: FlashSizeValues;
+    /**
+     * Erase the entire flash (factory reset) before writing. When false
+     * (default) the device configuration stored in NVS survives the flash.
+     */
+    eraseFlash?: boolean;
   }): Promise<ESPToolsResult<void>> {
-    const { firmware, terminal, onProgress, flashMode, flashFreq, flashSize } = options;
+    const { firmware, terminal, onProgress, flashMode, flashFreq, flashSize, eraseFlash = false } = options;
 
     let firmwareData: Uint8Array;
     try {
@@ -265,24 +405,21 @@ export class ESPTools {
           await esploader.main();
           await esploader.flashId();
 
-          const ERASE_FIRST = false;
+          // When not erasing, skip the NVS region so device settings survive.
+          const fileArray = this.buildFlashFileArray(firmwareData, !eraseFlash);
 
-          if (ERASE_FIRST) {
-            await esploader.eraseFlash();
-          }
-
-          const totalSize = firmware.size;
+          const totalSize = fileArray.reduce((sum, file) => sum + file.data.length, 0);
           let totalWritten = 0;
 
           await esploader.writeFlash({
-            fileArray: [{ data: firmwareData, address: 0 }],
+            fileArray,
             flashSize: flashSize ?? 'keep',
             flashMode: flashMode ?? 'dio',
             flashFreq: flashFreq ?? '80m',
-            eraseAll: false,
+            eraseAll: eraseFlash,
             compress: true,
-            reportProgress: (_fileIndex: number, written: number, total: number) => {
-              const uncompressedWritten = (written / total) * firmwareData.length;
+            reportProgress: (fileIndex: number, written: number, total: number) => {
+              const uncompressedWritten = (written / total) * fileArray[fileIndex].data.length;
               const currentProgress = totalWritten + uncompressedWritten;
               const percentage = Math.floor((currentProgress / totalSize) * 100);
 
@@ -298,12 +435,6 @@ export class ESPTools {
               }
             },
           });
-
-          // Call onProgress with 100% after flashing is complete
-          console.debug('Writing firmware: 100%');
-          if (onProgress) {
-            onProgress(100);
-          }
 
           return {
             success: true,
@@ -321,44 +452,67 @@ export class ESPTools {
       };
     }
 
-    return await this.useTransport({
-      blocking: true,
-      fn: async (transport) => {
-        try {
-          await this._hardReset(transport);
+    let resetResult: ESPToolsResult<void>;
+    if (!this._transport) {
+      // The port dropped right after flashing — on ESP32-S3 native USB this is
+      // the chip resetting and re-enumerating; auto-reconnect re-attaches.
+      console.debug('Transport gone after flashing, device is rebooting on its own');
+      resetResult = result;
+    } else {
+      try {
+        resetResult = await this.useTransport({
+          blocking: true,
+          fn: async (transport) => {
+            try {
+              await this._hardReset(transport);
 
-          return result;
-        } catch (err) {
-          return {
-            success: false,
-            error: { type: ESPToolsErrorType.RESET_FAILED, details: err },
-            data: null,
-          };
-        }
-      },
-    });
+              return result;
+            } catch (err) {
+              return {
+                success: false,
+                error: { type: ESPToolsErrorType.RESET_FAILED, details: err },
+                data: null,
+              };
+            }
+          },
+        });
+      } catch (err) {
+        resetResult = {
+          success: false,
+          error: { type: ESPToolsErrorType.RESET_FAILED, details: err },
+          data: null,
+        };
+      }
+    }
+
+    // Signal completion only after the reset so the UI doesn't start sending
+    // config commands while the chip is still in the bootloader.
+    if (resetResult.success) {
+      console.debug('Writing firmware: 100%');
+      if (onProgress) {
+        onProgress(100);
+      }
+    }
+
+    return resetResult;
   }
 
   private async _hardReset(transport: Transport): Promise<void> {
-    await transport.device.setSignals({
-      dataTerminalReady: false,
-      requestToSend: true,
-      dataCarrierDetect: false,
-      clearToSend: false,
-      ringIndicator: false,
-      dataSetReady: false,
-    });
-
+    // esptool's hard_reset sequence: assert RTS (pulls EN low / chip into
+    // reset), hold, release. transport.setRTS also re-applies the DTR state,
+    // which is required for adapters on Windows (see esptool-js webserial.ts).
+    await transport.setRTS(true);
     await new Promise((resolve) => setTimeout(resolve, 250));
 
-    await transport.device.setSignals({
-      dataTerminalReady: false,
-      requestToSend: false,
-      dataCarrierDetect: false,
-      clearToSend: false,
-      ringIndicator: false,
-      dataSetReady: false,
-    });
+    try {
+      await transport.setRTS(false);
+    } catch (err) {
+      // On ESP32-S3 native USB the chip reset tears down the USB session: the
+      // port may die between asserting and releasing RTS. The chip still
+      // reboots (the latched signal state is cleared with the USB session), so
+      // treat this as success and let auto-reconnect re-attach (ATT-556).
+      console.debug('Releasing RTS failed after reset, device likely re-enumerating', err);
+    }
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -378,6 +532,9 @@ export class ESPTools {
     }
 
     try {
+      // User-initiated disconnect: stop listening for device loss so we don't
+      // auto-reconnect to a port the user intentionally released.
+      (this._transport.device as unknown as SerialPort).removeEventListener('disconnect', this._onPortDisconnect);
       await this._transport.disconnect();
     } catch (err) {
       console.error('Error disconnecting transport:', err);
@@ -424,23 +581,33 @@ export class ESPTools {
           return null;
         }
 
-        let continueReading = true;
-        let buffer = '';
+        // Read with our own reader so the timeout can cancel a pending read().
+        // The previous implementation used transport.rawRead with a promise
+        // that was never resolved on timeout: the mutex stayed locked forever
+        // and the orphaned reader kept the stream locked, freezing every
+        // subsequent command until a page reload (ATT-556).
+        const readable = transport.device.readable;
+        if (!readable) {
+          throw new Error('Serial port is not readable');
+        }
 
+        const reader = readable.getReader();
         const timeoutId = setTimeout(() => {
-          continueReading = false;
+          // cancel() resolves the pending read() with done=true
+          reader.cancel().catch(() => undefined);
         }, timeout);
 
-        let resolveResult: ((v: string | null) => void) | null = null;
-        const resultPromise = new Promise<string | null>((resolve) => {
-          resolveResult = resolve;
-        });
+        try {
+          let buffer = '';
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done || !value) {
+              // Timed out (reader cancelled) or stream ended
+              console.debug(`No response for topic ${command.topic} within ${timeout}ms`);
+              return null;
+            }
 
-        transport.rawRead(
-          (value) => {
-            if (!continueReading) return;
-            const chunk = new TextDecoder().decode(value);
-            buffer += chunk;
+            buffer += new TextDecoder().decode(value);
 
             const bufferEndsWithNewLine = buffer.endsWith('\n');
             const lines = buffer.split('\n');
@@ -472,16 +639,13 @@ export class ESPTools {
                 continue;
               }
 
-              clearTimeout(timeoutId);
-              continueReading = false;
-              resolveResult?.(payload ?? null);
-              return;
+              return payload ?? null;
             }
-          },
-          () => !continueReading,
-        );
-
-        return await resultPromise;
+          }
+        } finally {
+          clearTimeout(timeoutId);
+          reader.releaseLock();
+        }
       },
     });
   }

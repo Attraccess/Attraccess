@@ -9,6 +9,12 @@
     "flash": "Jetzt Installieren",
     "retryFlash": "Installation erneut versuchen"
   },
+  "options": {
+    "erase": {
+      "label": "Gerät vollständig löschen (Werkseinstellungen)",
+      "description": "Löscht alle gespeicherten Einstellungen (WLAN, Server, PIN). Wenn deaktiviert, bleiben die Einstellungen beim Update erhalten."
+    }
+  },
   "errors": {
     "NO_PORT_SELECTED": "Es wurde kein Port ausgewählt",
     "CONNECTION_FAILED": "Verbindung fehlgeschlagen",

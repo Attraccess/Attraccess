@@ -67,6 +67,12 @@ type AttractapSerialCommContextValue = {
   isFetchingConfiguration: boolean;
   setAuthCode: (code: string | null) => void;
   refreshPinStatus: () => Promise<void>;
+  /**
+   * Drop all cached device state (PIN status, auth code, configuration), e.g.
+   * after flashing new firmware. The provider then polls the device until it
+   * responds again.
+   */
+  resetSession: () => void;
   fetchConfiguration: () => Promise<AttractapConfiguration>;
   sendAuthedCommand: <T = unknown>(
     topic: string,
@@ -101,12 +107,44 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
+  const resetSession = useCallback(() => {
+    setPinIsSet(null);
+    setAuthCode(null);
+    setConfiguration(null);
+  }, []);
+
+  // Poll the device until it answers the PIN status query. A single one-shot
+  // attempt is not enough: right after flashing the device is still booting
+  // (or re-enumerating on USB), so keep retrying until it responds (ATT-556).
   useEffect(() => {
-    const id = setTimeout(() => {
-      refreshPinStatus().catch((err) => console.error('Failed to fetch PIN status', err));
-    }, 3000);
-    return () => clearTimeout(id);
-  }, [refreshPinStatus]);
+    if (pinIsSet !== null) {
+      return;
+    }
+
+    const espTools = ESPTools.getInstance();
+    let inFlight = false;
+
+    const tick = () => {
+      // Skip while disconnected (auto-reconnect is working on it) or while
+      // another operation (e.g. flashing) holds the transport.
+      if (inFlight || !espTools.isConnected || espTools.isBusy) {
+        return;
+      }
+      inFlight = true;
+      refreshPinStatus()
+        .catch((err) => console.debug('PIN status poll failed, retrying', err))
+        .finally(() => {
+          inFlight = false;
+        });
+    };
+
+    const initialId = setTimeout(tick, 2000);
+    const intervalId = setInterval(tick, 5000);
+    return () => {
+      clearTimeout(initialId);
+      clearInterval(intervalId);
+    };
+  }, [pinIsSet, refreshPinStatus]);
 
   const sendAuthedCommand = useCallback(
     async <T,>(topic: string, payload?: Record<string, unknown>, options?: SendOptions) => {
@@ -172,6 +210,7 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
       isFetchingConfiguration,
       setAuthCode,
       refreshPinStatus,
+      resetSession,
       fetchConfiguration,
       sendAuthedCommand,
     }),
@@ -181,6 +220,7 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
       configuration,
       isFetchingConfiguration,
       refreshPinStatus,
+      resetSession,
       fetchConfiguration,
       sendAuthedCommand,
     ],
@@ -241,6 +281,7 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
           </ProgressCircleTrack>
         </ProgressCircle>
         <p className="text-sm text-muted text-center">{t('waitingForDevice')}</p>
+        <p className="text-xs text-muted text-center">{t('waitingForDeviceHint')}</p>
         <Button
           variant="secondary"
           onPress={() => refreshPinStatus().catch((err) => console.error('Failed to refresh PIN status', err))}

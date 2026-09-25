@@ -3,6 +3,7 @@
   "subtitle": "Install firmware and configure your reader",
   "connection": {
     "connected": "Connected",
+    "reconnecting": "Reconnecting...",
     "disconnected": "Not connected"
   },
   "connect": {

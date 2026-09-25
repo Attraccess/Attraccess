@@ -2,6 +2,7 @@
   "title": "Geräte-PIN",
   "loading": "Geräte-PIN wird geprüft...",
   "waitingForDevice": "Warte auf Antwort des Geräts. Wenn du gerade Firmware installiert hast, gib ihm ein paar Sekunden zum Starten.",
+  "waitingForDeviceHint": "Wenn das Gerät nicht reagiert, trenne es kurz vom USB-Anschluss und stecke es wieder ein.",
   "retry": "Erneut prüfen",
   "enterPin": {
     "submit": "Entsperren"

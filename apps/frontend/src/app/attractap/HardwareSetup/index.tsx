@@ -49,16 +49,23 @@ interface SetupContentProps {
 
 function SetupContent({ openDeviceSettings, onClose }: SetupContentProps) {
   const espTools = useRef(ESPTools.getInstance());
-  const [isConnected, setIsConnected] = useState(espTools.current.isConnected);
+  const [connectionState, setConnectionState] = useState<{ connected: boolean; reconnecting: boolean }>({
+    connected: espTools.current.isConnected,
+    reconnecting: false,
+  });
 
   useEffect(() => {
     const tools = espTools.current;
-    const onConnectionState = (event: ConnectionStateEvent) => setIsConnected(event.connected);
+    const onConnectionState = (event: ConnectionStateEvent) =>
+      setConnectionState({ connected: event.connected, reconnecting: event.reconnecting });
     tools.on('connectionState', onConnectionState);
     return () => tools.off('connectionState', onConnectionState);
   }, []);
 
-  if (!isConnected) {
+  // While auto-reconnect is running (device rebooted after flashing or was
+  // power-cycled), keep the setup tabs mounted so the wizard state (selected
+  // tab, session) survives the brief USB re-enumeration (ATT-556).
+  if (!connectionState.connected && !connectionState.reconnecting) {
     return <ConnectScreen />;
   }
 
@@ -77,14 +84,24 @@ export function AttractapHardwareSetup(props: Props) {
   const { isOpen, open, setOpen, close } = useOverlayState();
 
   const espTools = useRef(ESPTools.getInstance());
-  const [isConnected, setIsConnected] = useState(espTools.current.isConnected);
+  const [connectionState, setConnectionState] = useState<{ connected: boolean; reconnecting: boolean }>({
+    connected: espTools.current.isConnected,
+    reconnecting: false,
+  });
 
   useEffect(() => {
     const tools = espTools.current;
-    const onConnectionState = (event: ConnectionStateEvent) => setIsConnected(event.connected);
+    const onConnectionState = (event: ConnectionStateEvent) =>
+      setConnectionState({ connected: event.connected, reconnecting: event.reconnecting });
     tools.on('connectionState', onConnectionState);
     return () => tools.off('connectionState', onConnectionState);
   }, []);
+
+  const connectionChipLabel = connectionState.connected
+    ? t('connection.connected')
+    : connectionState.reconnecting
+      ? t('connection.reconnecting')
+      : t('connection.disconnected');
 
   return (
     <>
@@ -97,8 +114,8 @@ export function AttractapHardwareSetup(props: Props) {
               <h2 className="text-lg font-semibold">{t('title')}</h2>
               <p className="text-sm text-muted">{t('subtitle')}</p>
             </div>
-            <Chip color={isConnected ? 'success' : 'default'}>
-              {isConnected ? t('connection.connected') : t('connection.disconnected')}
+            <Chip color={connectionState.connected ? 'success' : connectionState.reconnecting ? 'warning' : 'default'}>
+              {connectionChipLabel}
             </Chip>
           </div>
         </DrawerHeader>

@@ -22,7 +22,7 @@ type TabKey = 'firmware' | 'network' | 'server' | 'security';
 
 function FirmwareTab({ onFlashed }: { onFlashed: () => void }) {
   const { t } = useTranslations({ de, en });
-  const { refreshPinStatus } = useAttractapSerialComm();
+  const { resetSession } = useAttractapSerialComm();
   const [selectedFirmware, setSelectedFirmware] = useState<AttractapFirmware | null>(null);
 
   if (!selectedFirmware) {
@@ -38,7 +38,9 @@ function FirmwareTab({ onFlashed }: { onFlashed: () => void }) {
       <FirmwareFlasher
         firmware={selectedFirmware}
         onCompleted={() => {
-          refreshPinStatus().catch((err) => console.error('Failed to refresh PIN status after flash', err));
+          // The device is rebooting into the new firmware: drop all cached
+          // device state. The provider polls until the device responds again.
+          resetSession();
           onFlashed();
         }}
       />

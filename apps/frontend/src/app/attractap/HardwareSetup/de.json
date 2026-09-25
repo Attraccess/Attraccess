@@ -3,6 +3,7 @@
   "subtitle": "Firmware installieren und Leser konfigurieren",
   "connection": {
     "connected": "Verbunden",
+    "reconnecting": "Verbinde erneut...",
     "disconnected": "Nicht verbunden"
   },
   "connect": {

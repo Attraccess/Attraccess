@@ -2,6 +2,7 @@
   "title": "Device PIN",
   "loading": "Checking device PIN...",
   "waitingForDevice": "Waiting for the device to respond. If you just installed firmware, give it a few seconds to boot.",
+  "waitingForDeviceHint": "If the device does not respond, unplug it from USB and plug it back in.",
   "retry": "Check again",
   "enterPin": {
     "submit": "Unlock"

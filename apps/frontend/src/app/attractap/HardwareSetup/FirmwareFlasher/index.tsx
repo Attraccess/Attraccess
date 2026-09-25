@@ -1,6 +1,6 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Alert, AlertContent, AlertTitle, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Alert, AlertContent, AlertTitle, Checkbox, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
 import { Button } from '../../../../components/button';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -33,6 +33,7 @@ export function FirmwareFlasher(props: Props) {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [flashError, setFlashError] = useState<{ type: ESPToolsErrorType; details?: unknown } | null>(null);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
+  const [eraseFlash, setEraseFlash] = useState<boolean>(false);
 
   const flashFirmware = useCallback(async () => {
     if (!firmwareBinary) {
@@ -56,6 +57,7 @@ export function FirmwareFlasher(props: Props) {
     // Flash firmware with parameters from firmware metadata
     const flashResult = await espTools.flashFirmware({
       firmware: firmwareBinary as unknown as Blob,
+      eraseFlash,
       flashMode: props.firmware.flashMode as import('esptool-js').FlashModeValues | undefined,
       flashFreq: props.firmware.flashFreq as import('esptool-js').FlashFreqValues | undefined,
       flashSize: props.firmware.flashSize as import('esptool-js').FlashSizeValues | undefined,
@@ -93,7 +95,7 @@ export function FirmwareFlasher(props: Props) {
       setFlashError(flashResult.error);
       setIsFlashing(false);
     }
-  }, [firmwareBinary, props, toast, t]);
+  }, [firmwareBinary, props, toast, t, eraseFlash]);
 
   if (isDownloadingFirmware) {
     return (
@@ -111,6 +113,22 @@ export function FirmwareFlasher(props: Props) {
   if (flashProgress === 0 && logLines.length === 0 && !flashError) {
     return (
       <div className="space-y-4">
+        <Checkbox
+          isSelected={eraseFlash}
+          onChange={setEraseFlash}
+          data-cy="attractap-flasher-erase-checkbox"
+        >
+          <Checkbox.Control>
+            <Checkbox.Indicator />
+          </Checkbox.Control>
+          <Checkbox.Content>
+            <div className="flex flex-col">
+              <span>{t('options.erase.label')}</span>
+              <span className="text-xs text-muted">{t('options.erase.description')}</span>
+            </div>
+          </Checkbox.Content>
+        </Checkbox>
+
         <Button variant="primary" isPending={isFlashing} onPress={flashFirmware}>
           {t('action.flash')}
         </Button>

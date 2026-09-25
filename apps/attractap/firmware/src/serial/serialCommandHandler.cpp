@@ -11,6 +11,13 @@
 
 String SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
+uint32_t SerialCommandHandler::lastCommandReceivedMs = 0;
+bool SerialCommandHandler::anyCommandReceived = false;
+
+bool SerialCommandHandler::isWebConfigSessionActive()
+{
+    return anyCommandReceived && (millis() - lastCommandReceivedMs) < WEB_CONFIG_SESSION_TIMEOUT_MS;
+}
 
 void SerialCommandHandler::setup()
 {
@@ -91,6 +98,11 @@ void SerialCommandHandler::processLine(const String &line)
     }
 
     logger.infof("Handling command: %s %s", topic.c_str(), payload.c_str());
+
+    // A valid command means the web config tool is driving the device.
+    lastCommandReceivedMs = millis();
+    anyCommandReceived = true;
+
     handleCommand(topic, payload);
 }
 
