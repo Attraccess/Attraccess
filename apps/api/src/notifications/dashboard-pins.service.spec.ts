@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { DashboardPin, Resource } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DashboardPinsService } from './dashboard-pins.service';
 
 describe('DashboardPinsService', () => {
