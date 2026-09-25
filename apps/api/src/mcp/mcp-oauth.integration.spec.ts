@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import { createHash } from 'crypto';
 import express from 'express';
 import { createServer, Server } from 'http';
+import { AddressInfo } from 'net';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SessionService } from '../users-and-auth/auth/session.service';
@@ -74,6 +75,7 @@ describe('MCP OAuth authorization code and refresh grants', () => {
     const approved = await request(server)
       .post('/api/mcp/oauth/authorize')
       .set('Cookie', 'auth-session=browser-session')
+      .set('Origin', `http://127.0.0.1:${(server.address() as AddressInfo).port}`)
       .type('form')
       .send({ consent, decision: 'approve' })
       .expect(302);
@@ -128,5 +130,14 @@ describe('MCP OAuth authorization code and refresh grants', () => {
       .get('/api/mcp/oauth/authorize')
       .query({ response_type: 'code', client_id: 'desktop', redirect_uri: 'http://localhost:34171/callback', state: 'x', code_challenge: 'a'.repeat(43), code_challenge_method: 'S256', resource })
       .expect(401);
+  });
+
+  it('rejects cross-origin consent submissions', async () => {
+    await request(server)
+      .post('/api/mcp/oauth/authorize')
+      .set('Origin', 'https://attacker.test')
+      .type('form')
+      .send({ decision: 'approve' })
+      .expect(403);
   });
 });

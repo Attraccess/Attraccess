@@ -136,6 +136,22 @@ describe('MCP HTTP transport', () => {
     expect(writeSuccess.body.result).toMatchObject({ isError: false, content: [{ text: JSON.stringify({ id: 12, tags: ['production'] }) }] });
   });
 
+  it('rate limits MCP HTTP requests by client IP', async () => {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      await request(server)
+        .post('/api/mcp')
+        .set('Authorization', 'Bearer api-token-with-read')
+        .send({ jsonrpc: '2.0', id: attempt, method: 'tools/list' })
+        .expect(200);
+    }
+    const limited = await request(server)
+      .post('/api/mcp')
+      .set('Authorization', 'Bearer api-token-with-read')
+      .send({ jsonrpc: '2.0', id: 121, method: 'tools/list' })
+      .expect(429);
+    expect(limited.headers['retry-after']).toBeDefined();
+  });
+
   it('rejects unauthenticated calls and invalid inputs', async () => {
     const unauthorized = await request(server)
       .post('/api/mcp')

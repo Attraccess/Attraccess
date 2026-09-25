@@ -6,6 +6,7 @@ import { SessionService } from '../users-and-auth/auth/session.service';
 import { SessionStrategy } from '../users-and-auth/strategies/session.strategy';
 import { signMcpDelegation } from './mcp-delegation';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { createMcpRateLimit } from './mcp-rate-limit';
 
 type RegisteredClient = { client_id: string; redirect_uris: string[]; client_name?: string };
 type OAuthToken = {
@@ -116,6 +117,18 @@ export function registerMcpOAuthEndpoints(
   const authorizeUrl = `${issuer}${options.prefix}/oauth/authorize`;
   const router = Router();
   router.use(express.urlencoded({ extended: false }));
+  const authorizeRateLimit = createMcpRateLimit(20, 60_000);
+  const tokenRateLimit = createMcpRateLimit(30, 60_000);
+
+  function sameOrigin(request: Request, response: Response, next: express.NextFunction): void {
+    const origin = request.header('origin');
+    const expectedOrigin = `${request.protocol}://${request.get('host')}`;
+    if (!origin || origin !== expectedOrigin) {
+      response.status(403).send('Cross-origin authorization requests are not allowed');
+      return;
+    }
+    next();
+  }
 
   function authorizeParams(input: Record<string, unknown>): { client: RegisteredClient; redirectUri: string; state: string; challenge: string; permissions: string[] } | null {
     const client = clients.find((candidate) => candidate.client_id === input.client_id);
@@ -143,7 +156,7 @@ export function registerMcpOAuthEndpoints(
     }
   }
 
-  router.get('/authorize', async (request: Request, response: Response) => {
+  router.get('/authorize', authorizeRateLimit, async (request: Request, response: Response) => {
     const params = authorizeParams(request.query as Record<string, unknown>);
     if (!params) {
       response.status(400).send('Invalid OAuth authorization request');
@@ -169,7 +182,7 @@ export function registerMcpOAuthEndpoints(
     response.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><title>Authorize Attraccess MCP</title></head><body><main><h1>Authorize ${escapeHtml(params.client.client_name ?? params.client.client_id)}</h1><p>Signed in as ${escapeHtml(user.username ?? String(user.id))}</p><p>This client requests these permissions:</p><ul>${permissionList}</ul><form method="post" action="${escapeHtml(authorizeUrl)}"><input type="hidden" name="consent" value="${escapeHtml(consent)}"><button name="decision" value="approve">Approve</button><button name="decision" value="deny">Deny</button></form></main></body></html>`);
   });
 
-  router.post('/authorize', async (request: Request, response: Response) => {
+  router.post('/authorize', authorizeRateLimit, sameOrigin, async (request: Request, response: Response) => {
     const consent = decrypt(options.secret, formString(request, 'consent'));
     const user = await authenticatedUser(request);
     if (!consent || consent.typ !== 'consent' || !consent.userId || !consent.redirectUri || !consent.codeChallenge || !consent.state || !user || user.id !== consent.userId) {
@@ -204,7 +217,7 @@ export function registerMcpOAuthEndpoints(
     response.redirect(302, redirect.toString());
   });
 
-  router.post('/token', async (request: Request, response: Response) => {
+  router.post('/token', tokenRateLimit, async (request: Request, response: Response) => {
     const grantType = formString(request, 'grant_type');
     const clientId = formString(request, 'client_id');
     const resource = formString(request, 'resource');

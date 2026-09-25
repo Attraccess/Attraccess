@@ -4,6 +4,7 @@ import { generateMcpTools, McpManifestEntry, OpenApiDocument } from './openapi-t
 import reviewedManifest from './reviewed-manifest.json';
 import { mcpOAuthAuthorizationServerMetadata } from './mcp-oauth';
 import { signMcpDelegation } from './mcp-delegation';
+import { createMcpRateLimit } from './mcp-rate-limit';
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -26,7 +27,7 @@ function rpcError(id: JsonRpcRequest['id'], code: number, message: string) {
 
 function getBearerToken(request: Request): string | undefined {
   const value = request.header('authorization');
-  const match = value?.match(/^Bearer\s+(.+)$/i);
+  const match = value?.match(/^Bearer[ \t]+([^\s]+)[ \t]*$/i);
   return match?.[1]?.trim();
 }
 
@@ -149,6 +150,7 @@ export function registerMcpHttpEndpoints(
   const tools = generateMcpTools(options.document, options.manifest ?? (reviewedManifest as Record<string, McpManifestEntry>));
   const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
   const router = Router();
+  const mcpRateLimit = createMcpRateLimit(120, 60_000);
   const metadataRouter = Router();
   const issuer = new URL('/', options.resourceUrl).origin;
   const oauthPrefix = `${options.globalPrefix ? `/${options.globalPrefix}` : ''}/mcp`;
@@ -163,7 +165,7 @@ export function registerMcpHttpEndpoints(
   app.use('/.well-known/oauth-authorization-server', authorizationServerMetadata);
 
   router.get('/', (_request, response) => response.sendStatus(405));
-  router.post('/', async (request: AuthenticatedRequest, response: Response) => {
+  router.post('/', mcpRateLimit, async (request: AuthenticatedRequest, response: Response) => {
     const rpc = request.body as JsonRpcRequest;
     if (!rpc || rpc.jsonrpc !== '2.0' || typeof rpc.method !== 'string') {
       response.status(400).json(rpcError(rpc?.id, -32600, 'Invalid JSON-RPC request'));
