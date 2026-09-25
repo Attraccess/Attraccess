@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { DashboardPin, Resource } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { DashboardPinsService } from './dashboard-pins.service';
 
 describe('DashboardPinsService', () => {
@@ -16,7 +16,15 @@ describe('DashboardPinsService', () => {
     pinRepository = {
       find: jest.fn().mockResolvedValue([]),
       delete: jest.fn(),
-      manager: { transaction: jest.fn(async (callback: (manager: { getRepository: () => { delete: typeof deletePins; insert: typeof insertPins } }) => Promise<void>) => callback({ getRepository: () => ({ delete: deletePins, insert: insertPins }) })) } as never,
+      manager: {
+        transaction: jest.fn(
+          async (
+            callback: (manager: {
+              getRepository: () => { delete: typeof deletePins; insert: typeof insertPins };
+            }) => Promise<void>,
+          ) => callback({ getRepository: () => ({ delete: deletePins, insert: insertPins }) }),
+        ),
+      } as never,
     };
     resourceRepository = { find: jest.fn().mockResolvedValue([]) };
     const module = await Test.createTestingModule({
@@ -32,7 +40,10 @@ describe('DashboardPinsService', () => {
 
   it('starts with no pins and replaces a user list in its requested order', async () => {
     expect(await service.get(5)).toEqual([]);
-    const ordered = [{ itemType: 'page' as const, itemId: '/messages' }, { itemType: 'resource' as const, itemId: '7' }];
+    const ordered = [
+      { itemType: 'page' as const, itemId: '/messages' },
+      { itemType: 'resource' as const, itemId: '7' },
+    ];
     (resourceRepository.find as jest.Mock).mockResolvedValue([{ id: 7 }]);
     expect(await service.replace(5, ordered)).toEqual(ordered);
     expect(deletePins).toHaveBeenCalledWith({ userId: 5 });
@@ -43,10 +54,15 @@ describe('DashboardPinsService', () => {
   });
 
   it('rejects duplicate pins and nonexistent resources before replacing saved pins', async () => {
-    await expect(service.replace(5, [
-      { itemType: 'page', itemId: '/projects' }, { itemType: 'page', itemId: '/projects' },
-    ])).rejects.toBeInstanceOf(BadRequestException);
-    await expect(service.replace(5, [{ itemType: 'resource', itemId: '42' }])).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.replace(5, [
+        { itemType: 'page', itemId: '/projects' },
+        { itemType: 'page', itemId: '/projects' },
+      ]),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.replace(5, [{ itemType: 'resource', itemId: '42' }])).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(deletePins).not.toHaveBeenCalled();
   });
 
