@@ -10,18 +10,18 @@ const PINNABLE_PAGE_PATHS = new Set([
   '/attractap/readers', '/devices/mqtt/servers', '/devices/companion', '/balena', '/settings',
   '/dependencies', '/changelog', '/printables', '/shelly', '/rabbitmq', '/wago',
 ]);
-// Plugin sidebar entries are defined by frontend modules and cannot be enumerated by the API.
-// Accept canonical plugin paths while keeping the application's own routes restricted to the list above.
-const CORE_PATH_ROOTS = new Set([
-  'resources', 'projects', 'messages', 'attractap', 'billing', 'csv-export', 'users',
-  'devices', 'balena', 'settings', 'dependencies', 'changelog', 'printables',
-  'dashboard', 'kiosk', 'account', 'first-time-setup', 'confirm-delete-account',
-  'resource-groups',
-]);
+// Plugin sidebar entries under Settings are defined by frontend modules and cannot be
+// enumerated by the API. Other application paths stay restricted to the explicit list above.
+const PLUGIN_ROOT_PATHS = new Set(['/hello-world']);
 function isEligiblePagePath(path: string): boolean {
   if (PINNABLE_PAGE_PATHS.has(path)) return true;
   if (!/^\/[a-z][a-z0-9-]*(?:\/[a-z0-9-]+)*$/.test(path)) return false;
-  return !CORE_PATH_ROOTS.has(path.split('/')[1]);
+  const segments = path.slice(1).split('/');
+  const root = segments[0];
+  // Plugin routes can live inside a core namespace (notably /settings). The
+  // frontend still only renders paths present in its permitted sidebar registry.
+  if (root === 'settings' && segments.length > 1) return true;
+  return PLUGIN_ROOT_PATHS.has(path);
 }
 
 @Injectable()

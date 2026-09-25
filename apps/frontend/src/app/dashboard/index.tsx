@@ -17,6 +17,9 @@ import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { ResourceUsageSession } from '../resources/usage/resourceUsageSession';
+import { StatusChip } from '../resourceOverview/resourceGroupCard/statusChip';
 
 function Landing() {
   const { data, isLoading, isError, refetch } = useDashboardPins();
@@ -44,7 +47,7 @@ function usePageEntries(pins: Pin[]): PageEntry[] {
     const all = [...flatten(sidebarItems, ''), ...flatten(buildSidebarEndItems('', ''), 'endItems.')];
     all.push(...plugins.flatMap((manifest) => {
       try { return manifest.plugin.getSidebarItems?.() ?? []; } catch { return []; }
-    }).map((item) => ({ path: item.path, title: item.label, icon: undefined })));
+    }).map((item) => ({ path: item.path, title: item.label, icon: item.icon })));
     return pins.flatMap((pin): PageEntry[] => {
       if (pin.itemType !== 'page') return [];
       const item = all.find((entry) => entry.path === pin.itemId);
@@ -106,8 +109,11 @@ function SortablePageCard({ id, className, children }: { id: string; className?:
 function ResourcePinCard({ pin, openLabel, resourceLabel, unpinLabel, onUnpin }: { pin: Pin; openLabel: string; resourceLabel: string; unpinLabel: string; onUnpin: () => void }) {
   const id = Number(pin.itemId);
   const name = pin.resourceName ?? resourceLabel;
+  const { data: resource } = useResourcesServiceGetOneResourceById({ id }, undefined, { enabled: Number.isSafeInteger(id) && id > 0, retry: false });
   return <SortableResourceCard id={`resource:${pin.itemId}`} className="flex flex-col gap-3 rounded-xl border border-default-200 bg-content1 p-4">
     <div className="flex flex-row items-center justify-between p-3"><GripVerticalIcon size={18} className="touch-none cursor-grab text-muted" /><h2 className="font-semibold">{name}</h2><button aria-label={`${unpinLabel} ${name}`} onClick={onUnpin}>★</button></div>
+    <div className="flex justify-end"><StatusChip resourceId={id} /></div>
+    {resource && <ResourceUsageSession resourceId={id} resource={resource} />}
     <Link className="mt-3 inline-block underline" to={`/resources/${id}`}>{openLabel}</Link>
   </SortableResourceCard>;
 }

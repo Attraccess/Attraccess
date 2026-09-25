@@ -56,21 +56,21 @@ describe('DashboardPinsService', () => {
   it('merges writes from separate sessions against the stored list', async () => {
     await service.update(5, { kind: 'add', item: page('/projects') });
     const first = service.update(5, { kind: 'add', item: page('/messages') });
-    const second = service.update(5, { kind: 'add', item: page('/plugin-report') });
+    const second = service.update(5, { kind: 'add', item: page('/settings/plugin-report') });
     await Promise.all([first, second]);
-    expect(await service.get(5)).toEqual([page('/projects'), page('/messages'), page('/plugin-report')]);
+    expect(await service.get(5)).toEqual([page('/projects'), page('/messages'), page('/settings/plugin-report')]);
     expect(userLock).toHaveBeenCalledWith({ where: { id: 5 }, lock: { mode: 'pessimistic_write' } });
     await service.update(5, { kind: 'remove', item: page('/projects') });
-    expect(await service.get(5)).toEqual([page('/messages'), page('/plugin-report')]);
+    expect(await service.get(5)).toEqual([page('/messages'), page('/settings/plugin-report')]);
     await service.update(5, { kind: 'remove', item: page('/messages') });
-    await service.update(5, { kind: 'remove', item: page('/plugin-report') });
+    await service.update(5, { kind: 'remove', item: page('/settings/plugin-report') });
     expect(await service.get(5)).toEqual([]);
   });
 
   it('moves a pin while retaining pins added in another session', async () => {
-    for (const itemId of ['/projects', '/messages', '/plugin-report']) await service.update(5, { kind: 'add', item: page(itemId) });
-    await service.update(5, { kind: 'move', item: page('/plugin-report'), before: page('/messages') });
-    expect(await service.get(5)).toEqual([page('/projects'), page('/plugin-report'), page('/messages')]);
+    for (const itemId of ['/projects', '/messages', '/settings/plugin-report']) await service.update(5, { kind: 'add', item: page(itemId) });
+    await service.update(5, { kind: 'move', item: page('/settings/plugin-report'), before: page('/messages') });
+    expect(await service.get(5)).toEqual([page('/projects'), page('/settings/plugin-report'), page('/messages')]);
   });
 
   it('acquires a SQLite writer lock before reading the current pins', async () => {
@@ -81,9 +81,11 @@ describe('DashboardPinsService', () => {
   });
 
   it('validates additions and limits the resulting list', async () => {
-    for (const itemId of ['/dashboard', '/resources/123', '//plugin-report']) {
+    for (const itemId of ['/dashboard', '/resources/123', '//plugin-report', '/not-a-sidebar-route']) {
       await expect(service.update(5, { kind: 'add', item: page(itemId) })).rejects.toBeInstanceOf(BadRequestException);
     }
+    await service.update(5, { kind: 'add', item: page('/settings/plugin-report') });
+    await service.update(5, { kind: 'remove', item: page('/settings/plugin-report') });
     for (const itemId of ['007', '7.0', '7e0', ' 7']) {
       await expect(service.update(5, { kind: 'add', item: { itemType: 'resource', itemId } })).rejects.toBeInstanceOf(BadRequestException);
     }

@@ -7,12 +7,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardLanding, DashboardPage } from './index';
 import usePluginState from '../plugins/plugin.state';
 
-const { getPins, updatePins, hasPermission } = vi.hoisted(() => ({ getPins: vi.fn(), updatePins: vi.fn(), hasPermission: vi.fn() }));
+const { getPins, updatePins, hasPermission, getResource } = vi.hoisted(() => ({ getPins: vi.fn(), updatePins: vi.fn(), hasPermission: vi.fn(), getResource: vi.fn() }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
   DashboardService: { dashboardGetPins: getPins, dashboardUpdatePins: updatePins },
+  useResourcesServiceGetOneResourceById: getResource,
   useLicenseServiceGetLicenseInformation: () => ({ isLoading: false }),
 }));
+vi.mock('../resources/usage/resourceUsageSession', () => ({ ResourceUsageSession: ({ resourceId }: { resourceId: number }) => <div>Session controls {resourceId}</div> }));
+vi.mock('../resourceOverview/resourceGroupCard/statusChip', () => ({ StatusChip: ({ resourceId }: { resourceId: number }) => <div>Status {resourceId}</div> }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
     t: (key: string) =>
@@ -51,6 +54,7 @@ describe('Dashboard', () => {
   beforeEach(() => {
     getPins.mockReset();
     updatePins.mockReset();
+    getResource.mockReset().mockReturnValue({ data: { id: 7, name: 'Printer' } });
     hasPermission.mockReset().mockReturnValue(true);
     usePluginState.setState({ plugins: [], isInitialized: true });
   });
@@ -106,11 +110,13 @@ describe('Dashboard', () => {
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
   });
 
-  it('renders resource names from the batched pins response without resource detail requests', async () => {
+  it('renders resource status and session controls with the pinned resource name', async () => {
     getPins.mockResolvedValue([{ itemType: 'resource', itemId: '7', resourceName: 'Printer' }]);
     mount(<DashboardPage />);
     expect(await screen.findByRole('heading', { name: 'Printer' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open resource' })).toHaveAttribute('href', '/resources/7');
+    expect(screen.getByText('Status 7')).toBeInTheDocument();
+    expect(screen.getByText('Session controls 7')).toBeInTheDocument();
   });
 
   it('falls back for empty pins without waiting for plugin discovery', async () => {
@@ -165,7 +171,7 @@ describe('Dashboard', () => {
       plugins: [
         {
           plugin: {
-            getSidebarItems: () => [{ path: '/plugin-report', label: 'Plugin report' }],
+            getSidebarItems: () => [{ path: '/plugin-report', label: 'Plugin report', icon: <span data-testid="plugin-page-icon">Plugin icon</span> }],
             getRoutes: () => [{ path: '/plugin-report', authRequired: true }],
           },
         } as never,
@@ -174,6 +180,7 @@ describe('Dashboard', () => {
     });
 
     expect(await screen.findByRole('link', { name: 'Plugin report' })).toBeInTheDocument();
+    expect(screen.getByTestId('plugin-page-icon')).toBeInTheDocument();
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
   });
 
