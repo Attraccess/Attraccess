@@ -15,6 +15,7 @@ describe('DashboardPinsService', () => {
   beforeEach(async () => {
     pinRepository = {
       find: jest.fn().mockResolvedValue([]),
+      delete: jest.fn(),
       manager: { transaction: jest.fn(async (callback: (manager: { getRepository: () => { delete: typeof deletePins; insert: typeof insertPins } }) => Promise<void>) => callback({ getRepository: () => ({ delete: deletePins, insert: insertPins }) })) } as never,
     };
     resourceRepository = { find: jest.fn().mockResolvedValue([]) };
@@ -49,6 +50,12 @@ describe('DashboardPinsService', () => {
     expect(deletePins).not.toHaveBeenCalled();
   });
 
+  it('rejects non-sidebar paths and dashboard or kiosk routes', async () => {
+    for (const itemId of ['/dashboard', '/kiosk/123', '/not-a-sidebar-route']) {
+      await expect(service.replace(5, [{ itemType: 'page', itemId }])).rejects.toBeInstanceOf(BadRequestException);
+    }
+  });
+
   it('cleans pins for soft-deleted resources when reading the persisted list', async () => {
     (pinRepository.find as jest.Mock).mockResolvedValue([
       { userId: 5, itemType: 'page', itemId: '/projects', position: 0 },
@@ -56,6 +63,7 @@ describe('DashboardPinsService', () => {
     ]);
     (resourceRepository.find as jest.Mock).mockResolvedValue([]);
     expect(await service.get(5)).toEqual([{ itemType: 'page', itemId: '/projects' }]);
-    expect(deletePins).toHaveBeenCalledWith({ userId: 5 });
+    expect(pinRepository.delete).toHaveBeenCalledWith({ userId: 5, itemType: 'resource', itemId: '42' });
+    expect(deletePins).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,14 @@ const changedEvent = 'attraccess:dashboard-pins-changed';
 const getPins = async (): Promise<Pin[]> => (await DashboardService.dashboardGetPins()) as unknown as Pin[];
 const savePins = async (items: Pin[]): Promise<Pin[]> =>
   (await DashboardService.dashboardUpdatePins({ requestBody: { items } })) as unknown as Pin[];
+let writeQueue = Promise.resolve<unknown>(undefined);
+export async function updateDashboardPins(update: (items: Pin[]) => Pin[]) {
+  const write = writeQueue.then(async () => savePins(update(await getPins())));
+  writeQueue = write.catch(() => undefined);
+  const items = await write;
+  window.dispatchEvent(new CustomEvent(changedEvent, { detail: items }));
+  return items;
+}
 export function useDashboardPins() {
   const client = useQueryClient();
   useEffect(() => {
@@ -42,7 +50,9 @@ export function DashboardPinToggle({ itemType, itemId, label }: Pin & { label: s
     onClick={async () => {
       setIsSaving(true);
       try {
-        const items = await savePins(pinned ? data.filter((pin) => !(pin.itemType === itemType && pin.itemId === itemId)) : [...data, { itemType, itemId }]);
+      const items = await updateDashboardPins((current) => current.some((pin) => pin.itemType === itemType && pin.itemId === itemId)
+        ? current.filter((pin) => !(pin.itemType === itemType && pin.itemId === itemId))
+        : [...current, { itemType, itemId }]);
         setData(items);
         window.dispatchEvent(new CustomEvent(changedEvent, { detail: items }));
       } finally { setIsSaving(false); }

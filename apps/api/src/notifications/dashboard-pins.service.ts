@@ -4,6 +4,11 @@ import { DashboardPin, Resource } from '@attraccess/database-entities';
 import { In, Repository } from 'typeorm';
 
 export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string };
+const PINNABLE_PAGE_PATHS = new Set([
+  '/resources', '/projects', '/messages', '/attractap/nfc-cards', '/billing', '/csv-export', '/users',
+  '/attractap/readers', '/devices/mqtt/servers', '/devices/companion', '/balena', '/settings',
+  '/dependencies', '/changelog', '/printables',
+]);
 
 @Injectable()
 export class DashboardPinsService {
@@ -18,7 +23,10 @@ export class DashboardPinsService {
     const activeResources = resourceIds.length ? await this.resources.find({ where: { id: In(resourceIds) } }) : [];
     const activeIds = new Set(activeResources.map((resource) => String(resource.id)));
     const valid = entries.filter((pin) => pin.itemType !== 'resource' || activeIds.has(pin.itemId));
-    if (valid.length !== entries.length) await this.replace(userId, valid.map(({ itemType, itemId }) => ({ itemType, itemId })));
+    if (valid.length !== entries.length) {
+      const invalidResources = entries.filter((pin) => pin.itemType === 'resource' && !activeIds.has(pin.itemId));
+      for (const pin of invalidResources) await this.pins.delete({ userId, itemType: 'resource', itemId: pin.itemId });
+    }
     return valid.map(({ itemType, itemId }) => ({ itemType, itemId }));
   }
 
@@ -28,6 +36,9 @@ export class DashboardPinsService {
     }
     const keys = items.map((item) => `${item.itemType}:${item.itemId}`);
     if (new Set(keys).size !== keys.length) throw new BadRequestException('Dashboard pins must be unique');
+    if (items.some((item) => item.itemType === 'page' && (!item.itemId.startsWith('/') || item.itemId.startsWith('//') || item.itemId.includes('..') || item.itemId === '/dashboard' || item.itemId.startsWith('/kiosk/') || (!PINNABLE_PAGE_PATHS.has(item.itemId) && !item.itemId.startsWith('/plugins/'))))) {
+      throw new BadRequestException('Page is not eligible for dashboard pinning');
+    }
     const resourceIds = items.filter((item) => item.itemType === 'resource').map((item) => Number(item.itemId));
     if (resourceIds.some((id) => !Number.isSafeInteger(id) || id < 1)) throw new BadRequestException('Invalid resource pin');
     if (resourceIds.length) {
