@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardLanding, DashboardPage } from './index';
 import usePluginState from '../plugins/plugin.state';
 
-const { getPins, updatePins } = vi.hoisted(() => ({ getPins: vi.fn(), updatePins: vi.fn() }));
+const { getPins, updatePins, hasPermission } = vi.hoisted(() => ({ getPins: vi.fn(), updatePins: vi.fn(), hasPermission: vi.fn() }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
   DashboardService: { dashboardGetPins: getPins, dashboardUpdatePins: updatePins },
@@ -23,15 +23,16 @@ vi.mock('../routes', () => ({
   useAllRoutes: () => {
     const plugins = usePluginState((state) => state.plugins);
     return [
-      ...['/projects', '/messages', '/devices/companion'].map((path) => ({ path, authRequired: true })),
+      ...['/projects', '/messages', '/devices/companion', '/printables'].map((path) => ({ path, authRequired: true })),
+      { path: '/users', authRequired: 'users.read' },
       ...plugins.flatMap((manifest) => manifest.plugin.getRoutes?.() ?? []),
     ];
   },
 }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission }) }));
 vi.mock('../layout/sidebarItems', async (importOriginal) => {
   const original = await importOriginal<typeof import('../layout/sidebarItems')>();
-  return { ...original, useSidebarItems: () => original.SIDEBAR_ITEMS, buildSidebarEndItems: () => [] };
+  return { ...original, useSidebarItems: () => original.SIDEBAR_ITEMS, buildSidebarEndItems: () => original.buildSidebarEndItems('', '') };
 });
 const page = (itemId: string) => ({ itemType: 'page', itemId });
 function mount(element: React.ReactNode) {
@@ -50,14 +51,16 @@ describe('Dashboard', () => {
   beforeEach(() => {
     getPins.mockReset();
     updatePins.mockReset();
+    hasPermission.mockReset().mockReturnValue(true);
     usePluginState.setState({ plugins: [], isInitialized: true });
   });
 
-  it('uses sidebar labels for default and grouped page pins', async () => {
-    getPins.mockResolvedValue([page('/projects'), page('/devices/companion')]);
+  it('uses sidebar labels for default, grouped and end-group page pins', async () => {
+    getPins.mockResolvedValue([page('/projects'), page('/devices/companion'), page('/printables')]);
     mount(<DashboardPage />);
     expect(await screen.findByRole('link', { name: 'Projects' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Companion App' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '3D Models' })).toBeInTheDocument();
   });
 
   it('keeps the dashboard landing for an unavailable saved pin while hiding its card', async () => {

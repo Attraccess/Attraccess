@@ -17,14 +17,15 @@ export class DashboardPinsService {
   async get(userId: number): Promise<DashboardPinItem[]> {
     const entries = await this.pins.find({ where: { userId }, order: { position: 'ASC' } });
     const resourceIds = entries.filter((pin) => pin.itemType === 'resource').map((pin) => Number(pin.itemId));
-    const activeResources = resourceIds.length ? await this.resources.find({ where: { id: In(resourceIds) } }) : [];
-    const activeIds = new Set(activeResources.map((resource) => String(resource.id)));
-    const valid = entries.filter((pin) => pin.itemType !== 'resource' || activeIds.has(pin.itemId));
-    if (valid.length !== entries.length) {
-      const invalidResources = entries.filter((pin) => pin.itemType === 'resource' && !activeIds.has(pin.itemId));
-      for (const pin of invalidResources) await this.pins.delete({ userId, itemType: 'resource', itemId: pin.itemId });
-    }
-    return valid.map(({ itemType, itemId }) => ({ itemType, itemId }));
+    const activeResources = resourceIds.length ? await this.resources.find({ select: { id: true, name: true }, where: { id: In(resourceIds) } }) : [];
+    const activeById = new Map(activeResources.map((resource) => [String(resource.id), resource.name]));
+    const valid = entries.filter((pin) => pin.itemType !== 'resource' || activeById.has(pin.itemId));
+    const validIds = new Set(valid.map((pin) => pin.id));
+    const staleIds = entries.filter((pin) => !validIds.has(pin.id)).map((pin) => pin.id);
+    if (staleIds.length) await this.pins.delete({ userId, id: In(staleIds) });
+    return valid.map(({ itemType, itemId }) => itemType === 'resource'
+      ? { itemType, itemId, resourceName: activeById.get(itemId) }
+      : { itemType, itemId });
   }
 
   async replace(userId: number, items: DashboardPinItem[], operation?: { kind: 'add' | 'remove' | 'reorder'; item?: DashboardPinItem; order?: string[] }): Promise<DashboardPinItem[]> {
