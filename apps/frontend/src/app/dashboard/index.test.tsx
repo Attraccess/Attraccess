@@ -60,7 +60,7 @@ describe('Dashboard', () => {
     expect(screen.getByRole('link', { name: 'Companion App' })).toBeInTheDocument();
   });
 
-  it('falls back to resources when the only pin cannot be resolved, but lets users remove it on the dashboard', async () => {
+  it('keeps the dashboard landing for an unavailable saved pin while hiding its card', async () => {
     getPins.mockResolvedValue([page('/uninstalled-plugin')]);
     mount(
       <Routes>
@@ -68,9 +68,9 @@ describe('Dashboard', () => {
         <Route path="/resources" element={<span>Resources landing</span>} />
       </Routes>,
     );
-    expect(await screen.findByText('Resources landing')).toBeInTheDocument();
-    mount(<DashboardPage />);
-    expect(await screen.findByRole('button', { name: 'Unpin /uninstalled-plugin' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByText('/uninstalled-plugin')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unpin /uninstalled-plugin' })).not.toBeInTheDocument();
   });
 
   it('falls back for empty pins without waiting for plugin discovery', async () => {
@@ -137,7 +137,7 @@ describe('Dashboard', () => {
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
   });
 
-  it('falls back only after plugin discovery finishes without resolving the pin', async () => {
+  it('keeps the dashboard for an unavailable plugin pin after discovery completes', async () => {
     usePluginState.setState({ isInitialized: false });
     getPins.mockResolvedValue([page('/uninstalled-plugin')]);
     const { client } = mount(
@@ -150,24 +150,34 @@ describe('Dashboard', () => {
     await waitFor(() => expect(client.getQueryData(['dashboard', 'pins'])).toEqual([page('/uninstalled-plugin')]));
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
     usePluginState.setState({ isInitialized: true });
-    expect(await screen.findByText('Resources landing')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   });
 
-  it('does not send a second full-list update while removal is pending', async () => {
-    getPins.mockResolvedValue([page('/projects'), page('/messages')]);
+  it('queues remove operations so a pending action cannot overwrite a later remove', async () => {
+    let persisted = [page('/projects'), page('/messages')];
+    getPins.mockImplementation(() => Promise.resolve(persisted));
     let finish!: (items: unknown[]) => void;
-    updatePins.mockImplementation(
+    updatePins.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
-          finish = resolve;
+          finish = (items) => { persisted = items as typeof persisted; resolve(items); };
         }),
     );
+    updatePins.mockImplementation(async ({ requestBody }: { requestBody: { items: typeof persisted } }) => {
+      persisted = requestBody.items;
+      return persisted;
+    });
     mount(<DashboardPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Unpin Projects' }));
     fireEvent.click(screen.getByRole('button', { name: 'Unpin Messages' }));
     await waitFor(() => expect(updatePins).toHaveBeenCalledTimes(1));
-    expect(updatePins).toHaveBeenCalledWith({ requestBody: { items: [page('/messages')] } });
+    expect(updatePins).toHaveBeenCalledWith({ requestBody: {
+      items: [page('/messages')], operation: { kind: 'remove', item: page('/projects') },
+    } });
     finish([page('/messages')]);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unpin Messages' })).toBeEnabled());
+    await waitFor(() => expect(updatePins).toHaveBeenCalledTimes(2));
+    expect(updatePins).toHaveBeenLastCalledWith({ requestBody: {
+      items: [], operation: { kind: 'remove', item: page('/messages') },
+    } });
   });
 });

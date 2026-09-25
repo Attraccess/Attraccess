@@ -7,11 +7,8 @@ import { useAllRoutes } from '../routes';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRequiredPermissions } from '../routes/routeAccess';
 import {
-  SIDEBAR_ITEMS,
   useSidebarItems,
   buildSidebarEndItems,
-  type SidebarItem,
-  type SidebarItemGroup,
 } from '../layout/sidebarItems';
 import sidebarEn from '../layout/sidebar.en.json';
 import sidebarDe from '../layout/sidebar.de.json';
@@ -23,7 +20,6 @@ import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestC
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  useLicenseServiceGetLicenseInformation,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { StatusChip } from '../resourceOverview/resourceGroupCard/statusChip';
@@ -31,29 +27,10 @@ import { ResourceUsageSession } from '../resources/usage/components';
 
 function Landing() {
   const { data, isLoading, isError } = useDashboardPins();
-  const { isLoading: isLicenseLoading } = useLicenseServiceGetLicenseInformation();
-  const { isInitialized: pluginsInitialized, plugins } = usePluginState();
-  const sidebarItems = useSidebarItems();
-  const knownPaths = [
-    ...sidebarItems.flatMap((item) => ('items' in item ? item.items : [item])),
-    ...buildSidebarEndItems('', '').flatMap((item) => ('items' in item ? item.items : [item])),
-    ...plugins.flatMap((manifest) => {
-      try {
-        return manifest.plugin.getSidebarItems?.() ?? [];
-      } catch {
-        return [];
-      }
-    }),
-  ].map((item) => item.path);
-  const entries = (data ?? []).filter((pin) => pin.itemType === 'resource' || knownPaths.includes(pin.itemId));
   if (isLoading) return null;
   if (isError) return <p className="p-6">Could not load your dashboard.</p>;
   if (!data?.length) return <Navigate to="/resources" replace />;
-  if (data.some((pin) => pin.itemType === 'resource')) return <DashboardPage />;
-  if (isLicenseLoading) return null;
-  if (entries.length) return <DashboardPage />;
-  if (!pluginsInitialized) return null;
-  return <Navigate to="/resources" replace />;
+  return <DashboardPage />;
 }
 
 type NavEntry = { path: string; title: string; icon?: React.ReactNode; badgeCount?: number };
@@ -70,9 +47,6 @@ function DashboardPage() {
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
   );
   const entries = useMemo(() => {
-    const builtInPaths = new Set(
-      SIDEBAR_ITEMS.flatMap((item) => ('items' in item ? item.items : [item])).map((item) => item.path),
-    );
     const all: {
       path: string;
       translationKey?: string;
@@ -112,7 +86,6 @@ function DashboardPage() {
     return pins.flatMap((pin): (NavEntry & { pin: Pin })[] => {
       if (pin.itemType !== 'page') return [];
       const item = all.find((entry) => entry.path === pin.itemId);
-      if (!item && builtInPaths.has(pin.itemId)) return [];
       const route = routes.find((candidate) => candidate.path === pin.itemId);
       if (!item || item.isExternal) return [];
       if (
@@ -124,15 +97,8 @@ function DashboardPage() {
         return [];
       if (pin.itemId.startsWith('/kiosk') || pin.itemId === '/dashboard' || /^https?:/.test(pin.itemId)) return [];
       const labelKey = item.translationKey;
-      const translatedTitle = labelKey
-        ? sidebarT(
-            ['/dependencies', '/changelog', '/printables'].includes(pin.itemId)
-              ? `endItems.${labelKey}`
-              : `groups.##default##.items.${labelKey}`,
-          )
-        : pin.itemId;
-      const sidebarLabel = labelKey ? Object.values(sidebarEn.groups).map((group) => group.items?.[labelKey]).find(Boolean) : undefined;
-      const title = item.title ?? (translatedTitle.startsWith('groups.') ? sidebarLabel ?? translatedTitle : translatedTitle);
+      const translationPath = labelKey ? findTranslationPath(sidebarEn, labelKey) : undefined;
+      const title = item.title ?? (translationPath ? sidebarT(translationPath) : pin.itemId);
       return [{ path: pin.itemId, title, icon: item.icon, badgeCount: item.badgeCount, pin }];
     });
   }, [pins, routes, hasPermission, sidebarT, plugins, sidebarItems]);
@@ -187,15 +153,7 @@ function DashboardPage() {
               pin.itemType === 'page' ? (
                 (() => {
                   const entry = entries.find((item) => item.pin.itemId === pin.itemId);
-                  if (!entry)
-                    return (
-                      <Card key={`page:${pin.itemId}`} className="flex flex-row items-center gap-3 p-4">
-                        <span className="flex-1">{pin.itemId}</span>
-                        <button aria-label={`${t('unpin')} ${pin.itemId}`} onClick={() => removePin(pin)}>
-                          ★
-                        </button>
-                      </Card>
-                    );
+                  if (!entry) return null;
                   return (
                     <SortablePageCard
                       key={entry.pin.itemId}
@@ -232,6 +190,17 @@ function DashboardPage() {
       </DndContext>
     </section>
   );
+}
+
+function findTranslationPath(value: unknown, key: string, prefix = ''): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  for (const [childKey, child] of Object.entries(value)) {
+    const path = prefix ? `${prefix}.${childKey}` : childKey;
+    if (childKey === key && typeof child === 'string') return path;
+    const nested = findTranslationPath(child, key, path);
+    if (nested) return nested;
+  }
+  return undefined;
 }
 
 function SortablePageCard({ id, className, children }: { id: string; className?: string; children: React.ReactNode }) {
@@ -271,16 +240,12 @@ function ResourcePinCard({
     enabled: Number.isSafeInteger(id) && id > 0,
     retry: false,
   });
-  if (isLoading) return <Card className="p-4">Loading {resourceLabel.toLowerCase()}…</Card>;
-  if (isError || !resource)
-    return (
-      <Card className="flex flex-row items-center gap-3 p-4">
-        <span className="flex-1">{resourceLabel}</span>
-        <button aria-label={`${unpinLabel} ${resourceLabel}`} onClick={onUnpin}>
-          ★
-        </button>
-      </Card>
-    );
+  if (isLoading || isError || !resource)
+    return <SortableResourceCard id={`resource:${pin.itemId}`} className="flex flex-row items-center gap-3 rounded-xl border border-default-200 bg-content1 p-4">
+      <GripVerticalIcon size={18} className="touch-none cursor-grab text-muted" />
+      <span className="flex-1">{isLoading ? `Loading ${resourceLabel.toLowerCase()}…` : resourceLabel}</span>
+      <button aria-label={`${unpinLabel} ${resourceLabel}`} onClick={onUnpin}>★</button>
+    </SortableResourceCard>;
   return (
     <SortableResourceCard
       id={`resource:${pin.itemId}`}

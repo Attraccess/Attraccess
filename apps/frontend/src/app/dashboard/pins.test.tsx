@@ -38,6 +38,6 @@ describe('DashboardPinToggle', () => {
     await waitFor(() => expect(updatePins).toHaveBeenCalledWith({ requestBody: { items: [
       { itemType: 'page', itemId: '/messages' },
       { itemType: 'page', itemId: '/projects' },
-    ] } }));
+    ], operation: { kind: 'add', item: { itemType: 'page', itemId: '/projects' } } } }));
   });
 });
