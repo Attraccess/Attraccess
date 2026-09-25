@@ -118,7 +118,7 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "eslint apps/plugins/wago/backend apps/plugins/wago/frontend/src apps/plugins/wago/frontend/tests apps/plugins/wago/acceptance apps/plugins/wago/modbus apps/plugins/wago/measurement-contract.ts apps/plugins/wago/channel-behavior.ts"
+        "command": "eslint apps/plugins/wago/backend apps/plugins/wago/frontend/src apps/plugins/wago/frontend/tests apps/plugins/wago/acceptance apps/plugins/wago/modbus apps/plugins/wago/shared apps/plugins/wago/cc100-runtime apps/plugins/wago/diagnostics-types.ts apps/plugins/wago/measurement-contract.ts apps/plugins/wago/channel-behavior.ts"
       }
     },
     "test": {
