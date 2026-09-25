@@ -21,7 +21,6 @@ import { RuntimeArtifactImport } from './RuntimeArtifactImport';
 import type { RuntimeArtifactInfo } from './RuntimeArtifactImport';
 import { CommissioningSecurityPanel } from './CommissioningSecurityPanel';
 import { CommissioningPlatformPreflight } from './CommissioningPlatformPreflight';
-import { CommissioningOperationStatus } from './CommissioningOperationStatus';
 import { useQuery } from '@tanstack/react-query';
 import { commissioningLabel } from './ControllersTable';
 import { StandardDrawer } from './drawer';
@@ -42,6 +41,8 @@ interface CommissioningModalProps {
   onOpenChange: (isOpen: boolean) => void;
   onConfigure?: (controllerId: number) => void;
 }
+
+const DEFAULT_SSH = { username: 'root', password: 'wago' };
 
 function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onConfigure }: CommissioningModalProps) {
   const createSessionMutation = useCreateCommissioningSessionMutation();
@@ -71,11 +72,13 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     setIsolatedIdentity(false);
     setHostKeyFingerprint('');
   }, [resumedSession?.id, isOpen]);
-  const [sshUsername, setSshUsername] = useState('');
-  const [sshPassword, setSshPassword] = useState('');
+  const [sshUsername, setSshUsername] = useState(DEFAULT_SSH.username);
+  const [sshPassword, setSshPassword] = useState(DEFAULT_SSH.password);
+  const [customSsh, setCustomSsh] = useState(false);
   const [confirmInstall, setConfirmInstall] = useState(false);
-  const [recoveryUsername, setRecoveryUsername] = useState('');
-  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryUsername, setRecoveryUsername] = useState(DEFAULT_SSH.username);
+  const [recoveryPassword, setRecoveryPassword] = useState(DEFAULT_SSH.password);
+  const [customRecoverySsh, setCustomRecoverySsh] = useState(false);
   const [confirmRecovery, setConfirmRecovery] = useState(false);
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
@@ -105,10 +108,13 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
   });
 
   useEffect(() => {
-    setSshPassword('');
+    setSshUsername(DEFAULT_SSH.username);
+    setSshPassword(DEFAULT_SSH.password);
+    setCustomSsh(false);
     setConfirmInstall(false);
-    setRecoveryUsername('');
-    setRecoveryPassword('');
+    setRecoveryUsername(DEFAULT_SSH.username);
+    setRecoveryPassword(DEFAULT_SSH.password);
+    setCustomRecoverySsh(false);
     setConfirmRecovery(false);
     setHostKeyFingerprint('');
     setIsolatedIdentity(false);
@@ -131,12 +137,14 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     setControllerIp('');
     setMqttServerId(null);
     setHostKeyFingerprint('');
-    setSshUsername('');
-    setSshPassword('');
+    setSshUsername(DEFAULT_SSH.username);
+    setSshPassword(DEFAULT_SSH.password);
+    setCustomSsh(false);
     setConfirmInstall(false);
     setCancelConfirmationOpen(false);
-    setRecoveryUsername('');
-    setRecoveryPassword('');
+    setRecoveryUsername(DEFAULT_SSH.username);
+    setRecoveryPassword(DEFAULT_SSH.password);
+    setCustomRecoverySsh(false);
     setConfirmRecovery(false);
     createSessionMutation.reset();
     confirmHostKeyMutation.reset();
@@ -159,7 +167,7 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
       {
         onSuccess: (created) => {
           setCreatedSession(created);
-          setStep(2);
+          setStep(3);
         },
       },
     );
@@ -172,10 +180,9 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
       confirmInstall: true,
       temporarySsh: { username: sshUsername.trim(), password: sshPassword },
     });
-    setSshPassword('');
+    if (customSsh) setSshPassword('');
     setConfirmInstall(false);
-    setRecoveryUsername('');
-    setRecoveryPassword('');
+    if (customRecoverySsh) setRecoveryPassword('');
     setConfirmRecovery(false);
   }
 
@@ -194,10 +201,9 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
       confirmInstall: true,
       temporarySsh: { username: recoveryUsername.trim(), password: recoveryPassword },
     });
-    setRecoveryUsername('');
-    setRecoveryPassword('');
+    if (customRecoverySsh) setRecoveryPassword('');
     setConfirmRecovery(false);
-    setSshPassword('');
+    if (customSsh) setSshPassword('');
     setConfirmInstall(false);
   }
 
@@ -247,12 +253,16 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     sshPassword,
     setSshUsername,
     setSshPassword,
+    customSsh,
+    setCustomSsh,
     confirmInstall,
     setConfirmInstall,
     recoveryUsername,
     recoveryPassword,
     setRecoveryUsername,
     setRecoveryPassword,
+    customRecoverySsh,
+    setCustomRecoverySsh,
     confirmRecovery,
     setConfirmRecovery,
     createSessionMutation,
@@ -306,6 +316,8 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
     sshPassword,
     setSshUsername,
     setSshPassword,
+    customSsh,
+    setCustomSsh,
     confirmInstall,
     setConfirmInstall,
     isCancelConfirmationOpen,
@@ -318,7 +330,6 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
         <div className="wg:min-w-0 wg:space-y-5">
           <StepHeading step={activeStep} />
           {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
-          {session && <CommissioningOperationStatus key={`operation-${session.id}`} sessionId={session.id} />}
           <ConnectionFields model={model} />
           {session?.runtimeArtifactDigest && (
             <p className="wg:break-all wg:text-sm">
@@ -344,7 +355,7 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
               </Checkbox.Content>
             </Checkbox>
           )}
-          {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && (
+          {session && activeStep === 4 && session.state !== 'awaiting_identity_confirmation' && (
             <DeliveryStep
               isDelivering={deliverSessionMutation.isPending}
               session={session}
@@ -352,16 +363,26 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
               sshPassword={sshPassword}
               onSshUsernameChange={setSshUsername}
               onSshPasswordChange={setSshPassword}
+              customSsh={customSsh}
+              onCustomSshChange={(custom) => {
+                setCustomSsh(custom);
+                setSshUsername(custom ? '' : DEFAULT_SSH.username);
+                setSshPassword(custom ? '' : DEFAULT_SSH.password);
+              }}
               confirmInstall={confirmInstall}
               onConfirmInstallChange={setConfirmInstall}
             />
           )}
-          {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
-          {session &&
-            session.state !== 'awaiting_identity_confirmation' &&
-            (canInstall(session) || session.dockerProvisionState) && (
+          {session && activeStep === 5 && <ProgressStep name={title} session={session} />}
+          {session && canInstall(session) && (
+            <details>
+              <summary className="wg:cursor-pointer">Optional: inspect controller before installation</summary>
               <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
-            )}
+            </details>
+          )}
+          {session && !canInstall(session) && session.dockerProvisionState && (
+            <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
+          )}
           {session &&
             (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
               <VerificationStatus session={session} onConfigure={onConfigure ? configureController : undefined} />
@@ -456,6 +477,8 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
     recoveryPassword,
     setRecoveryUsername,
     setRecoveryPassword,
+    customRecoverySsh,
+    setCustomRecoverySsh,
     confirmRecovery,
     setConfirmRecovery,
   } = model;
@@ -468,10 +491,8 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
             <Alert.Content>
               <Alert.Title>Clean up failed installation</Alert.Title>
               <Alert.Description>
-                Cleanup interrupts the Attraccess runtime and reconciles this installation and its credentials. It
-                cannot undo broker credential revocation or restore CODESYS, other applications, Docker host settings,
-                or data erased during commissioning. It does not re-enable CODESYS. An incomplete cleanup keeps its
-                recovery record for another attempt. Cleanup does not certify readiness and is never automatic.
+                This stops and removes the failed Attraccess installation. It cannot restore previous applications,
+                data, or CODESYS. You can retry after cleanup.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -482,6 +503,12 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
             password={recoveryPassword}
             onUsernameChange={setRecoveryUsername}
             onPasswordChange={setRecoveryPassword}
+            custom={customRecoverySsh}
+            onCustomChange={(custom) => {
+              setCustomRecoverySsh(custom);
+              setRecoveryUsername(custom ? '' : DEFAULT_SSH.username);
+              setRecoveryPassword(custom ? '' : DEFAULT_SSH.password);
+            }}
           />
           <Checkbox
             isRequired
@@ -498,10 +525,6 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
               restore preexisting applications or data.
             </Checkbox.Content>
           </Checkbox>
-          <p className="wg:text-sm wg:text-muted">
-            Enter fresh SSH credentials and approve each recovery attempt separately. Credentials and recovery consent
-            are cleared after submission or closing.
-          </p>
         </div>
       )}
     </>
@@ -535,7 +558,7 @@ function ConnectionFields({ model }: { model: CommissioningModel }) {
           onMqttServerIdChange={setMqttServerId}
         />
       )}
-      {!session && activeStep === 1 && (
+      {!session && activeStep === 2 && (
         <RuntimeArtifactImport
           disabled={isLoading}
           onBusyChange={setArtifactBusy}
@@ -575,6 +598,24 @@ function CreateSessionActions({ model }: { model: CommissioningModel }) {
         </Button>
       )}
       {!session && activeStep === 1 && (
+        <Button
+          isDisabled={
+            !controllerIp.trim() ||
+            selectedMqttServerId === null ||
+            mqttServersQuery.isPending ||
+            mqttServersQuery.isError
+          }
+          onPress={() => setStep(2)}
+        >
+          Continue
+        </Button>
+      )}
+      {!session && activeStep === 2 && (
+        <Button variant="secondary" onPress={() => setStep(1)}>
+          Back to connection
+        </Button>
+      )}
+      {!session && activeStep === 2 && (
         <Button
           isPending={isLoading}
           isDisabled={
@@ -672,12 +713,12 @@ function DevicePassport({ className, name, step }: { className?: string; name: s
       </p>
       <p className="wg:mt-1 wg:truncate wg:text-lg wg:font-semibold">{name}</p>
       <div className="wg:mt-5 wg:space-y-3">
-        <PassportRow label="Identity" value={step >= 2 ? 'Review required' : 'Not scanned'} />
-        <PassportRow label="Runtime" value={step >= 2 ? 'See session status' : 'Not installed'} />
-        <PassportRow label="Claim" value={step >= 3 ? 'See session status' : 'Pending'} />
+        <PassportRow label="Identity" value={step >= 3 ? 'See session status' : 'Not scanned'} />
+        <PassportRow label="Runtime" value={step >= 4 ? 'See session status' : 'Not installed'} />
+        <PassportRow label="Claim" value={step >= 5 ? 'See session status' : 'Pending'} />
       </div>
       <div className="wg:mt-6 wg:flex wg:gap-1">
-        {[0, 1, 2, 3].map((index) => (
+        {[0, 1, 2, 3, 4, 5].map((index) => (
           <span
             key={index}
             className={`wg:h-1.5 wg:flex-1 wg:rounded-full ${index <= step ? 'wg:bg-primary' : 'wg:bg-default-300'}`}
@@ -699,26 +740,16 @@ function PassportRow({ label, value }: { label: string; value: string }) {
 
 function StepHeading({ step }: { step: number }) {
   const content = [
-    [
-      'Give this controller a useful name',
-      'This name is reserved now and applied automatically when the controller comes online.',
-    ],
-    [
-      'Connect the controller',
-      'Enter its private address and choose an MQTT server. Review the scanned identity before installation.',
-    ],
-    [
-      'Review and approve installation',
-      'Confirm the controller identity, enter temporary SSH credentials, and approve the changes for this attempt.',
-    ],
-    [
-      'Commissioning status',
-      'A saved session does not authorize a new installation. After an interruption, review the status before retrying.',
-    ],
+    ['Name the controller', 'Choose a name you will recognize later.'],
+    ['Connect the controller', 'Enter its IP address and choose the MQTT server it will use.'],
+    ['Choose a runtime release', 'Select the signed release to install on this controller.'],
+    ['Verify the controller', 'Check the SSH fingerprint before installation.'],
+    ['Install the runtime', 'Review what installation changes, then approve it.'],
+    ['Installation progress', 'You can close this window and return to the saved session later.'],
   ][step];
   return (
     <div>
-      <p className="wg:text-sm wg:font-medium">Step {step + 1} of 4</p>
+      <p className="wg:text-sm wg:font-medium">Step {step + 1} of 6</p>
       <h2 className="wg:mt-1 wg:text-xl wg:font-semibold">{content[0]}</h2>
       <p className="wg:mt-1 wg:text-sm wg:text-muted">{content[1]}</p>
     </div>
@@ -774,11 +805,8 @@ function ConnectionStep({
         <Alert.Content>
           <Alert.Title>Prepare the CC100 (751-9301), firmware 31</Alert.Title>
           <Alert.Description>
-            Have the controller powered using its specified supply and wait for it to finish starting. Connect its
-            Ethernet cable to the intended local network. Ask your network administrator for its assigned IP address and
-            ensure the Attraccess server can reach it. Keep power and networking connected during installation. If the
-            model or firmware is uncertain, check the device label and your maintenance records with the responsible
-            administrator before proceeding.
+            Power on the CC100 and connect it to the local network. Keep it connected during installation. Check the
+            device label and firmware if you are unsure which controller this is.
           </Alert.Description>
         </Alert.Content>
       </Alert>
@@ -845,11 +873,8 @@ function HostKeyConfirmationStep({
         <Alert.Content>
           <Alert.Title>Review the controller SSH key</Alert.Title>
           <Alert.Description>
-            Compare the scanned fingerprint with a trusted inventory record or a fingerprint obtained independently
-            through a trusted administrator. Copying the scan back here is not independent authentication. If no trusted
-            fingerprint is available, confirm the physical controller and its cabling on an isolated network you
-            control; this reduces exposure but does not independently authenticate the SSH key. Stop if the device or
-            network is uncertain. Confirming the key does not start installation.
+            Compare this fingerprint with a trusted record. If you do not have one, connect only this controller to an
+            isolated service network and confirm its physical label. Stop if you cannot identify the controller.
           </Alert.Description>
         </Alert.Content>
       </Alert>
@@ -877,6 +902,8 @@ function CredentialFields({
   password,
   onUsernameChange,
   onPasswordChange,
+  custom,
+  onCustomChange,
 }: {
   intent?: 'installation' | 'recovery';
   isDisabled: boolean;
@@ -884,23 +911,36 @@ function CredentialFields({
   password: string;
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
+  custom: boolean;
+  onCustomChange: (value: boolean) => void;
 }) {
   const prefix = intent === 'recovery' ? 'Recovery SSH' : 'Temporary SSH';
   return (
-    <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
-      <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-username`}>
-        <Label>{prefix} username</Label>
-        <Input autoComplete="off" value={username} onChange={(event) => onUsernameChange(event.target.value)} />
-      </TextField>
-      <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-password`}>
-        <Label>{prefix} password</Label>
-        <Input
-          autoComplete="off"
-          type="password"
-          value={password}
-          onChange={(event) => onPasswordChange(event.target.value)}
-        />
-      </TextField>
+    <div className="wg:space-y-3">
+      <p className="wg:text-sm">SSH login: {custom ? 'Custom credentials' : 'Default root account'}</p>
+      <Checkbox isSelected={custom} isDisabled={isDisabled} onChange={onCustomChange}>
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
+        <Checkbox.Content>Advanced: use different SSH credentials</Checkbox.Content>
+      </Checkbox>
+      {custom && (
+        <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
+          <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-username`}>
+            <Label>{prefix} username</Label>
+            <Input autoComplete="off" value={username} onChange={(event) => onUsernameChange(event.target.value)} />
+          </TextField>
+          <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-password`}>
+            <Label>{prefix} password</Label>
+            <Input
+              autoComplete="off"
+              type="password"
+              value={password}
+              onChange={(event) => onPasswordChange(event.target.value)}
+            />
+          </TextField>
+        </div>
+      )}
     </div>
   );
 }
@@ -912,6 +952,8 @@ function DeliveryStep({
   sshPassword,
   onSshUsernameChange,
   onSshPasswordChange,
+  customSsh,
+  onCustomSshChange,
   confirmInstall,
   onConfirmInstallChange,
 }: {
@@ -921,6 +963,8 @@ function DeliveryStep({
   sshPassword: string;
   onSshUsernameChange: (value: string) => void;
   onSshPasswordChange: (value: string) => void;
+  customSsh: boolean;
+  onCustomSshChange: (value: boolean) => void;
   confirmInstall: boolean;
   onConfirmInstallChange: (value: boolean) => void;
 }) {
@@ -934,11 +978,8 @@ function DeliveryStep({
             <Alert.Content>
               <Alert.Title>Destructive installation</Alert.Title>
               <Alert.Description>
-                Installing Attraccess on {session.targetHost} takes over this controller. Existing applications and
-                workloads may stop working or be erased. CODESYS will be stopped and permanently disabled before digital
-                I/O is enabled; installation fails if this cannot be verified. Attraccess does not preserve, back up, or
-                restore preexisting CODESYS applications or other workloads. Make connected equipment safe for the
-                interruption. Installation does not certify management hardening or physical readiness.
+                Make connected equipment safe before continuing. Installation stops and disables CODESYS on{' '}
+                {session.targetHost}. Existing applications and data may be lost and cannot be restored by Attraccess.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -948,6 +989,8 @@ function DeliveryStep({
             password={sshPassword}
             onUsernameChange={onSshUsernameChange}
             onPasswordChange={onSshPasswordChange}
+            custom={customSsh}
+            onCustomChange={onCustomSshChange}
           />
           <Checkbox
             isRequired
@@ -966,9 +1009,7 @@ function DeliveryStep({
             </Checkbox.Content>
           </Checkbox>
           <p className="wg:text-sm wg:text-muted">
-            Enter the controller credentials explicitly; no default credentials are used. The password and approval are
-            cleared after submitting or closing. Every retry needs a new approval and password. Restarting the server
-            does not start or resume an installation.
+            Each attempt needs your approval. Custom passwords are cleared after use.
           </p>
         </>
       )}
@@ -980,7 +1021,7 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
   const complete = ['completed', 'revoked', 'claim_interrupted', 'recovery_revocation_pending'].includes(session.state);
   return (
     <div className="wg:space-y-4">
-      <DevicePassport className="wg:md:hidden" name={name} step={3} />
+      <DevicePassport className="wg:md:hidden" name={name} step={5} />
       <CommissioningStatusPanel isActive={!complete} session={session} />
       <div className="wg:rounded-large wg:border wg:border-default-200 wg:p-4 wg:text-sm">
         <p className="wg:font-medium">Safe to close</p>
@@ -1064,7 +1105,7 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
     ? 'Installation approval required'
     : (session.progressStep ?? (isActive ? 'Preparing commissioning' : commissioningLabel(session.state)));
   const detail = isQueued
-    ? 'Review the installation, enter temporary SSH credentials, and approve this attempt. Saved sessions do not start or resume installation automatically.'
+    ? 'Review the installation and approve this attempt. Saved sessions do not start automatically.'
     : (session.progressDetail ?? 'Waiting for the next commissioning operation.');
   return (
     <div aria-live="polite" className="wg:rounded-large wg:border wg:border-primary/30 wg:bg-primary/5 wg:p-4">
@@ -1144,15 +1185,10 @@ function parseActivityLog(auditLog: string): Array<{ at: string; event: string }
 
 function sessionStep(session: CommissioningSession | null): number {
   if (!session) return 0;
-  return [
-    'awaiting_delivery',
-    'delivering',
-    'awaiting_identity_confirmation',
-    'awaiting_codesys_confirmation',
-    'delivery_failed',
-  ].includes(session.state)
-    ? 2
-    : 3;
+  if (session.state === 'awaiting_identity_confirmation') return 3;
+  return ['awaiting_delivery', 'delivering', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state)
+    ? 4
+    : 5;
 }
 
 function ErrorAlert({ error }: { error: unknown }) {

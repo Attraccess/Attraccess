@@ -148,20 +148,6 @@ export class WagoControllerApi {
     return this.commissioning.managementStatus(id);
   }
   @Auth('system.settings.manage')
-  @Get('commissioning/sessions/:id/operation')
-  operationStatus(@Param('id', ParseIntPipe) id: number) {
-    return this.commissioning.operationStatus(id);
-  }
-  @Auth('system.settings.manage')
-  @Post('commissioning/sessions/:id/operation/recover')
-  recoverOperation(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: Parameters<WagoCommissioningService['recoverOperation']>[1],
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.commissioning.recoverOperation(id, body ?? {}, commissioningPrincipal(request));
-  }
-  @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/platform/:action')
   platformAction(
     @Param('id', ParseIntPipe) id: number,

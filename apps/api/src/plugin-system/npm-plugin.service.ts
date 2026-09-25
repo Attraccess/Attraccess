@@ -839,7 +839,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         try {
           await this.writeState(installed, this.pendingAudit(audit));
         } catch (error) {
-          // The npm record alone is not used during module discovery, so restore
+          // Discovery uses the npm record to find this installation, so restore
           // the real quarantine before returning this failed activation.
           this.logger.error(`Failed to activate installed package ${name}`, error);
           const message = error instanceof Error ? error.message : 'Unknown error';

@@ -506,49 +506,6 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(recovered.runtimeRecoveryAvailable).toBeUndefined();
   });
 
-  it('serializes separate service instances before either can touch the same controller', async () => {
-    let release!: (value: string) => void;
-    let entered!: () => void;
-    const ready = new Promise<void>((resolve) => {
-      entered = resolve;
-    });
-    jest.spyOn(service as never, 'sudoRunScript').mockImplementation(((_host, _pin, _credential, script: string) => {
-      if (script.includes("printf 'epoch=")) return Promise.resolve(clockOutput());
-      entered();
-      return new Promise((resolve) => {
-        release = resolve;
-      }) as never;
-    }) as never);
-    const other = new WagoCommissioningService(context, wago as unknown as WagoService);
-    // Binding the shared repository is enough; do not run startup recovery against active work.
-    other['sessions'] = db.getRepository(WagoCommissioningSession);
-    const otherRemote = jest.spyOn(other as never, 'sudoRunScript');
-    const first = service.platform(session.id, 'inspect', { temporarySsh: credential });
-    await ready;
-    await expect(other.platform(session.id, 'inspect', { temporarySsh: credential })).rejects.toThrow('lease_busy');
-    expect(otherRemote).not.toHaveBeenCalled();
-    const controller = await db.getRepository(WagoController).save({
-      hardwareId: session.hardwareId,
-      trustState: 'claimed',
-      mqttServerId: 1,
-      pairingCodeHash: 'fixture',
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: '[]',
-      lastSequence: 0,
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    const remove = jest.fn().mockResolvedValue(session.hardwareId);
-    await expect(other.removeControllerSafely(controller.id, remove)).rejects.toThrow('lease_busy');
-    expect(remove).not.toHaveBeenCalled();
-    expect(await db.getRepository(WagoController).findOneBy({ id: controller.id })).not.toBeNull();
-    release(stoppedReport);
-    await first;
-    expect(await service.operationStatus(session.id)).toEqual({ state: 'available' });
-  });
-
   it('retains tokened recovery after registration removal, without exposing the token', async () => {
     const controller = await db.getRepository(WagoController).save({
       hardwareId: session.hardwareId,

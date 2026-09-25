@@ -6,7 +6,7 @@ import {
   type PluginContext,
   type PluginMqttSubscription,
 } from '@attraccess/plugins-backend-sdk';
-import type { CommissioningOperationGuard } from './wago-commissioning-lease';
+import type { CommissioningOperationGuard } from './wago-operation-guard';
 import { normalizeOperationalPrefix } from './protocol';
 import { sourceTime } from './diagnostics-envelope';
 import { WagoAudit } from './wago-audit';

@@ -17,7 +17,6 @@ import { WagoDiagnosticsController } from './diagnostics.controller';
 import { WagoDiagnosticsService } from './diagnostics.service';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import { WagoManagementEntity } from './wago-management.entity';
-import { WagoCommissioningLeaseEntity } from './wago-commissioning-lease.entity';
 import { createWagoCommandNode } from './wago-command-node';
 import { WagoFlowService } from './wago-flow.service';
 import { createWagoStateNodes } from './wago-state-nodes';
@@ -45,7 +44,6 @@ const plugin: PluginBackendModule = {
     WagoCredentialRotationEntity,
     WagoCommissioningSession,
     WagoManagementEntity,
-    WagoCommissioningLeaseEntity,
   ],
   flowNodes: (context) => [
     createWagoCommandNode(() => services(context).command),

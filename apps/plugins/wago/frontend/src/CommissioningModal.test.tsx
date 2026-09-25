@@ -97,11 +97,17 @@ function mount() {
 }
 
 function fillCredentials() {
+  if (!screen.queryByLabelText('Temporary SSH username'))
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Advanced: use different SSH credentials' })[0]);
   fireEvent.change(screen.getByLabelText('Temporary SSH username'), { target: { value: 'operator' } });
   fireEvent.change(screen.getByLabelText('Temporary SSH password'), { target: { value: 'test-only-password' } });
 }
 
 function fillRecoveryCredentials() {
+  if (!screen.queryByLabelText('Recovery SSH username')) {
+    const switches = screen.getAllByRole('checkbox', { name: 'Advanced: use different SSH credentials' });
+    fireEvent.click(switches[switches.length - 1]);
+  }
   fireEvent.change(screen.getByLabelText('Recovery SSH username'), { target: { value: 'recovery-operator' } });
   fireEvent.change(screen.getByLabelText('Recovery SSH password'), { target: { value: 'recovery-secret' } });
 }
@@ -234,6 +240,19 @@ describe('explicit recovery approval', () => {
     activeSession.runtimeRecoveryAvailable = true;
   });
 
+  it('uses the default root login for cleanup without another credential prompt', async () => {
+    activeSession.state = 'delivery_failed';
+    mount();
+    expect(screen.queryByLabelText('Recovery SSH password')).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clean up failed installation' }));
+    await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(1));
+    expect(JSON.parse(requests.find(({ url }) => url.endsWith('/recover'))?.body ?? '{}').temporarySsh).toEqual({
+      username: 'root',
+      password: 'wago',
+    });
+  });
+
   it.each([false, undefined])(
     'offers preparation cleanup alone without runtime recovery ownership (%s)',
     (available) => {
@@ -288,7 +307,7 @@ describe('explicit recovery approval', () => {
       activeSession.state = state;
       mount();
       expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(true);
-      expect(screen.getByText(/cannot undo broker credential revocation/)).toBeTruthy();
+      expect(screen.getByText(/cannot restore previous applications/)).toBeTruthy();
       expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
     },
   );
@@ -302,13 +321,12 @@ describe('explicit recovery approval', () => {
       const recover = screen.getByRole('button', { name: 'Clean up failed installation' });
       fillCredentials();
       fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
-      expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
+      expect(screen.queryByLabelText('Recovery SSH password')).toBeNull();
       fillRecoveryCredentials();
       expect(recover.hasAttribute('disabled')).toBe(true);
       fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
       fireEvent.click(recover);
       expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
-      expect((screen.getByLabelText('Recovery SSH username') as HTMLInputElement).value).toBe('');
       await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(1));
       expect(JSON.parse(requests.find(({ url }) => url.endsWith('/recover'))?.body ?? '{}')).toEqual({
         confirmInstall: true,
@@ -338,8 +356,8 @@ describe('explicit recovery approval', () => {
     if (mode === 'session') activeSession = { ...activeSession, id: 8 };
     else rerender(view(false));
     rerender(view(true));
-    expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
-    expect((screen.getByLabelText('Recovery SSH username') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByLabelText('Recovery SSH password')).toBeNull();
+    expect(screen.queryByLabelText('Recovery SSH username')).toBeNull();
     fillRecoveryCredentials();
     expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(true);
     expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
@@ -363,6 +381,23 @@ describe('explicit recovery approval', () => {
 });
 
 describe('explicit install approval', () => {
+  it('does not query coordinator recovery or show an interrupted-operation gate', () => {
+    mount();
+    expect(requests.some(({ url }) => url.endsWith('/operation'))).toBe(false);
+    expect(screen.queryByText('Interrupted coordinator recovery required')).toBeNull();
+  });
+  it('uses factory SSH access without asking for a password in the normal path', async () => {
+    mount();
+    expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
+    expect(screen.getAllByText('SSH login: Default root account').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Install runtime' }));
+    await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(1));
+    expect(JSON.parse(requests.find(({ url }) => url.endsWith('/deliver'))?.body ?? '{}').temporarySsh).toEqual({
+      username: 'root',
+      password: 'wago',
+    });
+  });
   it.each(['codesys-active', 'codesys-boot-enabled'])(
     'uses one consequence confirmation for %s without preservation or WBM gates',
     (exclusivity) => {
@@ -378,9 +413,8 @@ describe('explicit install approval', () => {
       });
       mount();
       expect(screen.getByText('Destructive installation')).toBeTruthy();
-      expect(screen.getByText(/Existing applications and workloads may stop working or be erased/)).toBeTruthy();
-      expect(screen.getByText(/Installation does not certify management hardening or physical readiness/)).toBeTruthy();
-      expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+      expect(screen.getByText(/Existing applications and data may be lost/)).toBeTruthy();
+      expect(screen.getByText(/Make connected equipment safe/)).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Recover saved runtime' })).toBeNull();
       fillCredentials();
       const install = screen.getByRole('button', { name: 'Install runtime' });
@@ -396,8 +430,8 @@ describe('explicit install approval', () => {
     if (failure) activeSession.state = 'delivery_failed';
     mount();
     const install = screen.getByRole('button', { name: failure ? 'Retry installation' : 'Install runtime' });
-    expect((screen.getByLabelText('Temporary SSH username') as HTMLInputElement).value).toBe('');
-    expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByLabelText('Temporary SSH username')).toBeNull();
+    expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
     expect(install.hasAttribute('disabled')).toBe(true);
     fillCredentials();
     expect(install.hasAttribute('disabled')).toBe(true);
@@ -437,10 +471,10 @@ describe('explicit install approval', () => {
   it('clears the password and consent when closed externally and reopened', () => {
     const { rerender, view } = mount();
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     rerender(view(false));
     rerender(view(true));
-    expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
     fillCredentials();
     expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(true);
     expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(0);
@@ -449,12 +483,12 @@ describe('explicit install approval', () => {
   it('clears the password and consent on the Close button', () => {
     const { rerender, view, onOpenChange } = mount();
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     rerender(view(false));
     rerender(view(true));
-    expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
     fillCredentials();
     expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(true);
   });

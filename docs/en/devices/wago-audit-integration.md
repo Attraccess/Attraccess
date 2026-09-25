@@ -229,7 +229,7 @@ Commissioning PR #1817 at `f136365b` emits through the same host bridge. Its
 `auditCommissioning` helper uses `wago.commissioning` subjects (the persisted
 session ID) for `wago.commissioning.install`, `recover`, `security_inspect`,
 `security_review`, `security_apply`, `security_recover`, `platform_inspect`,
-`platform_activate`, `platform_recover`, and `lease_recover`. Details are empty.
+`platform_activate` and `platform_recover`. Details are empty.
 Automatic claim instead emits `wago.claim` against the real `wago.controller` ID.
 The authenticated initiating principal is persisted in commissioning sessions;
 legacy sessions without a valid initiator must not invent one.
