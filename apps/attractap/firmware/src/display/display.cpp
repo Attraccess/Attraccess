@@ -81,7 +81,7 @@ int16_t Display::gestureStartY = 0;
 static bool s_touchWarningPending = false;
 static std::string s_renderedLanguage;
 
-static void refreshVisibleTextForLanguageChange()
+void Display::refreshVisibleTextForLanguageChange()
 {
     const std::string language = State::getActiveLanguage();
     if (language == s_renderedLanguage) return;
