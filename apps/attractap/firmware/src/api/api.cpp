@@ -128,6 +128,9 @@ void API::processIncomingMessage(const char *buf, size_t len)
             if (err.length() > 0)
             {
                 if (isActionResponse && this->actionResultCallback) {
+                    // Keep the server's original error available in logs; the
+                    // UI may replace it with a safe English fallback below.
+                    this->logger.error((std::string("Reader action reported error: ") + err).c_str());
                     this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
                     this->sendAck(eventType);
                     return;

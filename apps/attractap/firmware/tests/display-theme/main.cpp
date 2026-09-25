@@ -917,6 +917,14 @@ int main(int argc, char **argv)
                    "Shared display catalog resolves German screen strings to English");
             expect(std::string(FirmwareI18n::translateForLocale("End session", "de")) == "Sitzung beenden",
                    "Visible labels can refresh back to German");
+            expect(std::string(FirmwareI18n::translateForLocale("Keine Aufsicht verfügbar", "en-US")) == "No supervisor available",
+                   "Supervision errors use English on English readers");
+            expect(std::string(FirmwareI18n::translateForLocale("Karte konnte nicht\ngelesen werden", "en")) == "Could not\nread card",
+                   "Card read errors use English on English readers");
+            expect(std::string(FirmwareI18n::translateForLocale("Karte wird zurückgesetzt...\nbitte nicht bewegen", "en")) == "Resetting card...\nplease keep it still",
+                   "Reset status is translated");
+            expect(std::string(FirmwareI18n::translateForLocale("Aktion fehlgeschlagen", "de")) == "Aktion fehlgeschlagen",
+                   "German fallback remains available");
             auto *root = lv_obj_create(lv_screen_active());
             auto *label = lv_label_create(root);
             lv_label_set_text(label, "Sitzung beenden");
