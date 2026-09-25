@@ -1,0 +1,828 @@
+#0 building with "att1079-local" instance using docker-container driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 940B 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:22-bookworm-slim
+#2 ...
+
+#3 [auth] library/node:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/node:24-bookworm-slim
+#4 DONE 1.9s
+
+#2 [internal] load metadata for docker.io/library/node:22-bookworm-slim
+#2 DONE 1.9s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 721B done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 DONE 0.0s
+
+#7 [stage-1 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#7 resolve docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c 0.0s done
+#7 ...
+
+#8 [build 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+#8 resolve docker.io/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 0.0s done
+#8 DONE 0.4s
+
+#7 [stage-1 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#7 sha256:730cb5e337e51a6b3ebbfc865a775b3deccc678c48317bef452d7a54bcc2317e 447B / 447B 0.1s done
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 0B / 44.53MB 0.2s
+#7 sha256:3a967c9f2eaea74d63c57d06c336284b2af15611edbcf12b909f7804b96a6960 0B / 3.31kB 0.2s
+#7 sha256:2787f28eed6bb695ad2c7f2412e410a75765c9a3b111a0994da815534cec3832 0B / 1.71MB 0.2s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 0B / 23.94MB 0.2s
+#7 sha256:3a967c9f2eaea74d63c57d06c336284b2af15611edbcf12b909f7804b96a6960 3.31kB / 3.31kB 0.4s done
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 9.44MB / 44.53MB 0.5s
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 14.68MB / 44.53MB 0.6s
+#7 sha256:2787f28eed6bb695ad2c7f2412e410a75765c9a3b111a0994da815534cec3832 1.05MB / 1.71MB 0.6s
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 22.02MB / 44.53MB 0.8s
+#7 sha256:2787f28eed6bb695ad2c7f2412e410a75765c9a3b111a0994da815534cec3832 1.71MB / 1.71MB 0.7s done
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 28.31MB / 44.53MB 0.9s
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 33.55MB / 44.53MB 1.1s
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 36.70MB / 44.53MB 1.2s
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 41.94MB / 44.53MB 1.4s
+#7 sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 44.53MB / 44.53MB 1.5s done
+#7 ...
+
+#6 [internal] load build context
+#6 transferring context: 218.40MB 1.8s done
+#6 DONE 2.0s
+
+#7 [stage-1 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 2.10MB / 23.94MB 1.7s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 4.19MB / 23.94MB 2.3s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 6.29MB / 23.94MB 2.9s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 8.39MB / 23.94MB 3.3s
+#7 ...
+
+#8 [build 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+#8 sha256:1adfcc98699692a1ffbfd67a06373979e575e7d84daa4a28dcd7094c1cbe2f70 446B / 446B 0.2s done
+#8 sha256:064d54af254cb1fa472a52725b75c8f2cfcb5ddf97f490b07baec003bc615492 1.71MB / 1.71MB 0.3s done
+#8 sha256:b244c8f190adc07ba9e1ff8067aa4320686e7c15a14e6893d82945859cb97187 50.84MB / 50.84MB 2.4s done
+#8 sha256:82cd842c80a4bd896d946f64cac8393d8289739310dd22bd53cf18a308f8197a 3.31kB / 3.31kB 0.3s done
+#8 sha256:333125b5cee9fb6718bdcb523fc93b4adc71b7c37ada6146a20c193430e549b9 28.12MB / 28.12MB 2.0s done
+#8 extracting sha256:333125b5cee9fb6718bdcb523fc93b4adc71b7c37ada6146a20c193430e549b9 0.5s done
+#8 extracting sha256:82cd842c80a4bd896d946f64cac8393d8289739310dd22bd53cf18a308f8197a 0.0s done
+#8 DONE 4.0s
+
+#7 [stage-1 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 12.58MB / 23.94MB 3.8s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 14.68MB / 23.94MB 3.9s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 16.78MB / 23.94MB 4.1s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 19.92MB / 23.94MB 4.2s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 22.02MB / 23.94MB 4.4s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 23.94MB / 23.94MB 4.5s
+#7 sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 23.94MB / 23.94MB 4.6s done
+#7 ...
+
+#8 [build 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+#8 extracting sha256:b244c8f190adc07ba9e1ff8067aa4320686e7c15a14e6893d82945859cb97187 1.0s done
+#8 extracting sha256:064d54af254cb1fa472a52725b75c8f2cfcb5ddf97f490b07baec003bc615492 0.1s done
+#8 extracting sha256:1adfcc98699692a1ffbfd67a06373979e575e7d84daa4a28dcd7094c1cbe2f70 0.0s done
+#8 DONE 5.1s
+
+#7 [stage-1 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#7 extracting sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2
+#7 extracting sha256:0f3351a6d282c9993e318db2f90ca23ba75e8f5e94bfff11cad56d85c2a630d2 1.0s done
+#7 extracting sha256:3a967c9f2eaea74d63c57d06c336284b2af15611edbcf12b909f7804b96a6960
+#7 extracting sha256:3a967c9f2eaea74d63c57d06c336284b2af15611edbcf12b909f7804b96a6960 0.1s done
+#7 extracting sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67
+#7 extracting sha256:9137ff083a667af1b9af4446e42a9a0531646c5f9ead1d6431139dfc61c92b67 0.9s done
+#7 DONE 7.0s
+
+#9 [build 2/4] WORKDIR /workspace
+#9 ...
+
+#7 [stage-1 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#7 extracting sha256:2787f28eed6bb695ad2c7f2412e410a75765c9a3b111a0994da815534cec3832 0.1s done
+#7 extracting sha256:730cb5e337e51a6b3ebbfc865a775b3deccc678c48317bef452d7a54bcc2317e 0.0s done
+#7 DONE 7.1s
+
+#10 [stage-1 2/6] WORKDIR /app
+#10 ...
+
+#9 [build 2/4] WORKDIR /workspace
+#9 DONE 2.2s
+
+#11 [build 3/4] COPY . .
+#11 ...
+
+#10 [stage-1 2/6] WORKDIR /app
+#10 DONE 0.6s
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 0.551 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#12 0.677 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#12 0.697 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+#12 ...
+
+#11 [build 3/4] COPY . .
+#11 DONE 1.3s
+
+#13 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+#13 0.138 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.34.5.tgz
+#13 1.167 Scope: all 4 workspace projects
+#13 1.280 Lockfile is up to date, resolution step is skipped
+#13 1.374 Progress: resolved 1, reused 0, downloaded 0, added 0
+#13 1.565 Packages: +3884
+#13 1.565 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#13 2.376 Progress: resolved 3884, reused 0, downloaded 27, added 0
+#13 3.029 
+#13 3.029    ╭──────────────────────────────────────────────╮
+#13 3.029    │                                              │
+#13 3.029    │     Update available! 10.34.5 → 12.6.0.      │
+#13 3.029    │     Changelog: https://pnpm.io/v/12.6.0      │
+#13 3.029    │   To update, run: corepack use pnpm@12.6.0   │
+#13 3.029    │                                              │
+#13 3.029    ╰──────────────────────────────────────────────╯
+#13 3.029 
+#13 3.376 Progress: resolved 3884, reused 0, downloaded 81, added 3
+#13 4.376 Progress: resolved 3884, reused 0, downloaded 157, added 45
+#13 5.377 Progress: resolved 3884, reused 0, downloaded 224, added 67
+#13 6.378 Progress: resolved 3884, reused 0, downloaded 262, added 77
+#13 7.382 Progress: resolved 3884, reused 0, downloaded 341, added 104
+#13 8.382 Progress: resolved 3884, reused 0, downloaded 434, added 146
+#13 9.385 Progress: resolved 3884, reused 0, downloaded 475, added 164
+#13 10.39 Progress: resolved 3884, reused 0, downloaded 518, added 177
+#13 ...
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 1.424 Get:4 http://deb.debian.org/debian bookworm/main armhf Packages [8506 kB]
+#12 2.080 Get:5 http://deb.debian.org/debian bookworm-updates/main armhf Packages [6928 B]
+#12 3.032 Get:6 http://deb.debian.org/debian-security bookworm-security/main armhf Packages [318 kB]
+#12 5.507 Fetched 9072 kB in 5s (1793 kB/s)
+#12 5.507 Reading package lists...
+#12 9.654 Reading package lists...
+#12 ...
+
+#13 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+#13 11.46 Progress: resolved 3884, reused 0, downloaded 518, added 178
+#13 12.46 Progress: resolved 3884, reused 0, downloaded 580, added 221
+#13 13.46 Progress: resolved 3884, reused 0, downloaded 590, added 228
+#13 14.46 Progress: resolved 3884, reused 0, downloaded 591, added 228
+#13 15.47 Progress: resolved 3884, reused 0, downloaded 603, added 229
+#13 16.56 Progress: resolved 3884, reused 0, downloaded 612, added 233
+#13 ...
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 9.654 Reading package lists...
+#12 13.20 Building dependency tree...
+#12 13.90 Reading state information...
+#12 14.66 The following additional packages will be installed:
+#12 14.66   libexpat1 libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3
+#12 14.66   libkrb5support0 libncursesw6 libnsl2 libpython3-stdlib libpython3.11-minimal
+#12 14.66   libpython3.11-stdlib libreadline8 libsqlite3-0 libssl3 libtirpc-common
+#12 14.66   libtirpc3 media-types python3-minimal python3.11 python3.11-minimal
+#12 14.66   readline-common
+#12 14.67 Suggested packages:
+#12 14.67   krb5-doc krb5-user python3-doc python3-tk python3-venv python3.11-venv
+#12 14.67   python3.11-doc binutils binfmt-support readline-doc
+#12 14.67 Recommended packages:
+#12 14.67   krb5-locales libgpm2 ca-certificates
+#12 15.42 The following NEW packages will be installed:
+#12 15.42   libexpat1 libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3
+#12 15.42   libkrb5support0 libncursesw6 libnsl2 libpython3-stdlib libpython3.11-minimal
+#12 15.42   libpython3.11-stdlib libreadline8 libsqlite3-0 libssl3 libtirpc-common
+#12 15.42   libtirpc3 media-types python3 python3-minimal python3.11 python3.11-minimal
+#12 15.42   readline-common
+#12 15.74 0 upgraded, 22 newly installed, 0 to remove and 1 not upgraded.
+#12 15.74 Need to get 8320 kB of archives.
+#12 15.74 After this operation, 26.3 MB of additional disk space will be used.
+#12 15.74 Get:1 http://deb.debian.org/debian-security bookworm-security/main armhf libssl3 armhf 3.0.22-1~deb12u1 [1685 kB]
+#12 16.87 Get:2 http://deb.debian.org/debian bookworm/main armhf libpython3.11-minimal armhf 3.11.2-6+deb12u8 [803 kB]
+#12 17.47 Get:3 http://deb.debian.org/debian-security bookworm-security/main armhf libexpat1 armhf 2.5.0-1+deb12u3 [82.9 kB]
+#12 17.48 Get:4 http://deb.debian.org/debian bookworm/main armhf python3.11-minimal armhf 3.11.2-6+deb12u8 [1716 kB]
+#12 18.28 Get:5 http://deb.debian.org/debian bookworm/main armhf python3-minimal armhf 3.11.2-1+b1 [26.3 kB]
+#12 18.30 Get:6 http://deb.debian.org/debian bookworm/main armhf media-types all 10.0.0 [26.1 kB]
+#12 18.31 Get:7 http://deb.debian.org/debian bookworm/main armhf libncursesw6 armhf 6.4-4 [108 kB]
+#12 18.34 Get:8 http://deb.debian.org/debian bookworm/main armhf libkrb5support0 armhf 1.20.1-2+deb12u5 [30.2 kB]
+#12 18.37 Get:9 http://deb.debian.org/debian bookworm/main armhf libk5crypto3 armhf 1.20.1-2+deb12u5 [75.4 kB]
+#12 18.41 Get:10 http://deb.debian.org/debian bookworm/main armhf libkeyutils1 armhf 1.6.3-2 [7832 B]
+#12 18.41 Get:11 http://deb.debian.org/debian bookworm/main armhf libkrb5-3 armhf 1.20.1-2+deb12u5 [288 kB]
+#12 18.53 Get:12 http://deb.debian.org/debian bookworm/main armhf libgssapi-krb5-2 armhf 1.20.1-2+deb12u5 [112 kB]
+#12 18.58 Get:13 http://deb.debian.org/debian bookworm/main armhf libtirpc-common all 1.3.3+ds-1 [14.0 kB]
+#12 18.58 Get:14 http://deb.debian.org/debian bookworm/main armhf libtirpc3 armhf 1.3.3+ds-1 [72.9 kB]
+#12 18.62 Get:15 http://deb.debian.org/debian bookworm/main armhf libnsl2 armhf 1.3.0-2 [33.9 kB]
+#12 18.64 Get:16 http://deb.debian.org/debian bookworm/main armhf readline-common all 8.2-1.3 [69.0 kB]
+#12 18.67 Get:17 http://deb.debian.org/debian bookworm/main armhf libreadline8 armhf 8.2-1.3 [144 kB]
+#12 18.72 Get:18 http://deb.debian.org/debian bookworm/main armhf libsqlite3-0 armhf 3.40.1-2+deb12u2 [736 kB]
+#12 19.06 Get:19 http://deb.debian.org/debian bookworm/main armhf libpython3.11-stdlib armhf 3.11.2-6+deb12u8 [1680 kB]
+#12 19.80 Get:20 http://deb.debian.org/debian bookworm/main armhf python3.11 armhf 3.11.2-6+deb12u8 [574 kB]
+#12 20.07 Get:21 http://deb.debian.org/debian bookworm/main armhf libpython3-stdlib armhf 3.11.2-1+b1 [9296 B]
+#12 20.08 Get:22 http://deb.debian.org/debian bookworm/main armhf python3 armhf 3.11.2-1+b1 [26.3 kB]
+#12 21.28 debconf: delaying package configuration, since apt-utils is not installed
+#12 21.46 Fetched 8320 kB in 5s (1822 kB/s)
+#12 21.70 Selecting previously unselected package libssl3:armhf.
+#12 21.70 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6093 files and directories currently installed.)
+#12 21.75 Preparing to unpack .../libssl3_3.0.22-1~deb12u1_armhf.deb ...
+#12 22.09 Unpacking libssl3:armhf (3.0.22-1~deb12u1) ...
+#12 23.26 Selecting previously unselected package libpython3.11-minimal:armhf.
+#12 23.27 Preparing to unpack .../libpython3.11-minimal_3.11.2-6+deb12u8_armhf.deb ...
+#12 23.28 Unpacking libpython3.11-minimal:armhf (3.11.2-6+deb12u8) ...
+#12 24.30 Selecting previously unselected package libexpat1:armhf.
+#12 24.30 Preparing to unpack .../libexpat1_2.5.0-1+deb12u3_armhf.deb ...
+#12 24.34 Unpacking libexpat1:armhf (2.5.0-1+deb12u3) ...
+#12 24.77 Selecting previously unselected package python3.11-minimal.
+#12 24.78 Preparing to unpack .../python3.11-minimal_3.11.2-6+deb12u8_armhf.deb ...
+#12 24.89 Unpacking python3.11-minimal (3.11.2-6+deb12u8) ...
+#12 25.74 Setting up libssl3:armhf (3.0.22-1~deb12u1) ...
+#12 25.83 Setting up libpython3.11-minimal:armhf (3.11.2-6+deb12u8) ...
+#12 26.08 Setting up libexpat1:armhf (2.5.0-1+deb12u3) ...
+#12 26.17 Setting up python3.11-minimal (3.11.2-6+deb12u8) ...
+#12 ...
+
+#13 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+#13 17.56 Progress: resolved 3884, reused 0, downloaded 616, added 233
+#13 18.56 Progress: resolved 3884, reused 0, downloaded 632, added 240
+#13 19.56 Progress: resolved 3884, reused 0, downloaded 684, added 259
+#13 20.56 Progress: resolved 3884, reused 0, downloaded 722, added 271
+#13 21.57 Progress: resolved 3884, reused 0, downloaded 774, added 293
+#13 22.57 Progress: resolved 3884, reused 0, downloaded 875, added 337
+#13 23.57 Progress: resolved 3884, reused 0, downloaded 1022, added 376
+#13 24.57 Progress: resolved 3884, reused 0, downloaded 1106, added 402
+#13 25.57 Progress: resolved 3884, reused 0, downloaded 1150, added 417
+#13 26.58 Progress: resolved 3884, reused 0, downloaded 1194, added 427
+#13 27.58 Progress: resolved 3884, reused 0, downloaded 1252, added 450
+#13 28.58 Progress: resolved 3884, reused 0, downloaded 1304, added 465
+#13 29.58 Progress: resolved 3884, reused 0, downloaded 1329, added 473
+#13 30.58 Progress: resolved 3884, reused 0, downloaded 1366, added 483
+#13 31.58 Progress: resolved 3884, reused 0, downloaded 1414, added 500
+#13 32.59 Progress: resolved 3884, reused 0, downloaded 1543, added 536
+#13 33.79 Progress: resolved 3884, reused 0, downloaded 1546, added 536
+#13 35.87 Progress: resolved 3884, reused 0, downloaded 1546, added 537
+#13 ...
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 37.15 Selecting previously unselected package python3-minimal.
+#12 37.16 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6421 files and directories currently installed.)
+#12 37.24 Preparing to unpack .../00-python3-minimal_3.11.2-1+b1_armhf.deb ...
+#12 37.29 Unpacking python3-minimal (3.11.2-1+b1) ...
+#12 37.97 Selecting previously unselected package media-types.
+#12 37.98 Preparing to unpack .../01-media-types_10.0.0_all.deb ...
+#12 37.99 Unpacking media-types (10.0.0) ...
+#12 38.29 Selecting previously unselected package libncursesw6:armhf.
+#12 38.30 Preparing to unpack .../02-libncursesw6_6.4-4_armhf.deb ...
+#12 38.31 Unpacking libncursesw6:armhf (6.4-4) ...
+#12 38.68 Selecting previously unselected package libkrb5support0:armhf.
+#12 38.69 Preparing to unpack .../03-libkrb5support0_1.20.1-2+deb12u5_armhf.deb ...
+#12 38.71 Unpacking libkrb5support0:armhf (1.20.1-2+deb12u5) ...
+#12 38.96 Selecting previously unselected package libk5crypto3:armhf.
+#12 38.96 Preparing to unpack .../04-libk5crypto3_1.20.1-2+deb12u5_armhf.deb ...
+#12 38.97 Unpacking libk5crypto3:armhf (1.20.1-2+deb12u5) ...
+#12 39.28 Selecting previously unselected package libkeyutils1:armhf.
+#12 39.28 Preparing to unpack .../05-libkeyutils1_1.6.3-2_armhf.deb ...
+#12 39.31 Unpacking libkeyutils1:armhf (1.6.3-2) ...
+#12 39.60 Selecting previously unselected package libkrb5-3:armhf.
+#12 39.60 Preparing to unpack .../06-libkrb5-3_1.20.1-2+deb12u5_armhf.deb ...
+#12 39.62 Unpacking libkrb5-3:armhf (1.20.1-2+deb12u5) ...
+#12 40.00 Selecting previously unselected package libgssapi-krb5-2:armhf.
+#12 40.00 Preparing to unpack .../07-libgssapi-krb5-2_1.20.1-2+deb12u5_armhf.deb ...
+#12 40.04 Unpacking libgssapi-krb5-2:armhf (1.20.1-2+deb12u5) ...
+#12 40.32 Selecting previously unselected package libtirpc-common.
+#12 40.32 Preparing to unpack .../08-libtirpc-common_1.3.3+ds-1_all.deb ...
+#12 40.33 Unpacking libtirpc-common (1.3.3+ds-1) ...
+#12 40.59 Selecting previously unselected package libtirpc3:armhf.
+#12 40.59 Preparing to unpack .../09-libtirpc3_1.3.3+ds-1_armhf.deb ...
+#12 40.60 Unpacking libtirpc3:armhf (1.3.3+ds-1) ...
+#12 40.89 Selecting previously unselected package libnsl2:armhf.
+#12 40.90 Preparing to unpack .../10-libnsl2_1.3.0-2_armhf.deb ...
+#12 40.91 Unpacking libnsl2:armhf (1.3.0-2) ...
+#12 41.18 Selecting previously unselected package readline-common.
+#12 41.18 Preparing to unpack .../11-readline-common_8.2-1.3_all.deb ...
+#12 41.19 Unpacking readline-common (8.2-1.3) ...
+#12 41.51 Selecting previously unselected package libreadline8:armhf.
+#12 41.51 Preparing to unpack .../12-libreadline8_8.2-1.3_armhf.deb ...
+#12 41.52 Unpacking libreadline8:armhf (8.2-1.3) ...
+#12 41.80 Selecting previously unselected package libsqlite3-0:armhf.
+#12 41.80 Preparing to unpack .../13-libsqlite3-0_3.40.1-2+deb12u2_armhf.deb ...
+#12 41.81 Unpacking libsqlite3-0:armhf (3.40.1-2+deb12u2) ...
+#12 42.16 Selecting previously unselected package libpython3.11-stdlib:armhf.
+#12 42.16 Preparing to unpack .../14-libpython3.11-stdlib_3.11.2-6+deb12u8_armhf.deb ...
+#12 42.17 Unpacking libpython3.11-stdlib:armhf (3.11.2-6+deb12u8) ...
+#12 45.38 Selecting previously unselected package python3.11.
+#12 45.39 Preparing to unpack .../15-python3.11_3.11.2-6+deb12u8_armhf.deb ...
+#12 45.40 Unpacking python3.11 (3.11.2-6+deb12u8) ...
+#12 45.78 Selecting previously unselected package libpython3-stdlib:armhf.
+#12 45.79 Preparing to unpack .../16-libpython3-stdlib_3.11.2-1+b1_armhf.deb ...
+#12 45.79 Unpacking libpython3-stdlib:armhf (3.11.2-1+b1) ...
+#12 46.09 Setting up python3-minimal (3.11.2-1+b1) ...
+#12 ...
+
+#13 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+#13 36.87 Progress: resolved 3884, reused 0, downloaded 1589, added 557
+#13 37.87 Progress: resolved 3884, reused 0, downloaded 1607, added 561
+#13 38.87 Progress: resolved 3884, reused 0, downloaded 1624, added 564
+#13 39.88 Progress: resolved 3884, reused 0, downloaded 1664, added 576
+#13 40.88 Progress: resolved 3884, reused 0, downloaded 1714, added 592
+#13 41.88 Progress: resolved 3884, reused 0, downloaded 1776, added 602
+#13 44.06 Progress: resolved 3884, reused 0, downloaded 1777, added 602
+#13 45.07 Progress: resolved 3884, reused 0, downloaded 1808, added 607
+#13 46.07 Progress: resolved 3884, reused 0, downloaded 1921, added 614
+#13 47.07 Progress: resolved 3884, reused 0, downloaded 2009, added 622
+#13 ...
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 48.75 Selecting previously unselected package python3.
+#12 48.75 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6929 files and directories currently installed.)
+#12 48.81 Preparing to unpack .../python3_3.11.2-1+b1_armhf.deb ...
+#12 48.91 Unpacking python3 (3.11.2-1+b1) ...
+#12 49.15 Setting up media-types (10.0.0) ...
+#12 49.19 Setting up libkeyutils1:armhf (1.6.3-2) ...
+#12 49.22 Setting up libtirpc-common (1.3.3+ds-1) ...
+#12 49.25 Setting up libsqlite3-0:armhf (3.40.1-2+deb12u2) ...
+#12 49.26 Setting up libkrb5support0:armhf (1.20.1-2+deb12u5) ...
+#12 49.29 Setting up libncursesw6:armhf (6.4-4) ...
+#12 49.31 Setting up libk5crypto3:armhf (1.20.1-2+deb12u5) ...
+#12 49.33 Setting up libkrb5-3:armhf (1.20.1-2+deb12u5) ...
+#12 49.35 Setting up readline-common (8.2-1.3) ...
+#12 49.45 Setting up libreadline8:armhf (8.2-1.3) ...
+#12 49.48 Setting up libgssapi-krb5-2:armhf (1.20.1-2+deb12u5) ...
+#12 49.53 Setting up libtirpc3:armhf (1.3.3+ds-1) ...
+#12 49.56 Setting up libnsl2:armhf (1.3.0-2) ...
+#12 49.63 Setting up libpython3.11-stdlib:armhf (3.11.2-6+deb12u8) ...
+#12 49.72 Setting up libpython3-stdlib:armhf (3.11.2-1+b1) ...
+#12 49.86 Setting up python3.11 (3.11.2-6+deb12u8) ...
+#12 57.20 Setting up python3 (3.11.2-1+b1) ...
+#12 57.42 running python rtupdate hooks for python3.11...
+#12 57.42 running python post-rtupdate hooks for python3.11...
+#12 ...
+
+#13 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+#13 48.07 Progress: resolved 3884, reused 0, downloaded 2100, added 627
+#13 49.07 Progress: resolved 3884, reused 0, downloaded 2189, added 639
+#13 50.07 Progress: resolved 3884, reused 0, downloaded 2256, added 652
+#13 51.07 Progress: resolved 3884, reused 0, downloaded 2259, added 652
+#13 52.07 Progress: resolved 3884, reused 0, downloaded 2345, added 682
+#13 53.07 Progress: resolved 3884, reused 0, downloaded 2471, added 742
+#13 54.07 Progress: resolved 3884, reused 0, downloaded 2546, added 776
+#13 55.08 Progress: resolved 3884, reused 0, downloaded 2610, added 776
+#13 56.08 Progress: resolved 3884, reused 0, downloaded 2675, added 776
+#13 57.08 Progress: resolved 3884, reused 0, downloaded 2732, added 776
+#13 58.08 Progress: resolved 3884, reused 0, downloaded 2733, added 776
+#13 59.08 Progress: resolved 3884, reused 0, downloaded 2747, added 776
+#13 ...
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 60.38 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#12 62.58 useradd warning: runtime's uid 10001 is greater than SYS_UID_MAX 999
+#12 ...
+
+#13 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+#13 60.09 Progress: resolved 3884, reused 0, downloaded 2758, added 776
+#13 61.20 Progress: resolved 3884, reused 0, downloaded 2768, added 776
+#13 62.21 Progress: resolved 3884, reused 0, downloaded 2806, added 776
+#13 63.21 Progress: resolved 3884, reused 0, downloaded 2826, added 776
+#13 64.21 Progress: resolved 3884, reused 0, downloaded 2872, added 776
+#13 65.22 Progress: resolved 3884, reused 0, downloaded 2937, added 785
+#13 66.22 Progress: resolved 3884, reused 0, downloaded 2946, added 788
+#13 68.39 Progress: resolved 3884, reused 0, downloaded 2947, added 788
+#13 69.39 Progress: resolved 3884, reused 0, downloaded 2989, added 799
+#13 70.39 Progress: resolved 3884, reused 0, downloaded 3049, added 826
+#13 71.39 Progress: resolved 3884, reused 0, downloaded 3134, added 864
+#13 72.39 Progress: resolved 3884, reused 0, downloaded 3208, added 886
+#13 ...
+
+#12 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends python3     && rm -rf /var/lib/apt/lists/*     && useradd --system --uid 10001 runtime && mkdir -p /var/lib/attraccess-wago
+#12 DONE 73.8s
+
+#13 [build 4/4] RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+#13 73.39 Progress: resolved 3884, reused 0, downloaded 3263, added 918
+#13 74.39 Progress: resolved 3884, reused 0, downloaded 3359, added 988
+#13 75.40 Progress: resolved 3884, reused 0, downloaded 3488, added 1122
+#13 76.40 Progress: resolved 3884, reused 0, downloaded 3538, added 1165
+#13 77.40 Progress: resolved 3884, reused 0, downloaded 3575, added 1177
+#13 78.46 Progress: resolved 3884, reused 0, downloaded 3604, added 1186
+#13 80.41 Progress: resolved 3884, reused 0, downloaded 3605, added 1186
+#13 81.42 Progress: resolved 3884, reused 0, downloaded 3681, added 1206
+#13 82.42 Progress: resolved 3884, reused 0, downloaded 3736, added 1217
+#13 83.42 Progress: resolved 3884, reused 0, downloaded 3752, added 1264
+#13 84.42 Progress: resolved 3884, reused 0, downloaded 3752, added 1386
+#13 85.42 Progress: resolved 3884, reused 0, downloaded 3753, added 1439
+#13 86.43 Progress: resolved 3884, reused 0, downloaded 3753, added 1645
+#13 87.93 Progress: resolved 3884, reused 0, downloaded 3753, added 1646
+#13 88.93 Progress: resolved 3884, reused 0, downloaded 3753, added 1829
+#13 89.94 Progress: resolved 3884, reused 0, downloaded 3753, added 1929
+#13 90.94 Progress: resolved 3884, reused 0, downloaded 3753, added 2110
+#13 91.94 Progress: resolved 3884, reused 0, downloaded 3753, added 2249
+#13 92.94 Progress: resolved 3884, reused 0, downloaded 3753, added 2531
+#13 93.95 Progress: resolved 3884, reused 0, downloaded 3753, added 2715
+#13 94.95 Progress: resolved 3884, reused 0, downloaded 3753, added 2984
+#13 95.95 Progress: resolved 3884, reused 0, downloaded 3753, added 3156
+#13 96.96 Progress: resolved 3884, reused 0, downloaded 3753, added 3412
+#13 97.96 Progress: resolved 3884, reused 0, downloaded 3753, added 3610
+#13 98.96 Progress: resolved 3884, reused 0, downloaded 3753, added 3688
+#13 99.97 Progress: resolved 3884, reused 0, downloaded 3753, added 3846
+#13 100.7 Progress: resolved 3884, reused 0, downloaded 3753, added 3884, done
+#13 102.3 .../node_modules/@swc/core postinstall$ node postinstall.js
+#13 102.3 .../node_modules/@balena/compose-parser postinstall$ node scripts/fetch-binary.js || npm run build:go
+#13 102.3 .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+#13 102.4 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#13 102.5 .../node_modules/@balena/compose-parser postinstall: Downloading binary from: https://github.com/balena-io-modules/balena-compose-parser/releases/download/v0.3.0/balena-compose-parser-linux-arm64.tar.gz
+#13 102.6 .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+#13 102.6 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#13 102.6 .../node_modules/@nestjs/core postinstall$ opencollective || exit 0
+#13 102.6 .../node_modules/@swc/core postinstall: Done
+#13 102.7 .../node_modules/electron postinstall$ node install.js
+#13 102.7 .../sqlite3@5.1.7/node_modules/sqlite3 install$ prebuild-install -r napi || node-gyp rebuild
+#13 102.7 .../esbuild@0.20.2/node_modules/esbuild postinstall$ node install.js
+#13 102.9 .../esbuild@0.20.2/node_modules/esbuild postinstall: Done
+#13 102.9 .../sqlite3@5.1.7/node_modules/sqlite3 install: (node:110) [DEP0176] DeprecationWarning: fs.R_OK is deprecated, use fs.constants.R_OK instead
+#13 102.9 .../sqlite3@5.1.7/node_modules/sqlite3 install: (Use `node --trace-deprecation ...` to show where the warning was created)
+#13 102.9 .../node_modules/@nestjs/core postinstall:                            Thanks for installing nest 
+#13 102.9 .../node_modules/@nestjs/core postinstall:                  Please consider donating to our open collective
+#13 102.9 .../node_modules/@nestjs/core postinstall:                         to help us maintain this package.
+#13 102.9 .../node_modules/@nestjs/core postinstall:                                          
+#13 102.9 .../node_modules/@nestjs/core postinstall:                         Number of contributors: undefined
+#13 102.9 .../node_modules/@nestjs/core postinstall:                              Number of backers: 1220
+#13 103.0 .../bcrypt@6.0.0/node_modules/bcrypt install$ node-gyp-build
+#13 103.0 .../node_modules/@nestjs/core postinstall:                              Annual budget: $128,793
+#13 103.0 .../node_modules/@nestjs/core postinstall:                              Current balance: $15,294
+#13 103.0 .../node_modules/@nestjs/core postinstall:                                          
+#13 103.0 .../node_modules/@nestjs/core postinstall:              Become a partner: https://opencollective.com/nest/donate
+#13 103.0 .../node_modules/@nestjs/core postinstall:                                          
+#13 103.0 .../node_modules/@nestjs/core postinstall: Done
+#13 103.0 .../bcrypt@6.0.0/node_modules/bcrypt install: Done
+#13 103.0 .../node_modules/@balena/compose-parser postinstall: Extracting binary to /workspace/node_modules/.pnpm/@balena+compose-parser@0.3.0/node_modules/@balena/compose-parser/bin/
+#13 103.1 .../sharp@0.32.6/node_modules/sharp install$ (node install/libvips && node install/dll-copy && prebuild-install) || (node install/can-compile && node-gyp rebuild && node install/dll-copy)
+#13 103.2 .../sharp@0.32.6/node_modules/sharp install: sharp: Downloading https://github.com/lovell/sharp-libvips/releases/download/v8.14.5/libvips-8.14.5-linux-arm64v8.tar.br
+#13 103.3 .../node_modules/@balena/compose-parser postinstall: Binary successfully installed at /workspace/node_modules/.pnpm/@balena+compose-parser@0.3.0/node_modules/@balena/compose-parser/bin/balena-compose-parser
+#13 103.3 .../node_modules/@balena/compose-parser postinstall: Done
+#13 103.8 .../sqlite3@5.1.7/node_modules/sqlite3 install: Done
+#13 107.0 .../sharp@0.32.6/node_modules/sharp install: sharp: Integrity check passed for linux-arm64v8
+#13 107.1 .../sharp@0.32.6/node_modules/sharp install: (node:179) [DEP0176] DeprecationWarning: fs.R_OK is deprecated, use fs.constants.R_OK instead
+#13 107.1 .../sharp@0.32.6/node_modules/sharp install: (Use `node --trace-deprecation ...` to show where the warning was created)
+#13 107.5 .../sharp@0.32.6/node_modules/sharp install: Done
+#13 119.8 .../node_modules/electron postinstall: Done
+#13 120.6 .../node_modules/nx postinstall$ node -e "try{require('./dist/bin/post-install')}catch(e){}"
+#13 121.0 .../node_modules/nx postinstall: Done
+#13 122.2 
+#13 122.2 dependencies:
+#13 122.2 + @7nohe/openapi-react-query-codegen 1.6.2
+#13 122.2 + @dagrejs/dagre 3.1.1
+#13 122.2 + @dnd-kit/core 6.3.1
+#13 122.2 + @dnd-kit/sortable 10.0.0
+#13 122.2 + @dnd-kit/utilities 3.2.2
+#13 122.2 + @eslint/js 9.39.5
+#13 122.2 + @golevelup/ts-jest 3.0.0
+#13 122.2 + @heroui/react 3.2.2
+#13 122.2 + @heroui/styles 3.2.4
+#13 122.2 + @hookform/resolvers 5.7.1
+#13 122.2 + @icons-pack/react-simple-icons 13.13.0
+#13 122.2 + @internationalized/date 3.12.3
+#13 122.2 + @khmyznikov/pwa-install 0.6.4
+#13 122.2 + @licenso/client 1.2.0
+#13 122.2 + @million/lint 1.0.14
+#13 122.2 + @monaco-editor/react 4.7.0
+#13 122.2 + @nestjs-modules/mailer 2.3.7
+#13 122.2 + @nestjs/common 11.1.28
+#13 122.2 + @nestjs/config 4.0.4
+#13 122.2 + @nestjs/core 11.1.28
+#13 122.2 + @nestjs/event-emitter 3.1.0
+#13 122.2 + @nestjs/jwt 11.0.2
+#13 122.2 + @nestjs/passport 11.0.5
+#13 122.2 + @nestjs/platform-express 11.1.28
+#13 122.2 + @nestjs/platform-ws 11.1.28
+#13 122.2 + @nestjs/schedule 6.1.3
+#13 122.2 + @nestjs/schematics 11.1.0
+#13 122.2 + @nestjs/serve-static 5.0.5
+#13 122.2 + @nestjs/swagger 11.4.4
+#13 122.2 + @nestjs/testing 11.1.28
+#13 122.2 + @nestjs/typeorm 11.0.3
+#13 122.2 + @nestjs/websockets 11.1.28
+#13 122.2 + @node-saml/passport-saml 5.1.0
+#13 122.2 + @nx/devkit 22.7.8
+#13 122.2 + @react-stately/data 3.16.1
+#13 122.2 + @rollup/plugin-replace 6.0.3
+#13 122.2 + @simplewebauthn/browser 13.3.0
+#13 122.2 + @simplewebauthn/server 13.3.2
+#13 122.2 + @sumup/sdk 0.1.8
+#13 122.2 + @tailwindcss/typography 0.5.20
+#13 122.2 + @tailwindcss/vite 4.3.3
+#13 122.2 + @tanstack/react-query 5.101.4
+#13 122.2 + @types/decompress 4.2.7
+#13 122.2 + @types/multer 2.2.0
+#13 122.2 + @types/uuid 11.0.0
+#13 122.2 + @xyflow/react 12.11.2
+#13 122.2 + @yudiel/react-qr-scanner 2.6.0
+#13 122.2 + @zxcvbn-ts/core 4.1.2
+#13 122.2 + @zxcvbn-ts/language-common 3.0.4
+#13 122.2 + @zxcvbn-ts/language-de 3.0.2
+#13 122.2 + @zxcvbn-ts/language-en 3.0.2
+#13 122.2 + async-mutex 0.5.0
+#13 122.2 + axios 1.19.0
+#13 122.2 + balena-sdk 23.2.14
+#13 122.2 + bcrypt 6.0.0
+#13 122.2 + class-transformer 0.5.1
+#13 122.2 + class-validator 0.15.1
+#13 122.2 + clsx 2.1.1
+#13 122.2 + cookie-parser 1.4.7
+#13 122.2 + cookie-session 2.1.1
+#13 122.2 + csv 6.6.3
+#13 122.2 + csv-parse 6.2.1
+#13 122.2 + date-fns 4.4.0
+#13 122.2 + decompress 4.2.1
+#13 122.2 + decompress-targz 4.1.1
+#13 122.2 + docsify-cli 4.4.4
+#13 122.2 + esptool-js 0.6.1
+#13 122.2 + express 4.22.2
+#13 122.2 + express-session 1.19.0
+#13 122.2 + fetch-event-stream 0.1.6
+#13 122.2 + fflate 0.8.3
+#13 122.2 + glob 13.0.6
+#13 122.2 + grapesjs 0.23.4
+#13 122.2 + grapesjs-mjml 1.0.8
+#13 122.2 + handlebars 4.7.9
+#13 122.2 + identity-obj-proxy 3.0.0
+#13 122.2 + intl-pluralrules 2.0.1
+#13 122.2 + ioredis 5.11.1
+#13 122.2 + ipaddr.js 2.4.0
+#13 122.2 + jdenticon 3.3.0
+#13 122.2 + js-confetti 0.13.1
+#13 122.2 + lodash-es 4.18.1
+#13 122.2 + lucide-react 1.30.0
+#13 122.2 + mjml 5.4.0
+#13 122.2 + mjml-react 2.0.8
+#13 122.2 + mkcert 3.2.0
+#13 122.2 + mqtt 5.15.2
+#13 122.2 + nanoid 3.3.18
+#13 122.2 + nestjs-asyncapi 1.4.0
+#13 122.2 + new-github-issue-url 1.1.0
+#13 122.2 + nodemailer 9.0.5
+#13 122.2 + otplib 13.4.1
+#13 122.2 + parcel 2.16.4
+#13 122.2 + passport 0.7.0
+#13 122.2 + passport-custom 1.2.1
+#13 122.2 + passport-jwt 4.0.1
+#13 122.2 + passport-local 1.0.0
+#13 122.2 + passport-openidconnect 0.1.2
+#13 122.2 + prom-client 15.1.3
+#13 122.2 + react 19.2.8
+#13 122.2 + react-dom 19.2.8
+#13 122.2 + react-intersection-observer 10.1.0
+#13 122.2 + react-markdown 10.1.0
+#13 122.2 + react-pluggable 0.4.3
+#13 122.2 + react-qrcode-logo 3.0.0
+#13 122.2 + react-router-dom 7.18.2
+#13 122.2 + react-simple-pull-to-refresh 1.3.4
+#13 122.2 + react-toastify 11.1.0
+#13 122.2 + recharts 3.10.1
+#13 122.2 + reflect-metadata 0.2.2
+#13 122.2 + remark-gfm 4.0.1
+#13 122.2 + rxjs 7.8.2
+#13 122.2 + semver 7.8.5
+#13 122.2 + sharp 0.35.3
+#13 122.2 + sonner 2.0.7
+#13 122.2 + spark-md5 3.0.2
+#13 122.2 + sqlite3 5.1.7
+#13 122.2 + swagger-typescript-api 13.12.6
+#13 122.2 + tailwind-merge 3.6.0
+#13 122.2 + tailwindcss 4.3.3
+#13 122.2 + tar 7.5.22
+#13 122.2 + three 0.185.1
+#13 122.2 + tslib 2.8.1
+#13 122.2 + tw-animate-css 1.4.0
+#13 122.2 + typeorm 0.3.31
+#13 122.2 + usb 2.18.0
+#13 122.2 + uuid 14.0.1
+#13 122.2 + web-push 3.6.7
+#13 122.2 + workbox-core 7.4.1
+#13 122.2 + workbox-expiration 7.4.1
+#13 122.2 + workbox-precaching 7.4.1
+#13 122.2 + workbox-routing 7.4.1
+#13 122.2 + workbox-strategies 7.4.1
+#13 122.2 + workbox-window 7.4.1
+#13 122.2 + ws 8.21.3
+#13 122.2 + zod 4.4.3
+#13 122.2 + zustand 5.0.14
+#13 122.2 
+#13 122.2 devDependencies:
+#13 122.2 + @babel/core 7.29.7
+#13 122.2 + @babel/preset-react 7.29.7
+#13 122.2 + @balena/compose-parser 0.3.0
+#13 122.2 + @commitlint/cli 19.8.1
+#13 122.2 + @commitlint/config-conventional 21.2.0
+#13 122.2 + @cyclonedx/cdxgen 12.8.3
+#13 122.2 + @nx/esbuild 22.7.8
+#13 122.2 + @nx/eslint 22.7.8
+#13 122.2 + @nx/eslint-plugin 22.7.8
+#13 122.2 + @nx/jest 22.7.8
+#13 122.2 + @nx/js 22.7.8
+#13 122.2 + @nx/nest 22.7.8
+#13 122.2 + @nx/node 22.7.8
+#13 122.2 + @nx/plugin 22.7.8
+#13 122.2 + @nx/react 22.7.8
+#13 122.2 + @nx/rollup 22.7.8
+#13 122.2 + @nx/vite 22.7.8
+#13 122.2 + @nx/web 22.7.8
+#13 122.2 + @nx/webpack 22.7.8
+#13 122.2 + @nx/workspace 22.7.8
+#13 122.2 + @originjs/vite-plugin-federation 1.4.1
+#13 122.2 + @rolldown/plugin-babel 0.2.4
+#13 122.2 + @rollup/plugin-url 8.0.2
+#13 122.2 + @surma/rollup-plugin-off-main-thread 2.2.3
+#13 122.2 + @svgr/rollup 8.1.0
+#13 122.2 + @swc-node/register 1.12.1
+#13 122.2 + @swc/cli 0.8.1
+#13 122.2 + @swc/core 1.15.47
+#13 122.2 + @swc/helpers 0.5.23
+#13 122.2 + @testing-library/dom 10.4.1
+#13 122.2 + @testing-library/jest-dom 6.9.1
+#13 122.2 + @testing-library/react 16.3.2
+#13 122.2 + @testing-library/user-event 14.6.3
+#13 122.2 + @types/bcrypt 6.0.0
+#13 122.2 + @types/express 4.17.25
+#13 122.2 + @types/express-session 1.19.0
+#13 122.2 + @types/jest 30.0.0
+#13 122.2 + @types/lodash 4.17.25
+#13 122.2 + @types/lodash-es 4.17.12
+#13 122.2 + @types/mjml 5.0.0
+#13 122.2 + @types/node 25.9.5
+#13 122.2 + @types/nodemailer 8.0.1
+#13 122.2 + @types/passport-jwt 4.0.1
+#13 122.2 + @types/passport-local 1.0.38
+#13 122.2 + @types/passport-openidconnect 0.1.3
+#13 122.2 + @types/react 19.2.18
+#13 122.2 + @types/react-dom 19.2.4
+#13 122.2 + @types/semver 7.8.0
+#13 122.2 + @types/spark-md5 3.0.5
+#13 122.2 + @types/supertest 7.2.1
+#13 122.2 + @types/three 0.185.4
+#13 122.2 + @types/w3c-web-serial 1.0.8
+#13 122.2 + @types/web-push 3.6.4
+#13 122.2 + @types/ws 8.18.1
+#13 122.2 + @typescript-eslint/parser 8.64.0
+#13 122.2 + @typescript/typescript6 6.0.2
+#13 122.2 + @vitejs/plugin-react 6.0.5
+#13 122.2 + @vitest/coverage-istanbul 4.1.10
+#13 122.2 + @vitest/coverage-v8 4.1.10
+#13 122.2 + @vitest/ui 4.1.10
+#13 122.2 + autoprefixer 10.5.4
+#13 122.2 + babel-jest 30.4.1
+#13 122.2 + babel-plugin-react-compiler 1.0.0
+#13 122.2 + buffer 6.0.3
+#13 122.2 + core-js 3.50.0
+#13 122.2 + crap-score 1.2.1
+#13 122.2 + electron 34.5.8
+#13 122.2 + electron-builder 25.1.8
+#13 122.2 + esbuild 0.28.2
+#13 122.2 + eslint 9.39.5
+#13 122.2 + eslint-config-prettier 10.1.8
+#13 122.2 + eslint-plugin-import 2.32.0
+#13 122.2 + eslint-plugin-jsx-a11y 6.10.2
+#13 122.2 + eslint-plugin-react 7.37.5
+#13 122.2 + eslint-plugin-react-hooks 7.1.1
+#13 122.2 + happy-dom 20.11.1
+#13 122.2 + husky 9.1.7
+#13 122.2 + ink 7.1.1
+#13 122.2 + istanbul-lib-coverage 3.2.2
+#13 122.2 + istanbul-lib-instrument 6.0.3
+#13 122.2 + jest 30.4.2
+#13 122.2 + jest-environment-jsdom 30.4.1
+#13 122.2 + jest-environment-node 30.4.1
+#13 122.2 + jest-util 30.4.1
+#13 122.2 + jiti 2.7.0
+#13 122.2 + jsdom 29.1.1
+#13 122.2 + jsonc-eslint-parser 3.3.0
+#13 122.2 + lodash 4.18.1
+#13 122.2 + nx 22.7.8
+#13 122.2 + prettier 3.9.6
+#13 122.2 + rollup 4.62.4
+#13 122.2 + stream-browserify 3.0.0
+#13 122.2 + supertest 7.2.2
+#13 122.2 + testcontainers 10.28.0
+#13 122.2 + ts-jest 29.4.12
+#13 122.2 + ts-loader 9.6.2
+#13 122.2 + ts-morph 28.0.0
+#13 122.2 + ts-node 10.9.2
+#13 122.2 + typescript 7.0.2
+#13 122.2 + typescript-eslint 8.64.0
+#13 122.2 + util 0.12.5
+#13 122.2 + verdaccio 6.9.2
+#13 122.2 + vite 8.2.1
+#13 122.2 + vite-plugin-dts 5.0.3
+#13 122.2 + vite-plugin-pwa 1.3.0
+#13 122.2 + vitest 4.1.10
+#13 122.2 + webpack-cli 7.2.2
+#13 122.2 
+#13 122.3 . prepare$ husky
+#13 122.4 . prepare: .git can't be found
+#13 122.4 . prepare: Done
+#13 122.4 ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+#13 122.4 │                                                                              │
+#13 122.4 │   Ignored build scripts: @parcel/watcher@2.5.6, @scarf/scarf@1.4.0,          │
+#13 122.4 │   core-js@2.6.12, core-js@3.50.0, cpu-features@0.0.10, docsify@4.13.1,       │
+#13 122.4 │   es5-ext@0.10.64, less@4.5.1, lmdb@2.8.5, msgpackr-extract@3.0.3,           │
+#13 122.4 │   protobufjs@7.6.4, puppeteer@14.4.1, ssh2@1.17.0, unrs-resolver@1.12.2,     │
+#13 122.4 │   usb@2.18.0.                                                                │
+#13 122.4 │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+#13 122.4 │   to run scripts.                                                            │
+#13 122.4 │                                                                              │
+#13 122.4 ╰──────────────────────────────────────────────────────────────────────────────╯
+#13 122.4 Done in 2m 1.4s using pnpm v10.34.5
+#13 126.8 
+#13 126.8  NX   Running target build for project wago-cc100-runtime and 6 tasks it depends on:
+#13 126.8 
+#13 126.8 
+#13 127.5 
+#13 127.5 > nx run plugin-wago:build-backend
+#13 127.5 
+#13 127.5 > node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub
+#13 127.5 
+#13 127.5 
+#13 127.5   package/dist/index.js  2.5mb ⚠️
+#13 127.5 
+#13 127.5 ⚡ Done in 531ms
+#13 127.5 
+#13 127.5   package/dist/migrations.js  19.1kb
+#13 127.5 
+#13 127.5 ⚡ Done in 7ms
+#13 127.5 Built package/dist/index.js, package/dist/migrations.js — host-shared packages externalized, not bundled.
+#13 130.5 
+#13 130.5 > nx run shared:build
+#13 130.5 
+#13 130.5 Compiling TypeScript files for project "shared"...
+#13 130.5 Done compiling TypeScript files for project "shared".
+#13 137.4 
+#13 137.4 > nx run plugin-wago:build-frontend
+#13 137.4 
+#13 137.4 > pnpm exec vite build --config frontend/vite.config.ts
+#13 137.4 
+#13 137.4 [33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+#13 137.4   - ESM syntax in a file loaded as CommonJS (frontend/vite.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+#13 137.4 Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+#13 137.4 [36mvite v8.2.1 [32mbuilding client environment for production...[36m[39m
+#13 137.4 [2Ktransforming...[32m✓[0m 3556 modules transformed.
+#13 137.4 rendering chunks...
+#13 137.4 computing gzip size...
+#13 137.4 [2mpackage/frontend/[0m[32mindex.html                                   [0m[1;2m  0.16 kB[0m[2m │ gzip:  0.13 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[35mstyle.css                                    [0m[1;2m 10.58 kB[0m[2m │ gzip:  2.30 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36m__federation_fn_import-DAGm_xmC.js           [0m[1;2m  0.24 kB[0m[2m │ gzip:  0.15 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36mrolldown-runtime-DC62tzP2.js                 [0m[1;2m  1.44 kB[0m[2m │ gzip:  0.67 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36mjsx-runtime-DFPsoQIN.js                      [0m[1;2m  1.49 kB[0m[2m │ gzip:  0.67 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36mpreload-helper-DxWiKyOd.js                   [0m[1;2m  2.18 kB[0m[2m │ gzip:  0.99 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36mremoteEntry.js                               [0m[1;2m  2.97 kB[0m[2m │ gzip:  1.26 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36m_virtual___federation_fn_import-BXODRNto.js  [0m[1;2m 11.60 kB[0m[2m │ gzip:  2.83 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36mreact-Cr_hTkIJ.js                            [0m[1;2m 15.76 kB[0m[2m │ gzip:  4.31 kB[0m
+#13 137.4 [2mpackage/frontend/[0m[36m__federation_expose_Plugin-BoHSTQq7.js       [0m[1;2m312.33 kB[0m[2m │ gzip: 63.02 kB[0m
+#13 137.4 
+#13 137.4 [32m✓ built in 8.26s[39m
+#13 137.4 [33m[33m[PLUGIN_TIMINGS] [0mYour build spent 83% of 8.2s inside plugin hooks (6.9s).
+#13 137.4 Measured inside the callback, so queue time is excluded and time the callback itself awaited is not:
+#13 137.4   - originjs:federation transform (45%, 3.7s, 3556 calls)
+#13 137.4   - vite:css transform (30%, 2.4s, 1 call)
+#13 137.4   - vite:build-html transform (15%, 1.3s, 1 call)
+#13 137.4 See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+#13 137.4 [39m
+#13 137.7 
+#13 137.7 > nx run plugin-wago:build
+#13 137.7 
+#13 137.7 > node -e "for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)"
+#13 137.7 
+#13 138.2 
+#13 138.2 > nx run database-entities:build
+#13 138.2 
+#13 138.2 Compiling TypeScript files for project "database-entities"...
+#13 138.2 Done compiling TypeScript files for project "database-entities".
+#13 140.0 
+#13 140.0 > nx run plugins-backend-sdk:build
+#13 140.0 
+#13 140.0 Compiling TypeScript files for project "plugins-backend-sdk"...
+#13 140.0 Done compiling TypeScript files for project "plugins-backend-sdk".
+#13 140.0 
+#13 140.0 > nx run wago-cc100-runtime:build
+#13 140.0 
+#13 142.6 
+#13 142.6 
+#13 142.6 
+#13 142.6  NX   Successfully ran target build for project wago-cc100-runtime and 6 tasks it depends on
+#13 142.6 
+#13 142.6 
+#13 DONE 148.4s
+
+#14 [stage-1 4/6] COPY --from=build /workspace/dist/apps/wago-cc100-runtime ./
+#14 DONE 0.2s
+
+#15 [stage-1 5/6] COPY --from=build /workspace/apps/plugins/wago/cc100-runtime/manifest.json ./manifest.json
+#15 DONE 0.0s
+
+#16 [stage-1 6/6] RUN chown -R runtime:runtime /app /var/lib/attraccess-wago
+#16 DONE 0.2s
+
+#17 exporting to oci image format
+#17 exporting layers
+#17 exporting layers 1.5s done
+#17 exporting manifest sha256:6749fb2f028316d598f062ba09b3eb87994b29d04fe6d653d812748f47b62018
+#17 exporting manifest sha256:6749fb2f028316d598f062ba09b3eb87994b29d04fe6d653d812748f47b62018 0.0s done
+#17 exporting config sha256:9733f7f9307b8a87d071f4c950821a76dd1573b151b1d74fe06dfccd757ac356 0.0s done
+#17 sending tarball
+#17 sending tarball 1.7s done
+#17 DONE 3.2s
+
+#18 importing to docker
+#18 DONE 0.1s
