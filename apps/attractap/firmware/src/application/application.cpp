@@ -134,6 +134,7 @@ void Application::setup() {
         }
 
         if (response.keyLen != 16) {
+          State::setUserLanguage("");
           this->logger.error("Invalid key bytes provided");
           this->beeper.errorBeep();
           this->nfc.enableCardDetection();

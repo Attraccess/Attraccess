@@ -172,7 +172,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "READER_LANGUAGE") == 0)
     {
         const char *language = inboundDoc["data"]["payload"]["language"].as<const char *>();
-        State::setDefaultLanguage(language && strcmp(language, "de") == 0 ? "de" : "en");
+        State::setDefaultLanguage(language ? language : "en");
     }
     else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
     {

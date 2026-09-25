@@ -5,6 +5,9 @@
 #include "../state/state.hpp"
 
 void Application::processCardAuthenticationData() {
+  // A card that fails NFC verification must not inherit the language of the
+  // previous cardholder while its error screen is shown.
+  State::setUserLanguage("");
   this->logger.infof("Trying to authenticate with keyNo: %u",
                      this->cardAuthenticationData.keyNo);
   if (this->cardAuthenticationData.keyLen != 16) {

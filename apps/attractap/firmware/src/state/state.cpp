@@ -197,7 +197,9 @@ void State::setApiState(bool authenticated, std::string deviceName, std::string 
     StateLock lock(state_mutex);
     api_authenticated = authenticated;
     api_device_name = deviceName;
-    if (defaultLanguage == "en" || defaultLanguage == "de") active_default_language = defaultLanguage;
+    // An empty value means a connectivity transition. Keep the last server
+    // setting so the offline/unauthenticated screens do not jump to German.
+    if (!defaultLanguage.empty()) setDefaultLanguage(defaultLanguage);
     if (!authenticated)
     {
         active_user_language = "en";
@@ -222,13 +224,25 @@ void State::setUserLanguage(std::string language)
 {
     StateLock lock(state_mutex);
     user_authenticated = !language.empty();
-    active_user_language = language == "de" ? "de" : "en";
+    for (char &character : language)
+    {
+        if (character == '_') character = '-';
+        else if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
+    }
+    const std::string baseLanguage = language.substr(0, language.find('-'));
+    active_user_language = baseLanguage == "de" ? "de" : "en";
 }
 
 void State::setDefaultLanguage(std::string language)
 {
     StateLock lock(state_mutex);
-    active_default_language = language == "de" ? "de" : "en";
+    for (char &character : language)
+    {
+        if (character == '_') character = '-';
+        else if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
+    }
+    const std::string baseLanguage = language.substr(0, language.find('-'));
+    active_default_language = baseLanguage == "de" ? "de" : "en";
 }
 
 std::string State::getActiveLanguage()

@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "platform.hpp"
+#include "state/state.hpp"
 
 static SemaphoreHandle_t s_i2cBusMutex = nullptr;
 static i2c_master_bus_handle_t s_i2cBus = nullptr;
@@ -339,49 +340,53 @@ time_t parseIso8601ToTimeT(const std::string &iso8601)
 
 std::string translateReaderError(const std::string &errorKey)
 {
+    const bool english = State::getActiveLanguage() == "en";
+    // Reader protocol error catalog. Keep the German wording as the canonical
+    // fallback for older servers while resolving every known code to English.
+    //
     // Card / enrollment errors
     if (errorKey == "USER_NOT_SET")
-        return "Kein Benutzer ausgewählt";
+        return english ? "No user selected" : "Kein Benutzer ausgewählt";
     if (errorKey == "INVALID_PARAMS")
-        return "Ungültige Anfrage";
+        return english ? "Invalid request" : "Ungültige Anfrage";
     if (errorKey == "CARD_ALREADY_ENROLLED")
-        return "Karte ist bereits registriert";
+        return english ? "Card is already registered" : "Karte ist bereits registriert";
     if (errorKey == "ENROLL_NEW_CARD_DATA_NOT_SET")
-        return "Registrierungsdaten fehlen";
+        return english ? "Enrollment data is missing" : "Registrierungsdaten fehlen";
     if (errorKey == "KEY_NOT_SET")
-        return "Schlüssel fehlt";
+        return english ? "Key is missing" : "Schlüssel fehlt";
     if (errorKey == "USER_NOT_FOUND")
-        return "Benutzer nicht gefunden";
+        return english ? "User not found" : "Benutzer nicht gefunden";
     if (errorKey == "RESET_NFC_CARD_DATA_NOT_SET")
-        return "Daten zum Zurücksetzen fehlen";
+        return english ? "Reset data is missing" : "Daten zum Zurücksetzen fehlen";
     if (errorKey == "INVALID_UID")
-        return "Ungültige Karten-UID";
+        return english ? "Invalid card UID" : "Ungültige Karten-UID";
     if (errorKey == "CARD_NOT_FOUND")
-        return "Karte nicht gefunden";
+        return english ? "Card not found" : "Karte nicht gefunden";
     if (errorKey == "CARD_NOT_ACTIVE")
-        return "Karte ist nicht aktiv";
+        return english ? "Card is inactive" : "Karte ist nicht aktiv";
 
     // Resource usage / session errors
     if (errorKey == "INVALID_RESOURCE_ID")
-        return "Ungültige Ressource";
+        return english ? "Invalid resource" : "Ungültige Ressource";
     if (errorKey == "READER_NOT_FOUND")
-        return "Leser nicht gefunden";
+        return english ? "Reader not found" : "Leser nicht gefunden";
     if (errorKey == "RESOURCE_NOT_ASSOCIATED_WITH_READER")
-        return "Ressource ist diesem Leser nicht zugeordnet";
+        return english ? "Resource is not assigned to this reader" : "Ressource ist diesem Leser nicht zugeordnet";
     if (errorKey == "USER_NOT_AUTHENTICATED")
-        return "Nicht angemeldet";
+        return english ? "Not signed in" : "Nicht angemeldet";
     if (errorKey == "INSUFFICIENT_BALANCE")
-        return "Guthaben reicht nicht aus";
+        return english ? "Insufficient balance" : "Guthaben reicht nicht aus";
 
     // Billing / top-up errors
     if (errorKey == "SUMUP_NOT_ENABLED")
-        return "Bezahlung nicht aktiviert";
+        return english ? "Payments are not enabled" : "Bezahlung nicht aktiviert";
     if (errorKey == "INVALID_AMOUNT")
-        return "Ungültiger Betrag";
+        return english ? "Invalid amount" : "Ungültiger Betrag";
     if (errorKey == "NO_SUMUP_TERMINALS_AVAILABLE")
-        return "Kein Zahlungsterminal verfügbar";
+        return english ? "No payment terminal available" : "Kein Zahlungsterminal verfügbar";
     if (errorKey == "SUMUP_TOPUP_FAILED")
-        return "Aufladung fehlgeschlagen";
+        return english ? "Top-up failed" : "Aufladung fehlgeschlagen";
 
     // Unknown key or free-form server message: surface the raw value so the
     // information is not lost (e.g. door errors sent as free-form text).

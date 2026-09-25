@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AppSettingsForm } from './index';
 const state = vi.hoisted(() => ({
@@ -83,6 +83,21 @@ it('validates the wizard URL and advances after first-time setup succeeds', () =
   act(() => state.options.onSuccess());
   expect(next).toHaveBeenCalledOnce();
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['setup-status'] });
+});
+it('suggests German for a German setup browser locale and English for unsupported locales', () => {
+  const language = Object.getOwnPropertyDescriptor(window.navigator, 'language');
+  try {
+    Object.defineProperty(window.navigator, 'language', { configurable: true, value: 'de-AT' });
+    const german = render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
+    expect(screen.getByLabelText('inputs.attractapLanguage.label')).toHaveValue('de');
+    german.unmount();
+
+    Object.defineProperty(window.navigator, 'language', { configurable: true, value: 'fr-CA' });
+    render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
+    expect(screen.getByLabelText('inputs.attractapLanguage.label')).toHaveValue('en');
+  } finally {
+    if (language) Object.defineProperty(window.navigator, 'language', language);
+  }
 });
 it('shows loading state before settings arrive', () => {
   state.loading = true;
