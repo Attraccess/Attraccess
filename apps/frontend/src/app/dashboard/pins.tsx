@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { DashboardService } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -9,13 +9,15 @@ export type Pin = { itemType: 'page' | 'resource'; itemId: string; resourceName?
 const key = ['dashboard', 'pins'];
 const changedEvent = 'attraccess:dashboard-pins-changed';
 const getPins = async (): Promise<Pin[]> => (await DashboardService.dashboardGetPins()) as unknown as Pin[];
-const savePins = async (items: Pin[]): Promise<Pin[]> => {
-  const saved = (await DashboardService.dashboardUpdatePins({ requestBody: { items: items.map(({ itemType, itemId }) => ({ itemType, itemId })) } })) as unknown as Pin[];
-  return saved.map((pin) => ({ ...pin, resourceName: items.find((item) => item.itemType === pin.itemType && item.itemId === pin.itemId)?.resourceName }));
-};
+export type PinOperation = { kind: 'add' | 'remove' | 'move'; item: Pin; before?: Pin };
+const savePins = async ({ kind, item, before }: PinOperation): Promise<Pin[]> =>
+  (await DashboardService.dashboardUpdatePins({ requestBody: {
+    kind, item: { itemType: item.itemType, itemId: item.itemId },
+    ...(before ? { before: { itemType: before.itemType, itemId: before.itemId } } : {}),
+  } })) as unknown as Pin[];
 let writeQueue = Promise.resolve<unknown>(undefined);
-export async function updateDashboardPins(update: (items: Pin[]) => Pin[]) {
-  const write = writeQueue.then(async () => savePins(update(await getPins())));
+export async function updateDashboardPins(operation: PinOperation) {
+  const write = writeQueue.then(async () => savePins(operation));
   writeQueue = write.catch(() => undefined);
   const items = await write;
   window.dispatchEvent(new CustomEvent(changedEvent, { detail: items }));
@@ -32,12 +34,7 @@ export function useDashboardPins() {
     return () => window.removeEventListener(changedEvent, sync);
   }, [client]);
   const query = useQuery({ queryKey: key, queryFn: getPins });
-  const save = useMutation({ mutationFn: savePins, onSuccess: (items) => {
-    client.setQueryData(key, items);
-    window.dispatchEvent(new CustomEvent(changedEvent, { detail: items }));
-    void client.invalidateQueries({ queryKey: key });
-  } });
-  return { ...query, save };
+  return query;
 }
 export function DashboardPinToggle({ itemType, itemId, label }: Pin & { label: string }) {
   const { t } = useTranslations({ en, de });
@@ -64,9 +61,7 @@ export function DashboardPinToggle({ itemType, itemId, label }: Pin & { label: s
       if (!data) return;
       setIsSaving(true);
       try {
-      const items = await updateDashboardPins((current) => current.some((pin) => pin.itemType === itemType && pin.itemId === itemId)
-        ? current.filter((pin) => !(pin.itemType === itemType && pin.itemId === itemId))
-        : [...current, { itemType, itemId }]);
+        const items = await updateDashboardPins({ kind: pinned ? 'remove' : 'add', item: { itemType, itemId } });
         setData(items);
         window.dispatchEvent(new CustomEvent(changedEvent, { detail: items }));
       } finally { setIsSaving(false); }

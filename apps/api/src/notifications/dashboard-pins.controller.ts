@@ -13,8 +13,8 @@ export class DashboardPinsController {
   @ApiOperation({ summary: 'Get ordered pins for the authenticated user', operationId: 'dashboardGetPins' })
   get(@Req() req: AuthenticatedRequest): Promise<DashboardPinItem[]> { return this.service.get(req.user.id); }
   @Patch()
-  @ApiOperation({ summary: 'Replace ordered pins for the authenticated user', operationId: 'dashboardUpdatePins' })
+  @ApiOperation({ summary: 'Update a pin for the authenticated user', operationId: 'dashboardUpdatePins' })
   update(@Req() req: AuthenticatedRequest, @Body() body: UpdateDashboardPinsDto): Promise<DashboardPinItem[]> {
-    return this.service.replace(req.user.id, body?.items);
+    return this.service.update(req.user.id, body);
   }
 }

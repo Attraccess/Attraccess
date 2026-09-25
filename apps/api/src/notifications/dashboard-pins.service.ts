@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DashboardPin, Resource } from '@attraccess/database-entities';
+import { DashboardPin, Resource, User } from '@attraccess/database-entities';
 import { In, Repository } from 'typeorm';
+import { UpdateDashboardPinsDto } from './dtos/dashboard-pins.dto';
 
 export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string; resourceName?: string };
 const PINNABLE_PAGE_PATHS = new Set([
@@ -44,29 +45,51 @@ export class DashboardPinsService {
       : { itemType, itemId });
   }
 
-  async replace(userId: number, items: DashboardPinItem[]): Promise<DashboardPinItem[]> {
-    if (!Array.isArray(items) || items.length > 200 || items.some((item) => !item || !['page', 'resource'].includes(item.itemType) || typeof item.itemId !== 'string' || !item.itemId.trim())) {
+  async update(userId: number, operation: UpdateDashboardPinsDto): Promise<DashboardPinItem[]> {
+    const kind = operation?.kind;
+    const item = operation?.item;
+    const before = operation?.before;
+    if (!['add', 'remove', 'move'].includes(kind) || !item || !['page', 'resource'].includes(item.itemType) || typeof item.itemId !== 'string' || !item.itemId.trim() ||
+      (before && (!['page', 'resource'].includes(before.itemType) || typeof before.itemId !== 'string' || !before.itemId.trim())) ||
+      (kind !== 'move' && before)) {
       throw new BadRequestException('Invalid dashboard pins');
     }
-    const keys = items.map((item) => `${item.itemType}:${item.itemId}`);
-    if (new Set(keys).size !== keys.length) throw new BadRequestException('Dashboard pins must be unique');
-    if (items.some((item) => item.itemType === 'page' && !isEligiblePagePath(item.itemId))) {
+    if (kind === 'add' && item.itemType === 'page' && !isEligiblePagePath(item.itemId)) {
       throw new BadRequestException('Page is not eligible for dashboard pinning');
     }
-    const resourceIds = items.filter((item) => item.itemType === 'resource').map((item) => Number(item.itemId));
-    if (items.some((item) => item.itemType === 'resource' &&
-      (!Number.isSafeInteger(Number(item.itemId)) || Number(item.itemId) < 1 || String(Number(item.itemId)) !== item.itemId))) {
+    if (kind === 'add' && item.itemType === 'resource' &&
+      (!Number.isSafeInteger(Number(item.itemId)) || Number(item.itemId) < 1 || String(Number(item.itemId)) !== item.itemId)) {
       throw new BadRequestException('Invalid resource pin');
     }
-    if (resourceIds.length) {
-      const found = await this.resources.find({ where: { id: In(resourceIds) } });
-      if (found.length !== resourceIds.length) throw new BadRequestException('Resource does not exist');
+    if (kind === 'add' && item.itemType === 'resource') {
+      const found = await this.resources.find({ where: { id: Number(item.itemId) } });
+      if (!found.length) throw new BadRequestException('Resource does not exist');
     }
+    const key = (pin: DashboardPinItem) => `${pin.itemType}:${pin.itemId}`;
     await this.pins.manager.transaction(async (manager) => {
+      // The user row exists even when no pins do, so it serializes writes from every session.
+      // SQLite does not support SELECT FOR UPDATE; acquire its writer lock before reading.
+      if (manager.connection.options.type === 'sqlite') {
+        await manager.query('UPDATE "user" SET "id" = "id" WHERE "id" = ?', [userId]);
+      } else {
+        await manager.getRepository(User).findOneOrFail({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+      }
       const repo = manager.getRepository(DashboardPin);
+      const current = await repo.find({ where: { userId }, order: { position: 'ASC' } });
+      const next = current.map(({ itemType, itemId }) => ({ itemType, itemId }));
+      const index = next.findIndex((pin) => key(pin) === key(item));
+      if (kind === 'add' && index < 0) next.push(item);
+      if (kind === 'remove' && index >= 0) next.splice(index, 1);
+      if (kind === 'move' && index >= 0) {
+        const [moving] = next.splice(index, 1);
+        const target = before ? next.findIndex((pin) => key(pin) === key(before)) : -1;
+        next.splice(target < 0 ? next.length : target, 0, moving);
+      }
+      if (next.length > 200) throw new BadRequestException('Invalid dashboard pins');
+      if (next.length === current.length && next.every((pin, position) => key(pin) === key(current[position]))) return;
       await repo.delete({ userId });
-      if (items.length) await repo.insert(items.map(({ itemType, itemId }, position) => ({ userId, itemType, itemId, position })));
+      if (next.length) await repo.insert(next.map(({ itemType, itemId }, position) => ({ userId, itemType, itemId, position })));
     });
-    return items;
+    return this.get(userId);
   }
 }

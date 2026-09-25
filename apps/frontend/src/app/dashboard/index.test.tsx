@@ -191,7 +191,7 @@ describe('Dashboard', () => {
     expect(await screen.findByText('Resources landing')).toBeInTheDocument();
   });
 
-  it('does not send a second full-list update while removal is pending', async () => {
+  it('sends individual removal operations without replacing other pins', async () => {
     getPins.mockResolvedValue([page('/projects'), page('/messages')]);
     let finish!: (items: unknown[]) => void;
     updatePins.mockImplementation(
@@ -204,7 +204,7 @@ describe('Dashboard', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Unpin Projects' }));
     fireEvent.click(screen.getByRole('button', { name: 'Unpin Messages' }));
     await waitFor(() => expect(updatePins).toHaveBeenCalledTimes(1));
-    expect(updatePins).toHaveBeenCalledWith({ requestBody: { items: [page('/messages')] } });
+    expect(updatePins).toHaveBeenCalledWith({ requestBody: { kind: 'remove', item: page('/projects') } });
     finish([page('/messages')]);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Unpin Messages' })).toBeEnabled());
   });

@@ -74,15 +74,12 @@ function DashboardPage() {
     const source = pins.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === from);
     const target = pins.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === to);
     if (source < 0 || target < 0 || source === target) return;
-    void updateDashboardPins((current) => {
-      const fromIndex = current.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === from);
-      const toIndex = current.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === to);
-      if (fromIndex < 0 || toIndex < 0) return current;
-      const ordered = [...current]; const [entry] = ordered.splice(fromIndex, 1); ordered.splice(toIndex, 0, entry);
-      return ordered;
-    });
+    const ordered = [...pins];
+    const [item] = ordered.splice(source, 1);
+    ordered.splice(target, 0, item);
+    void updateDashboardPins({ kind: 'move', item, before: ordered[target + 1] });
   };
-  const removePin = (pin: Pin) => void updateDashboardPins((current) => current.filter((item) => item.itemType !== pin.itemType || item.itemId !== pin.itemId));
+  const removePin = (pin: Pin) => void updateDashboardPins({ kind: 'remove', item: pin });
 
   return <section className="p-6">
     <header className="mb-6 flex items-center gap-3"><LayoutDashboardIcon /><div><h1 className="text-2xl font-semibold">{t('title')}</h1><p className="text-sm text-muted">{t('subtitle')}</p></div></header>

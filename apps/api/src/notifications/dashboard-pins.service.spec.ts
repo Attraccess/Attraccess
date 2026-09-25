@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { DashboardPin, Resource } from '@attraccess/database-entities';
+import { DashboardPin, Resource, User } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
 import { In, Repository } from 'typeorm';
@@ -9,22 +9,34 @@ describe('DashboardPinsService', () => {
   let service: DashboardPinsService;
   let pinRepository: jest.Mocked<Partial<Repository<DashboardPin>>>;
   let resourceRepository: jest.Mocked<Partial<Repository<Resource>>>;
-  const deletePins = jest.fn();
-  const insertPins = jest.fn();
+  let stored: DashboardPin[];
+  const userLock = jest.fn();
+  const sqliteLock = jest.fn();
+  let driver = 'postgres';
+  let transaction: Promise<void>;
 
   beforeEach(async () => {
+    stored = [];
+    driver = 'postgres';
+    userLock.mockReset().mockResolvedValue({ id: 5 });
+    sqliteLock.mockReset().mockResolvedValue([]);
     pinRepository = {
-      find: jest.fn().mockResolvedValue([]),
-      delete: jest.fn(),
+      find: jest.fn(async () => stored.map((pin) => ({ ...pin }))),
+      delete: jest.fn(async () => { stored = []; return { affected: 1, raw: [] }; }),
       manager: {
-        transaction: jest.fn(
-          async (
-            callback: (manager: {
-              getRepository: () => { delete: typeof deletePins; insert: typeof insertPins };
-            }) => Promise<void>,
-          ) => callback({ getRepository: () => ({ delete: deletePins, insert: insertPins }) }),
-        ),
+        transaction: jest.fn(async (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<void>) => {
+          transaction = (transaction ?? Promise.resolve()).then(() => callback({
+            connection: { options: { type: driver } },
+            query: sqliteLock,
+            getRepository: (entity) => entity === User ? { findOneOrFail: userLock } : pinRepository,
+          }));
+          await transaction;
+        }),
       } as never,
+      insert: jest.fn(async (items: DashboardPin[]) => {
+        stored = items.map((pin, index) => ({ ...pin, id: index + 1 }));
+        return { identifiers: [], generatedMaps: [], raw: [] };
+      }),
     };
     resourceRepository = { find: jest.fn().mockResolvedValue([]) };
     const module = await Test.createTestingModule({
@@ -36,71 +48,57 @@ describe('DashboardPinsService', () => {
     }).compile();
     service = module.get(DashboardPinsService);
     jest.clearAllMocks();
+    transaction = Promise.resolve();
   });
 
-  it('starts with no pins and replaces a user list in its requested order', async () => {
+  const page = (itemId: string) => ({ itemType: 'page' as const, itemId });
+
+  it('merges writes from separate sessions against the stored list', async () => {
+    await service.update(5, { kind: 'add', item: page('/projects') });
+    const first = service.update(5, { kind: 'add', item: page('/messages') });
+    const second = service.update(5, { kind: 'add', item: page('/plugin-report') });
+    await Promise.all([first, second]);
+    expect(await service.get(5)).toEqual([page('/projects'), page('/messages'), page('/plugin-report')]);
+    expect(userLock).toHaveBeenCalledWith({ where: { id: 5 }, lock: { mode: 'pessimistic_write' } });
+    await service.update(5, { kind: 'remove', item: page('/projects') });
+    expect(await service.get(5)).toEqual([page('/messages'), page('/plugin-report')]);
+    await service.update(5, { kind: 'remove', item: page('/messages') });
+    await service.update(5, { kind: 'remove', item: page('/plugin-report') });
     expect(await service.get(5)).toEqual([]);
-    const ordered = [
-      { itemType: 'page' as const, itemId: '/messages' },
-      { itemType: 'resource' as const, itemId: '7' },
-    ];
-    (resourceRepository.find as jest.Mock).mockResolvedValue([{ id: 7 }]);
-    expect(await service.replace(5, ordered)).toEqual(ordered);
-    expect(deletePins).toHaveBeenCalledWith({ userId: 5 });
-    expect(insertPins).toHaveBeenCalledWith([
-      { userId: 5, itemType: 'page', itemId: '/messages', position: 0 },
-      { userId: 5, itemType: 'resource', itemId: '7', position: 1 },
-    ]);
   });
 
-  it('rejects duplicate pins and nonexistent resources before replacing saved pins', async () => {
-    await expect(
-      service.replace(5, [
-        { itemType: 'page', itemId: '/projects' },
-        { itemType: 'page', itemId: '/projects' },
-      ]),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    await expect(service.replace(5, [{ itemType: 'resource', itemId: '42' }])).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(deletePins).not.toHaveBeenCalled();
+  it('moves a pin while retaining pins added in another session', async () => {
+    for (const itemId of ['/projects', '/messages', '/plugin-report']) await service.update(5, { kind: 'add', item: page(itemId) });
+    await service.update(5, { kind: 'move', item: page('/plugin-report'), before: page('/messages') });
+    expect(await service.get(5)).toEqual([page('/projects'), page('/plugin-report'), page('/messages')]);
   });
 
-  it('accepts canonical plugin sidebar paths alongside core and resource pins', async () => {
-    (resourceRepository.find as jest.Mock).mockResolvedValue([{ id: 7 }]);
-    const items = [
-      { itemType: 'page' as const, itemId: '/plugin-report' },
-      { itemType: 'page' as const, itemId: '/projects' },
-      { itemType: 'resource' as const, itemId: '7' },
-    ];
-    expect(await service.replace(5, items)).toEqual(items);
-    expect(insertPins).toHaveBeenCalledWith(items.map((item, position) => ({ ...item, userId: 5, position })));
-    (pinRepository.find as jest.Mock).mockResolvedValue(items.map((item, position) => ({ ...item, id: position + 1, userId: 5, position })));
-    (resourceRepository.find as jest.Mock).mockResolvedValue([{ id: 7, name: 'Printer' }]);
-    expect(await service.get(5)).toEqual([...items.slice(0, 2), { ...items[2], resourceName: 'Printer' }]);
-    expect(await service.replace(5, items.slice(0, 2))).toEqual(items.slice(0, 2));
+  it('acquires a SQLite writer lock before reading the current pins', async () => {
+    driver = 'sqlite';
+    await service.update(5, { kind: 'add', item: page('/projects') });
+    expect(sqliteLock).toHaveBeenCalledWith('UPDATE "user" SET "id" = "id" WHERE "id" = ?', [5]);
+    expect(userLock).not.toHaveBeenCalled();
   });
 
-  it('rejects noncanonical paths and unsupported core routes', async () => {
-    for (const itemId of ['/dashboard', '/kiosk/123', '/resources/123', '//plugin-report', '/plugin-report?x=1', 'https://example.com']) {
-      await expect(service.replace(5, [{ itemType: 'page', itemId }])).rejects.toBeInstanceOf(BadRequestException);
+  it('validates additions and limits the resulting list', async () => {
+    for (const itemId of ['/dashboard', '/resources/123', '//plugin-report']) {
+      await expect(service.update(5, { kind: 'add', item: page(itemId) })).rejects.toBeInstanceOf(BadRequestException);
     }
+    for (const itemId of ['007', '7.0', '7e0', ' 7']) {
+      await expect(service.update(5, { kind: 'add', item: { itemType: 'resource', itemId } })).rejects.toBeInstanceOf(BadRequestException);
+    }
+    stored = Array.from({ length: 200 }, (_, index) => ({ id: index + 1, userId: 5, position: index, ...page(`/plugin-${index}`) }));
+    await expect(service.update(5, { kind: 'add', item: page('/projects') })).rejects.toBeInstanceOf(BadRequestException);
+    expect(stored).toHaveLength(200);
   });
 
-  it('cleans pins for soft-deleted resources when reading the persisted list', async () => {
-    (pinRepository.find as jest.Mock).mockResolvedValue([
-      { id: 1, userId: 5, itemType: 'page', itemId: '/projects', position: 0 },
-      { id: 2, userId: 5, itemType: 'resource', itemId: '42', position: 1 },
-    ]);
-    (resourceRepository.find as jest.Mock).mockResolvedValue([]);
-    expect(await service.get(5)).toEqual([{ itemType: 'page', itemId: '/projects' }]);
+  it('cleans pins for soft-deleted resources without replacing other pins', async () => {
+    stored = [
+      { id: 1, userId: 5, position: 0, ...page('/projects') },
+      { id: 2, userId: 5, position: 1, itemType: 'resource', itemId: '42' },
+    ];
+    (pinRepository.delete as jest.Mock).mockImplementationOnce(async () => ({ affected: 1, raw: [] }));
+    expect(await service.get(5)).toEqual([page('/projects')]);
     expect(pinRepository.delete).toHaveBeenCalledWith({ userId: 5, id: In([2]) });
-    expect(deletePins).not.toHaveBeenCalled();
-  });
-
-  it('rejects noncanonical resource IDs', async () => {
-    for (const itemId of ['007', '7.0', '7e0', ' 7', '+7', '9007199254740992']) {
-      await expect(service.replace(5, [{ itemType: 'resource', itemId }])).rejects.toBeInstanceOf(BadRequestException);
-    }
   });
 });

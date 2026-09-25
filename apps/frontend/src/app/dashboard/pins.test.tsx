@@ -35,9 +35,8 @@ describe('DashboardPinToggle', () => {
     const pinButton = await screen.findByRole('button', { name: 'pin Projects' });
     await waitFor(() => expect(pinButton).toBeEnabled());
     fireEvent.click(pinButton);
-    await waitFor(() => expect(updatePins).toHaveBeenCalledWith({ requestBody: { items: [
-      { itemType: 'page', itemId: '/messages' },
-      { itemType: 'page', itemId: '/projects' },
-    ] } }));
+    await waitFor(() => expect(updatePins).toHaveBeenCalledWith({ requestBody: {
+      kind: 'add', item: { itemType: 'page', itemId: '/projects' },
+    } }));
   });
 });
