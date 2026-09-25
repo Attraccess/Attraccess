@@ -28,7 +28,7 @@ export class DashboardPinsService {
       : { itemType, itemId });
   }
 
-  async replace(userId: number, items: DashboardPinItem[], operation?: { kind: 'add' | 'remove' | 'reorder'; item?: DashboardPinItem; order?: string[] }): Promise<DashboardPinItem[]> {
+  async replace(userId: number, items: DashboardPinItem[]): Promise<DashboardPinItem[]> {
     if (!Array.isArray(items) || items.length > 200 || items.some((item) => !item || !['page', 'resource'].includes(item.itemType) || typeof item.itemId !== 'string' || !item.itemId.trim())) {
       throw new BadRequestException('Invalid dashboard pins');
     }
@@ -36,16 +36,6 @@ export class DashboardPinsService {
     if (new Set(keys).size !== keys.length) throw new BadRequestException('Dashboard pins must be unique');
     if (items.some((item) => item.itemType === 'page' && !isPinnablePagePath(item.itemId))) {
       throw new BadRequestException('Page is not eligible for dashboard pinning');
-    }
-    if (operation?.item?.itemType === 'page' && !isPinnablePagePath(operation.item.itemId)) {
-      throw new BadRequestException('Page is not eligible for dashboard pinning');
-    }
-    const operationItem = operation?.item;
-    if (operation?.kind === 'add' && (!operationItem || !items.some((item) => item.itemType === operationItem.itemType && item.itemId === operationItem.itemId))) {
-      throw new BadRequestException('Added pin must be present in the requested list');
-    }
-    if (operation?.kind === 'remove' && operationItem && items.some((item) => item.itemType === operationItem.itemType && item.itemId === operationItem.itemId)) {
-      throw new BadRequestException('Removed pin must be absent from the requested list');
     }
     const resourceIds = items.filter((item) => item.itemType === 'resource').map((item) => Number(item.itemId));
     if (items.some((item) => item.itemType === 'resource' &&
@@ -58,25 +48,8 @@ export class DashboardPinsService {
     }
     await this.pins.manager.transaction(async (manager) => {
       const repo = manager.getRepository(DashboardPin);
-      let nextItems = items;
-      if (operation) {
-        const current = await repo.find({ where: { userId }, order: { position: 'ASC' } });
-        const key = (item: DashboardPinItem) => `${item.itemType}:${item.itemId}`;
-        const item = operation.item;
-        const order = operation.order;
-        if (operation.kind === 'add' && item) {
-          nextItems = current.map(({ itemType, itemId }) => ({ itemType, itemId }));
-          if (!current.some((pin) => key(pin) === key(item))) nextItems.push(item);
-        } else if (operation.kind === 'remove' && item) {
-          nextItems = current.filter((pin) => key(pin) !== key(item)).map(({ itemType, itemId }) => ({ itemType, itemId }));
-        } else if (operation.kind === 'reorder' && order) {
-          const byKey = new Map(current.map((pin) => [key(pin), { itemType: pin.itemType, itemId: pin.itemId }]));
-          nextItems = [...order.flatMap((itemKey) => { const found = byKey.get(itemKey); return found ? [found] : []; }), ...current.filter((pin) => !order.includes(key(pin))).map(({ itemType, itemId }) => ({ itemType, itemId }))];
-        }
-      }
       await repo.delete({ userId });
-      if (nextItems.length) await repo.insert(nextItems.map(({ itemType, itemId }, position) => ({ userId, itemType, itemId, position })));
-      items = nextItems;
+      if (items.length) await repo.insert(items.map(({ itemType, itemId }, position) => ({ userId, itemType, itemId, position })));
     });
     return items;
   }

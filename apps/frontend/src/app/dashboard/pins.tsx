@@ -15,22 +15,7 @@ const savePins = async (items: Pin[]): Promise<Pin[]> => {
 };
 let writeQueue = Promise.resolve<unknown>(undefined);
 export async function updateDashboardPins(update: (items: Pin[]) => Pin[]) {
-  const write = writeQueue.then(async () => {
-    const current = await getPins();
-    const next = update(current);
-    const currentKeys = current.map((pin) => `${pin.itemType}:${pin.itemId}`);
-    const nextKeys = next.map((pin) => `${pin.itemType}:${pin.itemId}`);
-    const added = next.filter((pin) => !currentKeys.includes(`${pin.itemType}:${pin.itemId}`));
-    const removed = current.filter((pin) => !nextKeys.includes(`${pin.itemType}:${pin.itemId}`));
-    const operation = added.length === 1 && removed.length === 0
-      ? { kind: 'add', item: added[0] }
-      : removed.length === 1 && added.length === 0
-        ? { kind: 'remove', item: removed[0] }
-        : currentKeys.length === nextKeys.length && currentKeys.some((item, index) => item !== nextKeys[index])
-          ? { kind: 'reorder', order: nextKeys }
-          : undefined;
-    return (await DashboardService.dashboardUpdatePins({ requestBody: { items: next, ...(operation ? { operation } : {}) } as never })) as unknown as Pin[];
-  });
+  const write = writeQueue.then(async () => savePins(update(await getPins())));
   writeQueue = write.catch(() => undefined);
   const items = await write;
   window.dispatchEvent(new CustomEvent(changedEvent, { detail: items }));

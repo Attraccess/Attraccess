@@ -15,6 +15,6 @@ export class DashboardPinsController {
   @Patch()
   @ApiOperation({ summary: 'Replace ordered pins for the authenticated user', operationId: 'dashboardUpdatePins' })
   update(@Req() req: AuthenticatedRequest, @Body() body: UpdateDashboardPinsDto): Promise<DashboardPinItem[]> {
-    return this.service.replace(req.user.id, body?.items, body?.operation);
+    return this.service.replace(req.user.id, body?.items);
   }
 }

@@ -11,7 +11,6 @@ describe('DashboardPinsService', () => {
   let resourceRepository: jest.Mocked<Partial<Repository<Resource>>>;
   const deletePins = jest.fn();
   const insertPins = jest.fn();
-  const findPins = jest.fn();
 
   beforeEach(async () => {
     pinRepository = {
@@ -21,9 +20,9 @@ describe('DashboardPinsService', () => {
         transaction: jest.fn(
           async (
             callback: (manager: {
-              getRepository: () => { delete: typeof deletePins; insert: typeof insertPins; find: typeof findPins };
+              getRepository: () => { delete: typeof deletePins; insert: typeof insertPins };
             }) => Promise<void>,
-          ) => callback({ getRepository: () => ({ delete: deletePins, insert: insertPins, find: findPins }) }),
+          ) => callback({ getRepository: () => ({ delete: deletePins, insert: insertPins }) }),
         ),
       } as never,
     };
@@ -37,7 +36,6 @@ describe('DashboardPinsService', () => {
     }).compile();
     service = module.get(DashboardPinsService);
     jest.clearAllMocks();
-    findPins.mockResolvedValue([]);
   });
 
   it('starts with no pins and replaces a user list in its requested order', async () => {
@@ -75,19 +73,6 @@ describe('DashboardPinsService', () => {
     for (const itemId of ['/dashboard', '/kiosk', '/kiosk/123', '//external.example']) {
       await expect(service.replace(5, [{ itemType: 'page', itemId }])).rejects.toBeInstanceOf(BadRequestException);
     }
-  });
-
-  it('applies an add operation against the current stored pins', async () => {
-    findPins.mockResolvedValue([{ userId: 5, itemType: 'page', itemId: '/projects', position: 0 }]);
-    const added = { itemType: 'page' as const, itemId: '/hello-world' };
-    expect(await service.replace(5, [added], { kind: 'add', item: added })).toEqual([
-      { itemType: 'page', itemId: '/projects' },
-      added,
-    ]);
-    expect(insertPins).toHaveBeenCalledWith([
-      { userId: 5, itemType: 'page', itemId: '/projects', position: 0 },
-      { userId: 5, itemType: 'page', itemId: '/hello-world', position: 1 },
-    ]);
   });
 
   it('cleans pins for soft-deleted resources when reading the persisted list', async () => {

@@ -31,7 +31,11 @@ function Landing() {
   if (isLoading) return null;
   if (isError) return <div className="p-6"><p>Could not load your dashboard.</p><button onClick={() => void refetch()}>Retry loading pins</button></div>;
   if (!data?.length) return <Navigate to="/resources" replace />;
-  return <DashboardPage />;
+  if (data.some((pin) => pin.itemType === 'resource')) return <DashboardPage />;
+  if (isLicenseLoading) return null;
+  if (entries.length) return <DashboardPage />;
+  if (!pluginsInitialized) return null;
+  return <Navigate to="/resources" replace />;
 }
 
 type PageEntry = { pin: Pin; path: string; title: string; icon?: React.ReactNode; badgeCount?: number };
