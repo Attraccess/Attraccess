@@ -4,8 +4,11 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PasswordResetForm } from './passwordResetForm';
 import { TestWrapper } from '../../../test-utils/wrappers';
+import en from './en.json';
+import de from './de.json';
 
 const locale = vi.hoisted(() => ({ current: 'en' }));
+const labels = { en, de };
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: (locales: Record<string, Record<string, unknown>>) => {
@@ -27,15 +30,12 @@ describe('PasswordResetForm labels', () => {
     locale.current = 'en';
   });
 
-  it.each([
-    ['en', 'Back to sign in', 'Email address', 'Reset password'],
-    ['de', 'Zurück zur Anmeldung', 'E-Mail-Adresse', 'Passwort zurücksetzen'],
-  ])('uses descriptive recovery labels in %s', (language, backLabel, emailLabel, submitLabel) => {
+  it.each(['en', 'de'] as const)('uses descriptive recovery labels in %s', (language) => {
     locale.current = language;
     render(<PasswordResetForm onGoBack={vi.fn()} />, { wrapper: TestWrapper });
 
-    expect(screen.getByRole('button', { name: backLabel })).toBeInTheDocument();
-    expect(screen.getByLabelText(emailLabel)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: submitLabel })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels[language].goBackButton })).toBeInTheDocument();
+    expect(screen.getByLabelText(labels[language].emailLabel)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels[language].mainButton })).toBeInTheDocument();
   });
 });

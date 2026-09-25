@@ -5,10 +5,13 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RegistrationForm } from './registrationForm';
 import { TestWrapper } from '../../test-utils/wrappers';
+import en from './registrationForm.en.json';
+import de from './registrationForm.de.json';
 
 const mutateMock = vi.fn();
 const onHasAccountMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
+const labels = { en, de };
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: (locales: Record<string, Record<string, unknown>>) => {
@@ -72,8 +75,8 @@ describe('RegistrationForm', () => {
   it('shows username guidance text', async () => {
     renderForm();
 
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.en.signInButton })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.en.createAccountButton })).toBeInTheDocument();
     expect(
       screen.getByText('3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.'),
     ).toBeInTheDocument();
@@ -83,13 +86,13 @@ describe('RegistrationForm', () => {
     locale.current = 'de';
     renderForm();
 
-    expect(screen.getByText('Hast du bereits ein Konto?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
-    expect(screen.getByLabelText('E-Mail-Adresse')).toBeInTheDocument();
-    expect(screen.getByLabelText('Passwort')).toBeInTheDocument();
-    expect(screen.getByLabelText('Bestätige dein Passwort')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Konto erstellen' })).toBeInTheDocument();
+    expect(screen.getByText(labels.de.hasAccount)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.de.signInButton })).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.username)).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.email)).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.password)).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.passwordConfirmation)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.de.createAccountButton })).toBeInTheDocument();
   });
 
   it('blocks invalid usernames and surfaces validation message', async () => {

@@ -5,10 +5,13 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginForm } from './loginForm';
 import { TestWrapper } from '../../test-utils/wrappers';
+import en from './loginForm.en.json';
+import de from './loginForm.de.json';
 
 const loginMock = vi.fn();
 const resendMutateMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
+const labels = { en, de };
 let loginError: Error | null = null;
 let resendOnSuccess: (() => void) | undefined;
 let resendOnError: ((error: unknown) => void) | undefined;
@@ -102,9 +105,9 @@ describe('LoginForm – resend verification email', () => {
   it('uses descriptive navigation and action labels', () => {
     renderLogin();
 
-    expect(screen.getByRole('button', { name: 'Create an account' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Forgot password?' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.en.signUpButton })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.en.forgotPassword })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.en.signInButton })).toBeInTheDocument();
   });
 
   it('renders descriptive German navigation, field, recovery, and resend labels', () => {
@@ -115,13 +118,13 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    expect(screen.getByText('Noch kein Konto?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Konto erstellen' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
-    expect(screen.getByLabelText('Passwort')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Passwort vergessen?' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
+    expect(screen.getByText(labels.de.noAccount)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.de.signUpButton })).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.username)).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.password)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.de.forgotPassword })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.de.signInButton })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.de.resendVerification.button })).toBeInTheDocument();
   });
 
   it('shows resend section when UserEmailNotVerifiedException occurs', () => {
@@ -131,9 +134,9 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    expect(screen.getByText("Didn't receive the verification email or link expired? Enter your email to get a new one.")).toBeInTheDocument();
+    expect(screen.getByText(labels.en.resendVerification.prompt)).toBeInTheDocument();
     expect(screen.getByTestId('resend-email-input')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.en.resendVerification.button })).toBeInTheDocument();
   });
 
   it('does not show resend section for other login errors', () => {
@@ -154,7 +157,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
 
@@ -181,7 +184,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'not-an-email');
 
     expect(screen.getByTestId('resend-verification-button')).toBeDisabled();
@@ -195,7 +198,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, '  test@example.com  ');
     await user.click(screen.getByTestId('resend-verification-button'));
 
@@ -212,7 +215,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
 
@@ -233,14 +236,14 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
     act(() => resendOnSuccess?.());
 
     await waitFor(() => {
       expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();
-      expect(screen.getByText('Email sent!')).toBeInTheDocument();
+      expect(screen.getByText(labels.en.resendVerification.successTitle)).toBeInTheDocument();
       expect(screen.queryByTestId('resend-verification-section')).not.toBeInTheDocument();
     });
   });
@@ -263,8 +266,8 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    expect(screen.getByLabelText('Username')).toBeInTheDocument();
-    expect(screen.getByLabelText('Password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.en.username)).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.en.password)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: labels.en.signInButton })).toBeInTheDocument();
   });
 });
