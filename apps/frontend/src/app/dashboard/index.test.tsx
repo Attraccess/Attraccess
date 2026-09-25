@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardLanding, DashboardPage } from './index';
 import usePluginState from '../plugins/plugin.state';
 
-const { getPins, updatePins } = vi.hoisted(() => ({ getPins: vi.fn(), updatePins: vi.fn() }));
+const { getPins, updatePins, hasPermission } = vi.hoisted(() => ({ getPins: vi.fn(), updatePins: vi.fn(), hasPermission: vi.fn() }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
   DashboardService: { dashboardGetPins: getPins, dashboardUpdatePins: updatePins },
@@ -24,11 +24,12 @@ vi.mock('../routes', () => ({
     const plugins = usePluginState((state) => state.plugins);
     return [
       ...['/projects', '/messages', '/devices/companion', '/printables'].map((path) => ({ path, authRequired: true })),
+      { path: '/users', authRequired: 'users.read' },
       ...plugins.flatMap((manifest) => manifest.plugin.getRoutes?.() ?? []),
     ];
   },
 }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission }) }));
 vi.mock('../layout/sidebarItems', async (importOriginal) => {
   const original = await importOriginal<typeof import('../layout/sidebarItems')>();
   return { ...original, useSidebarItems: () => original.SIDEBAR_ITEMS, buildSidebarEndItems: () => original.buildSidebarEndItems('', '') };
@@ -50,6 +51,7 @@ describe('Dashboard', () => {
   beforeEach(() => {
     getPins.mockReset();
     updatePins.mockReset();
+    hasPermission.mockReset().mockReturnValue(true);
     usePluginState.setState({ plugins: [], isInitialized: true });
   });
 
@@ -73,6 +75,33 @@ describe('Dashboard', () => {
     mount(<DashboardPage />);
     expect(await screen.findByRole('button', { name: 'Unpin /uninstalled-plugin' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No available shortcuts' })).toBeInTheDocument();
+  });
+
+  it('falls back to resources when the only pinned page requires a revoked permission', async () => {
+    hasPermission.mockReturnValue(false);
+    getPins.mockResolvedValue([page('/users')]);
+    mount(
+      <Routes>
+        <Route path="/" element={<DashboardLanding />} />
+        <Route path="/resources" element={<span>Resources landing</span>} />
+      </Routes>,
+    );
+    expect(await screen.findByText('Resources landing')).toBeInTheDocument();
+    expect(hasPermission).toHaveBeenCalledWith('users.read');
+  });
+
+  it('lands on the dashboard when another pinned page is accessible despite a revoked permission', async () => {
+    hasPermission.mockReturnValue(false);
+    getPins.mockResolvedValue([page('/users'), page('/projects')]);
+    mount(
+      <Routes>
+        <Route path="/" element={<DashboardLanding />} />
+        <Route path="/resources" element={<span>Resources landing</span>} />
+      </Routes>,
+    );
+    expect(await screen.findByRole('link', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
   });
 
   it('renders resource names from the batched pins response without resource detail requests', async () => {
