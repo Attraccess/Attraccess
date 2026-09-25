@@ -16,6 +16,7 @@ import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import usePluginState from '../plugins/plugin.state';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -26,27 +27,21 @@ import { StatusChip } from '../resourceOverview/resourceGroupCard/statusChip';
 import { ResourceUsageSession } from '../resources/usage/components';
 
 function Landing() {
-  const { data, isLoading, isError } = useDashboardPins();
+  const { data, isLoading, isError, refetch } = useDashboardPins();
   if (isLoading) return null;
-  if (isError) return <p className="p-6">Could not load your dashboard.</p>;
+  if (isError) return <div className="p-6"><p>Could not load your dashboard.</p><button onClick={() => void refetch()}>Retry loading pins</button></div>;
   if (!data?.length) return <Navigate to="/resources" replace />;
   return <DashboardPage />;
 }
 
-type NavEntry = { path: string; title: string; icon?: React.ReactNode; badgeCount?: number };
-function DashboardPage() {
-  const { t } = useTranslations({ en, de });
+type PageEntry = { pin: Pin; path: string; title: string; icon?: React.ReactNode; badgeCount?: number };
+function usePageEntries(pins: Pin[]): PageEntry[] {
   const { t: sidebarT } = useTranslations({ en: sidebarEn, de: sidebarDe });
   const routes = useAllRoutes();
   const { plugins } = usePluginState();
   const sidebarItems = useSidebarItems();
   const { hasPermission } = useAuth();
-  const { data: pins = [] } = useDashboardPins();
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
-  );
-  const entries = useMemo(() => {
+  return useMemo(() => {
     const all: {
       path: string;
       translationKey?: string;
@@ -83,18 +78,12 @@ function DashboardPage() {
           isExternal: false,
         })),
     );
-    return pins.flatMap((pin): (NavEntry & { pin: Pin })[] => {
+    return pins.flatMap((pin): PageEntry[] => {
       if (pin.itemType !== 'page') return [];
       const item = all.find((entry) => entry.path === pin.itemId);
+      if (!item) return [];
       const route = routes.find((candidate) => candidate.path === pin.itemId);
-      if (!item || item.isExternal) return [];
-      if (
-        !route ||
-        (route.authRequired &&
-          route.authRequired !== true &&
-          !hasRequiredPermissions(route.authRequired, hasPermission))
-      )
-        return [];
+      if (!route || (route.authRequired && route.authRequired !== true && !hasRequiredPermissions(route.authRequired, hasPermission))) return [];
       if (pin.itemId.startsWith('/kiosk') || pin.itemId === '/dashboard' || /^https?:/.test(pin.itemId)) return [];
       const labelKey = item.translationKey;
       const translationPath = labelKey ? findTranslationPath(sidebarEn, labelKey) : undefined;
@@ -102,6 +91,13 @@ function DashboardPage() {
       return [{ path: pin.itemId, title, icon: item.icon, badgeCount: item.badgeCount, pin }];
     });
   }, [pins, routes, hasPermission, sidebarT, plugins, sidebarItems]);
+}
+
+function DashboardPage() {
+  const { t } = useTranslations({ en, de });
+  const { data: pins = [], isLoading, isError, refetch } = useDashboardPins();
+  const entries = usePageEntries(pins);
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }));
 
   const reorder = (from: string, to: string) => {
     const source = pins.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === from);
@@ -111,16 +107,11 @@ function DashboardPage() {
       const fromIndex = current.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === from);
       const toIndex = current.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === to);
       if (fromIndex < 0 || toIndex < 0) return current;
-      const ordered = [...current];
-      const [entry] = ordered.splice(fromIndex, 1);
-      ordered.splice(toIndex, 0, entry);
+      const ordered = [...current]; const [entry] = ordered.splice(fromIndex, 1); ordered.splice(toIndex, 0, entry);
       return ordered;
     });
   };
-  const removePin = (pin: Pin) =>
-    void updateDashboardPins((current) =>
-      current.filter((item) => item.itemType !== pin.itemType || item.itemId !== pin.itemId),
-    );
+  const removePin = (pin: Pin) => void updateDashboardPins((current) => current.filter((item) => item.itemType !== pin.itemType || item.itemId !== pin.itemId));
 
   return (
     <section className="p-6">
@@ -205,32 +196,10 @@ function findTranslationPath(value: unknown, key: string, prefix = ''): string |
 
 function SortablePageCard({ id, className, children }: { id: string; className?: string; children: React.ReactNode }) {
   const { setNodeRef, attributes, listeners, transform, transition } = useSortable({ id });
-  return (
-    <Card
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      {...attributes}
-      {...listeners}
-      className={className}
-    >
-      {children}
-    </Card>
-  );
+  return <Card ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} {...attributes} {...listeners} className={className}>{children}</Card>;
 }
 
-function ResourcePinCard({
-  pin,
-  openLabel,
-  resourceLabel,
-  unpinLabel,
-  onUnpin,
-}: {
-  pin: Pin;
-  openLabel: string;
-  resourceLabel: string;
-  unpinLabel: string;
-  onUnpin: () => void;
-}) {
+function ResourcePinCard({ pin, openLabel, resourceLabel, unpinLabel, onUnpin }: { pin: Pin; openLabel: string; resourceLabel: string; unpinLabel: string; onUnpin: () => void }) {
   const id = Number(pin.itemId);
   const {
     data: resource,
@@ -269,27 +238,9 @@ function ResourcePinCard({
   );
 }
 
-function SortableResourceCard({
-  id,
-  className,
-  children,
-}: {
-  id: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
+function SortableResourceCard({ id, className, children }: { id: string; className?: string; children: React.ReactNode }) {
   const { setNodeRef, attributes, listeners, transform, transition } = useSortable({ id });
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      {...attributes}
-      {...listeners}
-      className={className}
-    >
-      {children}
-    </div>
-  );
+  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} {...attributes} {...listeners} className={className}>{children}</div>;
 }
 
 export { Landing as DashboardLanding, DashboardPage };

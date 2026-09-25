@@ -97,7 +97,13 @@ describe('DashboardPinsService', () => {
     ]);
     (resourceRepository.find as jest.Mock).mockResolvedValue([]);
     expect(await service.get(5)).toEqual([{ itemType: 'page', itemId: '/projects' }]);
-    expect(pinRepository.delete).toHaveBeenCalledWith({ userId: 5, itemType: 'resource', itemId: '42' });
+    expect(pinRepository.delete).toHaveBeenCalledWith({ userId: 5, id: In([2]) });
     expect(deletePins).not.toHaveBeenCalled();
+  });
+
+  it('rejects noncanonical resource IDs', async () => {
+    for (const itemId of ['007', '7.0', '7e0', ' 7', '+7', '9007199254740992']) {
+      await expect(service.replace(5, [{ itemType: 'resource', itemId }])).rejects.toBeInstanceOf(BadRequestException);
+    }
   });
 });
