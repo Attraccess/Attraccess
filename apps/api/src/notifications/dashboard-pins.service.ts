@@ -7,7 +7,7 @@ export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string }
 const PINNABLE_PAGE_PATHS = new Set([
   '/resources', '/projects', '/messages', '/attractap/nfc-cards', '/billing', '/csv-export', '/users',
   '/attractap/readers', '/devices/mqtt/servers', '/devices/companion', '/balena', '/settings',
-  '/dependencies', '/changelog', '/printables',
+  '/dependencies', '/changelog', '/printables', '/shelly', '/rabbitmq', '/wago',
 ]);
 
 @Injectable()
@@ -36,7 +36,7 @@ export class DashboardPinsService {
     }
     const keys = items.map((item) => `${item.itemType}:${item.itemId}`);
     if (new Set(keys).size !== keys.length) throw new BadRequestException('Dashboard pins must be unique');
-    if (items.some((item) => item.itemType === 'page' && (!item.itemId.startsWith('/') || item.itemId.startsWith('//') || item.itemId.includes('..') || item.itemId === '/dashboard' || item.itemId.startsWith('/kiosk/') || (!PINNABLE_PAGE_PATHS.has(item.itemId) && !item.itemId.startsWith('/plugins/'))))) {
+    if (items.some((item) => item.itemType === 'page' && !PINNABLE_PAGE_PATHS.has(item.itemId))) {
       throw new BadRequestException('Page is not eligible for dashboard pinning');
     }
     const resourceIds = items.filter((item) => item.itemType === 'resource').map((item) => Number(item.itemId));
