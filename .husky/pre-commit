@@ -1,1 +1,4 @@
+# Git exports these paths to hooks. Child checks create temporary repositories,
+# so let their Git commands discover those repositories from their own cwd.
+unset GIT_DIR GIT_WORK_TREE
 pnpm precommit

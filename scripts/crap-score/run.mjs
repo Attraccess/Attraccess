@@ -1,5 +1,6 @@
 /* eslint-disable no-console -- CLI progress and diagnostics are intentional. */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,13 +11,14 @@ import { getCrapReport } from 'crap-score';
 import ts from 'typescript';
 
 export const workspace = fileURLToPath(new URL('../../', import.meta.url));
+export const CRAP_SCORE_LIMIT = 30;
 
 export function isSource(file) {
   return (
     /\.[cm]?[jt]sx?$/.test(file) &&
     // Upstream OpenSCAD WebAssembly runtime, distributed unchanged with the app.
     file !== 'apps/frontend/public/openscad/openscad.wasm.js' &&
-    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package)(\/|$)/.test(
+    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package|\.nx-cache|\.nx-workspace-data|\.electron-cache|\.npm-cache)(\/|$)/.test(
       file,
     ) &&
     !/\.(spec|test|d)\.[cm]?[jt]sx?$/.test(file) &&
@@ -200,9 +202,39 @@ export function deduplicateStatements(file) {
 export function summarizeScores(functions) {
   return {
     functions: functions.length,
-    atLeast30: functions.filter((fn) => fn.statements.crap >= 30).length,
+    violations: functions.filter((fn) => fn.statements.crap > CRAP_SCORE_LIMIT).length,
     max: Math.max(0, ...functions.map((fn) => fn.statements.crap)),
   };
+}
+
+export function enforceScores(project, report, limit = CRAP_SCORE_LIMIT) {
+  if (!Number.isFinite(limit) || limit < 0) throw new Error(`Invalid CRAP score limit: ${limit}`);
+  if (!report || typeof report !== 'object' || Array.isArray(report))
+    throw new Error(`Malformed CRAP report for ${project}: expected a file map`);
+  const violations = [];
+  for (const [file, functions] of Object.entries(report)) {
+    if (!functions || typeof functions !== 'object' || Array.isArray(functions))
+      throw new Error(`Malformed CRAP report for ${project}: ${file}`);
+    for (const [key, fn] of Object.entries(functions)) {
+      const score = fn?.statements?.crap;
+      if (
+        !Number.isFinite(score) ||
+        !Number.isFinite(fn?.complexity) ||
+        !Number.isFinite(fn?.start?.line) ||
+        !Number.isFinite(fn?.statements?.coverage) ||
+        fn.statements.coverage < 0 ||
+        fn.statements.coverage > 1
+      )
+        throw new Error(`Malformed CRAP function report for ${project}: ${file} (${key})`);
+      if (score > limit) {
+        const coverage = fn.statements?.coverage;
+        violations.push(
+          `${project}: ${path.relative(workspace, file)}:${fn.start.line} ${fn.functionDescriptor ?? key} — CRAP ${score} (complexity ${fn.complexity}, coverage ${(coverage * 100).toFixed(2)}%)`,
+        );
+      }
+    }
+  }
+  if (violations.length) throw new Error(`CRAP score limit ${limit} exceeded by ${violations.length} function(s):\n${violations.join('\n')}`);
 }
 
 // Source-map remapping may leave end columns null (end of line). Restore exact
@@ -272,7 +304,16 @@ export function nodeCoverage(files, tests, output) {
   if (!tests.length) return [];
   mkdirSync(output, { recursive: true });
   const manifest = path.join(output, 'manifest.json');
-  writeFileSync(manifest, JSON.stringify({ files: files.map((file) => path.resolve(workspace, file)), output }));
+  const sourceCopies = {};
+  for (const file of files) {
+    const absolute = path.resolve(workspace, file);
+    const hash = createHash('sha256').update(readFileSync(absolute)).digest('hex');
+    (sourceCopies[hash] ??= []).push(absolute);
+  }
+  writeFileSync(
+    manifest,
+    JSON.stringify({ files: files.map((file) => path.resolve(workspace, file)), sourceCopies, output }),
+  );
   const loader = path.join(workspace, 'scripts/crap-score/node-coverage.mjs');
   const env = {
     ...process.env,
@@ -402,12 +443,15 @@ export async function run(root, outputDirectory) {
   const functions = Object.values(report).flatMap((file) => Object.values(file));
   const summary = {
     project: project.name,
+    limit: CRAP_SCORE_LIMIT,
     files: files.length,
+    sourceFiles: files.map((file) => path.resolve(workspace, file)),
     ...summarizeScores(functions),
   };
   writeFileSync(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
+  enforceScores(project.name, report);
   console.log(
-    `CRAP ${project.name}: ${summary.functions} functions, ${summary.atLeast30} at or above 30, max ${summary.max.toFixed(2)}. Reports: ${path.relative(workspace, output)}`,
+    `CRAP ${project.name}: ${summary.functions} functions, max ${summary.max.toFixed(2)} (limit ${CRAP_SCORE_LIMIT}). Reports: ${path.relative(workspace, output)}`,
   );
 }
 
