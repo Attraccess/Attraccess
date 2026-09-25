@@ -154,6 +154,11 @@ it.each([
   mount({ target: { type: targetType, id: 7 }, canManageIntroducers: hasActions, canManageIntroductions: false });
   expect(screen.getByText(subtitle)).toBeTruthy();
 });
+it('does not render a subtitle when the header is hidden', () => {
+  mount({ target: { type: 'group', id: 7 }, hideHeader: true });
+  expect(screen.queryByText('Manage introducers, maintainers and introductions for this group')).toBeNull();
+  expect(screen.queryByText('People & Permissions')).toBeNull();
+});
 it('renders people, limits inherited-role removal, and handles history and introduction changes', async () => {
   mount();
   expect(screen.getByText('Alex')).toBeTruthy();
