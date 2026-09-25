@@ -300,7 +300,9 @@ if (action === 'start') {
     file('etc/attraccess-wago/docker-provision/restored', '');
     expect(recover().status).not.toBe(0);
     expect(existsSync(join(root, 'mutations'))).toBe(false);
-    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).stderr).toContain('unresolved-lifecycle-effects');
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).stderr).toContain(
+      'unresolved-lifecycle-effects',
+    );
     expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision'))).toBe(true);
   });
 
@@ -316,12 +318,34 @@ if (action === 'start') {
     expect(recover().status).toBe(0);
     expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
     expect(existsSync(journal)).toBe(false);
+    expect(existsSync(`${journal}.completed-restored-${token}`)).toBe(true);
+    // The API may lose the first SSH response before it clears its saved token.
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
     expect(existsSync(join(root, 'mutations'))).toBe(false);
+  });
+
+  it('converts an interrupted finish cleanup into a durable retry receipt', () => {
+    preparedOnly();
+    expect(recover().status).toBe(0);
+    const journal = join(root, 'etc/attraccess-wago/docker-provision');
+    const cleanup = `${journal}.restored-${token}`;
+    mkdirSync(cleanup, { recursive: true });
+    for (const name of ['token', 'prior', 'restored']) {
+      writeFileSync(join(cleanup, name), readFileSync(join(journal, name)));
+    }
+    rmSync(journal, { recursive: true });
+
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
+    expect(existsSync(cleanup)).toBe(false);
+    expect(existsSync(`${journal}.completed-restored-${token}`)).toBe(true);
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
   });
 
   it('retains a legacy activation without fabricating snapshots or treating a running daemon as closure', () => {
     legacyStarted();
-    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain('unresolved-lifecycle-effects');
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain(
+      'unresolved-lifecycle-effects',
+    );
     expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('running');
     expect(existsSync(join(root, 'mutations'))).toBe(false);
   });
@@ -400,7 +424,9 @@ if (action === 'start') {
 
   it('retains successful activation effects without stopping or losing runtime data', () => {
     snapshotStarted();
-    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain('unresolved-lifecycle-effects');
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain(
+      'unresolved-lifecycle-effects',
+    );
     expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('running');
   });
 
@@ -425,7 +451,9 @@ if (action === 'start') {
   it('does not accept an activation when the daemon has subsequently stopped', () => {
     snapshotStarted();
     file('daemon', 'stopped');
-    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain('unresolved-lifecycle-effects');
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain(
+      'unresolved-lifecycle-effects',
+    );
     expect(recover().status).not.toBe(0);
   });
 

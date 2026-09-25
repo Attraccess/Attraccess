@@ -71,14 +71,15 @@ not invoke any init action; an unavailable installed daemon reports
 reason by itself to classify binaries as missing.
 
 Existing tokened journals are retained. Any `start-intent` or `started` marker
-blocks recovery acknowledgement and journal deletion, including old `restored`
+blocks recovery acknowledgement and completion receipt creation, including old `restored`
 receipts and interrupted cleanup. A failed vendor start can leave namespace effects
 while the daemon is absent. Missing journals also leave recovery unresolved. No vendor
 stop is called. Only a prepared journal without either start marker can be reconciled
 after stopped-state, firmware/service context and token checks. The base implementation
 never wrote historical snapshots: current context for a prepared legacy journal is
 recorded separately in `reconciliation/`. Missing only one modern snapshot is
-corruption, not a legacy journal. The `accepted` helper has no production caller
+corruption, not a legacy journal. A completed prepared-journal acknowledgement retains
+a token- and outcome-bound receipt, so a lost remote response can be retried. The `accepted` helper has no production caller
 and cannot provide product closure for existing activations.
 
 ## Source evidence
@@ -96,18 +97,18 @@ and source-identity requirements.
 
 All new exports are from `apps/plugins/wago/backend/wago-hardware-deployment.ts`:
 
-| Export                                                           | Use                                                                                        |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `wagoHardwareDeploymentReportScript(testRoot = '')`              | Read-only inspection over pinned SSH; require exit 0.                                      |
-| `parseWagoHardwareDeploymentReport(output)`                      | Strict version-1 parser; rejects incomplete, duplicate or unknown fields.                  |
-| `WagoHardwareDeploymentReport`                                   | Typed report contract below.                                                               |
-| `WAGO_DOCKER_PROVISION_REVIEW_FLAG`                              | Literal `reviewedDockerActivation`.                                                        |
-| `WagoDockerProvisionReview`                                      | `{ reviewedDockerActivation: boolean, action: 'start-installed-runtime', token: string }`. |
-| `wagoDockerProvisionScript(review, testRoot = '')`               | Legacy signature; refuses activation with the source dependency blocker.                   |
-| `wagoDockerProvisionRecoveryScript(token, testRoot = '')`        | Acknowledge an already stopped daemon; retain unresolved legacy journals.                   |
-| `wagoDockerProvisionFinishScript(token, outcome, testRoot = '')` | Acknowledge a verified prepared journal; start effects block deletion. `accepted` has no production caller. |
-| `wagoHardwareDeploymentPreflightScript(testRoot = '')`           | Read-only fail-closed install prerequisites. Already embedded in installer.                |
-| `wagoHardwareDeploymentDockerArgs(testRoot = '')`                | Fixed hardware arguments. Already embedded in installer.                                   |
+| Export                                                           | Use                                                                                                         |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `wagoHardwareDeploymentReportScript(testRoot = '')`              | Read-only inspection over pinned SSH; require exit 0.                                                       |
+| `parseWagoHardwareDeploymentReport(output)`                      | Strict version-1 parser; rejects incomplete, duplicate or unknown fields.                                   |
+| `WagoHardwareDeploymentReport`                                   | Typed report contract below.                                                                                |
+| `WAGO_DOCKER_PROVISION_REVIEW_FLAG`                              | Literal `reviewedDockerActivation`.                                                                         |
+| `WagoDockerProvisionReview`                                      | `{ reviewedDockerActivation: boolean, action: 'start-installed-runtime', token: string }`.                  |
+| `wagoDockerProvisionScript(review, testRoot = '')`               | Legacy signature; refuses activation with the source dependency blocker.                                    |
+| `wagoDockerProvisionRecoveryScript(token, testRoot = '')`        | Acknowledge an already stopped daemon; retain unresolved legacy journals.                                   |
+| `wagoDockerProvisionFinishScript(token, outcome, testRoot = '')` | Acknowledge a verified prepared journal into a retryable token-bound receipt; start effects block completion. `accepted` has no production caller. |
+| `wagoHardwareDeploymentPreflightScript(testRoot = '')`           | Read-only fail-closed install prerequisites. Already embedded in installer.                                 |
+| `wagoHardwareDeploymentDockerArgs(testRoot = '')`                | Fixed hardware arguments. Already embedded in installer.                                                    |
 
 `testRoot` exists solely for local isolated fixtures. Production must omit it.
 All existing runtime installer exports retain their signatures. Use the same

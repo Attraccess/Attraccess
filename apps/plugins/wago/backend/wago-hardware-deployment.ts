@@ -301,10 +301,25 @@ export function wagoDockerProvisionFinishScript(
   return `${provisionLock(token, testRoot)}
 ${dockerReconciliationHelpers()}
 cleanup="$journal.${outcome}-$token"
-if test -d "$cleanup" && test ! -e "$journal"; then
-  journal="$cleanup"
+completion="$journal.completed-${outcome}-$token"
+if test ! -e "$journal" && test -d "$completion" && test ! -L "$completion"; then
+  # The coordinator may retry after the remote finish completed but before it
+  # persisted its token cleanup. This receipt is only created after validation.
+  journal="$completion"
+  test "$(cat "$journal/token")" = "$token" || fail 'Docker provisioning token mismatch'
+  test "$(cat "$journal/prior")" = stopped || fail 'Invalid Docker provisioning snapshot'
+  test -f "$journal/${outcome === 'accepted' ? 'started' : 'restored'}" || fail 'Provisioning outcome not verified'
   require_no_start_effects
-  rm -rf "$cleanup"; exit 0
+  exit 0
+fi
+if test ! -e "$journal" && test -d "$cleanup" && test ! -L "$cleanup"; then
+  journal="$cleanup"
+  test "$(cat "$journal/token")" = "$token" || fail 'Docker provisioning token mismatch'
+  test "$(cat "$journal/prior")" = stopped || fail 'Invalid Docker provisioning snapshot'
+  test -f "$journal/${outcome === 'accepted' ? 'started' : 'restored'}" || fail 'Provisioning outcome not verified'
+  require_no_start_effects
+  mv "$cleanup" "$completion" || fail 'Cannot retain Docker provisioning completion receipt'
+  exit 0
 fi
 test -d "$journal" && test ! -L "$journal" || fail 'No Docker provisioning journal'
 test "$(cat "$journal/token")" = "$token" || fail 'Docker provisioning token mismatch'
@@ -321,6 +336,6 @@ ${outcome === 'accepted' ? `test ! -e "$journal/restored" || fail 'Docker provis
 capture_legacy_context
 ${outcome === 'accepted' ? `command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1 || fail 'Docker changed during reconciliation'` : `docker_stopped || fail 'Docker changed during reconciliation'`}
 mv "$journal" "$cleanup"
-rm -rf "$cleanup"
+mv "$cleanup" "$completion" || fail 'Cannot retain Docker provisioning completion receipt'
 `;
 }
