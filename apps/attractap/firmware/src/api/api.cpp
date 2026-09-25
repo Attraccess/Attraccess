@@ -145,6 +145,9 @@ void API::processIncomingMessage(const char *buf, size_t len)
                 {
                     if (this->errorCallback)
                     {
+                        // Keep the server's original code/message in diagnostics before
+                        // translating it for the user-facing popup.
+                        this->logger.error((std::string("Reader reported error: ") + err).c_str());
                         this->errorCallback("Fehler", translateReaderError(err).c_str());
                     }
                 }

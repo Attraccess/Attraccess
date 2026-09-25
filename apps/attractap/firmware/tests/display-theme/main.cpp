@@ -696,12 +696,21 @@ void testBackgroundScreens(Renderer &renderer)
         expect(lv_obj_get_style_text_font(resourceName, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
                "Lockscreen resource name uses a Latin-1 font");
         expectBackground(renderer, guard.root, "lockscreen-available");
+        Fixtures::activeLanguage = "en";
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Tap your NFC \n        card/tag to sign in");
+        requireObject(guard.root, &lv_label_class, "Available");
         lock.setUsageInfo(true, "Müller", false);
-        auto *usage = requireObject(guard.root, &lv_label_class, "In Verwendung: Müller");
+        auto *usage = requireObject(guard.root, &lv_label_class, "In use: Müller");
         expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
                "Lockscreen active username uses a Latin-1 font");
-        expectBackground(renderer, guard.root, "lockscreen-in-use");
         lock.setUsageInfo(false, "", true);
+        requireObject(guard.root, &lv_label_class, "Under maintenance");
+        Fixtures::activeLanguage = "de";
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Bitte mit NFC \n        Karte/Tag anmelden");
+        requireObject(guard.root, &lv_label_class, "In Wartung");
+        expectBackground(renderer, guard.root, "lockscreen-in-use");
         expectBackground(renderer, guard.root, "lockscreen-maintenance");
     }
     {

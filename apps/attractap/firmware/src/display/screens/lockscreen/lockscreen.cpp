@@ -106,6 +106,9 @@ void Lockscreen::loop()
         lv_label_set_text(this->signInPromptLabel, language == "en"
             ? "Tap your NFC \n        card/tag to sign in"
             : "Bitte mit NFC \n        Karte/Tag anmelden");
+        // This screen remains alive across authentication transitions. Refresh
+        // its status as well as the prompt when the active locale changes.
+        this->updateUsageInfo();
     }
 }
 
@@ -147,18 +150,20 @@ void Lockscreen::updateUsageInfo()
     // Status priority mirrors the web resource list: in use > maintenance > available.
     if (this->hasActiveUsage)
     {
-        std::string usageText = std::string("In Verwendung: ") + this->username;
+        const std::string usageText = State::getActiveLanguage() == "en"
+            ? std::string("In use: ") + this->username
+            : std::string("In Verwendung: ") + this->username;
         lv_label_set_text(this->usageInfoLabel, usageText.c_str());
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else if (this->isUnderMaintenance)
     {
-        lv_label_set_text(this->usageInfoLabel, "In Wartung");
+        lv_label_set_text(this->usageInfoLabel, State::getActiveLanguage() == "en" ? "Under maintenance" : "In Wartung");
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else
     {
-        lv_label_set_text(this->usageInfoLabel, "Verfügbar");
+        lv_label_set_text(this->usageInfoLabel, State::getActiveLanguage() == "en" ? "Available" : "Verfügbar");
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
