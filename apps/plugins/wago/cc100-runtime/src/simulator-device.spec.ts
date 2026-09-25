@@ -42,4 +42,24 @@ describe('SimulatorDeviceAdapter', () => {
 
     await expect(device.read(output)).resolves.toBe(true);
   });
+
+  it('keeps distinct Modbus bindings independent', async () => {
+    const device = new SimulatorDeviceAdapter({}, 'normal', 0);
+    const first = {
+      id: 'first',
+      hardwareProfile: 'modbus' as const,
+      channel: 0,
+      modbus: { deviceId: 'meter-a', actionId: 'relay-1' },
+    };
+    const second = {
+      id: 'second',
+      hardwareProfile: 'modbus' as const,
+      channel: 0,
+      modbus: { deviceId: 'meter-b', actionId: 'relay-1' },
+    };
+
+    await device.write(first, true);
+    await expect(device.read(first)).resolves.toBe(true);
+    await expect(device.read(second)).resolves.toBe(false);
+  });
 });

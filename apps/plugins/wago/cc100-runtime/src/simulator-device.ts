@@ -43,5 +43,12 @@ export class SimulatorDeviceAdapter implements DeviceAdapter {
 }
 
 function key(point: Point): string {
+  if (point.modbus)
+    return JSON.stringify([
+      point.hardwareProfile,
+      point.modbus.deviceId,
+      point.modbus.actionId ?? null,
+      point.modbus.measurementId ?? null,
+    ]);
   return `${point.hardwareProfile}:${point.channel}`;
 }

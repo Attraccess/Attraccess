@@ -291,16 +291,9 @@ export class OutputController {
       if (!this.disconnected || outage !== this.outageGeneration) throw new WriteAdmissionError('outage_ended');
     };
     let stateSaveFailed = false;
+    const immediateShutdowns: Array<Promise<void>> = [];
     for (const channel of this.options.getSnapshot()?.logicalChannels ?? []) {
       if (!channel.capabilities.includes('output')) continue;
-      if (channel.disconnectPolicy.mode === 'immediate') {
-        try {
-          await this.write(channel, false);
-        } catch {
-          // Continue the safety shutdown even when durable state cannot be updated for one output.
-          stateSaveFailed = true;
-        }
-      }
       if (channel.disconnectPolicy.mode === 'watchdog')
         this.watchdogs.set(
           channel.id,
@@ -317,7 +310,17 @@ export class OutputController {
             Math.max(0, channel.disconnectPolicy.timeoutMs - (Date.now() - disconnectedAt)),
           ),
         );
+      if (channel.disconnectPolicy.mode === 'immediate')
+        immediateShutdowns.push(
+          this.write(channel, false)
+            .then(() => undefined)
+            .catch(() => {
+              // Continue the safety shutdown even when durable state cannot be updated for one output.
+              stateSaveFailed = true;
+            }),
+        );
     }
+    await Promise.all(immediateShutdowns);
     if (stateSaveFailed) await this.options.saveState();
   }
 

@@ -363,6 +363,12 @@ if test "$action" = stop; then
   contain_runtime || fail 'Runtime stop unverified; recovery required'
   exit 0
 fi
+if test "$action" = start && test ! -e "$config/runtime-enabled" && test ! -L "$config/runtime-enabled"; then
+  enabled_stage=$(mktemp "$config/.runtime-enabled.XXXXXX") || fail 'Cannot restore runtime enablement'
+  test -f "$enabled_stage" && test ! -L "$enabled_stage" &&
+    test "$(stat -c '%u:%g:%a:%h' "$enabled_stage")" = 0:0:600:1 || fail 'Unsafe runtime enablement staging'
+  mv "$enabled_stage" "$config/runtime-enabled" || fail 'Cannot restore runtime enablement'
+fi
 if test ! -e "$config/runtime-enabled" && test ! -L "$config/runtime-enabled"; then
   case "$action" in cycle|watch) echo disabled ;; esac
   exit 0

@@ -86,6 +86,7 @@ try {
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
+  if (interrupted) throw new Error('Interrupted');
   const status = await new Promise((resolve, reject) => {
     child = spawn(
       process.execPath,

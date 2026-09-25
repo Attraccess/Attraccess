@@ -10,6 +10,7 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
 const MAX_CACHE_ENTRIES = 2_000;
 const MAX_PENDING_DISPATCHES = 100;
+const MAX_CONCURRENT_DISPATCHES = 10;
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const MAX_RETIRED_STREAMS = 128;
 
@@ -60,9 +61,10 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly waiters = new Set<Waiter>();
   private readonly waitersByKey = new Map<string, Set<Waiter>>();
   private readonly subscriptions: PluginMqttSubscription[] = [];
-  private readonly dispatches: Array<{ state: CachedState; previous?: CachedState }> = [];
+  private readonly dispatches: Array<{ state: CachedState }> = [];
   private readonly lastDispatchAtByNode = new Map<string, number>();
-  private dispatching = false;
+  private readonly lastEmittedMeasurementByNode = new Map<string, CachedState>();
+  private activeDispatches = 0;
   private readonly controllerMessages = new Map<string, Promise<void>>();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -133,6 +135,9 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         .filter(([, entry]) => Boolean(entry.serverId)),
     );
     const replacements: PluginMqttSubscription[] = [];
+    const previousControllerByHardwareId = this.controllerByHardwareId;
+    // Retained messages can arrive before subscribe resolves.
+    this.controllerByHardwareId = controllerByHardwareId;
     try {
       for (const serverId of serverIds)
         replacements.push(
@@ -142,11 +147,11 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         );
     } catch (error) {
       replacements.forEach((subscription) => subscription.unsubscribe());
+      this.controllerByHardwareId = previousControllerByHardwareId;
       throw error;
     }
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
     this.subscriptions.push(...replacements);
-    this.controllerByHardwareId = controllerByHardwareId;
   }
 
   async resolveConfigSchema(config: Record<string, unknown>, kind: NodeKind): Promise<Record<string, unknown>> {
@@ -396,7 +401,6 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         Date.parse(event.timestamp) < (this.streams.get(controller.id)?.sampleNotBefore ?? 0),
     };
     const cacheKey = this.cacheKey(controller.id, channelId, event.category);
-    const previous = this.cache.get(cacheKey);
     this.cache.set(cacheKey, state);
     if (this.cache.size > MAX_CACHE_ENTRIES) {
       const oldest = this.cache.keys().next().value;
@@ -407,8 +411,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       this.context.logger.warn(`Dropping excess WAGO flow dispatch for ${controller.hardwareId}`);
       return;
     }
-    this.dispatches.push({ state, previous });
-    if (!this.dispatching) void this.dispatch();
+    this.dispatches.push({ state });
+    this.dispatch();
   }
   private async channels(controllerId: number): Promise<WagoConfigurationSnapshot['logicalChannels']> {
     const cached = this.channelCache.get(controllerId);
@@ -488,7 +492,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     config: Record<string, unknown>,
     nodeId: string,
     state: CachedState,
-    previous?: CachedState,
+    _previous?: CachedState,
   ): boolean {
     if (
       config.controllerId !== state.controllerId ||
@@ -496,14 +500,15 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       config.category !== state.category
     )
       return false;
+    const emitted = this.lastEmittedMeasurementByNode.get(nodeId);
     if (
       typeof config.minimumChange === 'number' &&
       typeof state.value === 'number' &&
-      typeof previous?.value === 'number' &&
-      previous.streamId === state.streamId &&
-      previous.unit === state.unit &&
-      previous.kind === state.kind &&
-      Math.abs(state.value - previous.value) < config.minimumChange
+      typeof emitted?.value === 'number' &&
+      emitted.streamId === state.streamId &&
+      emitted.unit === state.unit &&
+      emitted.kind === state.kind &&
+      Math.abs(state.value - emitted.value) < config.minimumChange
     )
       return false;
     if (typeof config.minimumIntervalMs === 'number') {
@@ -511,6 +516,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       if (lastDispatchAt !== undefined && state.receivedAt - lastDispatchAt < config.minimumIntervalMs) return false;
       this.lastDispatchAtByNode.set(nodeId, state.receivedAt);
     }
+    if (state.category === 'measurement') this.lastEmittedMeasurementByNode.set(nodeId, state);
     return true;
   }
   private matchesCondition(state: CachedState, config: Record<string, unknown>): boolean {
@@ -549,24 +555,28 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     delete payload.invalidated;
     return { ...payload, ...this.freshness(state) };
   }
-  private async dispatch(): Promise<void> {
-    this.dispatching = true;
-    while (this.dispatches.length) {
+  private dispatch(): void {
+    while (this.activeDispatches < MAX_CONCURRENT_DISPATCHES && this.dispatches.length) {
       const dispatch = this.dispatches.shift();
       if (!dispatch) continue;
-      const { state, previous } = dispatch;
-      const stream = this.streams.get(state.controllerId);
-      if (stream?.active !== state.streamId || stream.exhausted) continue;
-      try {
-        await this.context.flows.trigger(
-          'plugin.wago.event-received',
-          (config, nodeId) => this.matchesEvent(config, nodeId, state, previous),
-          { wago: this.payload(state) },
-        );
-      } catch (error) {
-        this.context.logger.warn(`Could not trigger WAGO flows: ${String(error)}`);
-      }
+      this.activeDispatches += 1;
+      void this.trigger(dispatch).finally(() => {
+        this.activeDispatches -= 1;
+        this.dispatch();
+      });
     }
-    this.dispatching = false;
+  }
+  private async trigger({ state }: { state: CachedState }): Promise<void> {
+    const stream = this.streams.get(state.controllerId);
+    if (stream?.active !== state.streamId || stream.exhausted) return;
+    try {
+      await this.context.flows.trigger(
+        'plugin.wago.event-received',
+        (config, nodeId) => this.matchesEvent(config, nodeId, state),
+        { wago: this.payload(state) },
+      );
+    } catch (error) {
+      this.context.logger.warn(`Could not trigger WAGO flows: ${String(error)}`);
+    }
   }
 }

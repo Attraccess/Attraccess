@@ -8,6 +8,10 @@ export class AddWagoCommissioningDeliveryToken1780000000008 implements Migration
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
+    const rows = await queryRunner.query(
+      'SELECT 1 FROM "plugin_wago_commissioning_sessions" WHERE "delivery_token" IS NOT NULL LIMIT 1',
+    );
+    if (rows.length) throw new Error('Recover runtime deliveries before removing their saved ownership tokens');
     await queryRunner.query('ALTER TABLE "plugin_wago_commissioning_sessions" DROP COLUMN "delivery_token"');
   }
 }

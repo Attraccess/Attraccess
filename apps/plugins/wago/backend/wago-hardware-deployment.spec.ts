@@ -411,6 +411,20 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
     expect(fixture.containers()[0].running).toBe(true);
   });
 
+  it('restores runtime enablement for an explicit start after a stop', () => {
+    expect(prepare().status).toBe(0);
+    fixture.file('etc/attraccess-wago/runtime-enabled', '');
+    fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);
+
+    expect(fixture.run('set -- stop\n' + wagoRuntimeBootScript(fixture.root)).status).toBe(0);
+    expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+    expect(fixture.containers()[0].running).toBe(false);
+
+    expect(fixture.run('set -- start\n' + wagoRuntimeBootScript(fixture.root)).status).toBe(0);
+    expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(true);
+    expect(fixture.containers()[0].running).toBe(true);
+  });
+
   it('does not stop another active transaction when the boot hook cannot obtain its lock', () => {
     fixture.file('etc/attraccess-wago/runtime-enabled', '');
     fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);

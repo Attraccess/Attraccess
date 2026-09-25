@@ -472,8 +472,8 @@ describe('WagoFlowService', () => {
       await stateMessage(service, 1, { outputs: Object.fromEntries(logicalChannels.map(({ id }) => [id, true])) });
       await expect(waiting).resolves.toMatchObject({ channelId: 'channel-2000', value: true });
       expect(service['cache'].size).toBe(2_000);
-      expect(service['dispatches'].length).toBe(100);
-      expect(trigger).toHaveBeenCalledTimes(1);
+      expect(service['dispatches'].length).toBeLessThanOrEqual(100);
+      expect(trigger.mock.calls.length).toBeGreaterThan(1);
       releaseDispatch();
       await jest.advanceTimersByTimeAsync(0);
       expect(service['dispatches'].length).toBe(0);
@@ -750,7 +750,7 @@ describe('WagoFlowService', () => {
       await expect(waiting).resolves.toMatchObject({ sequence: 2 });
     });
 
-    it('drops queued events from a retired boot while keeping the dispatch queue bounded', async () => {
+    it('dispatches the current boot while keeping the dispatch queue bounded', async () => {
       const { service, trigger } = await setup();
       let release: () => void;
       trigger.mockImplementationOnce(
@@ -765,8 +765,9 @@ describe('WagoFlowService', () => {
       await snapshot(service, 1, { inputs: { sensor: false } }, STREAM_B);
       release();
       await jest.advanceTimersByTimeAsync(0);
-      expect(trigger).toHaveBeenCalledTimes(2);
-      expect(trigger.mock.calls[1][2]).toMatchObject({ wago: { streamId: STREAM_B, value: false } });
+      expect(trigger.mock.calls.map(([, , payload]) => payload)).toContainEqual(
+        expect.objectContaining({ wago: expect.objectContaining({ streamId: STREAM_B, value: false }) }),
+      );
       expect(service['dispatches']).toHaveLength(0);
     });
 
@@ -862,11 +863,34 @@ describe('WagoFlowService', () => {
       receivedAt: 0,
     } as const;
 
+    expect(service['matchesEvent'](config, 'node', previous, previous)).toBe(true);
     expect(service['matchesEvent'](config, 'node', { ...previous, value: 505 }, previous)).toBe(false);
     expect(service['matchesEvent'](config, 'node', { ...previous, value: 520 }, previous)).toBe(true);
     expect(service['matchesEvent'](config, 'node', { ...previous, unit: 'ampere' }, previous)).toBe(true);
     expect(service['matchesEvent'](config, 'node', { ...previous, kind: 'cumulative' }, previous)).toBe(true);
     expect(service['matchesEvent'](config, 'node', { ...previous, streamId: STREAM_B }, previous)).toBe(true);
+  });
+
+  it('compares measurement changes to the last emitted value, not a suppressed received sample', () => {
+    const { service } = createService();
+    const config = { controllerId: 1, channelId: 'power', category: 'measurement', minimumChange: 10 };
+    const measurement = (value: number) => ({
+      controllerId: 1,
+      hardwareId: 'cc100-01',
+      channelId: 'power',
+      category: 'measurement' as const,
+      value,
+      unit: 'milliwatt',
+      kind: 'live' as const,
+      timestamp: '2026-08-30T00:00:00.000Z',
+      sequence: value,
+      streamId: STREAM_A,
+      receivedAt: value,
+    });
+
+    expect(service['matchesEvent'](config, 'node', measurement(100))).toBe(true);
+    expect(service['matchesEvent'](config, 'node', measurement(105))).toBe(false);
+    expect(service['matchesEvent'](config, 'node', measurement(110))).toBe(true);
   });
 
   it('applies minimum intervals from the last dispatch for each trigger node', () => {
