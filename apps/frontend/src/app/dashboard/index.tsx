@@ -13,19 +13,18 @@ import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import usePluginState from '../plugins/plugin.state';
-import sidebarEn from '../layout/sidebar.en.json';
-import sidebarDe from '../layout/sidebar.de.json';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 function Landing() {
-  const { data, isLoading, isError } = useDashboardPins();
+  const { data, isLoading, isError, refetch } = useDashboardPins();
   const { isLoading: isLicenseLoading } = useLicenseServiceGetLicenseInformation();
   const pluginsInitialized = usePluginState((state) => state.isInitialized);
   const entries = usePageEntries(data ?? []);
   if (isLoading) return null;
-  if (isError) return <p className="p-6">Could not load your dashboard.</p>;
+  if (isError) return <div className="p-6"><p>Could not load your dashboard.</p><button onClick={() => void refetch()}>Retry loading pins</button></div>;
   if (!data?.length) return <Navigate to="/resources" replace />;
   if (data.some((pin) => pin.itemType === 'resource')) return <DashboardPage />;
   if (isLicenseLoading) return null;
@@ -34,35 +33,42 @@ function Landing() {
   return <Navigate to="/resources" replace />;
 }
 
-type NavEntry = { path: string; title: string; icon?: React.ReactNode; badgeCount?: number };
-function DashboardPage() {
-  const { t } = useTranslations({ en, de });
+type PageEntry = { pin: Pin; path: string; title: string; icon?: React.ReactNode; badgeCount?: number };
+function usePageEntries(pins: Pin[]): PageEntry[] {
   const { t: sidebarT } = useTranslations({ en: sidebarEn, de: sidebarDe });
   const routes = useAllRoutes();
   const { plugins } = usePluginState();
   const sidebarItems = useSidebarItems();
   const { hasPermission } = useAuth();
-  const { data: pins = [] } = useDashboardPins();
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }));
-  const entries = useMemo(() => {
+  return useMemo(() => {
     const builtInPaths = new Set(SIDEBAR_ITEMS.flatMap((item) => 'items' in item ? item.items : [item]).map((item) => item.path));
-    const all: { path: string; translationKey?: string; icon?: React.ReactNode; title?: string; badgeCount?: number; isExternal?: boolean }[] = [...sidebarItems.flatMap((i) => 'items' in i ? i.items : [i]), ...buildSidebarEndItems('', '').flatMap((i) => 'items' in i ? i.items : [i])].map((item) => ({ path: item.path, translationKey: item.translationKey, icon: <item.icon size={22} />, title: undefined, badgeCount: item.badgeCount, isExternal: item.isExternal }));
+    const flatten = (items: (SidebarItem | SidebarItemGroup)[], prefix: string): { path: string; title: string; icon?: React.ReactNode; badgeCount?: number; isExternal?: boolean }[] => items.flatMap((item) => {
+      if ('items' in item) return item.items.map((child) => ({ path: child.path, title: sidebarT(`${prefix}groups.${item.translationKey}.items.${child.translationKey}`), icon: <child.icon size={22} />, badgeCount: child.badgeCount, isExternal: child.isExternal }));
+      return [{ path: item.path, title: sidebarT(prefix === 'endItems.' ? `endItems.${item.translationKey}` : `groups.##default##.items.${item.translationKey}`), icon: <item.icon size={22} />, badgeCount: item.badgeCount, isExternal: item.isExternal }];
+    });
+    const all = [...flatten(sidebarItems, ''), ...flatten(buildSidebarEndItems('', ''), 'endItems.')];
     all.push(...plugins.flatMap((manifest) => {
       try { return manifest.plugin.getSidebarItems?.() ?? []; } catch { return []; }
-    }).map((item) => ({ path: item.path, translationKey: undefined, icon: item.icon, title: item.label, badgeCount: undefined, isExternal: false })));
-    return pins.flatMap((pin): (NavEntry & { pin: Pin })[] => {
+    }).map((item) => ({ path: item.path, title: item.label, icon: undefined })));
+    return pins.flatMap((pin): PageEntry[] => {
       if (pin.itemType !== 'page') return [];
       const item = all.find((entry) => entry.path === pin.itemId);
-      if (!item && builtInPaths.has(pin.itemId)) return [];
+      if (!item || (builtInPaths.has(pin.itemId) && !sidebarItems.some((group) => ('items' in group ? group.items : [group]).some((entry) => entry.path === pin.itemId)))) return [];
       const route = routes.find((candidate) => candidate.path === pin.itemId);
-      if (!item || item.isExternal) return [];
       if (!route || (route.authRequired && route.authRequired !== true && !hasRequiredPermissions(route.authRequired, hasPermission))) return [];
       if (pin.itemId.startsWith('/kiosk') || pin.itemId === '/dashboard' || /^https?:/.test(pin.itemId)) return [];
-      const labelKey = item.translationKey;
-      const title = item.title ?? (labelKey ? sidebarT(['/dependencies', '/changelog', '/printables'].includes(pin.itemId) ? `endItems.${labelKey}` : `groups.##default##.items.${labelKey}`) : pin.itemId);
-      return [{ path: pin.itemId, title, icon: item.icon, badgeCount: item.badgeCount, pin }];
+      if ('isExternal' in item && item.isExternal) return [];
+      return [{ path: pin.itemId, title: item.title, icon: item.icon, badgeCount: 'badgeCount' in item ? item.badgeCount : undefined, pin }];
     });
   }, [pins, routes, hasPermission, sidebarT, plugins, sidebarItems]);
+}
+
+function DashboardPage() {
+  const { t } = useTranslations({ en, de });
+  const { data: pins = [], isLoading, isError, refetch } = useDashboardPins();
+  const entries = usePageEntries(pins);
+  const unavailable = pins.filter((pin) => pin.itemType === 'page' && !entries.some((entry) => entry.pin.itemId === pin.itemId));
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }));
 
   const reorder = (from: string, to: string) => {
     const source = pins.findIndex((pin) => `${pin.itemType}:${pin.itemId}` === from);
@@ -80,11 +86,12 @@ function DashboardPage() {
 
   return <section className="p-6">
     <header className="mb-6 flex items-center gap-3"><LayoutDashboardIcon /><div><h1 className="text-2xl font-semibold">{t('title')}</h1><p className="text-sm text-muted">{t('subtitle')}</p></div></header>
-    {!pins.length ? <Card className="p-6"><h2 className="text-lg font-semibold">{t('emptyTitle')}</h2><p className="mt-2">{t('emptyDescription')}</p><Link className="mt-3 underline" to="/resources">{t('resources')}</Link></Card> : null}
+    {isError ? <Card className="p-6"><p>Could not load your dashboard.</p><button onClick={() => void refetch()}>{t('retry')}</button></Card> : null}
+    {!isLoading && !isError && pins.length === unavailable.length ? <Card className="p-6"><h2 className="text-lg font-semibold">{t('emptyTitle')}</h2><p className="mt-2">{t('emptyDescription')}</p><Link className="mt-3 underline" to="/resources">{t('resources')}</Link></Card> : null}
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={({ active, over }) => { if (over) reorder(String(active.id), String(over.id)); }}>
     <SortableContext items={pins.map((pin) => `${pin.itemType}:${pin.itemId}`)} strategy={rectSortingStrategy}>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {pins.map((pin) => pin.itemType === 'page' ? (() => {
+      {!isError && pins.map((pin) => pin.itemType === 'page' ? (() => {
         const entry = entries.find((item) => item.pin.itemId === pin.itemId);
         if (!entry) return null;
         return <SortablePageCard key={entry.pin.itemId} id={`page:${entry.pin.itemId}`} className="flex flex-row items-center gap-3 p-4">
@@ -97,6 +104,7 @@ function DashboardPage() {
       })() : <ResourcePinCard key={`resource:${pin.itemId}`} pin={pin} openLabel={t('open')} resourceLabel={t('resource')} unpinLabel={t('unpin')} onUnpin={() => removePin(pin)} />)}
     </div>
     </SortableContext></DndContext>
+    {!isError && !!unavailable.length && <div className="mt-6"><h2 className="mb-3 font-semibold">{t('unavailable')}</h2>{unavailable.map((pin) => <Card key={pin.itemId} className="mb-2 flex items-center justify-between p-4"><span>{pin.itemId}</span><button aria-label={`${t('unpin')} ${pin.itemId}`} onClick={() => removePin(pin)}>★</button></Card>)}</div>}
   </section>;
 }
 
@@ -107,13 +115,9 @@ function SortablePageCard({ id, className, children }: { id: string; className?:
 
 function ResourcePinCard({ pin, openLabel, resourceLabel, unpinLabel, onUnpin }: { pin: Pin; openLabel: string; resourceLabel: string; unpinLabel: string; onUnpin: () => void }) {
   const id = Number(pin.itemId);
-  const { data: resource, isLoading, isError } = useResourcesServiceGetOneResourceById({ id }, undefined, { enabled: Number.isSafeInteger(id) && id > 0, retry: false });
-  if (isLoading) return <Card className="p-4">Loading {resourceLabel.toLowerCase()}…</Card>;
-  if (isError || !resource) return <Card className="flex flex-row items-center gap-3 p-4"><span className="flex-1">{resourceLabel}</span><button aria-label={`${unpinLabel} ${resourceLabel}`} onClick={onUnpin}>★</button></Card>;
+  const name = pin.resourceName ?? resourceLabel;
   return <SortableResourceCard id={`resource:${pin.itemId}`} className="flex flex-col gap-3 rounded-xl border border-default-200 bg-content1 p-4">
-    <div className="flex flex-row items-center justify-between p-3"><GripVerticalIcon size={18} className="touch-none cursor-grab text-muted" /><h2 className="font-semibold">{resource.name}</h2><button aria-label={`${unpinLabel} ${resource.name}`} onClick={onUnpin}>★</button></div>
-    <div className="flex justify-end"><StatusChip resourceId={id} /></div>
-    <ResourceUsageSession resourceId={id} resource={resource} />
+    <div className="flex flex-row items-center justify-between p-3"><GripVerticalIcon size={18} className="touch-none cursor-grab text-muted" /><h2 className="font-semibold">{name}</h2><button aria-label={`${unpinLabel} ${name}`} onClick={onUnpin}>★</button></div>
     <Link className="mt-3 inline-block underline" to={`/resources/${id}`}>{openLabel}</Link>
   </SortableResourceCard>;
 }

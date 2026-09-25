@@ -50,8 +50,23 @@ describe('DashboardPinsService', () => {
     expect(deletePins).not.toHaveBeenCalled();
   });
 
-  it('rejects non-sidebar paths and dashboard or kiosk routes', async () => {
-    for (const itemId of ['/dashboard', '/kiosk/123', '/not-a-sidebar-route']) {
+  it('accepts canonical plugin sidebar paths alongside core and resource pins', async () => {
+    (resourceRepository.find as jest.Mock).mockResolvedValue([{ id: 7 }]);
+    const items = [
+      { itemType: 'page' as const, itemId: '/plugin-report' },
+      { itemType: 'page' as const, itemId: '/projects' },
+      { itemType: 'resource' as const, itemId: '7' },
+    ];
+    expect(await service.replace(5, items)).toEqual(items);
+    expect(insertPins).toHaveBeenCalledWith(items.map((item, position) => ({ ...item, userId: 5, position })));
+    (pinRepository.find as jest.Mock).mockResolvedValue(items.map((item, position) => ({ ...item, id: position + 1, userId: 5, position })));
+    (resourceRepository.find as jest.Mock).mockResolvedValue([{ id: 7, name: 'Printer' }]);
+    expect(await service.get(5)).toEqual([...items.slice(0, 2), { ...items[2], resourceName: 'Printer' }]);
+    expect(await service.replace(5, items.slice(0, 2))).toEqual(items.slice(0, 2));
+  });
+
+  it('rejects noncanonical paths and unsupported core routes', async () => {
+    for (const itemId of ['/dashboard', '/kiosk/123', '/resources/123', '//plugin-report', '/plugin-report?x=1', 'https://example.com']) {
       await expect(service.replace(5, [{ itemType: 'page', itemId }])).rejects.toBeInstanceOf(BadRequestException);
     }
   });
@@ -63,7 +78,13 @@ describe('DashboardPinsService', () => {
     ]);
     (resourceRepository.find as jest.Mock).mockResolvedValue([]);
     expect(await service.get(5)).toEqual([{ itemType: 'page', itemId: '/projects' }]);
-    expect(pinRepository.delete).toHaveBeenCalledWith({ userId: 5, itemType: 'resource', itemId: '42' });
+    expect(pinRepository.delete).toHaveBeenCalledWith({ userId: 5, id: In([2]) });
     expect(deletePins).not.toHaveBeenCalled();
+  });
+
+  it('rejects noncanonical resource IDs', async () => {
+    for (const itemId of ['007', '7.0', '7e0', ' 7', '+7', '9007199254740992']) {
+      await expect(service.replace(5, [{ itemType: 'resource', itemId }])).rejects.toBeInstanceOf(BadRequestException);
+    }
   });
 });

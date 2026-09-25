@@ -9,8 +9,10 @@ export type Pin = { itemType: 'page' | 'resource'; itemId: string; resourceName?
 const key = ['dashboard', 'pins'];
 const changedEvent = 'attraccess:dashboard-pins-changed';
 const getPins = async (): Promise<Pin[]> => (await DashboardService.dashboardGetPins()) as unknown as Pin[];
-const savePins = async (items: Pin[]): Promise<Pin[]> =>
-  (await DashboardService.dashboardUpdatePins({ requestBody: { items } })) as unknown as Pin[];
+const savePins = async (items: Pin[]): Promise<Pin[]> => {
+  const saved = (await DashboardService.dashboardUpdatePins({ requestBody: { items: items.map(({ itemType, itemId }) => ({ itemType, itemId })) } })) as unknown as Pin[];
+  return saved.map((pin) => ({ ...pin, resourceName: items.find((item) => item.itemType === pin.itemType && item.itemId === pin.itemId)?.resourceName }));
+};
 let writeQueue = Promise.resolve<unknown>(undefined);
 export async function updateDashboardPins(update: (items: Pin[]) => Pin[]) {
   const write = writeQueue.then(async () => savePins(update(await getPins())));

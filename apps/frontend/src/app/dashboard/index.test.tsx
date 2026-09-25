@@ -14,13 +14,13 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 }));
 vi.mock('../routes', () => ({ useAllRoutes: () => {
   const plugins = usePluginState((state) => state.plugins);
-  return [...['/projects', '/messages', '/devices/companion'].map((path) => ({ path, authRequired: true })),
+    return [...['/projects', '/messages', '/devices/companion', '/printables'].map((path) => ({ path, authRequired: true })),
     ...plugins.flatMap((manifest) => manifest.plugin.getRoutes?.() ?? [])];
 } }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
 vi.mock('../layout/sidebarItems', async (importOriginal) => {
   const original = await importOriginal<typeof import('../layout/sidebarItems')>();
-  return { ...original, useSidebarItems: () => original.SIDEBAR_ITEMS, buildSidebarEndItems: () => [] };
+  return { ...original, useSidebarItems: () => original.SIDEBAR_ITEMS, buildSidebarEndItems: () => original.buildSidebarEndItems('', '') };
 });
 const page = (itemId: string) => ({ itemType: 'page', itemId });
 function mount(element: React.ReactNode) {
@@ -34,11 +34,12 @@ describe('Dashboard', () => {
     usePluginState.setState({ plugins: [], isInitialized: true });
   });
 
-  it('uses sidebar labels for default and grouped page pins', async () => {
-    getPins.mockResolvedValue([page('/projects'), page('/devices/companion')]);
+  it('uses sidebar labels for default, grouped and end-group page pins', async () => {
+    getPins.mockResolvedValue([page('/projects'), page('/devices/companion'), page('/printables')]);
     mount(<DashboardPage />);
     expect(await screen.findByRole('link', { name: 'Projects' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Companion App' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '3D Models' })).toBeInTheDocument();
   });
 
   it('falls back to resources when the only pin cannot be resolved, but lets users remove it on the dashboard', async () => {
@@ -47,6 +48,14 @@ describe('Dashboard', () => {
     expect(await screen.findByText('Resources landing')).toBeInTheDocument();
     mount(<DashboardPage />);
     expect(await screen.findByRole('button', { name: 'Unpin /uninstalled-plugin' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No available shortcuts' })).toBeInTheDocument();
+  });
+
+  it('renders resource names from the batched pins response without resource detail requests', async () => {
+    getPins.mockResolvedValue([{ itemType: 'resource', itemId: '7', resourceName: 'Printer' }]);
+    mount(<DashboardPage />);
+    expect(await screen.findByRole('heading', { name: 'Printer' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open resource' })).toHaveAttribute('href', '/resources/7');
   });
 
   it('falls back for empty pins without waiting for plugin discovery', async () => {
