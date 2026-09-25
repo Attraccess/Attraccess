@@ -93,7 +93,6 @@ const commissioningActions: PluginAuditActionPolicy[] = [
   'platform_inspect',
   'platform_activate',
   'platform_recover',
-  'lease_recover',
 ].map((action) => ({ action: `wago.commissioning.${action}`, subjectTypes: ['wago.commissioning'] }));
 
 export const WAGO_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {

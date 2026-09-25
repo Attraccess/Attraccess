@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import Module from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -37,6 +37,18 @@ export async function verifyPackedPlugin(
     for (const entry of Object.values(pkg.attraccess ?? {})) {
       if (typeof entry === 'string' && entry.includes('/') && !existsSync(join(extracted, entry))) {
         throw new Error(`Packed plugin entry is unreadable: ${entry}`);
+      }
+    }
+    if (pkg.attraccess?.frontend) {
+      const frontendDir = dirname(join(extracted, pkg.attraccess.frontend));
+      for (const entry of readdirSync(frontendDir)) {
+        if (!entry.endsWith('.js')) continue;
+        const source = readFileSync(join(frontendDir, entry), 'utf8');
+        if (/\bQueryClientContext\s*=\s*[^;]*\.createContext\(/.test(source)) {
+          throw new Error(
+            `Packed plugin bundles a private React Query context in ${entry}; share @tanstack/react-query with the host`,
+          );
+        }
       }
     }
 

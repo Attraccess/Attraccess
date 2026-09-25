@@ -213,11 +213,24 @@ export class PluginService {
     }
 
     const potentialPluginFolders = readdirSync(rootFolder);
+    // npm packages are active only while their installation is tracked. A failed or
+    // interrupted removal may leave files behind; loading them alongside an uploaded
+    // copy of the same plugin would register its flow nodes and audit domains twice.
+    const npmInstalls = new Set(
+      PluginService.readJsonFile<Array<{ installPath?: unknown }>>('.npm-plugin-state.json', [])
+        .map((record) => record?.installPath)
+        .filter((path): path is string => typeof path === 'string'),
+    );
 
     PluginService.logger.log(`Found ${potentialPluginFolders.length} folders in ${rootFolder}`);
 
     return potentialPluginFolders
-      .filter((pluginFolder) => !pluginFolder.startsWith('.') && !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder))
+      .filter(
+        (pluginFolder) =>
+          !pluginFolder.startsWith('.') &&
+          !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder) &&
+          (!/^npm-[A-Za-z0-9_-]+$/.test(pluginFolder) || npmInstalls.has(pluginFolder)),
+      )
       .map((pluginFolder) => {
         const manifest = PluginService.findPluginManifestInPluginFolder(
           rootFolder,

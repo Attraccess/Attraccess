@@ -83,6 +83,15 @@ test('verifies actual packed entries and removes archives after success or failu
       readdirSync(packageDir).some((file) => file.endsWith('.tgz')),
       false,
     );
+    writeFileSync(path.join(packageDir, 'frontend/chunk.js'), 'var QueryClientContext = React.createContext(void 0);');
+    await assert.rejects(
+      verifyPackedPlugin(packageDir, ['frontend/index.js'], workspace),
+      /private React Query context/,
+    );
+    assert.equal(
+      readdirSync(packageDir).some((file) => file.endsWith('.tgz')),
+      false,
+    );
     await assert.rejects(verifyPackedPlugin(packageDir, ['missing.js'], workspace), /missing missing.js/);
     assert.equal(
       readdirSync(packageDir).some((file) => file.endsWith('.tgz')),

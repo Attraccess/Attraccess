@@ -36,8 +36,6 @@ import { WagoCommissioningService } from '../backend/wago-commissioning.service'
 import { CLOCK_INSPECTION_SCRIPT } from '../backend/wago-commissioning-clock';
 import { fw31IdentityOutput } from '../backend/fixtures/fw31-identity';
 import { WagoCommissioningSession } from '../backend/wago-commissioning-session.entity';
-import { commissioningFingerprintHash } from '../backend/wago-commissioning-lease';
-import { WagoCommissioningLeaseEntity } from '../backend/wago-commissioning-lease.entity';
 import { WagoRuntimeArtifactsService } from '../backend/wago-runtime-artifacts';
 import { WagoCredentialRotationService } from '../backend/wago-credential-rotation';
 import { WagoCredentialRotationEntity } from '../backend/wago-credential-rotation.entity';
@@ -531,7 +529,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await lifecycle('unclaim', controller.id);
   }, 30_000);
 
-  it('reopens encrypted pending rotation and retries the same handoff only after explicit operation recovery', async () => {
+  it('reopens encrypted pending rotation and retries the same handoff', async () => {
     const controller = await deliverAndClaim();
     await rotationReady(controller);
     const rotate = observeRotationProvider();
@@ -545,10 +543,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(pending).toMatchObject({ phase: 'pending', revision: 1 });
     expect(pending.encryptedCredentials).not.toContain(privateValue);
     const failedEvidence = await lifecycle('credential_rotation', controller.id, 'failed');
-    const lease = await db
-      .getRepository(WagoCommissioningLeaseEntity)
-      .findOneByOrFail({ fingerprintHash: commissioningFingerprintHash(session.hostKeyFingerprint) });
-    await remove(controller.id).expect(409);
     await app.close();
     wago.onModuleDestroy();
     await audit.onModuleDestroy();
@@ -563,21 +557,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await mountApi();
     expect(await rotationRecord(controller.id)).toEqual(pending);
     expect(await rows('credential_rotation')).toEqual(failedEvidence);
-    await post(`controllers/${controller.id}/credentials/rotate`, { confirm: true, retry: true }).expect(409);
-    // Advance only this isolated fixture's lease timestamps to represent the real recovery waiting period.
-    await db.getRepository(WagoCommissioningLeaseEntity).update(
-      { fingerprintHash: lease.fingerprintHash },
-      {
-        leaseUntil: Date.now() - 3_000,
-        operationUntil: Date.now() - 2_000,
-        recoveryAfter: Date.now() - 1_000,
-      },
-    );
-    await post(`commissioning/sessions/${session.id}/operation/recover`, {
-      owner: lease.owner,
-      previousWorkerStopped: true,
-      temporarySsh: { username: 'root', password: privateValue },
-    }).expect(201, { state: 'available' });
     // Broker credentials have already changed: recovery remains possible without fresh runtime liveness.
     await db
       .getRepository(WagoController)
@@ -598,7 +577,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     });
     expect(rotate).toHaveBeenCalledTimes(1);
     expect((await rotationRecord(controller.id)).encryptedCredentials).toBeNull();
-    expect(await db.getRepository(WagoCommissioningLeaseEntity).count()).toBe(0);
     const evidence = await rows('credential_rotation');
     expect(evidence.map((row) => row.outcome)).toEqual(['attempted', 'failed', 'attempted', 'succeeded']);
     expect(evidence[2].operationId).toBe(evidence[3].operationId);
@@ -607,7 +585,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(JSON.stringify(evidence)).not.toContain(pending.token);
   });
 
-  it('bounds a stalled rotation dispatch and retains encrypted recovery plus the commissioning lease', async () => {
+  it('bounds a stalled rotation dispatch and retains encrypted recovery', async () => {
     const controller = await deliverAndClaim();
     await rotationReady(controller);
     const rotate = observeRotationProvider();
@@ -620,9 +598,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect((await rotationRecord(controller.id)).phase).toBe('pending');
     expect((await rotationRecord(controller.id)).encryptedCredentials).not.toContain(privateValue);
     await lifecycle('credential_rotation', controller.id, 'failed');
-    expect(await db.getRepository(WagoCommissioningLeaseEntity).count()).toBe(1);
-    await remove(controller.id).expect(409);
-    expect(await rows('unclaim')).toHaveLength(0);
   }, 45_000);
 
   it('rejects unauthenticated lifecycle requests before creating audit evidence', async () => {
@@ -708,14 +683,11 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(JSON.stringify(await db.getRepository(AuditLog).find())).not.toContain(privateValue);
   });
 
-  it('records exactly one unclaim inside the live removal lease and retains success after session cleanup fails', async () => {
+  it('records exactly one unclaim and retains success after session cleanup fails', async () => {
     const controller = await deliverAndClaim();
     const original = audit.record.bind(audit);
     jest.spyOn(audit, 'record').mockImplementation(async (event) => {
       if (event.action === 'wago.unclaim') {
-        const leases = await db.getRepository(WagoCommissioningLeaseEntity).find();
-        expect(leases).toHaveLength(1);
-        expect(Number(leases[0].leaseUntil)).toBeGreaterThan(Date.now());
         const persisted = await db.getRepository(WagoController).findOneBy({ id: controller.id });
         expect(Boolean(persisted)).toBe(event.outcome === 'attempted');
       }
@@ -728,21 +700,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await remove(controller.id).expect(500);
     await lifecycle('unclaim', controller.id);
     expect(await db.getRepository(WagoController).findOneBy({ id: controller.id })).toBeNull();
-    expect(await db.getRepository(WagoCommissioningLeaseEntity).count()).toBe(0);
-  });
-
-  it('emits no unclaim when another owner holds the lease', async () => {
-    const controller = await deliverAndClaim();
-    await db.getRepository(WagoCommissioningLeaseEntity).insert({
-      fingerprintHash: commissioningFingerprintHash(session.hostKeyFingerprint),
-      owner: 'independent-fixture-worker',
-      leaseUntil: Date.now() + 90_000,
-      operationUntil: Date.now() + 120_000,
-      recoveryAfter: Date.now() + 150_000,
-    });
-    await remove(controller.id).expect(409);
-    expect(await rows('unclaim')).toHaveLength(0);
-    expect(await db.getRepository(WagoController).findOneBy({ id: controller.id })).not.toBeNull();
   });
 
   it('records failed unclaim on credential revocation failure without deleting the controller', async () => {
@@ -939,7 +896,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(JSON.stringify(await rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 
-  it('preserves acknowledged credentials and the durable recovery lease when the later publish receipt fails', async () => {
+  it('preserves acknowledged credentials when the later publish receipt fails', async () => {
     const { controller, provision } = await manuallyEnrolledController();
     // Associate the manually enrolled controller with a real pinned commissioning session.
     await db.getRepository(WagoCommissioningSession).update(session.id, {
@@ -963,11 +920,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       expect.objectContaining({ identity: 'wago-controller-manual-fixture' }),
     ]);
     expect((await db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).trustState).toBe('claimed');
-    const leases = await db.getRepository(WagoCommissioningLeaseEntity).find();
-    expect(leases).toHaveLength(1);
-    expect(leases[0].fingerprintHash).toBe(commissioningFingerprintHash(session.hostKeyFingerprint));
-    await remove(controller.id).expect(409);
-    expect(await rows('unclaim')).toHaveLength(0);
     expect(JSON.stringify(await rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 

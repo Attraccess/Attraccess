@@ -43,17 +43,13 @@ controller recovery rather than a claim of successful rotation.
 
 An interruption between the broker mutation and saving its returned credential
 leaves a `provisioning` recovery record. The broker outcome is uncertain and automatic
-re-rotation is refused. Explicit controller removal can recover this state: recover
-the controller-operation lease first, validate the original broker, revoke its
+re-rotation is refused. Explicit controller removal can recover this state: validate the original broker, revoke its
 credential with the existing removal workflow, and then delete its registration.
 The recovery row is deleted by the controller foreign-key cascade. Manual broker
 instructions alone never count as completed revocation or rotation.
 
-All operations run within the existing controller-operation lease. The owner must
-pass its `assertOwned`, abort signal, and deadline into the rotation service,
-retain the lease on `WagoCredentialRotationUncertainError`, and call
-`assertRemovalBroker` before existing removal revokes credentials. The module owns
-no second controller lock. Register `WagoCredentialRotationEntity`,
+Operations use the in-process controller queue. Pass its cancellation signal and deadline into the rotation service.
+Call `assertRemovalBroker` before removal revokes credentials. Register `WagoCredentialRotationEntity`,
 `WagoCredentialRotationService`, and `WagoCredentialRotation1780010610000` in the
 plugin. The HTTP owner must authenticate with `system.settings.manage`, derive the
 principal from the authenticated request, and require explicit rotation/retry intent.

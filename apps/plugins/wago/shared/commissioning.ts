@@ -1,8 +1,4 @@
 /** Data-only browser/server contracts; never import server implementations into the UI. */
-export type CommissioningLeaseStatus =
-  | { state: 'available' }
-  | { state: 'active' | 'stale'; owner: string; leaseUntil: number; operationUntil: number; recoveryAfter: number };
-
 export interface WagoHardwareDeploymentReport {
   version: '1';
   platform: 'supported' | 'unsupported-firmware';
