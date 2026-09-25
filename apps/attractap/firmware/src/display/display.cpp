@@ -1,5 +1,6 @@
 #include "display.hpp"
 #include "theme.hpp"
+#include "i18n.hpp"
 #include <vector>
 #include <string>
 #include <functional>
@@ -78,6 +79,18 @@ int16_t Display::gestureStartY = 0;
 // Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
 // to ensure LVGL is fully running before creating overlay objects.
 static bool s_touchWarningPending = false;
+static std::string s_renderedLanguage;
+
+static void refreshVisibleTextForLanguageChange()
+{
+    const std::string language = State::getActiveLanguage();
+    if (language == s_renderedLanguage) return;
+    s_renderedLanguage = language;
+    if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
+    FirmwareI18n::refreshTree(Display::activePopup, language);
+    FirmwareI18n::refreshTree(Display::drawerPanel, language);
+    FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
+}
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -363,6 +376,7 @@ void Display::loop()
 #ifdef ATTRACTAP_HOST
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
     return;
 #endif
@@ -374,12 +388,13 @@ void Display::loop()
     if (s_touchWarningPending)
     {
         s_touchWarningPending = false;
-        Display::showErrorPopup("Touch Unavailable",
-                                "Touch panel not detected.\nCheck hardware and reboot.");
+        Display::showErrorPopup("Berührung nicht verfügbar",
+                                "Das Touch-Panel wurde nicht erkannt.\nBitte Hardware prüfen und neu starten.");
     }
 
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
 
     lv_unlock();

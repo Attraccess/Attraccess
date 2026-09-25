@@ -2,6 +2,7 @@
 // FEATURE: Cross-task state synchronization for network and API status
 
 #include "state.hpp"
+#include "language.hpp"
 #include <string>
 
 struct StateLock
@@ -224,29 +225,17 @@ void State::setUserLanguage(std::string language)
 {
     StateLock lock(state_mutex);
     user_authenticated = !language.empty();
-    for (char &character : language)
-    {
-        if (character == '_') character = '-';
-        else if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
-    }
-    const std::string baseLanguage = language.substr(0, language.find('-'));
-    active_user_language = baseLanguage == "de" ? "de" : "en";
+    active_user_language = Language::supported(language);
 }
 
 void State::setDefaultLanguage(std::string language)
 {
     StateLock lock(state_mutex);
-    for (char &character : language)
-    {
-        if (character == '_') character = '-';
-        else if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
-    }
-    const std::string baseLanguage = language.substr(0, language.find('-'));
-    active_default_language = baseLanguage == "de" ? "de" : "en";
+    active_default_language = Language::supported(language);
 }
 
 std::string State::getActiveLanguage()
 {
     StateLock lock(state_mutex);
-    return user_authenticated ? active_user_language : active_default_language;
+    return Language::active(user_authenticated, active_user_language, active_default_language);
 }

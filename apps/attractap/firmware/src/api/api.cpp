@@ -143,11 +143,11 @@ void API::processIncomingMessage(const char *buf, size_t len)
                 }
                 else
                 {
+                    // Preserve the raw server value for diagnostics even when
+                    // no UI error callback is currently registered.
+                    this->logger.error((std::string("Reader reported error: ") + err).c_str());
                     if (this->errorCallback)
                     {
-                        // Keep the server's original code/message in diagnostics before
-                        // translating it for the user-facing popup.
-                        this->logger.error((std::string("Reader reported error: ") + err).c_str());
                         this->errorCallback("Fehler", translateReaderError(err).c_str());
                     }
                 }

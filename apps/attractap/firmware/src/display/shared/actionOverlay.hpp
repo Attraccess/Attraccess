@@ -1,5 +1,7 @@
 #pragma once
 
+#include "display/i18n.hpp"
+
 #include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
 
@@ -41,8 +43,8 @@ public:
             lv_obj_align(description, LV_ALIGN_TOP_MID, 0, 112);
             lv_label_set_long_mode(description, LV_LABEL_LONG_DOT);
         }
-        lv_label_set_text(heading, title ? title : "Bitte warten");
-        lv_label_set_text(description, resource ? resource : "");
+        FirmwareI18n::setLabel(heading, title ? title : "Bitte warten");
+        FirmwareI18n::setLabel(description, resource ? resource : "");
         lv_obj_remove_flag(root, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(root);
     }

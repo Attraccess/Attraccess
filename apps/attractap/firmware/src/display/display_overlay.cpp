@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "display.hpp"
 #include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
@@ -39,7 +40,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_x(Display::deviceNameLabel, -75);
     lv_obj_set_y(Display::deviceNameLabel, -18);
     lv_obj_set_align(Display::deviceNameLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(Display::deviceNameLabel, Display::deviceNameInitValue.c_str());
+    FirmwareI18n::setLabel(Display::deviceNameLabel, Display::deviceNameInitValue.c_str());
 
     lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -49,7 +50,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_width(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_height(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(firmwareLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str());
+    FirmwareI18n::setLabel(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str());
     lv_obj_set_style_text_color(firmwareLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(firmwareLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(firmwareLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -71,7 +72,7 @@ void Display::initDeviceOverlay()
     lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
 
     Display::networkQualityLabel = lv_label_create(Display::networkQualityContainer);
-    lv_label_set_text(Display::networkQualityLabel, "! NET");
+    FirmwareI18n::setLabel(Display::networkQualityLabel, "! NET");
     lv_obj_set_style_text_color(Display::networkQualityLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(Display::networkQualityLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
@@ -97,18 +98,18 @@ void Display::updateNetworkQualityOverlay()
     case State::NETWORK_QUALITY_GOOD:
         lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_label_set_text(Display::networkQualityLabel, "OK NET");
+        FirmwareI18n::setLabel(Display::networkQualityLabel, "OK NET");
         break;
     case State::NETWORK_QUALITY_DEGRADED:
         lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_label_set_text(Display::networkQualityLabel, "! NET");
+        FirmwareI18n::setLabel(Display::networkQualityLabel, "! NET");
         break;
     case State::NETWORK_QUALITY_OFFLINE:
     default:
         lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_label_set_text(Display::networkQualityLabel, "x NET");
+        FirmwareI18n::setLabel(Display::networkQualityLabel, "x NET");
         break;
     }
 }
@@ -133,7 +134,7 @@ void Display::setDeviceName(std::string deviceName)
         {
             if (Display::deviceNameLabel)
             {
-                lv_label_set_text(Display::deviceNameLabel, (const char *)p);
+                FirmwareI18n::setLabel(Display::deviceNameLabel, (const char *)p);
             }
             free(p);
         },

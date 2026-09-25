@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #ifdef DEMO_MODE
 
 #include "demoSettingsScreen.hpp"
@@ -38,7 +39,7 @@ void DemoSettingsScreen::init()
     lv_obj_set_style_pad_hor(titleBar, 16, LV_PART_MAIN);
 
     lv_obj_t *title = lv_label_create(titleBar);
-    lv_label_set_text(title, "Demo Einstellungen");
+    FirmwareI18n::setLabel(title, "Demo Einstellungen");
     lv_obj_set_style_text_color(title, DisplayTheme::onPrimarySoft(), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, LV_PART_MAIN);
 
@@ -59,7 +60,7 @@ void DemoSettingsScreen::init()
     DisplayTheme::button(addBtn);
     lv_obj_add_event_cb(addBtn, &DemoSettingsScreen::onAddCardBtn, LV_EVENT_CLICKED, this);
     lv_obj_t *addLbl = lv_label_create(addBtn);
-    lv_label_set_text(addLbl, "Karte hinzufügen");
+    FirmwareI18n::setLabel(addLbl, "Karte hinzufügen");
     lv_obj_set_align(addLbl, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(addLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(addLbl, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
@@ -139,7 +140,7 @@ void DemoSettingsScreen::rebuildCardList()
     if (count == 0)
     {
         lv_obj_t *emptyLbl = lv_label_create(_cardList);
-        lv_label_set_text(emptyLbl, "Noch keine Karten registriert.");
+        FirmwareI18n::setLabel(emptyLbl, "Noch keine Karten registriert.");
         lv_obj_set_style_text_color(emptyLbl, DisplayTheme::muted(), LV_PART_MAIN);
         lv_obj_set_style_text_font(emptyLbl, &lv_font_montserrat_20, LV_PART_MAIN);
         return;
@@ -185,14 +186,14 @@ void DemoSettingsScreen::rebuildCardList()
         lv_obj_t *nameLbl = lv_label_create(nameCol);
         lv_obj_set_width(nameLbl, lv_pct(100));
         const char *displayName = (card.label[0] != '\0') ? card.label : uidShort;
-        lv_label_set_text(nameLbl, displayName);
+        FirmwareI18n::setLabel(nameLbl, displayName);
         lv_label_set_long_mode(nameLbl, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_color(nameLbl, DisplayTheme::text(), LV_PART_MAIN);
         lv_obj_set_style_text_font(nameLbl, &lv_font_montserrat_20, LV_PART_MAIN);
 
         lv_obj_t *roleLbl = lv_label_create(nameCol);
         lv_obj_set_width(roleLbl, lv_pct(100));
-        lv_label_set_text(roleLbl, DemoStore::roleName(card.role));
+        FirmwareI18n::setLabel(roleLbl, DemoStore::roleName(card.role));
         lv_color_t roleColor = DisplayTheme::muted();
         switch (card.role) {
         case DemoStore::UserRole::INTRODUCED: roleColor = DisplayTheme::success(); break;
@@ -209,7 +210,7 @@ void DemoSettingsScreen::rebuildCardList()
         _delPayloads[i] = {this, i};
         lv_obj_add_event_cb(delBtn, &DemoSettingsScreen::onDeleteCardBtn, LV_EVENT_CLICKED, &_delPayloads[i]);
         lv_obj_t *delBtnInner = lv_label_create(delBtn);
-        lv_label_set_text(delBtnInner, "Löschen");
+        FirmwareI18n::setLabel(delBtnInner, "Löschen");
         lv_obj_set_align(delBtnInner, LV_ALIGN_CENTER);
         lv_obj_set_style_text_color(delBtnInner, DisplayTheme::onPrimary(), LV_PART_MAIN);
         lv_obj_set_style_text_font(delBtnInner, &attractap_font_montserrat_latin1_14, LV_PART_MAIN);
@@ -238,7 +239,7 @@ void DemoSettingsScreen::showScanOverlay()
     lv_obj_set_style_pad_row(_scanOverlay, 24, LV_PART_MAIN);
 
     lv_obj_t *lbl = lv_label_create(_scanOverlay);
-    lv_label_set_text(lbl, "Karte ans Lesegerät halten...");
+    FirmwareI18n::setLabel(lbl, "Karte ans Lesegerät halten...");
     lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, &attractap_font_montserrat_latin1_24, LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
@@ -248,7 +249,7 @@ void DemoSettingsScreen::showScanOverlay()
     DisplayTheme::button(cancelBtn);
     lv_obj_add_event_cb(cancelBtn, &DemoSettingsScreen::onCancelScanBtn, LV_EVENT_CLICKED, this);
     lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
-    lv_label_set_text(cancelLbl, "Abbrechen");
+    FirmwareI18n::setLabel(cancelLbl, "Abbrechen");
     lv_obj_set_align(cancelLbl, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(cancelLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(cancelLbl, &lv_font_montserrat_20, LV_PART_MAIN);
@@ -295,7 +296,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     char titleBuf[64];
     snprintf(titleBuf, sizeof(titleBuf), "Rolle für Karte %s", uid.c_str());
     lv_obj_t *titleLbl = lv_label_create(_rolePicker);
-    lv_label_set_text(titleLbl, titleBuf);
+    FirmwareI18n::setLabel(titleLbl, titleBuf);
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN);
     lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_20, LV_PART_MAIN);
     lv_label_set_long_mode(titleLbl, LV_LABEL_LONG_WRAP);
@@ -320,7 +321,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
         lv_obj_add_event_cb(btn, &DemoSettingsScreen::onRolePickerBtn, LV_EVENT_CLICKED, &_rolePayloads[j]);
 
         lv_obj_t *lbl = lv_label_create(btn);
-        lv_label_set_text(lbl, entry.label);
+        FirmwareI18n::setLabel(lbl, entry.label);
         lv_obj_set_align(lbl, LV_ALIGN_CENTER);
         lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);

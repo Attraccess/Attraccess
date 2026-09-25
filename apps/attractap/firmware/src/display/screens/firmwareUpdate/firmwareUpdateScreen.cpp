@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "firmwareUpdateScreen.hpp"
 #include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
@@ -36,7 +37,7 @@ void FirmwareUpdateScreen::init()
     lv_obj_set_x(this->title, 0);
     lv_obj_set_y(this->title, -50);
     lv_obj_set_align(this->title, LV_ALIGN_CENTER);
-    lv_label_set_text(this->title, "Softwareaktualiesierung");
+    FirmwareI18n::setLabel(this->title, "Softwareaktualiesierung");
     lv_obj_set_style_text_color(this->title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(this->title, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -57,7 +58,7 @@ void FirmwareUpdateScreen::init()
     else
     {
         std::string placeholder = std::string(FIRMWARE_VERSION) + " -> ??.??.??";
-        lv_label_set_text(this->versionsLabel, placeholder.c_str());
+        FirmwareI18n::setLabel(this->versionsLabel, placeholder.c_str());
     }
 
     this->setProgress(this->progressPercent);
@@ -86,7 +87,7 @@ void FirmwareUpdateScreen::setAvailableVersion(std::string availablevVersion)
         return;
     }
     std::string s = std::string(FIRMWARE_VERSION) + " -> " + availablevVersion;
-    lv_label_set_text(this->versionsLabel, s.c_str());
+    FirmwareI18n::setLabel(this->versionsLabel, s.c_str());
 }
 
 void FirmwareUpdateScreen::setProgress(int percent)

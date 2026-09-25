@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "pinInputPage.hpp"
 #include "display/theme.hpp"
 #include "display/fonts/attractap_fonts.hpp"
@@ -32,7 +33,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     lv_obj_set_width(this->labelForDevicePin, lv_pct(100));
     lv_obj_set_height(this->labelForDevicePin, LV_SIZE_CONTENT);
     lv_obj_set_align(this->labelForDevicePin, LV_ALIGN_CENTER);
-    lv_label_set_text(this->labelForDevicePin, title);
+    FirmwareI18n::setLabel(this->labelForDevicePin, title);
     lv_obj_set_style_text_align(this->labelForDevicePin, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->labelForDevicePin, &attractap_font_montserrat_latin1_32, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);

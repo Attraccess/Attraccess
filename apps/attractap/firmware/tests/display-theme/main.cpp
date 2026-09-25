@@ -12,6 +12,8 @@
 #include "display/screens/supervision/supervisionScreen.hpp"
 #include "display/shared/pinInput/pinInputPage.hpp"
 #include "fixtures.hpp"
+#include "state/language.hpp"
+#include "display/i18n.hpp"
 
 #include <algorithm>
 #include <array>
@@ -898,6 +900,32 @@ int main(int argc, char **argv)
         test("theme/automatic-button-states", [&] { testButtons(renderer, false); });
         test("theme/helper-button-states", [&] { testButtons(renderer, true); });
         test("theme/fields-and-keyboard-states", [&] { testInputs(renderer); });
+        test("i18n/default-user-fallback-transitions", [&] {
+            const std::string existingInstallDefault = Language::supported("de");
+            expect(existingInstallDefault == "de", "Existing installations retain German default");
+            const std::string setupBrowserDefault = Language::supported("DE-at");
+            expect(setupBrowserDefault == "de", "Setup browser locale resolves to supported base language");
+            expect(Language::supported("en-US") == "en", "English browser locale resolves to English");
+            expect(Language::supported("fr-CA") == "en", "Unsupported browser and device locales fall back to English");
+            expect(Language::active(false, "de", "en") == "en", "Unauthenticated display uses system default");
+            expect(Language::active(true, "de-AT", "en") == "de", "Authenticated display uses first user's locale");
+            expect(Language::active(true, "en-US", "de") == "en", "Changing users changes the active locale");
+            expect(Language::active(false, "en", "de") == "de", "Ending authentication returns to system default");
+            expect(std::string(Language::text("English fallback", "", "de")) == "English fallback",
+                   "Missing locale translation falls back to English");
+            expect(std::string(FirmwareI18n::translateForLocale("Sitzung beenden", "en")) == "End session",
+                   "Shared display catalog resolves German screen strings to English");
+            expect(std::string(FirmwareI18n::translateForLocale("End session", "de")) == "Sitzung beenden",
+                   "Visible labels can refresh back to German");
+            auto *root = lv_obj_create(lv_screen_active());
+            auto *label = lv_label_create(root);
+            lv_label_set_text(label, "Sitzung beenden");
+            FirmwareI18n::refreshTree(root, "en-US");
+            expect(std::string(lv_label_get_text(label)) == "End session", "Active visible labels refresh to English");
+            FirmwareI18n::refreshTree(root, "de-DE");
+            expect(std::string(lv_label_get_text(label)) == "Sitzung beenden", "Active visible labels refresh back to German");
+            lv_obj_delete(root);
+        });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });
         test("screen/att-880-authenticated-list", [&] { testAuthenticatedList(renderer); });
         test("screen/restored-backgrounds", [&] { testBackgroundScreens(renderer); });

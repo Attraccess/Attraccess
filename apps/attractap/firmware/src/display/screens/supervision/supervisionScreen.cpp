@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "supervisionScreen.hpp"
 #include "display/theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
@@ -41,7 +42,7 @@ void SupervisionScreen::init()
    lv_obj_t *title = lv_label_create(this->screen);
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   lv_label_set_text(title, "Aufsicht erforderlich");
+   FirmwareI18n::setLabel(title, "Aufsicht erforderlich");
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -52,7 +53,7 @@ void SupervisionScreen::init()
    lv_obj_set_height(this->requesterNameLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->requesterNameLabel, LV_LABEL_LONG_WRAP);
    const char *initialName = this->view.requesterName.length() > 0 ? this->view.requesterName.c_str() : "...";
-   lv_label_set_text(this->requesterNameLabel, initialName);
+   FirmwareI18n::setLabel(this->requesterNameLabel, initialName);
    lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->requesterNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->requesterNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -70,7 +71,7 @@ void SupervisionScreen::init()
    lv_obj_set_width(this->hintLabel, lv_pct(100));
    lv_obj_set_height(this->hintLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->hintLabel, LV_LABEL_LONG_WRAP);
-   lv_label_set_text(this->hintLabel, this->view.supervisorHint.c_str());
+   FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint.c_str());
    lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -88,7 +89,7 @@ void SupervisionScreen::init()
 
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(cancelLabel, "Abbrechen");
+   FirmwareI18n::setLabel(cancelLabel, "Abbrechen");
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -149,7 +150,7 @@ void SupervisionScreen::applyStatus()
       break;
    }
 
-   lv_label_set_text(this->statusLabel, text);
+   FirmwareI18n::setLabel(this->statusLabel, text);
    lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Hide the cancel button once approved — nothing left to cancel.
@@ -177,11 +178,11 @@ void SupervisionScreen::render(const View &view)
    this->timeoutTime = view.deadlineMs;
    if (this->hintLabel)
    {
-       lv_label_set_text(this->hintLabel, this->view.supervisorHint.c_str());
+       FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint.c_str());
    }
    if (this->requesterNameLabel)
    {
-       lv_label_set_text(this->requesterNameLabel, this->view.requesterName.c_str());
+       FirmwareI18n::setLabel(this->requesterNameLabel, this->view.requesterName.c_str());
    }
    this->updateTimeoutBar();
    this->applyStatus();

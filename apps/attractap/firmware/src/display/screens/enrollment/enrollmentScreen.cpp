@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "enrollmentScreen.hpp"
 #include "display/theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
@@ -44,7 +45,7 @@ void EnrollmentScreen::init()
    this->titleLabel = title;
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   lv_label_set_text(title, State::getActiveLanguage() == "en" ? "Register new card" : "Neue Karte registrieren");
+   FirmwareI18n::setLabel(title, State::getActiveLanguage() == "en" ? "Register new card" : "Neue Karte registrieren");
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -55,7 +56,7 @@ void EnrollmentScreen::init()
    lv_obj_set_height(this->userNameLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->userNameLabel, LV_LABEL_LONG_WRAP);
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
-   lv_label_set_text(this->userNameLabel, initialName);
+   FirmwareI18n::setLabel(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -79,7 +80,7 @@ void EnrollmentScreen::init()
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    this->cancelLabel = cancelLabel;
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(cancelLabel, State::getActiveLanguage() == "en" ? "Cancel" : "Abbrechen");
+   FirmwareI18n::setLabel(cancelLabel, State::getActiveLanguage() == "en" ? "Cancel" : "Abbrechen");
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -94,8 +95,8 @@ void EnrollmentScreen::loop()
    if (language != this->renderedLanguage)
    {
       this->renderedLanguage = language;
-      if (this->titleLabel) lv_label_set_text(this->titleLabel, language == "en" ? "Register new card" : "Neue Karte registrieren");
-      if (this->cancelLabel) lv_label_set_text(this->cancelLabel, language == "en" ? "Cancel" : "Abbrechen");
+      if (this->titleLabel) FirmwareI18n::setLabel(this->titleLabel, language == "en" ? "Register new card" : "Neue Karte registrieren");
+      if (this->cancelLabel) FirmwareI18n::setLabel(this->cancelLabel, language == "en" ? "Cancel" : "Abbrechen");
       this->applyStatus();
    }
 }
@@ -149,7 +150,7 @@ void EnrollmentScreen::applyStatus()
       break;
    }
 
-   lv_label_set_text(this->statusLabel, text);
+   FirmwareI18n::setLabel(this->statusLabel, text);
    lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Hide the cancel button once enrollment has succeeded — nothing left to
@@ -183,7 +184,7 @@ void EnrollmentScreen::setUserName(std::string userName)
    this->userNameCache = userName;
    if (this->userNameLabel)
    {
-      lv_label_set_text(this->userNameLabel, userName.c_str());
+      FirmwareI18n::setLabel(this->userNameLabel, userName.c_str());
    }
 }
 

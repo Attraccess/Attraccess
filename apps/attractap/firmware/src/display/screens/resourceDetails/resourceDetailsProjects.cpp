@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "resourceDetailsScreen.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
@@ -165,13 +166,13 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
       return;
    }
 
-   std::string label = "Projekt wählen";
+   std::string label = FirmwareI18n::translate("Projekt wählen");
    if (this->selectedProjectId != 0 && this->selectedProjectName.length() > 0)
    {
-      label = "Projekt: " + this->selectedProjectName;
+      label = std::string(FirmwareI18n::translate("Projekt: ")) + this->selectedProjectName;
    }
 
-   lv_label_set_text(this->projectsButtonLabel, label.c_str());
+   FirmwareI18n::setLabel(this->projectsButtonLabel, label.c_str());
    lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::updateClearProjectButtonState()
@@ -247,7 +248,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_margin_bottom(header, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *title = lv_label_create(header);
-   lv_label_set_text(title, "Projekt auswählen");
+   FirmwareI18n::setLabel(title, "Projekt auswählen");
     lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -257,7 +258,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_pad_all(closeButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(closeButton, &ResourceDetailsScreen::onProjectsModalClose, LV_EVENT_CLICKED, this);
    lv_obj_t *closeLabel = lv_label_create(closeButton);
-   lv_label_set_text(closeLabel, LV_SYMBOL_CLOSE);
+   FirmwareI18n::setLabel(closeLabel, LV_SYMBOL_CLOSE);
    lv_obj_center(closeLabel);
 
    this->projectsListContainer = lv_obj_create(panel);
@@ -288,11 +289,11 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_pad_right(this->projectsPrevButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->projectsPrevButton, &ResourceDetailsScreen::onProjectsPrevPage, LV_EVENT_CLICKED, this);
    lv_obj_t *prevLabel = lv_label_create(this->projectsPrevButton);
-   lv_label_set_text(prevLabel, "Zurück");
+   FirmwareI18n::setLabel(prevLabel, "Zurück");
    lv_obj_set_style_text_font(prevLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    this->projectsPaginationLabel = lv_label_create(footer);
-   lv_label_set_text(this->projectsPaginationLabel, "Seite 1");
+   FirmwareI18n::setLabel(this->projectsPaginationLabel, "Seite 1");
    lv_obj_set_style_text_color(this->projectsPaginationLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->projectsNextButton = lv_button_create(footer);
@@ -303,7 +304,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_pad_right(this->projectsNextButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->projectsNextButton, &ResourceDetailsScreen::onProjectsNextPage, LV_EVENT_CLICKED, this);
    lv_obj_t *nextLabel = lv_label_create(this->projectsNextButton);
-   lv_label_set_text(nextLabel, "Weiter");
+   FirmwareI18n::setLabel(nextLabel, "Weiter");
    lv_obj_set_style_text_align(nextLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::showProjectsModal()
@@ -344,7 +345,7 @@ void ResourceDetailsScreen::showProjectsLoading()
 
    lv_obj_clean(this->projectsListContainer);
    lv_obj_t *loadingLabel = lv_label_create(this->projectsListContainer);
-   lv_label_set_text(loadingLabel, "Lade Projekte ...");
+   FirmwareI18n::setLabel(loadingLabel, "Lade Projekte ...");
    lv_obj_set_style_text_color(loadingLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    if (this->projectsPrevButton)
    {
@@ -356,7 +357,7 @@ void ResourceDetailsScreen::showProjectsLoading()
    }
    if (this->projectsPaginationLabel)
    {
-      lv_label_set_text(this->projectsPaginationLabel, "Lade...");
+      FirmwareI18n::setLabel(this->projectsPaginationLabel, "Lade...");
    }
 }
 void ResourceDetailsScreen::rebuildProjectsList()
@@ -371,7 +372,7 @@ void ResourceDetailsScreen::rebuildProjectsList()
    if (this->projectsCache.count == 0)
    {
       lv_obj_t *emptyLabel = lv_label_create(this->projectsListContainer);
-      lv_label_set_text(emptyLabel, this->projectsDataInitialized ? "Keine Projekte verfügbar" : "Lade Projekte ...");
+      FirmwareI18n::setLabel(emptyLabel, this->projectsDataInitialized ? "Keine Projekte verfügbar" : "Lade Projekte ...");
       lv_obj_set_style_text_font(emptyLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
       lv_obj_set_style_text_color(emptyLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
       this->updateProjectsPaginationControls();
@@ -400,11 +401,11 @@ void ResourceDetailsScreen::rebuildProjectsList()
       lv_obj_t *label = lv_label_create(btn);
       if (project.name.length() > 0)
       {
-         lv_label_set_text(label, project.name.c_str());
+         FirmwareI18n::setLabel(label, project.name.c_str());
       }
       else
       {
-         lv_label_set_text(label, "Unbenanntes Projekt");
+         FirmwareI18n::setLabel(label, "Unbenanntes Projekt");
       }
       lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -426,7 +427,7 @@ void ResourceDetailsScreen::updateProjectsPaginationControls()
 
    if (this->projectsPaginationLabel)
    {
-      lv_label_set_text_fmt(this->projectsPaginationLabel, "Seite %u von %u", (unsigned)this->projectsCurrentPage, (unsigned)totalPages);
+      lv_label_set_text_fmt(this->projectsPaginationLabel, FirmwareI18n::translate("Seite %u von %u"), (unsigned)this->projectsCurrentPage, (unsigned)totalPages);
    }
 
    if (this->projectsPrevButton)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "display/i18n.hpp"
+
 #include "display/fonts/attractap_fonts.hpp"
 #include "display/screens/IScreen.hpp"
 #include "display/theme.hpp"
@@ -31,7 +33,7 @@ public:
         lv_obj_set_size(button, 104, 46);
         auto *text = lv_label_create(button);
         lv_obj_set_style_text_font(text, &attractap_font_montserrat_latin1_14, 0);
-        lv_label_set_text(text, "Abmelden");
+        FirmwareI18n::setLabel(text, "Abmelden");
         lv_obj_center(text);
         lv_obj_add_event_cb(button, [](lv_event_t *e) {
             auto *self = static_cast<SessionHeader *>(lv_event_get_user_data(e));
