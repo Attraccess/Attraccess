@@ -31,7 +31,7 @@ export function PluginProvider(props: PropsWithChildren) {
 
   const arePluginsLoaded = useRef(false);
   const loadingPlugins = useRef(false);
-  const loadedManifests = useRef(new Set<string>());
+  const loadedManifests = useRef(new Map<string, string>());
   const warnedFailures = useRef(new Set<string>());
 
   useEffect(() => {
@@ -172,9 +172,9 @@ export function PluginProvider(props: PropsWithChildren) {
           .filter((manifest) => manifest.status !== 'error')
           .map(async (manifest) => {
             const key = `${manifest.name}@${manifest.version}`;
-            if (loadedManifests.current.has(key)) return;
+            if (loadedManifests.current.get(manifest.name) === manifest.version) return;
             if (await loadPlugin(manifest)) {
-              loadedManifests.current.add(key);
+              loadedManifests.current.set(manifest.name, manifest.version);
               warnedFailures.current.delete(key);
             }
           }),

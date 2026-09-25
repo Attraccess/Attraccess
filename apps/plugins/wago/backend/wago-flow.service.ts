@@ -146,11 +146,12 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         )
         .filter(([, entry]) => Boolean(entry.serverId)),
     );
+    const wildcardTopic = operationalWildcardTopic(settings.operationalPrefix);
     const replacements: PluginMqttSubscription[] = [];
     try {
       for (const serverId of serverIds)
         replacements.push(
-          await this.context.mqtt.subscribe(serverId, operationalWildcardTopic(settings.operationalPrefix), (message) =>
+          await this.context.mqtt.subscribe(serverId, wildcardTopic, (message) =>
             this.onMessage(serverId, settings.operationalPrefix, message.topic, message.payload),
           ),
         );
