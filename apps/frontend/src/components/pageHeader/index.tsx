@@ -5,6 +5,7 @@ import { Button, cn } from '@heroui/react';
 import { PageAction, PageHeaderActions } from './actions';
 import { DashboardPinToggle } from '../../app/dashboard/pins';
 import { SIDEBAR_ITEMS } from '../../app/layout/sidebarItems';
+import usePluginState from '../../app/plugins/plugin.state';
 
 export type {
   PageAction,
@@ -46,11 +47,15 @@ export function PageHeader({
 }: Readonly<PageHeaderProps>) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { plugins } = usePluginState();
 
   const hasActions = !!actions && actions.some((a) => !a.isHidden);
   const dashboardEntry = [...SIDEBAR_ITEMS.flatMap((item) => 'items' in item ? item.items : [item]), ...['/dependencies', '/changelog', '/printables'].map((path) => ({ path, isExternal: false }))]
     .find((item) => item.path === location.pathname && !item.isExternal && item.path !== '/dashboard');
-  const pin = dashboardPin ?? (dashboardEntry ? { path: dashboardEntry.path, label: typeof title === 'string' ? title : dashboardEntry.path } : undefined);
+  const pluginEntry = plugins.flatMap((manifest) => {
+    try { return manifest.plugin.getSidebarItems?.() ?? []; } catch { return []; }
+  }).find((item) => item.path === location.pathname);
+  const pin = dashboardPin ?? (dashboardEntry ? { path: dashboardEntry.path, label: typeof title === 'string' ? title : dashboardEntry.path } : pluginEntry ? { path: pluginEntry.path, label: typeof title === 'string' ? title : pluginEntry.label } : undefined);
 
   return (
     <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-4', noMargin && 'mb-0')}>
