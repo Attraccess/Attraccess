@@ -9,6 +9,8 @@ type OpenApiOperation = {
   parameters?: Array<{ name: string; in: string; required?: boolean; schema?: Record<string, unknown> }>;
   requestBody?: { required?: boolean; content?: Record<string, { schema?: Record<string, unknown> }> };
   responses?: Record<string, { content?: Record<string, unknown> }>;
+  callbacks?: Record<string, unknown>;
+  'x-mcp-streaming'?: boolean;
 };
 
 export type McpTool = {
@@ -20,8 +22,8 @@ export type McpTool = {
 };
 
 const methods = new Set(['get', 'post', 'put', 'patch', 'delete']);
-const excludedMethods = new Set(['parameters', 'servers', 'summary', 'description', 'options', 'head', 'trace']);
-const incompatiblePath = /(?:callback|webhook|stream|binary|download|upload|firmware|restart|shutdown|host\/lifecycle)/i;
+const pathItemKeys = new Set(['parameters', 'servers', 'summary', 'description', '$ref']);
+const incompatibleOperation = /(?:callback|webhook|stream|live|subscribe|binary|download|upload|firmware|restart|shutdown|host.?lifecycle)/i;
 
 function resolveSchema(schema: Record<string, unknown> | undefined, schemas: Record<string, unknown>, stack = new Set<string>()): Record<string, unknown> {
   if (!schema) throw new Error('Operation has an input without a schema');
@@ -40,7 +42,7 @@ function resolveSchema(schema: Record<string, unknown> | undefined, schemas: Rec
     const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
     const resolved: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(properties ?? {})) resolved[key] = resolveSchema(value, schemas, stack);
-    return { ...schema, properties: resolved, additionalProperties: false };
+    return { ...schema, properties: resolved };
   }
   if (schema.type === 'array') return { ...schema, items: resolveSchema(schema.items as Record<string, unknown>, schemas, stack) };
   if (!['string', 'number', 'integer', 'boolean'].includes(String(schema.type)) && schema.enum === undefined) {
@@ -50,12 +52,23 @@ function resolveSchema(schema: Record<string, unknown> | undefined, schemas: Rec
 }
 
 /** Validate full exported coverage against a reviewed per-operation allow/deny manifest. */
-export function generateMcpTools(document: OpenApiDocument, manifest: Record<string, { decision: 'allow' | 'deny'; reason: string }>): McpTool[] {
+export type McpManifestEntry = { decision: 'allow' | 'deny'; reason: string; shape: string };
+
+/** Stable digest of the operation contract which the reviewer approved. */
+export function operationShape(method: string, path: string, operation: OpenApiOperation): string {
+  const canonical = JSON.stringify({ method: method.toUpperCase(), path, operation });
+  // FNV-1a is used as a review drift marker, not as a security primitive.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < canonical.length; i++) hash = Math.imul(hash ^ canonical.charCodeAt(i), 0x01000193) >>> 0;
+  return hash.toString(16).padStart(8, '0');
+}
+
+export function generateMcpTools(document: OpenApiDocument, manifest: Record<string, McpManifestEntry>): McpTool[] {
   const operations = new Map<string, { method: string; path: string; operation: OpenApiOperation }>();
   for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
     for (const [method, operation] of Object.entries(pathItem)) {
       const verb = method.toLowerCase();
-      if (excludedMethods.has(verb) || verb === '$ref' || verb.startsWith('x-')) continue;
+      if (pathItemKeys.has(verb) || verb.startsWith('x-')) continue;
       if (!methods.has(verb)) throw new Error(`Unsupported OpenAPI operation ${method.toUpperCase()} ${path}`);
       if (!operation || typeof operation !== 'object' || Array.isArray(operation)) throw new Error(`Invalid OpenAPI operation ${verb.toUpperCase()} ${path}`);
       const openApiOperation = operation as OpenApiOperation;
@@ -73,16 +86,24 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
   for (const [id, entry] of operations) {
     const review = manifest[id];
     if (!review.reason.trim()) throw new Error(`Manifest operation ${id} has no review reason`);
+    if (review.shape !== operationShape(entry.method, entry.path, entry.operation)) throw new Error(`Reviewed operation shape drift for ${id}`);
     if (review.decision !== 'allow' && review.decision !== 'deny') throw new Error(`Invalid manifest decision for ${id}`);
     if (review.decision === 'deny') continue;
-    if (incompatiblePath.test(entry.path)) throw new Error(`Incompatible endpoint ${entry.method} ${entry.path} cannot be allowed (${id})`);
+    if (
+      incompatibleOperation.test(`${id} ${entry.path}`) ||
+      entry.operation.callbacks ||
+      entry.operation['x-mcp-streaming']
+    ) throw new Error(`Incompatible endpoint ${entry.method} ${entry.path} cannot be allowed (${id})`);
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
       const pathParameters = document.paths?.[entry.path]?.parameters;
     const sharedParameters = Array.isArray(pathParameters) ? pathParameters as OpenApiOperation['parameters'] : [];
-    for (const parameter of [...(sharedParameters ?? []), ...(entry.operation.parameters ?? [])]) {
+    const mergedParameters = new Map<string, NonNullable<OpenApiOperation['parameters']>[number]>();
+    for (const parameter of sharedParameters ?? []) mergedParameters.set(`${parameter.in}:${parameter.name}`, parameter);
+    for (const parameter of entry.operation.parameters ?? []) mergedParameters.set(`${parameter.in}:${parameter.name}`, parameter);
+    for (const parameter of mergedParameters.values()) {
       if (!['path', 'query'].includes(parameter.in)) throw new Error(`Unsupported ${parameter.in} parameter in ${id}`);
-      if (properties[parameter.name]) throw new Error(`Duplicate input ${parameter.name} in ${id}`);
+      if (Object.prototype.hasOwnProperty.call(properties, parameter.name)) throw new Error(`Duplicate input ${parameter.name} in ${id}`);
       properties[parameter.name] = resolveSchema(parameter.schema, schemas);
       if (parameter.required || parameter.in === 'path') required.push(parameter.name);
     }
@@ -95,7 +116,7 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
       if (!json?.schema) throw new Error(`Unsupported request media type for ${id}`);
       const bodySchema = resolveSchema(json.schema, schemas);
       const bodyProperties = bodySchema.properties as Record<string, unknown> | undefined;
-      if (bodySchema.type === 'object' && bodyProperties) {
+      if (bodySchema.type === 'object' && bodyProperties && Object.keys(bodyProperties).length > 0) {
         for (const [name, schema] of Object.entries(bodyProperties)) {
           if (properties[name]) throw new Error(`Request body conflicts with parameter ${name} in ${id}`);
           properties[name] = schema;
@@ -107,11 +128,15 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
         if (body.required) required.push('body');
       }
     }
-    const successResponse = Object.entries(entry.operation.responses ?? {}).find(([code]) => /^2\d\d$/.test(code))?.[1];
-    if (successResponse?.content && Object.keys(successResponse.content).some((type) =>
-      type !== 'application/json' && !/^application\/[a-z0-9.+-]+\+json$/i.test(type),
-    )) {
-      throw new Error(`Unsupported response media type for ${id}`);
+    const successResponses = Object.entries(entry.operation.responses ?? {}).filter(([code]) => /^2\d\d$/.test(code));
+    if (!successResponses.length) throw new Error(`Operation ${id} has no declared success response`);
+    for (const [, successResponse] of successResponses) {
+      if (!successResponse || typeof successResponse !== 'object' || '$ref' in successResponse) {
+        throw new Error(`Unsupported success response definition for ${id}`);
+      }
+      if (successResponse.content && Object.keys(successResponse.content).some((type) =>
+        type !== 'application/json' && !/^application\/[a-z0-9.+-]+\+json$/i.test(type),
+      )) throw new Error(`Unsupported response media type for ${id}`);
     }
     tools.push({
       name: id,
