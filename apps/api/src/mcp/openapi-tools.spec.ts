@@ -66,4 +66,24 @@ describe('generateMcpTools', () => {
       downloadFirmware: { decision: 'allow', reason: 'Reviewed.' },
     })).toThrow('Incompatible endpoint');
   });
+
+  it('ignores OpenAPI extensions and supports structured JSON media types', () => {
+    const extended = structuredClone(document);
+    const resourcePath = extended.paths?.['/resources/{id}'];
+    if (!resourcePath) throw new Error('Test fixture is missing its resource path');
+    resourcePath['x-display-name'] = 'Resource';
+    resourcePath.patch = {
+      operationId: 'updateResource',
+      requestBody: {
+        required: true,
+        content: { 'application/vnd.attraccess+json': { schema: { $ref: '#/components/schemas/UpdateResource' } } },
+      },
+      responses: { '200': { content: { 'application/vnd.attraccess+json': {} } } },
+    };
+
+    expect(generateMcpTools(extended, {
+      getResource: { decision: 'allow', reason: 'Read-only resource lookup.' },
+      updateResource: { decision: 'allow', reason: 'Resource updates use normal REST authorization.' },
+    })).toHaveLength(2);
+  });
 });

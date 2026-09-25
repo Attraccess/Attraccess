@@ -55,7 +55,7 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
   for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
     for (const [method, operation] of Object.entries(pathItem)) {
       const verb = method.toLowerCase();
-      if (excludedMethods.has(verb) || verb === '$ref') continue;
+      if (excludedMethods.has(verb) || verb === '$ref' || verb.startsWith('x-')) continue;
       if (!methods.has(verb)) throw new Error(`Unsupported OpenAPI operation ${method.toUpperCase()} ${path}`);
       if (!operation || typeof operation !== 'object' || Array.isArray(operation)) throw new Error(`Invalid OpenAPI operation ${verb.toUpperCase()} ${path}`);
       const openApiOperation = operation as OpenApiOperation;
@@ -78,7 +78,7 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
     if (incompatiblePath.test(entry.path)) throw new Error(`Incompatible endpoint ${entry.method} ${entry.path} cannot be allowed (${id})`);
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
-    const pathParameters = document.paths?.[entry.path]?.parameters;
+      const pathParameters = document.paths?.[entry.path]?.parameters;
     const sharedParameters = Array.isArray(pathParameters) ? pathParameters as OpenApiOperation['parameters'] : [];
     for (const parameter of [...(sharedParameters ?? []), ...(entry.operation.parameters ?? [])]) {
       if (!['path', 'query'].includes(parameter.in)) throw new Error(`Unsupported ${parameter.in} parameter in ${id}`);
@@ -88,7 +88,10 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
     }
     const body = entry.operation.requestBody;
     if (body) {
-      const json = body.content?.['application/json'];
+      const jsonMediaType = Object.keys(body.content ?? {}).find((type) =>
+        type === 'application/json' || /^application\/[a-z0-9.+-]+\+json$/i.test(type),
+      );
+      const json = jsonMediaType ? body.content?.[jsonMediaType] : undefined;
       if (!json?.schema) throw new Error(`Unsupported request media type for ${id}`);
       const bodySchema = resolveSchema(json.schema, schemas);
       const bodyProperties = bodySchema.properties as Record<string, unknown> | undefined;
@@ -105,7 +108,9 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
       }
     }
     const successResponse = Object.entries(entry.operation.responses ?? {}).find(([code]) => /^2\d\d$/.test(code))?.[1];
-    if (successResponse?.content && Object.keys(successResponse.content).some((type) => !['application/json', 'application/*+json'].includes(type))) {
+    if (successResponse?.content && Object.keys(successResponse.content).some((type) =>
+      type !== 'application/json' && !/^application\/[a-z0-9.+-]+\+json$/i.test(type),
+    )) {
       throw new Error(`Unsupported response media type for ${id}`);
     }
     tools.push({
