@@ -1,6 +1,6 @@
 {
     "title": "Passwort zurücksetzen",
-    "goBackButton": "Zurück",
+    "goBackButton": "Zurück zur Anmeldung",
     "mainButton": "Passwort zurücksetzen",
     "success": {
         "title": "Passwort rücksetzung angefragt",
@@ -9,5 +9,5 @@
     "error": {
         "title": "Passwort zurücksetzen"
     },
-    "emailLabel": "E-Mail"
+    "emailLabel": "E-Mail-Adresse"
 }

@@ -1,6 +1,6 @@
 {
     "title": "Password Reset",
-    "goBackButton": "Go Back",
+    "goBackButton": "Back to sign in",
     "mainButton": "Reset password",
     "success": {
         "title": "Password reset requested",
@@ -9,5 +9,5 @@
     "error": {
         "title": "Password Reset"
     },
-    "emailLabel": "E-Mail"
+    "emailLabel": "Email address"
 }

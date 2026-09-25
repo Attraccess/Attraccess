@@ -8,22 +8,40 @@ import { TestWrapper } from '../../test-utils/wrappers';
 
 const loginMock = vi.fn();
 const resendMutateMock = vi.fn();
+const locale = vi.hoisted(() => ({ current: 'en' }));
 let loginError: Error | null = null;
 let resendOnSuccess: (() => void) | undefined;
 let resendOnError: ((error: unknown) => void) | undefined;
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => {
-    const translations: Record<string, string> = {
+    const translations: Record<string, string> = locale.current === 'de' ? {
+      title: 'Willkommen zurück, Maker!',
+      noAccount: 'Noch kein Konto?',
+      signUpButton: 'Konto erstellen',
+      username: 'Benutzername',
+      password: 'Passwort',
+      twoFactorCode: 'Authenticator-Code',
+      twoFactorHelper: 'Nur eingeben, wenn du 2FA bereits eingerichtet hast.',
+      forgotPassword: 'Passwort vergessen?',
+      signInButton: 'Anmelden',
+      signingIn: 'Anmelden...',
+      'accordion.title': 'Anmelden mit E-Mail und Passwort',
+      'resendVerification.prompt': 'Verifizierungs-E-Mail nicht erhalten?',
+      'resendVerification.emailLabel': 'E-Mail-Adresse',
+      'resendVerification.button': 'Verifizierungsmail erneut senden',
+      'resendVerification.successTitle': 'E-Mail gesendet!',
+      'resendVerification.successMessage': 'Ein neuer Verifizierungslink wurde gesendet.',
+    } : {
       title: 'Welcome back, maker!',
-      noAccount: 'First time here?',
-      signUpButton: 'Get started here',
+      noAccount: "Don't have an account?",
+      signUpButton: 'Create an account',
       username: 'Username',
       password: 'Password',
       twoFactorCode: 'Authenticator code',
       twoFactorHelper: 'Enter the code if you already set up 2FA.',
-      forgotPassword: 'Password slipped your mind?',
-      signInButton: 'Start making',
+      forgotPassword: 'Forgot password?',
+      signInButton: 'Sign in',
       signingIn: 'Signing in...',
       'accordion.title': 'Sign in with email and password',
       'api.UserEmailNotVerifiedException.title': 'Email not verified',
@@ -99,6 +117,7 @@ describe('LoginForm – resend verification email', () => {
     loginError = null;
     resendOnSuccess = undefined;
     resendOnError = undefined;
+    locale.current = 'en';
   });
 
   it('does not show resend section when there is no login error', () => {
@@ -106,6 +125,31 @@ describe('LoginForm – resend verification email', () => {
 
     expect(screen.queryByTestId('resend-verification-section')).not.toBeInTheDocument();
     expect(screen.queryByTestId('resend-verification-button')).not.toBeInTheDocument();
+  });
+
+  it('uses descriptive navigation and action labels', () => {
+    renderLogin();
+
+    expect(screen.getByRole('button', { name: 'Create an account' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Forgot password?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('renders descriptive German navigation, field, recovery, and resend labels', () => {
+    locale.current = 'de';
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+
+    renderLogin();
+
+    expect(screen.getByText('Noch kein Konto?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Konto erstellen' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
+    expect(screen.getByLabelText('Passwort')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Passwort vergessen?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
   });
 
   it('shows resend section when UserEmailNotVerifiedException occurs', () => {
@@ -117,7 +161,7 @@ describe('LoginForm – resend verification email', () => {
 
     expect(screen.getByText("Didn't receive the verification email?")).toBeInTheDocument();
     expect(screen.getByTestId('resend-email-input')).toBeInTheDocument();
-    expect(screen.getByTestId('resend-verification-button')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument();
   });
 
   it('does not show resend section for other login errors', () => {
@@ -249,6 +293,6 @@ describe('LoginForm – resend verification email', () => {
 
     expect(screen.getByLabelText('Username')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start making' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
   });
 });

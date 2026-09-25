@@ -8,21 +8,40 @@ import { TestWrapper } from '../../test-utils/wrappers';
 
 const mutateMock = vi.fn();
 const onHasAccountMock = vi.fn();
+const locale = vi.hoisted(() => ({ current: 'en' }));
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => {
-    const translations: Record<string, string> = {
+    const translations: Record<string, string> = locale.current === 'de' ? {
+      title: 'Bereit zum Gestalten?',
+      hasAccount: 'Hast du bereits ein Konto?',
+      signInButton: 'Anmelden',
+      username: 'Benutzername',
+      usernameDescription: '3-32 Zeichen.',
+      'usernameValidation.length': 'Ungültige Länge.',
+      'usernameValidation.format': 'Ungültiges Format.',
+      email: 'E-Mail-Adresse',
+      password: 'Passwort',
+      passwordConfirmation: 'Bestätige dein Passwort',
+      createAccountButton: 'Konto erstellen',
+      creatingAccount: 'Dein Konto wird erstellt...',
+      generatePassword: 'Starkes Passwort generieren',
+      'validationError.passwordsDoNotMatch': 'Die Passwörter stimmen nicht überein',
+      'success.title': 'Konto erfolgreich erstellt!',
+      'success.message': 'Aktivierungs-E-Mail an {email} gesendet.',
+      'success.closeButton': 'Verstanden',
+    } : {
       title: 'Ready to create?',
-      hasAccount: 'Already using our machines?',
-      signInButton: 'Sign in here',
-      username: 'Pick a username',
+      hasAccount: 'Already have an account?',
+      signInButton: 'Sign in',
+      username: 'Username',
       usernameDescription: '3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.',
       'usernameValidation.length': 'Username must be between 3 and 32 characters.',
       'usernameValidation.format': 'Only letters, numbers, underscores, hyphens, and dots are allowed.',
-      email: 'Your email address',
-      password: 'Create your password',
+      email: 'Email address',
+      password: 'Password',
       passwordConfirmation: 'Confirm your password',
-      createAccountButton: 'Create account and start making!',
+      createAccountButton: 'Create account',
       creatingAccount: 'Creating your account...',
       generatePassword: 'Generate strong password',
       'validationError.passwordsDoNotMatch': 'The passwords do not match',
@@ -84,29 +103,45 @@ describe('RegistrationForm', () => {
   beforeEach(() => {
     mutateMock.mockReset();
     onHasAccountMock.mockReset();
+    locale.current = 'en';
   });
 
   it('shows username guidance text', async () => {
     renderForm();
 
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
     expect(
       screen.getByText('3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.'),
     ).toBeInTheDocument();
+  });
+
+  it('renders descriptive German navigation, field, and submit labels', () => {
+    locale.current = 'de';
+    renderForm();
+
+    expect(screen.getByText('Hast du bereits ein Konto?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
+    expect(screen.getByLabelText('E-Mail-Adresse')).toBeInTheDocument();
+    expect(screen.getByLabelText('Passwort')).toBeInTheDocument();
+    expect(screen.getByLabelText('Bestätige dein Passwort')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Konto erstellen' })).toBeInTheDocument();
   });
 
   it('blocks invalid usernames and surfaces validation message', async () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.type(screen.getByLabelText('Pick a username'), 'john+qa');
-    await user.type(screen.getByLabelText('Your email address'), 'admin@example.com');
-    await user.type(screen.getByLabelText('Create your password'), 'correct-horse-battery-staple-42');
+    await user.type(screen.getByLabelText('Username'), 'john+qa');
+    await user.type(screen.getByLabelText('Email address'), 'admin@example.com');
+    await user.type(screen.getByLabelText('Password'), 'correct-horse-battery-staple-42');
     await user.type(screen.getByLabelText('Confirm your password'), 'correct-horse-battery-staple-42');
 
     expect(screen.getByText('Only letters, numbers, underscores, hyphens, and dots are allowed.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create account and start making!' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Create account and start making!' }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
@@ -114,12 +149,12 @@ describe('RegistrationForm', () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.type(screen.getByLabelText('Pick a username'), '  Jane_Doe  ');
-    await user.type(screen.getByLabelText('Your email address'), ' test@example.com ');
-    await user.type(screen.getByLabelText('Create your password'), 'correct-horse-battery-staple-42');
+    await user.type(screen.getByLabelText('Username'), '  Jane_Doe  ');
+    await user.type(screen.getByLabelText('Email address'), ' test@example.com ');
+    await user.type(screen.getByLabelText('Password'), 'correct-horse-battery-staple-42');
     await user.type(screen.getByLabelText('Confirm your password'), 'correct-horse-battery-staple-42');
 
-    await user.click(screen.getByRole('button', { name: 'Create account and start making!' }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(mutateMock).toHaveBeenCalledWith({
       requestBody: {

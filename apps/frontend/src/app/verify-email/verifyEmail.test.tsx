@@ -11,6 +11,7 @@ import { Providers } from '@attraccess/ui';
 
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
+const locale = vi.hoisted(() => ({ current: 'en' }));
 let verifyOnError: ((error: unknown) => void) | undefined;
 let verifyOnSuccess: (() => void) | undefined;
 let resendOnSuccess: (() => void) | undefined;
@@ -22,13 +23,30 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
   return {
     ...actual,
     useTranslations: () => {
-      const translations: Record<string, string> = {
+      const translations: Record<string, string> = locale.current === 'de' ? {
+        'success.title': 'E-Mail verifiziert!',
+        'success.message': 'Ihre E-Mail wurde erfolgreich verifiziert.',
+        'success.goToLogin': 'Zur Anmeldung',
+        'error.title': 'Verifizierung fehlgeschlagen',
+        'error.tryAgain': 'E-Mail erneut verifizieren',
+        'error.backToLogin': 'Zurück zur Anmeldung',
+        'error.errorTitle': 'Fehler',
+        'resend.prompt': 'Neuen Verifizierungslink benötigt?',
+        'resend.emailLabel': 'E-Mail-Adresse',
+        'resend.button': 'Verifizierungsmail erneut senden',
+        'resend.successTitle': 'E-Mail gesendet!',
+        'resend.successMessage': 'Ein neuer Verifizierungslink wurde gesendet.',
+        'apiErrors.UserEmailInvalidVerificationTokenException': 'Ungültiger Verifizierungstoken.',
+        'apiErrors.UserEmailVerificationTokenExpiredException': 'Dein Verifizierungslink ist abgelaufen.',
+        'apiErrors.invalidLink': 'Ungültiger Verifizierungslink.',
+        'apiErrors.unexpectedError': 'Ein unerwarteter Fehler ist aufgetreten',
+      } : {
         'success.title': 'Email Verified!',
         'success.message': 'Your email has been successfully verified.',
-        'success.goToLogin': 'Go to Login',
+        'success.goToLogin': 'Go to sign in',
         'error.title': 'Verification Failed',
-        'error.tryAgain': 'Try Again',
-        'error.backToLogin': 'Back to Login',
+        'error.tryAgain': 'Verify email again',
+        'error.backToLogin': 'Back to sign in',
         'error.errorTitle': 'Error',
         'resend.prompt': 'Need a new verification link?',
         'resend.emailLabel': 'Email address',
@@ -95,6 +113,7 @@ describe('VerifyEmail', () => {
     verifyOnError = undefined;
     verifyOnSuccess = undefined;
     resendOnSuccess = undefined;
+    locale.current = 'en';
   });
 
   it('calls verifyEmail mutation with token and email from URL params', () => {
@@ -111,7 +130,7 @@ describe('VerifyEmail', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Email Verified!')).toBeInTheDocument();
-      expect(screen.getByText('Go to Login')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to sign in' })).toBeInTheDocument();
     });
   });
 
@@ -176,13 +195,26 @@ describe('VerifyEmail', () => {
     expect(verifyMutateMock).not.toHaveBeenCalled();
   });
 
-  it('shows Try Again and Back to Login buttons on error', async () => {
+  it('shows Try Again and Back to sign in buttons on error', async () => {
     renderWithRoute('/verify-email?email=test%40example.com&token=bad');
     act(() => verifyOnError?.(new Error('bad')));
 
     await waitFor(() => {
-      expect(screen.getByText('Try Again')).toBeInTheDocument();
-      expect(screen.getByText('Back to Login')).toBeInTheDocument();
+      expect(screen.getByText('Verify email again')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back to sign in' })).toBeInTheDocument();
+    });
+  });
+
+  it('renders German verification and resend controls with descriptive names', async () => {
+    locale.current = 'de';
+    renderWithRoute('/verify-email?email=test%40example.com&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'E-Mail erneut verifizieren' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Zurück zur Anmeldung' })).toBeInTheDocument();
+      expect(screen.getByLabelText('E-Mail-Adresse')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
     });
   });
 
