@@ -71,11 +71,12 @@ reports with task success or failure, and hashes the shared runner in every
 target so cache restores preserve enforcement.
 
 `pnpm precommit` selects affected projects from Nx's local uncommitted change set.
-Before running checks it rejects unstaged or untracked JS/TS files, including
-partially staged files, because the scorer reads workspace source and tests. This
-prevents worktree-only fixes from validating a different staged snapshot and
-leaves the index and worktree untouched. Stage or discard those code changes and
-retry. CI uses the PR or merge-queue base and applies the same project check.
+Before running checks it rejects unstaged or untracked JS/TS files and CRAP
+analysis configuration, including partially staged files, because the scorer
+reads workspace source, tests, and configuration. This prevents worktree-only
+fixes or configuration from validating a different staged snapshot and leaves
+the index and worktree untouched. Stage or discard those changes and retry. CI
+uses the PR or merge-queue base and applies the same project check.
 `pnpm crap-score` always runs the full workspace.
 
 Run the adapter's regression checks with:

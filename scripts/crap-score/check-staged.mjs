@@ -7,17 +7,24 @@ const names = (args) =>
     .split('\0')
     .filter(Boolean);
 const unstaged = names(['diff', '--name-only', '-z']);
-const unstagedSources = unstaged.filter((file) => /\.[cm]?[jt]sx?$/.test(file));
-const untrackedSources = names(['ls-files', '--others', '--exclude-standard', '-z']).filter((file) =>
-  /\.[cm]?[jt]sx?$/.test(file),
-);
+const generatedCache = (file) =>
+  /^(?:\.nx-cache|\.nx-workspace-data|\.electron-cache|\.npm-cache)(?:\/|$)/.test(file);
+const affectsCrap = (file) =>
+  !generatedCache(file) &&
+  (/\.[cm]?[jt]sx?$/.test(file) ||
+    /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|project\.json|tsconfig(?:\.[^/]+)?\.json|(?:jest\.preset|(?:jest|vitest|vite)\.config|babel\.config)\.[cm]?[jt]sx?|test-setup\.[cm]?[jt]sx?)$/.test(
+      file,
+    ) ||
+    /(^|\/)(?:\.swcrc|\.babelrc(?:\.[^/]+)?)$/.test(file));
+const unstagedSources = unstaged.filter(affectsCrap);
+const untrackedSources = names(['ls-files', '--others', '--exclude-standard', '-z']).filter(affectsCrap);
 
 if (unstagedSources.length || untrackedSources.length) {
   console.error(
     [
-      'CRAP commit validation cannot verify the staged snapshot while JS/TS source or tests differ in the worktree.',
-      ...(unstagedSources.length ? [`Unstaged JS/TS paths: ${unstagedSources.join(', ')}`] : []),
-      ...(untrackedSources.length ? [`Untracked JS/TS paths: ${untrackedSources.join(', ')}`] : []),
+      'CRAP commit validation cannot verify the staged snapshot while source, tests, or analysis configuration differ in the worktree.',
+      ...(unstagedSources.length ? [`Unstaged relevant paths: ${unstagedSources.join(', ')}`] : []),
+      ...(untrackedSources.length ? [`Untracked relevant paths: ${untrackedSources.join(', ')}`] : []),
       'Stage or discard those changes, then retry the commit.',
     ].join('\n'),
   );

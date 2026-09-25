@@ -186,10 +186,17 @@
         "{workspaceRoot}/scripts/crap-score/**/*",
         "{workspaceRoot}/jest.preset.js",
         "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/pnpm-workspace.yaml",
+        "{workspaceRoot}/jest.config.*",
+        "{workspaceRoot}/vitest.config.*",
+        "{workspaceRoot}/vite.config.*",
+        "{workspaceRoot}/babel.config.*",
+        "{workspaceRoot}/.babelrc*",
+        "{workspaceRoot}/.swcrc",
         "{workspaceRoot}/package.json",
         "{workspaceRoot}/pnpm-lock.yaml",
         {
-          "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
+          "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version + '-' + process.cwd()\""
         }
       ],
       "outputs": ["{workspaceRoot}/coverage/crap/{projectName}"]

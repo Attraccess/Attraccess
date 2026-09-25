@@ -7,7 +7,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { getCrapReport } from 'crap-score';
 import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run, enforceScores, workspace } from './run.mjs';
-import { isSharedChange, verifyReports } from './affected.mjs';
+import { affectedSelection, isSharedChange, projectSourceManifest, verifyReports } from './affected.mjs';
 
 test('source selection includes apps and scripts but excludes tests and generated clients', () => {
   for (const file of [
@@ -26,6 +26,8 @@ test('source selection includes apps and scripts but excludes tests and generate
     'apps/frontend/public/openscad/openscad.wasm.js',
   ])
     assert.ok(!isSource(file), file);
+  for (const file of ['.nx-cache/hash/project/src/generated.ts', '.nx-workspace-data/daemon.ts', '.electron-cache/runtime.js'])
+    assert.ok(!isSource(file), file);
 });
 
 test('only the vendored OpenSCAD runtime is excluded, not maintained public scripts', () => {
@@ -38,33 +40,79 @@ test('shared checker, root tooling and dependency configuration select every CRA
     'scripts/crap-score/run.mjs',
     'scripts/standalone-tool.ts',
     'package.json',
+    'apps/plugins/custom/package.json',
+    'apps/plugins/custom/tsconfig.test.json',
     'pnpm-lock.yaml',
     'nx.json',
     'jest.preset.js',
     'tsconfig.base.json',
     'apps/frontend/project.json',
     'apps/frontend/vitest.config.ts',
+    '.swcrc',
+    'vitest.config.mts',
+    'apps/plugins/custom/vite.config.mts',
+    'libs/demo/.babelrc',
+    'pnpm-workspace.yaml',
   ])
     assert.ok(isSharedChange([file]), file);
   for (const file of ['apps/attractap/hardware/nfc/src/a.ts', 'apps/companion/renderer/App.tsx', 'libs/shared/src/a.ts', 'tools/config-ui/main.ts'])
     assert.ok(!isSharedChange([file]), file);
 });
 
+test('affected selection expands shared changes and uses Nx base or worktree selectors', () => {
+  assert.equal(affectedSelection(['--base=origin/main'], true), null);
+  assert.equal(affectedSelection(['--all'], false), null);
+  assert.deepEqual(affectedSelection(['--base=origin/main'], false), ['--base=origin/main', '--head=HEAD']);
+  assert.deepEqual(affectedSelection(['--base=origin/main', '--head=feature'], false), ['--base=origin/main', '--head=feature']);
+  assert.deepEqual(affectedSelection(['--uncommitted'], false), ['--uncommitted']);
+  assert.deepEqual(affectedSelection([], false), ['--uncommitted']);
+});
+
+test('source manifests include only maintained files owned by each configured project', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-source-manifest-'));
+  try {
+    mkdirSync(path.join(directory, 'libs/demo/src'), { recursive: true });
+    mkdirSync(path.join(directory, 'libs/demo/tests'), { recursive: true });
+    writeFileSync(path.join(directory, 'libs/demo/project.json'), JSON.stringify({ name: 'demo', root: 'libs/demo' }));
+    writeFileSync(path.join(directory, 'libs/demo/src/index.ts'), 'export const value = 1;');
+    writeFileSync(path.join(directory, 'libs/demo/tests/index.test.ts'), '');
+    const files = ['libs/demo/project.json', 'libs/demo/src/index.ts', 'libs/demo/tests/index.test.ts'];
+    assert.deepEqual(projectSourceManifest(['demo'], files, directory).get('demo'), [
+      path.join(directory, 'libs/demo/src/index.ts'),
+    ]);
+    assert.throws(() => projectSourceManifest(['missing'], files, directory), /Missing Nx project configuration/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('project report validation distinguishes complete zero-function reports from omitted and malformed output', () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-report-validation-'));
   const output = path.join(directory, 'coverage/crap/demo');
-  const source = '/repo/demo/empty.ts';
+  const source = path.join(directory, 'demo/empty.ts');
+  const coverageEntry = (functions = {}) => ({
+    path: source,
+    statementMap: {},
+    s: {},
+    fnMap: functions,
+    f: Object.fromEntries(Object.keys(functions).map((key) => [key, 0])),
+    branchMap: {},
+    b: {},
+  });
   try {
     mkdirSync(path.join(output, 'html'), { recursive: true });
     writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
-    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: { statementMap: {}, s: {}, fnMap: {}, f: {}, branchMap: {}, b: {} } }));
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: coverageEntry() }));
     writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
-    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', files: 1, sourceFiles: [source], functions: 0, violations: 0, max: 0 }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 0, violations: 0, max: 0 }));
     assert.doesNotThrow(() => verifyReports(['demo'], directory), 'empty-function project is valid');
     writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({}));
     assert.throws(() => verifyReports(['demo'], directory), /Incomplete analysis report/);
     writeFileSync(path.join(output, 'crap-report.json'), '{');
     assert.throws(() => verifyReports(['demo'], directory), /Malformed CRAP report/);
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: { path: source } }));
+    assert.throws(() => verifyReports(['demo'], directory), /Malformed coverage data/);
     rmSync(path.join(output, 'coverage-final.json'));
     assert.throws(() => verifyReports(['demo'], directory), /Missing CRAP report/);
   } finally {
@@ -72,7 +120,42 @@ test('project report validation distinguishes complete zero-function reports fro
   }
 });
 
-test('commit validation accepts staged source and rejects partial stages without changing either snapshot', () => {
+test('restored project reports are checked against the current inclusive limit', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-restored-report-'));
+  const output = path.join(directory, 'coverage/crap/demo');
+  const source = path.join(directory, 'demo/example.ts');
+  try {
+    mkdirSync(path.join(output, 'html'), { recursive: true });
+    writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
+    const coverage = {
+      [source]: {
+        path: source,
+        statementMap: {}, s: {},
+        fnMap: { one: { name: 'example', decl: {}, loc: {} } }, f: { one: 0 },
+        branchMap: {}, b: {},
+      },
+    };
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify(coverage));
+    const fn = (crap) => ({
+      functionDescriptor: 'example',
+      start: { line: 4 },
+      complexity: 6,
+      statements: { crap, coverage: 0.5 },
+    });
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ 'demo/example.ts': { example: fn(30) } }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 1, violations: 0, max: 30 }));
+    assert.doesNotThrow(() => verifyReports(['demo'], directory), 'a cached score exactly at 30 passes');
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ 'demo/example.ts': { example: fn(30.0001) } }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 1, violations: 1, max: 30.0001 }));
+    assert.throws(() => verifyReports(['demo'], directory), /CRAP score limit 30 exceeded/);
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 0, violations: 0, max: 0 }));
+    assert.throws(() => verifyReports(['demo'], directory), /Incomplete function analysis/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('commit validation accepts staged source, rejects partial edits and ignores generated caches', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'crap-staged-'));
   const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
   const check = () =>
@@ -97,9 +180,26 @@ test('commit validation accepts staged source and rejects partial stages without
     const worktreeBefore = readFileSync(path.join(dir, 'source.ts'), 'utf8');
     const status = check();
     assert.equal(status.status, 1);
-    assert.match(status.stderr, /Unstaged JS\/TS paths: source\.ts/);
+    assert.match(status.stderr, /Unstaged relevant paths: source\.ts/);
     assert.equal(execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8' }), indexBefore);
     assert.equal(readFileSync(path.join(dir, 'source.ts'), 'utf8'), worktreeBefore);
+
+    git('checkout', '--', 'source.ts');
+    writeFileSync(path.join(dir, '.swcrc'), '{"jsc":{}}\n');
+    git('add', '.swcrc');
+    writeFileSync(path.join(dir, '.swcrc'), '{"jsc":{"target":"es2022"}}\n');
+    const configIndexBefore = execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8' });
+    const configWorktreeBefore = readFileSync(path.join(dir, '.swcrc'), 'utf8');
+    const configStatus = check();
+    assert.equal(configStatus.status, 1);
+    assert.match(configStatus.stderr, /Unstaged relevant paths: \.swcrc/);
+    assert.equal(execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8' }), configIndexBefore);
+    assert.equal(readFileSync(path.join(dir, '.swcrc'), 'utf8'), configWorktreeBefore);
+
+    git('checkout', '--', '.swcrc');
+    mkdirSync(path.join(dir, '.nx-cache/hash/project/src'), { recursive: true });
+    writeFileSync(path.join(dir, '.nx-cache/hash/project/src/generated.ts'), 'export const cached = true;\n');
+    assert.equal(check().status, 0, 'generated Nx cache data is not a proposed source change');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

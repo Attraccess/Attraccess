@@ -17,7 +17,7 @@ export function isSource(file) {
     /\.[cm]?[jt]sx?$/.test(file) &&
     // Upstream OpenSCAD WebAssembly runtime, distributed unchanged with the app.
     file !== 'apps/frontend/public/openscad/openscad.wasm.js' &&
-    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package)(\/|$)/.test(
+    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package|\.nx-cache|\.nx-workspace-data|\.electron-cache|\.npm-cache)(\/|$)/.test(
       file,
     ) &&
     !/\.(spec|test|d)\.[cm]?[jt]sx?$/.test(file) &&
