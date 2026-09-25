@@ -6,13 +6,12 @@ import { useDashboardPins, updateDashboardPins, type Pin } from './pins';
 import { useAllRoutes } from '../routes';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRequiredPermissions } from '../routes/routeAccess';
-import { SIDEBAR_ITEMS, useSidebarItems, buildSidebarEndItems } from '../layout/sidebarItems';
+import { SIDEBAR_ITEMS, useSidebarItems, buildSidebarEndItems, type SidebarItem, type SidebarItemGroup } from '../layout/sidebarItems';
+import sidebarEn from '../layout/sidebar.en.json';
+import sidebarDe from '../layout/sidebar.de.json';
 import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
-import { ResourceUsageSession } from '../resources/usage/components/ResourceUsageSession';
-import { StatusChip } from '../resourceOverview/resourceGroupCard/statusChip';
 import usePluginState from '../plugins/plugin.state';
 import sidebarEn from '../layout/sidebar.en.json';
 import sidebarDe from '../layout/sidebar.de.json';
@@ -22,9 +21,17 @@ import { CSS } from '@dnd-kit/utilities';
 
 function Landing() {
   const { data, isLoading, isError } = useDashboardPins();
+  const { isLoading: isLicenseLoading } = useLicenseServiceGetLicenseInformation();
+  const pluginsInitialized = usePluginState((state) => state.isInitialized);
+  const entries = usePageEntries(data ?? []);
   if (isLoading) return null;
   if (isError) return <p className="p-6">Could not load your dashboard.</p>;
-  return data?.length ? <DashboardPage /> : <Navigate to="/resources" replace />;
+  if (!data?.length) return <Navigate to="/resources" replace />;
+  if (data.some((pin) => pin.itemType === 'resource')) return <DashboardPage />;
+  if (isLicenseLoading) return null;
+  if (entries.length) return <DashboardPage />;
+  if (!pluginsInitialized) return null;
+  return <Navigate to="/resources" replace />;
 }
 
 type NavEntry = { path: string; title: string; icon?: React.ReactNode; badgeCount?: number };

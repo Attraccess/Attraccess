@@ -8,12 +8,16 @@ export interface PluginManifestWithPlugin extends LoadedPluginManifest {
 
 interface PluginState {
   plugins: PluginManifestWithPlugin[];
+  isInitialized: boolean;
+  setInitialized: (initialized: boolean) => void;
   addPlugin: (plugin: PluginManifestWithPlugin) => void;
   isInstalled: (pluginName: string) => boolean;
 }
 
 const usePluginState = create<PluginState>((set, get) => ({
   plugins: [],
+  isInitialized: false,
+  setInitialized: (isInitialized) => set({ isInitialized }),
   addPlugin: (plugin) =>
     set((state) => {
       return { plugins: [...state.plugins, plugin] };

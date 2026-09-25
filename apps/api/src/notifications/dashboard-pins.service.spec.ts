@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { DashboardPin, Resource } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DashboardPinsService } from './dashboard-pins.service';
 
 describe('DashboardPinsService', () => {
@@ -58,8 +58,8 @@ describe('DashboardPinsService', () => {
 
   it('cleans pins for soft-deleted resources when reading the persisted list', async () => {
     (pinRepository.find as jest.Mock).mockResolvedValue([
-      { userId: 5, itemType: 'page', itemId: '/projects', position: 0 },
-      { userId: 5, itemType: 'resource', itemId: '42', position: 1 },
+      { id: 1, userId: 5, itemType: 'page', itemId: '/projects', position: 0 },
+      { id: 2, userId: 5, itemType: 'resource', itemId: '42', position: 1 },
     ]);
     (resourceRepository.find as jest.Mock).mockResolvedValue([]);
     expect(await service.get(5)).toEqual([{ itemType: 'page', itemId: '/projects' }]);

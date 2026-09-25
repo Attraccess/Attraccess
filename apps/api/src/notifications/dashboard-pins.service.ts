@@ -40,7 +40,10 @@ export class DashboardPinsService {
       throw new BadRequestException('Page is not eligible for dashboard pinning');
     }
     const resourceIds = items.filter((item) => item.itemType === 'resource').map((item) => Number(item.itemId));
-    if (resourceIds.some((id) => !Number.isSafeInteger(id) || id < 1)) throw new BadRequestException('Invalid resource pin');
+    if (items.some((item) => item.itemType === 'resource' &&
+      (!Number.isSafeInteger(Number(item.itemId)) || Number(item.itemId) < 1 || String(Number(item.itemId)) !== item.itemId))) {
+      throw new BadRequestException('Invalid resource pin');
+    }
     if (resourceIds.length) {
       const found = await this.resources.find({ where: { id: In(resourceIds) } });
       if (found.length !== resourceIds.length) throw new BadRequestException('Resource does not exist');

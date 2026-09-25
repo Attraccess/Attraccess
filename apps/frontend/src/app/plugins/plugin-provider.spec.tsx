@@ -80,7 +80,7 @@ function primeManifest(options: ManifestOptions = {}) {
 }
 
 beforeEach(() => {
-  usePluginState.setState({ plugins: [] });
+  usePluginState.setState({ plugins: [], isInitialized: false });
   hoisted.setRemoteMock.mockReset();
   hoisted.getRemoteMock.mockReset();
   hoisted.refetchMock.mockReset();
@@ -114,6 +114,7 @@ describe('PluginProvider', () => {
     );
 
     expect(screen.getByText('core route')).toBeInTheDocument();
+    expect(usePluginState.getState().isInitialized).toBe(false);
   });
 
   it('sets up the module-federation remote and loads the plugin into the store', async () => {
@@ -126,6 +127,7 @@ describe('PluginProvider', () => {
     );
 
     await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
 
     expect(hoisted.setRemoteMock).toHaveBeenCalledWith(
       name,
@@ -137,6 +139,20 @@ describe('PluginProvider', () => {
     await expect(remoteConfig.url()).resolves.toBe(
       `http://test.local/api/plugins/${name}/frontend/module-federation/index.js`
     );
+  });
+
+  it('finishes initialization only after remote plugin modules have loaded', async () => {
+    const { name } = primeManifest();
+    let finishRemote!: (module: { default: () => AttraccessFrontendPlugin }) => void;
+    hoisted.getRemoteMock.mockImplementation(() => new Promise((resolve) => { finishRemote = resolve; }));
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(hoisted.getRemoteMock).toHaveBeenCalled());
+    expect(usePluginState.getState().isInitialized).toBe(false);
+
+    finishRemote({ default: function () { return createFakePlugin(name); } });
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
+    expect(usePluginState.getState().plugins).toHaveLength(1);
   });
 
   it('unwraps the default export when the remote returns one', async () => {
@@ -226,6 +242,7 @@ describe('PluginProvider', () => {
     );
 
     await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
     expect(usePluginState.getState().plugins).toHaveLength(0);
     expect(screen.getByText('app-shell')).toBeInTheDocument();
   });
