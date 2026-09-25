@@ -218,6 +218,14 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(fixture.containers()).toEqual([]);
   });
 
+  it('acknowledges a preflight-only failure when Docker is unavailable', () => {
+    rmSync(join(fixture.root, 'bin/docker'));
+    rmSync(join(fixture.root, 'bin/dockerd'));
+    expect(prepare().status).not.toBe(0);
+    expect(recover().status).toBe(0);
+    expect(finish().status).toBe(0);
+  });
+
   it('contains legacy activation effects without restoring CODESYS or vendor networking', () => {
     fixture.file(journal + '/token', token);
     fixture.file(journal + '/prior', 'stopped');
@@ -409,6 +417,18 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
     const boot = fixture.run('set -- start\n' + wagoRuntimeBootScript(fixture.root));
     expect(boot.status).toBe(0);
     expect(fixture.containers()[0].running).toBe(true);
+  });
+
+  it('uses one host I/O observation per runtime cycle', () => {
+    fixture.file('etc/attraccess-wago/runtime-enabled', '');
+    fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);
+    expect(fixture.run('set -- cycle\n' + wagoRuntimeBootScript(fixture.root)).stdout).toBe('running\n');
+    expect(
+      fixture
+        .read('docker.log')
+        .split('\n')
+        .filter((line) => line.includes('container ls -a --no-trunc --filter name=^/attraccess-wago$')),
+    ).toHaveLength(1);
   });
 
   it('does not stop another active transaction when the boot hook cannot obtain its lock', () => {

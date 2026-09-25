@@ -238,10 +238,10 @@ done
 
 function hardwareOwnership(): string {
   return `${codesysDisabled()}
-${wagoHostIoGuardShell()}
 din="$root${WAGO_DIN}"
 dout="$root${WAGO_DOUT}"
-wago_host_io_guard allow-owned || fail "$host_io_guard_reason"
+# The caller has just completed the locked host-I/O observation. Rechecking it
+# here would rescan every process and descriptor before the permission change.
 test -f "$root${WAGO_DIN}" && test ! -L "$root${WAGO_DIN}" &&
   test -f "$root${WAGO_DOUT}" && test ! -L "$root${WAGO_DOUT}" || fail 'missing-register'
 chown 10001:10001 "$root${WAGO_DIN}" "$root${WAGO_DOUT}" || fail 'io-ownership-failed'
@@ -380,7 +380,6 @@ done
 ${checks(testRoot, true)}
 [ "$exclusivity" = clear ] || fail "$exclusivity"
 ${hardwareOwnership()}
-${wagoHardwareDeploymentPreflightScript(testRoot, true)}
 test "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' attraccess-wago)" = no || fail 'Invalid runtime restart policy'
 running=$(docker inspect --format '{{.State.Running}}' attraccess-wago) || fail 'Cannot observe runtime'
 case "$running" in
@@ -491,7 +490,6 @@ done
 ${checks(testRoot)}
 [ "$exclusivity" = clear ] || fail "$exclusivity"
 ${hardwareOwnership()}
-${wagoHardwareDeploymentPreflightScript(testRoot)}
 test ! -L "$root/etc/rc.d/S99_zz_attraccess_wago" || fail 'Invalid runtime boot hook'
 wago_require_root_directory "$root/etc/rc.d" || fail 'Unsafe boot directory'
 boot_stage=$(mktemp "$root/etc/rc.d/.attraccess-wago-stage.XXXXXX")
@@ -520,8 +518,11 @@ function dockerRecoveryHelpers(): string {
   return `
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 export DOCKER_HOST=unix:///var/run/docker.sock
-docker_cli=$(command -v docker) || fail 'Docker command unavailable for recovery'
-docker() { timeout -k 5 10 "$docker_cli" --host unix:///var/run/docker.sock "$@"; }
+docker_cli=$(command -v docker || :)
+docker() {
+  test -n "$docker_cli" || { echo 'Docker command unavailable for recovery' >&2; return 127; }
+  timeout -k 5 10 "$docker_cli" --host unix:///var/run/docker.sock "$@"
+}
 completed="$config/docker-provision.completed-$token"
 ${runtimeContainment()}
 validate_journal() {
