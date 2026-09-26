@@ -1,7 +1,7 @@
 {
     "title": "Passwort zurücksetzen",
     "goBackButton": "Zurück zur Anmeldung",
-    "mainButton": "Passwort zurücksetzen",
+    "mainButton": "Passwort-Reset-Link senden",
     "success": {
         "title": "Passwort rücksetzung angefragt",
         "description": "Überprüfe bitte dein E-Mail Postfach"

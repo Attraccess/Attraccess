@@ -31,8 +31,8 @@ describe('PasswordResetForm labels', () => {
     render(<PasswordResetForm onGoBack={vi.fn()} />, { wrapper: TestWrapper });
 
     const expectedLabels = language === 'en'
-      ? { back: 'Back to sign in', email: 'Email address', submit: 'Reset password' }
-      : { back: 'Zurück zur Anmeldung', email: 'E-Mail-Adresse', submit: 'Passwort zurücksetzen' };
+      ? { back: 'Back to sign in', email: 'Email address', submit: 'Send password reset link' }
+      : { back: 'Zurück zur Anmeldung', email: 'E-Mail-Adresse', submit: 'Passwort-Reset-Link senden' };
     expect(screen.getByRole('button', { name: expectedLabels.back })).toBeInTheDocument();
     expect(screen.getByLabelText(expectedLabels.email)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: expectedLabels.submit })).toBeInTheDocument();

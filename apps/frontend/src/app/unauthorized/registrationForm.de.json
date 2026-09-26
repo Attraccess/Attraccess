@@ -23,7 +23,7 @@
   "success": {
     "title": "Konto erfolgreich erstellt!",
     "message": "Wir haben eine Aktivierungs-E-Mail an {email} gesendet. Bitte überprüfe deinen Posteingang und klicke auf den Aktivierungslink, um deine Registrierung abzuschließen.",
-    "closeButton": "Verstanden"
+    "closeButton": "Schließen"
   },
   "twoFactor": {
     "title": "Zwei-Faktor-Authentifizierung einrichten",

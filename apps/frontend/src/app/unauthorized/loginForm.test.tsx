@@ -11,6 +11,7 @@ import de from './loginForm.de.json';
 const loginMock = vi.fn();
 const resendMutateMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
+const pending = vi.hoisted(() => ({ login: false, resend: false }));
 const labels = { en, de };
 let loginError: Error | null = null;
 let resendOnSuccess: (() => void) | undefined;
@@ -39,7 +40,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 vi.mock('../../hooks/useAuth', () => ({
   useLogin: () => ({
     mutate: loginMock,
-    isPending: false,
+    isPending: pending.login,
     error: loginError,
   }),
 }));
@@ -62,7 +63,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   }) => {
     resendOnSuccess = options?.onSuccess;
     resendOnError = options?.onError;
-    return { mutate: resendMutateMock, isPending: false };
+    return { mutate: resendMutateMock, isPending: pending.resend };
   },
 }));
 
@@ -93,6 +94,8 @@ describe('LoginForm – resend verification email', () => {
     resendOnSuccess = undefined;
     resendOnError = undefined;
     locale.current = 'en';
+    pending.login = false;
+    pending.resend = false;
   });
 
   it('does not show resend section when there is no login error', () => {
@@ -108,6 +111,25 @@ describe('LoginForm – resend verification email', () => {
     expect(screen.getByRole('button', { name: 'Create an account' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Forgot password?' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('keeps the sign-in action visible and named while pending', () => {
+    pending.login = true;
+    renderLogin();
+
+    const button = screen.getByRole('button', { name: 'Sign in' });
+    expect(button).toBeDisabled();
+  });
+
+  it('keeps the resend action visible and named while pending', () => {
+    pending.resend = true;
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+    renderLogin();
+
+    const button = screen.getByRole('button', { name: 'Resend verification email' });
+    expect(button).toBeDisabled();
   });
 
   it('renders descriptive German navigation, field, recovery, and resend labels', () => {

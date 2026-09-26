@@ -219,7 +219,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         isDisabled={isPending}
         data-cy="login-form-sign-in-button"
       >
-        {isPending ? t('signingIn') : t('signInButton')}
+        {t('signInButton')}
         {arrowRight}</Button>
 
       {errorTitle && (

@@ -1,7 +1,7 @@
 {
     "title": "Password Reset",
     "goBackButton": "Back to sign in",
-    "mainButton": "Reset password",
+    "mainButton": "Send password reset link",
     "success": {
         "title": "Password reset requested",
         "description": "Please watch your E-Mail inbox"

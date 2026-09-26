@@ -167,6 +167,7 @@ export function VerifyEmail() {
               variant="primary"
               className="w-full"
               onPress={activateEmail}
+              isPending={verifyEmail.isPending}
               isDisabled={verifyEmail.isPending}
               data-cy="verify-email-error-try-again-button"
             >

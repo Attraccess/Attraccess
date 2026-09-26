@@ -11,6 +11,7 @@ import de from './registrationForm.de.json';
 const mutateMock = vi.fn();
 const onHasAccountMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
+const pending = vi.hoisted(() => ({ createAccount: false }));
 const labels = { en, de };
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
@@ -36,7 +37,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 vi.mock('@attraccess/react-query-client', () => ({
   useUsersServiceCreateOneUser: () => ({
     mutate: mutateMock,
-    isPending: false,
+    isPending: pending.createAccount,
   }),
   usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({
     data: {
@@ -70,6 +71,7 @@ describe('RegistrationForm', () => {
     mutateMock.mockReset();
     onHasAccountMock.mockReset();
     locale.current = 'en';
+    pending.createAccount = false;
   });
 
   it('shows username guidance text', async () => {
@@ -93,6 +95,18 @@ describe('RegistrationForm', () => {
     expect(screen.getByLabelText(labels.de.password)).toBeInTheDocument();
     expect(screen.getByLabelText(labels.de.passwordConfirmation)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Konto erstellen' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Create account'],
+    ['de', 'Konto erstellen'],
+  ] as const)('keeps the %s create-account action visible and named while pending', (language, label) => {
+    locale.current = language;
+    pending.createAccount = true;
+    renderForm();
+
+    const button = screen.getByRole('button', { name: label });
+    expect(button).toBeDisabled();
   });
 
   it('blocks invalid usernames and surfaces validation message', async () => {
