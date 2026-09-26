@@ -63,6 +63,19 @@ export class SqliteSessionStore implements SessionStore {
     return wasActive;
   }
 
+  async consumeSession(token: string): Promise<boolean> {
+    const now = new Date();
+    const hashed = this.tokenHashService.hashToken(token);
+    const result = await this.sessionRepository
+      .createQueryBuilder()
+      .delete()
+      .from(Session)
+      .where('(token = :hashed OR token = :token)', { hashed, token })
+      .andWhere('expiresAt > :now', { now })
+      .execute();
+    return result.affected === 1;
+  }
+
   async revokeAllUserSessions(userId: number): Promise<number> {
     const activeCount = await this.sessionRepository.count({
       where: { userId, expiresAt: MoreThan(new Date()) },

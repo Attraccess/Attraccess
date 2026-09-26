@@ -12,6 +12,7 @@ import { PluginMigrationService } from './plugin-system/plugin-migration.service
 import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { createCert } from 'mkcert';
+import { registerMcpHttpEndpoints } from './mcp/mcp-http';
 
 jest.mock('./app/app.module', () => ({ AppModule: class AppModule {} }));
 jest.mock('./plugin-system/plugin.service', () => ({
@@ -28,6 +29,8 @@ jest.mock('./plugin-system/npm-plugin.service', () => ({ NpmPluginService: { rec
 jest.mock('./plugin-system/plugin-migration.service', () => ({
   PluginMigrationService: { runPendingUpMigrationsForAllPlugins: jest.fn() },
 }));
+jest.mock('./mcp/mcp-http', () => ({ registerMcpHttpEndpoints: jest.fn() }));
+jest.mock('./mcp/mcp-oauth', () => ({ registerMcpOAuthEndpoints: jest.fn(() => jest.fn()) }));
 jest.mock('fs', () => {
   const actual = jest.requireActual<typeof import('fs')>('fs');
   return { ...actual, existsSync: jest.fn(actual.existsSync) };
@@ -95,6 +98,7 @@ describe('API bootstrap ordering and configuration', () => {
     jest.spyOn(NestFactory, 'createApplicationContext').mockResolvedValue(early as never);
     jest.spyOn(NestFactory, 'create').mockResolvedValue(app as never);
     jest.spyOn(SwaggerModule, 'setup').mockImplementation(() => undefined);
+    jest.spyOn(SwaggerModule, 'createDocument').mockReturnValue({ openapi: '3.0.0', paths: {} } as never);
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -139,6 +143,10 @@ describe('API bootstrap ordering and configuration', () => {
     expect(app.set).toHaveBeenCalledWith('trust proxy', 1);
     expect(app.setGlobalPrefix).toHaveBeenCalledWith('api');
     expect(SwaggerModule.setup).toHaveBeenCalledWith('api', app, expect.any(Function));
+    expect(registerMcpHttpEndpoints).toHaveBeenCalledWith(
+      app,
+      expect.objectContaining({ resourceUrl: 'https://access.example/api/mcp', secure: false }),
+    );
   });
   it('honors migration skips and disabled plugins without opening the database', async () => {
     process.env.SKIP_DATABASE_MIGRATIONS = 'true';
@@ -166,6 +174,7 @@ describe('API bootstrap ordering and configuration', () => {
       expect.objectContaining({ httpsOptions: { cert: Buffer.from('certificate'), key: Buffer.from('certificate') } }),
     );
     expect(app.set).toHaveBeenCalledWith('trust proxy', false);
+    expect(registerMcpHttpEndpoints).toHaveBeenCalledWith(app, expect.objectContaining({ secure: true }));
   });
   it('records migration failures and stops boot before accepting requests', async () => {
     const error = new Error('migration failed');

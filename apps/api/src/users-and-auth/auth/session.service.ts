@@ -59,11 +59,19 @@ export class SessionService implements OnModuleInit {
     return newToken;
   }
 
-  async revokeSession(token: string): Promise<void> {
-    if (!token) return;
+  async revokeSession(token: string): Promise<boolean> {
+    if (!token) return false;
     const wasActive = await this.store.revokeSession(token);
     if (wasActive) this.metricsService.authActiveSessions.dec();
     this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
+    return wasActive;
+  }
+
+  async consumeSession(token: string): Promise<boolean> {
+    if (!token) return false;
+    const consumed = await this.store.consumeSession(token);
+    if (consumed) this.metricsService.authActiveSessions.dec();
+    return consumed;
   }
 
   async revokeAllUserSessions(userId: number): Promise<void> {

@@ -7,6 +7,7 @@ describe('SqliteSessionStore', () => {
   let store: SqliteSessionStore;
   let repo: jest.Mocked<Repository<Session>>;
   let tokenHashService: jest.Mocked<TokenHashService>;
+  let queryBuilder: { delete: jest.Mock; from: jest.Mock; where: jest.Mock; andWhere: jest.Mock; execute: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' } as User;
 
@@ -19,7 +20,16 @@ describe('SqliteSessionStore', () => {
       find: jest.fn(),
       count: jest.fn(),
       delete: jest.fn(),
+      createQueryBuilder: jest.fn(),
     } as unknown as jest.Mocked<Repository<Session>>;
+    queryBuilder = {
+      delete: jest.fn(), from: jest.fn(), where: jest.fn(), andWhere: jest.fn(),
+      execute: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    for (const method of [queryBuilder.delete, queryBuilder.from, queryBuilder.where, queryBuilder.andWhere]) {
+      method.mockReturnValue(queryBuilder);
+    }
+    repo.createQueryBuilder.mockReturnValue(queryBuilder as never);
 
     tokenHashService = {
       hashToken: jest.fn().mockImplementation((t: string) => `hashed:${t}`),
@@ -78,5 +88,16 @@ describe('SqliteSessionStore', () => {
       expect(repo.save).not.toHaveBeenCalled();
       expect(repo.remove).toHaveBeenCalledWith(session);
     });
+  });
+
+  it('atomically consumes a live session at most once', async () => {
+    expect(await store.consumeSession('single-use')).toBe(true);
+    expect(repo.createQueryBuilder).toHaveBeenCalled();
+    expect(queryBuilder.delete).toHaveBeenCalled();
+    expect(queryBuilder.where).toHaveBeenCalledWith('(token = :hashed OR token = :token)', {
+      hashed: 'hashed:single-use', token: 'single-use',
+    });
+    queryBuilder.execute.mockResolvedValueOnce({ affected: 0 });
+    expect(await store.consumeSession('single-use')).toBe(false);
   });
 });

@@ -285,6 +285,38 @@ export async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
 
+  const { SessionStrategy } = await import('./users-and-auth/strategies/session.strategy');
+  const { registerMcpHttpEndpoints } = await import('./mcp/mcp-http');
+  const { registerMcpOAuthEndpoints } = await import('./mcp/mcp-oauth');
+  const { SessionService } = await import('./users-and-auth/auth/session.service');
+  const { RbacService } = await import('./users-and-auth/rbac/rbac.service');
+  const sessionStrategy = app.get(SessionStrategy, { strict: false });
+  const sessionService = app.get(SessionService, { strict: false });
+  const rbacService = app.get(RbacService, { strict: false });
+  const mcpPath = `/${globalPrefix ? `${globalPrefix}/` : ''}mcp`;
+  const mcpResourceUrl = new URL(mcpPath, appConfig.ATTRACCESS_URL ?? `http://localhost:${appConfig.PORT}`).toString();
+  const authenticateMcp = registerMcpOAuthEndpoints(app, {
+    resourceUrl: mcpResourceUrl,
+    secret: appConfig.AUTH_SESSION_SECRET,
+    clientsJson: appConfig.MCP_OAUTH_CLIENTS,
+    prefix: mcpPath,
+    sessions: sessionService,
+    rbac: rbacService,
+    sessionStrategy,
+  });
+  registerMcpHttpEndpoints(app, {
+    document: documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument,
+    resourceUrl: mcpResourceUrl,
+    port: appConfig.PORT,
+    // The public URL may terminate TLS at a reverse proxy while this local
+    // Nest listener remains plain HTTP. Delegation must follow the listener.
+    secure: Boolean(httpsOptions),
+    tlsCa: httpsOptions?.cert as Buffer | undefined,
+    globalPrefix,
+    delegationSecret: appConfig.AUTH_SESSION_SECRET,
+    authenticate: authenticateMcp,
+  });
+
   const port = appConfig.PORT;
   // Listening and related logging will be handled by startListening function
   bootstrapLogger.log('Bootstrap process completed.');
