@@ -25,7 +25,7 @@ void ConnectionConfigurationScreen::loop()
          this->wifiScanCompleted = true;
          this->wifiScanRequested = false;
          this->wifiDropdownHasNetworks = false;
-         lv_dropdown_set_options(this->wifiSelectNetwork, FirmwareI18n::translate(WIFI_DROPDOWN_SCAN_FAILED));
+         FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, WIFI_DROPDOWN_SCAN_FAILED);
       }
       return;
    }
@@ -46,7 +46,7 @@ void ConnectionConfigurationScreen::startWifiScan()
    this->wifiScanCompleted = false;
    this->wifiScanStartMs = millis();
    this->wifiDropdownHasNetworks = false;
-   lv_dropdown_set_options(this->wifiSelectNetwork, FirmwareI18n::translate(WIFI_DROPDOWN_LOADING));
+   FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, WIFI_DROPDOWN_LOADING);
    Wifi::startScan();
 }
 
@@ -112,12 +112,12 @@ void ConnectionConfigurationScreen::populateWifiDropdown()
    if (options.length() == 0)
    {
       this->wifiDropdownHasNetworks = false;
-      lv_dropdown_set_options(this->wifiSelectNetwork, FirmwareI18n::translate(WIFI_DROPDOWN_EMPTY));
+      FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, WIFI_DROPDOWN_EMPTY);
       return;
    }
 
    this->wifiDropdownHasNetworks = true;
-   lv_dropdown_set_options(this->wifiSelectNetwork, options.c_str());
+   FirmwareI18n::setDynamicDropdownOptions(this->wifiSelectNetwork, options.c_str());
    if (selectedFound)
    {
       lv_dropdown_set_selected(this->wifiSelectNetwork, selectedIndex);

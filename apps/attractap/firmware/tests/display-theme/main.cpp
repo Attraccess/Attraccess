@@ -749,12 +749,12 @@ void testAuthenticatedList(Renderer &renderer)
     API::ResourceList resources{};
     resources.count = 4;
     std::strcpy(resources.authenticatedUsername, "Alex Example");
-    const char *names[] = {"Lasercutter", "CNC Fräse", "Werkstatttür", "3D Drucker"};
+    const char *names[] = {"Lasercutter", "Maintenance", "Werkstatttür", "3D Drucker"};
     for (int i = 0; i < 4; ++i) {
         auto &resource = resources.items[i];
         resource.id = i + 1;
         std::strcpy(resource.name, names[i]);
-        resource.description = "Werkstatt";
+        resource.description = i == 1 ? "Maintenance" : "Werkstatt";
         resource.isHealthy = true;
         resource.accessKnown = true;
         resource.hasIntroduction = true;
@@ -809,7 +809,7 @@ void testAuthenticatedList(Renderer &renderer)
     auto *overlay = lv_obj_get_child(guard.root, -1);
     lv_area_t area; lv_obj_get_coords(overlay, &area);
     expect(area.x1 == 0 && area.y1 == 0 && area.x2 == 479 && area.y2 == 479, "Loading overlay covers the entire input surface");
-    click("Start"); click("CNC Fräse"); click("Abmelden");
+    click("Start"); click("Maintenance"); click("Abmelden");
     expect(acted == 3 && opened == 1 && logouts == 0, "Pending action blocks actions, navigation and logout");
     Fixtures::nowMs += 45000;
     list.loop();
@@ -931,6 +931,20 @@ int main(int argc, char **argv)
                    "Shared display catalog resolves German screen strings to English");
             expect(std::string(FirmwareI18n::translateForLocale("End session", "de")) == "Sitzung beenden",
                    "Visible labels can refresh back to German");
+            expect(std::string(FirmwareI18n::translateForLocale("Gesperrt", "en")) == "Unavailable (locked)",
+                   "Locked state has a distinct English translation for reversible locale changes");
+            auto *lockedRoot = lv_obj_create(lv_screen_active());
+            auto *lockedLabel = lv_label_create(lockedRoot);
+            FirmwareI18n::setLabel(lockedLabel, "Gesperrt");
+            FirmwareI18n::refreshTree(lockedRoot, "en");
+            FirmwareI18n::refreshTree(lockedRoot, "de");
+            expect(std::string(lv_label_get_text(lockedLabel)) == "Gesperrt",
+                   "Language refresh preserves message identity when two states once shared an English value");
+            lv_obj_delete(lockedRoot);
+            expect(std::string(FirmwareI18n::translateForLocale("Demo Ressource", "en")) == "Demo resource",
+                   "Demo fixture descriptions are translated");
+            expect(std::string(FirmwareI18n::translateForLocale("Unbekannt", "en")) == "Unknown",
+                   "Unknown demo roles are translated");
             expect(std::string(FirmwareI18n::translateForLocale("Kein Zugang", "en")) == "No access",
                    "Demo role is translated to English");
             expect(std::string(FirmwareI18n::translateForLocale("Eingewiesen", "en")) == "Introduced",
@@ -996,16 +1010,16 @@ int main(int argc, char **argv)
             auto *placeholder = lv_textarea_create(root);
             lv_textarea_set_placeholder_text(placeholder, "Mind. 4 Ziffern");
             auto *dropdown = lv_dropdown_create(root);
-            lv_dropdown_set_options(dropdown, "Suche WLANs...");
+            FirmwareI18n::setDropdownOptions(dropdown, "Suche WLANs...");
             FirmwareI18n::refreshTree(root, "en");
             expect(std::string(lv_textarea_get_placeholder_text(placeholder)) == "At least 4 digits",
                    "Text-area placeholders refresh to English");
             expect(std::string(lv_dropdown_get_options(dropdown)) == "Searching for Wi-Fi networks...",
                    "Static dropdown options refresh to English");
-            lv_dropdown_set_options(dropdown, "Maintenance\nWartung");
+            FirmwareI18n::setDynamicDropdownOptions(dropdown, "Maintenance");
             FirmwareI18n::refreshTree(root, "de");
-            expect(std::string(lv_dropdown_get_options(dropdown)) == "Maintenance\nWartung",
-                   "Server supplied Wi-Fi names are preserved");
+            expect(std::string(lv_dropdown_get_options(dropdown)) == "Maintenance",
+                   "A single server-supplied Wi-Fi name is preserved");
             lv_obj_delete(root);
         });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });

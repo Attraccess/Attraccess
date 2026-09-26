@@ -12,10 +12,18 @@
 namespace FirmwareI18n
 {
 inline std::array<lv_obj_t *, 256> localizedLabels{};
+inline std::array<std::string, 256> localizedSources{};
+inline std::array<lv_obj_t *, 64> localizedDropdowns{};
+inline std::array<std::string, 64> localizedDropdownSources{};
 inline void forgetLocalizedLabel(lv_event_t *event)
 {
     auto *label = static_cast<lv_obj_t *>(lv_event_get_target(event));
-    for (auto &known : localizedLabels) if (known == label) known = nullptr;
+    for (size_t i = 0; i < localizedLabels.size(); ++i) if (localizedLabels[i] == label) { localizedLabels[i] = nullptr; localizedSources[i].clear(); }
+}
+inline void forgetLocalizedDropdown(lv_event_t *event)
+{
+    auto *dropdown = lv_event_get_target(event);
+    for (size_t i = 0; i < localizedDropdowns.size(); ++i) if (localizedDropdowns[i] == dropdown) { localizedDropdowns[i] = nullptr; localizedDropdownSources[i].clear(); }
 }
 inline bool isLocalizedLabel(lv_obj_t *label)
 {
@@ -25,16 +33,21 @@ inline bool isLocalizedLabel(lv_obj_t *label)
 inline void markLocalizedLabel(lv_obj_t *label, bool localized)
 {
     if (!label) return;
-    for (auto &known : localizedLabels)
+    for (size_t i = 0; i < localizedLabels.size(); ++i)
     {
-        if (known == label) { if (!localized) known = nullptr; return; }
+        if (localizedLabels[i] == label) { if (!localized) { localizedLabels[i] = nullptr; localizedSources[i].clear(); } return; }
     }
-    if (localized) for (auto &known : localizedLabels) if (!known)
+    if (localized) for (size_t i = 0; i < localizedLabels.size(); ++i) if (!localizedLabels[i])
     {
-        known = label;
+        localizedLabels[i] = label;
         lv_obj_add_event_cb(label, forgetLocalizedLabel, LV_EVENT_DELETE, nullptr);
         return;
     }
+}
+inline const char *localizedSource(lv_obj_t *label)
+{
+    for (size_t i = 0; i < localizedLabels.size(); ++i) if (localizedLabels[i] == label) return localizedSources[i].c_str();
+    return nullptr;
 }
 struct Entry { const char *de; const char *en; };
 inline constexpr Entry catalog[] = {
@@ -94,7 +107,8 @@ inline constexpr Entry catalog[] = {
         {"Karte mit NFC Karte/Tag anmelden", "Tap NFC card/tag to sign in"},
         {"Bitte mit NFC Karte/Tag anmelden", "Tap NFC card/tag to sign in"},
         {"In Verwendung: ", "In use: "}, {"Von dir verwendet", "In use by you"},
-        {"Wartung", "Maintenance"}, {"Gesperrt", "Unavailable"}, {"Belegt", "In use"},
+        {"Wartung", "Maintenance"}, {"Gesperrt", "Unavailable (locked)"}, {"Belegt", "In use"},
+        {"Demo Ressource", "Demo resource"}, {"Unbekannt", "Unknown"},
         {"Öffnen", "Open"}, {"Übernehmen", "Take over"}, {"Einweisung", "Introduction"},
         {"Kein Benutzer ausgewählt", "No user selected"}, {"Nutzer abmelden", "Sign out"},
         {"Bitte warten", "Please wait"}, {"Karte wird geprüft", "Checking card"},
@@ -140,7 +154,8 @@ inline constexpr Entry catalog[] = {
         {"Speichern", "Save"}, {"Neustart", "Reboot"}, {"Einstellungen", "Settings"},
         {"Keine Ressourcen verfügbar", "No resources available"},
         {"In Wartung", "Under maintenance"}, {"Nicht betriebsbereit", "Unavailable"},
-        {"Wartung", "Maintenance"}, {"Gesperrt", "Unavailable"}, {"Belegt", "In use"},
+        {"Wartung", "Maintenance"}, {"Gesperrt", "Unavailable (locked)"}, {"Belegt", "In use"},
+        {"Demo Ressource", "Demo resource"}, {"Unbekannt", "Unknown"},
         {"Einweisung", "Introduction"}, {"Aufsicht", "Supervision"}, {"Übernehmen", "Take over"},
         {"Laden ...", "Loading ..."}, {"Status: ", "Status: "},
         {"verbinde WLAN", "Connecting to Wi-Fi"}, {"verbinde Ethernet", "Connecting to Ethernet"},
@@ -262,9 +277,8 @@ inline void refreshTree(lv_obj_t *root, const std::string &locale)
     if (!root) return;
     if (lv_obj_check_type(root, &lv_label_class) && isLocalizedLabel(root))
     {
-        const char *current = lv_label_get_text(root);
-        const char *translated = translateForLocale(current, locale);
-        if (translated != current) lv_label_set_text(root, translated);
+        const char *source = localizedSource(root);
+        if (source) lv_label_set_text(root, translateForLocale(source, locale));
     }
     else if (lv_obj_check_type(root, &lv_textarea_class))
     {
@@ -274,20 +288,30 @@ inline void refreshTree(lv_obj_t *root, const std::string &locale)
     }
     else if (lv_obj_check_type(root, &lv_dropdown_class))
     {
-        const char *current = lv_dropdown_get_options(root);
-        if (current && std::strchr(current, '\n') == nullptr)
-        {
-            const char *translated = translateForLocale(current, locale);
-            if (translated != current) lv_dropdown_set_options(root, translated);
-        }
+        for (size_t i = 0; i < localizedDropdowns.size(); ++i)
+            if (localizedDropdowns[i] == root) { lv_dropdown_set_options(root, translateForLocale(localizedDropdownSources[i].c_str(), locale)); break; }
     }
     for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
         refreshTree(lv_obj_get_child(root, i), locale);
+}
+inline void setDropdownOptions(lv_obj_t *dropdown, const char *value)
+{
+    if (!dropdown) return;
+    for (size_t i = 0; i < localizedDropdowns.size(); ++i) if (localizedDropdowns[i] == dropdown) { localizedDropdownSources[i] = value ? value : ""; lv_dropdown_set_options(dropdown, translate(value)); return; }
+    for (size_t i = 0; i < localizedDropdowns.size(); ++i) if (!localizedDropdowns[i]) { localizedDropdowns[i] = dropdown; localizedDropdownSources[i] = value ? value : ""; lv_obj_add_event_cb(dropdown, forgetLocalizedDropdown, LV_EVENT_DELETE, nullptr); lv_dropdown_set_options(dropdown, translate(value)); return; }
+    lv_dropdown_set_options(dropdown, translate(value));
+}
+inline void setDynamicDropdownOptions(lv_obj_t *dropdown, const char *value)
+{
+    if (!dropdown) return;
+    for (size_t i = 0; i < localizedDropdowns.size(); ++i) if (localizedDropdowns[i] == dropdown) { localizedDropdowns[i] = nullptr; localizedDropdownSources[i].clear(); break; }
+    lv_dropdown_set_options(dropdown, value ? value : "");
 }
 
 inline void setLabel(lv_obj_t *label, const char *value)
 {
     markLocalizedLabel(label, true);
+    for (size_t i = 0; i < localizedLabels.size(); ++i) if (localizedLabels[i] == label) { localizedSources[i] = value ? value : ""; break; }
     lv_label_set_text(label, translate(value));
 }
 inline void setDynamicLabel(lv_obj_t *label, const char *value)

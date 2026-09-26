@@ -49,7 +49,7 @@ void ConnectionConfigurationScreen::init()
 
    this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
    DisplayTheme::field(this->wifiSelectNetwork);
-   lv_dropdown_set_options(this->wifiSelectNetwork, FirmwareI18n::translate("Suche WLANs..."));
+   FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, "Suche WLANs...");
    lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
    lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
@@ -179,6 +179,14 @@ void ConnectionConfigurationScreen::init()
 
    // Device tab
    lv_obj_t *deviceTab = lv_tabview_add_tab(this->tabs, FirmwareI18n::translate("Gerät"));
+   // Tab labels are owned by LVGL's separate tab bar. Register their stable
+   // German keys so the standard language refresh can update them in place.
+   const char *tabKeys[] = {"WLAN", "API", "Gerät"};
+   lv_obj_t *tabBar = lv_tabview_get_tab_bar(this->tabs);
+   for (uint32_t i = 0; i < 3 && i < lv_obj_get_child_count(tabBar); ++i) {
+      lv_obj_t *button = lv_obj_get_child(tabBar, i);
+      if (lv_obj_get_child_count(button) > 0) FirmwareI18n::setLabel(lv_obj_get_child(button, 0), tabKeys[i]);
+   }
    lv_obj_set_style_text_font(lv_tabview_get_tab_bar(this->tabs), &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_flex_flow(deviceTab, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(deviceTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);

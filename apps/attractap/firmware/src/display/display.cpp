@@ -90,6 +90,9 @@ void Display::refreshVisibleTextForLanguageChange()
     FirmwareI18n::refreshTree(Display::activePopup, language);
     FirmwareI18n::refreshTree(Display::drawerPanel, language);
     FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
+    // Project and form dialogs live on LVGL's top layer, outside the active
+    // screen tree. Refreshing the layer reaches those open dialogs as well.
+    FirmwareI18n::refreshTree(lv_layer_top(), language);
 }
 
 #if LV_USE_LOG != 0

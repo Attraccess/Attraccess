@@ -44,6 +44,11 @@ import { UpdateMetricsTogglesDto } from './dto/update-metrics-toggles.dto';
 import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-toggle-invalidator.token';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+function normalizeAttractapLanguage(language: string): 'en' | 'de' {
+  const baseLanguage = language.trim().toLowerCase().replace('_', '-').split('-')[0];
+  return baseLanguage === 'de' ? 'de' : 'en';
+}
+
 @Injectable()
 export class SettingsService {
   getAuditSettings() {
@@ -134,7 +139,7 @@ export class SettingsService {
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
       // Missing values preserve the legacy German behavior; malformed stored values use English.
-      attractapLanguage: attractapLanguage === null ? 'de' : attractapLanguage === 'de' ? 'de' : 'en',
+      attractapLanguage: attractapLanguage === null ? 'de' : normalizeAttractapLanguage(attractapLanguage),
     };
   }
 
@@ -156,7 +161,7 @@ export class SettingsService {
 
   async getAttractapLanguage(): Promise<'en' | 'de'> {
     const language = await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage);
-    return language === null ? 'de' : language === 'de' ? 'de' : 'en';
+    return language === null ? 'de' : normalizeAttractapLanguage(language);
   }
 
   async getSmtpSettings(): Promise<SmtpSettingsDto> {
