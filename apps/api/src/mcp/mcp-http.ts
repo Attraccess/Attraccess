@@ -161,7 +161,7 @@ export function registerMcpHttpEndpoints(
   metadataRouter.get('/api/mcp', metadata);
   app.use(RESOURCE_METADATA_PATH, metadataRouter);
   const authorizationServerMetadata = Router();
-  authorizationServerMetadata.get('/', (_request, response) => response.json(mcpOAuthAuthorizationServerMetadata(issuer, oauthPrefix)));
+  authorizationServerMetadata.get('/', mcpRateLimit, (_request, response) => response.json(mcpOAuthAuthorizationServerMetadata(issuer, oauthPrefix)));
   app.use('/.well-known/oauth-authorization-server', authorizationServerMetadata);
 
   router.get('/', (_request, response) => response.sendStatus(405));
