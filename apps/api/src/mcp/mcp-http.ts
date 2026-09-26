@@ -254,7 +254,7 @@ export function registerMcpHttpEndpoints(
         const resourceHostname = new URL(options.resourceUrl).hostname;
         const value = await invokeRestTool(
           tool, args, request, options.port,
-          options.secure ?? new URL(options.resourceUrl).protocol === 'https:',
+          options.secure ?? false,
           options.delegationSecret, options.tlsCa, isIP(resourceHostname) ? undefined : resourceHostname,
         );
         response.json({ jsonrpc: '2.0', id: rpc.id ?? null, result: { content: [{ type: 'text', text: JSON.stringify(value ?? null) }], isError: false } });

@@ -308,6 +308,9 @@ export async function bootstrap() {
     document: documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument,
     resourceUrl: mcpResourceUrl,
     port: appConfig.PORT,
+    // The public URL may terminate TLS at a reverse proxy while this local
+    // Nest listener remains plain HTTP. Delegation must follow the listener.
+    secure: Boolean(httpsOptions),
     tlsCa: httpsOptions?.cert as Buffer | undefined,
     globalPrefix,
     delegationSecret: appConfig.AUTH_SESSION_SECRET,
