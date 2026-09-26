@@ -146,7 +146,7 @@ void Lockscreen::updateUsageInfo()
         return;
     }
 
-    FirmwareI18n::setLabel(this->resourceNameLabel, this->resourceName);
+    lv_label_set_text(this->resourceNameLabel, this->resourceName);
 
     // Status priority mirrors the web resource list: in use > maintenance > available.
     if (this->hasActiveUsage)

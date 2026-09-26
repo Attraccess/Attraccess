@@ -401,7 +401,7 @@ void ResourceDetailsScreen::rebuildProjectsList()
       lv_obj_t *label = lv_label_create(btn);
       if (project.name.length() > 0)
       {
-         FirmwareI18n::setLabel(label, project.name.c_str());
+      lv_label_set_text(label, project.name.c_str());
       }
       else
       {

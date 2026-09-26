@@ -230,7 +230,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
       FormFieldWidget *widget = this->findFieldWidget(result.formId, result.errors[i].fieldId);
       if (widget && widget->errorLabel)
       {
-         FirmwareI18n::setLabel(widget->errorLabel, result.errors[i].message.c_str());
+         lv_label_set_text(widget->errorLabel, result.errors[i].message.c_str());
          shown = true;
       }
    }
@@ -606,7 +606,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
       {
          breadcrumb += "\n" + scope;
       }
-      FirmwareI18n::setLabel(this->formsBreadcrumbLabel, breadcrumb.c_str());
+      lv_label_set_text(this->formsBreadcrumbLabel, breadcrumb.c_str());
    }
 
    {
@@ -627,7 +627,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             fieldTitle += " *";
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
-         FirmwareI18n::setLabel(fieldLabel, fieldTitle.c_str());
+         lv_label_set_text(fieldLabel, fieldTitle.c_str());
           lv_obj_set_style_text_font(fieldLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
           lv_obj_set_style_text_color(fieldLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -636,7 +636,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          if (field.description.length() > 0)
          {
             lv_obj_t *desc = lv_label_create(fieldContainer);
-            FirmwareI18n::setLabel(desc, field.description.c_str());
+            lv_label_set_text(desc, field.description.c_str());
              lv_obj_set_style_text_color(desc, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
              lv_obj_set_style_text_font(desc, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -710,7 +710,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
-                  FirmwareI18n::setLabel(optLabel, displayValue.c_str());
+                  lv_label_set_text(optLabel, displayValue.c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -810,7 +810,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
       {
          if (widget.errorLabel)
          {
-            FirmwareI18n::setLabel(widget.errorLabel, msg);
+            lv_label_set_text(widget.errorLabel, msg);
          }
          hasErrors = true;
       };
@@ -952,13 +952,14 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
       {
          hint = widget.definition->options.text.placeholder.c_str();
       }
-      FirmwareI18n::setLabel(widget.previewLabel, hint);
+      if (hint == "Antippen zum Eingeben") FirmwareI18n::setLabel(widget.previewLabel, hint);
+      else lv_label_set_text(widget.previewLabel, hint);
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
    {
       const std::string displayValue = makeLVGLDisplayText(widget.textValue);
-      FirmwareI18n::setLabel(widget.previewLabel, displayValue.c_str());
+      lv_label_set_text(widget.previewLabel, displayValue.c_str());
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 }

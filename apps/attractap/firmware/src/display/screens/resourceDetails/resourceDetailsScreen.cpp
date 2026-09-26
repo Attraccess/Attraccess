@@ -430,25 +430,25 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    {
       return;
    }
-   FirmwareI18n::setLabel(this->resourceName, resource.name);
-   FirmwareI18n::setLabel(this->resourceDescription, resource.description.c_str());
+   lv_label_set_text(this->resourceName, resource.name);
+   lv_label_set_text(this->resourceDescription, resource.description.c_str());
 
    // Update introducer/maintainer panel lists (same set of allowed users)
    std::string introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
-      FirmwareI18n::setLabel(this->introducersListLabel, introducersText.c_str());
+      lv_label_set_text(this->introducersListLabel, introducersText.c_str());
    }
    if (this->maintenanceIntroducersLabel)
    {
-      FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, introducersText.c_str());
+      lv_label_set_text(this->maintenanceIntroducersLabel, introducersText.c_str());
    }
 
    // Update health banner reason text
    if (this->healthReasonLabel)
    {
       const char *reason = (resource.healthReason[0] != '\0') ? resource.healthReason : "Kein Grund angegeben.";
-      FirmwareI18n::setLabel(this->healthReasonLabel, reason);
+      lv_label_set_text(this->healthReasonLabel, reason);
    }
 
    // Toggle sections based on type and usage
@@ -459,7 +459,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       // Persist the session start time so periodic updates can compute elapsed time correctly
       this->sessionStartTime = (time_t)resource.activeStartEpoch;
       FirmwareI18n::setLabel(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str());
-      FirmwareI18n::setLabel(this->currentUser, resource.activeUser);
+      lv_label_set_text(this->currentUser, resource.activeUser);
    }
 
    lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
@@ -514,7 +514,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
       lv_obj_set_height(labelForFlowButton, LV_SIZE_CONTENT);
        lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
-       FirmwareI18n::setLabel(labelForFlowButton, fb.label);
+       lv_label_set_text(labelForFlowButton, fb.label);
        lv_obj_set_style_text_font(labelForFlowButton, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
