@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdio>
 #include <array>
+#include <string>
 #include <lvgl.h>
 
 #include "state/language.hpp"
@@ -118,6 +119,7 @@ inline constexpr Entry catalog[] = {
         {"Aufsichts-Karte auflegen oder per\nApp/Web bestätigen", "Tap supervisor card or approve in the\napp/web interface"},
         {"Karte nicht als Aufsicht\nberechtigt", "Card is not authorized as a\nsupervisor"},
         {"Keine Aufsicht verfügbar", "No supervisor available"},
+        {"-- kein Einweiser verfügbar --", "-- no introducer available --"},
         {"Aufsicht abgelehnt", "Supervision denied"},
         {"Karte konnte nicht\ngelesen werden", "Could not\nread card"},
         {"Karte konnte nicht\nvorbereitet werden", "Could not\nprepare card"},
@@ -179,6 +181,21 @@ inline const char *translateForLocale(const char *value, const std::string &loca
         if (english && std::strcmp(value, entry.de) == 0) return entry.en;
         if (!english && std::strcmp(value, entry.en) == 0) return entry.de;
     }
+    // Translate a complete multiline firmware prompt and keep appended user
+    // names or other server data after it.
+    for (const auto &entry : catalog)
+    {
+        const char *from = english ? entry.de : entry.en;
+        const char *to = english ? entry.en : entry.de;
+        const size_t fromLength = std::strlen(from);
+        if (fromLength && std::strncmp(value, from, fromLength) == 0 && value[fromLength] == '\n')
+        {
+            static std::string multiline;
+            multiline = to;
+            multiline += value + fromLength;
+            return multiline.c_str();
+        }
+    }
     // Translate a firmware-authored breadcrumb heading while retaining its
     // server supplied resource/form scope on following lines.
     const char *newline = std::strchr(value, '\n');
@@ -191,9 +208,10 @@ inline const char *translateForLocale(const char *value, const std::string &loca
             const char *to = english ? entry.en : entry.de;
             if (heading == from)
             {
-                static char breadcrumb[384];
-                snprintf(breadcrumb, sizeof(breadcrumb), "%s%s", to, newline);
-                return breadcrumb;
+                static std::string breadcrumb;
+                breadcrumb = to;
+                breadcrumb += newline;
+                return breadcrumb.c_str();
             }
         }
     }
@@ -206,9 +224,10 @@ inline const char *translateForLocale(const char *value, const std::string &loca
         const size_t prefixLength = std::strlen(from);
         if (prefixLength && from[prefixLength - 1] == ' ' && std::strncmp(value, from, prefixLength) == 0)
         {
-            static char prefixed[256];
-            snprintf(prefixed, sizeof(prefixed), "%s%s", to, value + prefixLength);
-            return prefixed;
+            static std::string prefixed;
+            prefixed = to;
+            prefixed += value + prefixLength;
+            return prefixed.c_str();
         }
     }
     // The displayed value contains numbers/IDs, so it cannot be an exact
@@ -219,11 +238,11 @@ inline const char *translateForLocale(const char *value, const std::string &loca
     const bool englishRoleTitle = std::strncmp(value, "Role for card ", englishRolePrefixLength) == 0;
     if (germanRoleTitle || englishRoleTitle)
     {
-        static char roleTitle[80];
+        static std::string roleTitle;
         const bool english = Language::supported(locale) == "en";
-        snprintf(roleTitle, sizeof(roleTitle), "%s%s", english ? "Role for card " : "Rolle für Karte ",
-                 value + (englishRoleTitle ? englishRolePrefixLength : germanRolePrefixLength));
-        return roleTitle;
+        roleTitle = english ? "Role for card " : "Rolle für Karte ";
+        roleTitle += value + (englishRoleTitle ? englishRolePrefixLength : germanRolePrefixLength);
+        return roleTitle.c_str();
     }
     unsigned currentPage = 0, totalPages = 0;
     char trailing = '\0';

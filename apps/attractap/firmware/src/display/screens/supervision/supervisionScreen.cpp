@@ -71,7 +71,7 @@ void SupervisionScreen::init()
    lv_obj_set_width(this->hintLabel, lv_pct(100));
    lv_obj_set_height(this->hintLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->hintLabel, LV_LABEL_LONG_WRAP);
-   FirmwareI18n::setDynamicLabel(this->hintLabel, this->view.supervisorHint.c_str());
+   FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint.c_str());
    lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -178,7 +178,7 @@ void SupervisionScreen::render(const View &view)
    this->timeoutTime = view.deadlineMs;
    if (this->hintLabel)
    {
-       FirmwareI18n::setDynamicLabel(this->hintLabel, this->view.supervisorHint.c_str());
+       FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint.c_str());
    }
    if (this->requesterNameLabel)
    {

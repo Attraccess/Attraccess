@@ -437,11 +437,13 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    std::string introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
-      FirmwareI18n::setDynamicLabel(this->introducersListLabel, introducersText.c_str());
+      if (resource.introducers.empty()) FirmwareI18n::setLabel(this->introducersListLabel, "-- kein Einweiser verfügbar --");
+      else FirmwareI18n::setDynamicLabel(this->introducersListLabel, introducersText.c_str());
    }
    if (this->maintenanceIntroducersLabel)
    {
-      FirmwareI18n::setDynamicLabel(this->maintenanceIntroducersLabel, introducersText.c_str());
+      if (resource.introducers.empty()) FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, "-- kein Einweiser verfügbar --");
+      else FirmwareI18n::setDynamicLabel(this->maintenanceIntroducersLabel, introducersText.c_str());
    }
 
    // Update health banner reason text

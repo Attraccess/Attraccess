@@ -933,12 +933,34 @@ int main(int argc, char **argv)
                    "Visible labels can refresh back to German");
             expect(std::string(FirmwareI18n::translateForLocale("Kein Zugang", "en")) == "No access",
                    "Demo role is translated to English");
+            expect(std::string(FirmwareI18n::translateForLocale("Eingewiesen", "en")) == "Introduced",
+                   "Second demo role is translated to English");
+            expect(std::string(FirmwareI18n::translateForLocale("Aufsichts-Karte auflegen oder per\nApp/Web bestätigen\nAlex", "en")) ==
+                       "Tap supervisor card or approve in the\napp/web interface\nAlex",
+                   "Supervision hint translates while preserving the server supplied user name");
+            expect(std::string(FirmwareI18n::translateForLocale("-- kein Einweiser verfügbar --", "en")) ==
+                       "-- no introducer available --",
+                   "Empty introducer state is translated");
             expect(std::string(FirmwareI18n::translateForLocale("Rolle für Karte 04A1", "en")) == "Role for card 04A1",
                    "Formatted demo role title preserves the card UID");
             expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5", "en")) == "Page 2 of 5",
                    "Formatted project pagination is translated");
             expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5 boats", "en")) == "Seite 2 von 5 boats",
                    "Pagination matcher preserves trailing server text");
+            const std::string longScope(700, 'x');
+            const std::string longBreadcrumb = std::string("Bitte Formular ausfüllen\n") + longScope;
+            expect(std::string(FirmwareI18n::translateForLocale(longBreadcrumb.c_str(), "en")) ==
+                       std::string("Please complete the form\n") + longScope,
+                   "Long form breadcrumb translates its heading without truncating supplied scope");
+            const std::string longProject = std::string("Projekt: ") + longScope;
+            expect(std::string(FirmwareI18n::translateForLocale(longProject.c_str(), "en")) ==
+                       std::string("Project: ") + longScope,
+                   "Long project label translates its prefix without truncating supplied name");
+            const std::string longUid(300, '9');
+            const std::string longRole = std::string("Rolle für Karte ") + longUid;
+            expect(std::string(FirmwareI18n::translateForLocale(longRole.c_str(), "en")) ==
+                       std::string("Role for card ") + longUid,
+                   "Long demo role title preserves the complete card identifier");
             expect(std::string(FirmwareI18n::translateForLocale("Keine Aufsicht verfügbar", "en-US")) == "No supervisor available",
                    "Supervision errors use English on English readers");
             expect(std::string(FirmwareI18n::translateForLocale("Karte konnte nicht\ngelesen werden", "en")) == "Could not\nread card",
