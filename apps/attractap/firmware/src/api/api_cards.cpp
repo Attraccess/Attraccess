@@ -62,6 +62,7 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     response.keyLen = keyLen;
     response.error = error;
     response.username = username;
+    response.language = payload["language"].is<const char *>() ? payload["language"].as<std::string>() : "en";
     response.canManageResource = payload["canManageResource"].is<bool>() ? payload["canManageResource"].as<bool>() : false;
     response.hasIntroduction = payload["hasIntroduction"].is<bool>() ? payload["hasIntroduction"].as<bool>() : false;
     response.isIntroducer = payload["isIntroducer"].is<bool>() ? payload["isIntroducer"].as<bool>() : false;

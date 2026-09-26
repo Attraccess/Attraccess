@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "initscreen.hpp"
 #include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
@@ -116,7 +117,7 @@ void InitScreen::init()
    lv_obj_set_width(this->wifiLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->wifiLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->wifiLabel, "verbinde WLAN");
+   FirmwareI18n::setLabel(this->wifiLabel, "verbinde WLAN");
    lv_obj_set_style_text_font(this->wifiLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->wifiSpinner, this->wifiLabel);
@@ -148,7 +149,7 @@ void InitScreen::init()
    lv_obj_set_width(this->ethernetLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->ethernetLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->ethernetLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->ethernetLabel, "verbinde Ethernet");
+   FirmwareI18n::setLabel(this->ethernetLabel, "verbinde Ethernet");
    lv_obj_set_style_text_font(this->ethernetLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->ethernetSpinner, this->ethernetLabel);
@@ -175,7 +176,7 @@ void InitScreen::init()
    lv_obj_set_width(this->apiConnectionLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->apiConnectionLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->apiConnectionLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->apiConnectionLabel, "verbinde API");
+   FirmwareI18n::setLabel(this->apiConnectionLabel, "verbinde API");
    lv_obj_set_style_text_font(this->apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
@@ -202,7 +203,7 @@ void InitScreen::init()
    lv_obj_set_width(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->apiAuthenticationLabel, "authentifiziere an API");
+   FirmwareI18n::setLabel(this->apiAuthenticationLabel, "authentifiziere an API");
    lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
@@ -224,7 +225,7 @@ void InitScreen::init()
    this->serverTargetLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->serverTargetLabel, lv_pct(100));
    lv_obj_set_height(this->serverTargetLabel, LV_SIZE_CONTENT);
-   lv_label_set_text(this->serverTargetLabel, "");
+   FirmwareI18n::setLabel(this->serverTargetLabel, "");
    lv_obj_set_style_text_font(this->serverTargetLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->serverTargetLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -232,14 +233,14 @@ void InitScreen::init()
    lv_obj_set_width(this->certLabel, lv_pct(100));
    lv_obj_set_height(this->certLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->certLabel, LV_LABEL_LONG_DOT);
-   lv_label_set_text(this->certLabel, "");
+   FirmwareI18n::setLabel(this->certLabel, "");
    lv_obj_set_style_text_font(this->certLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->certLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->connectionStateLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
    lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
-   lv_label_set_text(this->connectionStateLabel, "");
+   FirmwareI18n::setLabel(this->connectionStateLabel, "");
    lv_obj_set_style_text_font(this->connectionStateLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -255,7 +256,7 @@ void InitScreen::init()
    lv_obj_set_width(openSettingsButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(openSettingsButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(openSettingsButtonLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(openSettingsButtonLabel, "Einstellungen");
+   FirmwareI18n::setLabel(openSettingsButtonLabel, "Einstellungen");
    lv_obj_set_style_text_color(openSettingsButtonLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 

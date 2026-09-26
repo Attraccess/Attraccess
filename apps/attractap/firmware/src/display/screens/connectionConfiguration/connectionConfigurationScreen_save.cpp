@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "connectionConfigurationScreen.hpp"
 #include "display/theme.hpp"
 #include <string>
@@ -133,7 +134,7 @@ lv_obj_t *ConnectionConfigurationScreen::createSaveButton(lv_obj_t *parent)
    lv_obj_set_width(label, LV_SIZE_CONTENT);
    lv_obj_set_height(label, LV_SIZE_CONTENT);
    lv_obj_set_align(label, LV_ALIGN_CENTER);
-   lv_label_set_text(label, "Speichern");
+   FirmwareI18n::setLabel(label, "Speichern");
    lv_obj_set_style_text_opa(label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    return save;
@@ -177,7 +178,7 @@ void ConnectionConfigurationScreen::onResetCertificateButtonEvent(lv_event_t *e)
    // One-shot feedback: relabel and disable until the screen is rebuilt.
    if (self->resetCertLabel)
    {
-      lv_label_set_text(self->resetCertLabel, "Zurückgesetzt");
+      FirmwareI18n::setLabel(self->resetCertLabel, "Zurückgesetzt");
    }
    if (self->resetCertButton)
    {

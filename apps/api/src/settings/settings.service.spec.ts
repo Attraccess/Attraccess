@@ -62,6 +62,14 @@ describe('SettingsService', () => {
     expect(store.setSecretSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.licenseKey, null);
   });
 
+  it('defaults existing readers to German, persists the selected language, and falls back to English for corrupt values', async () => {
+    expect(await service.getAttractapLanguage()).toBe('de');
+    await service.updateAppSettings({ attractapLanguage: 'en' });
+    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.attractapLanguage, 'en');
+    store.getPlainSetting.mockResolvedValue('unexpected');
+    expect(await service.getAttractapLanguage()).toBe('en');
+  });
+
   it('persists every authentication rate-limit option and returns the resolved policy', async () => {
     const values = new Map<string, string>();
     store.setPlainSetting.mockImplementation(async (parent, key, value) => {

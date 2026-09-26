@@ -245,6 +245,7 @@ public:
         uint8_t keyLen;
         std::string error;
         std::string username;
+        std::string language;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;

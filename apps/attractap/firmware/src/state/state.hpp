@@ -92,11 +92,18 @@ public:
     };
     static WebsocketState getWebsocketState();
 
-    static void setApiState(bool authenticated, std::string deviceName);
+    // Empty means no new server default was received (for example on disconnect).
+    static void setApiState(bool authenticated, std::string deviceName, std::string defaultLanguage = "");
+    static void setUserLanguage(std::string language);
+    static void setDefaultLanguage(std::string language);
+    static std::string getActiveLanguage();
     struct ApiState
     {
         bool authenticated;
         std::string deviceName;
+        std::string defaultLanguage;
+        std::string userLanguage;
+        bool userAuthenticated;
     };
     static ApiState getApiState();
 

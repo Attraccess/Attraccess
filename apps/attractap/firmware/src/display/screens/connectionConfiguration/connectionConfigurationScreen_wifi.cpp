@@ -1,4 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
+#include "display/i18n.hpp"
 #include <string>
 #include "../../../network/wifi/wifi.hpp"
 #include "platform.hpp"
@@ -24,7 +25,7 @@ void ConnectionConfigurationScreen::loop()
          this->wifiScanCompleted = true;
          this->wifiScanRequested = false;
          this->wifiDropdownHasNetworks = false;
-         lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_SCAN_FAILED);
+         lv_dropdown_set_options(this->wifiSelectNetwork, FirmwareI18n::translate(WIFI_DROPDOWN_SCAN_FAILED));
       }
       return;
    }
@@ -45,7 +46,7 @@ void ConnectionConfigurationScreen::startWifiScan()
    this->wifiScanCompleted = false;
    this->wifiScanStartMs = millis();
    this->wifiDropdownHasNetworks = false;
-   lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_LOADING);
+   lv_dropdown_set_options(this->wifiSelectNetwork, FirmwareI18n::translate(WIFI_DROPDOWN_LOADING));
    Wifi::startScan();
 }
 
@@ -111,7 +112,7 @@ void ConnectionConfigurationScreen::populateWifiDropdown()
    if (options.length() == 0)
    {
       this->wifiDropdownHasNetworks = false;
-      lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_EMPTY);
+      lv_dropdown_set_options(this->wifiSelectNetwork, FirmwareI18n::translate(WIFI_DROPDOWN_EMPTY));
       return;
    }
 

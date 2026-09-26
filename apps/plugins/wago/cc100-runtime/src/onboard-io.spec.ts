@@ -219,17 +219,22 @@ describe('CC100 packed digital I/O', () => {
       }
       await publish(topic, payload, options);
     });
+    const pulseOff = deferred();
+    const write = adapter.write.bind(adapter);
+    jest.spyOn(adapter, 'write').mockImplementation(async (physical, value) => {
+      await write(physical, value);
+      if (physical.channel === 0 && !value) pulseOff.resolve();
+    });
     await writeFile(paths.input, '1');
     const reconnect = runtime.setConnected(true);
     await started.promise;
     try {
       await reconnect;
       await command('DO1', true, 'pulse', 'pulse');
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      await pulseOff.promise;
       expect(await readFile(paths.output, 'utf8')).toBe('0');
       await command('DO2', true);
       const writtenOff = deferred();
-      const write = adapter.write.bind(adapter);
       jest.spyOn(adapter, 'write').mockImplementation(async (physical, value) => {
         await write(physical, value);
         if (physical.channel === 3 && !value) writtenOff.resolve();

@@ -12,6 +12,8 @@
 #include "display/screens/supervision/supervisionScreen.hpp"
 #include "display/shared/pinInput/pinInputPage.hpp"
 #include "fixtures.hpp"
+#include "state/language.hpp"
+#include "display/i18n.hpp"
 
 #include <algorithm>
 #include <array>
@@ -696,12 +698,21 @@ void testBackgroundScreens(Renderer &renderer)
         expect(lv_obj_get_style_text_font(resourceName, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
                "Lockscreen resource name uses a Latin-1 font");
         expectBackground(renderer, guard.root, "lockscreen-available");
+        Fixtures::activeLanguage = "en";
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Tap your NFC \n        card/tag to sign in");
+        requireObject(guard.root, &lv_label_class, "Available");
         lock.setUsageInfo(true, "Müller", false);
-        auto *usage = requireObject(guard.root, &lv_label_class, "In Verwendung: Müller");
+        auto *usage = requireObject(guard.root, &lv_label_class, "In use: Müller");
         expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
                "Lockscreen active username uses a Latin-1 font");
-        expectBackground(renderer, guard.root, "lockscreen-in-use");
         lock.setUsageInfo(false, "", true);
+        requireObject(guard.root, &lv_label_class, "Under maintenance");
+        Fixtures::activeLanguage = "de";
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Bitte mit NFC \n        Karte/Tag anmelden");
+        requireObject(guard.root, &lv_label_class, "In Wartung");
+        expectBackground(renderer, guard.root, "lockscreen-in-use");
         expectBackground(renderer, guard.root, "lockscreen-maintenance");
     }
     {
@@ -868,6 +879,7 @@ int main(int argc, char **argv)
         Renderer renderer(output);
         unsigned passed = 0, failed = 0;
         const auto test = [&](const char *name, auto run) {
+            Fixtures::activeLanguage = "de";
             Fixtures::nowMs = 1000;
             Fixtures::network = {};
             Fixtures::websocket = {};
@@ -888,12 +900,132 @@ int main(int argc, char **argv)
         test("theme/automatic-button-states", [&] { testButtons(renderer, false); });
         test("theme/helper-button-states", [&] { testButtons(renderer, true); });
         test("theme/fields-and-keyboard-states", [&] { testInputs(renderer); });
+        test("i18n/default-user-fallback-transitions", [&] {
+            const std::string existingInstallDefault = Language::supported("de");
+            expect(existingInstallDefault == "de", "Existing installations retain German default");
+            const std::string setupBrowserDefault = Language::supported("DE-at");
+            expect(setupBrowserDefault == "de", "Setup browser locale resolves to supported base language");
+            expect(Language::supported("en-US") == "en", "English browser locale resolves to English");
+            expect(Language::supported("fr-CA") == "en", "Unsupported browser and device locales fall back to English");
+            expect(Language::active(false, "de", "en") == "en", "Unauthenticated display uses system default");
+            expect(Language::active(true, "de-AT", "en") == "de", "Authenticated display uses first user's locale");
+            expect(Language::active(true, "en-US", "de") == "en", "Changing users changes the active locale");
+            expect(Language::active(false, "en", "de") == "de", "Ending authentication returns to system default");
+            Language::Session session;
+            expect(session.active() == "de", "Installation without saved default starts in German");
+            session.setApi(true, "en");
+            expect(session.active() == "en", "Reader receives system default");
+            session.setUser("de-AT");
+            expect(session.active() == "de", "Authenticated card selects its user's locale");
+            session.setUser("en-US");
+            expect(session.active() == "en", "A second card replaces the previous user's locale");
+            session.setUser("");
+            expect(session.active() == "en", "Clearing authentication restores system default");
+            session.setApi(true, "de");
+            session.setUser("en");
+            session.setApi(false, "");
+            expect(session.active() == "de", "Disconnect restores preserved system default");
+            expect(std::string(Language::text("English fallback", "", "de")) == "English fallback",
+                   "Missing locale translation falls back to English");
+            expect(std::string(FirmwareI18n::translateForLocale("Sitzung beenden", "en")) == "End session",
+                   "Shared display catalog resolves German screen strings to English");
+            expect(std::string(FirmwareI18n::translateForLocale("End session", "de")) == "Sitzung beenden",
+                   "Visible labels can refresh back to German");
+            expect(std::string(FirmwareI18n::translateForLocale("Kein Zugang", "en")) == "No access",
+                   "Demo role is translated to English");
+            expect(std::string(FirmwareI18n::translateForLocale("Eingewiesen", "en")) == "Introduced",
+                   "Second demo role is translated to English");
+            expect(std::string(FirmwareI18n::translateForLocale("Aufsichts-Karte auflegen oder per\nApp/Web bestätigen\nAlex", "en")) ==
+                       "Tap supervisor card or approve in the\napp/web interface\nAlex",
+                   "Supervision hint translates while preserving the server supplied user name");
+            expect(std::string(FirmwareI18n::translateForLocale("-- kein Einweiser verfügbar --", "en")) ==
+                       "-- no introducer available --",
+                   "Empty introducer state is translated");
+            expect(std::string(FirmwareI18n::translateForLocale("Rolle für Karte 04A1", "en")) == "Role for card 04A1",
+                   "Formatted demo role title preserves the card UID");
+            expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5", "en")) == "Page 2 of 5",
+                   "Formatted project pagination is translated");
+            expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5 boats", "en")) == "Seite 2 von 5 boats",
+                   "Pagination matcher preserves trailing server text");
+            const std::string longScope(700, 'x');
+            const std::string longBreadcrumb = std::string("Bitte Formular ausfüllen\n") + longScope;
+            expect(std::string(FirmwareI18n::translateForLocale(longBreadcrumb.c_str(), "en")) ==
+                       std::string("Please complete the form\n") + longScope,
+                   "Long form breadcrumb translates its heading without truncating supplied scope");
+            const std::string longProject = std::string("Projekt: ") + longScope;
+            expect(std::string(FirmwareI18n::translateForLocale(longProject.c_str(), "en")) ==
+                       std::string("Project: ") + longScope,
+                   "Long project label translates its prefix without truncating supplied name");
+            const std::string longUid(300, '9');
+            const std::string longRole = std::string("Rolle für Karte ") + longUid;
+            expect(std::string(FirmwareI18n::translateForLocale(longRole.c_str(), "en")) ==
+                       std::string("Role for card ") + longUid,
+                   "Long demo role title preserves the complete card identifier");
+            expect(std::string(FirmwareI18n::translateForLocale("Keine Aufsicht verfügbar", "en-US")) == "No supervisor available",
+                   "Supervision errors use English on English readers");
+            expect(std::string(FirmwareI18n::translateForLocale("Karte konnte nicht\ngelesen werden", "en")) == "Could not\nread card",
+                   "Card read errors use English on English readers");
+            expect(std::string(FirmwareI18n::translateForLocale("Karte wird zurückgesetzt...\nbitte nicht bewegen", "en")) == "Resetting card...\nplease keep it still",
+                   "Reset status is translated");
+            expect(std::string(FirmwareI18n::translateForLocale("Aktion fehlgeschlagen", "de")) == "Aktion fehlgeschlagen",
+                   "German fallback remains available");
+            auto *root = lv_obj_create(lv_screen_active());
+            auto *label = lv_label_create(root);
+            FirmwareI18n::setLabel(label, "Sitzung beenden");
+            Language::Session visibleSession;
+            visibleSession.setApi(true, "en-US");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "End session",
+                   "Unauthenticated screen uses the received English system default");
+            visibleSession.setUser("de-AT");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "Sitzung beenden",
+                   "First authenticated user's German locale refreshes visible text");
+            visibleSession.setUser("en-US");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "End session",
+                   "Second authenticated user's English locale replaces the first user's locale");
+            visibleSession.setUser("");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "End session",
+                   "Unauthenticated screen returns to the system default after sign-out");
+            auto *serverValue = lv_label_create(root);
+            FirmwareI18n::setDynamicLabel(serverValue, "Maintenance");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_label_get_text(serverValue)) == "Maintenance", "Server resource names survive locale refresh");
+            auto *placeholder = lv_textarea_create(root);
+            lv_textarea_set_placeholder_text(placeholder, "Mind. 4 Ziffern");
+            auto *dropdown = lv_dropdown_create(root);
+            lv_dropdown_set_options(dropdown, "Suche WLANs...");
+            FirmwareI18n::refreshTree(root, "en");
+            expect(std::string(lv_textarea_get_placeholder_text(placeholder)) == "At least 4 digits",
+                   "Text-area placeholders refresh to English");
+            expect(std::string(lv_dropdown_get_options(dropdown)) == "Searching for Wi-Fi networks...",
+                   "Static dropdown options refresh to English");
+            lv_dropdown_set_options(dropdown, "Maintenance\nWartung");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_dropdown_get_options(dropdown)) == "Maintenance\nWartung",
+                   "Server supplied Wi-Fi names are preserved");
+            lv_obj_delete(root);
+        });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });
         test("screen/att-880-authenticated-list", [&] { testAuthenticatedList(renderer); });
         test("screen/restored-backgrounds", [&] { testBackgroundScreens(renderer); });
         test("screen/boot", [&] { testBoot(renderer); });
         test("screen/init", [&] { testInit(renderer); });
         test("screen/enrollment", [&] { testCard<EnrollmentScreen>(renderer, "enrollment", "Karte wird beschrieben...\nbitte nicht bewegen", "Karte registriert!"); });
+        test("i18n/enrollment-locale-transition", [&] {
+            EnrollmentScreen card;
+            card.init();
+            ScreenGuard screen(card.getScreen(), &card);
+            requireObject(screen.root, &lv_label_class, "Karte an den Leser halten");
+            Fixtures::activeLanguage = "en";
+            card.loop();
+            requireObject(screen.root, &lv_label_class, "Hold card to reader");
+            requireObject(screen.root, &lv_label_class, "Register new card");
+            card.setStatus(EnrollmentScreen::STATUS_WRITING);
+            requireObject(screen.root, &lv_label_class, "Writing card...\nplease keep it still");
+        });
         test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurückgesetzt...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });

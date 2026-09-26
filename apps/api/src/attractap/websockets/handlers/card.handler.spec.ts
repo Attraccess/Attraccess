@@ -760,7 +760,11 @@ describe('AttractapCardHandler', () => {
 
     it('sets lastAuthenticatedUserId and sends CARD_AUTHENTICATION_DATA on success', async () => {
       const socket = createMockSocket();
-      attractapService.getNFCCardByUID.mockResolvedValueOnce(activeCard);
+      const user = { ...activeCard.user, locale: 'de-DE' };
+      attractapService.getNFCCardByUID.mockResolvedValueOnce({
+        ...activeCard,
+        user,
+      });
       resourceUsageService.canControllResource.mockResolvedValueOnce(true);
       resourceIntroducersService.isIntroducer.mockResolvedValueOnce(true);
       rbacService.getEffectivePermissions.mockResolvedValueOnce(new Set(['resources.update']));
@@ -769,8 +773,8 @@ describe('AttractapCardHandler', () => {
       await handler.handleCardAuthenticationRequest(socket, data);
 
       expect(socket.state.lastAuthenticatedUserId).toBe(activeCard.user.id);
-      expect(resourceUsageService.canControllResource).toHaveBeenCalledWith(10, activeCard.user);
-      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(10, activeCard.user.id, true);
+      expect(resourceUsageService.canControllResource).toHaveBeenCalledWith(10, user);
+      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(10, user.id, true);
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -779,6 +783,7 @@ describe('AttractapCardHandler', () => {
               keyNo: activeCard.keyNo,
               key: activeCard.key,
               username: activeCard.user.username,
+              language: 'de',
               canManageResource: true,
               hasIntroduction: true,
               isIntroducer: true,

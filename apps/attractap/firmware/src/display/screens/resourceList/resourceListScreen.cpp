@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "resourceListScreen.hpp"
 #include "display/images/logo_40h.hpp"
 #include "display/images/lockscreen_background_image.hpp"
@@ -5,7 +6,7 @@
 namespace {
 lv_obj_t *text(lv_obj_t *parent, const char *value, const lv_font_t *font, lv_color_t color) {
     auto *label = lv_label_create(parent);
-    lv_label_set_text(label, value);
+    FirmwareI18n::setLabel(label, value);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_width(label, lv_pct(100));
@@ -100,7 +101,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     lv_obj_set_height(name, 26);
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
     std::string status = resource.description;
-    if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser ? "Von dir verwendet" : std::string("In Verwendung: ") + resource.activeUser;
+    if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser ? "Von dir verwendet" : std::string(State::getActiveLanguage() == "en" ? "In use: " : "In Verwendung: ") + resource.activeUser;
     else if (resource.isUnderMaintenance) status = "Wartung";
     else if (!resource.isHealthy) status = "Nicht betriebsbereit";
     else if (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource) status = "Einweisung fehlt";

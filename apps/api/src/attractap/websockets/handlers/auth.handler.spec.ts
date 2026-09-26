@@ -62,6 +62,7 @@ describe('AttractapAuthHandler', () => {
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
+    (handler as any).settingsService = { getAttractapLanguage: jest.fn().mockResolvedValue('de') };
   });
 
   describe('handleReaderRegister', () => {
@@ -187,7 +188,7 @@ describe('AttractapAuthHandler', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.READER_AUTHENTICATED,
-            payload: { name: 'Reader A' },
+            payload: { name: 'Reader A', language: 'de' },
           }),
         }),
       );

@@ -5,6 +5,7 @@ export const APP_KEYS = {
   url: 'backend_url',
   publicInternetUrl: 'public_internet_url',
   licenseKey: 'license_key',
+  attractapLanguage: 'attractap_language',
 } as const;
 
 export const METRICS_PARENT = 'metrics';

@@ -1,8 +1,10 @@
+#include "display/i18n.hpp"
 #include "lockscreen.hpp"
 #include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
 #include "display/shared/headerButton.hpp"
 #include "display/images/lockscreen_background_image.hpp"
+#include "state/state.hpp"
 #include <string>
 
 #include <cstring>
@@ -20,12 +22,16 @@ void Lockscreen::init()
     lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
 
     lv_obj_t *label = lv_label_create(this->screen);
+    this->signInPromptLabel = label;
     lv_obj_set_width(label, LV_SIZE_CONTENT);
     lv_obj_set_height(label, LV_SIZE_CONTENT);
     lv_obj_set_x(label, 12);
     lv_obj_set_y(label, -57);
     lv_obj_set_align(label, LV_ALIGN_CENTER);
-    lv_label_set_text(label, "Bitte mit NFC \n        Karte/Tag anmelden");
+    this->renderedLanguage = State::getActiveLanguage();
+    FirmwareI18n::setLabel(label, this->renderedLanguage == "en"
+        ? "Tap your NFC \n        card/tag to sign in"
+        : "Bitte mit NFC \n        Karte/Tag anmelden");
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -71,7 +77,7 @@ void Lockscreen::init()
     lv_label_set_long_mode(this->resourceNameLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->resourceNameLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(this->resourceNameLabel, "???");
+    FirmwareI18n::setLabel(this->resourceNameLabel, "???");
     lv_obj_set_style_text_color(this->resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->resourceNameLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -80,7 +86,7 @@ void Lockscreen::init()
     lv_label_set_long_mode(this->usageInfoLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->usageInfoLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->usageInfoLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(this->usageInfoLabel, "???");
+    FirmwareI18n::setLabel(this->usageInfoLabel, "???");
     lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_update_layout(this->screen);
@@ -94,6 +100,17 @@ lv_obj_t *Lockscreen::getScreen()
 
 void Lockscreen::loop()
 {
+    const std::string language = State::getActiveLanguage();
+    if (this->signInPromptLabel && language != this->renderedLanguage)
+    {
+        this->renderedLanguage = language;
+        FirmwareI18n::setLabel(this->signInPromptLabel, language == "en"
+            ? "Tap your NFC \n        card/tag to sign in"
+            : "Bitte mit NFC \n        Karte/Tag anmelden");
+        // This screen remains alive across authentication transitions. Refresh
+        // its status as well as the prompt when the active locale changes.
+        this->updateUsageInfo();
+    }
 }
 
 std::string Lockscreen::getName()
@@ -134,18 +151,20 @@ void Lockscreen::updateUsageInfo()
     // Status priority mirrors the web resource list: in use > maintenance > available.
     if (this->hasActiveUsage)
     {
-        std::string usageText = std::string("In Verwendung: ") + this->username;
-        lv_label_set_text(this->usageInfoLabel, usageText.c_str());
+        const std::string usageText = State::getActiveLanguage() == "en"
+            ? std::string("In use: ") + this->username
+            : std::string("In Verwendung: ") + this->username;
+        FirmwareI18n::setLabel(this->usageInfoLabel, usageText.c_str());
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else if (this->isUnderMaintenance)
     {
-        lv_label_set_text(this->usageInfoLabel, "In Wartung");
+        FirmwareI18n::setLabel(this->usageInfoLabel, State::getActiveLanguage() == "en" ? "Under maintenance" : "In Wartung");
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else
     {
-        lv_label_set_text(this->usageInfoLabel, "Verfügbar");
+        FirmwareI18n::setLabel(this->usageInfoLabel, State::getActiveLanguage() == "en" ? "Available" : "Verfügbar");
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }

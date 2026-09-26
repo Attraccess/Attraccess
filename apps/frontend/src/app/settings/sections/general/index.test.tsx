@@ -117,7 +117,7 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
+      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' } },
     });
   });
 
@@ -136,7 +136,7 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined } },
+      requestBody: { app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' } },
     });
   });
 
@@ -230,7 +230,7 @@ describe('GeneralSection — Enter key', () => {
     await userEvent.type(field, '/app{Enter}');
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
+      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' } },
     });
   });
 });

@@ -39,6 +39,8 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const [url, setUrl] = useState(window.location.origin);
   const [publicInternetUrl, setPublicInternetUrl] = useState(window.location.origin);
   const [licenseKey, setLicenseKey] = useState('');
+  const browserLanguage = (navigator.language || '').toLowerCase().split(/[-_]/, 1)[0];
+  const [attractapLanguage, setAttractapLanguage] = useState<'en' | 'de'>(browserLanguage === 'de' ? 'de' : 'en');
 
   const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, { enabled: variant === 'standalone' });
 
@@ -47,6 +49,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     setUrl(settings.app.url ?? '');
     setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
     setLicenseKey('');
+    setAttractapLanguage((settings.app as typeof settings.app & { attractapLanguage?: 'en' | 'de' }).attractapLanguage ?? 'de');
   }, [variant, settings]);
 
   const mutateConfig = useMemo(() => {
@@ -88,6 +91,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           url: url.trim(),
           publicInternetUrl: publicInternetUrl.trim() ? publicInternetUrl.trim() : undefined,
           licenseKey: licenseKey.trim() ? licenseKey.trim() : undefined,
+          attractapLanguage,
         },
       },
     };
@@ -97,7 +101,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     } else {
       saveSettings(payload);
     }
-  }, [url, publicInternetUrl, licenseKey, saveSettings, saveSettingsFirstTimeSetup, endpoint]);
+  }, [url, publicInternetUrl, licenseKey, attractapLanguage, saveSettings, saveSettingsFirstTimeSetup, endpoint]);
 
   const showLoading = variant === 'standalone' && isLoading;
 
@@ -129,6 +133,13 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         <Input type="url" />
         <Description>{t('inputs.publicInternetUrl.description')}</Description>
       </TextField>
+      <label className="flex flex-col gap-1">
+        <span>{t('inputs.attractapLanguage.label')}</span>
+        <select aria-label={t('inputs.attractapLanguage.label')} value={attractapLanguage} onChange={(event) => setAttractapLanguage(event.target.value as 'en' | 'de')} className="rounded-medium border border-default-300 bg-default-100 px-3 py-2">
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </label>
       {variant === 'standalone' && (
         <>
           <PasswordInput

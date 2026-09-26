@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "resourceDetailsScreen.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
@@ -7,7 +8,6 @@
 #include <stdio.h>
 #include <cstdlib>
 
-static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option wählen";
 static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
 static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
@@ -152,16 +152,16 @@ void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &
    {
       lv_obj_clean(this->formsModalList);
       lv_obj_t *loading = lv_label_create(this->formsModalList);
-      lv_label_set_text(loading, "Laden...");
+      FirmwareI18n::setLabel(loading, "Laden...");
       lv_obj_set_style_text_color(loading, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
    }
    if (this->formsModalProgressLabel)
    {
-      lv_label_set_text(this->formsModalProgressLabel, "");
+      FirmwareI18n::setLabel(this->formsModalProgressLabel, "");
    }
    if (this->formsBackButton)
    {
@@ -189,7 +189,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
    if (this->formsModalProgressLabel)
    {
       std::string progress = std::to_string(fieldNumber) + " / " + std::to_string(totalFields);
-      lv_label_set_text(this->formsModalProgressLabel, progress.c_str());
+      FirmwareI18n::setLabel(this->formsModalProgressLabel, progress.c_str());
    }
 
    if (this->formsProgressBar && totalFields > 0)
@@ -213,7 +213,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
    }
    if (this->formsNextLabel)
    {
-      lv_label_set_text(this->formsNextLabel, isLast ? "Absenden" : "Weiter");
+      FirmwareI18n::setLabel(this->formsNextLabel, isLast ? "Absenden" : "Weiter");
    }
 
    this->closeFormsEditor(false);
@@ -235,7 +235,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
    }
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungültig.");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungültig.");
    }
 }
 void ResourceDetailsScreen::hideFormsModal()
@@ -288,7 +288,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
    this->formsModalProgressLabel = lv_label_create(header);
-   lv_label_set_text(this->formsModalProgressLabel, "");
+   FirmwareI18n::setLabel(this->formsModalProgressLabel, "");
    lv_obj_set_style_text_color(this->formsModalProgressLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -298,7 +298,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_size(cancelBtn, 34, 34);
    DisplayTheme::secondaryButton(cancelBtn);
    lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
-   lv_label_set_text(cancelLabel, LV_SYMBOL_CLOSE);
+   FirmwareI18n::setLabel(cancelLabel, LV_SYMBOL_CLOSE);
    lv_obj_center(cancelLabel);
    lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
 
@@ -332,14 +332,14 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(content, 1);
 
    this->formsBreadcrumbLabel = lv_label_create(content);
-   lv_label_set_text(this->formsBreadcrumbLabel, "");
+   FirmwareI18n::setLabel(this->formsBreadcrumbLabel, "");
     lv_obj_set_style_text_color(this->formsBreadcrumbLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsModalErrorLabel = lv_label_create(content);
-   lv_label_set_text(this->formsModalErrorLabel, "");
+   FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
     lv_obj_set_style_text_color(this->formsModalErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->formsModalErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -373,7 +373,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_all(backBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::secondaryButton(backBtn);
    lv_obj_t *backLabel = lv_label_create(backBtn);
-   lv_label_set_text(backLabel, "Zurück");
+   FirmwareI18n::setLabel(backLabel, "Zurück");
    lv_obj_set_style_text_font(backLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
@@ -385,7 +385,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_all(nextBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::button(nextBtn);
    this->formsNextLabel = lv_label_create(nextBtn);
-   lv_label_set_text(this->formsNextLabel, "Weiter");
+   FirmwareI18n::setLabel(this->formsNextLabel, "Weiter");
    lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
    this->formsNextSpinner = lv_spinner_create(nextBtn);
    lv_obj_set_style_arc_color(this->formsNextSpinner, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -430,7 +430,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_column(editorHeader, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->formsEditorTitleLabel = lv_label_create(editorHeader);
-   lv_label_set_text(this->formsEditorTitleLabel, "");
+   FirmwareI18n::setLabel(this->formsEditorTitleLabel, "");
    lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
    lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(this->formsEditorTitleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -441,7 +441,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_size(editorCancelBtn, 34, 34);
    DisplayTheme::secondaryButton(editorCancelBtn);
    lv_obj_t *editorCancelLabel = lv_label_create(editorCancelBtn);
-   lv_label_set_text(editorCancelLabel, LV_SYMBOL_CLOSE);
+   FirmwareI18n::setLabel(editorCancelLabel, LV_SYMBOL_CLOSE);
    lv_obj_center(editorCancelLabel);
    lv_obj_add_event_cb(editorCancelBtn, &ResourceDetailsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
 
@@ -526,7 +526,7 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *)
       {
          lv_obj_clear_flag(this->formsNextLabel, LV_OBJ_FLAG_HIDDEN);
          lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
-         lv_label_set_text(this->formsNextLabel, this->formsIsLastField ? "Absenden" : "Weiter");
+         FirmwareI18n::setLabel(this->formsNextLabel, this->formsIsLastField ? "Absenden" : "Weiter");
       }
    }
 }
@@ -542,7 +542,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
    }
 
    if (!this->formsModalPage || this->formsModalPage->fieldCount == 0)
@@ -605,7 +605,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
       {
          breadcrumb += "\n" + scope;
       }
-      lv_label_set_text(this->formsBreadcrumbLabel, breadcrumb.c_str());
+      FirmwareI18n::setLabel(this->formsBreadcrumbLabel, breadcrumb.c_str());
    }
 
    {
@@ -626,7 +626,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             fieldTitle += " *";
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
-         lv_label_set_text(fieldLabel, fieldTitle.c_str());
+         FirmwareI18n::setDynamicLabel(fieldLabel, fieldTitle.c_str());
           lv_obj_set_style_text_font(fieldLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
           lv_obj_set_style_text_color(fieldLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -689,7 +689,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             if (field.options.select.count == 0)
             {
                lv_obj_t *info = lv_label_create(selectContainer);
-               lv_label_set_text(info, SELECT_FIELD_NO_OPTIONS);
+               FirmwareI18n::setLabel(info, SELECT_FIELD_NO_OPTIONS);
                 lv_obj_set_style_text_color(info, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
                 lv_obj_set_style_text_font(info, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -771,7 +771,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_label_set_long_mode(valueLabel, multiline ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
 
             lv_obj_t *editIcon = lv_label_create(preview);
-            lv_label_set_text(editIcon, LV_SYMBOL_EDIT);
+            FirmwareI18n::setLabel(editIcon, LV_SYMBOL_EDIT);
             lv_obj_set_style_text_color(editIcon, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
             lv_obj_add_event_cb(preview, &ResourceDetailsScreen::onFieldPreviewClick, LV_EVENT_CLICKED, this);
@@ -779,7 +779,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
 
          widget.errorLabel = lv_label_create(fieldContainer);
-         lv_label_set_text(widget.errorLabel, "");
+         FirmwareI18n::setLabel(widget.errorLabel, "");
           lv_obj_set_style_text_color(widget.errorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
           lv_obj_set_style_text_font(widget.errorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
       }
@@ -809,7 +809,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
       {
          if (widget.errorLabel)
          {
-            lv_label_set_text(widget.errorLabel, msg);
+            FirmwareI18n::setLabel(widget.errorLabel, msg);
          }
          hasErrors = true;
       };
@@ -886,7 +886,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       if (this->formsModalErrorLabel)
       {
-         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfüllen.");
+         FirmwareI18n::setLabel(this->formsModalErrorLabel, "Bitte markierte Felder ausfüllen.");
       }
       return false;
    }
@@ -926,12 +926,12 @@ void ResourceDetailsScreen::clearFormFieldErrors()
    {
       if (this->formFieldWidgets[i].errorLabel)
       {
-         lv_label_set_text(this->formFieldWidgets[i].errorLabel, "");
+         FirmwareI18n::setLabel(this->formFieldWidgets[i].errorLabel, "");
       }
    }
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
    }
 }
 void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
@@ -946,12 +946,15 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
    {
       // Empty: show the field placeholder (or a generic hint) in muted gray.
       const char *hint = "Antippen zum Eingeben";
+      bool useTranslatedHint = true;
       if (widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
           widget.definition->options.text.hasPlaceholder && widget.definition->options.text.placeholder.length() > 0)
       {
          hint = widget.definition->options.text.placeholder.c_str();
+         useTranslatedHint = false;
       }
-      lv_label_set_text(widget.previewLabel, hint);
+      if (useTranslatedHint) FirmwareI18n::setLabel(widget.previewLabel, hint);
+      else lv_label_set_text(widget.previewLabel, hint);
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
@@ -981,7 +984,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
       {
          title += " *";
       }
-      lv_label_set_text(this->formsEditorTitleLabel, title.c_str());
+      FirmwareI18n::setLabel(this->formsEditorTitleLabel, title.c_str());
    }
 
    bool multiline = widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
