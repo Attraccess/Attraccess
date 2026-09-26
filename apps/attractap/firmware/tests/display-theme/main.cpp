@@ -972,10 +972,23 @@ int main(int argc, char **argv)
             auto *root = lv_obj_create(lv_screen_active());
             auto *label = lv_label_create(root);
             FirmwareI18n::setLabel(label, "Sitzung beenden");
-            FirmwareI18n::refreshTree(root, "en-US");
-            expect(std::string(lv_label_get_text(label)) == "End session", "Active visible labels refresh to English");
-            FirmwareI18n::refreshTree(root, "de-DE");
-            expect(std::string(lv_label_get_text(label)) == "Sitzung beenden", "Active visible labels refresh back to German");
+            Language::Session visibleSession;
+            visibleSession.setApi(true, "en-US");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "End session",
+                   "Unauthenticated screen uses the received English system default");
+            visibleSession.setUser("de-AT");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "Sitzung beenden",
+                   "First authenticated user's German locale refreshes visible text");
+            visibleSession.setUser("en-US");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "End session",
+                   "Second authenticated user's English locale replaces the first user's locale");
+            visibleSession.setUser("");
+            FirmwareI18n::refreshTree(root, visibleSession.active());
+            expect(std::string(lv_label_get_text(label)) == "End session",
+                   "Unauthenticated screen returns to the system default after sign-out");
             auto *serverValue = lv_label_create(root);
             FirmwareI18n::setDynamicLabel(serverValue, "Maintenance");
             FirmwareI18n::refreshTree(root, "de");
