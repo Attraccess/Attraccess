@@ -1,10 +1,10 @@
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Request, Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { generateMcpTools, McpManifestEntry, OpenApiDocument } from './openapi-tools';
 import reviewedManifest from './reviewed-manifest.json';
 import { mcpOAuthAuthorizationServerMetadata } from './mcp-oauth';
 import { signMcpDelegation } from './mcp-delegation';
-import { createMcpRateLimit } from './mcp-rate-limit';
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -150,7 +150,7 @@ export function registerMcpHttpEndpoints(
   const tools = generateMcpTools(options.document, options.manifest ?? (reviewedManifest as Record<string, McpManifestEntry>));
   const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
   const router = Router();
-  const mcpRateLimit = createMcpRateLimit(120, 60_000);
+  const mcpRateLimit = rateLimit({ max: 120, windowMs: 60_000, standardHeaders: true });
   const metadataRouter = Router();
   const issuer = new URL('/', options.resourceUrl).origin;
   const oauthPrefix = `${options.globalPrefix ? `/${options.globalPrefix}` : ''}/mcp`;

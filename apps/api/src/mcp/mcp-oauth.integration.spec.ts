@@ -1,4 +1,3 @@
-import cookieParser from 'cookie-parser';
 import { createHash } from 'crypto';
 import express from 'express';
 import { createServer, Server } from 'http';
@@ -38,7 +37,12 @@ describe('MCP OAuth authorization code and refresh grants', () => {
     const rbac = { getEffectivePermissions: jest.fn(async () => new Set(permissions)) } as unknown as RbacService;
     const strategy = { validate: jest.fn(async () => ({ ...user })) } as unknown as SessionStrategy;
     const app = express();
-    app.use(cookieParser());
+    app.use((request, _response, next) => {
+      if (request.header('cookie') === 'auth-session=browser-session') {
+        (request as typeof request & { cookies?: Record<string, string> }).cookies = { 'auth-session': 'browser-session' };
+      }
+      next();
+    });
     authorizeMcp = registerMcpOAuthEndpoints(app as unknown as NestExpressApplication, {
       resourceUrl: resource,
       secret,

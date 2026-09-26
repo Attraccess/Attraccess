@@ -1,12 +1,12 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import express, { Request, Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { SessionStrategy } from '../users-and-auth/strategies/session.strategy';
 import { signMcpDelegation } from './mcp-delegation';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import { createMcpRateLimit } from './mcp-rate-limit';
 
 type RegisteredClient = { client_id: string; redirect_uris: string[]; client_name?: string };
 type OAuthToken = {
@@ -117,8 +117,8 @@ export function registerMcpOAuthEndpoints(
   const authorizeUrl = `${issuer}${options.prefix}/oauth/authorize`;
   const router = Router();
   router.use(express.urlencoded({ extended: false }));
-  const authorizeRateLimit = createMcpRateLimit(20, 60_000);
-  const tokenRateLimit = createMcpRateLimit(30, 60_000);
+  const authorizeRateLimit = rateLimit({ max: 20, windowMs: 60_000, standardHeaders: true });
+  const tokenRateLimit = rateLimit({ max: 30, windowMs: 60_000, standardHeaders: true });
 
   function sameOrigin(request: Request, response: Response, next: express.NextFunction): void {
     const origin = request.header('origin');
