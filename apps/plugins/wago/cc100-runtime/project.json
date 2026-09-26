@@ -46,7 +46,7 @@
     "test": {
       "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "@nx/jest:jest",
-      "options": { "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts" }
+      "options": { "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts", "runInBand": true }
     },
     "lint": {
       "executor": "nx:run-commands",

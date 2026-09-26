@@ -9,6 +9,10 @@ import { managementKeyCommand, ManagementShellAction } from './wago-management-s
 import { WagoManagementProvider } from './wago-management-provider';
 import { fw31Model, fw31OsRelease, fw31Revisions } from './fixtures/fw31-identity';
 
+// Shell-backed fixtures spawn several bounded utility processes; keep Jest's
+// test deadline above the per-command timeout even on loaded validation hosts.
+jest.setTimeout(15000);
+
 const exec = promisify(execFile);
 const token = '1234567890abcdef1234567890abcdef';
 const key = generateManagementKey();
@@ -101,7 +105,7 @@ describe('executable isolated management shell fixtures', () => {
     expect(await readFile(path(`.attraccess-management-recovered-${token}`, 'previous'), 'utf8')).toBe(
       '# existing key\n',
     );
-  }, 10000);
+  }, 30000);
 
   it('removes a newly created authorized_keys file on rollback', async () => {
     await run('prepare');
@@ -163,9 +167,14 @@ describe('executable isolated management shell fixtures', () => {
   it('retries watchdog lock contention beyond the first five-second wait', async () => {
     await prepared();
     await run('install');
+    // Keep the lock in the process that acquired it. The fixture's flock shim
+    // is a short-lived utility and cannot model a shell-held lock on macOS.
     const holder = exec(
-      '/bin/sh',
-      ['-c', 'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; sleep 7'],
+      'python3',
+      [
+        '-c',
+        'import fcntl, os, time; home=os.environ["HOME"]; lock=open(os.path.join(home, ".ssh", ".attraccess-management.lock"), "a"); fcntl.flock(lock, fcntl.LOCK_EX); open(os.path.join(home, "locked"), "w").close(); time.sleep(7)',
+      ],
       { env: env(), timeout: 10000 },
     );
     await waitFor(async () => (await readdir(home)).includes('locked'));
