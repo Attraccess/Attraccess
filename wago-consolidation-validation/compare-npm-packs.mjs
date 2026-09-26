@@ -3,8 +3,8 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 const roots = {
-  baseline: 'ATT-1079-validation/npm-baseline/package',
-  current: 'ATT-1079-validation/npm-current/package',
+  baseline: 'wago-consolidation-validation/npm-baseline/package',
+  current: 'wago-consolidation-validation/npm-current/package',
 };
 const asset = /(__federation_expose_Plugin|__federation_fn_import|_virtual___federation_fn_import|jsx-runtime|preload-helper|react|rolldown-runtime)-[A-Za-z0-9_-]+\.js/g;
 async function files(root, dir = root) {
