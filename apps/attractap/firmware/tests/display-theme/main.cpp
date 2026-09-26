@@ -917,6 +917,12 @@ int main(int argc, char **argv)
                    "Shared display catalog resolves German screen strings to English");
             expect(std::string(FirmwareI18n::translateForLocale("End session", "de")) == "Sitzung beenden",
                    "Visible labels can refresh back to German");
+            expect(std::string(FirmwareI18n::translateForLocale("Kein Zugang", "en")) == "No access",
+                   "Demo role is translated to English");
+            expect(std::string(FirmwareI18n::translateForLocale("Rolle für Karte 04A1", "en")) == "Role for card 04A1",
+                   "Formatted demo role title preserves the card UID");
+            expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5", "en")) == "Page 2 of 5",
+                   "Formatted project pagination is translated");
             expect(std::string(FirmwareI18n::translateForLocale("Keine Aufsicht verfügbar", "en-US")) == "No supervisor available",
                    "Supervision errors use English on English readers");
             expect(std::string(FirmwareI18n::translateForLocale("Karte konnte nicht\ngelesen werden", "en")) == "Could not\nread card",
@@ -932,6 +938,19 @@ int main(int argc, char **argv)
             expect(std::string(lv_label_get_text(label)) == "End session", "Active visible labels refresh to English");
             FirmwareI18n::refreshTree(root, "de-DE");
             expect(std::string(lv_label_get_text(label)) == "Sitzung beenden", "Active visible labels refresh back to German");
+            auto *placeholder = lv_textarea_create(root);
+            lv_textarea_set_placeholder_text(placeholder, "Mind. 4 Ziffern");
+            auto *dropdown = lv_dropdown_create(root);
+            lv_dropdown_set_options(dropdown, "Suche WLANs...");
+            FirmwareI18n::refreshTree(root, "en");
+            expect(std::string(lv_textarea_get_placeholder_text(placeholder)) == "At least 4 digits",
+                   "Text-area placeholders refresh to English");
+            expect(std::string(lv_dropdown_get_options(dropdown)) == "Searching for Wi-Fi networks...",
+                   "Static dropdown options refresh to English");
+            lv_dropdown_set_options(dropdown, "Maintenance\nWartung");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_dropdown_get_options(dropdown)) == "Maintenance\nWartung",
+                   "Server supplied Wi-Fi names are preserved");
             lv_obj_delete(root);
         });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <cstdio>
 #include <lvgl.h>
 
 #include "state/language.hpp"
@@ -127,6 +128,7 @@ inline constexpr Entry catalog[] = {
         {"Seite %u von %u", "Page %u of %u"},
         {"bsp.: deine-domain.de oder 192.168.1.100:3000", "e.g. your-domain.com or 192.168.1.100:3000"},
         {"Mind. 4 Ziffern", "At least 4 digits"}, {"Gerät", "Device"}, {"WLAN", "Wi-Fi"},
+        {"Kein Zugang", "No access"}, {"Eingewiesen", "Introduced"},
         {"Keine Netzwerke gefunden", "No networks found"}, {"WLAN Scan fehlgeschlagen", "Wi-Fi scan failed"},
         {"bsp.: deine-domain.de oder 192.168.1.100:3000", "e.g. your-domain.com or 192.168.1.100:3000"},
         {"SSID*", "SSID*"}, {"SSID", "SSID"}, {"Password", "Password"},
@@ -151,6 +153,29 @@ inline const char *translateForLocale(const char *value, const std::string &loca
         if (english && std::strcmp(value, entry.de) == 0) return entry.en;
         if (!english && std::strcmp(value, entry.en) == 0) return entry.de;
     }
+    // The displayed value contains numbers/IDs, so it cannot be an exact
+    // catalog key. Translate the fixed UI prefix while preserving its data.
+    constexpr size_t germanRolePrefixLength = sizeof("Rolle für Karte ") - 1;
+    constexpr size_t englishRolePrefixLength = sizeof("Role for card ") - 1;
+    const bool germanRoleTitle = std::strncmp(value, "Rolle für Karte ", germanRolePrefixLength) == 0;
+    const bool englishRoleTitle = std::strncmp(value, "Role for card ", englishRolePrefixLength) == 0;
+    if (germanRoleTitle || englishRoleTitle)
+    {
+        static char roleTitle[80];
+        const bool english = Language::supported(locale) == "en";
+        snprintf(roleTitle, sizeof(roleTitle), "%s%s", english ? "Role for card " : "Rolle für Karte ",
+                 value + (englishRoleTitle ? englishRolePrefixLength : germanRolePrefixLength));
+        return roleTitle;
+    }
+    unsigned currentPage = 0, totalPages = 0;
+    if (std::sscanf(value, "Seite %u von %u", &currentPage, &totalPages) == 2 ||
+        std::sscanf(value, "Page %u of %u", &currentPage, &totalPages) == 2)
+    {
+        static char pageText[40];
+        snprintf(pageText, sizeof(pageText), Language::supported(locale) == "en" ? "Page %u of %u" : "Seite %u von %u",
+                 currentPage, totalPages);
+        return pageText;
+    }
     return value;
 }
 
@@ -162,6 +187,21 @@ inline void refreshTree(lv_obj_t *root, const std::string &locale)
         const char *current = lv_label_get_text(root);
         const char *translated = translateForLocale(current, locale);
         if (translated != current) lv_label_set_text(root, translated);
+    }
+    else if (lv_obj_check_type(root, &lv_textarea_class))
+    {
+        const char *current = lv_textarea_get_placeholder_text(root);
+        const char *translated = translateForLocale(current, locale);
+        if (translated != current) lv_textarea_set_placeholder_text(root, translated);
+    }
+    else if (lv_obj_check_type(root, &lv_dropdown_class))
+    {
+        const char *current = lv_dropdown_get_options(root);
+        if (current && std::strchr(current, '\n') == nullptr)
+        {
+            const char *translated = translateForLocale(current, locale);
+            if (translated != current) lv_dropdown_set_options(root, translated);
+        }
     }
     for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
         refreshTree(lv_obj_get_child(root, i), locale);
