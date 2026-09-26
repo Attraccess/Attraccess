@@ -21,6 +21,7 @@ const pluginStore = createPluginStore();
 export function PluginProvider(props: PropsWithChildren) {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
   const addPlugin = usePluginState((s) => s.addPlugin);
+  const setInitialized = usePluginState((s) => s.setInitialized);
   const isInstalled = usePluginState((s) => s.isInstalled);
   const plugins = usePluginState((s) => s.plugins);
   const toast = useToastMessage();
@@ -165,9 +166,10 @@ export function PluginProvider(props: PropsWithChildren) {
       console.error('Attraccess Plugin System: Failed to fetch plugins', error);
     } finally {
       arePluginsLoaded.current = true;
+      setInitialized(true);
       console.debug('Attraccess Plugin System: All plugins loaded');
     }
-  }, [loadPlugin, refetchPlugins]);
+  }, [loadPlugin, refetchPlugins, setInitialized]);
 
   useEffect(() => {
     if (arePluginsLoaded.current) return;

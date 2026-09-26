@@ -93,6 +93,7 @@ import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
+import { DashboardPin } from './entities/dashboard-pin.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
 import { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 import { CompanionDevice } from './entities/companion-device.entity';
@@ -209,6 +210,7 @@ export {
   Message,
   MessageReferenceType,
   NotificationPreference,
+  DashboardPin,
   PushSubscription,
   Passkey,
   PasskeyChallenge,
@@ -274,6 +276,7 @@ export const entities = {
   ConversationParticipant,
   Message,
   NotificationPreference,
+  DashboardPin,
   PushSubscription,
   Passkey,
   PasskeyChallenge,

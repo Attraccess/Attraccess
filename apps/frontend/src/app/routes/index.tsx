@@ -59,6 +59,8 @@ import { AuditLogSection } from '../settings/sections/audit-log';
 import { SecuritySection } from '../settings/sections/security';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
+import { DashboardLanding, DashboardPage } from '../dashboard';
+import { PageHeader } from '../../components/pageHeader';
 
 const CompanionSettingsPage = lazy(() => import('../settings/companion'));
 const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
@@ -90,7 +92,12 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/',
-    element: <Navigate to="/resources" replace />,
+    element: <DashboardLanding />,
+    authRequired: true,
+  },
+  {
+    path: '/dashboard',
+    element: <DashboardPage />,
     authRequired: true,
   },
   {
@@ -505,11 +512,27 @@ function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): RouteConfi
     return [];
   }
 
-  // Wrap each plugin route element so a throwing render can't crash the app shell.
-  return routes.map((route) => ({
-    ...route,
-    element: <PluginRouteBoundary pluginName={pluginName}>{route.element}</PluginRouteBoundary>,
-  }));
+  let sidebarItems: ReturnType<NonNullable<typeof plugin.getSidebarItems>> = [];
+  try {
+    sidebarItems = plugin.getSidebarItems?.() ?? [];
+  } catch (error) {
+    console.error(`Attraccess Plugin System: getSidebarItems() of plugin "${pluginName}" threw`, error);
+  }
+
+  // Wrap plugin routes to isolate errors. Shared PageHeader reads the plugin
+  // sidebar registry and places the pin action alongside its other actions.
+  return routes.map((route) => {
+    const sidebarItem = sidebarItems.find((item) => item.path === route.path);
+    return {
+      ...route,
+      element: (
+        <PluginRouteBoundary pluginName={pluginName}>
+          {sidebarItem && <PageHeader title={sidebarItem.label} />}
+          {route.element}
+        </PluginRouteBoundary>
+      ),
+    };
+  });
 }
 
 export function useAllRoutes() {

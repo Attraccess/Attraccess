@@ -19,6 +19,7 @@
     "##default##": {
       "items": {
         "resources": "Resources",
+        "dashboard": "Dashboard",
         "projects": "Projects",
         "messages": "Messages",
         "billing": "Billing",

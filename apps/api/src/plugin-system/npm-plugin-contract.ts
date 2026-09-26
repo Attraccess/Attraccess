@@ -26,6 +26,7 @@ const packageSchema = z.object({
     frontend: entryPath.optional(),
     migrations: entryPath.optional(),
     styles: entryPath.optional(),
+    dashboardPaths: z.array(z.string().regex(/^\/(?!kiosk(?:\/|$)|dashboard(?:\/|$))[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/)).optional(),
     permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
     sdk: z.object({
       backend: z.string().optional(),
@@ -52,7 +53,7 @@ export function parseNpmPluginPackage(value: unknown, hostVersion: string): { pk
 
   const main = {
     ...(pkg.attraccess.backend ? { backend: splitEntry(pkg.attraccess.backend) } : {}),
-    ...(pkg.attraccess.frontend ? { frontend: { ...splitEntry(pkg.attraccess.frontend), ...(pkg.attraccess.styles ? { styles: styleForFrontend(pkg.attraccess.frontend, pkg.attraccess.styles) } : {}) } } : {}),
+    ...(pkg.attraccess.frontend ? { frontend: { ...splitEntry(pkg.attraccess.frontend), ...(pkg.attraccess.styles ? { styles: styleForFrontend(pkg.attraccess.frontend, pkg.attraccess.styles) } : {}), ...(pkg.attraccess.dashboardPaths ? { dashboardPaths: pkg.attraccess.dashboardPaths } : {}) } } : {}),
     ...(pkg.attraccess.migrations ? { migrations: splitEntry(pkg.attraccess.migrations) } : {}),
   };
   if (!main.backend && !main.frontend) {

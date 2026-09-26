@@ -22,6 +22,9 @@ export class PluginMainFrontend {
     required: false,
   })
   styles?: string;
+
+  @ApiProperty({ description: 'Exact frontend sidebar paths that may be pinned to a user dashboard', required: false, type: [String] })
+  dashboardPaths?: string[];
 }
 
 export class PluginMainBackend {
@@ -171,7 +174,7 @@ const mainSchema = z.object({
 export const PluginManifestSchema = z.object({
   name: z.string(),
   main: z.object({
-    frontend: mainSchema.extend({ styles: z.string().optional() }).optional(),
+    frontend: mainSchema.extend({ styles: z.string().optional(), dashboardPaths: z.array(z.string().regex(/^\/(?!kiosk(?:\/|$)|dashboard(?:\/|$))[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/)).optional() }).optional(),
     backend: mainSchema.optional(),
     migrations: mainSchema.optional(),
   }),

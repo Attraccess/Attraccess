@@ -61,7 +61,7 @@ export function BalenaPage() {
       <div className="flex flex-row flex-wrap gap-4">
         <Card className="w-full">
           <Card.Header>
-            <PageHeader title="Host Machine" icon={<ComputerIcon />} />
+            <PageHeader title="Host Machine" icon={<ComputerIcon />} noMargin />
           </Card.Header>
           <Card.Content className="flex flex-col gap-4">
             {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}

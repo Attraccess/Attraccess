@@ -7,6 +7,7 @@ import {
   FileSpreadsheetIcon,
   FolderIcon,
   GiftIcon,
+  LayoutDashboardIcon,
   LightbulbIcon,
   LucideProps,
   MessageSquareIcon,
@@ -68,6 +69,7 @@ const BalenaSidebarIcon = ({ size = 16, ...props }: LucideProps) => (
  * representative child's glyph since they only expand/collapse. Guarded by sidebarItems.spec.tsx.
  */
 export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
+  { translationKey: 'dashboard', path: '/dashboard', icon: LayoutDashboardIcon },
   {
     translationKey: 'resources',
     path: '/resources',

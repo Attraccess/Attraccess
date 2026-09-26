@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesService } from './resources.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, DocumentationType, ResourceType, SupervisionMode } from '@attraccess/database-entities';
+import { DashboardPin, Resource, DocumentationType, ResourceType, SupervisionMode } from '@attraccess/database-entities';
 import { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
@@ -29,6 +29,7 @@ const mockMetricsService = {
 describe('ResourcesService', () => {
   let service: ResourcesService;
   let resourceRepository: jest.Mocked<Repository<Resource>>;
+  const dashboardPinRepository = { delete: jest.fn().mockResolvedValue({ affected: 0 }) };
   const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
   // ResourceImageService is injected but not directly used in these tests
 
@@ -88,6 +89,7 @@ describe('ResourcesService', () => {
           useValue: mockMetricsService,
         },
         { provide: AuditService, useValue: audit },
+        { provide: getRepositoryToken(DashboardPin), useValue: dashboardPinRepository },
       ],
     }).compile();
 
@@ -820,6 +822,7 @@ describe('ResourcesService', () => {
       await service.deleteResource(1);
 
       expect(resourceRepository.softDelete).toHaveBeenCalledWith(1);
+      expect(dashboardPinRepository.delete).toHaveBeenCalledWith({ itemType: 'resource', itemId: '1' });
     });
 
     it('audits deletion with the pre-delete safe projection', async () => {

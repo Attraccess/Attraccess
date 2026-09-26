@@ -12,6 +12,16 @@ const BASE = {
 };
 
 describe('PluginManifestSchema migrations entry', () => {
+  it('accepts exact dashboard paths declared by a frontend plugin', () => {
+    const parsed = PluginManifestSchema.parse({ ...BASE, main: { ...BASE.main, frontend: { ...BASE.main.frontend, dashboardPaths: ['/plugin-report'] } } });
+    expect(parsed.main.frontend?.dashboardPaths).toEqual(['/plugin-report']);
+  });
+
+  it('rejects malformed dashboard paths', () => {
+    for (const path of ['/kiosk/companion', '/dashboard', 'https://example.com', '/foo/../bar']) {
+      expect(() => PluginManifestSchema.parse({ ...BASE, main: { ...BASE.main, frontend: { ...BASE.main.frontend, dashboardPaths: [path] } } })).toThrow();
+    }
+  });
   it('accepts a manifest without a migrations entry', () => {
     const parsed = PluginManifestSchema.parse(BASE);
     expect(parsed.main.migrations).toBeUndefined();
