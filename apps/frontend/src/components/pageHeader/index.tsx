@@ -55,7 +55,9 @@ export function PageHeader({
   const pluginEntry = plugins.flatMap((manifest) => {
     try { return manifest.plugin.getSidebarItems?.() ?? []; } catch { return []; }
   }).find((item) => item.path === location.pathname);
-  const pin = dashboardPin ?? (dashboardEntry ? { path: dashboardEntry.path, label: typeof title === 'string' ? title : dashboardEntry.path } : pluginEntry ? { path: pluginEntry.path, label: typeof title === 'string' ? title : pluginEntry.label } : undefined);
+  // Nested section/table headers can share the route's location; only the page
+  // header (which uses the normal margin) owns the page pin action.
+  const pin = dashboardPin ?? (!noMargin && (dashboardEntry ? { path: dashboardEntry.path, label: typeof title === 'string' ? title : dashboardEntry.path } : pluginEntry ? { path: pluginEntry.path, label: typeof title === 'string' ? title : pluginEntry.label } : undefined));
 
   return (
     <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-4', noMargin && 'mb-0')}>

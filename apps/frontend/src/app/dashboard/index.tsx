@@ -66,6 +66,7 @@ function usePageEntries(pins: Pin[]): PageEntry[] {
 
 function DashboardPage() {
   const { t } = useTranslations({ en, de });
+  const { user } = useAuth();
   const { data: pins = [], isLoading, isError, refetch } = useDashboardPins();
   const entries = usePageEntries(pins);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }));
@@ -77,9 +78,9 @@ function DashboardPage() {
     const ordered = [...pins];
     const [item] = ordered.splice(source, 1);
     ordered.splice(target, 0, item);
-    void updateDashboardPins({ kind: 'move', item, before: ordered[target + 1] });
+    if (user) void updateDashboardPins({ kind: 'move', item, before: ordered[target + 1] }, user.id);
   };
-  const removePin = (pin: Pin) => void updateDashboardPins({ kind: 'remove', item: pin });
+  const removePin = (pin: Pin) => { if (user) void updateDashboardPins({ kind: 'remove', item: pin }, user.id); };
 
   return <section className="p-6">
     <header className="mb-6 flex items-center gap-3"><LayoutDashboardIcon /><div><h1 className="text-2xl font-semibold">{t('title')}</h1><p className="text-sm text-muted">{t('subtitle')}</p></div></header>

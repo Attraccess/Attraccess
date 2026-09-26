@@ -32,7 +32,7 @@ vi.mock('../routes', () => ({
     ];
   },
 }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission }) }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission, user: { id: 7 } }) }));
 vi.mock('../layout/sidebarItems', async (importOriginal) => {
   const original = await importOriginal<typeof import('../layout/sidebarItems')>();
   return { ...original, useSidebarItems: () => original.SIDEBAR_ITEMS, buildSidebarEndItems: () => original.buildSidebarEndItems('', '') };
@@ -40,6 +40,7 @@ vi.mock('../layout/sidebarItems', async (importOriginal) => {
 const page = (itemId: string) => ({ itemType: 'page', itemId });
 function mount(element: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(['UsersServiceGetCurrent'], { id: 7 });
   return {
     client,
     ...render(
@@ -164,7 +165,7 @@ describe('Dashboard', () => {
       </Routes>,
     );
 
-    await waitFor(() => expect(client.getQueryData(['dashboard', 'pins'])).toEqual([page('/plugin-report')]));
+    await waitFor(() => expect(client.getQueryData(['dashboard', 'pins', 7])).toEqual([page('/plugin-report')]));
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
 
     usePluginState.setState({
@@ -211,7 +212,7 @@ describe('Dashboard', () => {
       </Routes>,
     );
 
-    await waitFor(() => expect(client.getQueryData(['dashboard', 'pins'])).toEqual([page('/uninstalled-plugin')]));
+    await waitFor(() => expect(client.getQueryData(['dashboard', 'pins', 7])).toEqual([page('/uninstalled-plugin')]));
     expect(screen.queryByText('Resources landing')).not.toBeInTheDocument();
     usePluginState.setState({ isInitialized: true });
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();

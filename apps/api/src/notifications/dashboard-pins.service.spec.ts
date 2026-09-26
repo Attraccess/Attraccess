@@ -81,14 +81,14 @@ describe('DashboardPinsService', () => {
   });
 
   it('validates additions and limits the resulting list', async () => {
-    for (const itemId of ['/dashboard', '/kiosk', '/kiosk/display', '/resources/123', '/resources/123/edit', '//plugin-report', 'https://example.com', '/plugin/../admin', '/bad path']) {
+    for (const itemId of ['/dashboard', '/kiosk', '/kiosk/display', '/resources/123', '/resources/123/edit', '/does-not-exist', '/kiosk/companion', '//plugin-report', 'https://example.com', '/plugin/../admin', '/bad path']) {
       await expect(service.update(5, { kind: 'add', item: page(itemId) })).rejects.toBeInstanceOf(BadRequestException);
     }
-    for (const itemId of ['/resources', '/shelly', '/wago', '/rabbitmq', '/hello-world', '/kiosk-guide', '/resources/report']) {
+    for (const itemId of ['/resources', '/shelly', '/wago', '/rabbitmq', '/dependencies']) {
       await service.update(5, { kind: 'add', item: page(itemId) });
     }
-    expect((await service.get(5)).map(({ itemId }) => itemId)).toEqual(['/resources', '/shelly', '/wago', '/rabbitmq', '/hello-world', '/kiosk-guide', '/resources/report']);
-    for (const itemId of ['/resources', '/shelly', '/wago', '/rabbitmq', '/hello-world', '/kiosk-guide', '/resources/report']) {
+    expect((await service.get(5)).map(({ itemId }) => itemId)).toEqual(['/resources', '/shelly', '/wago', '/rabbitmq', '/dependencies']);
+    for (const itemId of ['/resources', '/shelly', '/wago', '/rabbitmq', '/dependencies']) {
       await service.update(5, { kind: 'remove', item: page(itemId) });
     }
     for (const itemId of ['007', '7.0', '7e0', ' 7']) {

@@ -8,10 +8,12 @@ import { DashboardPinToggle } from './pins';
 const { getPins, updatePins } = vi.hoisted(() => ({ getPins: vi.fn(), updatePins: vi.fn() }));
 vi.mock('@attraccess/react-query-client', () => ({
   DashboardService: { dashboardGetPins: getPins, dashboardUpdatePins: updatePins },
+  UseUsersServiceGetCurrentKeyFn: () => ['UsersServiceGetCurrent'],
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key }),
 }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 } }) }));
 
 describe('DashboardPinToggle', () => {
   beforeEach(() => {
@@ -28,6 +30,7 @@ describe('DashboardPinToggle', () => {
       { itemType: 'page', itemId: '/projects' },
     ]);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['UsersServiceGetCurrent'], { id: 7 });
     render(<QueryClientProvider client={client}><DashboardPinToggle itemType="page" itemId="/projects" label="Projects" /></QueryClientProvider>);
 
     fireEvent.click(await screen.findByRole('button', { name: 'retry' }));
@@ -38,5 +41,16 @@ describe('DashboardPinToggle', () => {
     await waitFor(() => expect(updatePins).toHaveBeenCalledWith({ requestBody: {
       kind: 'add', item: { itemType: 'page', itemId: '/projects' },
     } }));
+  });
+
+  it('shows a visible error when saving a pin fails', async () => {
+    getPins.mockResolvedValue([]);
+    updatePins.mockRejectedValue(new Error('offline'));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['UsersServiceGetCurrent'], { id: 7 });
+    render(<QueryClientProvider client={client}><DashboardPinToggle itemType="page" itemId="/projects" label="Projects" /></QueryClientProvider>);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'pin Projects' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('saveFailed');
   });
 });
