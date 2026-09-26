@@ -54,7 +54,7 @@ void ResetScreen::init()
    lv_obj_set_height(this->userNameLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->userNameLabel, LV_LABEL_LONG_WRAP);
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
-   FirmwareI18n::setLabel(this->userNameLabel, initialName);
+   FirmwareI18n::setDynamicLabel(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -172,7 +172,7 @@ void ResetScreen::setUserName(std::string userName)
    this->userNameCache = userName;
    if (this->userNameLabel)
    {
-      FirmwareI18n::setLabel(this->userNameLabel, userName.c_str());
+      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str());
    }
 }
 

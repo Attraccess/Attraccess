@@ -23,4 +23,24 @@ inline const char *text(const char *english, const char *german, const std::stri
 {
     return supported(locale) == "de" && german && german[0] != '\0' ? german : english;
 }
+
+struct Session
+{
+    std::string defaultLanguage = "de";
+    std::string userLanguage = "en";
+    bool userAuthenticated = false;
+
+    void setDefault(const std::string &locale) { defaultLanguage = supported(locale); }
+    void setUser(const std::string &locale)
+    {
+        userAuthenticated = !locale.empty();
+        userLanguage = supported(locale);
+    }
+    void setApi(bool authenticated, const std::string &locale)
+    {
+        if (!locale.empty()) setDefault(locale);
+        if (!authenticated) setUser("");
+    }
+    std::string active() const { return Language::active(userAuthenticated, userLanguage, defaultLanguage); }
+};
 }

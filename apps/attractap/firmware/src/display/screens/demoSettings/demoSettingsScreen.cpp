@@ -186,7 +186,7 @@ void DemoSettingsScreen::rebuildCardList()
         lv_obj_t *nameLbl = lv_label_create(nameCol);
         lv_obj_set_width(nameLbl, lv_pct(100));
         const char *displayName = (card.label[0] != '\0') ? card.label : uidShort;
-        FirmwareI18n::setLabel(nameLbl, displayName);
+        FirmwareI18n::setDynamicLabel(nameLbl, displayName);
         lv_label_set_long_mode(nameLbl, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_color(nameLbl, DisplayTheme::text(), LV_PART_MAIN);
         lv_obj_set_style_text_font(nameLbl, &lv_font_montserrat_20, LV_PART_MAIN);
@@ -321,7 +321,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
         lv_obj_add_event_cb(btn, &DemoSettingsScreen::onRolePickerBtn, LV_EVENT_CLICKED, &_rolePayloads[j]);
 
         lv_obj_t *lbl = lv_label_create(btn);
-        FirmwareI18n::setLabel(lbl, entry.label);
+        FirmwareI18n::setDynamicLabel(lbl, entry.label);
         lv_obj_set_align(lbl, LV_ALIGN_CENTER);
         lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);

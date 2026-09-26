@@ -605,7 +605,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
       {
          breadcrumb += "\n" + scope;
       }
-      lv_label_set_text(this->formsBreadcrumbLabel, breadcrumb.c_str());
+      FirmwareI18n::setLabel(this->formsBreadcrumbLabel, breadcrumb.c_str());
    }
 
    {
@@ -626,7 +626,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             fieldTitle += " *";
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
-         lv_label_set_text(fieldLabel, fieldTitle.c_str());
+         FirmwareI18n::setDynamicLabel(fieldLabel, fieldTitle.c_str());
           lv_obj_set_style_text_font(fieldLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
           lv_obj_set_style_text_color(fieldLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -809,7 +809,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
       {
          if (widget.errorLabel)
          {
-            lv_label_set_text(widget.errorLabel, msg);
+            FirmwareI18n::setLabel(widget.errorLabel, msg);
          }
          hasErrors = true;
       };

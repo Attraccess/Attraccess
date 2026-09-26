@@ -430,25 +430,27 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    {
       return;
    }
-   lv_label_set_text(this->resourceName, resource.name);
-   lv_label_set_text(this->resourceDescription, resource.description.c_str());
+   FirmwareI18n::setDynamicLabel(this->resourceName, resource.name);
+   FirmwareI18n::setDynamicLabel(this->resourceDescription, resource.description.c_str());
 
    // Update introducer/maintainer panel lists (same set of allowed users)
    std::string introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
-      lv_label_set_text(this->introducersListLabel, introducersText.c_str());
+      FirmwareI18n::setDynamicLabel(this->introducersListLabel, introducersText.c_str());
    }
    if (this->maintenanceIntroducersLabel)
    {
-      lv_label_set_text(this->maintenanceIntroducersLabel, introducersText.c_str());
+      FirmwareI18n::setDynamicLabel(this->maintenanceIntroducersLabel, introducersText.c_str());
    }
 
    // Update health banner reason text
    if (this->healthReasonLabel)
    {
-      const char *reason = (resource.healthReason[0] != '\0') ? resource.healthReason : "Kein Grund angegeben.";
-      lv_label_set_text(this->healthReasonLabel, reason);
+      if (resource.healthReason[0] != '\0')
+         FirmwareI18n::setDynamicLabel(this->healthReasonLabel, resource.healthReason);
+      else
+         FirmwareI18n::setLabel(this->healthReasonLabel, "Kein Grund angegeben.");
    }
 
    // Toggle sections based on type and usage
@@ -459,7 +461,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       // Persist the session start time so periodic updates can compute elapsed time correctly
       this->sessionStartTime = (time_t)resource.activeStartEpoch;
       FirmwareI18n::setLabel(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str());
-      lv_label_set_text(this->currentUser, resource.activeUser);
+      FirmwareI18n::setDynamicLabel(this->currentUser, resource.activeUser);
    }
 
    lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
@@ -514,7 +516,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
       lv_obj_set_height(labelForFlowButton, LV_SIZE_CONTENT);
        lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
-       lv_label_set_text(labelForFlowButton, fb.label);
+       FirmwareI18n::setDynamicLabel(labelForFlowButton, fb.label);
        lv_obj_set_style_text_font(labelForFlowButton, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 

@@ -911,6 +911,20 @@ int main(int argc, char **argv)
             expect(Language::active(true, "de-AT", "en") == "de", "Authenticated display uses first user's locale");
             expect(Language::active(true, "en-US", "de") == "en", "Changing users changes the active locale");
             expect(Language::active(false, "en", "de") == "de", "Ending authentication returns to system default");
+            Language::Session session;
+            expect(session.active() == "de", "Installation without saved default starts in German");
+            session.setApi(true, "en");
+            expect(session.active() == "en", "Reader receives system default");
+            session.setUser("de-AT");
+            expect(session.active() == "de", "Authenticated card selects its user's locale");
+            session.setUser("en-US");
+            expect(session.active() == "en", "A second card replaces the previous user's locale");
+            session.setUser("");
+            expect(session.active() == "en", "Clearing authentication restores system default");
+            session.setApi(true, "de");
+            session.setUser("en");
+            session.setApi(false, "");
+            expect(session.active() == "de", "Disconnect restores preserved system default");
             expect(std::string(Language::text("English fallback", "", "de")) == "English fallback",
                    "Missing locale translation falls back to English");
             expect(std::string(FirmwareI18n::translateForLocale("Sitzung beenden", "en")) == "End session",
@@ -923,6 +937,8 @@ int main(int argc, char **argv)
                    "Formatted demo role title preserves the card UID");
             expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5", "en")) == "Page 2 of 5",
                    "Formatted project pagination is translated");
+            expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5 boats", "en")) == "Seite 2 von 5 boats",
+                   "Pagination matcher preserves trailing server text");
             expect(std::string(FirmwareI18n::translateForLocale("Keine Aufsicht verfügbar", "en-US")) == "No supervisor available",
                    "Supervision errors use English on English readers");
             expect(std::string(FirmwareI18n::translateForLocale("Karte konnte nicht\ngelesen werden", "en")) == "Could not\nread card",
@@ -933,11 +949,15 @@ int main(int argc, char **argv)
                    "German fallback remains available");
             auto *root = lv_obj_create(lv_screen_active());
             auto *label = lv_label_create(root);
-            lv_label_set_text(label, "Sitzung beenden");
+            FirmwareI18n::setLabel(label, "Sitzung beenden");
             FirmwareI18n::refreshTree(root, "en-US");
             expect(std::string(lv_label_get_text(label)) == "End session", "Active visible labels refresh to English");
             FirmwareI18n::refreshTree(root, "de-DE");
             expect(std::string(lv_label_get_text(label)) == "Sitzung beenden", "Active visible labels refresh back to German");
+            auto *serverValue = lv_label_create(root);
+            FirmwareI18n::setDynamicLabel(serverValue, "Maintenance");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_label_get_text(serverValue)) == "Maintenance", "Server resource names survive locale refresh");
             auto *placeholder = lv_textarea_create(root);
             lv_textarea_set_placeholder_text(placeholder, "Mind. 4 Ziffern");
             auto *dropdown = lv_dropdown_create(root);

@@ -40,7 +40,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_x(Display::deviceNameLabel, -75);
     lv_obj_set_y(Display::deviceNameLabel, -18);
     lv_obj_set_align(Display::deviceNameLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setLabel(Display::deviceNameLabel, Display::deviceNameInitValue.c_str());
+    FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, Display::deviceNameInitValue.c_str());
 
     lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -134,7 +134,7 @@ void Display::setDeviceName(std::string deviceName)
         {
             if (Display::deviceNameLabel)
             {
-                FirmwareI18n::setLabel(Display::deviceNameLabel, (const char *)p);
+                FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, (const char *)p);
             }
             free(p);
         },

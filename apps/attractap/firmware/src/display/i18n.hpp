@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <cstdio>
+#include <array>
 #include <lvgl.h>
 
 #include "state/language.hpp"
@@ -9,6 +10,31 @@
 
 namespace FirmwareI18n
 {
+inline std::array<lv_obj_t *, 256> localizedLabels{};
+inline void forgetLocalizedLabel(lv_event_t *event)
+{
+    auto *label = static_cast<lv_obj_t *>(lv_event_get_target(event));
+    for (auto &known : localizedLabels) if (known == label) known = nullptr;
+}
+inline bool isLocalizedLabel(lv_obj_t *label)
+{
+    for (auto *known : localizedLabels) if (known == label) return true;
+    return false;
+}
+inline void markLocalizedLabel(lv_obj_t *label, bool localized)
+{
+    if (!label) return;
+    for (auto &known : localizedLabels)
+    {
+        if (known == label) { if (!localized) known = nullptr; return; }
+    }
+    if (localized) for (auto &known : localizedLabels) if (!known)
+    {
+        known = label;
+        lv_obj_add_event_cb(label, forgetLocalizedLabel, LV_EVENT_DELETE, nullptr);
+        return;
+    }
+}
 struct Entry { const char *de; const char *en; };
 inline constexpr Entry catalog[] = {
         {"Wartung", "Maintenance"}, {"Einstellungen", "Settings"},
@@ -153,6 +179,38 @@ inline const char *translateForLocale(const char *value, const std::string &loca
         if (english && std::strcmp(value, entry.de) == 0) return entry.en;
         if (!english && std::strcmp(value, entry.en) == 0) return entry.de;
     }
+    // Translate a firmware-authored breadcrumb heading while retaining its
+    // server supplied resource/form scope on following lines.
+    const char *newline = std::strchr(value, '\n');
+    if (newline)
+    {
+        const std::string heading(value, newline - value);
+        for (const auto &entry : catalog)
+        {
+            const char *from = english ? entry.de : entry.en;
+            const char *to = english ? entry.en : entry.de;
+            if (heading == from)
+            {
+                static char breadcrumb[384];
+                snprintf(breadcrumb, sizeof(breadcrumb), "%s%s", to, newline);
+                return breadcrumb;
+            }
+        }
+    }
+    // Labels with a fixed UI prefix and server supplied suffix (for example
+    // "Projekt: <name>") translate only the prefix.
+    for (const auto &entry : catalog)
+    {
+        const char *from = english ? entry.de : entry.en;
+        const char *to = english ? entry.en : entry.de;
+        const size_t prefixLength = std::strlen(from);
+        if (prefixLength && from[prefixLength - 1] == ' ' && std::strncmp(value, from, prefixLength) == 0)
+        {
+            static char prefixed[256];
+            snprintf(prefixed, sizeof(prefixed), "%s%s", to, value + prefixLength);
+            return prefixed;
+        }
+    }
     // The displayed value contains numbers/IDs, so it cannot be an exact
     // catalog key. Translate the fixed UI prefix while preserving its data.
     constexpr size_t germanRolePrefixLength = sizeof("Rolle für Karte ") - 1;
@@ -168,8 +226,9 @@ inline const char *translateForLocale(const char *value, const std::string &loca
         return roleTitle;
     }
     unsigned currentPage = 0, totalPages = 0;
-    if (std::sscanf(value, "Seite %u von %u", &currentPage, &totalPages) == 2 ||
-        std::sscanf(value, "Page %u of %u", &currentPage, &totalPages) == 2)
+    char trailing = '\0';
+    if (std::sscanf(value, "Seite %u von %u%c", &currentPage, &totalPages, &trailing) == 2 ||
+        std::sscanf(value, "Page %u of %u%c", &currentPage, &totalPages, &trailing) == 2)
     {
         static char pageText[40];
         snprintf(pageText, sizeof(pageText), Language::supported(locale) == "en" ? "Page %u of %u" : "Seite %u von %u",
@@ -182,7 +241,7 @@ inline const char *translateForLocale(const char *value, const std::string &loca
 inline void refreshTree(lv_obj_t *root, const std::string &locale)
 {
     if (!root) return;
-    if (lv_obj_check_type(root, &lv_label_class))
+    if (lv_obj_check_type(root, &lv_label_class) && isLocalizedLabel(root))
     {
         const char *current = lv_label_get_text(root);
         const char *translated = translateForLocale(current, locale);
@@ -209,6 +268,12 @@ inline void refreshTree(lv_obj_t *root, const std::string &locale)
 
 inline void setLabel(lv_obj_t *label, const char *value)
 {
+    markLocalizedLabel(label, true);
     lv_label_set_text(label, translate(value));
+}
+inline void setDynamicLabel(lv_obj_t *label, const char *value)
+{
+    markLocalizedLabel(label, false);
+    lv_label_set_text(label, value ? value : "");
 }
 }
