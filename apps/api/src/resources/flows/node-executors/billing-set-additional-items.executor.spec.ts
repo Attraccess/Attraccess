@@ -156,6 +156,61 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     expect(manager.update).not.toHaveBeenCalled();
   });
 
+  it('uses an explicitly enabled calculated unit price for one metered session item', async () => {
+    ctx.lifecycleAttemptId = 'end-attempt';
+    await executor.execute(
+      createNode({ ...baseData, quantity: 1, unitPriceFromInput: true }),
+      {
+        id: 12,
+        unitPrice: '45',
+      },
+      ctx,
+    );
+    expect(resourceUsageService.stageLifecycleBillingItem).toHaveBeenCalledWith(
+      'end-attempt',
+      1,
+      12,
+      expect.objectContaining({ unitPrice: 45, quantity: 1 }),
+    );
+  });
+
+  it('keeps configured prices authoritative unless dynamic pricing is explicitly enabled', async () => {
+    ctx.lifecycleAttemptId = 'end-attempt';
+    await executor.execute(createNode(baseData), { id: 12, unitPrice: -5000 }, ctx);
+    expect(resourceUsageService.stageLifecycleBillingItem).toHaveBeenCalledWith(
+      'end-attempt',
+      1,
+      12,
+      expect.objectContaining({ unitPrice: 5 }),
+    );
+  });
+
+  it('records a verified zero-cost session item', async () => {
+    ctx.lifecycleAttemptId = 'end-attempt';
+    await executor.execute(
+      createNode({ ...baseData, quantity: 1, unitPriceFromInput: true }),
+      { id: 12, unitPrice: '0' },
+      ctx,
+    );
+    expect(resourceUsageService.stageLifecycleBillingItem).toHaveBeenCalledWith(
+      'end-attempt',
+      1,
+      12,
+      expect.objectContaining({ quantity: 1, unitPrice: 0 }),
+    );
+  });
+
+  it.each([undefined, null, '', false, '0.5', 'NaN', Number.MAX_SAFE_INTEGER + 1])(
+    'rejects an invalid calculated price %s instead of using a zero/default charge',
+    async (unitPrice) => {
+      ctx.lifecycleAttemptId = 'end-attempt';
+      await expect(
+        executor.execute(createNode({ ...baseData, unitPriceFromInput: true }), { id: 12, unitPrice }, ctx),
+      ).rejects.toThrow();
+      expect(resourceUsageService.stageLifecycleBillingItem).not.toHaveBeenCalled();
+    },
+  );
+
   it('uses the usage ID in stopped-session flow input', async () => {
     manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
 

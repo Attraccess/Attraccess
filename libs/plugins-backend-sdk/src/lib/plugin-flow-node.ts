@@ -23,10 +23,7 @@ export interface PluginNodeExecutionContext {
 }
 
 export type PluginFlowFailureKind =
-  | 'transport-dispatch'
-  | 'acknowledgement-timeout'
-  | 'controller-rejection'
-  | 'node-failure';
+  'transport-dispatch' | 'acknowledgement-timeout' | 'controller-rejection' | 'node-failure';
 
 export type PluginFlowFailureBehavior = 'fail-flow' | 'failure-output' | 'log-and-continue';
 
@@ -69,6 +66,11 @@ interface PluginFlowNodeDefinitionBase {
    *   { selectFromEntity: 'mqttServer', entityProperty: 'id' }
    *   { stringVariant: 'multiline' }
    *   { helpText: '...' }
+   *
+   * Canvas summaries use a top-level `preview: [{ label: string, value: string }]`
+   * (at most four plain-text rows). Include only the essential, non-secret fields.
+   * Dynamic nodes opt in with `configSchema: { dynamic: true, properties: {}, preview: [] }`
+   * and return the summary from resolveConfigSchema for the selected configuration.
    */
   readonly configSchema?: Record<string, unknown>;
 

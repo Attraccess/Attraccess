@@ -46,6 +46,15 @@ const VariableKeySchema = z.string().min(1, 'Key is required');
 
 export const NodeWithoutDataSchema = z.object({}).optional();
 
+export const UsageLifecycleNodeDataSchema = z
+  .object({
+    requiredForUsage: z.boolean().optional().meta({
+      helpText:
+        'If this branch fails, abort the usage start/end instead of completing it without its required effects.',
+    }),
+  })
+  .optional();
+
 export const ButtonNodeDataSchema = z.object({
   label: z.string().min(1, 'Label is required'),
 });
@@ -133,6 +142,10 @@ export const BillingTransactionItemCreateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   unitPrice: z.number().int().meta({
     isCurrency: true,
+  }),
+  unitPriceFromInput: z.boolean().optional().meta({
+    helpText:
+      'Require input.unitPrice in integer minor currency units. Missing or invalid prices fail; the configured price is not a fallback.',
   }),
   quantity: z.coerce.number().int().positive().meta({
     overrideWithInput: 'quantity',
@@ -317,9 +330,9 @@ export const CompanionUsbDeviceNodeDataSchema = z.object({
 
 const nodeDataSchemas = {
   [ResourceFlowNodeType.INPUT_BUTTON]: ButtonNodeDataSchema,
-  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED]: NodeWithoutDataSchema,
-  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: NodeWithoutDataSchema,
-  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED]: UsageLifecycleNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: UsageLifecycleNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: UsageLifecycleNodeDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: NodeWithoutDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: NodeWithoutDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: NodeWithoutDataSchema,

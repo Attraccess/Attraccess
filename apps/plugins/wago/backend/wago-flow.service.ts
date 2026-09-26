@@ -3,6 +3,7 @@ import type { PluginContext, PluginMqttSubscription, Repository } from '@attracc
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoController } from './wago-controller.entity';
 import type { WagoConfigurationSnapshot } from './configuration';
+import { wagoFlowPreview } from './wago-flow-preview';
 import { operationalWildcardTopic, parseOperationalMessage, type WagoOperationalMessage } from './protocol';
 import { WagoSettings } from './wago-settings.entity';
 import { WAGO_EVENT_NODE_TYPE } from './wago-state-nodes';
@@ -186,9 +187,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
           return latest ?? null;
         })
       : null;
-    const channels: WagoConfigurationSnapshot['logicalChannels'] = revision
-      ? JSON.parse(revision.snapshot).logicalChannels
-      : [];
+    const snapshot: WagoConfigurationSnapshot | null = revision ? JSON.parse(revision.snapshot) : null;
+    const channels = snapshot?.logicalChannels ?? [];
     let names: Record<string, unknown> = {};
     try {
       names = JSON.parse(revision?.presetProvenance ?? 'null')?.editor?.names ?? {};
@@ -251,6 +251,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     return {
       dynamic: true,
       type: 'object',
+      preview: wagoFlowPreview(config, kind, selected, snapshot, names),
       properties,
       required: ['controllerId', 'channelId', 'category', ...(kind === 'wait' ? ['equals', 'timeoutMs'] : [])],
     };

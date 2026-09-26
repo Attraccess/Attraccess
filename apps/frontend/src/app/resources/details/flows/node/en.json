@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Configuration",
+    "loading": "Loading summary…",
+    "unavailable": "Preview unavailable"
+  },
   "editor": {
     "buttons": {
       "save": "Save",
@@ -35,6 +40,12 @@
           "started": {
             "title": "Usage started",
             "description": "Triggers when a usage session starts.",
+            "config": {
+              "requiredForUsage": {
+                "label": "Require flow success",
+                "helpText": "Abort the usage start if this branch fails, for example when its initial meter reading is unavailable."
+              }
+            },
             "outputs": {
               "output": "Output"
             }
@@ -42,6 +53,12 @@
           "stopped": {
             "title": "Usage stopped",
             "description": "Triggers when a usage session stops.",
+            "config": {
+              "requiredForUsage": {
+                "label": "Require flow success",
+                "helpText": "Keep the usage open if this branch fails so required billing data is not silently lost."
+              }
+            },
             "outputs": {
               "output": "Output"
             }
@@ -49,6 +66,12 @@
           "takeover": {
             "title": "Usage taken over",
             "description": "Triggers when a usage session is taken over.",
+            "config": {
+              "requiredForUsage": {
+                "label": "Require flow success",
+                "helpText": "Abort the takeover if this branch fails."
+              }
+            },
             "outputs": {
               "output": "Output"
             }
@@ -648,6 +671,10 @@
                 },
                 "unitPrice": {
                   "label": "Unit price"
+                },
+                "unitPriceFromInput": {
+                  "label": "Use calculated unit price",
+                  "helpText": "Read input.unitPrice as integer minor currency units (for example, cents). Missing or invalid values fail instead of using the configured price."
                 },
                 "quantity": {
                   "label": "Quantity"

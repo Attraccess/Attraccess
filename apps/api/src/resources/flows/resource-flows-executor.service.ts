@@ -37,6 +37,7 @@ import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { randomBytes } from 'crypto';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import Handlebars from 'handlebars';
+import { registerFlowTemplateHelpers } from './flow-template-helpers';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import z from 'zod';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
@@ -81,14 +82,7 @@ interface FlowExecutionOptions {
   lifecycleCandidateCancellation?: boolean;
 }
 
-// Handlebars helpers
-Handlebars.registerHelper('json', (value: unknown) => {
-  try {
-    return new Handlebars.SafeString(JSON.stringify(value));
-  } catch {
-    return 'null';
-  }
-});
+registerFlowTemplateHelpers(Handlebars);
 
 interface UsageEventData {
   resource: {
@@ -587,7 +581,25 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       try {
         leafResults = await this.settleFlowBranches(
           nodes.map((node) => {
-            return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache, options);
+            return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache, options).catch(
+              (error) => {
+                // Required metering/validation branches must not finalize a usage with a missing bill.
+                // Opt in on the usage trigger; legacy and unrelated branches retain their behavior.
+                if (
+                  options.lifecycleAttemptId &&
+                  node.data?.requiredForUsage === true &&
+                  [
+                    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+                    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+                    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+                  ].includes(node.type) &&
+                  !(error instanceof ExternalEffectFailureError)
+                ) {
+                  throw new ExternalEffectFailureError(this.errorReason(error), error);
+                }
+                throw error;
+              },
+            );
           }),
         );
         this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);

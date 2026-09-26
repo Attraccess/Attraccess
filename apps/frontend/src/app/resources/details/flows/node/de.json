@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Konfiguration",
+    "loading": "Zusammenfassung wird geladen…",
+    "unavailable": "Vorschau nicht verfügbar"
+  },
   "editor": {
     "buttons": {
       "save": "Speichern",
@@ -35,6 +40,12 @@
           "started": {
             "title": "Nutzung gestartet",
             "description": "Wird ausgelöst, wenn eine Nutzungssitzung startet.",
+            "config": {
+              "requiredForUsage": {
+                "label": "Erfolgreichen Flow voraussetzen",
+                "helpText": "Nutzungsstart abbrechen, wenn dieser Zweig fehlschlägt, zum Beispiel bei einem fehlenden Zählerstand."
+              }
+            },
             "outputs": {
               "output": "Ausgabe"
             }
@@ -42,6 +53,12 @@
           "stopped": {
             "title": "Nutzung beendet",
             "description": "Wird ausgelöst, wenn eine Nutzungssitzung endet.",
+            "config": {
+              "requiredForUsage": {
+                "label": "Erfolgreichen Flow voraussetzen",
+                "helpText": "Die Nutzung bleibt bei einem Fehler offen, damit erforderliche Abrechnungsdaten nicht unbemerkt verloren gehen."
+              }
+            },
             "outputs": {
               "output": "Ausgabe"
             }
@@ -49,6 +66,12 @@
           "takeover": {
             "title": "Nutzung übernommen",
             "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird.",
+            "config": {
+              "requiredForUsage": {
+                "label": "Erfolgreichen Flow voraussetzen",
+                "helpText": "Übernahme abbrechen, wenn dieser Zweig fehlschlägt."
+              }
+            },
             "outputs": {
               "output": "Ausgabe"
             }
@@ -648,6 +671,10 @@
                 },
                 "unitPrice": {
                   "label": "Einheitspreis"
+                },
+                "unitPriceFromInput": {
+                  "label": "Berechneten Einheitspreis verwenden",
+                  "helpText": "Liest input.unitPrice als ganzzahlige Untereinheiten der Währung (z. B. Cent). Fehlende oder ungültige Werte verursachen einen Fehler statt eines Ersatzpreises."
                 },
                 "quantity": {
                   "label": "Menge"

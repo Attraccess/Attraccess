@@ -51,11 +51,19 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       quantity = numberQuantity;
     }
 
+    let unitPrice = data.unitPrice;
+    if (data.unitPriceFromInput === true) {
+      const value = 'unitPrice' in input ? input.unitPrice : undefined;
+      unitPrice = BillingTransactionItemCreateSchema.shape.unitPrice.parse(
+        typeof value === 'string' && /^-?(0|[1-9][0-9]*)$/.test(value) ? Number(value) : value,
+      );
+    }
+
     const item = {
       name: data.name,
       description: data.description,
       externalReference,
-      unitPrice: data.unitPrice,
+      unitPrice,
       quantity,
     };
     if (ctx.lifecycleAttemptId) {
@@ -91,7 +99,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
         name: data.name,
         description: data.description,
         externalReference,
-        unitPrice: data.unitPrice,
+        unitPrice,
       };
 
       const existingItem = await manager.findOne(BillingTransactionItem, {

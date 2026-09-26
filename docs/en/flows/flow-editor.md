@@ -47,6 +47,43 @@ To connect two nodes:
 
 Click on any node to open its settings panel. Each node type has its own configuration options -- see [Node Types](flows/node-types.md) for details.
 
+## Metered Billing
+
+For usage-based electricity billing, read a cumulative energy counter before
+enabling the load and store that reading with the usage ID in a resource variable.
+When ending the session, disable the load first and obtain a newer final reading.
+Check availability, unit, counter continuity and usage ID before calculating a charge.
+
+Set **Require flow success** on the usage start/stop triggers when these checks
+are mandatory. A failed required branch aborts that usage operation; errors in
+other, optional branches keep their existing behavior. If the load was already
+switched off, a failed billing check keeps the session open for an explicit retry.
+
+Payload and variable templates support these helpers:
+
+| Helper | Meaning |
+| --- | --- |
+| `subtract a b` | Exact difference of safe integers |
+| `divide a b` | Division of safe integers, useful for a human-readable quantity |
+| `roundRatio value multiplier divisor` | Exact integer multiplication/division, rounded half away from zero |
+| `timestamp value` | Convert an ISO timestamp or Date to epoch milliseconds |
+| `now` | Current server time in epoch milliseconds |
+| `json value` | Preserve structured data as JSON |
+
+Missing, nonnumeric, fractional integer inputs, zero divisors, and unsafe integer
+results produce errors. For example, with cumulative readings in milliwatt-hours,
+this calculates a charge at 30 cents/kWh:
+
+```handlebars
+{{roundRatio (subtract wago.value energyBaseline.reading.value) energyBaseline.rateCentsPerKwh 1000000}}
+```
+
+Use an **Add billing item** node with quantity `1` and **Use calculated unit price**
+enabled. It requires `input.unitPrice` in integer currency minor units (cents for
+EUR), including a valid zero. Put the measured kWh and captured rate in
+`input.externalReference` so they appear alongside the billing item. Without the
+option, the node continues to use its configured unit price.
+
 ## Auto-Layout
 
 Click the **Auto-Layout** button in the toolbar to automatically arrange all nodes in a clean, readable layout. This is useful after adding many nodes or when the canvas becomes cluttered.

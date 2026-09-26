@@ -296,6 +296,67 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     await expect(settled).rejects.toBe(externalFailure);
   });
 
+  it('calculates a metered energy charge with exact cent rounding through payload templates', async () => {
+    const start = createNode({ id: 'start', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED });
+    const calculate = createNode({
+      id: 'calculate',
+      type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+      data: {
+        entries: [
+          { key: 'unitPrice', value: '{{roundRatio (subtract end start) 30 1000000}}' },
+          { key: 'kWh', value: '{{divide (subtract end start) 1000000}}' },
+        ],
+      },
+    });
+    initialNodes = [start];
+    nodesById = { start, calculate };
+    edgesBySourceAndHandle['start|'] = [{ source: 'start', target: 'calculate' }];
+    await expect(service.runFlow(1, start.type, { start: 123456789, end: 124956789 })).resolves.toEqual([
+      expect.objectContaining({ unitPrice: '45', kWh: '1.5' }),
+    ]);
+  });
+
+  it('makes an explicitly required usage flow abort its lifecycle when a measurement guard fails', async () => {
+    const start = createNode({
+      id: 'start',
+      type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+      data: { requiredForUsage: true },
+    });
+    const guard = createNode({
+      id: 'guard',
+      type: ResourceFlowNodeType.PROCESSING_ERROR,
+      data: { message: 'Energy reading unavailable' },
+    });
+    initialNodes = [start];
+    nodesById = { start, guard };
+    edgesBySourceAndHandle['start|'] = [{ source: 'start', target: 'guard' }];
+    await expect(
+      service.runFlow(1, start.type, {}, undefined, { lifecycleAttemptId: 'end-attempt' }),
+    ).rejects.toBeInstanceOf(ExternalEffectFailureError);
+  });
+
+  it('keeps an optional usage branch failure non-fatal when a separate required branch succeeds', async () => {
+    const required = createNode({
+      id: 'required',
+      type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+      data: { requiredForUsage: true },
+    });
+    const optional = createNode({ id: 'optional', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED });
+    const error = createNode({
+      id: 'error',
+      type: ResourceFlowNodeType.PROCESSING_ERROR,
+      data: { message: 'Optional notification failed' },
+    });
+    initialNodes = [required, optional];
+    nodesById = { required, optional, error };
+    edgesBySourceAndHandle['optional|'] = [{ source: 'optional', target: 'error' }];
+    const failure = await service
+      .runFlow(1, required.type, {}, undefined, { lifecycleAttemptId: 'end-attempt' })
+      .catch((error) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(ExternalEffectFailureError);
+  });
+
   it('records the same execution identity on operating transitions and flow logs', async () => {
     const inputNode = createNode({ id: 'operating-input', type: ResourceFlowNodeType.INPUT_BUTTON });
     const operatingNode = createNode({
