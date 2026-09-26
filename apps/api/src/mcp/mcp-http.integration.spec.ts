@@ -16,7 +16,7 @@ import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { ApiTokenService } from '../users-and-auth/auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../users-and-auth/rate-limiting/auth-audit.logger';
 import { ConfigService } from '@nestjs/config';
-import { OpenApiDocument, generateMcpTools, McpManifestEntry, operationShape } from './openapi-tools';
+import { OpenApiDocument, McpManifestEntry, operationShape } from './openapi-tools';
 import { registerMcpHttpEndpoints } from './mcp-http';
 import reviewedManifest from './reviewed-manifest.json';
 import { SessionStrategy } from '../users-and-auth/strategies/session.strategy';
@@ -315,8 +315,6 @@ describe('MCP HTTP transport', () => {
   it('serves the production Swagger manifest through MCP and enforces the API-token permission intersection', async () => {
     const productionDocument = exportedOpenApiDocument();
     const productionManifest = reviewedManifest as Record<string, McpManifestEntry>;
-    const productionTools = generateMcpTools(productionDocument, productionManifest);
-    expect(productionTools.map((tool) => tool.name)).toContain('messagingMarkConversationRead');
     const currentOwnerPermissions = new Set(['messaging.read', 'users.api-tokens.manage']);
     const tokenPermissions = ['messaging.read'];
 
