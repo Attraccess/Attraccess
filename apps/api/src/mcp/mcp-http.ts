@@ -84,9 +84,6 @@ async function invokeRestTool(
       permissions: [...request.user.effectivePermissions],
       expiresAt: Date.now() + 60_000,
     }));
-  } else {
-    const delegation = request.header('x-mcp-delegation');
-    if (delegation) headers.set('x-mcp-delegation', delegation);
   }
 
   const body: Record<string, unknown> = {};

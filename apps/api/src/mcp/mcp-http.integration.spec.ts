@@ -41,6 +41,7 @@ class McpProductionManifestTestController {
 describe('MCP HTTP transport', () => {
   let server: Server;
   let port: number;
+  let lastDelegationHeader: string | undefined;
   const document: OpenApiDocument = {
     paths: {
       '/api/resources/{id}': {
@@ -80,6 +81,7 @@ describe('MCP HTTP transport', () => {
     const app = express();
     app.use(express.json());
     app.get('/api/resources/:id', (req, res) => {
+      lastDelegationHeader = req.header('x-mcp-delegation');
       if (req.header('authorization') !== 'Bearer api-token-with-read') {
         res.status(403).json({ message: 'Missing resources.read permission' });
         return;
@@ -167,6 +169,17 @@ describe('MCP HTTP transport', () => {
       .send({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'updateResourceTagsForMcpTest', arguments: { id: 12, tags: ['production'] } } })
       .expect(200);
     expect(writeSuccess.body.result).toMatchObject({ isError: false, content: [{ text: JSON.stringify({ id: 12, tags: ['production'] }) }] });
+  });
+
+  it('does not forward client supplied MCP delegation headers to REST', async () => {
+    const response = await request(server)
+      .post('/api/mcp')
+      .set('Authorization', 'Bearer api-token-with-read')
+      .set('x-mcp-delegation', 'attacker-controlled')
+      .send({ jsonrpc: '2.0', id: 22, method: 'tools/call', params: { name: 'getResourceForMcpTest', arguments: { id: 12 } } })
+      .expect(200);
+    expect(response.body.result.isError).toBe(false);
+    expect(lastDelegationHeader).toBeUndefined();
   });
 
   it('rate limits MCP HTTP requests by client IP', async () => {

@@ -1445,8 +1445,8 @@
     "shape": "cbe5a59d"
   },
   "getReaderCrashReportCoredump": {
-    "decision": "allow",
-    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "decision": "deny",
+    "reason": "Excluded because this endpoint downloads an application/octet-stream coredump attachment, which the MCP text result cannot preserve safely.",
     "shape": "caef1ae7"
   },
   "getAppKeyByUid": {
