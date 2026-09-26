@@ -382,5 +382,7 @@ describe('MCP HTTP transport', () => {
     } finally {
       await app.close();
     }
-  }, 30000);
+  // This boots the Nest application and generates tools from the full production
+  // Swagger document; under coverage instrumentation it can exceed 30 seconds.
+  }, 60000);
 });
