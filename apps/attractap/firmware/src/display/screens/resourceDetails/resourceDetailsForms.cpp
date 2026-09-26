@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <cstdlib>
 
-static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option wählen";
 static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
 static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
@@ -947,12 +946,14 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
    {
       // Empty: show the field placeholder (or a generic hint) in muted gray.
       const char *hint = "Antippen zum Eingeben";
+      bool useTranslatedHint = true;
       if (widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
           widget.definition->options.text.hasPlaceholder && widget.definition->options.text.placeholder.length() > 0)
       {
          hint = widget.definition->options.text.placeholder.c_str();
+         useTranslatedHint = false;
       }
-      if (hint == "Antippen zum Eingeben") FirmwareI18n::setLabel(widget.previewLabel, hint);
+      if (useTranslatedHint) FirmwareI18n::setLabel(widget.previewLabel, hint);
       else lv_label_set_text(widget.previewLabel, hint);
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
