@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
 import { In, Repository } from 'typeorm';
 import { DashboardPinsService } from './dashboard-pins.service';
+import { PluginService } from '../plugin-system/plugin.service';
 
 describe('DashboardPinsService', () => {
   let service: DashboardPinsService;
@@ -97,6 +98,16 @@ describe('DashboardPinsService', () => {
     stored = Array.from({ length: 200 }, (_, index) => ({ id: index + 1, userId: 5, position: index, ...page('/shelly') }));
     await expect(service.update(5, { kind: 'add', item: page('/projects') })).rejects.toBeInstanceOf(BadRequestException);
     expect(stored).toHaveLength(200);
+  });
+
+  it('accepts only sidebar page paths declared by installed frontend plugins', async () => {
+    const plugins = jest.spyOn(PluginService, 'getPlugins').mockReturnValue([{
+      status: 'loaded', main: { frontend: { dashboardPaths: ['/plugin-report'] } },
+    } as never]);
+    await service.update(5, { kind: 'add', item: page('/plugin-report') });
+    expect(await service.get(5)).toEqual([page('/plugin-report')]);
+    await expect(service.update(5, { kind: 'add', item: page('/unregistered-plugin-route') })).rejects.toBeInstanceOf(BadRequestException);
+    plugins.mockRestore();
   });
 
   it('cleans pins for soft-deleted resources without replacing other pins', async () => {

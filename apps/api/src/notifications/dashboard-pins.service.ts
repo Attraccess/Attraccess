@@ -3,17 +3,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DashboardPin, Resource, User } from '@attraccess/database-entities';
 import { In, Repository } from 'typeorm';
 import { UpdateDashboardPinsDto } from './dtos/dashboard-pins.dto';
+import { PluginService } from '../plugin-system/plugin.service';
 
 export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string; resourceName?: string };
-// These are the built-in sidebar destinations. The API does not load frontend
-// plugins, so plugin destinations cannot be validated against their sidebar registry here.
+// Keep this set in sync with the host sidebar. Plugin sidebar paths are
+// declared in their installed manifest so the API can validate them too.
 const eligiblePagePaths = new Set([
   '/resources', '/projects', '/messages', '/attractap/nfc-cards', '/billing', '/csv-export', '/users',
   '/attractap/readers', '/devices/mqtt/servers', '/devices/companion', '/balena', '/settings',
   '/dependencies', '/changelog', '/printables', '/shelly', '/wago', '/rabbitmq',
 ]);
 function isEligiblePagePath(path: string): boolean {
-  return eligiblePagePaths.has(path);
+  if (eligiblePagePaths.has(path)) return true;
+  return PluginService.getPlugins().some((plugin) => plugin.status !== 'error' && plugin.main.frontend?.dashboardPaths?.includes(path));
 }
 
 @Injectable()

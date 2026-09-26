@@ -64,6 +64,7 @@ keyword and an `attraccess` object:
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": ["/hello-world"],
     "permissions": ["READ_USERS", "LISTEN_EVENTS"],
     "sdk": { "backend": "^1.9.0", "frontend": "^1.9.0" }
   }
@@ -76,6 +77,7 @@ keyword and an `attraccess` object:
 | `version`                                    | yes          | Your plugin's semantic version.                                                                        |
 | `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
 | `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
+| `attraccess.dashboardPaths`                   | no           | Exact sidebar route paths that can be pinned on user dashboards; list paths returned by `getRoutes()` and `getSidebarItems()`. |
 | `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
 | `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
