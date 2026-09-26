@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Link } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getApiBaseUrl, type AttraccessFrontendPlugin } from '@attraccess/plugins-frontend-sdk';
-import { PluginProvider } from './plugin-provider';
+import { PluginProvider, validatePluginDashboardPaths } from './plugin-provider';
 import usePluginState from './plugin.state';
 
 const hoisted = vi.hoisted(() => ({
@@ -94,6 +94,17 @@ afterEach(() => {
 });
 
 describe('PluginProvider', () => {
+  it('requires the server-visible dashboard registry to exactly match actual sidebar routes', () => {
+    const plugin = {
+      getSidebarItems: () => [{ path: '/plugin-report', label: 'Reports' }],
+      getRoutes: () => [{ path: '/plugin-report' }],
+    } as unknown as AttraccessFrontendPlugin;
+    expect(() => validatePluginDashboardPaths(plugin, ['/plugin-report'])).not.toThrow();
+    expect(() => validatePluginDashboardPaths(plugin, undefined)).toThrow(/exactly match/);
+    expect(() => validatePluginDashboardPaths(plugin, ['/plugin-report', '/not-a-sidebar-route'])).toThrow(/exactly match/);
+    expect(() => validatePluginDashboardPaths({ ...plugin, getRoutes: () => [] }, ['/plugin-report'])).toThrow(/plugin routes/);
+  });
+
   it('renders its children', async () => {
     hoisted.refetchMock.mockResolvedValue({ data: [] });
     render(
