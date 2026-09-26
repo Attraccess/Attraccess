@@ -4,6 +4,7 @@ import { DashboardPin, Resource, User } from '@attraccess/database-entities';
 import { In, Repository } from 'typeorm';
 import { UpdateDashboardPinsDto } from './dtos/dashboard-pins.dto';
 import { PluginService } from '../plugin-system/plugin.service';
+import { PluginModule } from '../plugin-system/plugin.module';
 
 export type DashboardPinItem = { itemType: 'page' | 'resource'; itemId: string; resourceName?: string };
 // Keep this set in sync with the host sidebar. Plugin sidebar paths are
@@ -15,7 +16,10 @@ const eligiblePagePaths = new Set([
 ]);
 function isEligiblePagePath(path: string): boolean {
   if (eligiblePagePaths.has(path)) return true;
-  return PluginService.getPlugins().some((plugin) => plugin.status !== 'error' && plugin.main.frontend?.dashboardPaths?.includes(path));
+  if (PluginModule.arePluginsDisabled()) return false;
+  return PluginService.getPluginsWithLoadStatus().some((plugin) =>
+    plugin.status !== 'error' && !PluginService.isPluginQuarantined(plugin) && plugin.main.frontend?.dashboardPaths?.includes(path),
+  );
 }
 
 @Injectable()

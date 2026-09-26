@@ -53,7 +53,11 @@ export function PageHeader({
   const dashboardEntry = [...SIDEBAR_ITEMS.flatMap((item) => 'items' in item ? item.items : [item]), ...['/dependencies', '/changelog', '/printables'].map((path) => ({ path, isExternal: false }))]
     .find((item) => item.path === location.pathname && !item.isExternal && item.path !== '/dashboard');
   const pluginEntry = plugins.flatMap((manifest) => {
-    try { return manifest.plugin.getSidebarItems?.() ?? []; } catch { return []; }
+    if (manifest.status === 'error' || !manifest.main.frontend?.dashboardPaths?.length) return [];
+    try {
+      const pinnablePaths = new Set(manifest.main.frontend.dashboardPaths);
+      return (manifest.plugin.getSidebarItems?.() ?? []).filter((item) => pinnablePaths.has(item.path));
+    } catch { return []; }
   }).find((item) => item.path === location.pathname);
   // Nested section/table headers can share the route's location; only the page
   // header (which uses the normal margin) owns the page pin action.

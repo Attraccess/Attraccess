@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { In, Repository } from 'typeorm';
 import { DashboardPinsService } from './dashboard-pins.service';
 import { PluginService } from '../plugin-system/plugin.service';
+import { PluginModule } from '../plugin-system/plugin.module';
 
 describe('DashboardPinsService', () => {
   let service: DashboardPinsService;
@@ -101,12 +102,18 @@ describe('DashboardPinsService', () => {
   });
 
   it('accepts only sidebar page paths declared by installed frontend plugins', async () => {
-    const plugins = jest.spyOn(PluginService, 'getPlugins').mockReturnValue([{
-      status: 'loaded', main: { frontend: { dashboardPaths: ['/plugin-report'] } },
+    const disabled = jest.spyOn(PluginModule, 'arePluginsDisabled').mockReturnValue(false);
+    const plugins = jest.spyOn(PluginService, 'getPluginsWithLoadStatus').mockReturnValue([{
+      status: 'loaded', pluginDirectory: '/plugins/report', main: { frontend: { dashboardPaths: ['/plugin-report'] } },
     } as never]);
     await service.update(5, { kind: 'add', item: page('/plugin-report') });
     expect(await service.get(5)).toEqual([page('/plugin-report')]);
     await expect(service.update(5, { kind: 'add', item: page('/unregistered-plugin-route') })).rejects.toBeInstanceOf(BadRequestException);
+    plugins.mockReturnValue([{ status: 'error', main: { frontend: { dashboardPaths: ['/failed-plugin'] } } } as never]);
+    await expect(service.update(5, { kind: 'add', item: page('/failed-plugin') })).rejects.toBeInstanceOf(BadRequestException);
+    disabled.mockReturnValue(true);
+    await expect(service.update(5, { kind: 'add', item: page('/plugin-report') })).rejects.toBeInstanceOf(BadRequestException);
+    disabled.mockRestore();
     plugins.mockRestore();
   });
 
