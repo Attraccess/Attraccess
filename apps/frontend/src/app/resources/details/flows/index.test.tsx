@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   invalidate: vi.fn(),
   refresh: vi.fn(),
   fit: vi.fn(),
+  internalNode: vi.fn(),
   add: vi.fn(),
   copy: vi.fn(),
   cut: vi.fn(),
@@ -67,6 +68,7 @@ vi.mock('@xyflow/react', () => ({
   SelectionMode: { Partial: 'partial' },
   useReactFlow: () => ({
     fitView: state.fit,
+    getInternalNode: state.internalNode,
     screenToFlowPosition: ({ x, y }: { x: number; y: number }) => ({ x: x - 10, y: y - 20 }),
   }),
   ReactFlow: ({ children, ...props }: typeof state.flowProps & { children: ReactNode }) => {
@@ -129,6 +131,7 @@ function saveButton() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  state.internalNode.mockReset();
   state.original = {
     nodes: [
       { id: 'one', type: 'trigger', position: { x: 0, y: 0 }, data: {} },
@@ -239,6 +242,40 @@ it('adds catalog and dropped nodes, switches canvas mode and lays out the graph'
   expect(state.fit).toHaveBeenCalled();
   expect(state.nodes.every((node) => Number.isFinite(node.position.x))).toBe(true);
 });
+it('auto-aligns using measured source handle positions rather than handle or node insertion order', () => {
+  state.original = {
+    nodes: ['if', 'left', 'right'].map((id) => ({
+      id,
+      data: {},
+      position: { x: 0, y: 0 },
+      measured: { width: 256, height: 100 },
+    })),
+    edges: [
+      { id: 'left-edge', source: 'if', target: 'left', sourceHandle: 'yes' },
+      { id: 'right-edge', source: 'if', target: 'right', sourceHandle: 'no' },
+    ],
+  };
+  state.internalNode.mockImplementation((id: string) =>
+    id === 'if'
+      ? {
+          internals: {
+            handleBounds: {
+              source: [
+                { id: 'no', x: 256 },
+                { id: 'yes', x: 0 },
+              ],
+            },
+          },
+        }
+      : undefined,
+  );
+  show();
+  fireEvent.click(document.querySelector('svg.lucide-layout-grid')?.closest('button') as HTMLButtonElement);
+  const byId = Object.fromEntries(state.nodes.map((node) => [node.id, node]));
+  expect(byId.left.position.x).toBeLessThan(byId.right.position.x);
+  expect(state.edges).toEqual(state.original.edges);
+});
+
 it('animates running flows and distinguishes failed completion feedback', () => {
   show();
   act(() => state.live?.({ type: 'flow.start' }));
