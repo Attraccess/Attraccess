@@ -27,6 +27,10 @@ export type McpTool = {
 const methods = new Set(['get', 'post', 'put', 'patch', 'delete']);
 const pathItemKeys = new Set(['parameters', 'servers', 'summary', 'description', '$ref']);
 const incompatibleOperation = /(?:callback|webhook|stream|live|subscribe|binary|download|upload|firmware|restart|shutdown|host.?lifecycle|auth\/sso)/i;
+// These operations are known to return runtime streams/binary data even though
+// Swagger omits or misstates their response media types. A manifest edit alone
+// must not make them ordinary text tools.
+const knownNonToolOperations = new Set(['getLogo', 'getFrontendPluginFile']);
 
 function resolveSchema(schema: Record<string, unknown> | undefined, schemas: Record<string, unknown>, stack = new Set<string>()): Record<string, unknown> {
   if (!schema) throw new Error('Operation has an input without a schema');
@@ -102,6 +106,7 @@ export function generateMcpTools(document: OpenApiDocument, manifest: Record<str
     if (review.decision !== 'allow' && review.decision !== 'deny') throw new Error(`Invalid manifest decision for ${id}`);
     if (review.decision === 'deny') continue;
     if (
+      knownNonToolOperations.has(id) ||
       incompatibleOperation.test(`${id} ${entry.path}`) ||
       entry.operation.callbacks ||
       entry.operation['x-mcp-streaming']

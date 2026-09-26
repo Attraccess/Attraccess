@@ -1,7 +1,7 @@
 {
   "getLogo": {
-    "decision": "allow",
-    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "decision": "deny",
+    "reason": "Reviewed binary image response; excluded because MCP tool text results cannot preserve the endpoint binary representation.",
     "shape": "6af226ae"
   },
   "info": {
@@ -11,12 +11,12 @@
   },
   "rebootHost": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed rebootHost; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "06220de9"
   },
   "shutdownHost": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed shutdownHost; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9bcd2bd9"
   },
   "getLocalSignupDomainWhitelist": {
@@ -26,12 +26,12 @@
   },
   "setLocalSignupDomainWhitelist": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed setLocalSignupDomainWhitelist; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0599e124"
   },
   "createOneUser": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createOneUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "001d91f0"
   },
   "findMany": {
@@ -46,37 +46,37 @@
   },
   "verifyEmail": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed verifyEmail; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d8e79866"
   },
   "resendVerificationEmail": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resendVerificationEmail; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9d21f055"
   },
   "acceptInvitation": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed acceptInvitation; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d0042379"
   },
   "requestPasswordReset": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed requestPasswordReset; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "15f780d8"
   },
   "changePasswordViaResetToken": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed changePasswordViaResetToken; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "73567842"
   },
   "inviteUser": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed inviteUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4873003b"
   },
   "inviteUsersFromCsv": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed inviteUsersFromCsv; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "cadf837e"
   },
   "getCurrent": {
@@ -86,27 +86,27 @@
   },
   "requestDeleteAccount": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed requestDeleteAccount; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "e96bdf70"
   },
   "confirmDeleteAccount": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed confirmDeleteAccount; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4301f5cd"
   },
   "changeMyUsername": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed changeMyUsername; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "cfe69923"
   },
   "changeMyEmail": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed changeMyEmail; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "ced73e55"
   },
   "updateMyLocale": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateMyLocale; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9f44eda6"
   },
   "getOneUserById": {
@@ -116,27 +116,27 @@
   },
   "deleteUser": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "255a7bef"
   },
   "setUserPassword": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed setUserPassword; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "00d5836f"
   },
   "changeUserUsername": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed changeUserUsername; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0d494658"
   },
   "changeUserEmail": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed changeUserEmail; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "14ce430d"
   },
   "changeUserBillingFactor": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed changeUserBillingFactor; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d4f41499"
   },
   "getUserRoleAssignments": {
@@ -146,27 +146,27 @@
   },
   "assignRoleToUser": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed assignRoleToUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "95c7d770"
   },
   "revokeRoleFromUser": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed revokeRoleFromUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "3d56845c"
   },
   "createSession": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createSession; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0453dbb4"
   },
   "refreshSession": {
-    "decision": "allow",
-    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "decision": "deny",
+    "reason": "Reviewed credential lifecycle operation; excluded because returning a rotated application session credential would escape MCP permission delegation.",
     "shape": "7e6e27f7"
   },
   "endSession": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed endSession; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7870ec2f"
   },
   "getTwoFactorStatus": {
@@ -176,17 +176,17 @@
   },
   "setupTwoFactor": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed setupTwoFactor; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "050fb0b4"
   },
   "verifyTwoFactor": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed verifyTwoFactor; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "11aa7601"
   },
   "disableTwoFactor": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed disableTwoFactor; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "114ada45"
   },
   "getTwoFactorPolicy": {
@@ -196,7 +196,7 @@
   },
   "setTwoFactorPolicy": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed setTwoFactorPolicy; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "6378ddfb"
   },
   "listPasskeys": {
@@ -206,32 +206,32 @@
   },
   "getPasskeyRegistrationOptions": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getPasskeyRegistrationOptions; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b23d13de"
   },
   "verifyPasskeyRegistration": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed verifyPasskeyRegistration; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4b7275ec"
   },
   "renamePasskey": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed renamePasskey; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b81ca282"
   },
   "deletePasskey": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deletePasskey; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "2271ffdf"
   },
   "getPasskeyAuthenticationOptions": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getPasskeyAuthenticationOptions; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "cdc48272"
   },
   "createSessionWithPasskey": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createSessionWithPasskey; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "adc59c5f"
   },
   "listApiTokens": {
@@ -241,107 +241,107 @@
   },
   "createApiToken": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createApiToken; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "96bce766"
   },
   "updateApiToken": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateApiToken; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c7282746"
   },
   "revokeApiToken": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed revokeApiToken; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "1999bb9d"
   },
   "getAllSSOProviders": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getAllSSOProviders; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "a0956326"
   },
   "createOneSsoProvider": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createOneSsoProvider; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "332e53fa"
   },
   "linkUserToExternalAccount": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed linkUserToExternalAccount; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7af9cdf3"
   },
   "getOneSSOProviderById": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getOneSSOProviderById; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "f02f931c"
   },
   "updateOneSSOProvider": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateOneSSOProvider; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "5ffbf400"
   },
   "deleteOneSSOProvider": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteOneSSOProvider; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7d7e3507"
   },
   "discoverAuthentikOidc": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed discoverAuthentikOidc; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "df888319"
   },
   "discoverKeycloakOidc": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed discoverKeycloakOidc; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d488e68d"
   },
   "ssoOidcLogout": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed ssoOidcLogout; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4df2a000"
   },
   "ssoSamlLogout": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed ssoSamlLogout; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "46a1f326"
   },
   "ssoOidcDeleteUser": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed ssoOidcDeleteUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "bf75b0fd"
   },
   "ssoSamlDeleteUser": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed ssoSamlDeleteUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0cdec4e7"
   },
   "ssoOidcUpdatePermissions": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed ssoOidcUpdatePermissions; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "899eac1d"
   },
   "ssoSamlUpdatePermissions": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed ssoSamlUpdatePermissions; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "68e04d8d"
   },
   "loginWithOidc": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed loginWithOidc; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "1ae15cfb"
   },
   "oidcLoginCallback": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed oidcLoginCallback; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "dfd90606"
   },
   "loginWithSaml": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed loginWithSaml; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "207c27be"
   },
   "samlLoginCallback": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed samlLoginCallback; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "28c615ac"
   },
   "listRoles": {
@@ -351,7 +351,7 @@
   },
   "createRole": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createRole; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4b6c94fd"
   },
   "listPermissions": {
@@ -361,12 +361,12 @@
   },
   "updateRole": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateRole; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d2e9a7db"
   },
   "deleteRole": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteRole; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "fae392be"
   },
   "EmailTemplateController_findAll": {
@@ -381,12 +381,12 @@
   },
   "EmailTemplateController_update": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed EmailTemplateController_update; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "63b74b21"
   },
   "EmailTemplateController_resetToDefault": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed EmailTemplateController_resetToDefault; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "dc8b5212"
   },
   "EmailTemplateController_getTranslations": {
@@ -396,12 +396,12 @@
   },
   "EmailTemplateController_setTranslations": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed EmailTemplateController_setTranslations; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "fefac5d0"
   },
   "EmailTemplateController_deleteTranslations": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed EmailTemplateController_deleteTranslations; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "409a9464"
   },
   "EmailLayoutController_findGlobal": {
@@ -411,17 +411,17 @@
   },
   "EmailLayoutController_update": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed EmailLayoutController_update; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b23067e4"
   },
   "EmailLayoutController_previewLayout": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed EmailLayoutController_previewLayout; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c78ae009"
   },
   "EmailLayoutController_resetToDefault": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed EmailLayoutController_resetToDefault; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "bbd694b8"
   },
   "SettingsController_getAuditSettings": {
@@ -431,7 +431,7 @@
   },
   "SettingsController_updateAuditSettings": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed SettingsController_updateAuditSettings; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "07bf0c11"
   },
   "getSystemSettings": {
@@ -441,7 +441,7 @@
   },
   "updateSystemSettings": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateSystemSettings; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9e50c73f"
   },
   "getFirstTimeSetupStatus": {
@@ -451,7 +451,7 @@
   },
   "applyFirstTimeSetupSettings": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed applyFirstTimeSetupSettings; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "5690e681"
   },
   "getMetricsSettings": {
@@ -461,17 +461,17 @@
   },
   "updateMetricsSettings": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateMetricsSettings; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "8ccc1285"
   },
   "generateMetricsApiKey": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed generateMetricsApiKey; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c4b9d052"
   },
   "deleteMetricsApiKey": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteMetricsApiKey; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "444d2052"
   },
   "getAuthRateLimitSettings": {
@@ -481,7 +481,7 @@
   },
   "updateAuthRateLimitSettings": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateAuthRateLimitSettings; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "173daa31"
   },
   "getMessagingRateLimitSettings": {
@@ -491,7 +491,7 @@
   },
   "updateMessagingRateLimitSettings": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateMessagingRateLimitSettings; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "e40cae09"
   },
   "getLicenseInformation": {
@@ -511,12 +511,12 @@
   },
   "updateAdminPasswordPolicy": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateAdminPasswordPolicy; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "6fec45a7"
   },
   "previewAdminPasswordPolicy": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed previewAdminPasswordPolicy; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "f25d2a7a"
   },
   "listPasswordPolicyOverrides": {
@@ -531,17 +531,17 @@
   },
   "upsertPasswordPolicyOverride": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed upsertPasswordPolicyOverride; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "1f83ecd2"
   },
   "deletePasswordPolicyOverride": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deletePasswordPolicyOverride; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "93c58819"
   },
   "notificationsLive": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed notificationsLive; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "26f68414"
   },
   "notificationsGetPreferences": {
@@ -551,12 +551,12 @@
   },
   "notificationsUpdatePreferences": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed notificationsUpdatePreferences; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "8b4f620d"
   },
   "notificationsUpdateWebPresence": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed notificationsUpdateWebPresence; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "3bd82705"
   },
   "pushGetVapidPublicKey": {
@@ -571,17 +571,17 @@
   },
   "pushReplaceVapidKeys": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed pushReplaceVapidKeys; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "6a1e531f"
   },
   "pushUpsertSubscription": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed pushUpsertSubscription; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c14f09ab"
   },
   "pushDeleteSubscription": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed pushDeleteSubscription; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "03d1ebe7"
   },
   "AuditController_meta": {
@@ -596,7 +596,7 @@
   },
   "createOneResource": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createOneResource; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "5aef29bb"
   },
   "getAllResources": {
@@ -616,12 +616,12 @@
   },
   "updateOneResource": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resource update; excluded because its multipart image request cannot be represented by the current JSON-only MCP invocation boundary.",
     "shape": "9d2eb750"
   },
   "deleteOneResource": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteOneResource; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "2ec2a73d"
   },
   "mqttServersGetAll": {
@@ -631,7 +631,7 @@
   },
   "mqttServersCreateOne": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed mqttServersCreateOne; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "5feb7c11"
   },
   "mqttServersGetOneById": {
@@ -641,22 +641,22 @@
   },
   "mqttServersUpdateOne": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed mqttServersUpdateOne; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b4f61e56"
   },
   "mqttServersDeleteOne": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed mqttServersDeleteOne; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "77a1068c"
   },
   "SSEController_streamEvents": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed SSEController_streamEvents; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9c75b86b"
   },
   "resourceGroupsCreateOne": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupsCreateOne; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "3a33ab54"
   },
   "resourceGroupsGetMany": {
@@ -676,22 +676,22 @@
   },
   "resourceGroupsUpdateOne": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupsUpdateOne; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "984200e7"
   },
   "resourceGroupsAddResource": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupsAddResource; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "ff6754e3"
   },
   "resourceGroupsRemoveResource": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupsRemoveResource; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0bed37f8"
   },
   "resourceGroupsDeleteOne": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupsDeleteOne; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9f357a7a"
   },
   "resourceGroupIntroductionsGetMany": {
@@ -706,12 +706,12 @@
   },
   "resourceGroupIntroductionsGrant": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupIntroductionsGrant; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "82fdc5a0"
   },
   "resourceGroupIntroductionsRevoke": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupIntroductionsRevoke; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4eb4cb34"
   },
   "resourceGroupIntroducersGetMany": {
@@ -726,12 +726,12 @@
   },
   "resourceGroupIntroducersGrant": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupIntroducersGrant; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "09456266"
   },
   "resourceGroupIntroducersRevoke": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceGroupIntroducersRevoke; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "6cb8c83d"
   },
   "resourceRetrainingGetStatus": {
@@ -741,32 +741,32 @@
   },
   "resourceUsageStartSession": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceUsageStartSession; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "e91f78ea"
   },
   "resourceUsageEndSession": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceUsageEndSession; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0e5ac688"
   },
   "resourceUsageUpdateSessionProject": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceUsageUpdateSessionProject; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "623ad6ed"
   },
   "lockDoor": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed lockDoor; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "de0f9741"
   },
   "unlockDoor": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed unlockDoor; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "caf17703"
   },
   "unlatchDoor": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed unlatchDoor; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "601f9cd6"
   },
   "resourceUsageGetHistory": {
@@ -796,12 +796,12 @@
   },
   "resourceIntroducersGrant": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceIntroducersGrant; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "f0cdda54"
   },
   "resourceIntroducersRevoke": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceIntroducersRevoke; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "124a81cb"
   },
   "resourceIntroductionsGetMany": {
@@ -811,12 +811,12 @@
   },
   "resourceIntroductionsGrant": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceIntroductionsGrant; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "2373fdbe"
   },
   "resourceIntroductionsRevoke": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceIntroductionsRevoke; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0b910ba4"
   },
   "resourceIntroductionsGetHistory": {
@@ -831,7 +831,7 @@
   },
   "createMaintenance": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createMaintenance; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "eb13268a"
   },
   "findMaintenances": {
@@ -846,7 +846,7 @@
   },
   "finishMaintenance": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed finishMaintenance; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "e2543fc6"
   },
   "findMaintenanceSchedules": {
@@ -856,7 +856,7 @@
   },
   "createMaintenanceSchedule": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createMaintenanceSchedule; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "a433a1b2"
   },
   "getMaintenanceSchedule": {
@@ -866,17 +866,17 @@
   },
   "updateMaintenanceSchedule": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateMaintenanceSchedule; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b5793150"
   },
   "deleteMaintenanceSchedule": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteMaintenanceSchedule; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c8bb34d3"
   },
   "createMaintenanceRequest": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createMaintenanceRequest; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "8df06d7f"
   },
   "listMaintenanceRequests": {
@@ -886,7 +886,7 @@
   },
   "resolveMaintenanceRequest": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resolveMaintenanceRequest; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "ff7d3f2e"
   },
   "getBillingBalance": {
@@ -901,7 +901,7 @@
   },
   "createManualTransaction": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createManualTransaction; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "f36364c4"
   },
   "getBillingTransaction": {
@@ -916,17 +916,17 @@
   },
   "updateResourceBillingConfiguration": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateResourceBillingConfiguration; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "176d97ef"
   },
   "setSumUpApiKey": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed setSumUpApiKey; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "5aa5c3f0"
   },
   "setBillingConfiguration": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed setBillingConfiguration; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "8e3d2d79"
   },
   "getBillingConfiguration": {
@@ -946,32 +946,32 @@
   },
   "pairSumUpReader": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed pairSumUpReader; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "28034595"
   },
   "removeSumUpReader": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed removeSumUpReader; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "baf85f1e"
   },
   "topUpWithSumUpReader": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed topUpWithSumUpReader; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "19af174f"
   },
   "sumUpTopUpCallback": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed sumUpTopUpCallback; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "db454943"
   },
   "BillingController_streamEvents": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed BillingController_streamEvents; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "90d55199"
   },
   "refundTransaction": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed refundTransaction; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "ae8fc140"
   },
   "getNodeSchemas": {
@@ -981,7 +981,7 @@
   },
   "resolveNodeSchema": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resolveNodeSchema; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c9c2fa9e"
   },
   "getResourceFlow": {
@@ -991,7 +991,7 @@
   },
   "saveResourceFlow": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed saveResourceFlow; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "a6a4a326"
   },
   "getResourceFlowLogs": {
@@ -1006,22 +1006,22 @@
   },
   "startFlowLogRecording": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed startFlowLogRecording; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "6ded8bb7"
   },
   "stopFlowLogRecording": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed stopFlowLogRecording; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c9449ea8"
   },
   "ResourceFlowsController_streamEvents": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed ResourceFlowsController_streamEvents; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7751f597"
   },
   "pressButton": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed pressButton; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b7ddae1a"
   },
   "getButtons": {
@@ -1036,12 +1036,12 @@
   },
   "upsertFlowVariable": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed upsertFlowVariable; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0e067041"
   },
   "deleteFlowVariable": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteFlowVariable; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "cac6aa87"
   },
   "getResourceHealth": {
@@ -1051,7 +1051,7 @@
   },
   "clearResourceHealthEntry": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed clearResourceHealthEntry; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b40bb2e8"
   },
   "listCompanionDevices": {
@@ -1066,12 +1066,12 @@
   },
   "renameCompanionDevice": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed renameCompanionDevice; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "47332399"
   },
   "deleteCompanionDevice": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteCompanionDevice; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9b03ad6a"
   },
   "getCompanionDeviceResources": {
@@ -1086,7 +1086,7 @@
   },
   "downloadCompanionBinary": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed downloadCompanionBinary; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "ee349315"
   },
   "resourceOperatingAttributionGet": {
@@ -1121,7 +1121,7 @@
   },
   "createProject": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createProject; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "e5e4cba2"
   },
   "findOneProject": {
@@ -1131,22 +1131,22 @@
   },
   "deleteOneProject": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteOneProject; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "f6e638ec"
   },
   "updateProject": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateProject; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d8cacf81"
   },
   "archiveProject": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed archiveProject; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "57eaa8c6"
   },
   "unarchiveProject": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed unarchiveProject; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7e585e5c"
   },
   "getProjectUsageHistory": {
@@ -1166,7 +1166,7 @@
   },
   "removeProjectMember": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed removeProjectMember; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0710cdb5"
   },
   "listProjectInvitations": {
@@ -1176,17 +1176,17 @@
   },
   "createProjectInvitation": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed createProjectInvitation; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0e1b49b6"
   },
   "resendProjectInvitation": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resendProjectInvitation; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "55bbec9f"
   },
   "cancelProjectInvitation": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed cancelProjectInvitation; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "a18991e8"
   },
   "listMyProjectInvitations": {
@@ -1196,12 +1196,12 @@
   },
   "acceptProjectInvitation": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed acceptProjectInvitation; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7a1fe3bd"
   },
   "declineProjectInvitation": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed declineProjectInvitation; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "3769cfcb"
   },
   "resourceFormsList": {
@@ -1211,7 +1211,7 @@
   },
   "resourceFormsCreate": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceFormsCreate; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "6e9d3f9a"
   },
   "resourceFormsGetRequirements": {
@@ -1226,17 +1226,17 @@
   },
   "resourceFormsUpdate": {
     "decision": "deny",
-    "reason": "Reviewed PUT operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceFormsUpdate; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "394965c4"
   },
   "resourceFormsDelete": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceFormsDelete; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "12de36e7"
   },
   "resourceUsageRequestSupervisedSession": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resourceUsageRequestSupervisedSession; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b6a5ca08"
   },
   "supervisionListPendingRequests": {
@@ -1246,17 +1246,17 @@
   },
   "supervisionLive": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed supervisionLive; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "18550d2f"
   },
   "supervisionApproveRequest": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed supervisionApproveRequest; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "060752af"
   },
   "supervisionRejectRequest": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed supervisionRejectRequest; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7c420466"
   },
   "getCurrentVersion": {
@@ -1276,107 +1276,107 @@
   },
   "PluginController_listRegistries": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_listRegistries; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "2725ea30"
   },
   "PluginController_addRegistry": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_addRegistry; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "dccb00bf"
   },
   "PluginController_testRegistry": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_testRegistry; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "adb3fa2a"
   },
   "PluginController_removeRegistry": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_removeRegistry; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "894f967c"
   },
   "PluginController_packageMetadata": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_packageMetadata; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9a9923d3"
   },
   "PluginController_packageVersions": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_packageVersions; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "fcfa1a6f"
   },
   "PluginController_searchMarketplace": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_searchMarketplace; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "8124905b"
   },
   "PluginController_marketplacePackage": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_marketplacePackage; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "fa7c82c9"
   },
   "PluginController_installPackage": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_installPackage; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "f3157b29"
   },
   "PluginController_installPackageSpec": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_installPackageSpec; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "b21f113e"
   },
   "PluginController_removeInstalledPackage": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_removeInstalledPackage; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d6dfbde8"
   },
   "PluginController_installedPackages": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_installedPackages; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "16d2d73d"
   },
   "PluginController_updatePolicy": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_updatePolicy; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "cb1e84a3"
   },
   "PluginController_setUpdatePolicy": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_setUpdatePolicy; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "95ceae39"
   },
   "PluginController_checkAllInstalledPackages": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_checkAllInstalledPackages; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "7d8f6b97"
   },
   "PluginController_checkInstalledPackage": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_checkInstalledPackage; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "cdb48a26"
   },
   "PluginController_updateInstalledPackageSpec": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_updateInstalledPackageSpec; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4a397049"
   },
   "PluginController_updateInstalledPackageOverride": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_updateInstalledPackageOverride; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "ee8fc953"
   },
   "PluginController_updateInstalledPackagePolicy": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_updateInstalledPackagePolicy; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "3a773a62"
   },
   "PluginController_installedPackageVersions": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_installedPackageVersions; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0102ccc4"
   },
   "PluginController_replaceInstalledPackage": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed PluginController_replaceInstalledPackage; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "0f082f5a"
   },
   "getPlugins": {
@@ -1386,7 +1386,7 @@
   },
   "uploadPlugin": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed uploadPlugin; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "35395a84"
   },
   "getPluginSystemStatus": {
@@ -1396,32 +1396,32 @@
   },
   "retryPlugin": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed retryPlugin; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "a54ea0df"
   },
   "getFrontendPluginFile": {
-    "decision": "allow",
-    "reason": "Reviewed read-only JSON operation; REST authentication, validation, RBAC, and auditing remain authoritative.",
+    "decision": "deny",
+    "reason": "Reviewed plugin asset stream; excluded because plugin endpoint support is deferred and the runtime response streams JavaScript or CSS.",
     "shape": "be98ef8b"
   },
   "deletePlugin": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deletePlugin; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "dbb60b03"
   },
   "enrollNfcCard": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed enrollNfcCard; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "77b4d81c"
   },
   "resetNfcCard": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed resetNfcCard; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "4ea1c19c"
   },
   "updateReader": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed updateReader; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "826af2f3"
   },
   "getReaderById": {
@@ -1431,7 +1431,7 @@
   },
   "deleteReader": {
     "decision": "deny",
-    "reason": "Reviewed DELETE operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed deleteReader; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "dcd5958c"
   },
   "getReaders": {
@@ -1451,7 +1451,7 @@
   },
   "getAppKeyByUid": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getAppKeyByUid; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "5f00e8fa"
   },
   "getAllCards": {
@@ -1461,22 +1461,22 @@
   },
   "toggleCardActive": {
     "decision": "deny",
-    "reason": "Reviewed PATCH operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed toggleCardActive; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "1ca93042"
   },
   "getFirmwares": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getFirmwares; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "34c3876b"
   },
   "downloadFirmwareBinary": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed downloadFirmwareBinary; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "fc267031"
   },
   "getFirmwareBinary": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getFirmwareBinary; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "88c2202f"
   },
   "getResourceUsageHoursInDateRange": {
@@ -1486,7 +1486,7 @@
   },
   "getResourceOperatingDurations": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed getResourceOperatingDurations; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "c616a27a"
   },
   "getBillingTransactionsInDateRange": {
@@ -1496,17 +1496,17 @@
   },
   "messagingLive": {
     "decision": "deny",
-    "reason": "Reviewed GET operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed messagingLive; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "1455a7a3"
   },
   "messagingContactUser": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed messagingContactUser; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "365358b4"
   },
   "messagingContactResourceHolder": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed messagingContactResourceHolder; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "9a537852"
   },
   "messagingListConversations": {
@@ -1520,8 +1520,8 @@
     "shape": "3766a95d"
   },
   "messagingMarkConversationRead": {
-    "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "decision": "allow",
+    "reason": "Reviewed user-scoped write; marks the authenticated user’s conversation as read and retains REST RBAC and auditing.",
     "shape": "91e66e9c"
   },
   "messagingListMessages": {
@@ -1531,7 +1531,7 @@
   },
   "messagingSendMessage": {
     "decision": "deny",
-    "reason": "Reviewed POST operation; excluded from MCP tools pending a specific compatibility review.",
+    "reason": "Reviewed messagingSendMessage; excluded from the initial MCP surface until its operation-specific side effects and required permission scope are approved for MCP invocation.",
     "shape": "d041fabd"
   }
 }

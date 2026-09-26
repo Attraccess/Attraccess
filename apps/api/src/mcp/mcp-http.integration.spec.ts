@@ -1,6 +1,8 @@
 import express from 'express';
 import request from 'supertest';
 import { createServer, Server } from 'http';
+import { createServer as createHttpsServer, request as requestHttps } from 'https';
+import { createCA, createCert } from 'mkcert';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { OpenApiDocument, operationShape } from './openapi-tools';
 import { registerMcpHttpEndpoints } from './mcp-http';
@@ -166,4 +168,71 @@ describe('MCP HTTP transport', () => {
       .expect(200);
     expect(invalid.body.result).toMatchObject({ isError: true, content: [{ text: 'Missing required input id' }] });
   });
+
+  it('authenticates notifications and rejects cross-origin browser requests', async () => {
+    const unauthenticated = await request(server)
+      .post('/api/mcp')
+      .send({ jsonrpc: '2.0', method: 'notifications/initialized' })
+      .expect(401);
+    expect(unauthenticated.headers['www-authenticate']).toContain(
+      `http://127.0.0.1:${port}/.well-known/oauth-protected-resource/api/mcp`,
+    );
+
+    await request(server)
+      .post('/api/mcp')
+      .set('Origin', 'https://attacker.invalid')
+      .set('Authorization', 'Bearer api-token-with-read')
+      .send({ jsonrpc: '2.0', id: 8, method: 'tools/list' })
+      .expect(403);
+
+    await request(server)
+      .post('/api/mcp')
+      .set('Origin', `http://127.0.0.1:${port}`)
+      .set('Authorization', 'Bearer api-token-with-read')
+      .send({ jsonrpc: '2.0', method: 'notifications/initialized' })
+      .expect(202);
+  });
+
+  it('delegates tool calls to an HTTPS REST listener', async () => {
+    const ca = await createCA({ organization: 'MCP integration test', countryCode: 'DE', state: 'Berlin', locality: 'Berlin', validity: 1 });
+    const cert = await createCert({ ca: { key: ca.key, cert: ca.cert }, domains: ['127.0.0.1'], validity: 1 });
+    const app = express();
+    app.use(express.json());
+    app.get('/api/resources/:id', (_req, res) => res.json({ id: 23, name: 'TLS resource' }));
+    const tlsServer = createHttpsServer({ key: cert.key, cert: cert.cert }, app);
+    await new Promise<void>((resolve) => tlsServer.listen(0, '127.0.0.1', resolve));
+    const address = tlsServer.address();
+    if (!address || typeof address === 'string') throw new Error('Test HTTPS server did not bind a TCP port');
+    registerMcpHttpEndpoints(app as unknown as NestExpressApplication, {
+      document,
+      manifest,
+      resourceUrl: `https://127.0.0.1:${address.port}/api/mcp`,
+      port: address.port,
+      secure: true,
+      globalPrefix: 'api',
+      delegationSecret: 'test-secret',
+      authenticate: async (req) => { req.user = { id: 7, effectivePermissions: new Set(['resources.read']) }; },
+    });
+    try {
+      const body = JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'getResourceForMcpTest', arguments: { id: 23 } } });
+      const result = await new Promise<{ status: number; body: { result: { isError: boolean; content: Array<{ text: string }> } } }>((resolve, reject) => {
+        const req = requestHttps({
+          hostname: '127.0.0.1', port: address.port, path: '/api/mcp', method: 'POST', ca: ca.cert,
+          headers: { authorization: 'Bearer test-token', 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+        }, (res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('error', reject);
+          res.on('end', () => resolve({ status: res.statusCode ?? 0, body: JSON.parse(Buffer.concat(chunks).toString()) }));
+        });
+        req.on('error', reject);
+        req.write(body);
+        req.end();
+      });
+      expect(result.status).toBe(200);
+      expect(result.body.result).toMatchObject({ isError: false, content: [{ text: JSON.stringify({ id: 23, name: 'TLS resource' }) }] });
+    } finally {
+      await new Promise<void>((resolve, reject) => tlsServer.close((error) => error ? reject(error) : resolve()));
+    }
+  }, 15000);
 });

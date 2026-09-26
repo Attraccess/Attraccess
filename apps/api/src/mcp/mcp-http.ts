@@ -5,6 +5,7 @@ import { generateMcpTools, McpManifestEntry, OpenApiDocument } from './openapi-t
 import reviewedManifest from './reviewed-manifest.json';
 import { mcpOAuthAuthorizationServerMetadata } from './mcp-oauth';
 import { signMcpDelegation } from './mcp-delegation';
+import { request as httpsRequest } from 'node:https';
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -63,6 +64,7 @@ async function invokeRestTool(
   args: Record<string, unknown>,
   request: AuthenticatedRequest,
   port: number,
+  secure: boolean,
   delegationSecret: string,
 ): Promise<unknown> {
   const url = materializeToolUrl(tool, args);
@@ -89,11 +91,11 @@ async function invokeRestTool(
   for (const property of tool.bodyProperties) {
     if (property === 'body') {
       headers.set('content-type', 'application/json');
-      const response = await fetch(`http://127.0.0.1:${port}${forwardedPath}`, {
+      const response = await requestRest(`${secure ? 'https' : 'http'}://127.0.0.1:${port}${forwardedPath}`, {
         method: tool.method,
         headers,
         body: JSON.stringify(args.body),
-      });
+      }, secure);
       return readRestResponse(response);
     }
     if (Object.prototype.hasOwnProperty.call(args, property)) {
@@ -108,12 +110,36 @@ async function invokeRestTool(
     hasBody = true;
   }
   if (hasBody) headers.set('content-type', 'application/json');
-  const response = await fetch(`http://127.0.0.1:${port}${forwardedPath}`, {
+  const response = await requestRest(`${secure ? 'https' : 'http'}://127.0.0.1:${port}${forwardedPath}`, {
     method: tool.method,
     headers,
     body: hasBody ? JSON.stringify(body) : undefined,
-  });
+  }, secure);
   return readRestResponse(response);
+}
+
+function requestRest(url: string, init: RequestInit, secure: boolean): Promise<globalThis.Response> {
+  if (!secure) return fetch(url, init);
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(url, {
+      method: init.method,
+      headers: Object.fromEntries(new Headers(init.headers).entries()),
+      // The API's generated local certificate is not in the system trust store.
+      rejectUnauthorized: false,
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer | string) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      response.on('error', reject);
+      response.on('end', () => resolve(new globalThis.Response(Buffer.concat(chunks), {
+        status: response.statusCode ?? 502,
+        statusText: response.statusMessage,
+        headers: response.headers as HeadersInit,
+      })));
+    });
+    request.on('error', reject);
+    if (init.body !== undefined && init.body !== null) request.write(init.body);
+    request.end();
+  });
 }
 
 async function readRestResponse(response: globalThis.Response): Promise<unknown> {
@@ -142,6 +168,7 @@ export function registerMcpHttpEndpoints(
     authenticate: (request: AuthenticatedRequest) => Promise<void>;
     resourceUrl: string;
     port: number;
+    secure?: boolean;
     globalPrefix: string;
     delegationSecret: string;
     manifest?: Record<string, McpManifestEntry>;
@@ -166,21 +193,32 @@ export function registerMcpHttpEndpoints(
 
   router.get('/', (_request, response) => response.sendStatus(405));
   router.post('/', mcpRateLimit, async (request: AuthenticatedRequest, response: Response) => {
+    const origin = request.header('origin');
+    if (origin) {
+      let expectedOrigin: string;
+      try { expectedOrigin = new URL(options.resourceUrl).origin; } catch { expectedOrigin = ''; }
+      if (origin !== expectedOrigin) {
+        response.status(403).json(rpcError((request.body as JsonRpcRequest | undefined)?.id, -32003, 'Forbidden origin'));
+        return;
+      }
+    }
     const rpc = request.body as JsonRpcRequest;
     if (!rpc || rpc.jsonrpc !== '2.0' || typeof rpc.method !== 'string') {
       response.status(400).json(rpcError(rpc?.id, -32600, 'Invalid JSON-RPC request'));
-      return;
-    }
-    if (rpc.method === 'notifications/initialized') {
-      response.sendStatus(202);
       return;
     }
     try {
       if (!getBearerToken(request)) throw new Error('Bearer authentication is required');
       await options.authenticate(request);
     } catch {
-      response.setHeader('WWW-Authenticate', `Bearer resource_metadata="${options.resourceUrl.replace(/\/mcp\/?$/, '')}${RESOURCE_METADATA_PATH}/api/mcp"`);
+      const metadataUrl = new URL(`${RESOURCE_METADATA_PATH}${oauthPrefix}`, options.resourceUrl).toString();
+      response.setHeader('WWW-Authenticate', `Bearer resource_metadata="${metadataUrl}"`);
       response.status(401).json(rpcError(rpc.id, -32001, 'Unauthorized'));
+      return;
+    }
+
+    if (rpc.method.startsWith('notifications/')) {
+      response.sendStatus(202);
       return;
     }
 
@@ -209,15 +247,11 @@ export function registerMcpHttpEndpoints(
       }
       try {
         const args = validateToolArguments(tool, rpc.params?.arguments);
-        const value = await invokeRestTool(tool, args, request, options.port, options.delegationSecret);
+        const value = await invokeRestTool(tool, args, request, options.port, options.secure ?? new URL(options.resourceUrl).protocol === 'https:', options.delegationSecret);
         response.json({ jsonrpc: '2.0', id: rpc.id ?? null, result: { content: [{ type: 'text', text: JSON.stringify(value ?? null) }], isError: false } });
       } catch (error) {
         response.json({ jsonrpc: '2.0', id: rpc.id ?? null, result: { content: [{ type: 'text', text: error instanceof Error ? error.message : 'Tool invocation failed' }], isError: true } });
       }
-      return;
-    }
-    if (rpc.method.startsWith('notifications/')) {
-      response.sendStatus(202);
       return;
     }
     response.json(rpcError(rpc.id, -32601, `Method not found: ${rpc.method}`));

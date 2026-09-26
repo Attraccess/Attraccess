@@ -141,6 +141,24 @@ describe('generateMcpTools', () => {
     }))).toThrow('Incompatible endpoint');
   });
 
+  it.each([
+    ['getLogo', '/logo.png'],
+    ['getFrontendPluginFile', '/plugins/{name}/frontend/{file}'],
+  ])('rejects known binary or streamed operation %s even if its manifest says allow', (operationId, path) => {
+    const doc: OpenApiDocument = {
+      paths: {
+        [path]: {
+          get: {
+            operationId,
+            responses: { '200': { content: { 'application/json': { schema: { type: 'string' } } } } },
+          },
+        },
+      },
+    };
+    const reviewed = manifest(doc, { [operationId]: { decision: 'allow', reason: 'Deliberately unsafe regression fixture.' } });
+    expect(() => generateMcpTools(doc, reviewed)).toThrow(`Incompatible endpoint GET ${path} cannot be allowed (${operationId})`);
+  });
+
   it('lets operation parameters override shared parameters at matching name and location', () => {
     const doc: OpenApiDocument = { paths: { '/things/{id}': { parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], get: { operationId: 'getThing', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { content: { 'application/json': {} } } } } } } };
     expect(generateMcpTools(doc, manifest(doc, { getThing: { decision: 'allow', reason: 'Reviewed.' } }))[0].inputSchema.properties.id).toEqual({ type: 'integer' });
