@@ -6,6 +6,7 @@ import reviewedManifest from './reviewed-manifest.json';
 import { mcpOAuthAuthorizationServerMetadata } from './mcp-oauth';
 import { signMcpDelegation } from './mcp-delegation';
 import { request as httpsRequest } from 'node:https';
+import { isIP } from 'node:net';
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -66,6 +67,8 @@ async function invokeRestTool(
   port: number,
   secure: boolean,
   delegationSecret: string,
+  tlsCa?: Buffer,
+  tlsServername?: string,
 ): Promise<unknown> {
   const url = materializeToolUrl(tool, args);
   // Swagger's exported paths already contain Nest's configured global prefix.
@@ -95,7 +98,7 @@ async function invokeRestTool(
         method: tool.method,
         headers,
         body: JSON.stringify(args.body),
-      }, secure);
+      }, secure, tlsCa, tlsServername);
       return readRestResponse(response);
     }
     if (Object.prototype.hasOwnProperty.call(args, property)) {
@@ -114,18 +117,18 @@ async function invokeRestTool(
     method: tool.method,
     headers,
     body: hasBody ? JSON.stringify(body) : undefined,
-  }, secure);
+  }, secure, tlsCa, tlsServername);
   return readRestResponse(response);
 }
 
-function requestRest(url: string, init: RequestInit, secure: boolean): Promise<globalThis.Response> {
+function requestRest(url: string, init: RequestInit, secure: boolean, tlsCa?: Buffer, tlsServername?: string): Promise<globalThis.Response> {
   if (!secure) return fetch(url, init);
   return new Promise((resolve, reject) => {
     const request = httpsRequest(url, {
       method: init.method,
       headers: Object.fromEntries(new Headers(init.headers).entries()),
-      // The API's generated local certificate is not in the system trust store.
-      rejectUnauthorized: false,
+      ...(tlsCa ? { ca: tlsCa } : {}),
+      ...(tlsServername ? { servername: tlsServername } : {}),
     }, (response) => {
       const chunks: Buffer[] = [];
       response.on('data', (chunk: Buffer | string) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
@@ -169,6 +172,7 @@ export function registerMcpHttpEndpoints(
     resourceUrl: string;
     port: number;
     secure?: boolean;
+    tlsCa?: Buffer;
     globalPrefix: string;
     delegationSecret: string;
     manifest?: Record<string, McpManifestEntry>;
@@ -247,7 +251,12 @@ export function registerMcpHttpEndpoints(
       }
       try {
         const args = validateToolArguments(tool, rpc.params?.arguments);
-        const value = await invokeRestTool(tool, args, request, options.port, options.secure ?? new URL(options.resourceUrl).protocol === 'https:', options.delegationSecret);
+        const resourceHostname = new URL(options.resourceUrl).hostname;
+        const value = await invokeRestTool(
+          tool, args, request, options.port,
+          options.secure ?? new URL(options.resourceUrl).protocol === 'https:',
+          options.delegationSecret, options.tlsCa, isIP(resourceHostname) ? undefined : resourceHostname,
+        );
         response.json({ jsonrpc: '2.0', id: rpc.id ?? null, result: { content: [{ type: 'text', text: JSON.stringify(value ?? null) }], isError: false } });
       } catch (error) {
         response.json({ jsonrpc: '2.0', id: rpc.id ?? null, result: { content: [{ type: 'text', text: error instanceof Error ? error.message : 'Tool invocation failed' }], isError: true } });

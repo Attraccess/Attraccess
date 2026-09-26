@@ -308,6 +308,7 @@ export async function bootstrap() {
     document: documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument,
     resourceUrl: mcpResourceUrl,
     port: appConfig.PORT,
+    tlsCa: httpsOptions?.cert as Buffer | undefined,
     globalPrefix,
     delegationSecret: appConfig.AUTH_SESSION_SECRET,
     authenticate: authenticateMcp,

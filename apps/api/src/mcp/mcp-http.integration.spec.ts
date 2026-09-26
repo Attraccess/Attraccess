@@ -209,6 +209,7 @@ describe('MCP HTTP transport', () => {
       resourceUrl: `https://127.0.0.1:${address.port}/api/mcp`,
       port: address.port,
       secure: true,
+      tlsCa: ca.cert,
       globalPrefix: 'api',
       delegationSecret: 'test-secret',
       authenticate: async (req) => { req.user = { id: 7, effectivePermissions: new Set(['resources.read']) }; },
