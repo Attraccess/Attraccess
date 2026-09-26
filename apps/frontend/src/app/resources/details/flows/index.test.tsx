@@ -242,17 +242,17 @@ it('adds catalog and dropped nodes, switches canvas mode and lays out the graph'
   expect(state.fit).toHaveBeenCalled();
   expect(state.nodes.every((node) => Number.isFinite(node.position.x))).toBe(true);
 });
-it('auto-aligns using measured source handle positions rather than handle or node insertion order', () => {
+it('auto-aligns using measured handles and preserves positions, data and connections through save and reload', () => {
   state.original = {
     nodes: ['if', 'left', 'right'].map((id) => ({
       id,
-      data: {},
+      data: { label: id, custom: { retained: true } },
       position: { x: 0, y: 0 },
       measured: { width: 256, height: 100 },
     })),
     edges: [
-      { id: 'left-edge', source: 'if', target: 'left', sourceHandle: 'yes' },
-      { id: 'right-edge', source: 'if', target: 'right', sourceHandle: 'no' },
+      { id: 'left-edge', source: 'if', target: 'left', sourceHandle: 'yes', targetHandle: 'input' },
+      { id: 'right-edge', source: 'if', target: 'right', sourceHandle: 'no', targetHandle: 'input' },
     ],
   };
   state.internalNode.mockImplementation((id: string) =>
@@ -269,11 +269,26 @@ it('auto-aligns using measured source handle positions rather than handle or nod
         }
       : undefined,
   );
-  show();
+  const original = state.original;
+  const view = show();
   fireEvent.click(document.querySelector('svg.lucide-layout-grid')?.closest('button') as HTMLButtonElement);
   const byId = Object.fromEntries(state.nodes.map((node) => [node.id, node]));
   expect(byId.left.position.x).toBeLessThan(byId.right.position.x);
   expect(state.edges).toEqual(state.original.edges);
+
+  // Model a server round trip with serialized data and a fresh page mount.
+  state.save.mockImplementationOnce(({ requestBody }: { requestBody: { nodes: Node[]; edges: Edge[] } }) => {
+    state.original = JSON.parse(JSON.stringify(requestBody));
+  });
+  const aligned = structuredClone({ nodes: state.nodes, edges: state.edges });
+  fireEvent.click(saveButton());
+  expect(state.save).toHaveBeenCalledWith({ resourceId: 7, requestBody: aligned });
+  view.unmount();
+  show();
+  expect(state.nodes).toEqual(aligned.nodes);
+  expect(state.nodes.map((node) => node.data)).toEqual(original.nodes.map((node) => node.data));
+  expect(state.edges).toEqual(original.edges);
+  expect(saveButton()).toBeDisabled();
 });
 
 it('animates running flows and distinguishes failed completion feedback', () => {
