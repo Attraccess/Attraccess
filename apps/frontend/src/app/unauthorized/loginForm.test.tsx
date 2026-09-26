@@ -12,6 +12,7 @@ const loginMock = vi.fn();
 const resendMutateMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
 const pending = vi.hoisted(() => ({ login: false, resend: false }));
+const signup = vi.hoisted(() => ({ enabled: true }));
 const labels = { en, de };
 let loginError: Error | null = null;
 let resendOnSuccess: (() => void) | undefined;
@@ -54,7 +55,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     }
   },
   useUsersServiceIsLocalSignupEnabled: () => ({
-    data: { value: true },
+    data: { value: signup.enabled },
     isLoading: false,
   }),
   useUsersServiceResendVerificationEmail: (options: {
@@ -96,6 +97,7 @@ describe('LoginForm – resend verification email', () => {
     locale.current = 'en';
     pending.login = false;
     pending.resend = false;
+    signup.enabled = true;
   });
 
   it('does not show resend section when there is no login error', () => {
@@ -132,6 +134,18 @@ describe('LoginForm – resend verification email', () => {
     expect(button).toBeDisabled();
   });
 
+  it.each([
+    ['en', 'Sign in with email and password', 'Create an account'],
+    ['de', 'Anmelden mit E-Mail und Passwort', 'Konto erstellen'],
+  ] as const)('keeps the disabled-signup accordion action descriptive in %s', (language, accordionLabel, signupLabel) => {
+    locale.current = language;
+    signup.enabled = false;
+    renderLogin();
+
+    expect(screen.queryByRole('button', { name: signupLabel })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: accordionLabel })).toBeInTheDocument();
+  });
+
   it('renders descriptive German navigation, field, recovery, and resend labels', () => {
     locale.current = 'de';
     const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
@@ -147,6 +161,18 @@ describe('LoginForm – resend verification email', () => {
     expect(screen.getByRole('button', { name: 'Passwort vergessen?' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
+  });
+
+  it('keeps the German resend action visible and named while pending', () => {
+    locale.current = 'de';
+    pending.resend = true;
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+    renderLogin();
+
+    const button = screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' });
+    expect(button).toBeDisabled();
   });
 
   it('shows resend section when UserEmailNotVerifiedException occurs', () => {

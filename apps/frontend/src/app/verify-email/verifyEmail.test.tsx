@@ -14,6 +14,7 @@ import de from './de.json';
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
+const pending = vi.hoisted(() => ({ verify: false, resend: false }));
 let verifyOnError: ((error: unknown) => void) | undefined;
 let verifyOnSuccess: (() => void) | undefined;
 let resendOnSuccess: (() => void) | undefined;
@@ -41,11 +42,11 @@ vi.mock('@attraccess/react-query-client', () => ({
   useUsersServiceVerifyEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
     verifyOnSuccess = options?.onSuccess;
     verifyOnError = options?.onError;
-    return { mutate: verifyMutateMock, isPending: false };
+    return { mutate: verifyMutateMock, isPending: pending.verify };
   },
   useUsersServiceResendVerificationEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
     resendOnSuccess = options?.onSuccess;
-    return { mutate: resendMutateMock, isPending: false };
+    return { mutate: resendMutateMock, isPending: pending.resend };
   },
   useUsersServiceGetCurrentKey: 'useUsersServiceGetCurrentKey',
   ApiError: class ApiError extends Error {},
@@ -85,6 +86,8 @@ describe('VerifyEmail', () => {
     verifyOnSuccess = undefined;
     resendOnSuccess = undefined;
     locale.current = 'en';
+    pending.verify = false;
+    pending.resend = false;
   });
 
   it('calls verifyEmail mutation with token and email from URL params', () => {
@@ -243,6 +246,30 @@ describe('VerifyEmail', () => {
     await waitFor(() => {
       expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();
       expect(screen.queryByTestId('resend-verification-button')).not.toBeInTheDocument();
+    });
+  });
+
+  it.each([
+    ['en', 'Resend verification email'],
+    ['de', 'Verifizierungsmail erneut senden'],
+  ] as const)('keeps the %s resend action named while pending', async (language, label) => {
+    locale.current = language;
+    pending.resend = true;
+    renderWithRoute('/verify-email?email=test%40example.com&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+
+    const button = await screen.findByRole('button', { name: label });
+    expect(button).toBeDisabled();
+  });
+
+  it.each(['en', 'de'] as const)('shows the verification pending state in %s', async (language) => {
+    locale.current = language;
+    pending.verify = true;
+    renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+
+    expect(await screen.findByText('Loading...')).toBeInTheDocument();
+    expect(verifyMutateMock).toHaveBeenCalledWith({
+      requestBody: { token: 'abc123', email: 'test@example.com' },
     });
   });
 });

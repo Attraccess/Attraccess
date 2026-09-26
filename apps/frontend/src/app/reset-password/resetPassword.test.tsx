@@ -6,7 +6,7 @@ import en from './en.json';
 import de from './de.json';
 import { ResetPassword } from './resetPassword';
 
-const state = vi.hoisted(() => ({ locale: 'en' as 'en' | 'de' }));
+const state = vi.hoisted(() => ({ locale: 'en' as 'en' | 'de', pending: false, success: true }));
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useUrlQuery: () => new URLSearchParams('token=test&userId=1'),
@@ -17,12 +17,13 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceChangePasswordViaResetToken: () => ({ mutate: vi.fn(), isPending: false, isSuccess: true }),
+  useUsersServiceChangePasswordViaResetToken: () => ({ mutate: vi.fn(), isPending: state.pending, isSuccess: state.success }),
+  usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({ data: undefined }),
 }));
 vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn(), success: vi.fn() }) }));
 
 describe('ResetPassword completion labels', () => {
-  beforeEach(() => { state.locale = 'en'; });
+  beforeEach(() => { state.locale = 'en'; state.pending = false; state.success = true; });
 
   it.each(['en', 'de'] as const)('renders the translated sign-in action in %s', (locale) => {
     state.locale = locale;
@@ -32,5 +33,26 @@ describe('ResetPassword completion labels', () => {
     expect(screen.getByText(translations.success.title)).toBeInTheDocument();
     expect(screen.getByText(translations.success.message)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: translations.success.goToLogin })).toBeInTheDocument();
+  });
+
+  it.each(['en', 'de'] as const)('shows the reset-token pending state in %s', (locale) => {
+    state.locale = locale;
+    state.pending = true;
+    state.success = false;
+    render(<ResetPassword />);
+
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it.each(['en', 'de'] as const)('renders named reset-token form controls in %s', (locale) => {
+    state.locale = locale;
+    state.success = false;
+    const translations = locale === 'en' ? en : de;
+    render(<ResetPassword />);
+
+    expect(screen.getByLabelText(translations.inputs.password)).toBeInTheDocument();
+    expect(screen.getByLabelText(translations.inputs.confirmPassword)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: translations.submit })).toBeInTheDocument();
   });
 });

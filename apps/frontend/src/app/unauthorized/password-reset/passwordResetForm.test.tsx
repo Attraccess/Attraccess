@@ -5,10 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PasswordResetForm } from './passwordResetForm';
 import { TestWrapper } from '../../../test-utils/wrappers';
 
-const locale = vi.hoisted(() => ({ current: 'en' }));
+const state = vi.hoisted(() => ({ locale: 'en', pending: false }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: (locales: Record<string, Record<string, unknown>>) => {
-    const translations = locales[locale.current];
+    const translations = locales[state.locale];
     const t = (key: string) => key.split('.').reduce<unknown>(
       (value, part) => value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
       translations,
@@ -18,16 +18,17 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceRequestPasswordReset: () => ({ mutate: vi.fn(), isPending: false }),
+  useUsersServiceRequestPasswordReset: () => ({ mutate: vi.fn(), isPending: state.pending }),
 }));
 
 describe('PasswordResetForm labels', () => {
   beforeEach(() => {
-    locale.current = 'en';
+    state.locale = 'en';
+    state.pending = false;
   });
 
   it.each(['en', 'de'] as const)('uses descriptive recovery labels in %s', (language) => {
-    locale.current = language;
+    state.locale = language;
     render(<PasswordResetForm onGoBack={vi.fn()} />, { wrapper: TestWrapper });
 
     const expectedLabels = language === 'en'
@@ -36,5 +37,17 @@ describe('PasswordResetForm labels', () => {
     expect(screen.getByRole('button', { name: expectedLabels.back })).toBeInTheDocument();
     expect(screen.getByLabelText(expectedLabels.email)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: expectedLabels.submit })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Send password reset link'],
+    ['de', 'Passwort-Reset-Link senden'],
+  ] as const)('keeps the %s recovery action named while pending', (language, submitLabel) => {
+    state.locale = language;
+    state.pending = true;
+    render(<PasswordResetForm onGoBack={vi.fn()} />, { wrapper: TestWrapper });
+
+    const button = screen.getByRole('button', { name: submitLabel });
+    expect(button).toBeDisabled();
   });
 });
