@@ -10,6 +10,7 @@
 #include "display/screens/enrollment/enrollmentScreen.hpp"
 #include "display/screens/reset/resetScreen.hpp"
 #include "display/screens/supervision/supervisionScreen.hpp"
+#include "display/screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 #include "display/shared/pinInput/pinInputPage.hpp"
 #include "fixtures.hpp"
 #include "state/language.hpp"
@@ -754,6 +755,31 @@ void testPin(Renderer &renderer)
     lv_obj_send_event(keyboard, LV_EVENT_CANCEL, nullptr);
     expect(canceled && std::strlen(lv_textarea_get_text(field)) == 0, "PIN cancel callback clears field");
 }
+
+void testFirmwareUpdateLocales(Renderer &renderer)
+{
+    FirmwareUpdateScreen screen;
+    screen.setAvailableVersion("2.0.0");
+    screen.setProgress(67);
+    screen.init();
+    ScreenGuard guard(screen.getScreen(), &screen);
+    auto *title = requireObject(guard.root, &lv_label_class, "Softwareaktualiesierung");
+    auto *version = requireObject(guard.root, &lv_label_class, "test -> 2.0.0");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    expect(std::string(lv_label_get_text(title)) == "Software update",
+           "Production firmware update title translates to English");
+    expect(std::string(lv_label_get_text(version)) == "test -> 2.0.0",
+           "Firmware version supplied by the updater remains unchanged");
+    FirmwareI18n::refreshTree(guard.root, "de");
+    expect(std::string(lv_label_get_text(version)) == "test -> 2.0.0",
+           "Version data is preserved across locale refresh");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    renderer.capture("firmware-update-english");
+    FirmwareI18n::refreshTree(guard.root, "de");
+    expect(std::string(lv_label_get_text(title)) == "Softwareaktualiesierung",
+           "Production firmware update title refreshes to German");
+    renderer.capture("firmware-update-german");
+}
 }
 
 namespace
@@ -1187,6 +1213,7 @@ int main(int argc, char **argv)
         test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurückgesetzt...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });
+        test("screen/firmware-update-bilingual", [&] { testFirmwareUpdateLocales(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
                   << renderer.captures << " real LVGL frames\n";
         std::cout << "COVERAGE: production theme, boot/init/enrollment/reset/supervision/PIN, lockscreen/resource list/no resources and image assets.\n"

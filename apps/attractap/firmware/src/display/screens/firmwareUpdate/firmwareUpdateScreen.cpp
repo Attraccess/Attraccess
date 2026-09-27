@@ -58,7 +58,7 @@ void FirmwareUpdateScreen::init()
     else
     {
         std::string placeholder = std::string(FIRMWARE_VERSION) + " -> ??.??.??";
-        FirmwareI18n::setLabel(this->versionsLabel, placeholder.c_str());
+        FirmwareI18n::setDynamicLabel(this->versionsLabel, placeholder.c_str());
     }
 
     this->setProgress(this->progressPercent);
@@ -87,7 +87,7 @@ void FirmwareUpdateScreen::setAvailableVersion(std::string availablevVersion)
         return;
     }
     std::string s = std::string(FIRMWARE_VERSION) + " -> " + availablevVersion;
-    FirmwareI18n::setLabel(this->versionsLabel, s.c_str());
+    FirmwareI18n::setDynamicLabel(this->versionsLabel, s.c_str());
 }
 
 void FirmwareUpdateScreen::setProgress(int percent)
