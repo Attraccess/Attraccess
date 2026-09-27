@@ -146,6 +146,10 @@ void Lockscreen::updateUsageInfo()
         return;
     }
 
+    // Resource names come from the server and must not be treated as catalog
+    // keys. The label starts with a localized placeholder, so clear that
+    // registration before replacing it with server supplied text.
+    FirmwareI18n::markLocalizedLabel(this->resourceNameLabel, false);
     lv_label_set_text(this->resourceNameLabel, this->resourceName);
 
     // Status priority mirrors the web resource list: in use > maintenance > available.
