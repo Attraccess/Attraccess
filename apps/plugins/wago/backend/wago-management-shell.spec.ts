@@ -21,6 +21,9 @@ let watchdogPid: number | undefined;
 jest.setTimeout(60_000);
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
 const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` });
+// The shell fixtures spawn many small utilities. Leave headroom for loaded CI
+// runners instead of killing a healthy transaction at the old 10s cap.
+const shellTimeout = 30_000;
 const command = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
   managementKeyCommand(action, selectedToken, seconds, key.publicKey)
     .replaceAll('/proc/uptime', join(root, 'uptime'))
@@ -28,7 +31,7 @@ const command = (action: ManagementShellAction, seconds = 180, selectedToken = t
 const run = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
   exec('/bin/sh', ['-c', command(action, seconds, selectedToken)], {
     env: env(),
-    timeout: 10000,
+    timeout: shellTimeout,
     maxBuffer: 16384,
   });
 
