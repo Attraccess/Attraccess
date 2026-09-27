@@ -78,8 +78,13 @@
       ]
     },
     "current": {
+      "sourceCommit": "f231f3cc720be654fb02db8d0f9849c169ace64b",
       "files": 14,
       "unpackedBytes": 2974390,
+      "tarballSha1": "f361163525949d88cf28d6941f129fd11ca73e20",
+      "matchesBaseline": true,
+      "matchesPriorCurrentInventory": true,
+      "prHeadEvidence": "../.rocky-evidence/attraccess-pr-head-plugin-and-cc100.log and ../.rocky-evidence/attraccess-npm-pack-pr-head.json",
       "records": [
         {
           "path": "dist/index.js",
