@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { getCrapReport } from 'crap-score';
-import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run, enforceScores, workspace } from './run.mjs';
+import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run, enforceScores, sourceFunctionCount, workspace } from './run.mjs';
 import { affectedSelection, isSharedChange, projectSourceManifest, selectProjects, validateSupportedTargets, verifyReports } from './affected.mjs';
 
 test('source selection includes apps and scripts but excludes tests and generated clients', () => {
@@ -151,7 +151,7 @@ test('empty analysis is rejected when source contains a function', () => {
     writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: coverageEntry }));
     writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
     writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 0, violations: 0, max: 0 }));
-    assert.throws(() => verifyReports(['demo'], directory), /contains source functions but analysis has 0 and coverage has 0/);
+    assert.throws(() => verifyReports(['demo'], directory), /contains 1 source functions but analysis has 0 and coverage has 0/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -180,7 +180,7 @@ test('function analysis completeness is checked separately for every source file
     writeFileSync(path.join(output, 'summary.json'), JSON.stringify({
       project: 'demo', limit: 30, files: 2, sourceFiles: [populated, omitted], functions: 1, violations: 0, max: 1,
     }));
-    assert.throws(() => verifyReports(['demo'], directory), /omitted\.ts contains source functions but analysis has 0 and coverage has 0/);
+    assert.throws(() => verifyReports(['demo'], directory), /omitted\.ts contains 1 source functions but analysis has 0 and coverage has 0/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -209,7 +209,42 @@ test('per-file function counts must agree even when project totals agree', () =>
     writeFileSync(path.join(output, 'summary.json'), JSON.stringify({
       project: 'demo', limit: 30, files: 2, sourceFiles: [first, second], functions: 1, violations: 0, max: 1,
     }));
-    assert.throws(() => verifyReports(['demo'], directory), /first\.ts has 0 analyzed function\(s\) but coverage has 1/);
+    assert.throws(() => verifyReports(['demo'], directory), /first\.ts contains 1 source functions but analysis has 0 and coverage has 1/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('per-file function analysis cannot omit source functions when both reports agree', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-omitted-same-file-function-'));
+  const output = path.join(directory, 'coverage/crap/demo');
+  const source = path.join(directory, 'demo/source.tsx');
+  try {
+    mkdirSync(path.join(output, 'html'), { recursive: true });
+    mkdirSync(path.dirname(source), { recursive: true });
+    writeFileSync(source, 'export function included() { return <span />; }\nexport function omitted() { return <span />; }\n');
+    writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({
+      [source]: { path: source, statementMap: {}, s: {}, fnMap: { included: { name: 'included' } }, f: { included: 0 }, branchMap: {}, b: {} },
+    }));
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({
+      [source]: { included: { functionDescriptor: 'included', start: { line: 1 }, complexity: 1, statements: { crap: 1, coverage: 1 } } },
+    }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({
+      project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 1, violations: 0, max: 1,
+    }));
+    assert.throws(() => verifyReports(['demo'], directory), /source\.tsx contains 2 source functions but analysis has 1 and coverage has 1/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('source completeness ignores callback functions inside decorators', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-decorator-function-count-'));
+  const source = path.join(directory, 'decorated.ts');
+  try {
+    writeFileSync(source, 'class Example { @decorate(() => Service) method() {} }\nfunction decorate(value: unknown) { return value; }\n');
+    assert.equal(sourceFunctionCount(source), 2);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -221,6 +256,8 @@ test('restored project reports are checked against the current inclusive limit',
   const source = path.join(directory, 'demo/example.ts');
   try {
     mkdirSync(path.join(output, 'html'), { recursive: true });
+    mkdirSync(path.dirname(source), { recursive: true });
+    writeFileSync(source, 'export function example() { return 1; }\n');
     writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
     const coverage = {
       [source]: {

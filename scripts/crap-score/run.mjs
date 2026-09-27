@@ -302,10 +302,20 @@ export function ownedFiles(root, tracked) {
 
 export function sourceFunctionCount(file) {
   const source = readFileSync(file, 'utf8');
-  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, /\.tsx?$/.test(file) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
+  const scriptKind = /\.tsx$/.test(file) ? ts.ScriptKind.TSX : /\.ts$/.test(file) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
   let count = 0;
   const visit = (node) => {
-    if (ts.isFunctionLike(node) && node.body) count += 1;
+    let parent = node.parent;
+    let decorator = false;
+    while (parent) {
+      if (ts.isDecorator(parent)) {
+        decorator = true;
+        break;
+      }
+      parent = parent.parent;
+    }
+    if (ts.isFunctionLike(node) && node.body && !decorator) count += 1;
     ts.forEachChild(node, visit);
   };
   visit(ast);
@@ -320,8 +330,9 @@ export function validateFunctionCompleteness(project, files, report, coverage) {
     })?.[1];
     const analysisCount = Object.keys(findEntry(report) ?? {}).length;
     const coverageCount = Object.keys(findEntry(coverage)?.fnMap ?? {}).length;
-    if (!analysisCount && !coverageCount && sourceFunctionCount(file) > 0)
-      throw new Error(`Incomplete function analysis for ${project}: ${path.relative(workspace, file)} contains source functions but analysis has ${analysisCount} and coverage has ${coverageCount}`);
+    const sourceCount = sourceFunctionCount(file);
+    if (analysisCount < sourceCount || coverageCount < sourceCount)
+      throw new Error(`Incomplete function analysis for ${project}: ${path.relative(workspace, file)} contains ${sourceCount} source functions but analysis has ${analysisCount} and coverage has ${coverageCount}`);
     if (analysisCount !== coverageCount)
       throw new Error(`Incomplete function analysis for ${project}: ${path.relative(workspace, file)} has ${analysisCount} analyzed function(s) but coverage has ${coverageCount}`);
   }
