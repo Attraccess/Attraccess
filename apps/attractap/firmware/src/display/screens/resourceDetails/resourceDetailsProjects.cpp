@@ -166,13 +166,16 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
       return;
    }
 
-   std::string label = FirmwareI18n::translate("Projekt wählen");
+   std::string label = "Projekt wählen";
    if (this->selectedProjectId != 0 && this->selectedProjectName.length() > 0)
    {
-      label = std::string(FirmwareI18n::translate("Projekt: ")) + this->selectedProjectName;
+      label = std::string("Projekt: ") + this->selectedProjectName;
    }
 
-   FirmwareI18n::setDynamicLabel(this->projectsButtonLabel, label.c_str());
+   // The caption is firmware UI, while the selected project name is supplied
+   // data. The catalog translates only the fixed "Projekt: " prefix and
+   // preserves the project name during language refresh.
+   FirmwareI18n::setLabel(this->projectsButtonLabel, label.c_str());
    lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::updateClearProjectButtonState()

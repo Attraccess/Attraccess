@@ -2,6 +2,7 @@
 
 #include "demo_websocket.hpp"
 #include "../state/state.hpp"
+#include "../demo/demo_localization.hpp"
 #include <ArduinoJson.h>
 #include <cstring>
 #include <cstdio>
@@ -16,15 +17,7 @@
 namespace
 {
     // A handful of fake projects to pick from in the project selector.
-    const char *const DEMO_PROJECTS[] = {
-        "Möbelbau Eiche",
-        "Prototyp Gehäuse",
-        "Reparatur Fahrradrahmen",
-        "Weihnachtsgeschenke",
-        "CNC Schild Gravur",
-        "Ersatzteil Drucker",
-    };
-    constexpr uint32_t DEMO_PROJECT_COUNT = sizeof(DEMO_PROJECTS) / sizeof(DEMO_PROJECTS[0]);
+    constexpr uint32_t DEMO_PROJECT_COUNT = 6;
     constexpr uint32_t DEMO_PROJECT_PAGE_SIZE = 4;
 
     // Start form shown when a session on the CNC (resource id 1) begins.
@@ -273,7 +266,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
         const DemoStore::DemoResource &r = DemoStore::getResource(i);
         JsonObject obj = resources.createNestedObject();
         obj["id"] = r.id;
-        obj["name"] = r.name;
+        obj["name"] = DemoLocalization::resourceName(r.id, State::getActiveLanguage() == "en");
         obj["description"] = State::getActiveLanguage() == "en" ? "Demo resource" : "Demo Ressource";
         obj["type"] = (r.type == 1) ? "door" : "machine";
         if (!_currentUser.empty()) {
@@ -402,7 +395,7 @@ void DemoWebsocket::respondProjects(uint32_t page)
     {
         JsonObject obj = projects.createNestedObject();
         obj["id"] = i + 1;
-        obj["name"] = DEMO_PROJECTS[i];
+        obj["name"] = DemoLocalization::projectName(i, State::getActiveLanguage() == "en");
     }
 
     char buf[1024];

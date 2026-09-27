@@ -14,6 +14,7 @@
 #include "fixtures.hpp"
 #include "state/language.hpp"
 #include "display/i18n.hpp"
+#include "demo/demo_localization.hpp"
 
 #include <algorithm>
 #include <array>
@@ -973,6 +974,24 @@ int main(int argc, char **argv)
             expect(std::string(FirmwareI18n::translateForLocale(longProject.c_str(), "en")) ==
                        std::string("Project: ") + longScope,
                    "Long project label translates its prefix without truncating supplied name");
+            auto *projectCaption = lv_label_create(lv_screen_active());
+            FirmwareI18n::setLabel(projectCaption, "Projekt: Maintenance");
+            FirmwareI18n::refreshTree(projectCaption, "en");
+            expect(std::string(lv_label_get_text(projectCaption)) == "Project: Maintenance",
+                   "Project caption refresh translates its firmware prefix and preserves supplied name");
+            FirmwareI18n::refreshTree(projectCaption, "de");
+            expect(std::string(lv_label_get_text(projectCaption)) == "Projekt: Maintenance",
+                   "Project caption refresh returns to German without translating the project name");
+            lv_obj_delete(projectCaption);
+            expect(std::string(DemoLocalization::resourceName(1, true)) == "CNC Router" &&
+                       std::string(DemoLocalization::resourceName(1, false)) == "CNC Fraese" &&
+                       std::string(DemoLocalization::resourceName(2, true)) == "3D Printer" &&
+                       std::string(DemoLocalization::resourceName(3, true)) == "Main Entrance",
+                   "Demo resource fixtures provide both languages");
+            expect(std::string(DemoLocalization::projectName(0, true)) == "Oak Furniture" &&
+                       std::string(DemoLocalization::projectName(0, false)) == "Möbelbau Eiche" &&
+                       std::string(DemoLocalization::projectName(5, true)) == "Printer Spare Part",
+                   "Demo project fixtures provide both languages");
             const std::string longUid(300, '9');
             const std::string longRole = std::string("Rolle für Karte ") + longUid;
             expect(std::string(FirmwareI18n::translateForLocale(longRole.c_str(), "en")) ==
