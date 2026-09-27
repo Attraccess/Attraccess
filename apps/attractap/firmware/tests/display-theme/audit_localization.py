@@ -10,7 +10,7 @@ SCREEN_ROOT = ROOT / "screens"
 TEXT_CALL = re.compile(
     r"\b(?:lv_label_set_text(?:_fmt)?|lv_textarea_set_placeholder_text|"
     r"lv_dropdown_set_options|lv_tabview_add_tab|setLabelTextIfChanged|"
-    r"FirmwareI18n::(?:set(?:Dynamic)?Label|translate))\s*\("
+    r"FirmwareI18n::(?:set(?:Dynamic)?(?:Label|DropdownOptions)|translate))\s*\("
 )
 
 
