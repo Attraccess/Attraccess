@@ -331,10 +331,18 @@ export async function bootstrap() {
         include: hostModuleTypes as never[],
         deepScanRoutes: true,
       }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      // AppController is declared on AppModule itself rather than one of its
+      // imports. Scan the root module shallowly so those host operations count
+      // toward manifest coverage without pulling the plugin graph back in.
+      const rootDocument = SwaggerModule.createDocument(app, config, {
+        include: [AppModule],
+      }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
       const hostOperations = new Set<string>();
-      for (const [path, pathItem] of Object.entries(hostDocument.paths ?? {})) {
-        for (const [method, operation] of Object.entries(pathItem)) {
-          if (operation && typeof operation === 'object') hostOperations.add(`${method.toLowerCase()} ${path}`);
+      for (const source of [hostDocument, rootDocument]) {
+        for (const [path, pathItem] of Object.entries(source.paths ?? {})) {
+          for (const [method, operation] of Object.entries(pathItem)) {
+            if (operation && typeof operation === 'object') hostOperations.add(`${method.toLowerCase()} ${path}`);
+          }
         }
       }
       const pluginOperations = new Set<string>();

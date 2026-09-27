@@ -15,6 +15,15 @@ class NestedPluginFeatureModule {}
 @Module({ imports: [NestedPluginFeatureModule] })
 class PluginRootModule {}
 
+@Controller('host-root')
+class HostRootController {
+  @Get()
+  rootRoute() { return {}; }
+}
+
+@Module({ controllers: [HostRootController], imports: [PluginRootModule] })
+class HostRootModule {}
+
 describe('generateMcpTools', () => {
   it('discovers plugin controllers in imported modules for exclusion from host MCP tools', async () => {
     const app = await Test.createTestingModule({ imports: [PluginRootModule] }).compile();
@@ -79,6 +88,32 @@ describe('generateMcpTools', () => {
     expect(hostDocument.paths?.['/settings']?.get).toEqual({ operationId: 'newHostSettingsOperation' });
     expect(hostDocument.paths?.['/plugin']).toBeUndefined();
     expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation newHostSettingsOperation');
+  });
+
+  it('finds direct root-module host routes without scanning its plugin imports', async () => {
+    const app = await Test.createTestingModule({ imports: [HostRootModule] }).compile();
+    const nestApp = app.createNestApplication();
+    try {
+      await nestApp.init();
+      const config = new DocumentBuilder().build();
+      const rootDocument = SwaggerModule.createDocument(nestApp, config, { include: [HostRootModule] }) as unknown as OpenApiDocument;
+      expect(rootDocument.paths?.['/host-root']).toBeDefined();
+
+      const mixedDocument: OpenApiDocument = { paths: {
+        ...rootDocument.paths,
+        '/plugin-nested': { get: { operationId: 'nestedRoute' } },
+      } };
+      const filtered = excludeOpenApiOperations(
+        mixedDocument,
+        new Set(['get /plugin-nested']),
+        new Set(['get /host-root']),
+      );
+      expect(filtered.paths?.['/host-root']).toBeDefined();
+      expect(filtered.paths?.['/plugin-nested']).toBeUndefined();
+      expect(() => generateMcpTools(filtered, {})).toThrow('Unreviewed OpenAPI operation HostRootController_rootRoute');
+    } finally {
+      await nestApp.close();
+    }
   });
 
   const document: OpenApiDocument = {
