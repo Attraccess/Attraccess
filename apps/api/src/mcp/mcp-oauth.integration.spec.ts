@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { createServer, Server } from 'http';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -79,12 +80,13 @@ describe('MCP OAuth authorization code and refresh grants', () => {
       decision: 'allow' as const, reason: 'OAuth endpoint authorization integration fixture.',
       shape: operationShape(method, '/api/resources/{id}', operation as never),
     }]));
-    app.get('/api/resources/:id', async (req, res) => {
+    const apiRateLimit = rateLimit({ windowMs: 60_000, limit: 100, standardHeaders: true, legacyHeaders: false });
+    app.get('/api/resources/:id', apiRateLimit, async (req, res) => {
       const delegation = verifyMcpDelegation(secret, req.header('x-mcp-delegation') ?? '');
       if (!delegation?.permissions.includes('resources.read')) return res.status(403).json({ message: 'Read denied' });
       return res.json({ id: Number(req.params.id), name: 'OAuth protected resource' });
     });
-    app.post('/api/resources/:id', async (req, res) => {
+    app.post('/api/resources/:id', apiRateLimit, async (req, res) => {
       const delegation = verifyMcpDelegation(secret, req.header('x-mcp-delegation') ?? '');
       if (!delegation?.permissions.includes('resources.write')) return res.status(403).json({ message: 'Write denied' });
       return res.json({ id: Number(req.params.id), value: req.body.value });
