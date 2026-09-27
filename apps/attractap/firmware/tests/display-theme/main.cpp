@@ -451,6 +451,46 @@ void testDemoFixtureLocales(Renderer &renderer)
     lv_obj_delete(root);
 }
 
+void testDemoResourceListLocales(Renderer &renderer)
+{
+    ResourceListScreen list;
+    API::ResourceList resources{};
+    resources.count = 3;
+    std::strcpy(resources.authenticatedUsername, "Demo User");
+    for (int i = 0; i < 3; ++i) {
+        resources.items[i].id = i + 1;
+        resources.items[i].isHealthy = true;
+        resources.items[i].accessKnown = true;
+        resources.items[i].hasIntroduction = true;
+        std::strcpy(resources.items[i].name, DemoLocalization::resourceName(i + 1, false));
+    }
+    list.setResourceList(resources);
+    list.setAuthenticatedUser("Demo User");
+    list.setSessionTimeoutTime(Fixtures::nowMs + 30000);
+    list.init();
+    ScreenGuard screen(list.getScreen(), &list);
+
+    expect(requireObject(screen.root, &lv_label_class, "CNC Fraese") != nullptr,
+           "Production demo resource list displays its German CNC fixture");
+    expect(requireObject(screen.root, &lv_label_class, "3D Drucker") != nullptr,
+           "Production demo resource list displays its German printer fixture");
+    requireObject(screen.root, &lv_label_class, "Ressource links: Details · Aktion rechts");
+    renderer.capture("demo-resource-list-german");
+
+    for (int i = 0; i < 3; ++i)
+        std::strcpy(resources.items[i].name, DemoLocalization::resourceName(i + 1, true));
+    std::strcpy(resources.authenticatedUsername, "Demo User");
+    list.setResourceList(resources);
+    Fixtures::activeLanguage = "en";
+    list.loop();
+    expect(requireObject(screen.root, &lv_label_class, "CNC Router") != nullptr,
+           "Production demo resource list displays its English CNC fixture");
+    expect(requireObject(screen.root, &lv_label_class, "3D Printer") != nullptr,
+           "Production demo resource list displays its English printer fixture");
+    requireObject(screen.root, &lv_label_class, "Resource on the left: details · action on the right");
+    renderer.capture("demo-resource-list-english");
+}
+
 void testLogos(Renderer &renderer)
 {
     ScreenGuard screen(lv_obj_create(nullptr));
@@ -1082,6 +1122,7 @@ int main(int argc, char **argv)
             lv_obj_delete(root);
         });
         test("demo/fixture-locales", [&] { testDemoFixtureLocales(renderer); });
+        test("demo/production-resource-list-locales", [&] { testDemoResourceListLocales(renderer); });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });
         test("screen/att-880-authenticated-list", [&] { testAuthenticatedList(renderer); });
         test("screen/restored-backgrounds", [&] { testBackgroundScreens(renderer); });
