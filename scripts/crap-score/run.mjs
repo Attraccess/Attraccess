@@ -302,24 +302,18 @@ export function ownedFiles(root, tracked) {
 
 export function sourceFunctionCount(file) {
   const source = readFileSync(file, 'utf8');
-  const scriptKind = /\.tsx$/.test(file) ? ts.ScriptKind.TSX : /\.ts$/.test(file) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
-  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
-  let count = 0;
-  const visit = (node) => {
-    let parent = node.parent;
-    let decorator = false;
-    while (parent) {
-      if (ts.isDecorator(parent)) {
-        decorator = true;
-        break;
-      }
-      parent = parent.parent;
-    }
-    if (ts.isFunctionLike(node) && node.body && !decorator) count += 1;
-    ts.forEachChild(node, visit);
-  };
-  visit(ast);
-  return count;
+  const instrumenter = createInstrumenter({
+    parserPlugins: ['typescript', 'decorators-legacy', ...(/\.[jt]sx$/.test(file) ? ['jsx'] : [])],
+  });
+  instrumenter.instrumentSync(source, file);
+  const functions = instrumenter.lastFileCoverage();
+  // Count the same instrumented source functions as coverage and analysis.
+  // In particular, scored decorator callbacks remain included while TS
+  // decorator expressions that Istanbul does not instrument stay excluded.
+  removeEnumWrappers(functions, file, source);
+  removeExportGetters(functions, file, source);
+  deduplicateFunctions(functions);
+  return Object.keys(functions.fnMap).length;
 }
 
 export function validateFunctionCompleteness(project, files, report, coverage) {

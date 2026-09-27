@@ -239,11 +239,66 @@ test('per-file function analysis cannot omit source functions when both reports 
   }
 });
 
-test('source completeness ignores callback functions inside decorators', () => {
+test('source completeness counts callback functions inside decorators', () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-decorator-function-count-'));
   const source = path.join(directory, 'decorated.ts');
   try {
     writeFileSync(source, 'class Example { @decorate(() => Service) method() {} }\nfunction decorate(value: unknown) { return value; }\n');
+    assert.equal(sourceFunctionCount(source), 3);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('report validation rejects an omitted decorator callback from both maps', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-omitted-decorator-callback-'));
+  const output = path.join(directory, 'coverage/crap/demo');
+  const source = path.join(directory, 'demo/decorated.ts');
+  try {
+    mkdirSync(path.join(output, 'html'), { recursive: true });
+    mkdirSync(path.dirname(source), { recursive: true });
+    writeFileSync(
+      source,
+      'function decorate(callback: (value: number) => number) { return callback; }\nclass Example { @decorate((value: number) => value) method() { return 1; } }\n',
+    );
+    writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
+    const functions = {
+      helper: { name: 'decorate', loc: { start: { line: 1 } } },
+      method: { name: 'method', loc: { start: { line: 2 } } },
+    };
+    writeFileSync(
+      path.join(output, 'coverage-final.json'),
+      JSON.stringify({
+        [source]: {
+          path: source,
+          statementMap: {}, s: {},
+          fnMap: functions,
+          f: { helper: 0, method: 0 },
+          branchMap: {}, b: {},
+        },
+      }),
+    );
+    const fn = (name) => ({
+      functionDescriptor: name,
+      start: { line: 1 },
+      complexity: 1,
+      statements: { crap: 1, coverage: 1 },
+    });
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: { helper: fn('helper'), method: fn('method') } }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({
+      project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 2, violations: 0, max: 1,
+    }));
+    assert.throws(() => verifyReports(['demo'], directory), /decorated\.ts contains 3 source functions but analysis has 2 and coverage has 2/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('source completeness matches Istanbul for Nest forwardRef decorator callbacks', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-nest-decorator-function-count-'));
+  const source = path.join(directory, 'injected.ts');
+  try {
+    writeFileSync(source, 'class Example { constructor(@Inject(forwardRef(() => Service)) service: Service) {} }\n');
     assert.equal(sourceFunctionCount(source), 2);
   } finally {
     rmSync(directory, { recursive: true, force: true });
