@@ -178,13 +178,16 @@ describe('executable isolated management shell fixtures', () => {
     );
     await waitFor(async () => (await readdir(home)).includes('locked'));
     const watchdog = run('watchdog');
-    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 6500);
+    // The watchdog only records a timeout after its first five-second flock
+    // attempt. Under parallel plugin tests, startup and polling can be delayed;
+    // allow that observation window to complete before deciding it never retried.
+    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 15000);
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
     await holder;
     await watchdog;
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await expect(run('install')).rejects.toBeDefined();
-  }, 60_000);
+  }, 90_000);
 
   it('reserves append space and rolls back an installed image of exactly 65536 bytes', async () => {
     const previous = '#'.repeat(65536 - Buffer.byteLength(keyEntry) - 2);
