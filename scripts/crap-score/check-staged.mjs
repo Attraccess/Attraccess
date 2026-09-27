@@ -15,7 +15,8 @@ const affectsCrap = (file) =>
     /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|project\.json|tsconfig(?:\.[^/]+)?\.json|(?:jest\.preset|(?:jest|vitest|vite)\.config|babel\.config)\.[cm]?[jt]sx?|test-setup\.[cm]?[jt]sx?)$/.test(
       file,
     ) ||
-    /(^|\/)(?:\.swcrc|\.babelrc(?:\.[^/]+)?)$/.test(file));
+    /(^|\/)(?:\.swcrc|\.babelrc(?:\.[^/]+)?)$/.test(file) ||
+    /^patches\/.*\.(?:patch|diff)$/.test(file));
 const unstagedSources = unstaged.filter(affectsCrap);
 const untrackedSources = names(['ls-files', '--others', '--exclude-standard', '-z']).filter(affectsCrap);
 

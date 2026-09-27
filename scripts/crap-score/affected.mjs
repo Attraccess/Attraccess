@@ -3,8 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
-import { CRAP_SCORE_LIMIT, enforceScores, isSource, ownedFiles, workspace } from './run.mjs';
+import { CRAP_SCORE_LIMIT, enforceScores, isSource, ownedFiles, validateFunctionCompleteness, workspace } from './run.mjs';
 
 const exec = (command, args, options = {}) => execFileSync(command, args, { cwd: workspace, ...options });
 
@@ -129,8 +128,6 @@ function validateProjectReport(project, root, currentSources) {
     throw new Error(`Malformed function data for ${project}`);
   const normalizedReport = Object.fromEntries(reportEntries);
   const functions = Object.values(normalizedReport).flatMap((file) => Object.values(file));
-  if (functions.length === 0 && expected.some((file) => sourceFunctionCount(file) > 0))
-    throw new Error(`Incomplete function analysis for ${project}: source contains functions but the analysis report is empty`);
   const coverageFunctions = coverageEntries.reduce((count, [, file]) => count + Object.keys(file.fnMap).length, 0);
   if (functions.length !== summary.functions || functions.length !== coverageFunctions)
     throw new Error(`Incomplete function analysis for ${project}: coverage has ${coverageFunctions}, report has ${functions.length}`);
@@ -138,19 +135,8 @@ function validateProjectReport(project, root, currentSources) {
   const max = Math.max(0, ...functions.map((fn) => fn?.statements?.crap));
   if (summary.violations !== violations || summary.max !== max)
     throw new Error(`Inconsistent CRAP summary for ${project}: expected ${violations} violation(s), max ${max}`);
+  validateFunctionCompleteness(project, expected, normalizedReport, Object.fromEntries(coverageEntries));
   enforceScores(project, normalizedReport);
-}
-
-function sourceFunctionCount(file) {
-  const source = readFileSync(file, 'utf8');
-  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, /\.tsx?$/.test(file) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
-  let count = 0;
-  const visit = (node) => {
-    if (ts.isFunctionLike(node) && node.body) count += 1;
-    ts.forEachChild(node, visit);
-  };
-  visit(ast);
-  return count;
 }
 
 export function validateSupportedTargets(supportedProjects, targetProjects) {

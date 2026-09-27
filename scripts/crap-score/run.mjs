@@ -300,6 +300,30 @@ export function ownedFiles(root, tracked) {
   return tracked.filter((file) => (projects.find((directory) => file.startsWith(`${directory}/`)) ?? '.') === root);
 }
 
+export function sourceFunctionCount(file) {
+  const source = readFileSync(file, 'utf8');
+  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, /\.tsx?$/.test(file) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
+  let count = 0;
+  const visit = (node) => {
+    if (ts.isFunctionLike(node) && node.body) count += 1;
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  return count;
+}
+
+export function validateFunctionCompleteness(project, files, report, coverage) {
+  for (const file of files) {
+    const findEntry = (map) => Object.entries(map).find(([name]) =>
+      (path.isAbsolute(name) ? path.normalize(name) : path.resolve(workspace, name)) === file,
+    )?.[1];
+    const analysisCount = Object.keys(findEntry(report) ?? {}).length;
+    const coverageCount = Object.keys(findEntry(coverage)?.fnMap ?? {}).length;
+    if (!analysisCount && !coverageCount && sourceFunctionCount(file) > 0)
+      throw new Error(`Incomplete function analysis for ${project}: ${path.relative(workspace, file)} contains source functions but analysis has ${analysisCount} and coverage has ${coverageCount}`);
+  }
+}
+
 export function nodeCoverage(files, tests, output) {
   if (!tests.length) return [];
   mkdirSync(output, { recursive: true });
@@ -440,6 +464,7 @@ export async function run(root, outputDirectory) {
     },
   });
   if (errors.length) throw new Error(`CRAP analysis reported ${errors.length} errors; see output above.`);
+  validateFunctionCompleteness(project.name, files.map((file) => path.resolve(workspace, file)), report, testCoverage);
   const functions = Object.values(report).flatMap((file) => Object.values(file));
   const summary = {
     project: project.name,
