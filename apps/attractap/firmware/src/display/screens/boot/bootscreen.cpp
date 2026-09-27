@@ -22,7 +22,7 @@ void BootScreen::init()
     // Firmware info
     lv_obj_t *firmware_label = lv_label_create(this->screen);
     std::string firmware_info = std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION;
-    FirmwareI18n::setLabel(firmware_label, firmware_info.c_str());
+    FirmwareI18n::setDynamicLabel(firmware_label, firmware_info.c_str());
     lv_obj_set_style_text_font(firmware_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(firmware_label, DisplayTheme::muted(), 0);
     lv_obj_align(firmware_label, LV_ALIGN_CENTER, 0, 20);

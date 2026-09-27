@@ -462,7 +462,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    {
       // Persist the session start time so periodic updates can compute elapsed time correctly
       this->sessionStartTime = (time_t)resource.activeStartEpoch;
-      FirmwareI18n::setLabel(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str());
+      FirmwareI18n::setDynamicLabel(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str());
       FirmwareI18n::setDynamicLabel(this->currentUser, resource.activeUser);
    }
 

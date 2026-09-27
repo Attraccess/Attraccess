@@ -172,7 +172,7 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
       label = std::string(FirmwareI18n::translate("Projekt: ")) + this->selectedProjectName;
    }
 
-   FirmwareI18n::setLabel(this->projectsButtonLabel, label.c_str());
+   FirmwareI18n::setDynamicLabel(this->projectsButtonLabel, label.c_str());
    lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::updateClearProjectButtonState()

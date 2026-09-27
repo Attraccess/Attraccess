@@ -233,6 +233,8 @@ void DemoWebsocket::respondAuthenticated()
     doc["event"] = "EVENT";
     doc["data"]["type"] = "READER_AUTHENTICATED";
     doc["data"]["payload"]["name"] = "Demo Gerät";
+    // Keep the standalone demo's unauthenticated screens in English by default.
+    doc["data"]["payload"]["language"] = "en";
 
     char buf[256];
     size_t n = serializeJson(doc, buf, sizeof(buf));
@@ -339,6 +341,9 @@ void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resource
     doc["data"]["payload"]["keyNo"] = 0;
     doc["data"]["payload"]["key"] = "00000000000000000000000000000000";
     doc["data"]["payload"]["username"] = DemoStore::displayName(card);
+    // Demo cards represent an English-speaking cardholder so the localized
+    // fixture form is reachable in the normal demo card-authentication flow.
+    doc["data"]["payload"]["language"] = "en";
     doc["data"]["payload"]["canManageResource"] = (card.role == DemoStore::UserRole::ADMIN);
     doc["data"]["payload"]["hasIntroduction"] = (card.role != DemoStore::UserRole::NO_PERMISSION);
     doc["data"]["payload"]["isIntroducer"] = (card.role == DemoStore::UserRole::ADMIN);

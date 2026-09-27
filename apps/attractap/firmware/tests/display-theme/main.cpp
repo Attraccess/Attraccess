@@ -702,6 +702,7 @@ void testBackgroundScreens(Renderer &renderer)
         lock.loop();
         requireObject(guard.root, &lv_label_class, "Tap your NFC \n        card/tag to sign in");
         requireObject(guard.root, &lv_label_class, "Available");
+        renderer.capture("lockscreen-english-available");
         lock.setUsageInfo(true, "Müller", false);
         auto *usage = requireObject(guard.root, &lv_label_class, "In use: Müller");
         expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
@@ -945,6 +946,8 @@ int main(int argc, char **argv)
                    "Demo fixture descriptions are translated");
             expect(std::string(FirmwareI18n::translateForLocale("Unbekannt", "en")) == "Unknown",
                    "Unknown demo roles are translated");
+            expect(std::string(FirmwareI18n::translateForLocale("Unbekannt 04A1", "en")) == "Unknown 04A1",
+                   "Generated unknown demo role names translate while retaining the card suffix");
             expect(std::string(FirmwareI18n::translateForLocale("Kein Zugang", "en")) == "No access",
                    "Demo role is translated to English");
             expect(std::string(FirmwareI18n::translateForLocale("Eingewiesen", "en")) == "Introduced",
@@ -983,6 +986,8 @@ int main(int argc, char **argv)
                    "Reset status is translated");
             expect(std::string(FirmwareI18n::translateForLocale("Aktion fehlgeschlagen", "de")) == "Aktion fehlgeschlagen",
                    "German fallback remains available");
+            expect(std::string(FirmwareI18n::translateForLocale("Nicht katalogierter Firmwaretext", "en")) == "[Translation missing]",
+                   "Uncatalogued firmware UI text uses an English fallback");
             auto *root = lv_obj_create(lv_screen_active());
             auto *label = lv_label_create(root);
             FirmwareI18n::setLabel(label, "Sitzung beenden");
@@ -1007,6 +1012,15 @@ int main(int argc, char **argv)
             FirmwareI18n::setDynamicLabel(serverValue, "Maintenance");
             FirmwareI18n::refreshTree(root, "de");
             expect(std::string(lv_label_get_text(serverValue)) == "Maintenance", "Server resource names survive locale refresh");
+            auto *formValue = lv_label_create(root);
+            FirmwareI18n::setDynamicLabel(formValue, "12.5");
+            FirmwareI18n::refreshTree(root, "en");
+            expect(std::string(lv_label_get_text(formValue)) == "12.5",
+                   "Entered form values survive a language refresh");
+            FirmwareI18n::setDynamicLabel(formValue, "Value is required");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_label_get_text(formValue)) == "Value is required",
+                   "Server field errors survive a language refresh");
             auto *placeholder = lv_textarea_create(root);
             lv_textarea_set_placeholder_text(placeholder, "Mind. 4 Ziffern");
             auto *dropdown = lv_dropdown_create(root);
@@ -1037,8 +1051,14 @@ int main(int argc, char **argv)
             card.loop();
             requireObject(screen.root, &lv_label_class, "Hold card to reader");
             requireObject(screen.root, &lv_label_class, "Register new card");
+            renderer.capture("enrollment-english-waiting");
             card.setStatus(EnrollmentScreen::STATUS_WRITING);
             requireObject(screen.root, &lv_label_class, "Writing card...\nplease keep it still");
+            renderer.capture("enrollment-english-writing");
+            Fixtures::activeLanguage = "de";
+            card.loop();
+            requireObject(screen.root, &lv_label_class, "Karte wird beschrieben...\nbitte nicht bewegen");
+            renderer.capture("enrollment-german-writing");
         });
         test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurückgesetzt...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });

@@ -106,9 +106,11 @@ inline constexpr Entry catalog[] = {
         {"Speichern", "Save"}, {"Zurückgesetzt", "Reset"}, {"Karte zurücksetzen", "Reset card"},
         {"Karte mit NFC Karte/Tag anmelden", "Tap NFC card/tag to sign in"},
         {"Bitte mit NFC Karte/Tag anmelden", "Tap NFC card/tag to sign in"},
+        {"Bitte mit NFC \n        Karte/Tag anmelden", "Tap your NFC \n        card/tag to sign in"},
         {"In Verwendung: ", "In use: "}, {"Von dir verwendet", "In use by you"},
         {"Wartung", "Maintenance"}, {"Gesperrt", "Unavailable (locked)"}, {"Belegt", "In use"},
         {"Demo Ressource", "Demo resource"}, {"Unbekannt", "Unknown"},
+        {"Unbekannt ", "Unknown "}, {"Kein Zugang ", "No access "}, {"Eingewiesen ", "Introduced "},
         {"Öffnen", "Open"}, {"Übernehmen", "Take over"}, {"Einweisung", "Introduction"},
         {"Kein Benutzer ausgewählt", "No user selected"}, {"Nutzer abmelden", "Sign out"},
         {"Bitte warten", "Please wait"}, {"Karte wird geprüft", "Checking card"},
@@ -190,11 +192,18 @@ inline const char *translate(const char *value)
 inline const char *translateForLocale(const char *value, const std::string &locale)
 {
     if (!value) return value;
+    // Empty labels and LVGL's private-use symbol glyphs are not prose keys.
+    const unsigned char firstByte = static_cast<unsigned char>(value[0]);
+    if (firstByte == '\0' || firstByte == 0xEF || firstByte == 0xF0) return value;
     const bool english = Language::supported(locale) == "en";
     for (const auto &entry : catalog)
     {
         if (english && std::strcmp(value, entry.de) == 0) return entry.en;
         if (!english && std::strcmp(value, entry.en) == 0) return entry.de;
+        // Some screens select a complete locale-specific string before
+        // calling setLabel. Preserve that already-localized value.
+        if (english && std::strcmp(value, entry.en) == 0) return entry.en;
+        if (!english && std::strcmp(value, entry.de) == 0) return entry.de;
     }
     // Translate a complete multiline firmware prompt and keep appended user
     // names or other server data after it.
@@ -244,6 +253,13 @@ inline const char *translateForLocale(const char *value, const std::string &loca
             prefixed += value + prefixLength;
             return prefixed.c_str();
         }
+        const char *alreadyLocalized = english ? entry.en : entry.de;
+        const size_t localizedLength = std::strlen(alreadyLocalized);
+        if (localizedLength && alreadyLocalized[localizedLength - 1] == ' ' &&
+            std::strncmp(value, alreadyLocalized, localizedLength) == 0)
+        {
+            return value;
+        }
     }
     // The displayed value contains numbers/IDs, so it cannot be an exact
     // catalog key. Translate the fixed UI prefix while preserving its data.
@@ -269,7 +285,16 @@ inline const char *translateForLocale(const char *value, const std::string &loca
                  currentPage, totalPages);
         return pageText;
     }
-    return value;
+    if (std::sscanf(value, "Seite %u von %u%c", &currentPage, &totalPages, &trailing) == 3 ||
+        std::sscanf(value, "Page %u of %u%c", &currentPage, &totalPages, &trailing) == 3)
+    {
+        // A suffix means the value includes supplied data, not a complete UI key.
+        return value;
+    }
+    // All server-provided names, values and free-form errors must use
+    // setDynamicLabel. An unmatched firmware UI key should never leak its
+    // source-language text onto an English screen.
+    return english ? "[Translation missing]" : value;
 }
 
 inline void refreshTree(lv_obj_t *root, const std::string &locale)

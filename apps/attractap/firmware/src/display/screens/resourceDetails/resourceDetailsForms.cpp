@@ -189,7 +189,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
    if (this->formsModalProgressLabel)
    {
       std::string progress = std::to_string(fieldNumber) + " / " + std::to_string(totalFields);
-      FirmwareI18n::setLabel(this->formsModalProgressLabel, progress.c_str());
+      FirmwareI18n::setDynamicLabel(this->formsModalProgressLabel, progress.c_str());
    }
 
    if (this->formsProgressBar && totalFields > 0)
@@ -229,7 +229,10 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
       FormFieldWidget *widget = this->findFieldWidget(result.formId, result.errors[i].fieldId);
       if (widget && widget->errorLabel)
       {
-         lv_label_set_text(widget->errorLabel, result.errors[i].message.c_str());
+         // Field errors come from the server and may contain arbitrary text.
+         // Keep them out of the firmware UI catalog so a later language refresh
+         // does not replace them with the label's initial empty value.
+         FirmwareI18n::setDynamicLabel(widget->errorLabel, result.errors[i].message.c_str());
          shown = true;
       }
    }
@@ -960,7 +963,7 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
    else
    {
       const std::string displayValue = makeLVGLDisplayText(widget.textValue);
-      lv_label_set_text(widget.previewLabel, displayValue.c_str());
+      FirmwareI18n::setDynamicLabel(widget.previewLabel, displayValue.c_str());
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 }
@@ -984,7 +987,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
       {
          title += " *";
       }
-      FirmwareI18n::setLabel(this->formsEditorTitleLabel, title.c_str());
+      FirmwareI18n::setDynamicLabel(this->formsEditorTitleLabel, title.c_str());
    }
 
    bool multiline = widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
