@@ -321,6 +321,22 @@ export async function bootstrap() {
         include: pluginModuleTypes,
         deepScanRoutes: true,
       }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      // Plugin module graphs can import host modules (for example SettingsModule).
+      // Build host coverage independently of the reviewed manifest so those routes
+      // remain visible to generateMcpTools even when they are new and unreviewed.
+      const hostModuleTypes = ((Reflect.getMetadata('imports', AppModule) as unknown[] | undefined) ?? [])
+        .map((entry) => entry && typeof entry === 'object' && 'module' in entry ? (entry as { module: unknown }).module : entry)
+        .filter((moduleType) => moduleType !== PluginModule);
+      const hostDocument = SwaggerModule.createDocument(app, config, {
+        include: hostModuleTypes as never[],
+        deepScanRoutes: true,
+      }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      const hostOperations = new Set<string>();
+      for (const [path, pathItem] of Object.entries(hostDocument.paths ?? {})) {
+        for (const [method, operation] of Object.entries(pathItem)) {
+          if (operation && typeof operation === 'object') hostOperations.add(`${method.toLowerCase()} ${path}`);
+        }
+      }
       const pluginOperations = new Set<string>();
       for (const [path, pathItem] of Object.entries(pluginDocument.paths ?? {})) {
         for (const [method, operation] of Object.entries(pathItem)) {
@@ -329,7 +345,7 @@ export async function bootstrap() {
           }
         }
       }
-      return excludeOpenApiOperations(document, pluginOperations);
+      return excludeOpenApiOperations(document, pluginOperations, hostOperations);
     })(),
     resourceUrl: mcpResourceUrl,
     port: appConfig.PORT,

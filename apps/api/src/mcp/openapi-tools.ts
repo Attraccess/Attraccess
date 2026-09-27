@@ -5,13 +5,18 @@ export type OpenApiDocument = {
 };
 
 /** Remove only routes identified by their plugin-owned method/path; host coverage remains manifest-validated. */
-export function excludeOpenApiOperations(document: OpenApiDocument, excludedOperations: ReadonlySet<string>): OpenApiDocument {
+export function excludeOpenApiOperations(
+  document: OpenApiDocument,
+  excludedOperations: ReadonlySet<string>,
+  retainedOperations: ReadonlySet<string> = new Set(),
+): OpenApiDocument {
   const paths: NonNullable<OpenApiDocument['paths']> = {};
   for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
     const filtered: Record<string, unknown> = {};
     for (const [method, operation] of Object.entries(pathItem)) {
+      const key = `${method.toLowerCase()} ${path}`;
       if (operation && typeof operation === 'object' && !Array.isArray(operation) &&
-          excludedOperations.has(`${method.toLowerCase()} ${path}`)) continue;
+          excludedOperations.has(key) && !retainedOperations.has(key)) continue;
       filtered[method] = operation;
     }
     if (Object.keys(filtered).length) paths[path] = filtered;

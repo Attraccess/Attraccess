@@ -70,6 +70,17 @@ describe('generateMcpTools', () => {
     expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation sharedOperation');
   });
 
+  it('retains host routes imported into a plugin module for manifest coverage validation', () => {
+    const mixed: OpenApiDocument = { paths: {
+      '/settings': { get: { operationId: 'newHostSettingsOperation' } },
+      '/plugin': { get: { operationId: 'pluginOperation' } },
+    } };
+    const hostDocument = excludeOpenApiOperations(mixed, new Set(['get /settings', 'get /plugin']), new Set(['get /settings']));
+    expect(hostDocument.paths?.['/settings']?.get).toEqual({ operationId: 'newHostSettingsOperation' });
+    expect(hostDocument.paths?.['/plugin']).toBeUndefined();
+    expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation newHostSettingsOperation');
+  });
+
   const document: OpenApiDocument = {
     paths: {
       '/resources/{id}': {
