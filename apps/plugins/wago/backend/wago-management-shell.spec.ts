@@ -62,6 +62,7 @@ elif name=='flock':
    fcntl.flock(int(sys.argv[-1]),fcntl.LOCK_EX|fcntl.LOCK_NB)
    break
   except BlockingIOError:
+   open(os.path.join(os.environ['HOME'],'flock-waiting'),'a').close()
    if time.monotonic()>=end:
     with open(os.path.join(os.environ['HOME'],'flock-timeouts'),'a') as log: log.write('timeout\\n')
     sys.exit(1)
@@ -173,15 +174,19 @@ describe('executable isolated management shell fixtures', () => {
     await run('install');
     const holder = exec(
       '/bin/sh',
-      ['-c', 'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; sleep 7'],
-      { env: env(), timeout: 10000 },
+      [
+        '-c',
+        'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; while [ ! -e "$HOME/flock-timeouts" ]; do sleep 0.02; done; sleep 1.5',
+      ],
+      { env: env(), timeout: shellTimeout },
     );
     await waitFor(async () => (await readdir(home)).includes('locked'));
     const watchdog = run('watchdog');
-    // The watchdog only records a timeout after its first five-second flock
-    // attempt. Under parallel plugin tests, startup and polling can be delayed;
-    // allow that observation window to complete before deciding it never retried.
-    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 15000);
+    // Hold the lock until the watchdog itself records a timed-out attempt. This
+    // synchronizes contention on the actual flock call instead of assuming the
+    // watchdog starts within a fixed window after the holder.
+    await waitFor(async () => (await readdir(home)).includes('flock-waiting'), 30000);
+    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 30000);
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
     await holder;
     await watchdog;
