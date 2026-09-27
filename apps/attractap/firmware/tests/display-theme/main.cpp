@@ -425,6 +425,32 @@ void testInputs(Renderer &renderer)
     }
 }
 
+void testDemoFixtureLocales(Renderer &renderer)
+{
+    auto *root = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(root, 400, 220);
+    lv_obj_center(root);
+    auto *resource = lv_label_create(root);
+    lv_obj_align(resource, LV_ALIGN_TOP_MID, 0, 24);
+    auto *project = lv_label_create(root);
+    lv_obj_align(project, LV_ALIGN_TOP_MID, 0, 84);
+
+    FirmwareI18n::setDynamicLabel(resource, DemoLocalization::resourceName(1, true));
+    FirmwareI18n::setDynamicLabel(project, DemoLocalization::projectName(0, true));
+    expect(std::string(lv_label_get_text(resource)) == "CNC Router" &&
+               std::string(lv_label_get_text(project)) == "Oak Furniture",
+           "English demo resource and project fixtures reach the display labels");
+    renderer.capture("demo-english-fixtures");
+
+    FirmwareI18n::setDynamicLabel(resource, DemoLocalization::resourceName(1, false));
+    FirmwareI18n::setDynamicLabel(project, DemoLocalization::projectName(0, false));
+    expect(std::string(lv_label_get_text(resource)) == "CNC Fraese" &&
+               std::string(lv_label_get_text(project)) == "Möbelbau Eiche",
+           "German demo resource and project fixtures reach the display labels");
+    renderer.capture("demo-german-fixtures");
+    lv_obj_delete(root);
+}
+
 void testLogos(Renderer &renderer)
 {
     ScreenGuard screen(lv_obj_create(nullptr));
@@ -1055,6 +1081,7 @@ int main(int argc, char **argv)
                    "A single server-supplied Wi-Fi name is preserved");
             lv_obj_delete(root);
         });
+        test("demo/fixture-locales", [&] { testDemoFixtureLocales(renderer); });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });
         test("screen/att-880-authenticated-list", [&] { testAuthenticatedList(renderer); });
         test("screen/restored-backgrounds", [&] { testBackgroundScreens(renderer); });
