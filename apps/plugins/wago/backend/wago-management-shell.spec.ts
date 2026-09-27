@@ -14,13 +14,14 @@ const token = '1234567890abcdef1234567890abcdef';
 const key = generateManagementKey();
 const keyEntry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${key.publicKey}`;
 let root: string, home: string, bin: string;
+const hostPath = process.env.PATH ?? '/usr/bin:/bin';
 let watchdogPid: number | undefined;
 // These fixtures execute several portable shell pipelines per assertion. Under
 // the plugin project's parallel test load, a Jest default timeout can expire
 // before the isolated subprocess chain gets CPU time.
 jest.setTimeout(60_000);
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
-const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` });
+const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${hostPath}` });
 // The shell fixtures spawn many small utilities. Leave headroom for loaded CI
 // runners instead of killing a healthy transaction at the old 10s cap.
 const shellTimeout = 30_000;
