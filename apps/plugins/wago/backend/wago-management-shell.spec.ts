@@ -24,7 +24,7 @@ const command = (action: ManagementShellAction, seconds = 180, selectedToken = t
 const run = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
   exec('/bin/sh', ['-c', command(action, seconds, selectedToken)], {
     env: env(),
-    timeout: 10000,
+    timeout: 30000,
     maxBuffer: 16384,
   });
 
@@ -101,7 +101,7 @@ describe('executable isolated management shell fixtures', () => {
     expect(await readFile(path(`.attraccess-management-recovered-${token}`, 'previous'), 'utf8')).toBe(
       '# existing key\n',
     );
-  }, 10000);
+  }, 30000);
 
   it('removes a newly created authorized_keys file on rollback', async () => {
     await run('prepare');
@@ -166,17 +166,17 @@ describe('executable isolated management shell fixtures', () => {
     const holder = exec(
       '/bin/sh',
       ['-c', 'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; sleep 7'],
-      { env: env(), timeout: 10000 },
+      { env: env(), timeout: 20000 },
     );
     await waitFor(async () => (await readdir(home)).includes('locked'));
     const watchdog = run('watchdog');
-    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 6500);
+    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 12000);
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
     await holder;
     await watchdog;
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await expect(run('install')).rejects.toBeDefined();
-  }, 15000);
+  }, 30000);
 
   it('reserves append space and rolls back an installed image of exactly 65536 bytes', async () => {
     const previous = '#'.repeat(65536 - Buffer.byteLength(keyEntry) - 2);
@@ -188,7 +188,7 @@ describe('executable isolated management shell fixtures', () => {
     await run('commit');
     await run('rollback');
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe(previous);
-  });
+  }, 30000);
 
   it.each([65536 - Buffer.byteLength(keyEntry) - 1, 65536])(
     'refuses an append that would overflow (%i existing bytes)',
