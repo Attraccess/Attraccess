@@ -314,13 +314,16 @@ export function sourceFunctionCount(file) {
 
 export function validateFunctionCompleteness(project, files, report, coverage) {
   for (const file of files) {
-    const findEntry = (map) => Object.entries(map).find(([name]) =>
-      (path.isAbsolute(name) ? path.normalize(name) : path.resolve(workspace, name)) === file,
-    )?.[1];
+    const findEntry = (map) => Object.entries(map).find(([name]) => {
+      const normalized = path.isAbsolute(name) ? path.normalize(name) : path.resolve(workspace, name);
+      return normalized === file || file.endsWith(`/${name}`);
+    })?.[1];
     const analysisCount = Object.keys(findEntry(report) ?? {}).length;
     const coverageCount = Object.keys(findEntry(coverage)?.fnMap ?? {}).length;
     if (!analysisCount && !coverageCount && sourceFunctionCount(file) > 0)
       throw new Error(`Incomplete function analysis for ${project}: ${path.relative(workspace, file)} contains source functions but analysis has ${analysisCount} and coverage has ${coverageCount}`);
+    if (analysisCount !== coverageCount)
+      throw new Error(`Incomplete function analysis for ${project}: ${path.relative(workspace, file)} has ${analysisCount} analyzed function(s) but coverage has ${coverageCount}`);
   }
 }
 

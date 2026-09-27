@@ -186,6 +186,35 @@ test('function analysis completeness is checked separately for every source file
   }
 });
 
+test('per-file function counts must agree even when project totals agree', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-mismatched-file-analysis-'));
+  const output = path.join(directory, 'coverage/crap/demo');
+  const first = path.join(directory, 'demo/first.ts');
+  const second = path.join(directory, 'demo/second.ts');
+  try {
+    mkdirSync(path.join(output, 'html'), { recursive: true });
+    mkdirSync(path.dirname(first), { recursive: true });
+    writeFileSync(first, 'export function first() { return 1; }\n');
+    writeFileSync(second, 'export function second() { return 2; }\n');
+    writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
+    const coverageEntry = (file, fnMap = {}) => ({
+      path: file, statementMap: {}, s: {}, fnMap, f: Object.fromEntries(Object.keys(fnMap).map((key) => [key, 0])), branchMap: {}, b: {},
+    });
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({
+      [first]: coverageEntry(first, { first: { name: 'first', loc: { start: { line: 1 } } } }),
+      [second]: coverageEntry(second),
+    }));
+    const fn = (name) => ({ functionDescriptor: name, start: { line: 1 }, complexity: 1, statements: { crap: 1, coverage: 1 } });
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [first]: {}, [second]: { second: fn('second') } }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({
+      project: 'demo', limit: 30, files: 2, sourceFiles: [first, second], functions: 1, violations: 0, max: 1,
+    }));
+    assert.throws(() => verifyReports(['demo'], directory), /first\.ts has 0 analyzed function\(s\) but coverage has 1/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('restored project reports are checked against the current inclusive limit', () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-restored-report-'));
   const output = path.join(directory, 'coverage/crap/demo');
