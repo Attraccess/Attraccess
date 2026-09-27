@@ -294,7 +294,11 @@ export async function bootstrap() {
   const sessionService = app.get(SessionService, { strict: false });
   const rbacService = app.get(RbacService, { strict: false });
   const mcpPath = `/${globalPrefix ? `${globalPrefix}/` : ''}mcp`;
-  const mcpResourceUrl = new URL(mcpPath, appConfig.ATTRACCESS_URL ?? `http://localhost:${appConfig.PORT}`).toString();
+  const publicBaseUrl = appUrl ?? `http://localhost:${appConfig.PORT}`;
+  const mcpResourceUrl = new URL(mcpPath, publicBaseUrl).toString();
+  const publicUrl = new URL(mcpResourceUrl);
+  const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(publicUrl.hostname);
+  if (publicUrl.protocol !== 'https:' && !isLoopback) throw new Error('MCP OAuth requires HTTPS for public ATTRACCESS_URL');
   const authenticateMcp = registerMcpOAuthEndpoints(app, {
     resourceUrl: mcpResourceUrl,
     secret: appConfig.AUTH_SESSION_SECRET,
@@ -305,7 +309,20 @@ export async function bootstrap() {
     sessionStrategy,
   });
   registerMcpHttpEndpoints(app, {
-    document: documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument,
+    document: (() => {
+      const exportedHostOperationIds = new Set(Object.keys(require('./mcp/reviewed-manifest.json')));
+      const document = documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      const paths: NonNullable<import('./mcp/openapi-tools').OpenApiDocument['paths']> = {};
+      for (const [path, item] of Object.entries(document.paths ?? {})) {
+        const hostOperations: Record<string, unknown> = {};
+        for (const [method, operation] of Object.entries(item)) {
+          if (operation && typeof operation === 'object' && exportedHostOperationIds.has((operation as { operationId?: string }).operationId ?? '')) hostOperations[method] = operation;
+          else if (['parameters', 'servers', 'summary', 'description'].includes(method)) hostOperations[method] = operation;
+        }
+        if (Object.keys(hostOperations).length) paths[path] = hostOperations;
+      }
+      return { ...document, paths };
+    })(),
     resourceUrl: mcpResourceUrl,
     port: appConfig.PORT,
     // The public URL may terminate TLS at a reverse proxy while this local

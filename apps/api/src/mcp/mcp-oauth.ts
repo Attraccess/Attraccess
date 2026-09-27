@@ -122,7 +122,7 @@ export function registerMcpOAuthEndpoints(
 
   function sameOrigin(request: Request, response: Response, next: express.NextFunction): void {
     const origin = request.header('origin');
-    const expectedOrigin = `${request.protocol}://${request.get('host')}`;
+    const expectedOrigin = new URL(options.resourceUrl).origin;
     if (!origin || origin !== expectedOrigin) {
       response.status(403).send('Cross-origin authorization requests are not allowed');
       return;
@@ -284,6 +284,10 @@ export function registerMcpOAuthEndpoints(
     const match = authorization.match(/^Bearer\s+(mcp1\.[^\s]+)$/i);
     if (!match) {
       request.user = await options.sessionStrategy.validate(request);
+      if ((request.user as AuthenticatedUser | undefined)?.authenticationMethod !== 'api-token') {
+        request.user = undefined;
+        throw new Error('MCP requires an API token or an MCP OAuth access token');
+      }
       return;
     }
     const token = decrypt(options.secret, match[1]);

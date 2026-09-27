@@ -213,6 +213,36 @@ describe('MCP HTTP transport', () => {
     expect(invalid.body.result).toMatchObject({ isError: true, content: [{ text: 'Missing required input id' }] });
   });
 
+  it('rejects dot segments, type-invalid path inputs, and unsupported protocol versions', async () => {
+    for (const id of ['..', '1/../../api']) {
+      const response = await request(server).post('/api/mcp').set('Authorization', 'Bearer api-token-with-read')
+        .send({ jsonrpc: '2.0', id: 31, method: 'tools/call', params: { name: 'getResourceForMcpTest', arguments: { id } } }).expect(200);
+      expect(response.body.result).toMatchObject({ isError: true });
+    }
+    const wrongType = await request(server).post('/api/mcp').set('Authorization', 'Bearer api-token-with-read')
+      .send({ jsonrpc: '2.0', id: 32, method: 'tools/call', params: { name: 'getResourceForMcpTest', arguments: { id: 'abc' } } }).expect(200);
+    expect(wrongType.body.result.content[0].text).toContain('Invalid integer value');
+    const unsupported = await request(server).post('/api/mcp').set('Authorization', 'Bearer api-token-with-read')
+      .send({ jsonrpc: '2.0', id: 33, method: 'initialize', params: { protocolVersion: '2099-01-01' } }).expect(200);
+    expect(unsupported.body.error).toMatchObject({ code: -32602, message: 'Unsupported protocol version' });
+  });
+
+  it('rejects spec drift before registering the HTTP endpoint', () => {
+    const changed: OpenApiDocument = structuredClone(document);
+    const operation = changed.paths?.['/api/resources/{id}']?.get;
+    if (!operation || typeof operation !== 'object') throw new Error('Test fixture is missing its read operation');
+    operation.summary = 'Changed after review';
+    expect(() => registerMcpHttpEndpoints(express() as unknown as NestExpressApplication, {
+      document: changed,
+      manifest,
+      resourceUrl: 'http://127.0.0.1/api/mcp',
+      port: 80,
+      globalPrefix: 'api',
+      delegationSecret: 'test-secret',
+      authenticate: async () => undefined,
+    })).toThrow('Reviewed operation shape drift');
+  });
+
   it('authenticates notifications and rejects cross-origin browser requests', async () => {
     const unauthenticated = await request(server)
       .post('/api/mcp')

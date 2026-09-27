@@ -125,6 +125,21 @@ describe('generateMcpTools', () => {
     expect(() => generateMcpTools(unsupported, {})).toThrow('Unsupported OpenAPI operation OPTIONS');
   });
 
+  it('resolves and rejects incompatible additionalProperties schemas', () => {
+    const doc: OpenApiDocument = {
+      paths: { '/maps': { post: { operationId: 'setMap', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', additionalProperties: { $ref: '#/components/schemas/MapValue' } } } } }, responses: { '200': {} } } } },
+      components: { schemas: { MapValue: { type: 'array', items: { type: 'string', format: 'binary' } } } },
+    };
+    const reviewed = manifest(doc, { setMap: { decision: 'allow', reason: 'Reviewed map schema.' } });
+    expect(() => generateMcpTools(doc, reviewed)).toThrow('Binary schemas are not tool-compatible');
+    const valid = structuredClone(doc);
+    const schemas = valid.components?.schemas;
+    if (!schemas) throw new Error('Test fixture is missing schemas');
+    schemas.MapValue = { type: 'string' };
+    const validManifest = manifest(valid, { setMap: { decision: 'allow', reason: 'Reviewed map schema.' } });
+    expect(generateMcpTools(valid, validManifest)[0].inputSchema.properties.body).toMatchObject({ additionalProperties: { type: 'string' } });
+  });
+
   it('rejects streaming operation IDs even when the path and response do not declare streaming', () => {
     const doc: OpenApiDocument = {
       paths: {

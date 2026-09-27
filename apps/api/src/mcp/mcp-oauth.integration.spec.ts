@@ -1,7 +1,6 @@
 import { createHash } from 'crypto';
 import express from 'express';
 import { createServer, Server } from 'http';
-import { AddressInfo } from 'net';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SessionService } from '../users-and-auth/auth/session.service';
@@ -9,6 +8,8 @@ import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { SessionStrategy } from '../users-and-auth/strategies/session.strategy';
 import { registerMcpOAuthEndpoints } from './mcp-oauth';
 import { verifyMcpDelegation } from './mcp-delegation';
+import { registerMcpHttpEndpoints } from './mcp-http';
+import { operationShape } from './openapi-tools';
 
 describe('MCP OAuth authorization code and refresh grants', () => {
   const resource = 'https://api.example.test/api/mcp';
@@ -37,6 +38,7 @@ describe('MCP OAuth authorization code and refresh grants', () => {
     const rbac = { getEffectivePermissions: jest.fn(async () => new Set(permissions)) } as unknown as RbacService;
     const strategy = { validate: jest.fn(async () => ({ ...user })) } as unknown as SessionStrategy;
     const app = express();
+    app.use(express.json());
     app.use((request, _response, next) => {
       if (request.header('cookie') === 'auth-session=browser-session') {
         (request as typeof request & { cookies?: Record<string, string> }).cookies = { 'auth-session': 'browser-session' };
@@ -52,8 +54,48 @@ describe('MCP OAuth authorization code and refresh grants', () => {
       rbac,
       sessionStrategy: strategy,
     });
+    const document = { paths: { '/api/resources/{id}': {
+      get: {
+        operationId: 'readOAuthResource',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { content: { 'application/json': {} } } },
+      },
+      post: {
+        operationId: 'writeOAuthResource',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { type: 'object', properties: { value: { type: 'string' } } },
+            },
+          },
+        },
+        responses: { '200': { content: { 'application/json': {} } } },
+      },
+    } } };
+    const ops = document.paths['/api/resources/{id}'];
+    const manifest = Object.fromEntries(Object.entries(ops).map(([method, operation]) => [operation.operationId, {
+      decision: 'allow' as const, reason: 'OAuth endpoint authorization integration fixture.',
+      shape: operationShape(method, '/api/resources/{id}', operation as never),
+    }]));
+    app.get('/api/resources/:id', async (req, res) => {
+      const delegation = verifyMcpDelegation(secret, req.header('x-mcp-delegation') ?? '');
+      if (!delegation?.permissions.includes('resources.read')) return res.status(403).json({ message: 'Read denied' });
+      return res.json({ id: Number(req.params.id), name: 'OAuth protected resource' });
+    });
+    app.post('/api/resources/:id', async (req, res) => {
+      const delegation = verifyMcpDelegation(secret, req.header('x-mcp-delegation') ?? '');
+      if (!delegation?.permissions.includes('resources.write')) return res.status(403).json({ message: 'Write denied' });
+      return res.json({ id: Number(req.params.id), value: req.body.value });
+    });
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('OAuth MCP test server did not bind a TCP port');
+    registerMcpHttpEndpoints(app as unknown as NestExpressApplication, {
+      document, manifest, resourceUrl: resource, port: address.port, globalPrefix: 'api', delegationSecret: secret, authenticate: authorizeMcp,
+    });
   });
 
   afterEach(async () => {
@@ -79,7 +121,7 @@ describe('MCP OAuth authorization code and refresh grants', () => {
     const approved = await request(server)
       .post('/api/mcp/oauth/authorize')
       .set('Cookie', 'auth-session=browser-session')
-      .set('Origin', `http://127.0.0.1:${(server.address() as AddressInfo).port}`)
+      .set('Origin', new URL(resource).origin)
       .type('form')
       .send({ consent, decision: 'approve' })
       .expect(302);
@@ -111,6 +153,15 @@ describe('MCP OAuth authorization code and refresh grants', () => {
       .send({ grant_type: 'refresh_token', client_id: 'desktop', refresh_token: tokenResponse.body.refresh_token, resource })
       .expect(400);
 
+    const endpointRead = await request(server).post('/api/mcp')
+      .set('Authorization', `Bearer ${refreshResponse.body.access_token}`)
+      .send({ jsonrpc: '2.0', id: 50, method: 'tools/call', params: { name: 'readOAuthResource', arguments: { id: 9 } } }).expect(200);
+    expect(endpointRead.body.result).toMatchObject({ isError: false, content: [{ text: JSON.stringify({ id: 9, name: 'OAuth protected resource' }) }] });
+    const endpointWrite = await request(server).post('/api/mcp')
+      .set('Authorization', `Bearer ${refreshResponse.body.access_token}`)
+      .send({ jsonrpc: '2.0', id: 51, method: 'tools/call', params: { name: 'writeOAuthResource', arguments: { id: 9, value: 'x' } } }).expect(200);
+    expect(endpointWrite.body.result).toMatchObject({ isError: true, content: [{ text: 'REST 403: Write denied' }] });
+
     const accessRequest = {
       headers: { authorization: `Bearer ${refreshResponse.body.access_token}` },
       path: '/api/mcp',
@@ -134,6 +185,11 @@ describe('MCP OAuth authorization code and refresh grants', () => {
       .get('/api/mcp/oauth/authorize')
       .query({ response_type: 'code', client_id: 'desktop', redirect_uri: 'http://localhost:34171/callback', state: 'x', code_challenge: 'a'.repeat(43), code_challenge_method: 'S256', resource })
       .expect(401);
+  });
+
+  it('rejects ordinary application session bearers at the MCP endpoint', async () => {
+    await request(server).post('/api/mcp').set('Authorization', 'Bearer browser-session')
+      .send({ jsonrpc: '2.0', id: 70, method: 'tools/list' }).expect(401);
   });
 
   it('rejects cross-origin consent submissions', async () => {

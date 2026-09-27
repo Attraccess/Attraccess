@@ -36,7 +36,11 @@ function getBearerToken(request: Request): string | undefined {
 function materializeToolUrl(tool: ReturnType<typeof generateMcpTools>[number], args: Record<string, unknown>): URL {
   const path = tool.path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
     if (!(name in args)) throw new Error(`Missing required path input ${name}`);
-    return encodeURIComponent(String(args[name]));
+    const value = args[name];
+    validateSchemaValue(tool.inputSchema.properties[name] as Record<string, unknown>, value, name);
+    const segment = String(value);
+    if (segment === '.' || segment === '..' || /%2e/i.test(segment)) throw new Error(`Invalid path input ${name}`);
+    return encodeURIComponent(segment);
   });
   const url = new URL(path, 'http://localhost');
   for (const name of tool.queryParameters) {
@@ -47,6 +51,39 @@ function materializeToolUrl(tool: ReturnType<typeof generateMcpTools>[number], a
     }
   }
   return url;
+}
+
+function validateSchemaValue(schema: Record<string, unknown> | undefined, value: unknown, name: string): void {
+  if (!schema) throw new Error(`Missing schema for input ${name}`);
+  const type = schema.type;
+  const valid = type === 'integer' ? Number.isInteger(value)
+    : type === 'number' ? typeof value === 'number' && Number.isFinite(value)
+      : type === 'string' ? typeof value === 'string'
+        : type === 'boolean' ? typeof value === 'boolean'
+          : type === 'array' ? Array.isArray(value)
+            : type === 'object' ? !!value && typeof value === 'object' && !Array.isArray(value)
+              : schema.enum ? (schema.enum as unknown[]).includes(value) : true;
+  if (!valid) throw new Error(`Invalid ${type} value for input ${name}`);
+  if (Array.isArray(value) && schema.items) value.forEach((item, index) => validateSchemaValue(schema.items as Record<string, unknown>, item, `${name}[${index}]`));
+  if (typeof value === 'string') {
+    if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern).test(value)) throw new Error(`Invalid value for input ${name}`);
+    if (typeof schema.minLength === 'number' && value.length < schema.minLength) throw new Error(`Invalid value for input ${name}`);
+    if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) throw new Error(`Invalid value for input ${name}`);
+  }
+  if (typeof value === 'number') {
+    if (typeof schema.minimum === 'number' && value < schema.minimum) throw new Error(`Invalid value for input ${name}`);
+    if (typeof schema.maximum === 'number' && value > schema.maximum) throw new Error(`Invalid value for input ${name}`);
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const object = value as Record<string, unknown>;
+    for (const key of (schema.required as string[] | undefined) ?? []) if (!(key in object)) throw new Error(`Missing required input ${name}.${key}`);
+    const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+    for (const [key, item] of Object.entries(object)) {
+      if (props[key]) validateSchemaValue(props[key], item, `${name}.${key}`);
+      else if (schema.additionalProperties === false) throw new Error(`Unknown input ${name}.${key}`);
+      else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') validateSchemaValue(schema.additionalProperties as Record<string, unknown>, item, `${name}.${key}`);
+    }
+  }
 }
 
 function validateToolArguments(tool: ReturnType<typeof generateMcpTools>[number], value: unknown): Record<string, unknown> {
@@ -224,11 +261,17 @@ export function registerMcpHttpEndpoints(
     }
 
     if (rpc.method === 'initialize') {
+      const requested = rpc.params?.protocolVersion;
+      const supported = ['2025-06-18', '2025-03-26', '2024-11-05'];
+      if (requested !== undefined && (typeof requested !== 'string' || !supported.includes(requested))) {
+        response.json(rpcError(rpc.id, -32602, 'Unsupported protocol version'));
+        return;
+      }
       response.json({
         jsonrpc: '2.0',
         id: rpc.id ?? null,
         result: {
-          protocolVersion: typeof rpc.params?.protocolVersion === 'string' ? rpc.params.protocolVersion : '2025-06-18',
+          protocolVersion: requested ?? '2025-06-18',
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: 'attraccess-openapi-mcp', version: '1.0.0' },
         },

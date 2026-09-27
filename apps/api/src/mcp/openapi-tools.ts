@@ -49,6 +49,11 @@ function resolveSchema(schema: Record<string, unknown> | undefined, schemas: Rec
     const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
     const resolved: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(properties ?? {})) resolved[key] = resolveSchema(value, schemas, stack);
+    const additional = schema.additionalProperties;
+    if (additional !== undefined && additional !== true && additional !== false) {
+      if (!additional || typeof additional !== 'object' || Array.isArray(additional)) throw new Error('Unsupported additionalProperties schema');
+      return { ...schema, properties: resolved, additionalProperties: resolveSchema(additional as Record<string, unknown>, schemas, stack) };
+    }
     return { ...schema, properties: resolved };
   }
   if (schema.type === 'array') return { ...schema, items: resolveSchema(schema.items as Record<string, unknown>, schemas, stack) };
