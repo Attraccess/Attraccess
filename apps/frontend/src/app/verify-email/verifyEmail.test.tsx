@@ -120,6 +120,25 @@ describe('VerifyEmail', () => {
     });
   });
 
+  it('does not automatically repeat a failed verification and retries only on button press', async () => {
+    const user = userEvent.setup();
+    renderWithRoute('/verify-email?email=test%40example.com&token=expired');
+    expect(verifyMutateMock).toHaveBeenCalledTimes(1);
+
+    act(() => verifyOnError?.(new Error('expired')));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Verify email again' })).toBeEnabled();
+    });
+    expect(verifyMutateMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Verify email again' }));
+    expect(verifyMutateMock).toHaveBeenCalledTimes(2);
+    expect(verifyMutateMock).toHaveBeenLastCalledWith({
+      requestBody: { token: 'expired', email: 'test@example.com' },
+    });
+  });
+
   it('shows the German success action after successful verification', async () => {
     locale.current = 'de';
     renderWithRoute('/verify-email?email=test%40example.com&token=abc123');

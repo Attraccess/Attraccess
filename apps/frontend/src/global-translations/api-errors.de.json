@@ -63,6 +63,10 @@
     "title": "Unbekannter Benutzer oder Passwort",
     "description": "Der Benutzer oder das Passwort ist ungültig."
   },
+  "TooManyAuthAttempts": {
+    "title": "Zu viele Anmeldeversuche",
+    "description": "Bitte warte {{retryAfterSeconds}} Sekunden, bevor du dich erneut anmeldest."
+  },
   "EmailSendFailed": {
     "title": "E-Mail konnte nicht gesendet werden",
     "description": "Die Einladung konnte nicht versendet werden. Bitte Mailserver-Konfiguration prüfen und erneut versuchen."

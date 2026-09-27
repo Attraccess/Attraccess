@@ -145,10 +145,17 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       fallbackKey: 'generic',
     });
 
+    const responseBody = (error as ApiError).body as Record<string, unknown> | undefined;
+    const retryAfterSeconds = Number(responseBody?.retryAfterSeconds);
+    const retryAfter = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+      ? retryAfterSeconds
+      : undefined;
+
     return {
       errorTitle: t(key + '.title', { error }),
       errorDescription: t(key + '.description', {
         error,
+        retryAfterSeconds: retryAfter ?? '',
       }),
     };
   }, [error, t, tExists]);

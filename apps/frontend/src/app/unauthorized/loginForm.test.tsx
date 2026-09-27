@@ -74,6 +74,9 @@ vi.mock('../../utils/apiError', () => ({
     if (message === 'UserEmailNotVerifiedException') {
       return { key: 'api.UserEmailNotVerifiedException' };
     }
+    if (message === 'TooManyAuthAttempts') {
+      return { key: 'api.TooManyAuthAttempts' };
+    }
     return { key: 'api.generic' };
   },
 }));
@@ -195,6 +198,20 @@ describe('LoginForm – resend verification email', () => {
     renderLogin();
 
     expect(screen.queryByTestId('resend-verification-section')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Please wait 17 seconds before trying to sign in again.'],
+    ['de', 'Bitte warte 17 Sekunden, bevor du dich erneut anmeldest.'],
+  ] as const)('shows the rate-limit retry time in %s', (language, message) => {
+    locale.current = language;
+    const apiError = new Error('Too many attempts') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'TooManyAuthAttempts', retryAfterSeconds: 17 };
+    loginError = apiError;
+
+    renderLogin();
+
+    expect(screen.getByText(message)).toBeInTheDocument();
   });
 
   it('calls resend mutation with entered email', async () => {
