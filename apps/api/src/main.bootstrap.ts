@@ -321,15 +321,15 @@ export async function bootstrap() {
         include: pluginModuleTypes,
         deepScanRoutes: true,
       }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
-      const pluginOperationIds = new Set<string>();
-      for (const pathItem of Object.values(pluginDocument.paths ?? {})) {
-        for (const operation of Object.values(pathItem)) {
+      const pluginOperations = new Set<string>();
+      for (const [path, pathItem] of Object.entries(pluginDocument.paths ?? {})) {
+        for (const [method, operation] of Object.entries(pathItem)) {
           if (operation && typeof operation === 'object' && typeof (operation as { operationId?: unknown }).operationId === 'string') {
-            pluginOperationIds.add((operation as { operationId: string }).operationId);
+            pluginOperations.add(`${method.toLowerCase()} ${path}`);
           }
         }
       }
-      return excludeOpenApiOperations(document, pluginOperationIds);
+      return excludeOpenApiOperations(document, pluginOperations);
     })(),
     resourceUrl: mcpResourceUrl,
     port: appConfig.PORT,

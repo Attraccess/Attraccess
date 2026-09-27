@@ -32,15 +32,16 @@ describe('generateMcpTools', () => {
       }) as unknown as OpenApiDocument;
       expect(pluginDocument.paths?.['/plugin-nested']).toBeDefined();
 
-      const hostDocument = excludeOpenApiOperations(pluginDocument, new Set(
-        Object.values(pluginDocument.paths ?? {}).flatMap((item) =>
-          Object.values(item).flatMap((operation) =>
+      const pluginRoutes = new Set(
+        Object.entries(pluginDocument.paths ?? {}).flatMap(([path, item]) =>
+          Object.entries(item).flatMap(([method, operation]) =>
             operation && typeof operation === 'object' && 'operationId' in operation && typeof operation.operationId === 'string'
-              ? [operation.operationId]
+              ? [`${method.toLowerCase()} ${path}`]
               : [],
           ),
         ),
-      ));
+      );
+      const hostDocument = excludeOpenApiOperations(pluginDocument, pluginRoutes);
       expect(hostDocument.paths?.['/plugin-nested']).toBeUndefined();
     } finally {
       await nestApp.close();
@@ -52,10 +53,21 @@ describe('generateMcpTools', () => {
       '/host': { get: { operationId: 'newHostOperation' } },
       '/plugin': { get: { operationId: 'pluginOperation' } },
     } };
-    const hostDocument = excludeOpenApiOperations(mixed, new Set(['pluginOperation']));
+    const hostDocument = excludeOpenApiOperations(mixed, new Set(['get /plugin']));
     expect(hostDocument.paths?.['/host']?.get).toEqual({ operationId: 'newHostOperation' });
     expect(hostDocument.paths?.['/plugin']).toBeUndefined();
     expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation newHostOperation');
+  });
+
+  it('retains a host route when it shares an operationId with an excluded plugin route', () => {
+    const mixed: OpenApiDocument = { paths: {
+      '/host': { get: { operationId: 'sharedOperation' } },
+      '/plugin': { get: { operationId: 'sharedOperation' } },
+    } };
+    const hostDocument = excludeOpenApiOperations(mixed, new Set(['get /plugin']));
+    expect(hostDocument.paths?.['/host']?.get).toEqual({ operationId: 'sharedOperation' });
+    expect(hostDocument.paths?.['/plugin']).toBeUndefined();
+    expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation sharedOperation');
   });
 
   const document: OpenApiDocument = {
