@@ -16,6 +16,7 @@ import {
   BillingTransactionStatus,
   Conversation,
   ConversationParticipant,
+  DashboardPin,
   EmailTemplate,
   EmailTemplateType,
   Form,
@@ -138,6 +139,13 @@ const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
 const seedDatabase = async (dataSource: DataSource) => {
   const seedTag = Date.now().toString(36);
   const { primaryUser, secondaryUser } = await ensureUsers(dataSource, seedTag);
+
+  await ensureEntity(dataSource.getRepository(DashboardPin), () => ({
+    userId: primaryUser.id,
+    itemType: 'page',
+    itemId: '/resources',
+    position: 0,
+  }));
 
   await ensureEntity(dataSource.getRepository(AuditLog), () => ({
     at: new Date(),

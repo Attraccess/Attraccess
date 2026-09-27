@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
-import { Resource, SupervisionMode } from '@attraccess/database-entities';
+import { DashboardPin, Resource, SupervisionMode } from '@attraccess/database-entities';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { PaginatedResponse } from '../types/response';
@@ -43,6 +43,8 @@ export class ResourcesService {
   constructor(
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
+    @InjectRepository(DashboardPin)
+    private readonly dashboardPinRepository: Repository<DashboardPin>,
     private readonly resourceImageService: ResourceImageService,
     private readonly licenseService: LicenseService,
     @Inject(EventEmitter2)
@@ -202,6 +204,9 @@ export class ResourcesService {
     if (result.affected === 0) {
       throw new ResourceNotFoundException(id);
     }
+
+    // Resources use soft deletion, so database cascades cannot remove their dashboard pins.
+    await this.dashboardPinRepository.delete({ itemType: 'resource', itemId: String(id) });
 
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(id));
     this.metricsService.resourcesTotal.dec();

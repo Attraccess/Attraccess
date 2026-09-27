@@ -16,6 +16,7 @@ const validPackage = {
     frontend: 'frontend/remoteEntry.js',
     migrations: 'dist/migrations.js',
     styles: 'frontend/style.css',
+    dashboardPaths: ['/plugin-report'],
     permissions: [PluginPermission.DATABASE_ACCESS],
     sdk: { backend: '^1.9.0', frontend: '^1.9.0' },
   },
@@ -26,7 +27,7 @@ describe('parseNpmPluginPackage', () => {
     const { manifest } = parseNpmPluginPackage(validPackage, '1.9.0');
     expect(manifest).toMatchObject({
       name: '@attraccess/plugin-example', version: '1.2.3', permissions: [PluginPermission.DATABASE_ACCESS],
-      main: { backend: { directory: 'dist', entryPoint: 'index.js' }, frontend: { directory: 'frontend', entryPoint: 'remoteEntry.js', styles: 'style.css' } },
+      main: { backend: { directory: 'dist', entryPoint: 'index.js' }, frontend: { directory: 'frontend', entryPoint: 'remoteEntry.js', styles: 'style.css', dashboardPaths: ['/plugin-report'] } },
     });
   });
 

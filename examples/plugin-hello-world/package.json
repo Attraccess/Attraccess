@@ -37,6 +37,7 @@
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": ["/hello-world"],
     "permissions": [
       "READ_USERS",
       "LISTEN_EVENTS"

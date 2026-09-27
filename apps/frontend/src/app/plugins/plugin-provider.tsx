@@ -17,10 +17,32 @@ import { ToastType, useToastMessage } from '../../components/toastProvider';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
 
+/**
+ * The API uses dashboardPaths from the installed manifest as its authoritative
+ * allowlist. Keep that server-visible registry honest by rejecting a plugin
+ * whose runtime sidebar does not exactly match its declared paths.
+ */
+export function validatePluginDashboardPaths(
+  plugin: AttraccessFrontendPlugin,
+  declaredPaths: string[] | undefined,
+): void {
+  const sidebarItems = plugin.getSidebarItems?.() ?? [];
+  const sidebarPaths = [...new Set(sidebarItems.map(({ path }) => path))].sort();
+  const dashboardPaths = [...new Set(declaredPaths ?? [])].sort();
+  const routePaths = new Set((plugin.getRoutes?.() ?? []).map(({ path }) => path));
+  if (sidebarPaths.some((path) => !routePaths.has(path))) {
+    throw new Error('Plugin sidebar items must point to plugin routes');
+  }
+  if (sidebarPaths.length !== dashboardPaths.length || sidebarPaths.some((path, index) => path !== dashboardPaths[index])) {
+    throw new Error('Plugin dashboardPaths must exactly match its sidebar paths');
+  }
+}
+
 const pluginStore = createPluginStore();
 export function PluginProvider(props: PropsWithChildren) {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
   const addPlugin = usePluginState((s) => s.addPlugin);
+  const setInitialized = usePluginState((s) => s.setInitialized);
   const isInstalled = usePluginState((s) => s.isInstalled);
   const plugins = usePluginState((s) => s.plugins);
   const toast = useToastMessage();
@@ -113,6 +135,7 @@ export function PluginProvider(props: PropsWithChildren) {
         }
 
         const pluginName = plugin.getPluginName();
+        validatePluginDashboardPaths(plugin, pluginManifest.main.frontend?.dashboardPaths);
         console.debug(`Attraccess Plugin System: Checking if plugin ${pluginName} is installed`);
         if (isInstalled(pluginName)) {
           console.debug(`Attraccess Plugin System: Plugin ${pluginName} is already installed, uninstalling first`);
@@ -165,9 +188,10 @@ export function PluginProvider(props: PropsWithChildren) {
       console.error('Attraccess Plugin System: Failed to fetch plugins', error);
     } finally {
       arePluginsLoaded.current = true;
+      setInitialized(true);
       console.debug('Attraccess Plugin System: All plugins loaded');
     }
-  }, [loadPlugin, refetchPlugins]);
+  }, [loadPlugin, refetchPlugins, setInitialized]);
 
   useEffect(() => {
     if (arePluginsLoaded.current) return;

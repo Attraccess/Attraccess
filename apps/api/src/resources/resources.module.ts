@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Resource,
+  DashboardPin,
   ResourceUsage,
   ResourceIntroduction,
   ResourceIntroducer,
@@ -32,6 +33,7 @@ import { LicenseModule } from '../license/license.module';
   imports: [
     TypeOrmModule.forFeature([
       Resource,
+      DashboardPin,
       ResourceUsage,
       ResourceIntroduction,
       ResourceIntroducer,
