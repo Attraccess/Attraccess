@@ -9,17 +9,18 @@ ROOT = Path(__file__).resolve().parents[2] / "src" / "display"
 SCREEN_ROOT = ROOT / "screens"
 TEXT_CALL = re.compile(
     r"\b(?:lv_label_set_text(?:_fmt)?|lv_textarea_set_placeholder_text|"
-    r"lv_dropdown_set_options|lv_tabview_add_tab|FirmwareI18n::set(?:Dynamic)?Label)\s*\("
+    r"lv_dropdown_set_options|lv_tabview_add_tab|setLabelTextIfChanged|"
+    r"FirmwareI18n::(?:set(?:Dynamic)?Label|translate))\s*\("
 )
 
 
 def main() -> None:
     screen_units = sorted(SCREEN_ROOT.rglob("*.cpp"))
-    display_units = sorted(ROOT.rglob("*.cpp"))
+    display_units = sorted(path for path in ROOT.rglob("*") if path.suffix in {".cpp", ".hpp"})
     print("Attractap production display localization source audit")
     print(f"Screen implementation units: {len(screen_units)}")
-    print(f"All display implementation units including shared overlays: {len(display_units)}")
-    print("Every unit below was inspected; text call lines are shown for direct review.")
+    print(f"All display source units including shared headers and overlays: {len(display_units)}")
+    print("Every .cpp and .hpp unit below was inspected; text call lines are shown for direct review.")
     for source in display_units:
         relative = source.relative_to(ROOT)
         hits = [

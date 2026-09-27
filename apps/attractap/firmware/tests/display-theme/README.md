@@ -66,7 +66,7 @@ warnings may also appear in a host build.
 | Supervision | Waiting, verifying, success, error; public `View` fixture; hint; cancel visibility and time-based cancel guard |
 | PIN | Production field/numeric keyboard, real keyboard value-change callbacks entering `1234`, valid/rejected/short PIN and cancel behavior, per-key state rendering |
 | Localization catalog | Every catalog entry translated and rendered through LVGL in German and English, across paginated 480 x 480 framebuffer captures |
-| Production screen localization audit | `audit_localization.py` inventories every production display `.cpp` unit under `src/display`, including all screen implementations and shared overlays, and prints every text-writing/localization call with its source line for review. Firmware-authored UI text routes through `FirmwareI18n`; raw writes are reviewed as supplied values (project names, form descriptions/options, resource names, form previews/editor placeholders) or the PIN's numeric placeholder. The harness additionally renders production boot, init, enrollment, reset, supervision, PIN, lockscreen, resource-list, no-resources, demo resource-list, and firmware-update screens. |
+| Production screen localization audit | `audit_localization.py` inventories every production display `.cpp` and `.hpp` unit under `src/display`, including shared components and overlays, and prints text-writing/localization helper call sites with source lines. It includes the `setLabelTextIfChanged` helper used by periodically updated init and resource-list labels. Firmware-authored UI text routes through `FirmwareI18n`; raw writes are reviewed as supplied values (project names, form descriptions/options, resource names, form previews/editor placeholders) or the PIN's numeric placeholder. The harness additionally renders production boot, init, enrollment, reset, supervision, PIN, lockscreen, resource-list, no-resources, demo resource-list, and firmware-update screens. |
 
 Production `IScreen::init()` idempotence and normal screen teardown are exercised.
 There are **19 test groups**. The reported check count
@@ -79,8 +79,9 @@ captures them through production LVGL at the supported harness resolution. The
 source audit complements those captures. Run it from the repository root with
 `python3 apps/attractap/firmware/tests/display-theme/audit_localization.py`.
 It derives its inventory from the production source tree (rather than a manually
-maintained file list), includes shared display components, and prints all text
-writer and localization helper call sites. Review those call sites alongside
+maintained file list), includes shared display `.cpp` and `.hpp` components, and
+prints text writer and localization helper call sites, including
+`setLabelTextIfChanged`. Review those call sites alongside
 the catalog test: server/device supplied values must remain dynamic, while
 firmware-authored labels and prompts must use `FirmwareI18n`. The rendering
 suite exercises representative production layouts and dynamic-content paths;
