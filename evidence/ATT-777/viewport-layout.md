@@ -6,10 +6,12 @@ Revalidated on 2026-09-26 from this assigned worktree using its `pnpm serve` ins
 | --- | ---: | ---: | ---: | ---: |
 | Required, collapsed | 1440 × 900 | (464, 301.5, 512, 297) | 900 / 900 | — |
 | Required, expanded | 1440 × 900 | (464, 63.5, 512, 773) | 900 / 900 | top 801, bottom 837 |
-| Required, expanded | 1024 × 600 | (256, 32, 512, 773) | 600 / 837 | after scrollTop 237: top 56, bottom 92 |
+| Required, expanded | 1024 × 600 | (256, 32, 512, 773) | 600 / 837 | after scrollTop 237: top 532, bottom 568 |
 | Required, expanded | 390 × 667 | (16, 32, 358, 825) | 667 / 889 | after scrollTop 222: top 595, bottom 635 |
 
 The collapsed desktop card center is y=450, matching the 900px viewport center. At constrained sizes the content exceeds the viewport and the gate container exposes vertical scrolling; after scrolling, the final button is inside the viewport. At mobile width the document width is 390px, equal to the viewport width, with no horizontal overflow.
+
+The short-viewport button position is 532–568px, matching the run-7 browser acceptance report and captures. The former 56–92px value was inconsistent with the same 237px scroll position and the retained current-run evidence; it was a transcription error, not a different measurement.
 
 The setup request returned successfully and exposed the manual key, confirmation code field, and disabled-until-entered **Bestätigen & aktivieren** control. The optional setup prompt was also rendered with **Spaeter**; selecting it dismissed the prompt and returned to the resources page. The test policy was restored to `required_for_all`, and the required gate was confirmed again afterward.
 
