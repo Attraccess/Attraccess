@@ -1,6 +1,52 @@
 import { excludeOpenApiOperations, generateMcpTools, OpenApiDocument, operationShape } from './openapi-tools';
+import { Controller, Get, Module } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { Test } from '@nestjs/testing';
+
+@Controller('plugin-nested')
+class NestedPluginController {
+  @Get()
+  nestedRoute() { return {}; }
+}
+
+@Module({ controllers: [NestedPluginController] })
+class NestedPluginFeatureModule {}
+
+@Module({ imports: [NestedPluginFeatureModule] })
+class PluginRootModule {}
 
 describe('generateMcpTools', () => {
+  it('discovers plugin controllers in imported modules for exclusion from host MCP tools', async () => {
+    const app = await Test.createTestingModule({ imports: [PluginRootModule] }).compile();
+    const nestApp = app.createNestApplication();
+    try {
+      await nestApp.init();
+      const shallowPluginDocument = SwaggerModule.createDocument(nestApp, new DocumentBuilder().build(), {
+        include: [PluginRootModule],
+      }) as unknown as OpenApiDocument;
+      expect(shallowPluginDocument.paths?.['/plugin-nested']).toBeUndefined();
+
+      const pluginDocument = SwaggerModule.createDocument(nestApp, new DocumentBuilder().build(), {
+        include: [PluginRootModule],
+        deepScanRoutes: true,
+      }) as unknown as OpenApiDocument;
+      expect(pluginDocument.paths?.['/plugin-nested']).toBeDefined();
+
+      const hostDocument = excludeOpenApiOperations(pluginDocument, new Set(
+        Object.values(pluginDocument.paths ?? {}).flatMap((item) =>
+          Object.values(item).flatMap((operation) =>
+            operation && typeof operation === 'object' && 'operationId' in operation && typeof operation.operationId === 'string'
+              ? [operation.operationId]
+              : [],
+          ),
+        ),
+      ));
+      expect(hostDocument.paths?.['/plugin-nested']).toBeUndefined();
+    } finally {
+      await nestApp.close();
+    }
+  });
+
   it('excludes identified plugin operations while retaining unreviewed host operations for coverage validation', () => {
     const mixed: OpenApiDocument = { paths: {
       '/host': { get: { operationId: 'newHostOperation' } },

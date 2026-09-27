@@ -314,7 +314,13 @@ export async function bootstrap() {
       const document = documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument;
       const pluginModuleTypes = PluginModule.getLoadedPluginModuleTypes();
       if (pluginModuleTypes.length === 0) return document;
-      const pluginDocument = SwaggerModule.createDocument(app, config, { include: pluginModuleTypes }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      // Plugin controllers may live in imported feature modules, not only on the
+      // plugin root module. Scan the complete plugin module graph so every plugin
+      // operation is excluded from MCP, including endpoints deferred by this feature.
+      const pluginDocument = SwaggerModule.createDocument(app, config, {
+        include: pluginModuleTypes,
+        deepScanRoutes: true,
+      }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
       const pluginOperationIds = new Set<string>();
       for (const pathItem of Object.values(pluginDocument.paths ?? {})) {
         for (const operation of Object.values(pathItem)) {
