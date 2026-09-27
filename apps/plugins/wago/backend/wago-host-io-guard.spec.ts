@@ -40,6 +40,7 @@ function fixture() {
   processRecord(1);
   mkdirSync(join(root, 'bin'));
   symlinkSync('/bin/dd', join(root, 'bin/dd'));
+  symlinkSync('/usr/bin/head', join(root, 'bin/head'));
   symlinkSync('/usr/bin/tr', join(root, 'bin/tr'));
   executable(
     'bin/awk',
