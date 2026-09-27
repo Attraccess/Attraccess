@@ -491,6 +491,42 @@ void testDemoResourceListLocales(Renderer &renderer)
     renderer.capture("demo-resource-list-english");
 }
 
+void testCatalogLocales(Renderer &renderer)
+{
+    constexpr size_t labelsPerFrame = 12;
+    auto *root = lv_obj_create(nullptr);
+    lv_obj_set_size(root, Renderer::width, Renderer::height);
+    ScreenGuard screen(root);
+    for (const char *locale : {"de", "en"}) {
+        for (size_t offset = 0; offset < std::size(FirmwareI18n::catalog); offset += labelsPerFrame) {
+            lv_obj_clean(root);
+            const size_t count = std::min(labelsPerFrame, std::size(FirmwareI18n::catalog) - offset);
+            for (size_t i = 0; i < count; ++i) {
+                const auto &entry = FirmwareI18n::catalog[offset + i];
+                auto *item = lv_label_create(root);
+                lv_obj_set_width(item, 220);
+                lv_obj_set_height(item, 34);
+                lv_obj_set_pos(item, (i % 2) * 230, (i / 2) * 72);
+                lv_label_set_long_mode(item, LV_LABEL_LONG_MODE_WRAP);
+                const char *rendered = std::strcmp(locale, "en") == 0 ? entry.en : entry.de;
+                const char *translated = FirmwareI18n::translateForLocale(entry.de, "en");
+                expect(std::strcmp(translated, entry.en) == 0,
+                       std::string("English catalog entry translates: ") + entry.de);
+                if (std::strcmp(locale, "de") == 0) {
+                    const char *reverse = FirmwareI18n::translateForLocale(entry.en, "de");
+                    const bool validReverse = std::any_of(std::begin(FirmwareI18n::catalog),
+                        std::end(FirmwareI18n::catalog), [&](const auto &candidate) {
+                            return std::strcmp(candidate.en, entry.en) == 0 && std::strcmp(candidate.de, reverse) == 0;
+                        });
+                    expect(validReverse, std::string("German catalog reverse mapping is valid: ") + entry.en);
+                }
+                lv_label_set_text(item, rendered);
+            }
+            renderer.capture(std::string("catalog-") + locale + "-" + std::to_string(offset / labelsPerFrame));
+        }
+    }
+}
+
 void testLogos(Renderer &renderer)
 {
     ScreenGuard screen(lv_obj_create(nullptr));
@@ -1123,6 +1159,7 @@ int main(int argc, char **argv)
         });
         test("demo/fixture-locales", [&] { testDemoFixtureLocales(renderer); });
         test("demo/production-resource-list-locales", [&] { testDemoResourceListLocales(renderer); });
+        test("i18n/catalog-bilingual-rendering", [&] { testCatalogLocales(renderer); });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });
         test("screen/att-880-authenticated-list", [&] { testAuthenticatedList(renderer); });
         test("screen/restored-backgrounds", [&] { testBackgroundScreens(renderer); });
