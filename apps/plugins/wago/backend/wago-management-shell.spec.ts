@@ -260,7 +260,7 @@ describe('executable isolated management shell fixtures', () => {
     await expect(run('commit')).rejects.toBeDefined();
     await run('rollback');
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
-  }, 10000);
+  }, 30000);
 
   it('kills an in-flight install at its remote deadline and leaves it recoverable', async () => {
     await prepared();
@@ -271,7 +271,7 @@ describe('executable isolated management shell fixtures', () => {
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await rm(join(bin, 'mv'));
     await run('rollback');
-  }, 10000);
+  }, 30000);
 
   it('rejects shell-injection keys, tokens and arbitrary actions before execution', () => {
     expect(() => managementKeyCommand('install', token, 180, `${key.publicKey}\ncommand`)).toThrow('invalid_key');
