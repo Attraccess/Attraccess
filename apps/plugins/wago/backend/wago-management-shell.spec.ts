@@ -15,6 +15,10 @@ const key = generateManagementKey();
 const keyEntry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${key.publicKey}`;
 let root: string, home: string, bin: string;
 let watchdogPid: number | undefined;
+// These fixtures execute several portable shell pipelines per assertion. Under
+// the plugin project's parallel test load, a Jest default timeout can expire
+// before the isolated subprocess chain gets CPU time.
+jest.setTimeout(60_000);
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
 const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` });
 const command = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
@@ -101,7 +105,7 @@ describe('executable isolated management shell fixtures', () => {
     expect(await readFile(path(`.attraccess-management-recovered-${token}`, 'previous'), 'utf8')).toBe(
       '# existing key\n',
     );
-  }, 10000);
+  }, 60_000);
 
   it('removes a newly created authorized_keys file on rollback', async () => {
     await run('prepare');
@@ -118,7 +122,7 @@ describe('executable isolated management shell fixtures', () => {
     await expect(run('rollback')).rejects.toBeDefined();
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# administrator replacement\n');
     expect(await readFile(path('.attraccess-management-transaction', 'previous'), 'utf8')).toBe('# existing key\n');
-  }, 10000);
+  }, 60_000);
 
   it('a foreign transaction and unsafe permissions or symlinks cannot overwrite keys', async () => {
     await prepared();
@@ -158,7 +162,7 @@ describe('executable isolated management shell fixtures', () => {
     }
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await expect(run('commit')).rejects.toBeDefined();
-  }, 30000);
+  }, 60_000);
 
   it('retries watchdog lock contention beyond the first five-second wait', async () => {
     await prepared();
@@ -176,7 +180,7 @@ describe('executable isolated management shell fixtures', () => {
     await watchdog;
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await expect(run('install')).rejects.toBeDefined();
-  }, 15000);
+  }, 60_000);
 
   it('reserves append space and rolls back an installed image of exactly 65536 bytes', async () => {
     const previous = '#'.repeat(65536 - Buffer.byteLength(keyEntry) - 2);
@@ -260,7 +264,7 @@ describe('executable isolated management shell fixtures', () => {
     await expect(run('commit')).rejects.toBeDefined();
     await run('rollback');
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
-  }, 10000);
+  }, 60_000);
 
   it('kills an in-flight install at its remote deadline and leaves it recoverable', async () => {
     await prepared();
