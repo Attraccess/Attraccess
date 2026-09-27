@@ -23,7 +23,7 @@ jest.mock('./plugin-system/plugin.service', () => ({
   },
 }));
 jest.mock('./plugin-system/plugin.module', () => ({
-  PluginModule: { configure: jest.fn(), resetHostReferences: jest.fn() },
+  PluginModule: { configure: jest.fn(), resetHostReferences: jest.fn(), getLoadedPluginModuleTypes: jest.fn(() => []) },
 }));
 jest.mock('./plugin-system/npm-plugin.service', () => ({ NpmPluginService: { recoverBackups: jest.fn() } }));
 jest.mock('./plugin-system/plugin-migration.service', () => ({

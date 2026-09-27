@@ -1,6 +1,17 @@
-import { generateMcpTools, OpenApiDocument, operationShape } from './openapi-tools';
+import { excludeOpenApiOperations, generateMcpTools, OpenApiDocument, operationShape } from './openapi-tools';
 
 describe('generateMcpTools', () => {
+  it('excludes identified plugin operations while retaining unreviewed host operations for coverage validation', () => {
+    const mixed: OpenApiDocument = { paths: {
+      '/host': { get: { operationId: 'newHostOperation' } },
+      '/plugin': { get: { operationId: 'pluginOperation' } },
+    } };
+    const hostDocument = excludeOpenApiOperations(mixed, new Set(['pluginOperation']));
+    expect(hostDocument.paths?.['/host']?.get).toEqual({ operationId: 'newHostOperation' });
+    expect(hostDocument.paths?.['/plugin']).toBeUndefined();
+    expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation newHostOperation');
+  });
+
   const document: OpenApiDocument = {
     paths: {
       '/resources/{id}': {

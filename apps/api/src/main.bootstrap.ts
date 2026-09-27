@@ -21,6 +21,7 @@ import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
 import { SettingsService } from './settings/settings.service';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
+import { excludeOpenApiOperations } from './mcp/openapi-tools';
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -310,18 +311,19 @@ export async function bootstrap() {
   });
   registerMcpHttpEndpoints(app, {
     document: (() => {
-      const exportedHostOperationIds = new Set(Object.keys(require('./mcp/reviewed-manifest.json')));
       const document = documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument;
-      const paths: NonNullable<import('./mcp/openapi-tools').OpenApiDocument['paths']> = {};
-      for (const [path, item] of Object.entries(document.paths ?? {})) {
-        const hostOperations: Record<string, unknown> = {};
-        for (const [method, operation] of Object.entries(item)) {
-          if (operation && typeof operation === 'object' && exportedHostOperationIds.has((operation as { operationId?: string }).operationId ?? '')) hostOperations[method] = operation;
-          else if (['parameters', 'servers', 'summary', 'description'].includes(method)) hostOperations[method] = operation;
+      const pluginModuleTypes = PluginModule.getLoadedPluginModuleTypes();
+      if (pluginModuleTypes.length === 0) return document;
+      const pluginDocument = SwaggerModule.createDocument(app, config, { include: pluginModuleTypes }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      const pluginOperationIds = new Set<string>();
+      for (const pathItem of Object.values(pluginDocument.paths ?? {})) {
+        for (const operation of Object.values(pathItem)) {
+          if (operation && typeof operation === 'object' && typeof (operation as { operationId?: unknown }).operationId === 'string') {
+            pluginOperationIds.add((operation as { operationId: string }).operationId);
+          }
         }
-        if (Object.keys(hostOperations).length) paths[path] = hostOperations;
       }
-      return { ...document, paths };
+      return excludeOpenApiOperations(document, pluginOperationIds);
     })(),
     resourceUrl: mcpResourceUrl,
     port: appConfig.PORT,

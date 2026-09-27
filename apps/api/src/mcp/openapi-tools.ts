@@ -3,6 +3,21 @@ export type OpenApiDocument = {
   paths?: Record<string, Record<string, OpenApiOperation | unknown>>;
   components?: { schemas?: Record<string, unknown> };
 };
+
+/** Remove only operations identified as plugin-owned; host coverage remains manifest-validated. */
+export function excludeOpenApiOperations(document: OpenApiDocument, excludedOperationIds: ReadonlySet<string>): OpenApiDocument {
+  const paths: NonNullable<OpenApiDocument['paths']> = {};
+  for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
+    const filtered: Record<string, unknown> = {};
+    for (const [method, operation] of Object.entries(pathItem)) {
+      if (operation && typeof operation === 'object' && !Array.isArray(operation) &&
+          excludedOperationIds.has((operation as OpenApiOperation).operationId ?? '')) continue;
+      filtered[method] = operation;
+    }
+    if (Object.keys(filtered).length) paths[path] = filtered;
+  }
+  return { ...document, paths };
+}
 type OpenApiOperation = {
   operationId?: string;
   summary?: string;
