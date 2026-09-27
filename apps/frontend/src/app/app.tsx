@@ -29,6 +29,7 @@ import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 import { NotFound } from './not-found';
 import { ThemeToggle } from '../components/themeToggle';
+import { PeopleManagementPreview } from './resources/PeopleManagement/PeopleManagementPreview';
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
@@ -162,6 +163,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/verify-email" element={<VerifyEmail />} />
+      {import.meta.env.DEV && <Route path="/__dev/people-management" element={<PeopleManagementPreview />} />}
       <Route
         path="/accept-invitation"
         element={
