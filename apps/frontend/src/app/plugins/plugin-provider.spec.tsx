@@ -40,7 +40,7 @@ vi.mock('../../components/toastProvider', () => ({
 
 let pluginCounter = 0;
 
-function createFakePlugin(name: string, routes: unknown[] = []): AttraccessFrontendPlugin {
+function createFakePlugin(name: string, routes: unknown[] = [], sidebarItems: unknown[] = []): AttraccessFrontendPlugin {
   return {
     getPluginName: () => name,
     getDependencies: () => [],
@@ -50,6 +50,7 @@ function createFakePlugin(name: string, routes: unknown[] = []): AttraccessFront
     onApiAuthStateChange: vi.fn(),
     onApiEndpointChange: vi.fn(),
     getRoutes: () => routes,
+    getSidebarItems: () => sidebarItems,
   } as unknown as AttraccessFrontendPlugin;
 }
 
@@ -58,6 +59,7 @@ interface ManifestOptions {
   entryPoint?: string | undefined;
   styles?: string;
   routes?: unknown[];
+  sidebarItems?: unknown[];
 }
 
 function primeManifest(options: ManifestOptions = {}) {
@@ -74,7 +76,7 @@ function primeManifest(options: ManifestOptions = {}) {
   };
   hoisted.refetchMock.mockResolvedValue({ data: [manifest] });
   hoisted.getRemoteMock.mockResolvedValue({ default: function () {
-    return createFakePlugin(name, options.routes ?? []);
+    return createFakePlugin(name, options.routes ?? [], options.sidebarItems ?? []);
   } });
   return { name, manifest };
 }
@@ -94,15 +96,25 @@ afterEach(() => {
 });
 
 describe('PluginProvider', () => {
-  it('requires the server-visible dashboard registry to exactly match actual sidebar routes', () => {
+  it('allows legacy plugins without dashboard declarations while validating declared paths', () => {
     const plugin = {
       getSidebarItems: () => [{ path: '/plugin-report', label: 'Reports' }],
       getRoutes: () => [{ path: '/plugin-report' }],
     } as unknown as AttraccessFrontendPlugin;
     expect(() => validatePluginDashboardPaths(plugin, ['/plugin-report'])).not.toThrow();
-    expect(() => validatePluginDashboardPaths(plugin, undefined)).toThrow(/exactly match/);
+    expect(() => validatePluginDashboardPaths(plugin, undefined)).not.toThrow();
     expect(() => validatePluginDashboardPaths(plugin, ['/plugin-report', '/not-a-sidebar-route'])).toThrow(/exactly match/);
     expect(() => validatePluginDashboardPaths({ ...plugin, getRoutes: () => [] }, ['/plugin-report'])).toThrow(/plugin routes/);
+  });
+
+  it('installs a legacy plugin with a sidebar route when dashboardPaths is omitted', async () => {
+    const name = `LegacyPlugin${++pluginCounter}`;
+    const routes = [{ path: '/legacy-report', authRequired: false, element: <div>Legacy Report</div> }];
+    primeManifest({ name, routes, sidebarItems: [{ path: '/legacy-report', label: 'Reports' }] });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins.map(({ plugin }) => plugin.getPluginName())).toContain(name));
   });
 
   it('renders its children', async () => {

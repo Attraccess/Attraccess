@@ -18,9 +18,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
 
 /**
- * The API uses dashboardPaths from the installed manifest as its authoritative
- * allowlist. Keep that server-visible registry honest by rejecting a plugin
- * whose runtime sidebar does not exactly match its declared paths.
+ * When a plugin declares dashboardPaths, keep that server-visible registry
+ * aligned with its runtime routes. Older plugins may omit the optional field;
+ * they must still load, though their pages cannot be pinned until upgraded.
  */
 export function validatePluginDashboardPaths(
   plugin: AttraccessFrontendPlugin,
@@ -33,6 +33,7 @@ export function validatePluginDashboardPaths(
   if (sidebarPaths.some((path) => !routePaths.has(path))) {
     throw new Error('Plugin sidebar items must point to plugin routes');
   }
+  if (declaredPaths === undefined) return;
   if (sidebarPaths.length !== dashboardPaths.length || sidebarPaths.some((path, index) => path !== dashboardPaths[index])) {
     throw new Error('Plugin dashboardPaths must exactly match its sidebar paths');
   }
