@@ -4,7 +4,7 @@ ARG BUILDPLATFORM
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS build
 WORKDIR /workspace
 COPY . .
-RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx build wago-cc100-runtime
+RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx run plugin-wago:build-cc100-runtime
 
 FROM node:22-bookworm-slim
 WORKDIR /app

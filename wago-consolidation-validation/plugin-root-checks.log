@@ -1,0 +1,262 @@
+(node:30530) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ NX   Running targets lint, test, typecheck, build for project plugin-wago and 3 tasks it depends on:
+
+- plugin-wago
+
+
+
+> nx run plugin-wago:test-frontend  [existing outputs match the cache, left as is]
+
+> pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts
+
+(node:71784) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71785) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ jsx: 'automatic' }`
+
+ RUN  v4.1.10 /Users/jappy/.rocky/runs/ATT-1079-3/workspace/attraccess
+
+(node:71791) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71941) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  2 passed (2)
+      Tests  37 passed (37)
+   Start at  02:41:34
+   Duration  15.99s (transform 154ms, setup 0ms, import 1.12s, tests 13.91s, environment 815ms)
+
+
+> nx run plugin-wago:build-frontend  [local cache]
+
+> pnpm exec vite build --config frontend/vite.config.ts
+
+(node:71693) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71697) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (frontend/vite.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+vite v8.2.1 building client environment for production...
+[2Ktransforming...[32m✓[0m 3556 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mpackage/frontend/[0m[32mindex.html                                   [0m[1;2m  0.16 kB[0m[2m │ gzip:  0.13 kB[0m
+[2mpackage/frontend/[0m[35mstyle.css                                    [0m[1;2m 10.58 kB[0m[2m │ gzip:  2.30 kB[0m
+[2mpackage/frontend/[0m[36m__federation_fn_import-DAGm_xmC.js           [0m[1;2m  0.24 kB[0m[2m │ gzip:  0.15 kB[0m
+[2mpackage/frontend/[0m[36mrolldown-runtime-DC62tzP2.js                 [0m[1;2m  1.44 kB[0m[2m │ gzip:  0.67 kB[0m
+[2mpackage/frontend/[0m[36mjsx-runtime-DFPsoQIN.js                      [0m[1;2m  1.49 kB[0m[2m │ gzip:  0.67 kB[0m
+[2mpackage/frontend/[0m[36mpreload-helper-DxWiKyOd.js                   [0m[1;2m  2.18 kB[0m[2m │ gzip:  0.99 kB[0m
+[2mpackage/frontend/[0m[36mremoteEntry.js                               [0m[1;2m  2.97 kB[0m[2m │ gzip:  1.26 kB[0m
+[2mpackage/frontend/[0m[36m_virtual___federation_fn_import-BXODRNto.js  [0m[1;2m 11.60 kB[0m[2m │ gzip:  2.83 kB[0m
+[2mpackage/frontend/[0m[36mreact-Cr_hTkIJ.js                            [0m[1;2m 15.76 kB[0m[2m │ gzip:  4.31 kB[0m
+[2mpackage/frontend/[0m[36m__federation_expose_Plugin-BoHSTQq7.js       [0m[1;2m312.33 kB[0m[2m │ gzip: 63.02 kB[0m
+
+✓ built in 873ms
+
+> nx run plugin-wago:build-backend  [local cache]
+
+> node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub
+
+(node:71692) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  package/dist/index.js  2.5mb ⚠️
+
+⚡ Done in 103ms
+
+  package/dist/migrations.js  19.1kb
+
+⚡ Done in 2ms
+Built package/dist/index.js, package/dist/migrations.js — host-shared packages externalized, not bundled.
+
+> nx run plugin-wago:lint  [existing outputs match the cache, left as is]
+
+> eslint apps/plugins/wago/backend apps/plugins/wago/frontend/src apps/plugins/wago/frontend/tests apps/plugins/wago/acceptance apps/plugins/wago/modbus apps/plugins/wago/shared apps/plugins/wago/cc100-runtime apps/plugins/wago/diagnostics-types.ts apps/plugins/wago/measurement-contract.ts apps/plugins/wago/channel-behavior.ts && node apps/plugins/wago/scripts/lint-module-boundaries.mjs
+
+(node:20745) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/acceptance/audit-hooks.integration.spec.ts[24m[0m
+[0m  [2m1:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/acceptance/credential-rotation-mqtt.spec.ts[24m[0m
+[0m   [2m9:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m  [2m11:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/acceptance/production-fleet.spec.ts[24m[0m
+[0m  [2m1:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/backend/configuration.spec.ts[24m[0m
+[0m  [2m9:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/backend/measurement-contract.spec.ts[24m[0m
+[0m  [2m5:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m  [2m7:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/backend/wago-configuration.service.spec.ts[24m[0m
+[0m  [2m128:23[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m129:12[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m540:48[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m544:48[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m693:59[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m834:75[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m860:75[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m908:23[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m908:23[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/backend/wago-credential-rotation.spec.ts[24m[0m
+[0m  [2m11:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m  [2m13:1[22m  [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/backend/wago-management.spec.ts[24m[0m
+[0m   [2m44:49[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m103:14[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m183:41[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m199:34[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m202:23[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m202:23[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m221:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m234:23[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m234:23[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m238:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m250:57[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m250:57[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m252:14[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m255:36[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m267:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m282:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m293:34[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m311:19[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m312:44[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m332:34[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m345:39[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m351:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m362:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m364:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m378:27[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m382:38[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m393:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m407:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m415:20[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m421:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m426:25[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m430:30[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m446:26[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m475:19[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/backend/wago-management.ts[24m[0m
+[0m  [2m239:16[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m280:12[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m289:21[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m319:35[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m341:31[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/backend/wago-privilege-probe.spec.ts[24m[0m
+[0m  [2m140:20[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/cc100-runtime/integration/simulator.integration.ts[24m[0m
+[0m    [2m1:1[22m   [33mwarning[39m  Unused eslint-disable directive (no problems were reported from '@nx/enforce-module-boundaries')[0m
+[0m   [2m17:19[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m   [2m75:51[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m   [2m86:40[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m  [2m108:35[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m  [2m185:60[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m  [2m247:5[22m   [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m251:20[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m288:52[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m296:39[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m307:40[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m  [2m324:27[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m329:9[22m   [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m362:19[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m384:33[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m386:25[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m388:26[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m392:52[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m  [2m406:23[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m417:5[22m   [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m445:27[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m446:52[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m  [2m457:23[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m552:71[22m  [33mwarning[39m  Unexpected any. Specify a different type                                                          [2m@typescript-eslint/no-explicit-any[22m[0m
+[0m  [2m625:22[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m637:7[22m   [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m645:7[22m   [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m685:29[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m719:39[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m721:11[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m737:11[22m  [33mwarning[39m  Forbidden non-null assertion                                                                      [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/frontend/src/CommissioningModal.tsx[24m[0m
+[0m  [2m1046:48[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m1046:48[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m  [2m1051:62[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/frontend/src/ConfigurationRevisions.tsx[24m[0m
+[0m  [2m245:37[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/frontend/tests/harness/main.tsx[24m[0m
+[0m  [2m22:12[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[4m/Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/frontend/tests/visual-editor.test.tsx[24m[0m
+[0m  [2m876:24[22m  [33mwarning[39m  Forbidden non-null assertion  [2m@typescript-eslint/no-non-null-assertion[22m[0m
+[0m[0m
+[0m[33m[1m✖ 95 problems (0 errors, 95 warnings)[22m[39m[0m
+[0m[33m[1m[22m[39m[33m[1m  0 errors and 10 warnings potentially fixable with the `--fix` option.[22m[39m[0m
+[0m[33m[1m[22m[39m[0m
+(node:20782) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Module boundaries passed for 247 Wago files and 4 negative probes.
+
+> nx run plugin-wago:typecheck  [existing outputs match the cache, left as is]
+
+> pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json
+
+(node:75293) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+> pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json
+
+(node:75425) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+> nx run plugin-wago:test  [local cache]
+
+(node:70754) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:70792) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:70793) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /Users/jappy/.rocky/runs/ATT-1079-4/workspace/attraccess/apps/plugins/wago/tsconfig.spec.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+source-only stat fixture: {"mode":"native","observations":42,"emissions":3,"elapsedMs":3058,"help":0,"native":45,"terse":0}
+source-only stat fixture: {"mode":"terse","observations":42,"emissions":3,"elapsedMs":3864,"help":3,"native":3,"terse":45}
+[Nest] 70793  - 09/25/2026, 10:43:03 PM   DEBUG [EffectivePermissionsGuard] User 1 missing permissions: resources.update
+[Nest] 70793  - 09/25/2026, 10:43:03 PM   DEBUG [EffectivePermissionsGuard] User 1 missing permissions: resources.update
+
+[1mTest Suites: [22m[1m[32m55 passed[39m[22m, 55 total
+[1mTests:       [22m[1m[32m1363 passed[39m[22m, 1363 total
+[1mSnapshots:   [22m0 total
+[1mTime:[22m        [1m[33m1241.39 s[39m[22m
+[2mRan all test suites[22m[2m.[22m
+
+> nx run plugin-wago:build  [local cache]
+
+> node -e "for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)"
+
+
+
+
+ NX   Successfully ran targets lint, test, typecheck, build for project plugin-wago and 3 tasks it depends on
+
+Nx read the output from the cache instead of running the command for 7 out of 7 tasks.
+

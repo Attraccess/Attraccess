@@ -1,0 +1,98 @@
+
+ NX   Running target pack for project plugin-wago and 3 tasks it depends on:
+
+
+
+> nx run plugin-wago:build-frontend
+
+> pnpm exec vite build --config frontend/vite.config.ts
+
+
+> nx run plugin-wago:build-backend
+
+> node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub
+
+(node:7783) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:7825) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7828) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  package/dist/index.js  2.5mb ⚠️
+
+⚡ Done in 75ms
+
+  package/dist/migrations.js  19.1kb
+
+⚡ Done in 2ms
+Built package/dist/index.js, package/dist/migrations.js — host-shared packages externalized, not bundled.
+(node:7834) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (frontend/vite.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+vite v8.2.1 building client environment for production...
+[2Ktransforming...[32m✓[0m 3556 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mpackage/frontend/[0m[32mindex.html                                   [0m[1;2m  0.16 kB[0m[2m │ gzip:  0.13 kB[0m
+[2mpackage/frontend/[0m[35mstyle.css                                    [0m[1;2m 10.58 kB[0m[2m │ gzip:  2.30 kB[0m
+[2mpackage/frontend/[0m[36m__federation_fn_import-Iq0vzNT_.js           [0m[1;2m  0.24 kB[0m[2m │ gzip:  0.15 kB[0m
+[2mpackage/frontend/[0m[36mrolldown-runtime-DC62tzP2.js                 [0m[1;2m  1.44 kB[0m[2m │ gzip:  0.67 kB[0m
+[2mpackage/frontend/[0m[36mjsx-runtime-CYVbqwEp.js                      [0m[1;2m  1.52 kB[0m[2m │ gzip:  0.68 kB[0m
+[2mpackage/frontend/[0m[36mpreload-helper-DxWiKyOd.js                   [0m[1;2m  2.18 kB[0m[2m │ gzip:  0.99 kB[0m
+[2mpackage/frontend/[0m[36mremoteEntry.js                               [0m[1;2m  2.97 kB[0m[2m │ gzip:  1.26 kB[0m
+[2mpackage/frontend/[0m[36m_virtual___federation_fn_import-B8Lh10O_.js  [0m[1;2m 11.61 kB[0m[2m │ gzip:  2.84 kB[0m
+[2mpackage/frontend/[0m[36mreact-D5HgnfBV.js                            [0m[1;2m 15.79 kB[0m[2m │ gzip:  4.32 kB[0m
+[2mpackage/frontend/[0m[36m__federation_expose_Plugin-CLU15ldF.js       [0m[1;2m312.33 kB[0m[2m │ gzip: 63.02 kB[0m
+
+✓ built in 954ms
+
+> nx run plugin-wago:build
+
+> node -e "for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)"
+
+
+> nx run plugin-wago:pack
+
+> rm -rf dist && mkdir dist && (cd package && npm pack --pack-destination ../dist)
+
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+(node:7893) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm notice
+npm notice 📦  @attraccess/plugin-wago@0.1.0-alpha.0
+npm notice Tarball Contents
+npm notice 2.6MB dist/index.js
+npm notice 19.5kB dist/migrations.js
+npm notice 81B dist/signing-public-key.pub
+npm notice 312.3kB frontend/__federation_expose_Plugin-CLU15ldF.js
+npm notice 246B frontend/__federation_fn_import-Iq0vzNT_.js
+npm notice 11.6kB frontend/_virtual___federation_fn_import-B8Lh10O_.js
+npm notice 162B frontend/index.html
+npm notice 1.5kB frontend/jsx-runtime-CYVbqwEp.js
+npm notice 2.2kB frontend/preload-helper-DxWiKyOd.js
+npm notice 15.8kB frontend/react-D5HgnfBV.js
+npm notice 3.0kB frontend/remoteEntry.js
+npm notice 1.4kB frontend/rolldown-runtime-DC62tzP2.js
+npm notice 10.6kB frontend/style.css
+npm notice 1.2kB package.json
+npm notice Tarball Details
+npm notice name: @attraccess/plugin-wago
+npm notice version: 0.1.0-alpha.0
+npm notice filename: attraccess-plugin-wago-0.1.0-alpha.0.tgz
+npm notice package size: 612.5 kB
+npm notice unpacked size: 3.0 MB
+npm notice shasum: b8ce9e2d3efc1d3dbbbf078825b85bc7f5a8bb46
+npm notice integrity: sha512-ZtXoF1iYuTBDO[...]woYw3zwcsATQQ==
+npm notice total files: 14
+npm notice
+attraccess-plugin-wago-0.1.0-alpha.0.tgz
+
+
+
+ NX   Successfully ran target pack for project plugin-wago and 3 tasks it depends on
+
+

@@ -41,7 +41,8 @@
       "plugin": "@nx/eslint/plugin",
       "options": {
         "targetName": "lint"
-      }
+      },
+      "exclude": ["apps/plugins/wago/cc100-runtime/**/*"]
     },
     {
       "plugin": "@nx/jest/plugin",
