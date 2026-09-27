@@ -20,7 +20,7 @@ stat() (
   # Mark failures too; the outer dot preserves newlines at the byte limit so
   # truncated output cannot impersonate a complete successful capture.
   wago_stat_capture() {
-    wago_stat_output=$( (if command stat "$@" 2>/dev/null; then printf '\nWAGO_STAT_OK'; else printf '\nWAGO_STAT_FAILED'; fi) | dd bs=1 count=8193 2>/dev/null | tr '\000' '\001' && printf '.') || return 1
+    wago_stat_output=$( (if command stat "$@" 2>/dev/null; then printf '\nWAGO_STAT_OK'; else printf '\nWAGO_STAT_FAILED'; fi) | head -c 8193 | tr '\000' '\001' && printf '.') || return 1
     wago_stat_output=${'$'}{wago_stat_output%.}
     test "${'$'}{#wago_stat_output}" -le 8192 || return 1
     case "$wago_stat_output" in *"$wago_stat_invalid"*) return 1 ;; esac
@@ -50,7 +50,7 @@ WAGO_STAT_OK'} ;; *) return 1 ;; esac
     # A verified native tool's file errors must never trigger fallback.
     test "$wago_stat_mode" = probe || exit 1
     # Do not infer compatibility from a failed -c invocation alone.
-    wago_stat_help=$( (if command stat --help 2>&1; then printf '\nWAGO_STAT_OK'; else printf '\nWAGO_STAT_FAILED'; fi) | dd bs=1 count=8193 2>/dev/null | tr '\000' '\001' && printf '.') || exit 1
+    wago_stat_help=$( (if command stat --help 2>&1; then printf '\nWAGO_STAT_OK'; else printf '\nWAGO_STAT_FAILED'; fi) | head -c 8193 | tr '\000' '\001' && printf '.') || exit 1
     wago_stat_help=${'$'}{wago_stat_help%.}
     test "${'$'}{#wago_stat_help}" -le 8192 || exit 1
     case "$wago_stat_help" in *"$wago_stat_invalid"*) exit 1 ;; esac

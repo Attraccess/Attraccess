@@ -54,6 +54,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     grep: '/usr/bin/grep',
     wc: '/usr/bin/wc',
     tr: '/usr/bin/tr',
+    head: '/usr/bin/head',
     sed: '/usr/bin/sed',
     sort: '/usr/bin/sort',
     base64: '/usr/bin/base64',
