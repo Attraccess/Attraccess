@@ -8,8 +8,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/apps/api',
-  // Keep API tests within the memory budget when Nx runs multiple project targets concurrently.
-  maxWorkers: 2,
+  // Nx runs multiple project targets concurrently; keep API tests within the shared memory budget.
+  maxWorkers: 1,
   moduleNameMapper: {
     '^lodash-es$': 'lodash',
     '^@node-saml/passport-saml$': '<rootDir>/src/test/mocks/node-saml-passport-saml.ts',
