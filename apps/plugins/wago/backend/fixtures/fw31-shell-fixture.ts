@@ -339,7 +339,7 @@ const syncProcess=c=>{
  fs.writeFileSync(p+'/cgroup','0::/docker/'+fullId(c)+'\\n');
  for(const n of ['uid_map','gid_map'])fs.writeFileSync(p+'/'+n,'0 0 4294967295\\n');
 };
-const save=()=>{fs.writeFileSync(root+'/containers.json',JSON.stringify(state));state.forEach(syncProcess);},find=id=>state.find(c=>c.id===id||c.name===id||fullId(c)===id);
+const save=()=>{const tmp=root+'/containers.json.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(state));fs.renameSync(tmp,root+'/containers.json');state.forEach(syncProcess);},find=id=>state.find(c=>c.id===id||c.name===id||fullId(c)===id);
 if(args[0]==='container'&&args[1]==='ls'){
  if(fault==='docker-list-failed')process.exit(1);
  const filter=args.indexOf('--filter'),selected=filter===-1?state:state.filter(c=>args[filter+1]==='name=^/'+c.name+'$');
