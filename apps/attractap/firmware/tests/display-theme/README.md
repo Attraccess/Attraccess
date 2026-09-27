@@ -66,6 +66,7 @@ warnings may also appear in a host build.
 | Supervision | Waiting, verifying, success, error; public `View` fixture; hint; cancel visibility and time-based cancel guard |
 | PIN | Production field/numeric keyboard, real keyboard value-change callbacks entering `1234`, valid/rejected/short PIN and cancel behavior, per-key state rendering |
 | Localization catalog | Every catalog entry translated and rendered through LVGL in German and English, across paginated 480 x 480 framebuffer captures |
+| Production screen localization audit | All 21 screen translation units inspected: firmware-authored labels, placeholders, tab captions, and option lists use `FirmwareI18n`; direct LVGL text writes are limited to server/device supplied values (project names, form descriptions/options, resource names, and editor placeholders). The harness additionally renders production boot, init, enrollment, reset, supervision, PIN, lockscreen, resource-list, no-resources, demo resource-list, and firmware-update screens. |
 
 Production `IScreen::init()` idempotence and normal screen teardown are exercised.
 There are **19 test groups**. The reported check count
@@ -74,8 +75,13 @@ frames are labeled `widgets-*`; they exercise the production theme but are not
 claimed to be firmware screens. All other screen fixtures use production layouts.
 
 The catalog render verifies both translations for every catalog entry and
-captures them through production LVGL at the supported harness resolution. It
-does not claim complete screen-by-screen rendering coverage: physical touch or
+captures them through production LVGL at the supported harness resolution. The
+source audit complements those captures: every production screen translation
+unit was inspected for literal user-facing labels and direct LVGL text writes.
+The inspected direct writes are dynamic server/device content and must remain
+untranslated. The rendering suite exercises representative production layouts
+and dynamic-content paths; it does not claim complete screen-by-screen
+rendering coverage: physical touch or
 NFC, RTOS scheduling, memory pressure on the ESP32, display panel/DMA/byte
 swapping, networking or TLS, the display router, drawers/overlays/popups, and
 several production screens are not rendered by this harness. Nonblank frame
