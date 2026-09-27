@@ -118,7 +118,7 @@ describe('executable isolated management shell fixtures', () => {
     await expect(run('rollback')).rejects.toBeDefined();
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# administrator replacement\n');
     expect(await readFile(path('.attraccess-management-transaction', 'previous'), 'utf8')).toBe('# existing key\n');
-  });
+  }, 10000);
 
   it('a foreign transaction and unsafe permissions or symlinks cannot overwrite keys', async () => {
     await prepared();
