@@ -1,8 +1,10 @@
 // Register paths and bit order: WAGO/cc100-howtos/HowTo_Access_Onboard_IO.
 // Counts: https://www.wago.com/global/controllers/compact-controller-100/p/751-9301
 // Firmware 31 still requires physical acceptance testing (ATT-984).
+import { CC100_DIGITAL_PROFILE_ID } from '../../shared/hardware-profile';
+
 export const CC100_DIGITAL_PROFILE = {
-  id: 'cc100-751-9301-fw31-digital-v1',
+  id: CC100_DIGITAL_PROFILE_ID,
   model: '751-9301',
   firmware: '31',
   registers: {

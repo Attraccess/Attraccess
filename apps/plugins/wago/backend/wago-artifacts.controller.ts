@@ -29,7 +29,7 @@ import {
 
 function uploadError(error: unknown) {
   if (error instanceof BadRequestException || error instanceof ConflictException) return error;
-  return new BadRequestException('Runtime upload could not be completed. Retry with the signed release files.');
+  return new BadRequestException('Runtime upload could not be completed. Retry with the release files.');
 }
 
 /** Guards run before this interceptor allocates disk or reads multipart bytes. */
@@ -83,14 +83,14 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
       rejectUpload(cancellationError);
       void cleanup().catch(() => undefined);
     };
-    const abort = () => cancel('Runtime upload was interrupted. Retry with the signed release files.');
+    const abort = () => cancel('Runtime upload was interrupted. Retry with the release files.');
     try {
       request.once('aborted', abort);
       request.once('error', abort);
       timer = setTimeout(
         () => {
           if (bodyAccepted || stopped) return;
-          cancel('Runtime upload timed out. Retry with the signed release files.');
+          cancel('Runtime upload timed out. Retry with the release files.');
           request.destroy();
         },
         10 * 60 * 1000,
@@ -108,16 +108,15 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
         [
           { name: 'bundle', maxCount: 1 },
           { name: 'checksum', maxCount: 1 },
-          { name: 'signature', maxCount: 1 },
         ],
         {
-          // Busboy emits partsLimit at the boundary after the third part when set to 3.
-          // files/fields and maxCount still enforce exactly the three named file parts.
+          // Busboy emits partsLimit at the boundary after the second part when set to 2.
+          // files/fields and maxCount still enforce exactly the two named file parts.
           limits: {
             fileSize: WAGO_RUNTIME_MAX_BYTES,
-            files: 3,
+            files: 2,
             fields: 0,
-            parts: 4,
+            parts: 3,
             fieldNameSize: 32,
             headerPairs: 32,
           },
@@ -133,7 +132,7 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
               const writer = writeArtifactStream(
                 path,
                 file.stream,
-                file.fieldname === 'bundle' ? WAGO_RUNTIME_MAX_BYTES : file.fieldname === 'checksum' ? 4096 : 16384,
+                file.fieldname === 'bundle' ? WAGO_RUNTIME_MAX_BYTES : 4096,
               );
               writers.push(writer);
               writer.then(
@@ -213,12 +212,12 @@ export class WagoArtifactsController {
   }
   @Post('import')
   @UseInterceptors(WagoArtifactUploadInterceptor)
-  async import(@UploadedFiles() files: Partial<Record<'bundle' | 'checksum' | 'signature', { path: string }[]>>) {
-    if (!files || (['bundle', 'checksum', 'signature'] as const).some((name) => files[name]?.length !== 1))
-      throw new BadRequestException('Select the runtime tar, checksum, and signature files');
+  async import(@UploadedFiles() files: Partial<Record<'bundle' | 'checksum', { path: string }[]>>) {
+    if (!files || (['bundle', 'checksum'] as const).some((name) => files[name]?.length !== 1))
+      throw new BadRequestException('Select the runtime tar and checksum files');
     const handles: Awaited<ReturnType<typeof openArtifactFile>>[] = [];
     try {
-      for (const name of ['bundle', 'checksum', 'signature'] as const) {
+      for (const name of ['bundle', 'checksum'] as const) {
         const file = files[name]?.[0];
         if (!file) throw new BadRequestException('Missing release file');
         handles.push(await openArtifactFile(file.path));
@@ -226,11 +225,10 @@ export class WagoArtifactsController {
       return await this.artifacts.import({
         bundle: handles[0].createReadStream({ autoClose: false }),
         checksum: handles[1].createReadStream({ autoClose: false }),
-        signature: handles[2].createReadStream({ autoClose: false }),
       });
     } catch (error) {
       if (error instanceof ConflictException) throw error;
-      throw new BadRequestException('Runtime import failed. Check the signed release files and retry.');
+      throw new BadRequestException('Runtime import failed. Check the release files and retry.');
     } finally {
       await Promise.allSettled(handles.map((file) => file.close()));
     }

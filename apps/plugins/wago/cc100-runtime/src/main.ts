@@ -1,7 +1,9 @@
 import { connect, type MqttClient } from 'mqtt';
 import { Cc100OnboardIoAdapter } from './adapters';
-import { CC100_DIGITAL_PROFILE } from './onboard-profile';
+import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } from '../../shared/hardware-profile';
+import { ModbusDeviceRouter } from './modbus/adapter';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
+import { RunLed } from './status-led';
 
 const hardwareId = required('WAGO_HARDWARE_ID');
 const defaultPrefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
@@ -11,14 +13,20 @@ const enrollmentSecret = required('WAGO_ENROLLMENT_SECRET');
 const store = new JsonStateStore(statePath);
 if (process.env.WAGO_IO_PATHS)
   throw new Error('WAGO_IO_PATHS is no longer supported; redeploy with the firmware-31 digital hardware profile');
-if (required('WAGO_HARDWARE_PROFILE') !== CC100_DIGITAL_PROFILE.id)
-  throw new Error(`unsupported WAGO_HARDWARE_PROFILE; expected ${CC100_DIGITAL_PROFILE.id}`);
-const adapter = new Cc100OnboardIoAdapter();
+const hardwareProfile = required('WAGO_HARDWARE_PROFILE');
+if (!isCc100HardwareProfile(hardwareProfile)) throw new Error('unsupported WAGO_HARDWARE_PROFILE');
+const onboard = new Cc100OnboardIoAdapter();
+const adapter =
+  hardwareProfile === CC100_MODBUS_PROFILE_ID
+    ? new ModbusDeviceRouter(onboard, undefined, [CC100_SERIAL_PATH])
+    : onboard;
 const mqttUrl = required('WAGO_MQTT_URL');
 let client: MqttClient | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let measurementTimer: NodeJS.Timeout | undefined;
 let inputTimer: NodeJS.Timeout | undefined;
+const runLed = new RunLed();
+runLed.set('starting');
 
 void handleAsync(start);
 
@@ -71,6 +79,8 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       activeClient.options.password = next.password;
       activeClient.reconnect();
     },
+    onReadiness: ({ connected, configurationAccepted, ready }) =>
+      runLed.set(ready ? 'ready' : !connected ? 'disconnected' : !configurationAccepted ? 'unconfigured' : 'fault'),
   });
   let initialized = false;
   let connected = false;
@@ -105,6 +115,7 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     () =>
       void handleAsync(async () => {
         if (!credentials) {
+          runLed.set('pairing');
           await transport.subscribe(runtime.discoveryClaimTopic(), async (payload) => {
             const claim = await runtime.receiveDiscoveryClaim(payload);
             if (!claim || activeClient !== client) return;
@@ -121,11 +132,18 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
         }
         if (connected && credentials) await runtime.acknowledgeCredentialRotation(credentials);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
-        measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
+        // The router applies each measurement's minimum interval; this is only the scheduler tick.
+        measurementTimer = setInterval(
+          () => void handleAsync(() => runtime.publishMeasurements()),
+          hardwareProfile === CC100_MODBUS_PROFILE_ID ? 100 : 5000,
+        ).unref();
         inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();
       }),
   );
-  activeClient.on('close', () => applyConnectionState(false));
+  activeClient.on('close', () => {
+    if (activeClient === client) runLed.set('disconnected');
+    applyConnectionState(false);
+  });
   activeClient.on('connect', () => applyConnectionState(true));
 }
 
@@ -133,6 +151,7 @@ process.on('SIGTERM', () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   if (measurementTimer) clearInterval(measurementTimer);
   if (inputTimer) clearInterval(inputTimer);
+  runLed.stop();
   client?.end(true, () => process.exit(0));
 });
 

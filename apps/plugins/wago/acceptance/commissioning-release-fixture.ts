@@ -1,18 +1,6 @@
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
-// A new, untrusted Ed25519 key exists only in this process. Never read release keys.
-export function signingFixture() {
-  const keys = generateKeyPairSync('ed25519');
-  function sshString(value: string | Buffer) {
-    const bytes = Buffer.from(value);
-    const length = Buffer.alloc(4);
-    length.writeUInt32BE(bytes.length);
-    return Buffer.concat([length, bytes]);
-  }
-  const publicKey = Buffer.concat([
-    sshString('ssh-ed25519'),
-    sshString(keys.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32)),
-  ]);
+export function releaseFixture() {
   function member(name: string, value: string) {
     const bytes = Buffer.from(value);
     const header = Buffer.alloc(512);
@@ -60,34 +48,12 @@ export function signingFixture() {
       Buffer.alloc(1024),
     ]);
     const digest = createHash('sha256').update(bundle).digest('hex');
-    const namespace = 'attraccess-wago-runtime';
-    const signed = Buffer.concat([
-      Buffer.from('SSHSIG'),
-      sshString(namespace),
-      sshString(''),
-      sshString('sha512'),
-      sshString(createHash('sha512').update(bundle).digest()),
-    ]);
-    const versionBytes = Buffer.alloc(4);
-    versionBytes.writeUInt32BE(1);
-    const packet = Buffer.concat([
-      Buffer.from('SSHSIG'),
-      versionBytes,
-      sshString(publicKey),
-      sshString(namespace),
-      sshString(''),
-      sshString('sha512'),
-      sshString(Buffer.concat([sshString('ssh-ed25519'), sshString(sign(null, signed, keys.privateKey))])),
-    ]);
     return {
       bundle,
       checksum: Buffer.from(digest),
-      signature: Buffer.from(
-        `-----BEGIN SSH SIGNATURE-----\n${packet.toString('base64')}\n-----END SSH SIGNATURE-----\n`,
-      ),
       digest,
       manifest,
     };
   }
-  return { trustedKey: publicKey.toString('base64'), release };
+  return { release };
 }

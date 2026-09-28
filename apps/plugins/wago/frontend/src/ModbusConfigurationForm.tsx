@@ -316,6 +316,20 @@ export function ModbusProfileForm({
                     update({ kind: v as typeof m.kind, rollover: v === 'live' ? undefined : m.rollover });
                   }}
                 />
+                <Choice
+                  label="Reading precision (physical units)"
+                  value={m.decimalPlaces ?? 'exact'}
+                  options={['exact', 0, 1, 2, 3]}
+                  labels={{
+                    exact: 'Exact (no rounding)',
+                    0: 'Whole units',
+                    1: '0.1 units',
+                    2: '0.01 units',
+                    3: '0.001 units',
+                  }}
+                  disabled={readonly}
+                  onChange={(v) => update({ decimalPlaces: v === 'exact' ? undefined : Number(v) })}
+                />
                 <Field
                   label="Polling interval (ms)"
                   value={m.pollIntervalMs}
@@ -462,7 +476,9 @@ export function ModbusConfigurationForm({
           }));
   const selectedId = items.find((item) => item.id === selected[section])?.id ?? items[0]?.id;
   function change(next: ModbusConfiguration) {
-    const selectedProfileIndex = profiles.findIndex((profile) => `${profile.id}@${profile.version}` === selected.profiles);
+    const selectedProfileIndex = profiles.findIndex(
+      (profile) => `${profile.id}@${profile.version}` === selected.profiles,
+    );
     if (selectedProfileIndex >= BUILTIN_MODBUS_PROFILES.length) {
       const profile = next.profiles[selectedProfileIndex - BUILTIN_MODBUS_PROFILES.length];
       setSelected((current) => ({ ...current, profiles: `${profile.id}@${profile.version}` }));
@@ -524,7 +540,8 @@ export function ModbusConfigurationForm({
         </>
       )}
       <p className="wg:text-sm wg:text-muted">
-        Built-in register maps are unverified candidates. Check the device manual and qualify the hardware before use.
+        WAGO 879-3000 uses its documented read-only register map. Profiles marked unverified are retained for existing
+        configurations.
       </p>
       {value.connections.map((c, index) => {
         if (focused && (section !== 'connections' || c.id !== selectedId)) return null;
@@ -562,8 +579,8 @@ export function ModbusConfigurationForm({
                               : {
                                   transport: 'rtu' as const,
                                   path: '/dev/serial',
-                                  baudRate: 19200,
-                                  parity: 'even' as const,
+                                  baudRate: 9600,
+                                  parity: 'none' as const,
                                   stopBits: 1 as const,
                                 }),
                           }
@@ -585,6 +602,9 @@ export function ModbusConfigurationForm({
                 </>
               ) : (
                 <>
+                  <p className="wg:text-sm wg:text-muted">
+                    CC100 two-wire RS-485: /dev/serial. WAGO 879-3000 factory settings: unit 1, 9600 baud, 8N1.
+                  </p>
                   <Field
                     label="Serial device path"
                     value={c.path}

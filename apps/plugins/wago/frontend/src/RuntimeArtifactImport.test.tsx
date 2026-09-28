@@ -47,7 +47,6 @@ async function selectFiles() {
   for (const [label, name] of [
     ['Runtime bundle (.tar)', 'runtime.tar'],
     ['Checksum (.sha256)', 'runtime.tar.sha256'],
-    ['Signature (.sig)', 'runtime.tar.sig'],
   ])
     await userEvent.upload(screen.getByLabelText(label), new File(['fixture'], name));
 }
@@ -159,7 +158,7 @@ describe('RuntimeArtifactImport', () => {
     expect(imported).toHaveLength(1);
     const body = imported[0].options?.body;
     expect(body).toBeInstanceOf(FormData);
-    expect(Array.from((body as FormData).keys())).toEqual(['bundle', 'checksum', 'signature']);
+    expect(Array.from((body as FormData).keys())).toEqual(['bundle', 'checksum']);
     expect(imported[0].options?.credentials).toBe('include');
     expect(imported[0].options?.headers).toBeUndefined();
     expect(screen.getByRole('status').textContent).toContain('Release verified');

@@ -1,8 +1,11 @@
 # Modbus integration (ATT-1059)
 
 This implementation provides configurable Modbus TCP and POSIX RTU acquisition and
-binary named actions. **No device, controller, firmware, or register map is hardware
-qualified.** Do not use the existence of a built-in profile as a support claim.
+binary named actions. The 879-3000 read-only profile has documented registers and
+has been read-tested on a CC100 FW31 over two-wire RS-485. See
+[setup and evidence](../../../../docs/en/devices/wago-879-3000-modbus-rtu.md).
+Other built-in candidates retain their unverified labels; communication evidence
+does not qualify loaded energy accuracy or every physical assembly.
 
 ## Configuration and shared editor integration
 
@@ -44,8 +47,7 @@ require a named action. `validateModbus` and `validateModbusBindings` return
 the full snapshot has errors. Removing or renaming referenced entries intentionally
 produces reference errors until the editor repairs the bindings.
 
-The shared controller editor has deliberately not been modified. Until ATT-1058
-mounts these exports, these forms are not reachable from that editor. Profile
+The shared controller editor mounts these forms under **External devices**. Profile
 versions are embedded in each configuration revision; update device references
 when changing a custom profile version. Custom profiles are not globally shared
 between controllers.
@@ -58,7 +60,11 @@ such as 40001 is not implicitly converted to a holding-register offset. Choose
 FC03 (holding registers) or FC04 (input registers) explicitly. `uint16`, `int16`,
 `uint32`, `int32`, and IEEE float32 have explicit byte and word order. Scaling is
 `raw * scale + offset`, yielding persisted engineering units A/V/W/Wh/percent.
-Non-finite values fault instead of becoming fabricated samples.
+Non-finite values fault instead of becoming fabricated samples. An optional
+measurement `decimalPlaces` (0-3) explicitly rounds engineering values before MQTT
+encoding. Without it, values retain their exact semantics. The new 879-3000 profile
+uses three places to handle IEEE float32 approximation while emitting integer
+milli-units; the old `-unverified` profile IDs/maps remain unchanged.
 
 Actions map runtime boolean commands to explicit `onValue`/`offValue` in physical
 units. FC05 requires 0/1, identity scaling and uint16; FC06 writes one 16-bit
@@ -67,23 +73,16 @@ be represented are rejected. Write echoes are checked for address, value/count,
 function, unit, and transaction/CRC. No failed write is automatically replayed.
 Other functions and arbitrary numeric runtime commands are not supported.
 
-The ATT-979 correction owns MQTT encoding (safe integer milliampere, millivolt,
-milliwatt, milliwatt-hour, millipercent; source timestamp; per-boot UUID stream;
-per-category sequences). This branch starts from PR1796's older integer-base-unit
-encoder. **Merge the corrected ATT-979 branch before release**: fractional
-engineering values will otherwise be rejected by that older encoder. This module
-returns engineering values and does not multiply by 1000 itself.
+The shared measurement contract owns MQTT encoding (safe integer milliampere,
+millivolt, milliwatt, milliwatt-hour, millipercent; source timestamp; per-boot UUID
+stream; per-category sequences). The Modbus adapter returns engineering values;
+profile scaling such as kW to W is applied once, before wire encoding.
 
-The reviewed ATT-979 correction is `73995720` on PR1796. Fleet lead performs the
-merge; do not copy or edit its encoder from this dirty worktree. The Modbus hook
-is `acquireMeasurements(snapshot, device)`: each yielded result contains all
-bound `channels`, either `raw` and an ISO `timestamp` captured immediately after
-the read completes, or the original `error`. Keep the sweep/fanout when resolving
-the runtime merge, call `encodeMeasurement(channel.id, raw, transform)`, then
-`publishOperational('measurements', measurement, undefined, timestamp)`.
-Use `measurementErrorCode(error)` when publishing faults: it preserves both
-`MeasurementContractError.code` and transport codes such as `modbus_rtu_quarantined`.
-Do not replace the acquisition timestamp with publication time.
+The acquisition hook is `acquireMeasurements(snapshot, device)`: each yielded
+result contains all bound `channels`, either `raw` and an ISO `timestamp` captured
+immediately after the read completes, or the original `error`. The runtime passes
+that timestamp through publication. `measurementErrorCode(error)` preserves
+measurement-contract and transport codes, including `modbus_rtu_quarantined`.
 
 Polling intervals are best-effort minimum intervals (100–3600000 ms), checked by
 the runtime's 100 ms scheduler. Onboard reads retain a 5 s minimum. Only one
@@ -176,6 +175,11 @@ its group; device discovery and RS-485 direction control are not configured here
 The adapter assumes the serial driver/hardware handles RS-485 transmit direction.
 This must be checked on the actual CC100 before qualification.
 
+The production entry point selects `ModbusDeviceRouter` for the
+`cc100-751-9301-fw31-digital-rtu-v1` deployment. That release maps the onboard UART
+and preserves the firmware's dialout ownership; the runtime uses `/dev/serial`.
+The scheduler ticks every 100 ms while the router enforces per-signal intervals.
+
 `QueuedModbusTransport(connection, serialExchange?)` supports injected serial
 fixtures. `ModbusDeviceRouter(onboardAdapter, transportFactory?)` is the production
 routing seam and leaves onboard adapter implementation with ATT-1056. The legacy
@@ -188,17 +192,18 @@ The user's ATT-979 evidence identifies official documents:
 - 879-3000: https://www.wago.com/us/d/5937710
 - 879-1300: https://www.wago.com/us/d/18838796
 
-Both links failed to load during this implementation. The candidate maps use the
+The initial implementation could not load either manual. Its legacy candidate maps use the
 supplied RTU FC03 wire addresses: `0x5012` float kW active power, `0x600C` imported
 energy, `0x6018` exported energy. Energy is float kWh for 879-3000 and uint32 Wh
-for 879-1300. Big byte/word order is an **unverified assumption**, not a confirmed
-manual fact. Built-ins are version 1, frozen, read-only, explicitly labelled
-UNQUALIFIED / map unverified, and have no outputs or rollover assumption.
+for 879-1300. Those legacy IDs remain frozen and read-only. The new `wago-879-3000`
+profile is based on the retrieved manual V1.8, pages 35-38, which confirms FC03,
+ABCD float order, and the listed units. It also exposes L1 voltage and current.
+The 879-1300 candidate still needs independent verification. Neither meter profile
+has outputs or assumes rollover.
 
-Before release: merge and test corrected ATT-979 encoding, mount/visually verify
-forms with ATT-1058, independently verify manuals and byte/word order, run TCP
-fixtures in a socket-enabled environment, and qualify RTU/TCP on actual hardware
-with a complete backup. No hardware operation or hardware proof was performed.
+Remaining acceptance includes loaded power/energy accuracy, physical disconnect
+and fault scenarios, other meter models, and TCP hardware. Development-device
+reads and integrated software checks do not establish those broader claims.
 
 Tests: `backend/modbus-configuration.spec.ts` validates persisted models/bindings;
 `cc100-runtime/src/modbus/modbus.spec.ts` contains actual loopback TCP fixtures,

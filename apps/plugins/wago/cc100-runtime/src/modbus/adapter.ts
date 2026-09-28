@@ -45,18 +45,32 @@ export class ModbusDeviceRouter implements DeviceAdapter {
   constructor(
     private readonly onboard: DeviceAdapter,
     private readonly factory: (c: ModbusConnection) => ModbusTransport = (c) => new QueuedModbusTransport(c),
+    private readonly allowedSerialPaths?: readonly string[],
   ) {}
   validate(snapshot: Snapshot) {
     const points = snapshot.physicalPoints.filter((point) => !point.modbus);
     const ids = new Set(points.map((point) => point.id));
-    return (
+    const errors =
       this.onboard.validate?.({
         ...snapshot,
         modbus: undefined,
         physicalPoints: points,
         logicalChannels: snapshot.logicalChannels.filter((channel) => ids.has(channel.physicalPointId)),
-      }) ?? []
-    );
+      }) ?? [];
+    snapshot.modbus?.connections.forEach((connection, index) => {
+      if (
+        connection.transport === 'rtu' &&
+        this.allowedSerialPaths &&
+        !this.allowedSerialPaths.includes(connection.path)
+      ) {
+        errors.push({
+          path: `snapshot.modbus.connections[${index}].path`,
+          code: 'unsupported_serial_path',
+          message: `This runtime exposes ${this.allowedSerialPaths.join(', ')} for Modbus RTU`,
+        });
+      }
+    });
+    return errors;
   }
   checkAvailability(): Promise<void> {
     return this.onboard.checkAvailability?.() ?? Promise.resolve();
@@ -149,7 +163,10 @@ export class ModbusDeviceRouter implements DeviceAdapter {
       }
       const scaled = value * m.scale + m.offset;
       if (!Number.isFinite(scaled)) throw new Error('Modbus scaling overflow');
-      return scaled;
+      // Float registers carry binary approximation noise. Only profiles that
+      // explicitly declare a precision may round; legacy/custom exact maps keep
+      // their original semantics and the MQTT encoder remains strict.
+      return m.decimalPlaces === undefined ? scaled : Number(scaled.toFixed(m.decimalPlaces));
     } finally {
       this.active.delete(key);
     }
@@ -219,5 +236,6 @@ function sourceIdentity(connection: ModbusConnection, unit: number, m: ModbusMea
     m.unit,
     m.kind,
     m.rollover ?? null,
+    m.decimalPlaces ?? null,
   ]);
 }

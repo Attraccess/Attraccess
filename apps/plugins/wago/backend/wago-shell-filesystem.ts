@@ -7,10 +7,12 @@ import { wagoShellStat } from './wago-shell-stat';
  */
 export function wagoShellFilesystemGuard({
   acquireLock = true,
+  waitForLock = false,
   lockName = 'install.lock',
   descriptor = 9,
 }: {
   acquireLock?: boolean;
+  waitForLock?: boolean;
   lockName?: 'install.lock' | 'supervisor.lock';
   descriptor?: 8 | 9;
 } = {}): string {
@@ -37,7 +39,12 @@ validate_controller_lock || fail 'Unsafe controller lock ownership, permissions 
 ${
   acquireLock
     ? `exec ${descriptor}<>"$config/${lockName}"
-flock -n ${descriptor} || fail 'Another runtime transaction holds the controller lock'
+  ${
+    waitForLock
+      ? `command -v timeout >/dev/null || fail 'Bounded controller lock wait unavailable'
+  timeout -k 5 310 flock ${descriptor}`
+      : `flock -n ${descriptor}`
+  } || fail 'Another runtime transaction holds the controller lock'
 validate_controller_lock || fail 'Controller lock changed during acquisition'`
     : ''
 }
