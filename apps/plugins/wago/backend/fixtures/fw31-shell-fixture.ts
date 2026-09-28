@@ -41,6 +41,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
   for (const [name, path] of Object.entries({
     sh: '/bin/sh',
     cat: '/bin/cat',
+    date: '/bin/date',
     cp: '/bin/cp',
     cmp: '/usr/bin/cmp',
     awk: '/usr/bin/awk',
@@ -155,9 +156,12 @@ console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
     'bin/timeout',
     `
 const args=process.argv.slice(2);
-if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300'].includes(args[2]))process.exit(99);
+if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300','310'].includes(args[2]))process.exit(99);
 if(process.env.FAULT==='gate-timeout'&&args[3].endsWith('/S99_zz_attraccess_wago'))process.exit(124);
 const root=process.env.FIXTURE_ROOT;
+// Model image-import duration without a minute-long sleep in each shell test.
+const fs=require('node:fs'),loadDuration=root+'/docker-load-seconds';
+if(args[3]==='docker'&&args[6]==='load'&&fs.existsSync(loadDuration)&&Number(fs.readFileSync(loadDuration,'utf8'))>Number(args[2]))process.exit(143);
 const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';
 // Match the generated command's deadline. Shorter wall-clock caps measure host
 // process scheduling, except for the explicit isolated privilege lifecycle test.
@@ -243,6 +247,10 @@ fs.writeFileSync(root+'/owners.json',JSON.stringify(owners));`,
     `
 const fs=require('node:fs'),root=process.env.FIXTURE_ROOT;
 if(process.argv[2]==='-u')process.exit(0);
+if(process.env.FAULT==='supervisor-lock-held'){
+  if(process.argv[2]==='-n')process.exit(1);
+  if(process.argv[2]==='9')require('node:child_process').spawnSync('/bin/sleep',['0.1']);
+}
 if(process.argv[3]==='8'&&fs.existsSync(root+'/supervisor-fixture-live'))process.exit(1);
 if(process.env.FAULT==='lock-handoff'){
  const path=root+'/flock-calls',calls=fs.existsSync(path)?Number(fs.readFileSync(path,'utf8')):0;

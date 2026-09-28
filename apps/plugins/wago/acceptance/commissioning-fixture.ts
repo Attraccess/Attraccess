@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { WagoManagementEntity } from '../backend/wago-management.entity';
 import { managementKeyCommand } from '../backend/wago-management-shell';
 import type { ManagementRecord } from '../backend/wago-management.types';
@@ -26,14 +26,21 @@ import { WagoController } from '../backend/wago-controller.entity';
 import { WagoService } from '../backend/wago.service';
 import { MANAGEMENT_INSPECTION_COMMAND } from '../backend/wago-management-inspection';
 import { CLOCK_INSPECTION_SCRIPT } from '../backend/wago-commissioning-clock';
-import { signingFixture } from './commissioning-signing-fixture';
+import { releaseFixture } from './commissioning-release-fixture';
 
 export async function commissioningFixture() {
   const directory = await mkdtemp(join(tmpdir(), 'wago-commissioning-acceptance-'));
-  const signing = signingFixture();
-  const first = signing.release('0.1.0');
-  const second = signing.release('0.2.0');
-  const catalog = new WagoRuntimeArtifactCatalog(join(directory, 'catalog'), signing.trustedKey);
+  const releases = releaseFixture();
+  const hostPublicKey = generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).subarray(-32);
+  const sshField = (bytes: Buffer) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(bytes.length);
+    return Buffer.concat([length, bytes]);
+  };
+  const hostKey = Buffer.concat([sshField(Buffer.from('ssh-ed25519')), sshField(hostPublicKey)]).toString('base64');
+  const first = releases.release('0.1.0');
+  const second = releases.release('0.2.0');
+  const catalog = new WagoRuntimeArtifactCatalog(join(directory, 'catalog'));
   const database = new DataSource({
     type: 'sqlite',
     database: ':memory:',
@@ -74,7 +81,7 @@ export async function commissioningFixture() {
       queueMicrotask(() => {
         child.stdout.emit(
           'data',
-          command === 'ssh-keyscan' ? `10.99.0.7 ssh-ed25519 ${signing.trustedKey}\n` : `256 ${fingerprint} fixture\n`,
+          command === 'ssh-keyscan' ? `10.99.0.7 ssh-ed25519 ${hostKey}\n` : `256 ${fingerprint} fixture\n`,
         );
         child.emit('close', 0);
       });
@@ -255,10 +262,8 @@ export async function commissioningFixture() {
       for (const [extension, data] of [
         ['tar', release.bundle],
         ['sha256', release.checksum],
-        ['sig', release.signature],
       ] as const)
         await writeFile(join(directory, `${name}.${extension}`), data);
-    await writeFile(join(directory, 'invalid.sig'), signingFixture().release('0.1.0').signature);
     return {
       app,
       url: await app.getUrl(),

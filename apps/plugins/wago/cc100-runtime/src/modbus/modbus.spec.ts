@@ -251,7 +251,9 @@ describe('Modbus protocol fixtures (no hardware)', () => {
     expect(() => unknown.update(1)).toThrow('without documented');
   });
   it('validates profiles and routes named measurements/actions, bounded duplicate acquisition', async () => {
-    const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[1], 'custom');
+    const meter = BUILTIN_MODBUS_PROFILES.find((profile) => profile.id === 'wago-879-1300-unverified');
+    if (!meter) throw new Error('Missing 879-1300 profile');
+    const profile = duplicateProfile(meter, 'custom');
     const config: ModbusConfiguration = {
       connections: [serial],
       profiles: [profile],

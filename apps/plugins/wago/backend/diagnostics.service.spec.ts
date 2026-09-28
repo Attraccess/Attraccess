@@ -244,7 +244,7 @@ describe('controller diagnostics', () => {
       jest.useRealTimers();
     }
   });
-  it('does not persist rejected canonical heartbeats as fresh liveness', async () => {
+  it.each([42, 2100, 5000, 5001])('persists a canonical heartbeat only within the skew bound (%i ms)', async (skew) => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
       const controller = { id: 1, hardwareId: 'cc100', trustState: 'claimed', lastSequence: 0, lastHeartbeatAt: null };
@@ -264,14 +264,19 @@ describe('controller diagnostics', () => {
             protocolVersion: '1.0.0',
             runtimeVersion: '0.1.0',
             capabilities: ['claim', 'heartbeat', 'configuration-v1'],
-            timestamp: '2026-09-05T12:00:01.000Z',
+            timestamp: new Date(Date.now() + skew).toISOString(),
             streamId: '00000000-0000-4000-8000-000000000001',
             sequence: 1,
           }),
         ),
       );
-      expect(save).not.toHaveBeenCalled();
-      expect(controller.lastHeartbeatAt).toBeNull();
+      if (skew <= 5000) {
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(controller.lastHeartbeatAt).toBe(new Date(Date.now() + skew).toISOString());
+      } else {
+        expect(save).not.toHaveBeenCalled();
+        expect(controller.lastHeartbeatAt).toBeNull();
+      }
     } finally {
       jest.useRealTimers();
     }

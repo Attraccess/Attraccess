@@ -74,6 +74,8 @@ export class WagoRuntime {
       transport: Transport;
       device: DeviceAdapter;
       reconnectCredentials?: (credentials: DiscoveryClaim) => Promise<void>;
+      /** Observes every evaluated readiness, including unchanged/unpublished ones. */
+      onReadiness?: (readiness: { connected: boolean; configurationAccepted: boolean; ready: boolean }) => void;
     },
   ) {
     this.outputs = new OutputController({
@@ -684,6 +686,7 @@ export class WagoRuntime {
         errors,
       },
     };
+    this.options.onReadiness?.({ connected: this.connected, ...payload.readiness });
     const signature = JSON.stringify(payload);
     if (!force && signature === this.lastPublishedState) return;
     for (const error of errors) {

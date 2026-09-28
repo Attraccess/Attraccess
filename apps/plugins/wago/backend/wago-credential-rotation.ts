@@ -9,6 +9,7 @@ import {
 import type { CommissioningOperationGuard } from './wago-operation-guard';
 import { normalizeOperationalPrefix } from './protocol';
 import { sourceTime } from './diagnostics-envelope';
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 import { WagoAudit } from './wago-audit';
 import { WagoController } from './wago-controller.entity';
 import { WagoCredentialRotationEntity } from './wago-credential-rotation.entity';
@@ -41,7 +42,10 @@ function assertRotationController(
   const now = Date.now();
   // A discovery announcement cannot establish that the permanent runtime is subscribed.
   // Retry only delivers an already rotated credential; allow recovery without a fresh heartbeat.
-  if (!retry && (heartbeatAt === null || heartbeatAt > now || now - heartbeatAt >= 90_000))
+  if (
+    !retry &&
+    (heartbeatAt === null || heartbeatAt > now + CONTROLLER_CLOCK_TOLERANCE_MS || now - heartbeatAt >= 90_000)
+  )
     throw new ConflictException('Wait for a fresh permanent controller heartbeat before rotating credentials.');
 }
 

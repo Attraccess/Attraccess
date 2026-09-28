@@ -1,27 +1,30 @@
 #!/usr/bin/env node
-// Release engineering only. Operators import the three output files in the UI.
-// node scripts/package-runtime-artifact.mjs --image-archive image.tar --image ghcr.io/attraccess/wago-cc100-runtime@sha256:… --version 0.1.0 --signing-key /release/key --out ./release
-import { constants, createReadStream } from 'node:fs';
+// Release engineering only. Operators import the tar and checksum in the UI.
+// node scripts/package-runtime-artifact.mjs --image-archive image.tar --image ghcr.io/attraccess/wago-cc100-runtime@sha256:… --version 0.1.0 --out ./release
+import { constants, createReadStream, createWriteStream } from 'node:fs';
 import { open, mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { pipeline } from 'node:stream/promises';
+import { Transform } from 'node:stream';
 
 const { values } = parseArgs({
   options: Object.fromEntries(
-    ['image-archive', 'image', 'version', 'signing-key', 'out'].map((name) => [name, { type: 'string' }]),
+    ['image-archive', 'image', 'version', 'out', 'hardware-profile'].map((name) => [name, { type: 'string' }]),
   ),
 });
+const hardwareProfile = values['hardware-profile'] ?? 'cc100-751-9301-fw31-digital-v1';
 if (
-  !Object.values(values).every(Boolean) ||
-  Object.keys(values).length !== 5 ||
+  !['image-archive', 'image', 'version', 'out'].every((name) => values[name]) ||
+  !['cc100-751-9301-fw31-digital-v1', 'cc100-751-9301-fw31-digital-rtu-v1'].includes(hardwareProfile) ||
   !/^ghcr\.io\/attraccess\/wago-cc100-runtime(?::[A-Za-z0-9_.-]+)?@sha256:[a-f0-9]{64}$/.test(values.image) ||
   values.image.length > 300 ||
   !/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/.test(values.version) ||
   values.version.length > 80
 ) {
-  throw new Error('Supply --image-archive, digest-pinned --image, --version, --signing-key, and --out');
+  throw new Error('Supply --image-archive, digest-pinned --image, --version, and --out');
 }
 const manifest = {
   schemaVersion: 1,
@@ -29,7 +32,12 @@ const manifest = {
   runtimeVersion: values.version,
   protocolVersion: '1.0.0',
   image: values.image,
-  hardware: { model: '751-9301', platform: 'linux/arm/v7', firmwareBaseline: '31', profile: 'cc100-751-9301-fw31-digital-v1' },
+  hardware: {
+    model: '751-9301',
+    platform: 'linux/arm/v7',
+    firmwareBaseline: '31',
+    profile: hardwareProfile,
+  },
 };
 const output = resolve(values.out);
 await mkdir(output, { recursive: true });
@@ -63,35 +71,78 @@ try {
     const info = await archive.stat();
     if (!info.isFile() || !info.size || info.size > 512 * 1024 * 1024 - 32768)
       throw new Error('Invalid or oversized image archive');
-    const tar = await open(join(stage, filename), 'wx', 0o600);
+    const magic = Buffer.alloc(2);
+    await archive.read(magic, 0, magic.length, 0);
+    if (magic.equals(Buffer.from([0x1f, 0x8b]))) throw new Error('Supply an uncompressed Docker image archive');
+    // Compress before writing the outer header, whose size must be exact. gzip
+    // -n omits source filename and timestamp; the CLI's -9 output is smaller
+    // than Node's zlib output for this image and fits the controller's preflight.
+    const compressedPath = join(stage, 'compressed-image');
+    let sourceBytes = 0;
+    const gzip = spawn('gzip', ['-n', '-9', '-c'], { stdio: ['pipe', 'pipe', 'ignore'] });
+    const finished = new Promise((resolvePromise, reject) => {
+      gzip.once('error', () => reject(new Error('Runtime compression could not start')));
+      gzip.once('exit', (code) => (code === 0 ? resolvePromise() : reject(new Error('Runtime compression failed'))));
+    });
     try {
-      async function write(data) {
-        let offset = 0;
-        while (offset < data.length) offset += (await tar.write(data, offset, data.length - offset)).bytesWritten;
-      }
-      await write(header('image.tar', info.size));
-      let bytes = 0;
-      for await (const chunk of archive.createReadStream({ autoClose: false })) {
-        bytes += chunk.length;
-        if (bytes > info.size) throw new Error('Image changed during packaging');
-        await write(chunk);
-      }
-      if (bytes !== info.size) throw new Error('Image changed during packaging');
-      await write(Buffer.alloc((512 - (info.size % 512)) % 512));
-      for (const [name, text] of [
-        ['image-reference', `${values.image}\n`],
-        ['manifest.json', `${JSON.stringify(manifest)}\n`],
-      ]) {
-        const data = Buffer.from(text);
-        await write(header(name, data.length));
-        await write(data);
-        await write(Buffer.alloc((512 - (data.length % 512)) % 512));
-      }
-      await write(Buffer.alloc(1024));
-      await tar.sync();
-    } finally {
-      await tar.close();
+      await Promise.all([
+        pipeline(
+          archive.createReadStream({ autoClose: false }),
+          new Transform({
+            transform(chunk, _encoding, callback) {
+              sourceBytes += chunk.length;
+              callback(sourceBytes <= info.size ? null : new Error('Image changed during packaging'), chunk);
+            },
+          }),
+          gzip.stdin,
+        ),
+        pipeline(gzip.stdout, createWriteStream(compressedPath, { flags: 'wx', mode: 0o600 })),
+        finished,
+      ]);
+    } catch (error) {
+      gzip.kill();
+      throw error;
     }
+    if (sourceBytes !== info.size || (await archive.stat()).size !== info.size)
+      throw new Error('Image changed during packaging');
+    const compressed = await open(compressedPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const compressedInfo = await compressed.stat();
+      if (!compressedInfo.size || compressedInfo.size > 512 * 1024 * 1024 - 32768)
+        throw new Error('Invalid or oversized compressed image archive');
+      const tar = await open(join(stage, filename), 'wx', 0o600);
+      try {
+        async function write(data) {
+          let offset = 0;
+          while (offset < data.length) offset += (await tar.write(data, offset, data.length - offset)).bytesWritten;
+        }
+        await write(header('image.tar', compressedInfo.size));
+        let bytes = 0;
+        for await (const chunk of compressed.createReadStream({ autoClose: false })) {
+          bytes += chunk.length;
+          if (bytes > compressedInfo.size) throw new Error('Compressed image changed during packaging');
+          await write(chunk);
+        }
+        if (bytes !== compressedInfo.size) throw new Error('Compressed image changed during packaging');
+        await write(Buffer.alloc((512 - (compressedInfo.size % 512)) % 512));
+        for (const [name, text] of [
+          ['image-reference', `${values.image}\n`],
+          ['manifest.json', `${JSON.stringify(manifest)}\n`],
+        ]) {
+          const data = Buffer.from(text);
+          await write(header(name, data.length));
+          await write(data);
+          await write(Buffer.alloc((512 - (data.length % 512)) % 512));
+        }
+        await write(Buffer.alloc(1024));
+        await tar.sync();
+      } finally {
+        await tar.close();
+      }
+    } finally {
+      await compressed.close();
+    }
+    await rm(compressedPath);
   } finally {
     await archive.close();
   }
@@ -104,18 +155,9 @@ try {
   } finally {
     await checksum.close();
   }
-  await new Promise((resolvePromise, reject) => {
-    const child = spawn(
-      'ssh-keygen',
-      ['-Y', 'sign', '-f', resolve(values['signing-key']), '-n', 'attraccess-wago-runtime', join(stage, filename)],
-      { stdio: 'ignore' },
-    );
-    child.once('error', () => reject(new Error('Runtime signing could not start')));
-    child.once('exit', (code) => (code === 0 ? resolvePromise() : reject(new Error('Runtime signing failed'))));
-  });
   // Publish a whole versioned directory. Never overwrite a previous release.
   await rename(stage, join(output, `cc100-${values.version}-${Date.now()}`));
-  process.stdout.write('Signed runtime release packaged successfully. Import its .tar, .sha256 and .sig files.\n');
+  process.stdout.write('Runtime release packaged successfully. Import its .tar and .sha256 files.\n');
 } finally {
   await rm(stage, { recursive: true, force: true });
 }

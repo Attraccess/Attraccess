@@ -2,6 +2,7 @@ import { isCc100Fw31Identity, wagoFw31IdentityRead } from './wago-firmware-ident
 import { parseWagoCodesysClassification, wagoCodesysClassificationShell } from './wago-codesys-classification';
 import { commissionClock } from './wago-commissioning-clock';
 import type { WagoCommissioningPreflightReport } from '../shared/commissioning';
+import { CC100_DIGITAL_PROFILE_ID, type Cc100HardwareProfile } from '../shared/hardware-profile';
 import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
 import { ManagementPeerVersion } from './wago-management-peer-version';
 import {
@@ -73,16 +74,22 @@ const configuredFirmwareBaseline = process.env.WAGO_CC100_FIRMWARE_BASELINE?.tri
 const configuredRuntimeImage = process.env.WAGO_CC100_RUNTIME_IMAGE?.trim() ?? '';
 const configuredRuntimeBundle = process.env.WAGO_CC100_RUNTIME_BUNDLE_PATH?.trim() ?? '';
 const configuredRuntimeBundleChecksum = process.env.WAGO_CC100_RUNTIME_BUNDLE_SHA256_PATH?.trim() ?? '';
-const configuredRuntimeBundleSignature = process.env.WAGO_CC100_RUNTIME_BUNDLE_SIGNATURE_PATH?.trim() ?? '';
-const configuredRuntimeSigningPublicKey = process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH?.trim() ?? '';
-const SIGNING_NAMESPACE = 'attraccess-wago-runtime';
-const SIGNING_IDENTITY = 'attraccess-wago-runtime';
 
 type TemporarySshCredential = { username: string; password: string };
-type SshRunLimits = { timeoutMs: number; maxOutputBytes: number; storageDiagnostic?: boolean };
+type SshRunLimits = {
+  timeoutMs: number;
+  maxOutputBytes: number;
+  storageDiagnostic?: boolean;
+  lockDiagnostic?: boolean;
+};
 export class WagoStorageCapacityError extends Error {
   constructor() {
     super('Not enough free storage on the CC100 for this runtime. Free space and retry.');
+  }
+}
+export class WagoControllerLockError extends Error {
+  constructor() {
+    super('The CC100 is busy with a runtime operation. Retry installation shortly; no preparation was started.');
   }
 }
 type CommissioningSessionResponse = Omit<
@@ -91,6 +98,10 @@ type CommissioningSessionResponse = Omit<
 > & { runtimeRecoveryAvailable?: boolean };
 const VERIFIER_PREFIX = 'encrypted:v1:';
 type DeliveryInput = { temporarySsh?: TemporarySshCredential; confirmInstall?: boolean };
+type RuntimeDeliveryBundle = Awaited<ReturnType<typeof verifyRuntimeBundle>> & {
+  image?: string;
+  hardwareProfile?: Cc100HardwareProfile;
+};
 
 @Injectable()
 export class WagoCommissioningService implements OnApplicationBootstrap {
@@ -138,8 +149,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           configuredFirmwareBaseline &&
           isImmutableImage(configuredRuntimeImage) &&
           configuredRuntimeBundle &&
-          configuredRuntimeBundleChecksum &&
-          configuredRuntimeBundleSignature,
+          configuredRuntimeBundleChecksum,
         ),
     };
   }
@@ -149,7 +159,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       mqttServerId: number;
       targetHost: string;
       name: string;
-      runtimeArtifactDigest?: string;
     },
     principal: CommissioningPrincipal | null = null,
   ): Promise<CommissioningSessionResponse> {
@@ -176,13 +185,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     }
     const hardwareId = `cc100-${createHash('sha256').update(hostKeyFingerprint).digest('hex').slice(0, 16)}`;
     const now = new Date().toISOString();
-    let runtimeArtifactDigest =
-      input.runtimeArtifactDigest === undefined ? ((await this.artifacts?.current())?.digest ?? null) : null;
-    if (input.runtimeArtifactDigest !== undefined) {
-      if (!this.artifacts || !/^[a-f0-9]{64}$/.test(input.runtimeArtifactDigest))
-        throw new ConflictException('Select a verified runtime release.');
-      runtimeArtifactDigest = (await this.artifacts.get(input.runtimeArtifactDigest)).digest;
-    }
     const session = await this.sessions.save(
       this.sessions.create({
         hardwareId,
@@ -197,7 +199,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         // This verifier authenticates the first runtime announcement and is never exposed to an operator.
         pairingCode: this.encryptVerifier(randomBytes(32).toString('base64url')),
         initiatingPrincipal: principal ? JSON.stringify(principal) : null,
-        runtimeArtifactDigest,
+        runtimeArtifactDigest: null,
         codesysState: null,
         progressPercent: 0,
         progressStep: 'Confirm controller identity',
@@ -335,7 +337,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               } else if (action === 'activate') {
                 const bundle = await this.acquireRuntimeBundle(session);
                 try {
-                  await this.prepareController(session, credential, bundle.bytes);
+                  await this.prepareController(session, credential, bundle.bytes, bundle.hardwareProfile);
                 } finally {
                   await rm(bundle.directory, { recursive: true, force: true });
                 }
@@ -353,11 +355,13 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               session.failureReason =
                 error instanceof WagoStorageCapacityError
                   ? error.message
-                  : action === 'inspect'
-                    ? 'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.'
-                    : action === 'activate'
-                      ? 'Controller preparation failed. Check the signed runtime release, staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.'
-                      : 'Controller preparation cleanup remains unverified. Clean up any runtime transaction first, then retry preparation cleanup. The recovery token is retained; previous workloads are not restored.';
+                  : error instanceof WagoControllerLockError
+                    ? error.message
+                    : action === 'inspect'
+                      ? 'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.'
+                      : action === 'activate'
+                        ? 'Controller preparation failed. Check the runtime release, staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.'
+                        : 'Controller preparation cleanup remains unverified. Clean up any runtime transaction first, then retry preparation cleanup. The recovery token is retained; previous workloads are not restored.';
               return this.toResponse(await this.save(session, `platform_${action}_failed`));
             }
           }),
@@ -399,6 +403,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     session: WagoCommissioningSession,
     credential: TemporarySshCredential,
     verifiedBundleBytes: number,
+    hardwareProfile: Cc100HardwareProfile = CC100_DIGITAL_PROFILE_ID,
   ): Promise<void> {
     if (session.deliveryToken)
       throw new ConflictException('Clean up the retained runtime installation before preparing the controller.');
@@ -419,12 +424,19 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         session.targetHost,
         session.hostKeyFingerprint,
         credential,
-        wagoCommissioningPreparationScript(session.dockerProvisionToken),
+        wagoCommissioningPreparationScript(session.dockerProvisionToken, '', hardwareProfile),
+        { timeoutMs: SSH_TIMEOUT_MS, maxOutputBytes: 65_536, lockDiagnostic: true },
       );
       session.dockerProvisionState = 'started';
       session.codesysState = 'disabled';
       await this.save(session, 'controller_prepared');
     } catch (error) {
+      if (error instanceof WagoControllerLockError) {
+        session.dockerProvisionToken = null;
+        session.dockerProvisionState = null;
+        await this.save(session, 'controller_preparation_busy');
+        throw error;
+      }
       session.dockerProvisionState = 'recovery_required';
       await this.save(session, 'controller_preparation_failed');
       throw error;
@@ -645,9 +657,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     return session;
   }
 
-  private async requireRuntimeArtifact(session: WagoCommissioningSession): Promise<void> {
-    if (!isRuntimeArtifactConfigured() && !session.runtimeArtifactDigest && !(await this.artifacts?.has()))
-      throw new ConflictException('Import a signed CC100 runtime release before installation.');
+  private async requireRuntimeArtifact(): Promise<void> {
+    if (!isRuntimeArtifactConfigured() && !(await this.artifacts?.has()))
+      throw new ConflictException('Import a CC100 runtime release before installation.');
   }
 
   private async deliverWhileLocked(
@@ -658,7 +670,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const session = await this.loadDeliverableSession(id);
     const credential = requireDeliveryCredentials(input);
     if (principal) session.initiatingPrincipal = JSON.stringify(principal);
-    await this.requireRuntimeArtifact(session);
+    await this.requireRuntimeArtifact();
 
     let pairingCode: string;
     try {
@@ -669,7 +681,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     }
     let enrollmentExpiresAt: string | null = null;
     let credentialsTouched = false;
-    let bundle: (Awaited<ReturnType<typeof verifyRuntimeBundle>> & { image?: string }) | undefined;
+    let bundle: RuntimeDeliveryBundle | undefined;
     let safeFailure = 'Delivery failed. Controller recovery may be required; check access and runtime prerequisites.';
 
     try {
@@ -687,6 +699,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         throw new Error(safeFailure);
       }
       bundle = await this.acquireRuntimeBundle(session);
+      await this.assertCurrentRuntimeBundle(bundle);
       session.state = 'delivering';
       session.failureReason = null;
       await this.updateProgress(
@@ -709,14 +722,14 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       );
       safeFailure =
         'Controller preparation failed. Check staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.';
-      await this.prepareController(session, credential, bundle.bytes);
+      await this.prepareController(session, credential, bundle.bytes, bundle.hardwareProfile);
       safeFailure =
         'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.';
       await this.sudoRunScript(
         session.targetHost,
         session.hostKeyFingerprint,
         credential,
-        runtimeBundlePreflightScript(bundle.bytes),
+        runtimeBundlePreflightScript(bundle.bytes, '', bundle.hardwareProfile),
       );
       await this.sudoRunScript(
         session.targetHost,
@@ -789,11 +802,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           : []),
       ];
       if (environment.some((line) => /[\r\n\0]/.test(line))) throw new Error('Invalid environment value');
+      await this.assertCurrentRuntimeBundle(bundle);
       await this.updateProgress(
         session,
         55,
         'Transferring runtime',
-        'One locked delivery stages configuration and installs the signed runtime.',
+        'One locked delivery stages configuration and installs the runtime.',
       );
       const deliveryToken = session.deliveryToken ?? session.dockerProvisionToken ?? randomBytes(16).toString('hex');
       session.deliveryToken = deliveryToken;
@@ -811,6 +825,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             bundle.bytes,
             bundle.digest,
             deliveryToken,
+            '',
+            bundle.hardwareProfile,
           ),
           (percent) => this.reportTransferProgress(session, percent),
         );
@@ -827,7 +843,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
       return this.toResponse(await this.save(session, 'bootstrap_delivered'));
     } catch (error) {
-      if (error instanceof WagoRuntimeUploadError || error instanceof WagoStorageCapacityError)
+      if (
+        error instanceof WagoRuntimeUploadError ||
+        error instanceof WagoStorageCapacityError ||
+        error instanceof WagoControllerLockError
+      )
         safeFailure = error.message;
       if (credentialsTouched && session.enrollmentId !== null) {
         try {
@@ -847,7 +867,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.progressDetail =
         error instanceof WagoStorageCapacityError
           ? 'Free space on the CC100, then retry installation.'
-          : 'Review the blocker. Clean up any interrupted preparation or runtime installation before retrying. Cleanup will not restore CODESYS or previous workloads.';
+          : error instanceof WagoControllerLockError
+            ? 'The CC100 was busy. No preparation started; retry installation.'
+            : 'Review the blocker. Clean up any interrupted preparation or runtime installation before retrying. Cleanup will not restore CODESYS or previous workloads.';
       session.failureReason = safeFailure;
       return this.toResponse(await this.save(session, 'delivery_failed'));
     } finally {
@@ -855,25 +877,29 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     }
   }
 
-  private async acquireRuntimeBundle(
-    session: WagoCommissioningSession,
-  ): Promise<Awaited<ReturnType<typeof verifyRuntimeBundle>> & { image?: string }> {
-    const bundle =
-      this.artifacts && (session.runtimeArtifactDigest || (await this.artifacts.has()))
-        ? await this.artifacts.acquire(session.runtimeArtifactDigest ?? undefined)
-        : await verifyRuntimeBundle();
+  private async acquireRuntimeBundle(session: WagoCommissioningSession): Promise<RuntimeDeliveryBundle> {
+    const acquired =
+      this.artifacts && (await this.artifacts.has()) ? await this.artifacts.acquire() : await verifyRuntimeBundle();
+    const bundle = {
+      ...acquired,
+      hardwareProfile: 'manifest' in acquired ? acquired.manifest.hardware.profile : CC100_DIGITAL_PROFILE_ID,
+    };
     try {
-      if (session.runtimeArtifactDigest && session.runtimeArtifactDigest !== bundle.digest)
-        throw new ConflictException('Verified runtime release does not match the session-pinned artifact.');
-      if ('image' in bundle && bundle.image && !session.runtimeArtifactDigest) {
+      if (session.runtimeArtifactDigest !== bundle.digest) {
         session.runtimeArtifactDigest = bundle.digest;
-        await this.save(session, 'runtime_release_selected');
+        await this.save(session, 'runtime_release_resolved');
       }
       return bundle;
     } catch (error) {
       await rm(bundle.directory, { recursive: true, force: true });
       throw error;
     }
+  }
+
+  private async assertCurrentRuntimeBundle(bundle: { digest: string; image?: string }): Promise<void> {
+    if (!bundle.image || !this.artifacts) return;
+    if ((await this.artifacts.current())?.digest !== bundle.digest)
+      throw new ConflictException('The runtime release changed during delivery. Retry with the current release.');
   }
 
   async recover(
@@ -1317,6 +1343,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             timeoutMs: limits?.timeoutMs ?? SSH_TIMEOUT_MS,
             maxOutputBytes: limits?.maxOutputBytes ?? 65_536,
             storageDiagnostic: limits?.storageDiagnostic,
+            lockDiagnostic: limits?.lockDiagnostic,
             signal: guard?.signal,
             peerVersion: peer,
           },
@@ -1410,7 +1437,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const progressPercent = 55 + Math.round((percent * 15) / 100);
     session.progressPercent = progressPercent;
     session.progressStep = 'Transferring runtime';
-    session.progressDetail = `Uploading signed runtime bundle: ${percent}%.`;
+    session.progressDetail = `Uploading runtime bundle: ${percent}%.`;
     const update = {
       progressPercent,
       progressStep: session.progressStep,
@@ -1667,7 +1694,7 @@ function runProcess(
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { env: { ...process.env, ...environment }, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
-    let storageStderr = '';
+    let diagnosticStderr = '';
     let stopped = false;
     const stop = () => {
       if (stopped) return;
@@ -1692,7 +1719,8 @@ function runProcess(
     });
     child.stderr.on('data', (chunk: Buffer) => {
       limits.peerVersion?.write(chunk);
-      if (limits.storageDiagnostic) storageStderr = (storageStderr + chunk.toString('utf8')).slice(-4096);
+      if (limits.storageDiagnostic || limits.lockDiagnostic)
+        diagnosticStderr = (diagnosticStderr + chunk.toString('utf8')).slice(-4096);
     });
     child.on('error', () => {
       clearTimeout(timer);
@@ -1703,8 +1731,13 @@ function runProcess(
       clearTimeout(timer);
       limits.signal?.removeEventListener('abort', stop);
       if (code === 0) resolve(stdout);
-      else if (limits.storageDiagnostic && storageStderr.includes('Insufficient runtime storage:'))
+      else if (limits.storageDiagnostic && diagnosticStderr.includes('Insufficient runtime storage:'))
         reject(new WagoStorageCapacityError());
+      else if (
+        limits.lockDiagnostic &&
+        diagnosticStderr.split('\n').includes('Another runtime transaction holds the controller lock')
+      )
+        reject(new WagoControllerLockError());
       else reject(new Error('Commissioning subprocess failed.'));
     });
     child.stdin.end(input);
@@ -1720,6 +1753,7 @@ export class WagoRuntimeUploadError extends Error {
     termination: 'remote-exit' | 'local-timeout' | 'operation-aborted' = 'remote-exit',
   ) {
     const known = [
+      'Runtime image load failed or exceeded 300 seconds',
       'Runtime supervisor launch unverified: prerequisites',
       'Runtime supervisor launch unverified: readiness',
       'Runtime supervisor launch unverified: owner-verification',
@@ -1825,10 +1859,7 @@ function isImmutableImage(image: string): boolean {
 
 function isRuntimeArtifactConfigured(): boolean {
   return Boolean(
-    isImmutableImage(configuredRuntimeImage) &&
-    configuredRuntimeBundle &&
-    configuredRuntimeBundleChecksum &&
-    configuredRuntimeBundleSignature,
+    isImmutableImage(configuredRuntimeImage) && configuredRuntimeBundle && configuredRuntimeBundleChecksum,
   );
 }
 
@@ -1836,21 +1867,14 @@ async function verifyRuntimeBundle(): Promise<{ directory: string; path: string;
   const directory = await mkdtemp(join(tmpdir(), 'attraccess-cc100-runtime-'));
   const bundlePath = join(directory, 'runtime.tar');
   const checksumPath = join(directory, 'runtime.tar.sha256');
-  const signaturePath = join(directory, 'runtime.tar.sig');
   try {
     const copies = await Promise.allSettled([
       copyFile(configuredRuntimeBundle, bundlePath),
       copyFile(configuredRuntimeBundleChecksum, checksumPath),
-      copyFile(configuredRuntimeBundleSignature, signaturePath),
     ]);
     const failedCopy = copies.find((result) => result.status === 'rejected');
     if (failedCopy?.status === 'rejected') throw failedCopy.reason;
-    const [bundle, checksum, signature] = await Promise.all([
-      readFile(bundlePath),
-      readFile(checksumPath, 'utf8'),
-      stat(signaturePath),
-    ]);
-    if (!signature.isFile()) throw new ConflictException('CC100 runtime signature is not a file');
+    const [bundle, checksum] = await Promise.all([readFile(bundlePath), readFile(checksumPath, 'utf8')]);
 
     const digest = createHash('sha256').update(bundle).digest('hex');
     if (
@@ -1860,25 +1884,6 @@ async function verifyRuntimeBundle(): Promise<{ directory: string; path: string;
     )
       throw new ConflictException('CC100 runtime bundle checksum does not match');
 
-    const allowedSigners = join(directory, 'allowed_signers');
-    const publicKey = await readFile(
-      resolveRuntimeSigningPublicKeyPath(
-        process.env.NODE_ENV,
-        configuredRuntimeSigningPublicKey,
-        join(__dirname, 'signing-public-key.pub'),
-      ),
-      'utf8',
-    );
-    await writeFile(allowedSigners, `${SIGNING_IDENTITY} ${publicKey.trim()}\n`, { mode: 0o600 });
-    try {
-      await runProcess(
-        'ssh-keygen',
-        ['-Y', 'verify', '-f', allowedSigners, '-I', SIGNING_IDENTITY, '-n', SIGNING_NAMESPACE, '-s', signaturePath],
-        bundle,
-      );
-    } finally {
-      await rm(allowedSigners, { force: true });
-    }
     return { directory, path: bundlePath, bytes: bundle.length, digest };
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
@@ -1892,17 +1897,6 @@ function escapeRegExp(value: string): string {
 
 export function isSupportedController(inspection: string, firmwareBaseline: string): boolean {
   return firmwareBaseline.trim() === '31' && isCc100Fw31Identity(inspection);
-}
-
-export function resolveRuntimeSigningPublicKeyPath(
-  environment: string | undefined,
-  localPath: string,
-  releasePath: string,
-): string {
-  if (!localPath) return releasePath;
-  if (environment !== 'development')
-    throw new ConflictException('local CC100 runtime signing keys are only allowed in development');
-  return localPath;
 }
 
 export function shellQuote(value: string): string {

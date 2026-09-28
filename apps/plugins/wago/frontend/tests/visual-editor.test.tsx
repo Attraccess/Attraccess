@@ -606,7 +606,7 @@ describe('mounted Modbus configuration', () => {
     expect(validateEditorSnapshot(first)).toEqual([]);
     expect(first.modbus.devices[0]).toMatchObject({
       name: 'Workshop meter',
-      profileId: 'wago-879-3000-unverified',
+      profileId: 'wago-879-3000',
       profileVersion: 1,
     });
     expect(first.physicalPoints[1]).toMatchObject({
@@ -782,8 +782,8 @@ describe('Modbus output and serial composition', () => {
     expect(saved.modbus.connections[0]).toMatchObject({
       transport: 'rtu',
       path: '/dev/serial',
-      baudRate: 19200,
-      parity: 'even',
+      baudRate: 9600,
+      parity: 'none',
       stopBits: 1,
     });
     expect(saved.modbus.connections[0]).not.toHaveProperty('host');

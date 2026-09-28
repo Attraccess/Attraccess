@@ -55,6 +55,13 @@ describe('bounded commissioning runtime readiness', () => {
     expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
   });
 
+  it('uses the commissioning clock tolerance for runtime readiness', () => {
+    send({ ...payload, timestamp: new Date(time + 5000).toISOString() });
+    expect(service.observe(1, 'fixture', 'attraccess/wago')?.ready).toBe(true);
+    send({ ...payload, sequence: 2, timestamp: new Date(time + 5001).toISOString() });
+    expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
+  });
+
   it('does not restore an older ready observation after malformed input invalidates readiness', () => {
     send(payload);
     send({ ...payload, sequence: 2, readiness: { ...payload.readiness, ready: false } });
