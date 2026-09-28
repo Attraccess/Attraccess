@@ -38,7 +38,7 @@ export function RuntimeArtifactImport({
     onSelectionChange?.(current);
   }, [current, onSelectionChange]);
   const [artifacts, setArtifacts] = useState<RuntimeArtifactInfo[]>([]);
-  const [files, setFiles] = useState<Partial<Record<'bundle' | 'checksum' | 'signature', File>>>({});
+  const [files, setFiles] = useState<Partial<Record<'bundle' | 'checksum', File>>>({});
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -84,23 +84,14 @@ export function RuntimeArtifactImport({
     return () => abort.abort();
   }, [loadAttempt]);
   async function importRelease() {
-    if (
-      !files.bundle ||
-      !files.checksum ||
-      !files.signature ||
-      disabled ||
-      loading ||
-      loadFailed ||
-      uploadAbort.current
-    )
-      return;
-    if (files.bundle.size > maxBytes || files.checksum.size > 4096 || files.signature.size > 16384) {
-      setError('The runtime tar must be at most 512 MiB, checksum 4 KiB, and signature 16 KiB.');
+    if (!files.bundle || !files.checksum || disabled || loading || loadFailed || uploadAbort.current) return;
+    if (files.bundle.size > maxBytes || files.checksum.size > 4096) {
+      setError('The runtime tar must be at most 512 MiB and checksum 4 KiB.');
       return;
     }
     setBusy(true);
     setError('');
-    setStatus('Uploading and verifying the signed release…');
+    setStatus('Uploading and checking the runtime release…');
     const abort = new AbortController();
     uploadAbort.current = abort;
     let failureMessage = 'Import could not be completed. Check your connection and retry with the selected files.';
@@ -108,7 +99,6 @@ export function RuntimeArtifactImport({
       const body = new FormData();
       body.append('bundle', files.bundle);
       body.append('checksum', files.checksum);
-      body.append('signature', files.signature);
       const response = await api.fetch('/import', { method: 'POST', body, signal: abort.signal });
       if (abort.signal.aborted) return;
       if (!response.ok) {
@@ -117,7 +107,7 @@ export function RuntimeArtifactImport({
             ? 'Administrator access is required.'
             : response.status === 409
               ? 'Another upload is in progress. Try again shortly.'
-              : 'Import failed. Check that all three files belong to the same signed release and try again.';
+              : 'Import failed. Check that the runtime tar and checksum belong together and try again.';
         throw new Error('Import rejected');
       }
       const artifact: RuntimeArtifactInfo = await response.json();
@@ -143,10 +133,7 @@ export function RuntimeArtifactImport({
     <section className="wg:space-y-3" aria-label="CC100 runtime release">
       <header>
         <h3>CC100 runtime release</h3>
-        <p>
-          Download the signed WAGO runtime bundle, extract its archive, then select the three release files. No server
-          paths or signing keys are needed.
-        </p>
+        <p>Download the WAGO runtime bundle, extract its archive, then select the runtime tar and checksum files.</p>
       </header>
       <div className="wg:space-y-3">
         <p>
@@ -155,9 +142,9 @@ export function RuntimeArtifactImport({
             target="_blank"
             rel="noreferrer"
           >
-            Official signed runtime build artifacts
+            Official runtime build artifacts
           </a>
-          . Your software distributor can also provide these files. Only signed builds are importable.
+          . Your software distributor can also provide these files. Check the source before importing.
         </p>
         {loading ? (
           <p>Loading releases…</p>
@@ -186,12 +173,11 @@ export function RuntimeArtifactImport({
           }}
         >
           <fieldset disabled={disabled || busy || loading || loadFailed} className="wg:flex wg:flex-col wg:gap-3">
-            <legend>Signed release files</legend>
+            <legend>Runtime release files</legend>
             {(
               [
                 ['bundle', 'Runtime bundle (.tar)', '.tar'],
                 ['checksum', 'Checksum (.sha256)', '.sha256'],
-                ['signature', 'Signature (.sig)', '.sig'],
               ] as const
             ).map(([field, label, accept]) => (
               <label key={field}>
@@ -206,9 +192,7 @@ export function RuntimeArtifactImport({
             ))}
             <Button
               type="submit"
-              isDisabled={
-                disabled || busy || loading || loadFailed || !files.bundle || !files.checksum || !files.signature
-              }
+              isDisabled={disabled || busy || loading || loadFailed || !files.bundle || !files.checksum}
             >
               {busy ? 'Verifying release…' : 'Import and select release'}
             </Button>

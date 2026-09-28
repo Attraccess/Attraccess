@@ -284,7 +284,6 @@ class CommissioningDesktop(unittest.TestCase):
         expect(self.button("Clean up failed installation")).to_be_disabled()
         expect(self.page.get_by_text("Verifying commissioned controller", exact=True)).to_be_visible()
         expect(self.page.get_by_text(re.compile("Physical qualification: required"))).to_be_visible()
-        expect(self.page.get_by_text(re.compile("Pinned signed release:"))).to_be_visible()
         dialog = self.page.get_by_role("dialog", name="Commission a controller", exact=True)
         bounds = dialog.bounding_box()
         self.assertIsNotNone(bounds)
