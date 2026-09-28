@@ -514,6 +514,23 @@ describe('WagoFlowService', () => {
       expect(service['waiters'].size).toBe(0);
     });
 
+    it.each([42, 2100, 5000])(
+      'keeps flow reads and waits available with %i ms of positive clock skew',
+      async (skew) => {
+        const { service } = createService();
+        await service.refresh();
+        await stateMessage(service, 1, { age: -skew });
+        const cached = service.read(config);
+        expect(cached).not.toBeNull();
+        expect(cached && service.payload(cached)).toMatchObject({ available: true, stale: false });
+        await expect(service.wait(config)).resolves.toMatchObject({ sequence: 1, value: true });
+        await stateMessage(service, 99, { age: -5001 });
+        expect(service.read(config)).toMatchObject({ sequence: 1 });
+        await jest.advanceTimersByTimeAsync(skew + 90_001);
+        expect(cached && service.payload(cached)).toMatchObject({ available: false, stale: true });
+      },
+    );
+
     it('does not let future-dated samples block fresh updates after clock correction', async () => {
       const { service } = createService();
       await service.refresh();

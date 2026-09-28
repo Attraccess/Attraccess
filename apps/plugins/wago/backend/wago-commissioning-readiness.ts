@@ -2,6 +2,7 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PLUGIN_CONTEXT, PluginContext, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 import { admitEnvelope, emptyStream, type DiagnosticStream } from './diagnostics-envelope';
 import { normalizeOperationalPrefix, parseOperationalMessage } from './protocol';
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 
 export interface CommissioningRuntimeState {
   timestamp: number;
@@ -81,7 +82,7 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
             const value = JSON.parse(message.payload.toString('utf8')) as Record<string, unknown>;
             const readiness = value.readiness;
             if (
-              timestamp > now ||
+              timestamp > now + CONTROLLER_CLOCK_TOLERANCE_MS ||
               (event.contentHash !== null && !/^[a-f0-9]{64}$/i.test(event.contentHash)) ||
               !isReadiness(readiness)
             ) {

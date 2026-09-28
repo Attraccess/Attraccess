@@ -9,13 +9,14 @@ import {
   type DiagnosticStream,
 } from './diagnostics-envelope';
 import { safeValidationSummaries } from './diagnostics-validation';
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 /** Process-local, allowlisted diagnostics. Never retain raw MQTT payloads or free-form device errors. */
 export type Freshness = 'missing' | 'invalid' | 'future' | 'stale' | 'fresh';
 export function freshness(timestamp: string | null | undefined, now = Date.now(), maxAge = 90_000): Freshness {
   if (!timestamp) return 'missing';
   const time = sourceTime(timestamp);
   if (time === null) return 'invalid';
-  if (time > now) return 'future';
+  if (time > now + CONTROLLER_CLOCK_TOLERANCE_MS) return 'future';
   return now - time > maxAge ? 'stale' : 'fresh';
 }
 export interface DiagnosticSample {
