@@ -14,6 +14,9 @@ export default defineConfig({
     include: [
       'apps/plugins/wago/frontend/tests/*.test.tsx',
       'apps/plugins/wago/frontend/src/ModbusConfigurationForm.spec.tsx',
+      'apps/plugins/wago/frontend/src/CommissioningModal.test.tsx',
+      'apps/plugins/wago/frontend/src/ControllersTable.test.tsx',
+      'apps/plugins/wago/frontend/src/useCommissioningVerification.test.tsx',
     ],
     // The visual editor and Modbus form tests both render into jsdom's global document.
     // Running files concurrently allows user-event interactions in one file to target

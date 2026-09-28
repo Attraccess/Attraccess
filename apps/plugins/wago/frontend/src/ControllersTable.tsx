@@ -11,6 +11,7 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import type { CommissioningSession, WagoCommissioningState, WagoController } from './api';
+import { useCommissioningVerification } from './useCommissioningVerification';
 
 interface ControllersTableProps {
   controllers: WagoController[];
@@ -120,7 +121,20 @@ function CommissioningRow({ row, onResume }: { row: Extract<TableRowData, { kind
 }
 
 function CommissioningStatus({ session }: { session: CommissioningSession }) {
-  return <span className="wg:mt-1 wg:text-xs wg:text-primary">{commissioningLabel(session.state)}{session.failureReason ? `: ${session.failureReason}` : ''}</span>;
+  const verification = useCommissioningVerification(session);
+  const label = verification.enrollmentComplete
+    ? verification.runtimeVerified
+      ? 'Enrollment complete · runtime verified'
+      : 'Enrollment complete · runtime setup pending'
+    : verification.unavailable
+      ? 'Verification status unavailable'
+      : commissioningLabel(session.state);
+  return (
+    <span className="wg:mt-1 wg:text-xs wg:text-primary">
+      {label}
+      {session.failureReason ? `: ${session.failureReason}` : ''}
+    </span>
+  );
 }
 
 function EmptyControllers() {

@@ -16,7 +16,8 @@ import type { Key } from '@heroui/react';
 import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CommissioningSession } from './api';
-import { getCommissioningSupport, getCommissioningVerification } from './api';
+import { getCommissioningSupport } from './api';
+import { useCommissioningVerification } from './useCommissioningVerification';
 import { RuntimeArtifactImport } from './RuntimeArtifactImport';
 import type { RuntimeArtifactInfo } from './RuntimeArtifactImport';
 import { CommissioningSecurityPanel } from './CommissioningSecurityPanel';
@@ -162,7 +163,6 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
         name,
         targetHost: controllerIp,
         mqttServerId: selectedMqttServerId,
-        runtimeArtifactDigest: selectedArtifact?.digest,
       },
       {
         onSuccess: (created) => {
@@ -331,11 +331,6 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
           <StepHeading step={activeStep} />
           {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
           <ConnectionFields model={model} />
-          {session?.runtimeArtifactDigest && (
-            <p className="wg:break-all wg:text-sm">
-              Pinned signed release: <code>{session.runtimeArtifactDigest}</code>. Retries keep this release.
-            </p>
-          )}
           {session?.state === 'awaiting_identity_confirmation' && (
             <HostKeyConfirmationStep
               fingerprint={hostKeyFingerprint}
@@ -742,7 +737,7 @@ function StepHeading({ step }: { step: number }) {
   const content = [
     ['Name the controller', 'Choose a name you will recognize later.'],
     ['Connect the controller', 'Enter its IP address and choose the MQTT server it will use.'],
-    ['Choose a runtime release', 'Select the signed release to install on this controller.'],
+    ['Choose a runtime release', 'Select the release to install on this controller.'],
     ['Verify the controller', 'Check the SSH fingerprint before installation.'],
     ['Install the runtime', 'Review what installation changes, then approve it.'],
     ['Installation progress', 'You can close this window and return to the saved session later.'],
@@ -1018,11 +1013,23 @@ function DeliveryStep({
 }
 
 function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
-  const complete = ['completed', 'revoked', 'claim_interrupted', 'recovery_revocation_pending'].includes(session.state);
+  const verification = useCommissioningVerification(session);
+  const complete =
+    verification.enrollmentComplete ||
+    ['completed', 'revoked', 'claim_interrupted', 'recovery_revocation_pending'].includes(session.state);
+  const progress = verification.enrollmentComplete
+    ? {
+        ...session,
+        progressStep: 'Runtime enrollment complete',
+        progressDetail: verification.runtimeVerified
+          ? 'Permanent MQTT access, enrollment credential revocation, applied configuration and a fresh runtime probe are verified.'
+          : 'Permanent MQTT access and enrollment credential revocation are verified. Configure inputs and outputs to finish runtime setup.',
+      }
+    : session;
   return (
     <div className="wg:space-y-4">
       <DevicePassport className="wg:md:hidden" name={name} step={5} />
-      <CommissioningStatusPanel isActive={!complete} session={session} />
+      <CommissioningStatusPanel isActive={!complete} session={progress} />
       <div className="wg:rounded-large wg:border wg:border-default-200 wg:p-4 wg:text-sm">
         <p className="wg:font-medium">Safe to close</p>
         <p className="wg:mt-1 wg:text-muted">
@@ -1050,30 +1057,22 @@ function VerificationStatus({
   session: CommissioningSession;
   onConfigure?: (controllerId: number) => void;
 }) {
-  const verification = useQuery({
-    queryKey: ['wago', 'commissioning-verification', session.id],
-    queryFn: () => getCommissioningVerification(session.id),
-    refetchInterval: 5000,
-  });
+  const verification = useCommissioningVerification(session);
+  const controllerId = verification.data?.controllerId;
+  const managementControllerId = controllerId ?? session.managementControllerId;
   return (
     <div className="wg:space-y-3">
-      <Alert status="warning">
+      <Alert status={verification.enrollmentComplete ? 'success' : 'warning'}>
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Commissioning is not yet verified</Alert.Title>
+          <Alert.Title>{verification.enrollmentComplete ? 'Enrollment complete' : 'Verifying enrollment'}</Alert.Title>
           <Alert.Description>
-            {verification.isError ? (
-              'Verification could not be loaded. No readiness claim is made.'
+            {verification.unavailable ? (
+              'Current verification is unavailable. Waiting for a fresh status check.'
             ) : verification.data ? (
               <ul>
                 <li>Permanent heartbeat: {verification.data.permanentConnection ? 'received' : 'pending'}</li>
                 <li>Enrollment credential revoked: {verification.data.enrollmentRevoked ? 'verified' : 'pending'}</li>
-                <li>
-                  Desired/reported configuration: {verification.data.configurationApplied ? 'applied' : 'pending'}
-                </li>
-                <li>Runtime hardware probe: {verification.data.hardwareReadiness ?? 'unverified'}</li>
-                <li>Management hardening: {verification.data.managementHardening}</li>
-                <li>Physical qualification: required before production use</li>
               </ul>
             ) : (
               'Checking commissioning evidence...'
@@ -1081,16 +1080,23 @@ function VerificationStatus({
           </Alert.Description>
         </Alert.Content>
       </Alert>
-      {(verification.data?.controllerId || session.managementControllerId) && (
+      {verification.data && (
+        <section aria-label="Runtime setup and qualification">
+          <h3>{verification.runtimeVerified ? 'Runtime configuration verified' : 'Runtime setup checks'}</h3>
+          <ul>
+            <li>Desired/reported configuration: {verification.data.configurationApplied ? 'applied' : 'pending'}</li>
+            <li>Runtime hardware probe: {verification.data.hardwareReadiness ?? 'unverified'}</li>
+            <li>Management hardening: {verification.data.managementHardening}</li>
+            <li>Physical qualification: required before production use</li>
+          </ul>
+        </section>
+      )}
+      {managementControllerId && (
         <>
-          {onConfigure && verification.data?.controllerId && (
-            <Button onPress={() => onConfigure(verification.data!.controllerId!)}>Configure inputs and outputs</Button>
+          {onConfigure && controllerId && (
+            <Button onPress={() => onConfigure(controllerId)}>Configure inputs and outputs</Button>
           )}
-          <CommissioningSecurityPanel
-            key={session.id}
-            sessionId={session.id}
-            controllerId={verification.data?.controllerId ?? session.managementControllerId!}
-          />
+          <CommissioningSecurityPanel key={session.id} sessionId={session.id} controllerId={managementControllerId} />
         </>
       )}
     </div>
