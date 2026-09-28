@@ -209,10 +209,19 @@ describe('visual configuration workflow', () => {
     const name = await screen.findByRole('textbox', { name: 'Channel name' });
     await user.clear(name);
     await user.type(name, 'Unsaved diagnostic session');
-    state.diagnostics.mockClear();
-    await section(user, 'Diagnostics');
-    await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
-    await waitFor(() => expect(state.diagnostics).toHaveBeenCalledTimes(1));
+    // Pause the 5 s refetchInterval for the exact-count window: an interval
+    // tick only refetches while focusManager.isFocused(), which reads
+    // document.visibilityState at tick time. Without this, a slow runner can
+    // let a background poll land between the clear and the manual refresh.
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    try {
+      state.diagnostics.mockClear();
+      await section(user, 'Diagnostics');
+      await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
+      await waitFor(() => expect(state.diagnostics).toHaveBeenCalledTimes(1));
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState');
+    }
     expect(name).toHaveValue('Unsaved diagnostic session');
     expect(screen.getByText(/Unsaved local edits/)).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
