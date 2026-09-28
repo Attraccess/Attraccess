@@ -37,6 +37,7 @@ import { CLOCK_INSPECTION_SCRIPT } from '../backend/wago-commissioning-clock';
 import { fw31IdentityOutput } from '../backend/fixtures/fw31-identity';
 import { WagoCommissioningSession } from '../backend/wago-commissioning-session.entity';
 import { WagoRuntimeArtifactsService } from '../backend/wago-runtime-artifacts';
+import type { RuntimeArtifactManifest } from '../backend/wago-runtime-artifacts';
 import { WagoCredentialRotationService } from '../backend/wago-credential-rotation';
 import { WagoCredentialRotationEntity } from '../backend/wago-credential-rotation.entity';
 import { WagoConfigurationRevision } from '../backend/wago-configuration-revision.entity';
@@ -213,6 +214,19 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     const artifactDirectory = join(directory, 'artifact');
     await mkdir(artifactDirectory);
     const image = `ghcr.io/attraccess/wago-cc100-runtime@sha256:${'a'.repeat(64)}`;
+    const artifactManifest: RuntimeArtifactManifest = {
+      schemaVersion: 1,
+      runtime: 'attraccess-wago-cc100',
+      runtimeVersion: '0.1.0',
+      protocolVersion: '1.0.0',
+      image,
+      hardware: {
+        model: '751-9301',
+        platform: 'linux/arm/v7',
+        firmwareBaseline: '31',
+        profile: WAGO_HARDWARE_PROFILE,
+      },
+    };
     jest.spyOn(artifacts, 'acquire').mockResolvedValue({
       digest: 'a'.repeat(64),
       bytes: 512,
@@ -220,19 +234,13 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       path: join(artifactDirectory, 'runtime.tar'),
       directory: artifactDirectory,
       cleanup: async () => undefined,
-      manifest: {
-        schemaVersion: 1,
-        runtime: 'attraccess-wago-cc100',
-        runtimeVersion: '0.1.0',
-        protocolVersion: '1.0.0',
-        image,
-        hardware: {
-          model: '751-9301',
-          platform: 'linux/arm/v7',
-          firmwareBaseline: '31',
-          profile: WAGO_HARDWARE_PROFILE,
-        },
-      },
+      manifest: artifactManifest,
+    });
+    jest.spyOn(artifacts, 'current').mockResolvedValue({
+      digest: 'a'.repeat(64),
+      bytes: 512,
+      image,
+      manifest: artifactManifest,
     });
     commissioning = new WagoCommissioningService(context, wago, artifacts);
     // Replace only transport boundaries; delivery, inspection, leases and automatic claim remain real.

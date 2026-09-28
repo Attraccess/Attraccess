@@ -14,6 +14,7 @@ it('preserves interrupted credential revocation metadata through a full-registry
       VALUES ('fixture', 'untrusted', 'fixture', '1', '1', '[]', 'fixture', 'fixture', 'fixture', 19)`);
     await database.undoLastMigration();
     await database.undoLastMigration();
+    await database.undoLastMigration();
     await expect(database.undoLastMigration()).rejects.toThrow('Revoke tracked WAGO credentials');
     expect(await database.query('SELECT hardware_id, credential_mqtt_server_id FROM plugin_wago_controllers')).toEqual([
       { hardware_id: 'fixture', credential_mqtt_server_id: 19 },
