@@ -2,11 +2,12 @@ import { wagoHardwareDeploymentDockerArgs, wagoHardwareDeploymentPreflightScript
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
 import { wagoShellStat } from './wago-shell-stat';
 import { wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
+import { CC100_DIGITAL_PROFILE_ID, type Cc100HardwareProfile } from '../shared/hardware-profile';
 
 /**
- * The caller must authenticate the bundle signature/checksum before uploading it
+ * The caller must verify the bundle checksum and manifest before uploading it
  * to /tmp/attraccess-wago-runtime.tar over pinned SSH. This script checks the
- * embedded reference, not the signature (the controller has no signing key).
+ * embedded reference against the selected release.
  *
  * Stage runtime.env.next atomically, mode 0600, under the same install.lock
  * flock used here; refuse staging while install-transaction or runtime.env.next
@@ -18,11 +19,20 @@ import { wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
  * destructive commissioning never restores old workloads or revoked credentials.
  * testRoot is only for isolated shell fixtures; production callers must omit it.
  */
-export function runtimeBundleInstallScript(image: string, testRoot = ''): string {
-  return installScript(image, testRoot);
+export function runtimeBundleInstallScript(
+  image: string,
+  testRoot = '',
+  profile: Cc100HardwareProfile = CC100_DIGITAL_PROFILE_ID,
+): string {
+  return installScript(image, testRoot, false, profile);
 }
 
-function installScript(image: string, testRoot: string, locked = false): string {
+function installScript(
+  image: string,
+  testRoot: string,
+  locked = false,
+  profile: Cc100HardwareProfile = CC100_DIGITAL_PROFILE_ID,
+): string {
   if (!/^\S+@sha256:[a-f0-9]{64}$/i.test(image)) throw new Error('Runtime image must be digest-pinned');
   return `${preamble(testRoot, locked)}
 test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" || fail 'Runtime transaction exists; recover or accept it before retrying'
@@ -35,7 +45,7 @@ if [ -e "$config/docker-provision" ]; then
   test -f "$config/docker-provision/started" && test ! -e "$config/docker-provision/restored" || fail 'Docker provisioning recovery required'
   test -f "$config/delivery/token" && test "$(cat "$config/docker-provision/token")" = "$(cat "$config/delivery/token")" || fail 'Docker provisioning belongs to another delivery'
 fi
-${wagoHardwareDeploymentPreflightScript(testRoot)}
+${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 ${boundedDocker()}
 docker container ls -a --no-trunc --format '{{.ID}} {{.Names}}' > "$config/containers.next"
 stage=$(mktemp -d "$root/var/lib/attraccess-wago-install-stage.XXXXXX")
@@ -67,7 +77,7 @@ for old_id in $(cat "$tx/old-id"); do
   remove_owned_container "$old_id" || fail 'Previous owned runtime containment failed'
 done
 # No prior-workload snapshots: these fixed owned paths are replaced only after
-# the signed bundle is staged and the predecessor is stopped and removed.
+  # the verified bundle is staged and the predecessor is stopped and removed.
 touch "$tx/data-changing"
 rm -rf "$data"
 mkdir -m 0700 "$data"
@@ -83,8 +93,10 @@ touch "$tx/env-changing"
 rm -f "$config/runtime.env.previous"
 mv "$config/runtime.env.next" "$config/runtime.env"
 chmod 0600 "$config/runtime.env"
+# FW31 takes over 45s to decompress/import even a cached runtime image. Give
+# import its own bounded budget; ordinary Docker queries keep their short limit.
 # Do not pipe docker load into sed: POSIX sh would hide a failing load exit code.
-docker load -i "$tx/bundle/image.tar" > "$tx/load-output"
+timeout -k 5 300 docker --host unix:///var/run/docker.sock load -i "$tx/bundle/image.tar" > "$tx/load-output" || fail 'Runtime image load failed or exceeded 300 seconds'
 sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p' "$tx/load-output" > "$tx/loaded-image"
 test "$(wc -l < "$tx/loaded-image" | tr -d ' ')" = 1 || fail 'Expected exactly one loaded image'
 runtime_image=$(cat "$tx/loaded-image")
@@ -98,11 +110,11 @@ set --
 if [ -f "$config/runtime-ca.pem" ]; then
   set -- -v "$config/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro"
 fi
-${wagoHardwareDeploymentPreflightScript(testRoot)}
+${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 ${boundedDocker()}
 # Every subsequent start must pass the host gate again. Docker's own restart
 # manager cannot run that gate and must never restart a physical I/O writer.
-docker run -d --pull=never --name attraccess-wago --restart no --env-file "$config/runtime.env" ${wagoHardwareDeploymentDockerArgs(testRoot)} -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
+docker run -d --pull=never --name attraccess-wago --restart no --env-file "$config/runtime.env" ${wagoHardwareDeploymentDockerArgs(testRoot, profile)} -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
 touch "$tx/started"
 touch "$config/runtime-enabled"
 ${wagoRuntimeSupervisorLaunchShell()}
@@ -186,19 +198,21 @@ fi
 
 /** Call only after the coordinator accepts the new runtime; discards recovery metadata. */
 export function runtimeBundleAcceptScript(testRoot = ''): string {
-  return `${preamble(testRoot)}
+  return `${preamble(testRoot, false, true)}
 test ! -e "$cleanup" || fail 'Recovery cleanup is pending; acceptance is unavailable'
 if [ -d "$acceptedCleanup" ]; then rm -rf "$acceptedCleanup"; exit 0; fi
 test -f "$tx/started" || fail 'No started runtime transaction to accept'
 test ! -e "$tx/recovering" || fail 'Recovery already began; finish recovery instead of acceptance'
 validate_snapshot || fail 'Incomplete runtime transaction metadata'
+test -f "$config/runtime-enabled" && test ! -L "$config/runtime-enabled" || fail 'Runtime is not enabled'
+test "$(docker inspect --format '{{.State.Running}}' attraccess-wago)" = true || fail 'Runtime is not running; retain the transaction for recovery'
 touch "$tx/accepting"
 mv "$tx" "$acceptedCleanup"
 rm -rf "$acceptedCleanup"
 `;
 }
 
-function preamble(testRoot: string, locked = false): string {
+function preamble(testRoot: string, locked = false, waitForLock = false): string {
   if (testRoot && (!testRoot.startsWith('/') || testRoot === '/' || testRoot.includes('\n')))
     throw new Error('Test root must be an absolute isolated directory');
   return `set -eu
@@ -214,7 +228,7 @@ cleanup="$tx.cleanup"
 acceptedCleanup="$tx.accepted-cleanup"
 receipt="$tx.restored"
 fail() { echo "$*" >&2; exit 1; }
-${wagoShellFilesystemGuard({ acquireLock: !locked })}
+${wagoShellFilesystemGuard({ acquireLock: !locked, waitForLock })}
 wago_require_root_directory_or_alias "$root/var" && wago_require_root_directory_or_alias "$root/var/lib" || fail 'Unsafe runtime journal parent'
 for journal in "$tx" "$cleanup" "$acceptedCleanup" "$receipt" "$config/delivery" "$config/docker-provision" "$config"/docker-provision.completed-*; do
   if test -e "$journal" || test -L "$journal"; then
@@ -330,10 +344,11 @@ export function runtimeBundleDeliveryScript(
   digest: string,
   token: string,
   testRoot = '',
+  profile: Cc100HardwareProfile = CC100_DIGITAL_PROFILE_ID,
 ): string {
   if (!Number.isSafeInteger(bytes) || bytes <= 0 || !/^[a-f0-9]{64}$/.test(digest) || !/^[a-f0-9]{32}$/.test(token))
     throw new Error('Invalid delivery metadata');
-  return `${runtimeBundlePreflightScript(bytes, testRoot)}
+  return `${runtimeBundlePreflightScript(bytes, testRoot, profile)}
 ${preamble(testRoot)}
 test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" && test ! -e "$config/runtime.env.next" && test ! -e "$config/runtime-ca.pem.next" || fail 'Recovery or acceptance required before delivery'
 if [ -e "$config/docker-provision" ]; then
@@ -363,7 +378,7 @@ mv "$config/delivery/ca" "$config/runtime-ca.pem.next"`
     : ''
 }
 printf '%s\\n' installing > "$config/delivery/phase"
-${installScript(image, testRoot, true)}
+${installScript(image, testRoot, true, profile)}
 rm -f "$root/tmp/attraccess-wago-runtime.tar"
 rm -rf "$config/delivery"
 `;
@@ -452,9 +467,13 @@ export function runtimeBundleCapacityPreflightScript(bytes: number, testRoot = '
 }
 
 /** Delivery still requires the exclusive hardware gate after preparation. */
-export function runtimeBundlePreflightScript(bytes: number, testRoot = ''): string {
+export function runtimeBundlePreflightScript(
+  bytes: number,
+  testRoot = '',
+  profile: Cc100HardwareProfile = CC100_DIGITAL_PROFILE_ID,
+): string {
   return `${runtimeBundleCapacityPreflightScript(bytes, testRoot)}
-${wagoHardwareDeploymentPreflightScript(testRoot)}
+${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 `;
 }
 

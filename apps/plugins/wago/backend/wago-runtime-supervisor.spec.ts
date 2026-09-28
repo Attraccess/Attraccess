@@ -314,7 +314,7 @@ fs.rmSync(root+'/${request}',{recursive:true});
 
 describe('runtime supervisor handoff with real advisory locks and processes', () => {
   it.each([14, 15])(
-    'retains supervision or contains failure when launch arrives at contention %s',
+    'retains supervision through contention %s and contains a later hardware conflict',
     async (contention) => {
       const fixture = fw31ShellFixture();
       fixture.file(
@@ -354,7 +354,7 @@ const fs=require('node:fs'),root=process.env.FIXTURE_ROOT;
 if(fs.existsSync(root+'/owner-pid') && Number(fs.readFileSync(root+'/owner-pid','utf8'))===process.ppid){
  const count=fs.existsSync(root+'/sleeps')?Number(fs.readFileSync(root+'/sleeps','utf8'))+1:1;
  fs.writeFileSync(root+'/sleeps',String(count));
- if(count>=14){
+  if(count>=14 && !fs.existsSync(root+'/allow-polling')){
   fs.writeFileSync(root+'/sleep-'+count,'');
   while(!fs.existsSync(root+'/release-'+count))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
  }
@@ -408,19 +408,17 @@ echo launched
         await waitFor(() => existsSync(join(fixture.root, 'sleep-14')));
         if (contention === 15) {
           fixture.file('release-14', '');
-          // The 16th failed acquisition is the exhausted owner's containment
-          // path. It must keep supervisor.lock while waiting for the transaction.
-          await waitFor(() => fixture.read('busy').trim().split('\n').length >= 16);
+          await waitFor(() => existsSync(join(fixture.root, 'sleep-15')));
           expect(
             fixture.run('exec 8<>"$FIXTURE_ROOT/etc/attraccess-wago/supervisor.lock"\nflock -n 8').status,
           ).not.toBe(0);
-          fixture.file('release-launch', '');
         }
         fixture.file('trigger', '');
         // Pause at the launcher's actual poll, after its lock-release step, not
         // merely after mkdir (the caller could still be preparing the handoff).
         await waitFor(() => existsSync(join(fixture.root, 'launcher-waiting')));
         fixture.file('release-14', '');
+        if (contention === 15) fixture.file('release-15', '');
         if (contention === 14)
           await waitFor(
             () =>
@@ -429,22 +427,17 @@ echo launched
           );
         fixture.file('release-launch', '');
         await waitFor(() => status !== undefined);
-        if (contention === 15) {
-          expect(status).toBe(1);
-          expect(output).toContain('Runtime supervisor launch unverified');
-          expect(fixture.containers()[0].running).toBe(false);
-          expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
-          return;
-        }
         expect({ status, output }).toEqual({ status: 0, output: 'launched\n' });
         expect(fixture.run('exec 8<>"$FIXTURE_ROOT/etc/attraccess-wago/supervisor.lock"\nflock -n 8').status).not.toBe(
           0,
         );
         expect(fixture.containers()[0].running).toBe(true);
         fixture.file('plc', 'running');
+        fixture.file('allow-polling', '');
         fixture.file('release-15', '');
+        fixture.file('release-16', '');
         await waitFor(() => !fixture.containers()[0].running);
-        expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+        expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(true);
       } finally {
         for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
           try {

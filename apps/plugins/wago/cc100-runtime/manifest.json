@@ -22,10 +22,12 @@
   "security": { "arbitraryCodeUpload": false, "safetyRated": false },
   "deployment": {
     "privileged": false,
-    "hardwareProfile": "cc100-751-9301-fw31-digital-v1",
+    "hardwareProfile": "cc100-751-9301-fw31-digital-rtu-v1",
     "user": "10001",
     "capDrop": ["ALL"],
     "securityOpt": ["no-new-privileges"],
+    "devices": [{ "source": "/dev/ttySTM1", "target": "/dev/serial", "permissions": "rw" }],
+    "supplementaryGroups": ["Host dialout GID, verified by the installer"],
     "mounts": [
       {
         "source": "/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din",

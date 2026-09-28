@@ -107,7 +107,8 @@ describe('CC100 packed digital I/O', () => {
 
   it('keeps installer manifest and executable profile in sync', async () => {
     const manifest = JSON.parse(await readFile(join(__dirname, '../manifest.json'), 'utf8'));
-    expect(manifest.deployment.hardwareProfile).toBe(CC100_DIGITAL_PROFILE.id);
+    expect(manifest.deployment.hardwareProfile).toBe('cc100-751-9301-fw31-digital-rtu-v1');
+    expect(manifest.deployment.devices).toEqual([{ source: '/dev/ttySTM1', target: '/dev/serial', permissions: 'rw' }]);
     expect(manifest.deployment.privileged).toBe(false);
     expect(manifest.deployment.mounts).toEqual(
       Object.values(CC100_DIGITAL_PROFILE.registers).map((register) => ({
