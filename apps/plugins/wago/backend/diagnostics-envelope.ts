@@ -1,3 +1,5 @@
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
+
 /** Diagnostic consumer projection of the ATT-979 envelope; not a producer or flow protocol parser. */
 export const DIAGNOSTIC_CATEGORIES = [
   'heartbeat',
@@ -38,7 +40,7 @@ export function validEnvelope(data: Record<string, unknown>, now: number): boole
   const time = sourceTime(data.timestamp);
   return (
     time !== null &&
-    time <= now &&
+    time <= now + CONTROLLER_CLOCK_TOLERANCE_MS &&
     typeof data.streamId === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.streamId) &&
     Number.isSafeInteger(data.sequence) &&
@@ -60,7 +62,8 @@ export function admitEnvelope(
   if (restart) {
     if (
       !(category === 'heartbeat' || (category === 'state' && data.connected === true)) ||
-      now - timestamp > 90_000 || timestamp < state.lastSourceTime
+      now - timestamp > 90_000 ||
+      timestamp < state.lastSourceTime
     )
       return 'rejected';
     if (state.retiredStreams.length >= 16) {
