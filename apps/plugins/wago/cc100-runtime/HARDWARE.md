@@ -38,6 +38,10 @@ permissions, stop PLC software, or mount hardware itself.
   runtime restarts. A new enrollment uses fresh storage and credentials; cleanup
   is not a backup or restoration of preexisting workloads. Do not mount `/sys`,
   `/dev`, host root, or Docker socket.
+- Optionally grant UID 10001 read/write on the RUN LED `brightness` files under
+  `/sys/devices/platform/led/leds/run-{green,red}` and mount them at
+  `/run/attraccess-wago/io/led-run-{green,red}`. They are status feedback only:
+  absence or a failed grant never blocks I/O or startup.
 - Guided deployment uses Docker restart policy `no`. The root-owned boot hook
   `/etc/rc.d/S99_zz_attraccess_wago start` starts host supervision, which repeats
   the complete gate before each of at most five crash restarts per supervisor

@@ -34,7 +34,19 @@
         "target": "/run/attraccess-wago/io/din",
         "readOnly": true
       },
-      { "source": "/sys/kernel/dout_drv/DOUT_DATA", "target": "/run/attraccess-wago/io/dout", "readOnly": false }
+      { "source": "/sys/kernel/dout_drv/DOUT_DATA", "target": "/run/attraccess-wago/io/dout", "readOnly": false },
+      {
+        "source": "/sys/devices/platform/led/leds/run-green/brightness",
+        "target": "/run/attraccess-wago/io/led-run-green",
+        "readOnly": false,
+        "optional": true
+      },
+      {
+        "source": "/sys/devices/platform/led/leds/run-red/brightness",
+        "target": "/run/attraccess-wago/io/led-run-red",
+        "readOnly": false,
+        "optional": true
+      }
     ],
     "releaseRequirement": "ATT-984 must validate firmware-31 register access, UID 10001 permissions, exclusive output ownership and restart behavior on physical hardware. Installer integration is required; this manifest is not an installer."
   }

@@ -62,9 +62,13 @@ and deploys with:
 --env WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1
 --mount type=bind,src=/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din,dst=/run/attraccess-wago/io/din,readonly
 --mount type=bind,src=/sys/kernel/dout_drv/DOUT_DATA,dst=/run/attraccess-wago/io/dout
+--mount type=bind,src=/sys/devices/platform/led/leds/run-green/brightness,dst=/run/attraccess-wago/io/led-run-green
+--mount type=bind,src=/sys/devices/platform/led/leds/run-red/brightness,dst=/run/attraccess-wago/io/led-run-red
 ```
 
-Both sources must exist as the expected regular files, not substitute directories
+The two RUN LED mounts are optional status feedback. They are added only when the
+files exist, and a failed LED grant never blocks I/O (see [RUN LED status](#run-led-status)).
+Both DIN/DOUT sources must exist as the expected regular files, not substitute directories
 or final-component symlinks. No root fallback, privileged mode, broad `/sys`,
 `/dev`, host-root or Docker-socket mount is permitted. The protected runtime
 state directory and separate read-only private CA mount retain their TLS contract.
@@ -133,6 +137,24 @@ staging file in the validated boot directory. Unsafe existing paths are rejected
 
 Docker commands select the controller's local Unix endpoint and discard inherited
 remote-context settings. They never target the developer machine's daemon.
+
+## RUN LED status
+
+The runtime drives the CC100 RUN LED (green and red dies; both lit show yellow):
+
+| Pattern                              | Meaning                                          |
+| ------------------------------------ | ------------------------------------------------ |
+| Steady yellow                        | Runtime process starting                         |
+| Yellow blink                         | Connected, waiting to be claimed (pairing)       |
+| Red blink                            | MQTT broker unreachable                          |
+| Alternating green/yellow             | Claimed, no configuration accepted yet           |
+| Mostly red, short gap                | Hardware or configuration fault; check readiness |
+| Green heartbeat, periodic light show | Ready                                            |
+| Off                                  | Runtime stopped (or LED access unavailable)      |
+
+WAGO `ledserverd` leaves RUN at `STATIC_OFF` once CODESYS is disabled, so it does not
+compete with the runtime. The LED is cosmetic: missing files or permissions only
+disable it, and it is not a safety indicator.
 
 ## Reports, cleanup and security
 
