@@ -216,11 +216,28 @@ export class PluginService {
     // npm packages are active only while their installation is tracked. A failed or
     // interrupted removal may leave files behind; loading them alongside an uploaded
     // copy of the same plugin would register its flow nodes and audit domains twice.
-    const npmInstalls = new Set(
-      PluginService.readJsonFile<Array<{ installPath?: unknown }>>('.npm-plugin-state.json', [])
-        .map((record) => record?.installPath)
-        .filter((path): path is string => typeof path === 'string'),
-    );
+    // A missing state file means "no npm plugins installed" (filter normally); an
+    // existing-but-unreadable one (EACCES, EIO, a bad restore) must not be treated
+    // the same way, or every npm-installed plugin silently disappears from
+    // discovery with no signal beyond "Found N folders in ...".
+    const npmStatePath = join(PluginService.PLUGIN_PATH, '.npm-plugin-state.json');
+    let npmInstalls: Set<string> | null = new Set();
+    if (existsSync(npmStatePath)) {
+      try {
+        const records = JSON.parse(readFileSync(npmStatePath, 'utf8')) as unknown;
+        npmInstalls = new Set(
+          (Array.isArray(records) ? records : [])
+            .map((record: { installPath?: unknown }) => record?.installPath)
+            .filter((path): path is string => typeof path === 'string'),
+        );
+      } catch (error) {
+        PluginService.logger.error(
+          `Failed to read ${npmStatePath}; not filtering npm-managed plugin folders until it recovers`,
+          error as Error,
+        );
+        npmInstalls = null;
+      }
+    }
 
     PluginService.logger.log(`Found ${potentialPluginFolders.length} folders in ${rootFolder}`);
 
@@ -229,7 +246,7 @@ export class PluginService {
         (pluginFolder) =>
           !pluginFolder.startsWith('.') &&
           !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder) &&
-          (!/^npm-[A-Za-z0-9_-]+$/.test(pluginFolder) || npmInstalls.has(pluginFolder)),
+          (npmInstalls === null || !/^npm-[A-Za-z0-9_-]+$/.test(pluginFolder) || npmInstalls.has(pluginFolder)),
       )
       .map((pluginFolder) => {
         const manifest = PluginService.findPluginManifestInPluginFolder(
@@ -417,7 +434,11 @@ export class PluginService {
       safeName !== name ||
       name.includes('\\') ||
       targetRelativeToRoot.startsWith('..') ||
-      isAbsolute(targetRelativeToRoot)
+      isAbsolute(targetRelativeToRoot) ||
+      // The `npm-<base64url>` namespace is reserved for npm-managed installs
+      // (see pluginDirectory() in npm-plugin.service.ts); a ZIP upload landing
+      // in it would be silently dropped by findPluginsInFolder's discovery filter.
+      /^npm-[A-Za-z0-9_-]+$/.test(safeName)
     )
       throw new BadRequestException('Plugin name must be a visible single path segment');
     return safeName;

@@ -414,6 +414,9 @@ if(args[0]==='container'&&args[1]==='ls'){
         rmSync(path, { force: true });
       }
     },
-    dispose: () => rmSync(root, { recursive: true, force: true }),
+    // ponytail: a just-exited shim's child (node) process can still hold the
+    // directory open for a moment after spawnSync returns; retry through that race
+    // instead of widening the fixture's process bookkeeping.
+    dispose: () => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }),
   };
 }

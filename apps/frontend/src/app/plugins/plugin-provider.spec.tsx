@@ -135,7 +135,7 @@ describe('PluginProvider', () => {
 
     const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
     await expect(remoteConfig.url()).resolves.toBe(
-      `http://test.local/api/plugins/${name}/frontend/module-federation/index.js`
+      `http://test.local/api/plugins/${name}/frontend/module-federation/index.js?v=1.0.0`
     );
   });
 
@@ -214,13 +214,13 @@ describe('PluginProvider', () => {
 
     const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
     await expect(remoteConfig.url()).resolves.toBe(
-      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/index.js'
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/index.js?v=1.0.0'
     );
     const styleLink = appendChild.mock.calls.find(([node]) => node instanceof HTMLLinkElement)?.[0];
     expect(styleLink).toHaveAttribute('id', `plugin-styles-${name}`);
     expect(styleLink).toHaveAttribute(
       'href',
-      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/style.css'
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/style.css?v=1.0.0'
     );
   });
 

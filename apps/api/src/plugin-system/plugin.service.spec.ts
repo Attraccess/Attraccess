@@ -90,6 +90,20 @@ describe('PluginService', () => {
       expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual([folder]);
     });
 
+    it('keeps npm directories visible when the install state file is unreadable', () => {
+      const folder = 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28';
+      writePlugin(root, folder, { ...VALID_MANIFEST, name: 'wago' });
+      writeFileSync(join(root, '.npm-plugin-state.json'), '{corrupt');
+
+      expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual([folder]);
+    });
+
+    it('rejects a ZIP upload whose name falls in the reserved npm directory namespace', async () => {
+      const zip = zipFileUpload({ 'plugin.json': JSON.stringify({ ...VALID_MANIFEST, name: 'npm-tools' }) });
+
+      await expect(new PluginService().uploadPlugin(zip)).rejects.toThrow('visible single path segment');
+    });
+
     it('returns an empty array when the plugin folder does not exist', () => {
       PluginService.configure({ PLUGIN_DIR: join(root, 'does-not-exist'), RESTART_BY_EXIT: true });
       expect(PluginService.getPlugins()).toEqual([]);

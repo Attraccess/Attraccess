@@ -83,20 +83,24 @@ export function PluginProvider(props: PropsWithChildren) {
 
           const baseUrl = getBaseUrl();
           const pluginUrlPath = `${baseUrl}/api/plugins/${encodeURIComponent(pluginManifest.name)}/frontend/module-federation`;
-          const remoteUrl = `${pluginUrlPath}/${entryPointFile}`;
+          // The federation runtime re-`import()`s this exact URL string on every
+          // reload; without a version tag a new build reuses the browser's cached
+          // module for the old one and the upgrade silently never takes effect.
+          const versionTag = `v=${encodeURIComponent(pluginManifest.version)}`;
+          const remoteUrl = `${pluginUrlPath}/${entryPointFile}?${versionTag}`;
 
           // Plugins bundle their own CSS (e.g. their Tailwind utilities); the
           // federation remote only carries JS, so inject the stylesheet here.
           const stylesFile = pluginManifest.main.frontend?.styles;
           if (stylesFile) {
             const linkId = `plugin-styles-${pluginManifest.name}`;
-            if (!document.getElementById(linkId)) {
-              const link = document.createElement('link');
-              link.id = linkId;
-              link.rel = 'stylesheet';
-              link.href = `${pluginUrlPath}/${stylesFile}`;
-              document.head.appendChild(link);
-            }
+            const existingLink = document.getElementById(linkId);
+            if (existingLink) existingLink.remove();
+            const link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            link.href = `${pluginUrlPath}/${stylesFile}?${versionTag}`;
+            document.head.appendChild(link);
           }
 
           __federation_method_setRemote(pluginManifest.name, {
