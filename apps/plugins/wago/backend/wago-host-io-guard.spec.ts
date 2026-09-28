@@ -113,6 +113,15 @@ describe('host digital output and identity guard', () => {
     expect(host.run().status).toBe(0);
   });
 
+  it.each(['directory', 'pipe'])('does not spawn metadata parsers for a %s descriptor', (kind) => {
+    host.processRecord(22);
+    if (kind === 'pipe') expect(spawnSync('mkfifo', [join(host.root, 'pipe')]).status).toBe(0);
+    host.fd(22, '0100001', kind === 'directory' ? 'proc' : 'pipe');
+    // Any external stat of this FD fails. Its kernel file type already proves
+    // it cannot alias the regular sysfs DOUT register, so no parser is needed.
+    expect(host.run(false, 'fd-unreadable').status).toBe(0);
+  });
+
   it.each([
     ['etc/passwd', 'unrelated:x:10001:20000::/:/bin/sh\n'],
     ['etc/passwd', 'unrelated:x:20000:10001::/:/bin/sh\n'],
