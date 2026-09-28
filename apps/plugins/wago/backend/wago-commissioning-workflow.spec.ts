@@ -21,7 +21,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
   let service: WagoCommissioningService;
   let context: PluginContext;
   let session: WagoCommissioningSession;
-  let artifacts: { has: jest.Mock; get: jest.Mock; acquire: jest.Mock };
+  let artifacts: { has: jest.Mock; current: jest.Mock; get: jest.Mock; acquire: jest.Mock };
   const principal = { userId: 42, authenticationMethod: 'session' as const };
   const credential = { username: 'root', password: 'fixture-only' };
   const digest = 'a'.repeat(64);
@@ -55,6 +55,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     } as unknown as PluginContext;
     artifacts = {
       has: jest.fn().mockResolvedValue(true),
+      current: jest.fn().mockResolvedValue({ digest }),
       get: jest.fn().mockResolvedValue({ digest }),
       acquire: jest.fn().mockResolvedValue({
         digest,
@@ -209,7 +210,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
       script: string,
     ) => {
       const saved = await repository.findOneByOrFail({ id: session.id });
-      expect(artifacts.acquire).toHaveBeenCalledWith(digest);
+      expect(artifacts.acquire).toHaveBeenCalledWith();
       if (script === runtimeBundleStagingCapacityPreflightScript(512)) {
         expect(saved.dockerProvisionToken).toBeNull();
         expect(saved.dockerProvisionState).toBeNull();
@@ -246,7 +247,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
         _credential,
         script: string,
       ) => {
-        expect(artifacts.acquire).toHaveBeenCalledWith(digest);
+        expect(artifacts.acquire).toHaveBeenCalledWith();
         expect(script).toBe(runtimeBundleStagingCapacityPreflightScript(512));
         const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
         expect(saved.dockerProvisionToken).toBeNull();
@@ -301,28 +302,29 @@ describe('commissioning workflows with a real isolated database and mocked devic
     },
   );
 
-  it.each(['deliver', 'activate'] as const)(
-    'rejects a different verified artifact in %s before any remote calls',
-    async (action) => {
-      artifacts.acquire.mockResolvedValue({ digest: 'b'.repeat(64), bytes: 512, directory });
-      const remote = jest.spyOn(service as never, 'sudoRunScript');
-      wago.createEnrollment.mockClear();
-      if (action === 'deliver')
-        await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
-      else
-        await expect(
-          service.platform(
-            session.id,
-            'activate',
-            { reviewedDockerActivation: true, temporarySsh: credential },
-            principal,
-          ),
-        ).rejects.toThrow('session-pinned');
-      expect(remote).not.toHaveBeenCalled();
-      expect(wago.createEnrollment).not.toHaveBeenCalled();
-      expect(existsSync(directory)).toBe(false);
-    },
-  );
+  it('replaces a legacy session digest with the current release when acquiring a delivery snapshot', async () => {
+    const currentDigest = 'b'.repeat(64);
+    artifacts.acquire.mockResolvedValue({ digest: currentDigest, bytes: 512, directory });
+    const bundle = await service['acquireRuntimeBundle'](session);
+    expect(artifacts.acquire).toHaveBeenCalledWith();
+    expect(bundle.digest).toBe(currentDigest);
+    expect(
+      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).runtimeArtifactDigest,
+    ).toBe(currentDigest);
+  });
+
+  it('does not transfer a snapshot after the current release changes mid-delivery', async () => {
+    artifacts.current.mockResolvedValueOnce({ digest }).mockResolvedValue({ digest: 'b'.repeat(64) });
+    jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockImplementation((async (_host, _pin, _credential, script: string) =>
+        script.includes("printf 'epoch=") ? clockOutput() : '') as never);
+    const copy = jest.spyOn(service as never, 'copyTo');
+    const result = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+    expect(result.state).toBe('delivery_failed');
+    expect(copy).not.toHaveBeenCalled();
+    expect(artifacts.current).toHaveBeenCalledTimes(2);
+  });
 
   it('allows inactive Docker through staging, then activates before full hardware and capacity checks', async () => {
     let active = false;
@@ -429,7 +431,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     ).toBe(token);
   });
 
-  it('pins the artifact and carries an existing Docker token into the runtime transaction', async () => {
+  it('resolves the current artifact and carries an existing Docker token into the runtime transaction', async () => {
     jest
       .spyOn(service as never, 'sudoRunScript')
       .mockImplementation((async (_host, _pin, _credential, script: string) =>
@@ -446,7 +448,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     const copy = jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
     const delivered = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
     expect(delivered.state).toBe('awaiting_discovery');
-    expect(artifacts.acquire).toHaveBeenCalledWith(digest);
+    expect(artifacts.acquire).toHaveBeenCalledWith();
     const script = copy.mock.calls[0][4] as string;
     expect(script).toContain(saved.dockerProvisionToken);
     expect(script).toContain('WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1');

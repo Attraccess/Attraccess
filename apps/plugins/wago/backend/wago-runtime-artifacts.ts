@@ -9,12 +9,9 @@ import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import {
   inspectRuntimeTar,
-  loadRuntimeArtifactSigningKey,
   RuntimeArtifactManifest,
   validateRuntimeManifest,
-  verifyRuntimeSignature,
   WAGO_RUNTIME_MAX_BYTES,
-  WAGO_RUNTIME_RELEASE_KEY,
 } from './wago-runtime-artifacts-verification';
 
 export { WAGO_RUNTIME_MAX_BYTES } from './wago-runtime-artifacts-verification';
@@ -33,7 +30,6 @@ export interface VerifiedRuntimeArtifact extends RuntimeArtifactMetadata {
 export interface RuntimeArtifactUpload {
   bundle: Readable;
   checksum: Readable;
-  signature: Readable;
 }
 const digestPattern = /^[a-f0-9]{64}$/;
 const hostId = createHash('sha256').update(hostname()).digest('hex');
@@ -140,14 +136,13 @@ function storedMetadata(value: unknown, maxBytes: number): RuntimeArtifactMetada
   return Object.freeze({ digest: data.digest, bytes, image: data.image, manifest });
 }
 
-/** Internal catalog. The host-selected trust key is pinned for its lifetime; HTTP never supplies it. */
+/** Internal catalog of checksum-verified runtime bundles. */
 export class WagoRuntimeArtifactCatalog {
   private activeImports = 0;
   private readonly scans = new Map<string, Dir>();
   private reconciliation?: Promise<void>;
   constructor(
     private readonly storageRoot: string,
-    private readonly trustedKey = WAGO_RUNTIME_RELEASE_KEY,
     private readonly maxBytes = WAGO_RUNTIME_MAX_BYTES,
   ) {}
 
@@ -228,7 +223,6 @@ export class WagoRuntimeArtifactCatalog {
       const checksum = await smallFile(join(directory, 'runtime.tar.sha256'), 4096);
       if (!new RegExp(`^${digest}(?:[ \\t]+\\*?[A-Za-z0-9_.-]+\\.tar)?\\r?\\n?$`).test(checksum))
         throw new Error('Runtime artifact checksum does not match');
-      await verifyRuntimeSignature(file, await smallFile(join(directory, 'runtime.tar.sig'), 16384), this.trustedKey);
       const manifest = await inspectRuntimeTar(file, bytes);
       return Object.freeze({ digest, bytes, image: manifest.image, manifest });
     } finally {
@@ -265,7 +259,10 @@ export class WagoRuntimeArtifactCatalog {
     const info = await lstat(directory);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
     try {
-      const metadata = storedMetadata(JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)), this.maxBytes);
+      const metadata = storedMetadata(
+        JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)),
+        this.maxBytes,
+      );
       if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
       return metadata;
     } catch (error) {
@@ -297,14 +294,13 @@ export class WagoRuntimeArtifactCatalog {
       const results = await Promise.allSettled([
         writeArtifactStream(join(directory, 'runtime.tar'), upload.bundle, this.maxBytes),
         writeArtifactStream(join(directory, 'runtime.tar.sha256'), upload.checksum, 4096),
-        writeArtifactStream(join(directory, 'runtime.tar.sig'), upload.signature, 16384),
       ]);
       if (results.some((result) => result.status === 'rejected'))
         throw new Error('Invalid or oversized artifact upload');
       const metadata = await this.verify(directory);
       await this.writeMetadata(directory, metadata);
       const root = await this.root();
-      for (const name of ['runtime.tar', 'runtime.tar.sha256', 'runtime.tar.sig', 'metadata.json'])
+      for (const name of ['runtime.tar', 'runtime.tar.sha256', 'metadata.json'])
         await chmod(join(directory, name), 0o400);
       const stageHandle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
@@ -320,8 +316,7 @@ export class WagoRuntimeArtifactCatalog {
         const existing = await lstat(destination);
         if (!existing.isDirectory() || existing.isSymbolicLink()) throw new Error('Invalid catalog object');
         const existingMetadata = await this.verify(destination);
-        if (existingMetadata.digest !== metadata.digest)
-          throw new Error('Invalid catalog object');
+        if (existingMetadata.digest !== metadata.digest) throw new Error('Invalid catalog object');
         await this.backfillMetadata(destination, existingMetadata);
       }
       const objectsHandle = await open(join(root, 'objects'), constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -348,7 +343,7 @@ export class WagoRuntimeArtifactCatalog {
     } catch (error) {
       if (error instanceof ConflictException) throw error;
       throw new BadRequestException(
-        'Runtime import failed. Check the signed release files, size, and manifest compatibility.',
+        'Runtime import failed. Check the release files, size, and manifest compatibility.',
       );
     } finally {
       for (const source of Object.values(upload)) source.destroy();
@@ -406,7 +401,6 @@ export class WagoRuntimeArtifactCatalog {
       for (const [name, limit] of [
         ['runtime.tar', this.maxBytes],
         ['runtime.tar.sha256', 4096],
-        ['runtime.tar.sig', 16384],
       ] as const) {
         const file = await openArtifactFile(join(root, 'objects', selected, name));
         try {
@@ -425,15 +419,12 @@ export class WagoRuntimeArtifactCatalog {
   }
 }
 
-/** Register alongside WagoArtifactsController. Only trusted host configuration can select a development key. */
+/** Register alongside WagoArtifactsController. */
 @Injectable()
 export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
   constructor() {
     // Existing application setting and exact default from apps/api/src/config/storage.config.ts.
     // Plugin providers are constructed before the host ModuleRef is available.
-    super(
-      resolve(process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage')),
-      loadRuntimeArtifactSigningKey(process.env.NODE_ENV, process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH),
-    );
+    super(resolve(process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage')));
   }
 }

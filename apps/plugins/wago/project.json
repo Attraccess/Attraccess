@@ -65,15 +65,15 @@
         "{projectRoot}/diagnostics-types.ts",
         "{projectRoot}/channel-behavior.ts",
         "{projectRoot}/backend/**/*",
+        "{projectRoot}/shared/**/*",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/measurement-contract.ts",
-        "{projectRoot}/cc100-runtime/signing-public-key.pub",
         "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
       ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
       }
     },
     "build-frontend": {
@@ -83,6 +83,7 @@
         "{projectRoot}/diagnostics-types.ts",
         "{projectRoot}/channel-behavior.ts",
         "{projectRoot}/frontend/**/*",
+        "{projectRoot}/shared/**/*",
         "{projectRoot}/modbus/**/*",
         "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
       ],

@@ -14,7 +14,7 @@ The existing delivery request carries `confirmInstall: true` and fresh temporary
 SSH credentials. One consequence confirmation authorizes destructive preparation;
 there is no separate workload-preservation, Docker or mandatory WBM gate.
 
-Delivery validates the pinned SSH identity, signed offline runtime and broker
+Delivery validates the pinned SSH identity, offline runtime checksum and broker
 requirements, then prepares the controller under its operation lock:
 
 1. Verify the CC100 `751-9301` FW31 identity, required firmware-installed tools
@@ -29,7 +29,7 @@ requirements, then prepares the controller under its operation lock:
    Unsupported packages, missing tools and ambiguous service states fail closed.
 4. Establish persistent access limited to the required digital registers and
    recheck output ownership and runtime-account permissions.
-5. Complete restricted enrollment and locked signed runtime delivery, then wait
+5. Complete restricted enrollment and locked runtime delivery, then wait
    for permanent discovery and independent readiness verification.
 
 `codesysState=disabled` is recorded only after successful verified preparation.
@@ -185,7 +185,7 @@ container is stopped or absent before recording success. Runtime removal also
 verifies absence afterward. A missing/unreachable daemon or failed Docker query
 is not proof of a stopped writer; the error and recovery ownership are retained.
 
-Pinned SSH, signed artifacts, TLS and enrollment revocation remain enforced.
+Pinned SSH, runtime checksum/manifest checks, TLS and enrollment revocation remain enforced.
 Management-key enrollment and **Recover saved access** retain their separate
 security/recovery contract. Full management hardening remains unsupported where
 its vendor dependency and lockout-safe recovery requirements are unmet; that

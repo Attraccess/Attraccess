@@ -8,11 +8,11 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import {
   isSupportedController,
-  resolveRuntimeSigningPublicKeyPath,
   runtimeBundleInstallScript,
   WagoCommissioningService,
   WagoRuntimeUploadError,
   WagoStorageCapacityError,
+  WagoControllerLockError,
 } from './wago-commissioning.service';
 import { WagoService } from './wago.service';
 import { WagoController } from './wago-controller.entity';
@@ -90,6 +90,26 @@ describe('WagoCommissioningService', () => {
     expect(wago.createEnrollment).not.toHaveBeenCalled();
   });
 
+  it('keeps a lock-busy preparation retryable without a phantom recovery token', async () => {
+    const { service, session, wago, inspect } = securityHarness({ firmwareBaseline: '31', deliveryToken: null });
+    inspect.mockResolvedValue({ firmware: fw31IdentityOutput(), codesys: 'inactive' });
+    service['requireRuntimeArtifact'] = jest.fn().mockResolvedValue(undefined);
+    service['acquireRuntimeBundle'] = jest
+      .fn()
+      .mockResolvedValue({ bytes: 512, path: '/mock/runtime.tar', directory: '/mock/staging' });
+    service['sudoRunScript'] = jest.fn().mockResolvedValueOnce('').mockRejectedValueOnce(new WagoControllerLockError());
+    const result = await service.deliver(1, {
+      confirmInstall: true,
+      temporarySsh: { username: 'root', password: 'fixture-only' },
+    });
+    expect(result.state).toBe('delivery_failed');
+    expect(result.failureReason).toContain('Retry installation shortly; no preparation was started.');
+    expect(result.progressDetail).toContain('No preparation started');
+    expect(session.dockerProvisionToken).toBeNull();
+    expect(session.dockerProvisionState).toBeNull();
+    expect(wago.createEnrollment).not.toHaveBeenCalled();
+  });
+
   it('maps only the bounded storage diagnostic from SSH stderr to a fixed message', async () => {
     const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
     jest.mocked(spawn).mockImplementation(((command: string) => {
@@ -122,6 +142,44 @@ describe('WagoCommissioningService', () => {
     ).rejects.toThrow('Not enough free storage on the CC100 for this runtime. Free space and retry.');
   });
 
+  it('maps only the exact pre-journal lock diagnostic from SSH stderr', async () => {
+    const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+    jest.mocked(spawn).mockImplementation(((command: string) => {
+      const child = Object.assign(new EventEmitter(), {
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: new PassThrough(),
+        kill: jest.fn(),
+      });
+      child.stdin.resume();
+      child.stdin.on('finish', () => {
+        if (command === 'ssh-keyscan')
+          child.stdout.emit('data', '192.0.2.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey\n');
+        else if (command === 'ssh-keygen') child.stdout.emit('data', '256 SHA256:test fixture (ED25519)\n');
+        else
+          child.stderr.emit(
+            'data',
+            Buffer.from('private-value\nAnother runtime transaction holds the controller lock\n'),
+          );
+        child.emit('close', command === 'ssh' ? 1 : 0);
+      });
+      return child;
+    }) as never);
+    await expect(
+      service['run']('192.0.2.1', 'SHA256:test', { username: 'root', password: 'fixture-only' }, 'true', undefined, {
+        timeoutMs: 5000,
+        maxOutputBytes: 1024,
+        lockDiagnostic: true,
+      }),
+    ).rejects.toThrow('The CC100 is busy with a runtime operation');
+    await expect(
+      service['run']('192.0.2.1', 'SHA256:test', { username: 'root', password: 'fixture-only' }, 'true', undefined, {
+        timeoutMs: 5000,
+        maxOutputBytes: 1024,
+      }),
+    ).rejects.toThrow('Commissioning subprocess failed.');
+  });
+
   it.each(['local-timeout', 'operation-aborted'] as const)(
     'distinguishes %s without treating remote text as trusted diagnostics',
     (termination) => {
@@ -136,6 +194,16 @@ describe('WagoCommissioningService', () => {
       expect(error.message).not.toContain('secret');
     },
   );
+
+  it('reports the fixed image-load failure without exposing other remote output', () => {
+    const error = new WagoRuntimeUploadError(
+      1,
+      300_000,
+      'private-value\nRuntime image load failed or exceeded 300 seconds\n',
+    );
+    expect(error.message).toContain('Runtime image load failed or exceeded 300 seconds');
+    expect(error.message).not.toContain('private-value');
+  });
 
   it('releases a settled local rejection so a corrected request can retry', async () => {
     const { service } = securityHarness();
@@ -443,7 +511,6 @@ describe('WagoCommissioningService', () => {
       WAGO_CC100_RUNTIME_IMAGE: `test.invalid/runtime@sha256:${'a'.repeat(64)}`,
       WAGO_CC100_RUNTIME_BUNDLE_PATH: '/mock/runtime.tar',
       WAGO_CC100_RUNTIME_BUNDLE_SHA256_PATH: '/mock/runtime.tar.sha256',
-      WAGO_CC100_RUNTIME_BUNDLE_SIGNATURE_PATH: '/mock/runtime.tar.sig',
     };
     const previous = Object.fromEntries(Object.keys(configuration).map((key) => [key, process.env[key]]));
     let Service = WagoCommissioningService;
@@ -536,7 +603,7 @@ describe('WagoCommissioningService', () => {
     'delivery %s protects secrets and cleans verified artifacts',
     async (scenario) => {
       const fs = require('node:fs/promises') as typeof import('node:fs/promises');
-      const bundle = Buffer.from('mock signed bundle');
+      const bundle = Buffer.from('mock runtime bundle');
       const digest = createHash('sha256').update(bundle).digest('hex');
       jest.spyOn(fs, 'mkdtemp').mockResolvedValue('/mock/staging');
       jest.spyOn(fs, 'copyFile').mockResolvedValue(undefined);
@@ -747,15 +814,6 @@ describe('WagoCommissioningService', () => {
     const script = runtimeBundleInstallScript(`ghcr.io/attraccess/wago@sha256:${'a'.repeat(64)}`);
     expect(script).toContain('tar --warning=no-timestamp --warning=no-unknown-keyword -xOf');
     expect(script).toContain("-e 's/^Loaded image ID: //p'");
-  });
-
-  it('allows a local runtime signing key only during development', () => {
-    expect(resolveRuntimeSigningPublicKeyPath('development', '/local/key.pub', '/release/key.pub')).toBe(
-      '/local/key.pub',
-    );
-    expect(() => resolveRuntimeSigningPublicKeyPath('production', '/local/key.pub', '/release/key.pub')).toThrow(
-      'local CC100 runtime signing keys are only allowed in development',
-    );
   });
 
   it('requires framed FW31 identity including REVISIONS and the supported baseline', () => {

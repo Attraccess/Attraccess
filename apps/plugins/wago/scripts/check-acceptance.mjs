@@ -65,7 +65,7 @@ function checkBuild(build, errors) {
   for (const key of ['frontendDigest', 'backendDigest', 'runtimeDigest']) {
     if (typeof build?.[key] !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(build[key])) errors.push(`build.${key} must be a SHA-256 digest.`);
   }
-  for (const key of ['protocolVersion', 'signedBundleEvidence', 'visualArtifactProvisioningEvidence']) {
+  for (const key of ['protocolVersion', 'bundleChecksumEvidence', 'visualArtifactProvisioningEvidence']) {
     if (!text(build?.[key])) errors.push(`build.${key} is required.`);
   }
 }
