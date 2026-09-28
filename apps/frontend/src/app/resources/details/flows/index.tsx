@@ -25,7 +25,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppTheme } from '@attraccess/ui';
 import { usePtrStore } from '../../../../stores/ptr.store';
-import Dagre from '@dagrejs/dagre';
+import { getLayoutedElements } from './flowLayout';
 import { Button } from '../../../../components/button';
 import {
   BoxSelectIcon,
@@ -55,35 +55,6 @@ import nodesEnTranslations from './node/en.json';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
-
-function getLayoutedElements(nodes: Node[], edges: Edge[]) {
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB' });
-
-  edges.forEach((edge) => g.setEdge(edge.source, edge.target));
-  nodes.forEach((node) =>
-    g.setNode(node.id, {
-      ...node,
-      width: node.measured?.width ?? 0,
-      height: node.measured?.height ?? 0,
-    }),
-  );
-
-  Dagre.layout(g);
-
-  return {
-    nodes: nodes.map((node) => {
-      const position = g.node(node.id);
-      // We are shifting the dagre node position (anchor=center center) to the top left
-      // so it matches the React Flow node anchor point (top left).
-      const x = position.x - (node.measured?.width ?? 0) / 2;
-      const y = position.y - (node.measured?.height ?? 0) / 2;
-
-      return { ...node, position: { x, y } };
-    }),
-    edges,
-  };
-}
 
 // Efficient comparison functions to replace expensive JSON.stringify operations
 function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNodeDto | Node): boolean {
@@ -160,7 +131,7 @@ function FlowsPageInner() {
     },
   });
 
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition, getInternalNode } = useReactFlow();
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   const nodeCatalogRef = useRef<NodeCatalogHandle>(null);
   const {
@@ -256,11 +227,19 @@ function FlowsPageInner() {
   }, [nodes, edges, saveFlow, resourceId]);
 
   const layout = useCallback(() => {
-    const layouted = getLayoutedElements(nodes, edges);
+    const sourceHandles = new Map(
+      nodes.map((node) => [
+        node.id,
+        [...(getInternalNode(node.id)?.internals.handleBounds?.source ?? [])]
+          .sort((a, b) => a.x - b.x)
+          .flatMap((handle) => (handle.id == null ? [] : [handle.id])),
+      ]),
+    );
+    const layouted = getLayoutedElements(nodes, edges, sourceHandles);
     setNodes([...layouted.nodes]);
     setEdges([...layouted.edges]);
     fitView();
-  }, [nodes, edges, fitView, setNodes, setEdges]);
+  }, [nodes, edges, fitView, setNodes, setEdges, getInternalNode]);
 
   const addStartNode = useCallback(
     (nodeType: string) => {

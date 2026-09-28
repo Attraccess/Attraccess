@@ -53,7 +53,7 @@ importers:
         specifier: ^1.6.2
         version: 1.6.2(commander@14.0.3)(glob@13.0.6)(magicast@0.3.5)(ts-morph@28.0.0)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@dagrejs/dagre':
-        specifier: ^3.0.0
+        specifier: ^3.1.1
         version: 3.1.1
       '@dnd-kit/core':
         specifier: ^6.3.1
