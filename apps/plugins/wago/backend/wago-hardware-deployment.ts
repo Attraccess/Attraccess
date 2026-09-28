@@ -19,6 +19,13 @@ import { wagoSerialDeploymentPreflight } from './wago-serial-deployment';
 export const WAGO_HARDWARE_PROFILE = CC100_DIGITAL_PROFILE_ID;
 export const WAGO_DIN = '/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din';
 export const WAGO_DOUT = '/sys/kernel/dout_drv/DOUT_DATA';
+/** RUN LED dies used for runtime status. Cosmetic: absent files are skipped, never fatal.
+ * WAGO ledserverd keeps RUN at STATIC_OFF once CODESYS is disabled, so it does not compete.
+ */
+export const WAGO_RUN_LEDS = {
+  green: '/sys/devices/platform/led/leds/run-green/brightness',
+  red: '/sys/devices/platform/led/leds/run-red/brightness',
+} as const;
 export const WAGO_DOCKER_PROVISION_REVIEW_FLAG = 'reviewedDockerActivation' as const;
 
 export interface WagoDockerProvisionReview {
@@ -98,6 +105,10 @@ if test -f "$root/etc/os-release" &&
   ${wagoFw31IdentityCheck(true)}; then platform=supported; fi
 din="$root${WAGO_DIN}"
 dout="$root${WAGO_DOUT}"
+wago_led_green=
+wago_led_red=
+if test -f "$root${WAGO_RUN_LEDS.green}" && test ! -L "$root${WAGO_RUN_LEDS.green}"; then wago_led_green="$root${WAGO_RUN_LEDS.green}"; fi
+if test -f "$root${WAGO_RUN_LEDS.red}" && test ! -L "$root${WAGO_RUN_LEDS.red}"; then wago_led_red="$root${WAGO_RUN_LEDS.red}"; fi
 hardware=accessible
 if ! test -f "$din" || ! test -f "$dout" || test -L "$din" || test -L "$dout"; then
   hardware=missing-register
@@ -211,7 +222,14 @@ export function wagoHardwareDeploymentDockerArgs(
     profile === CC100_MODBUS_PROFILE_ID
       ? ` --group-add "$wago_serial_gid" --device ${quote(`${testRoot}${CC100_SERIAL_HOST_PATH}:${CC100_SERIAL_PATH}:rw`)}`
       : '';
-  return `--user 10001:10001 --cap-drop ALL --security-opt no-new-privileges --network host --env WAGO_HARDWARE_PROFILE=${profile} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly`)} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DOUT},dst=/run/attraccess-wago/io/dout`)}${serial}`;
+  // Preflight sets wago_led_* only for present LED files; quoted words survive the :+ expansion.
+  const leds = (['green', 'red'] as const)
+    .map(
+      (die) =>
+        ` \${wago_led_${die}:+--mount "type=bind,src=$wago_led_${die},dst=/run/attraccess-wago/io/led-run-${die}"}`,
+    )
+    .join('');
+  return `--user 10001:10001 --cap-drop ALL --security-opt no-new-privileges --network host --env WAGO_HARDWARE_PROFILE=${profile} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly`)} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DOUT},dst=/run/attraccess-wago/io/dout`)}${leds}${serial}`;
 }
 
 function provisionLock(token: string, testRoot: string): string {
@@ -278,6 +296,10 @@ chmod 0400 "$root${WAGO_DIN}" || fail 'io-permission-failed'
 chmod 0600 "$root${WAGO_DOUT}" || fail 'io-permission-failed'
 test "$(stat -c '%u:%g:%a' "$root${WAGO_DIN}")" = 10001:10001:400 &&
   test "$(stat -c '%u:%g:%a' "$root${WAGO_DOUT}")" = 10001:10001:600 || fail 'io-permission-unverified'
+# Status LEDs are best-effort: a failed grant only leaves the RUN LED dark.
+for led in "$root${WAGO_RUN_LEDS.green}" "$root${WAGO_RUN_LEDS.red}"; do
+  if test -f "$led" && test ! -L "$led"; then chown 10001:10001 "$led" && chmod 0600 "$led" || :; fi
+done
 `;
 }
 

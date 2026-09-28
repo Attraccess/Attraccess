@@ -3,6 +3,7 @@ import { Cc100OnboardIoAdapter } from './adapters';
 import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } from '../../shared/hardware-profile';
 import { ModbusDeviceRouter } from './modbus/adapter';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
+import { RunLed } from './status-led';
 
 const hardwareId = required('WAGO_HARDWARE_ID');
 const defaultPrefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
@@ -24,6 +25,8 @@ let client: MqttClient | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let measurementTimer: NodeJS.Timeout | undefined;
 let inputTimer: NodeJS.Timeout | undefined;
+const runLed = new RunLed();
+runLed.set('starting');
 
 void handleAsync(start);
 
@@ -76,6 +79,8 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       activeClient.options.password = next.password;
       activeClient.reconnect();
     },
+    onReadiness: ({ connected, configurationAccepted, ready }) =>
+      runLed.set(ready ? 'ready' : !connected ? 'disconnected' : !configurationAccepted ? 'unconfigured' : 'fault'),
   });
   let initialized = false;
   let connected = false;
@@ -110,6 +115,7 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     () =>
       void handleAsync(async () => {
         if (!credentials) {
+          runLed.set('pairing');
           await transport.subscribe(runtime.discoveryClaimTopic(), async (payload) => {
             const claim = await runtime.receiveDiscoveryClaim(payload);
             if (!claim || activeClient !== client) return;
@@ -134,7 +140,10 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
         inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();
       }),
   );
-  activeClient.on('close', () => applyConnectionState(false));
+  activeClient.on('close', () => {
+    if (activeClient === client) runLed.set('disconnected');
+    applyConnectionState(false);
+  });
   activeClient.on('connect', () => applyConnectionState(true));
 }
 
@@ -142,6 +151,7 @@ process.on('SIGTERM', () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   if (measurementTimer) clearInterval(measurementTimer);
   if (inputTimer) clearInterval(inputTimer);
+  runLed.stop();
   client?.end(true, () => process.exit(0));
 });
 

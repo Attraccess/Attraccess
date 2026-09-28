@@ -6,6 +6,7 @@ import { fw31Model, fw31Revisions } from './fixtures/fw31-identity';
 import {
   WAGO_DIN,
   WAGO_DOUT,
+  WAGO_RUN_LEDS,
   parseWagoHardwareDeploymentReport,
   wagoCommissioningPreparationScript,
   wagoDockerProvisionScript,
@@ -671,4 +672,10 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
     );
   });
 
+  it('grants present RUN LED files best-effort and tolerates their absence', () => {
+    fixture.file(WAGO_RUN_LEDS.green.slice(1), '0', 0o644);
+    expect(prepare().status).toBe(0);
+    expect(statSync(join(fixture.root, WAGO_RUN_LEDS.green)).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(fixture.root, WAGO_RUN_LEDS.red))).toBe(false);
+  });
 });
