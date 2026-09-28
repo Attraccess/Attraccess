@@ -126,6 +126,12 @@ wago_host_io_guard() {
     }
     for wago_fd in "$wago_proc"/fd/[0-9]*; do
       test -e "$wago_fd" || test -L "$wago_fd" || continue
+      # DOUT is a regular sysfs file. Kernel-typed pipes, sockets, directories
+      # and devices cannot alias it. Shell builtins avoid the many processes per
+      # BusyBox stat conversion that otherwise exhaust the live gate deadline.
+      # Unknown/unobservable types still take the fail-closed inode path below.
+      if test -S "$wago_fd" || test -p "$wago_fd" || test -d "$wago_fd" ||
+        test -c "$wago_fd" || test -b "$wago_fd"; then continue; fi
       wago_inode=$(stat -Lc '%d:%i' "$wago_fd" 2>/dev/null) || {
         # Closing a descriptor or exiting during observation is normal. A live
         # but unobservable descriptor must not be interpreted as no writer.
