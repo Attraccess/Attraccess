@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Cc100OnboardIoAdapter } from './adapters';
 import { CC100_DIGITAL_PROFILE } from './onboard-profile';
+import { RUN_LED_PATHS } from './status-led';
 import { hash, JsonStateStore, WagoRuntime, type Snapshot, type Transport } from './runtime';
 
 jest.mock('node:fs/promises', () => ({ __esModule: true, ...jest.requireActual('node:fs/promises') }));
@@ -107,9 +108,12 @@ describe('CC100 packed digital I/O', () => {
 
   it('keeps installer manifest and executable profile in sync', async () => {
     const manifest = JSON.parse(await readFile(join(__dirname, '../manifest.json'), 'utf8'));
-    expect(manifest.deployment.hardwareProfile).toBe(CC100_DIGITAL_PROFILE.id);
+    expect(manifest.deployment.hardwareProfile).toBe('cc100-751-9301-fw31-digital-rtu-v1');
+    expect(manifest.deployment.devices).toEqual([{ source: '/dev/ttySTM1', target: '/dev/serial', permissions: 'rw' }]);
     expect(manifest.deployment.privileged).toBe(false);
-    expect(manifest.deployment.mounts).toEqual(
+    const mounts: { target: string; optional?: boolean }[] = manifest.deployment.mounts;
+    expect(mounts.filter((mount) => mount.optional).map((mount) => mount.target)).toEqual(Object.values(RUN_LED_PATHS));
+    expect(mounts.filter((mount) => !mount.optional)).toEqual(
       Object.values(CC100_DIGITAL_PROFILE.registers).map((register) => ({
         source: register.hostPath,
         target: register.path,

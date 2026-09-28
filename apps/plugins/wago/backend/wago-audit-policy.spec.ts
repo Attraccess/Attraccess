@@ -30,7 +30,7 @@ describe('WAGO audit domain declaration', () => {
       'wago.manual_command',
     ])
       expect(actions).toContain(action);
-    expect(actions).toHaveLength(23);
+    expect(actions).toHaveLength(22);
   });
 
   it('declares every commissioning action with the commissioning subject', () => {
@@ -48,7 +48,6 @@ describe('WAGO audit domain declaration', () => {
         'platform_inspect',
         'platform_activate',
         'platform_recover',
-        'lease_recover',
       ].map((action) => `wago.commissioning.${action}`),
     );
     for (const entry of commissioning) {

@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
 import { WAGO_DOUT } from './wago-hardware-deployment';
@@ -16,7 +16,7 @@ import {
 const image = 'example.invalid/runtime@sha256:' + 'a'.repeat(64);
 const token = 'a'.repeat(32);
 
-describe('destructive runtime shell transaction and signed offline stream fixtures', () => {
+describe('destructive runtime shell transaction and offline stream fixtures', () => {
   let fixture: ReturnType<typeof fw31ShellFixture>;
   const config = 'etc/attraccess-wago';
   const data = 'var/lib/attraccess-wago';
@@ -86,6 +86,63 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
     expect(existsSync(join(fixture.root, data))).toBe(false);
     expect(existsSync(join(fixture.root, config, 'runtime-enabled'))).toBe(false);
     expect(fixture.read('docker.log')).not.toMatch(/^start old-id/m);
+  });
+
+  it('allows a slow firmware image import to complete before starting the runtime', () => {
+    // The real FW31 device takes 56 seconds even with the image already cached.
+    fixture.file('docker-load-seconds', '90');
+    expect(install().status).toBe(0);
+    expect(fixture.containers()).toEqual([
+      expect.objectContaining({ name: 'attraccess-wago', running: true, restart: 'no' }),
+    ]);
+  });
+
+  it('installs the RTU release with only the CC100 serial device and its existing group', () => {
+    fixture.file('dev/ttySTM1', 'isolated character-device stand-in', 0o660);
+    chmodSync(join(fixture.root, 'dev/ttySTM1'), 0o660);
+    symlinkSync(join(fixture.root, 'dev/ttySTM1'), join(fixture.root, 'dev/serial'));
+    fixture.file('sys/class/tty/ttySTM1/device/of_node/linux,rs485-enabled-at-boot-time', '');
+    fixture.file('etc/group', fixture.read('etc/group') + 'dialout:x:106:\n');
+    fixture.file(
+      'owners.json',
+      JSON.stringify({
+        ...JSON.parse(fixture.read('owners.json')),
+        '/dev/ttySTM1': '0:106',
+      }),
+    );
+    // Exercise the generated shell; only the isolated device's character type is synthetic.
+    const characterDevice = `test() {
+      if [ "$1" = -c ] && [ "$2" = "$FIXTURE_ROOT/dev/ttySTM1" ]; then command test -f "$2";
+      else command test "$@"; fi
+    }\n`;
+    const result = fixture.run(
+      characterDevice + runtimeBundleInstallScript(image, fixture.root, 'cc100-751-9301-fw31-digital-rtu-v1'),
+    );
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(fixture.read('docker.log')).toContain(`--device ${fixture.root}/dev/ttySTM1:/dev/serial:rw`);
+    expect(fixture.read('docker.log')).toContain('--group-add 106');
+    expect(fixture.read('docker.log')).toContain('WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-rtu-v1');
+    expect(fixture.read('docker.log')).not.toContain('--privileged');
+  });
+
+  it('rejects an RTU release before replacing the current runtime when its serial device is missing', () => {
+    prior();
+    const result = fixture.run(runtimeBundleInstallScript(image, fixture.root, 'cc100-751-9301-fw31-digital-rtu-v1'));
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('serial device');
+    expect(fixture.containers()[0].id).toBe('old-id');
+    expect(existsSync(join(fixture.root, tx))).toBe(false);
+  });
+
+  it('still bounds a stalled image import and contains the failed installation', () => {
+    prior();
+    fixture.file('docker-load-seconds', '1200');
+    const result = install();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Runtime image load failed or exceeded 300 seconds');
+    expect(fixture.containers()).toEqual([]);
+    expect(existsSync(join(fixture.root, config, 'runtime-enabled'))).toBe(false);
+    expect(existsSync(join(fixture.root, data))).toBe(false);
   });
 
   it.each(['load', 'inspect-image', 'start', 'supervisor-launch-failed'])(
@@ -186,6 +243,23 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
     expect(fixture.read('docker.log')).toContain(config + '/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro');
     expect(recover().status).toBe(0);
     expect(existsSync(join(fixture.root, config, 'runtime-ca.pem'))).toBe(false);
+  });
+
+  it('retains an unfinished transaction when its runtime is stopped', () => {
+    expect(install().status).toBe(0);
+    fixture.setContainers(fixture.containers().map((container) => ({ ...container, running: false })));
+    const result = fixture.run(runtimeBundleAcceptScript(fixture.root));
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Runtime is not running');
+    expect(existsSync(join(fixture.root, tx, 'started'))).toBe(true);
+    expect(existsSync(join(fixture.root, tx, 'accepting'))).toBe(false);
+  });
+
+  it('waits for the active supervisor gate before accepting a healthy installation', () => {
+    expect(install().status).toBe(0);
+    const result = fixture.run(runtimeBundleAcceptScript(fixture.root), 'supervisor-lock-held');
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(existsSync(join(fixture.root, tx))).toBe(false);
   });
 
   it('accepts explicitly, preserves active trust and supports a new destructive enrollment', () => {

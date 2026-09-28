@@ -11,7 +11,8 @@ describe('WAGO bounded diagnostics', () => {
   it('distinguishes missing, invalid, stale and future source times', () => {
     expect(freshness(null, now)).toBe('missing');
     expect(freshness('bad', now)).toBe('invalid');
-    expect(freshness(new Date(now + 1).toISOString(), now)).toBe('future');
+    expect(freshness(new Date(now + 5000).toISOString(), now)).toBe('fresh');
+    expect(freshness(new Date(now + 5001).toISOString(), now)).toBe('future');
     expect(freshness(new Date(now - 90_001).toISOString(), now)).toBe('stale');
     expect(freshness(new Date(now).toISOString(), now)).toBe('fresh');
   });

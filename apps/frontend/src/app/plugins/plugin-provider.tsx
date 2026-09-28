@@ -30,6 +30,9 @@ export function PluginProvider(props: PropsWithChildren) {
   toastRef.current = toast;
 
   const arePluginsLoaded = useRef(false);
+  const loadingPlugins = useRef(false);
+  const loadedManifests = useRef(new Map<string, string>());
+  const warnedFailures = useRef(new Set<string>());
 
   useEffect(() => {
     console.debug('Attraccess Plugin System: initializing');
@@ -52,7 +55,7 @@ export function PluginProvider(props: PropsWithChildren) {
           type: params.type,
           duration: params.duration,
         });
-      }
+      },
     );
 
     return () => {
@@ -73,27 +76,31 @@ export function PluginProvider(props: PropsWithChildren) {
 
           if (!entryPointFile) {
             console.debug(
-              `Attraccess Plugin System: Plugin ${pluginManifest.name} has no entry point file for frontend, skipping`
+              `Attraccess Plugin System: Plugin ${pluginManifest.name} has no entry point file for frontend, skipping`,
             );
             return;
           }
 
           const baseUrl = getBaseUrl();
           const pluginUrlPath = `${baseUrl}/api/plugins/${encodeURIComponent(pluginManifest.name)}/frontend/module-federation`;
-          const remoteUrl = `${pluginUrlPath}/${entryPointFile}`;
+          // The federation runtime re-`import()`s this exact URL string on every
+          // reload; without a version tag a new build reuses the browser's cached
+          // module for the old one and the upgrade silently never takes effect.
+          const versionTag = `v=${encodeURIComponent(pluginManifest.version)}`;
+          const remoteUrl = `${pluginUrlPath}/${entryPointFile}?${versionTag}`;
 
           // Plugins bundle their own CSS (e.g. their Tailwind utilities); the
           // federation remote only carries JS, so inject the stylesheet here.
           const stylesFile = pluginManifest.main.frontend?.styles;
           if (stylesFile) {
             const linkId = `plugin-styles-${pluginManifest.name}`;
-            if (!document.getElementById(linkId)) {
-              const link = document.createElement('link');
-              link.id = linkId;
-              link.rel = 'stylesheet';
-              link.href = `${pluginUrlPath}/${stylesFile}`;
-              document.head.appendChild(link);
-            }
+            const existingLink = document.getElementById(linkId);
+            if (existingLink) existingLink.remove();
+            const link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            link.href = `${pluginUrlPath}/${stylesFile}?${versionTag}`;
+            document.head.appendChild(link);
           }
 
           __federation_method_setRemote(pluginManifest.name, {
@@ -133,7 +140,7 @@ export function PluginProvider(props: PropsWithChildren) {
         console.error(`Attraccess Plugin System: Failed to load plugin: ${pluginManifest.name}`, error);
       }
     },
-    [addPlugin, isInstalled]
+    [addPlugin, isInstalled],
   );
 
   useEffect(() => {
@@ -147,7 +154,8 @@ export function PluginProvider(props: PropsWithChildren) {
   }, [plugins, user]);
 
   const loadAllPlugins = useCallback(async () => {
-    if (arePluginsLoaded.current) return;
+    if (loadingPlugins.current) return;
+    loadingPlugins.current = true;
     console.debug('Attraccess Plugin System: Loading all plugins');
 
     try {
@@ -155,29 +163,46 @@ export function PluginProvider(props: PropsWithChildren) {
       const pluginsArray = plugins.data ?? [];
       const failedPlugins = pluginsArray.filter((manifest) => manifest.status === 'error');
       for (const plugin of failedPlugins) {
+        const key = `${plugin.name}@${plugin.version}`;
+        if (warnedFailures.current.has(key)) continue;
+        warnedFailures.current.add(key);
         toastRef.current.warning({
           title: `Plugin "${plugin.name}" is disabled`,
           description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
         });
       }
-      await Promise.all(pluginsArray.filter((manifest) => manifest.status !== 'error').map((manifest) => loadPlugin(manifest)));
+      await Promise.all(
+        pluginsArray
+          .filter((manifest) => manifest.status !== 'error')
+          .map(async (manifest) => {
+            const key = `${manifest.name}@${manifest.version}`;
+            if (loadedManifests.current.get(manifest.name) === manifest.version) return;
+            if (await loadPlugin(manifest)) {
+              loadedManifests.current.set(manifest.name, manifest.version);
+              warnedFailures.current.delete(key);
+            }
+          }),
+      );
     } catch (error) {
       console.error('Attraccess Plugin System: Failed to fetch plugins', error);
     } finally {
       arePluginsLoaded.current = true;
+      loadingPlugins.current = false;
       console.debug('Attraccess Plugin System: All plugins loaded');
     }
   }, [loadPlugin, refetchPlugins]);
 
   useEffect(() => {
-    if (arePluginsLoaded.current) return;
     console.debug('Attraccess Plugin System: Refetching plugins');
-    loadAllPlugins();
-
-    // We're using the ref as our control mechanism, so the dependency array can be empty
-    // to ensure this only runs once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void loadAllPlugins();
+    // A server restart can recover a quarantined plugin while this tab stays mounted.
+    // Recheck when the user returns, without reinstalling plugins already loaded here.
+    const onFocus = () => {
+      if (arePluginsLoaded.current) void loadAllPlugins();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadAllPlugins]);
 
   return <PluginProviderBase pluginStore={pluginStore}>{props.children}</PluginProviderBase>;
 }

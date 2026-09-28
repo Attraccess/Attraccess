@@ -34,6 +34,8 @@ export type ModbusMeasurement = RegisterFormat & {
   unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent';
   kind: 'live' | 'cumulative';
   pollIntervalMs: number;
+  /** Explicit rounding in engineering units, before integer MQTT encoding. Absent preserves exact values. */
+  decimalPlaces?: number;
   /** Explicit raw counter modulus; absent means decreases fault. Never inferred from dtype. */
   rollover?: number;
 };
@@ -83,7 +85,7 @@ const base = {
   pollIntervalMs: 5000,
   functionCode: 3,
 } as const;
-export const BUILTIN_MODBUS_PROFILES: readonly ModbusProfile[] = ['879-3000', '879-1300'].map((model) => ({
+const legacyProfiles: ModbusProfile[] = ['879-3000', '879-1300'].map((model) => ({
   id: `wago-${model}-unverified`,
   name: `WAGO ${model} — UNQUALIFIED / map unverified`,
   version: 1,
@@ -112,6 +114,43 @@ export const BUILTIN_MODBUS_PROFILES: readonly ModbusProfile[] = ['879-3000', '8
     })),
   ],
 }));
+// WAGO manual 5937710, V1.8, pp. 35–38: FC03, hexadecimal wire addresses,
+// IEEE float ABCD, kW/kWh. Read-tested on the development 879-3000 over CC100 RS-485.
+// Keep the old profile IDs/maps unchanged for already-published configurations.
+export const BUILTIN_MODBUS_PROFILES: readonly ModbusProfile[] = [
+  {
+    id: 'wago-879-3000',
+    name: 'WAGO 879-3000 — Modbus RTU',
+    version: 1,
+    actions: [],
+    measurements: [
+      ...legacyProfiles[0].measurements.map((measurement) => ({ ...measurement, decimalPlaces: 3 })),
+      {
+        ...base,
+        id: 'voltage-l1',
+        name: 'L1 voltage',
+        address: 0x5002,
+        dataType: 'float32',
+        scale: 1,
+        unit: 'volt',
+        kind: 'live',
+        decimalPlaces: 3,
+      },
+      {
+        ...base,
+        id: 'current-l1',
+        name: 'L1 current',
+        address: 0x500c,
+        dataType: 'float32',
+        scale: 1,
+        unit: 'ampere',
+        kind: 'live',
+        decimalPlaces: 3,
+      },
+    ],
+  },
+  ...legacyProfiles,
+];
 // Freeze nested maps: callers must duplicate before editing. Evidence URLs are documented in README.
 function freeze(value: object): void {
   Object.values(value).forEach((child) => {
@@ -246,7 +285,7 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
           'offset',
           'functionCode',
           ...(p.measurements.includes(f as ModbusMeasurement)
-            ? ['unit', 'kind', 'pollIntervalMs', 'rollover']
+            ? ['unit', 'kind', 'pollIntervalMs', 'rollover', 'decimalPlaces']
             : ['onValue', 'offValue']),
         ],
         `${path}.${f.id}`,
@@ -258,6 +297,7 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
         ![3, 4].includes(m.functionCode) ||
         !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(m.unit) ||
         !['live', 'cumulative'].includes(m.kind) ||
+        (m.decimalPlaces !== undefined && !integer(m.decimalPlaces, 0, 3)) ||
         !integer(m.pollIntervalMs, 100, 3600000)
       )
         fail(path, 'measurement requires FC03/04, physical unit, kind, poll interval 100..3600000ms');

@@ -74,7 +74,6 @@ export interface CommissioningSession {
 }
 
 export interface CreateCommissioningSessionInput {
-  runtimeArtifactDigest?: string;
   targetHost: string;
   mqttServerId: number;
   name: string;

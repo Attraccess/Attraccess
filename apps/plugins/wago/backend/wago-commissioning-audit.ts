@@ -41,8 +41,7 @@ export async function auditCommissioning<T>(
     | 'security_recover'
     | 'platform_inspect'
     | 'platform_activate'
-    | 'platform_recover'
-    | 'lease_recover',
+    | 'platform_recover',
   operation: () => Promise<T>,
   succeeded: (result: T) => boolean = () => true,
 ): Promise<T> {

@@ -11,6 +11,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
   const [updated, setUpdated] = useState<CommissioningSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [approved, setApproved] = useState(false);
+  const [customSsh, setCustomSsh] = useState(false);
   const [error, setError] = useState('');
   const form = useRef<HTMLFormElement>(null);
   const generation = useRef(0);
@@ -35,10 +36,11 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
     if (busy || !form.current?.reportValidity() || (action !== 'inspect' && !approved)) return;
     const values = new FormData(form.current);
     const temporarySsh = {
-      username: String(values.get('preflightUsername') ?? ''),
-      password: String(values.get('preflightPassword') ?? ''),
+      username: customSsh ? String(values.get('preflightUsername') ?? '') : 'root',
+      password: customSsh ? String(values.get('preflightPassword') ?? '') : 'wago',
     };
     form.current.reset();
+    setCustomSsh(false);
     setApproved(false);
     setBusy(true);
     setError('');
@@ -56,7 +58,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
       }
     } catch {
       if (request === generation.current)
-        setError('Platform action failed. Recheck the supported action and fresh SSH credential.');
+        setError('Could not inspect or clean up the controller. Check SSH access and try again.');
     } finally {
       temporarySsh.password = '';
       if (request === generation.current) setBusy(false);
@@ -65,16 +67,12 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
 
   return (
     <section className="wg:space-y-3" aria-label="Controller installation preflight">
-      <h3>Controller installation preflight</h3>
-      <p>
-        Optionally inspect firmware, UTC clock skew, digital I/O access, CODESYS and Docker before installation.
-        Inspection does not change the controller. Installation checks these again under your destructive-install
-        approval.
-      </p>
+      <h3>Check the controller</h3>
+      <p>Optional: check firmware and installation prerequisites. This does not change the controller.</p>
       {codesysDisabled && (
         <p role="status">
-          Controller preparation verified CODESYS stopped and permanently disabled. This is a saved result, not a
-          live controller status check.
+          Controller preparation verified CODESYS stopped and permanently disabled. This is a saved result, not a live
+          controller status check.
         </p>
       )}
       {report?.clock && (
@@ -166,9 +164,9 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
       )}
       {!codesysDisabled && report?.exclusivity === 'codesys-boot-enabled' && (
         <p>
-          CODESYS is configured to start at boot. Destructive installation must disable that startup and verify
-          CODESYS is stopped before I/O. A stopped process alone is insufficient. No separate PLC preservation or
-          restoration approval is required.
+          CODESYS is configured to start at boot. Destructive installation must disable that startup and verify CODESYS
+          is stopped before I/O. A stopped process alone is insufficient. No separate PLC preservation or restoration
+          approval is required.
         </p>
       )}
       {report?.exclusivity === 'output-container-conflict' && (
@@ -204,14 +202,25 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
       )}
       {current.failureReason && <p role="alert">{current.failureReason}</p>}
       <form ref={form} onSubmit={(event) => event.preventDefault()}>
-        <TextField name="preflightUsername" isRequired isDisabled={busy}>
-          <Label>Preflight SSH username</Label>
-          <Input autoComplete="off" />
-        </TextField>
-        <TextField name="preflightPassword" isRequired isDisabled={busy}>
-          <Label>Preflight SSH password</Label>
-          <Input type="password" autoComplete="off" />
-        </TextField>
+        <p>SSH login: {customSsh ? 'Custom credentials' : 'Default root account'}</p>
+        <Checkbox isSelected={customSsh} onChange={setCustomSsh} isDisabled={busy}>
+          <Checkbox.Control>
+            <Checkbox.Indicator />
+          </Checkbox.Control>
+          <Checkbox.Content>Advanced: use different SSH credentials</Checkbox.Content>
+        </Checkbox>
+        {customSsh && (
+          <>
+            <TextField name="preflightUsername" isRequired isDisabled={busy}>
+              <Label>Preflight SSH username</Label>
+              <Input autoComplete="off" />
+            </TextField>
+            <TextField name="preflightPassword" isRequired isDisabled={busy}>
+              <Label>Preflight SSH password</Label>
+              <Input type="password" autoComplete="off" />
+            </TextField>
+          </>
+        )}
         <Button type="button" variant="secondary" isDisabled={busy} onPress={() => void run('inspect')}>
           Inspect installation prerequisites
         </Button>
@@ -222,15 +231,11 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
                 <Checkbox.Indicator />
               </Checkbox.Control>
               <Checkbox.Content>
-                I approve cleaning up this controller preparation. Preexisting workloads and host settings will not
-                be restored.
+                I approve cleaning up this controller preparation. Preexisting workloads and host settings will not be
+                restored.
               </Checkbox.Content>
             </Checkbox>
-            <Button
-              type="button"
-              isDisabled={busy || !approved}
-              onPress={() => void run('recover')}
-            >
+            <Button type="button" isDisabled={busy || !approved} onPress={() => void run('recover')}>
               Clean up controller preparation
             </Button>
           </>

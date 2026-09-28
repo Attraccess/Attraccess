@@ -3,6 +3,7 @@ import type { PluginContext, PluginMqttSubscription, Repository } from '@attracc
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoController } from './wago-controller.entity';
 import type { WagoConfigurationSnapshot } from './configuration';
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 import { operationalWildcardTopic, parseOperationalMessage, type WagoOperationalMessage } from './protocol';
 import { WagoSettings } from './wago-settings.entity';
 import { WAGO_EVENT_NODE_TYPE } from './wago-state-nodes';
@@ -44,6 +45,12 @@ type OperationalStream = {
   sequences: Map<WagoOperationalMessage['category'], number>;
 };
 
+class FlowSubscriptionError extends Error {
+  constructor(readonly mqttError: unknown) {
+    super(String(mqttError));
+  }
+}
+
 @Injectable()
 export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   // Plugin registration precedes the host datasource; resolve repositories only when used.
@@ -76,7 +83,12 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   async onModuleInit(): Promise<void> {
-    await this.refresh();
+    try {
+      await this.refresh();
+    } catch (error) {
+      if (!(error instanceof FlowSubscriptionError)) throw error;
+      this.context.logger.warn(`Could not refresh WAGO flow subscriptions during startup: ${String(error.mqttError)}`);
+    }
     // Claims and settings are managed by another service; periodically reconcile this shared subscription.
     this.refreshTimer = setInterval(
       () =>
@@ -135,17 +147,18 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         )
         .filter(([, entry]) => Boolean(entry.serverId)),
     );
+    const wildcardTopic = operationalWildcardTopic(settings.operationalPrefix);
     const replacements: PluginMqttSubscription[] = [];
     try {
       for (const serverId of serverIds)
         replacements.push(
-          await this.context.mqtt.subscribe(serverId, operationalWildcardTopic(settings.operationalPrefix), (message) =>
+          await this.context.mqtt.subscribe(serverId, wildcardTopic, (message) =>
             this.onMessage(serverId, settings.operationalPrefix, message.topic, message.payload),
           ),
         );
     } catch (error) {
       replacements.forEach((subscription) => subscription.unsubscribe());
-      throw error;
+      throw new FlowSubscriptionError(error);
     }
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
     this.subscriptions.push(...replacements);
@@ -357,8 +370,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     if (!entry || entry.serverId !== serverId) return;
     const { controller } = entry;
     const eventTime = Date.parse(event.timestamp);
-    if (eventTime > Date.now()) {
-      this.context.logger.warn(`Ignoring future-dated WAGO event for ${controller.hardwareId}`);
+    if (eventTime > Date.now() + CONTROLLER_CLOCK_TOLERANCE_MS) {
+      this.context.logger.warn(`Ignoring WAGO event beyond the clock-skew tolerance for ${controller.hardwareId}`);
       return;
     }
     // Resolve configuration before mutating stream/cache state, then process the entire snapshot atomically.
@@ -612,11 +625,15 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     available: boolean;
   } {
     const age = Date.now() - Date.parse(state.timestamp);
-    const stale = !Number.isFinite(age) || age < 0 || age > STALE_AFTER_MS;
+    const stale = !Number.isFinite(age) || age < -CONTROLLER_CLOCK_TOLERANCE_MS || age > STALE_AFTER_MS;
     const offline = state.offline === true || this.offlineControllers.has(state.controllerId);
     const stream = this.streams.get(state.controllerId);
     const stateTimestamp = stream?.stateTimestamp;
-    const connectionStale = stateTimestamp === undefined || Date.now() - stateTimestamp > STALE_AFTER_MS;
+    const connectionAge = stateTimestamp === undefined ? NaN : Date.now() - stateTimestamp;
+    const connectionStale =
+      !Number.isFinite(connectionAge) ||
+      connectionAge < -CONTROLLER_CLOCK_TOLERANCE_MS ||
+      connectionAge > STALE_AFTER_MS;
     return {
       stale,
       offline,

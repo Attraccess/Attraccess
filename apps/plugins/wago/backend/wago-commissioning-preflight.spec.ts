@@ -19,12 +19,16 @@ describe('commissioning broker preflight', () => {
     expect(() => assertCommissioningBroker(config)).not.toThrow();
   });
 
-  it.each([{ useTls: false }, { tlsInsecure: true }])('rejects unauthenticated transport %j', (override) => {
-    expect(() => assertCommissioningBroker({ ...config, ...override })).toThrow('certificate verification');
+  it.each([{ useTls: false, port: 1883 }, { tlsInsecure: true }])('accepts the selected transport %j', (override) => {
+    expect(() => assertCommissioningBroker({ ...config, ...override })).not.toThrow();
   });
 
-  it('does not silently discard a certificate hostname override', () => {
-    expect(() => assertCommissioningBroker({ ...config, tlsServername: 'other.example.test' })).toThrow('DNS name');
+  it('does not require a CA for TLS configured without certificate verification', () => {
+    expect(() => assertCommissioningBroker({ ...config, tlsInsecure: true, caCert: 'unused' })).not.toThrow();
+  });
+
+  it('uses the configured TLS hostname override', () => {
+    expect(() => assertCommissioningBroker({ ...config, tlsServername: 'other.example.test' })).not.toThrow();
   });
 
   it.each(['bad pem', '-----BEGIN CERTIFICATE-----\nbad\n-----END CERTIFICATE-----'])(

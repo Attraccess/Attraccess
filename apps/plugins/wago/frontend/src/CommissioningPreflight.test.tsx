@@ -2,7 +2,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CommissioningPlatformPreflight } from './CommissioningPlatformPreflight';
-import { CommissioningOperationStatus } from './CommissioningOperationStatus';
 import type { CommissioningSession } from './api';
 
 const session: CommissioningSession = {
@@ -59,14 +58,23 @@ function mountPreflight(value = session) {
   );
 }
 function credentials(prefix: string) {
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Advanced: use different SSH credentials' }));
   fireEvent.change(screen.getByLabelText(`${prefix} SSH username`), { target: { value: 'operator' } });
   fireEvent.change(screen.getByLabelText(`${prefix} SSH password`), { target: { value: 'fixture-password' } });
 }
+it('inspects using the factory login without prompting for SSH credentials', async () => {
+  mountPreflight();
+  expect(screen.queryByLabelText('Preflight SSH password')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect installation prerequisites' }));
+  await waitFor(() => expect(requests.some(({ url }) => url.endsWith('/platform/inspect'))).toBe(true));
+  expect(requests.find(({ url }) => url.endsWith('/platform/inspect'))?.body?.temporarySsh).toEqual({
+    username: 'root',
+    password: 'wago',
+  });
+});
 it('inspects with fresh credentials, clears fields, and updates only the matching cached session', async () => {
   client.setQueryData(['wago', 'commissioning-sessions'], [session, { ...session, id: 8 }]);
   mountPreflight();
-  fireEvent.click(screen.getByRole('button', { name: 'Inspect installation prerequisites' }));
-  expect(requests).toHaveLength(0);
   credentials('Preflight');
   fireEvent.click(screen.getByRole('button', { name: 'Inspect installation prerequisites' }));
   await screen.findByText(/preparation verified CODESYS stopped and permanently disabled/);
@@ -77,7 +85,7 @@ it('inspects with fresh credentials, clears fields, and updates only the matchin
       reviewedDockerActivation: false,
     },
   });
-  expect((screen.getByLabelText('Preflight SSH password') as HTMLInputElement).value).toBe('');
+  expect(screen.queryByLabelText('Preflight SSH password')).toBeNull();
   expect(client.getQueryData(['wago', 'commissioning-sessions'])).toEqual([response, { ...session, id: 8 }]);
 });
 it('requires preparation cleanup approval and reports a rejected recovery', async () => {
@@ -88,11 +96,11 @@ it('requires preparation cleanup approval and reports a rejected recovery', asyn
   fireEvent.click(screen.getByRole('checkbox', { name: /I approve cleaning up this controller preparation/ }));
   fail = true;
   fireEvent.click(button);
-  await screen.findByText(/Platform action failed/);
+  await screen.findByText(/Could not inspect or clean up/);
   expect(requests[0].url).toMatch(/\/platform\/recover$/);
   expect(requests[0].body?.reviewedDockerActivation).toBe(true);
-  expect((screen.getByLabelText('Preflight SSH password') as HTMLInputElement).value).toBe('');
-  expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+  expect(screen.queryByLabelText('Preflight SSH password')).toBeNull();
+  expect((screen.getByRole('checkbox', { name: /I approve cleaning/ }) as HTMLInputElement).checked).toBe(false);
 });
 it.each(['codesys-active', 'codesys-boot-enabled', 'output-container-conflict'])(
   'renders saved clock, platform, and exclusivity findings (%s)',
@@ -126,39 +134,3 @@ it.each(['codesys-active', 'codesys-boot-enabled', 'output-container-conflict'])
     expect(requests).toHaveLength(0);
   },
 );
-it('shows a stale coordinator lease and recovers only with explicit stopped-worker confirmation', async () => {
-  response = { state: 'stale', owner: 'old-owner', recoveryAfter: '2026-09-22T10:00:00Z' };
-  render(
-    <QueryClientProvider client={client}>
-      <CommissioningOperationStatus sessionId={7} />
-    </QueryClientProvider>,
-  );
-  const button = await screen.findByRole('button', { name: 'Recover interrupted coordinator' });
-  expect((button as HTMLButtonElement).disabled).toBe(true);
-  credentials('Coordinator recovery');
-  fireEvent.click(screen.getByRole('checkbox', { name: /previous commissioning instance has stopped/ }));
-  response = { state: 'available' };
-  fireEvent.click(button);
-  await waitFor(() => expect(screen.queryByText('Interrupted coordinator recovery required')).toBeNull());
-  const recover = requests.find(({ url }) => url.endsWith('/operation/recover'));
-  expect(recover?.body).toEqual({
-    temporarySsh: { username: 'operator', password: 'fixture-password' },
-    owner: 'old-owner',
-    previousWorkerStopped: true,
-  });
-});
-it('retains recovery guidance after the coordinator rejects recovery and clears credentials', async () => {
-  response = { state: 'stale', owner: 'old-owner', recoveryAfter: '2026-09-22T10:00:00Z' };
-  render(
-    <QueryClientProvider client={client}>
-      <CommissioningOperationStatus sessionId={7} />
-    </QueryClientProvider>,
-  );
-  await screen.findByRole('button', { name: 'Recover interrupted coordinator' });
-  credentials('Coordinator recovery');
-  fireEvent.click(screen.getByRole('checkbox'));
-  fail = true;
-  fireEvent.click(screen.getByRole('button', { name: 'Recover interrupted coordinator' }));
-  await screen.findByText(/Recovery remains blocked/);
-  expect((screen.getByLabelText('Coordinator recovery SSH password') as HTMLInputElement).value).toBe('');
-});
