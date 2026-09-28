@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import type { CommissioningSession } from './api';
+import type { CommissioningSession, CommissioningVerification } from './api';
 import { CommissioningModal } from './CommissioningModal';
 
 vi.mock('./drawer', () => ({
@@ -37,6 +37,7 @@ let failInstall: boolean;
 let failRecovery: boolean;
 let activeSession: CommissioningSession;
 let verificationControllerId: number | null;
+let verificationOverrides: Partial<CommissioningVerification>;
 
 beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 3 } } });
@@ -45,6 +46,7 @@ beforeEach(() => {
   failRecovery = false;
   activeSession = { ...session };
   verificationControllerId = null;
+  verificationOverrides = {};
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, options?: RequestInit) => {
@@ -64,6 +66,7 @@ beforeEach(() => {
                     permanentConnection: false,
                     enrollmentRevoked: false,
                     configurationApplied: false,
+                    ...verificationOverrides,
                   }
                 : url.includes('/commissioning/sessions')
                   ? [activeSession]
@@ -95,6 +98,37 @@ function mount() {
   );
   return { ...render(view(true)), view, onOpenChange };
 }
+
+it('shows verified enrollment separately from unfinished configuration and management', async () => {
+  activeSession.state = 'awaiting_verification';
+  activeSession.progressStep = 'Verifying commissioned controller';
+  activeSession.progressDetail = 'Claim sent. Permanent connection still requires verification.';
+  verificationControllerId = 2;
+  verificationOverrides = {
+    permanentConnection: true,
+    enrollmentRevoked: true,
+    managementHardening: 'unverified',
+  };
+  mount();
+  expect(await screen.findByText('Enrollment complete')).toBeTruthy();
+  expect(screen.getByText('Runtime enrollment complete')).toBeTruthy();
+  expect(screen.queryByText('Commissioning is not yet verified')).toBeNull();
+  expect(screen.queryByText(activeSession.progressDetail)).toBeNull();
+  expect(screen.getByText('Desired/reported configuration: pending')).toBeTruthy();
+  expect(screen.getByText('Management hardening: unverified')).toBeTruthy();
+});
+
+it.each(['permanentConnection', 'enrollmentRevoked'] as const)(
+  'keeps enrollment pending when %s has not been verified',
+  async (missing) => {
+    activeSession.state = 'awaiting_verification';
+    verificationControllerId = 2;
+    verificationOverrides = { permanentConnection: true, enrollmentRevoked: true, [missing]: false };
+    mount();
+    await screen.findByText('Desired/reported configuration: pending');
+    expect(screen.queryByText('Enrollment complete')).toBeNull();
+  },
+);
 
 function fillCredentials() {
   if (!screen.queryByLabelText('Temporary SSH username'))
