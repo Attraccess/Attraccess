@@ -41,6 +41,7 @@ module.exports = [
             // matches these patterns.
             '^(\\.\\./)+(modbus|backend)/',
             '^(\\.\\./)+(channel-behavior|measurement-contract)$',
+            '^(\\.\\./)+shared/hardware-profile$',
           ],
           depConstraints: [
             // Plugins are encapsulated, separately shipped products. They may build

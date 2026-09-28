@@ -154,6 +154,35 @@ const command = (id: string, value = true, revision = 1) =>
   );
 
 describe('ATT-1059 independent review regressions', () => {
+  it('publishes an actual 879-3000 float register as integer millivolts', async () => {
+    const s: Snapshot = snapshot();
+    if (!s.modbus) throw new Error('Missing fixture configuration');
+    s.modbus.devices[0].profileId = 'wago-879-3000';
+    s.modbus.profiles = [];
+    s.physicalPoints[0].modbus = { deviceId: 'device', measurementId: 'voltage-l1' };
+    s.logicalChannels = [
+      {
+        id: 'voltage',
+        physicalPointId: 'point',
+        profile: 'metered-switched-load',
+        capabilities: ['measurement'],
+        disconnectPolicy: { mode: 'hold' },
+        measurement: { unit: 'volt', scale: 1, offset: 0, kind: 'live' },
+      },
+    ];
+    // Captured FC03 register bytes: 232.07000732421875 V, the meter's 232.07 V reading.
+    const router = new ModbusDeviceRouter(onboard, () => ({ request: async () => Buffer.from('436811ec', 'hex') }));
+    const { runtime, published } = harness(s, router);
+    await runtime.start();
+    await runtime.publishMeasurements();
+    expect(published.filter(({ topic }) => topic.endsWith('/measurements'))).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({ channelId: 'voltage', value: 232070, unit: 'millivolt' }),
+      }),
+    ]);
+    expect(published.some(({ topic }) => topic.endsWith('/faults'))).toBe(false);
+  });
+
   it.each(['remove', 'rebind'])(
     'blocks route %s after an ambiguous ON, including after restart, until explicit OFF',
     async (mode) => {

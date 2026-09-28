@@ -236,3 +236,18 @@ test('production entrypoint drains connection states during startup and handles 
   expect(mockRuntime.setConnected).toHaveBeenLastCalledWith(true);
   expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
 });
+
+test('production RTU profile routes Modbus devices and schedules their configured polling intervals', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-rtu-v1';
+  delete process.env.WAGO_IO_PATHS;
+  mockState = { credentials: { username: 'permanent', password: 'persisted' } };
+  await import('./main');
+  await flush();
+  const { WagoRuntime } = await import('./runtime');
+  const { ModbusDeviceRouter } = await import('./modbus/adapter');
+  expect(jest.mocked(WagoRuntime).mock.calls[0][0].device).toBeInstanceOf(ModbusDeviceRouter);
+  mockClients[0].emit('connect');
+  await flush();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(1);
+});

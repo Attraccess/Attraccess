@@ -6,8 +6,17 @@ import { wagoShellStat } from './wago-shell-stat';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
 import { wagoPrivilegeProbeShell } from './wago-privilege-probe';
 import { wagoRuntimeSupervisorAcknowledgeShell, wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
+import {
+  CC100_DIGITAL_PROFILE_ID,
+  CC100_MODBUS_PROFILE_ID,
+  CC100_SERIAL_HOST_PATH,
+  CC100_SERIAL_PATH,
+  isCc100HardwareProfile,
+  type Cc100HardwareProfile,
+} from '../shared/hardware-profile';
+import { wagoSerialDeploymentPreflight } from './wago-serial-deployment';
 
-export const WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
+export const WAGO_HARDWARE_PROFILE = CC100_DIGITAL_PROFILE_ID;
 export const WAGO_DIN = '/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din';
 export const WAGO_DOUT = '/sys/kernel/dout_drv/DOUT_DATA';
 export const WAGO_DOCKER_PROVISION_REVIEW_FLAG = 'reviewedDockerActivation' as const;
@@ -178,18 +187,31 @@ printf 'version=1\\nplatform=%s\\nhardware=%s\\nexclusivity=%s\\ndocker=%s\\ncon
 }
 
 /** Recheck under the install lock immediately before any runtime transaction. */
-export function wagoHardwareDeploymentPreflightScript(testRoot = '', boundedDocker = true): string {
+export function wagoHardwareDeploymentPreflightScript(
+  testRoot = '',
+  boundedDocker = true,
+  profile: Cc100HardwareProfile = WAGO_HARDWARE_PROFILE,
+): string {
   return `${checks(testRoot, boundedDocker)}
 [ "$platform" = supported ] || { echo "$platform" >&2; exit 1; }
 [ "$hardware" = accessible ] || { echo "$hardware" >&2; exit 1; }
 [ "$docker_state" = running ] || { echo "$docker_state: $provision" >&2; exit 1; }
 [ "$exclusivity" = clear ] || { echo "$exclusivity" >&2; exit 1; }
+${profile === CC100_MODBUS_PROFILE_ID ? wagoSerialDeploymentPreflight() : ''}
 `;
 }
 
-export function wagoHardwareDeploymentDockerArgs(testRoot = ''): string {
+export function wagoHardwareDeploymentDockerArgs(
+  testRoot = '',
+  profile: Cc100HardwareProfile = WAGO_HARDWARE_PROFILE,
+): string {
   rootValue(testRoot);
-  return `--user 10001:10001 --cap-drop ALL --security-opt no-new-privileges --network host --env WAGO_HARDWARE_PROFILE=${WAGO_HARDWARE_PROFILE} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly`)} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DOUT},dst=/run/attraccess-wago/io/dout`)}`;
+  if (!isCc100HardwareProfile(profile)) throw new Error('Unsupported CC100 hardware profile');
+  const serial =
+    profile === CC100_MODBUS_PROFILE_ID
+      ? ` --group-add "$wago_serial_gid" --device ${quote(`${testRoot}${CC100_SERIAL_HOST_PATH}:${CC100_SERIAL_PATH}:rw`)}`
+      : '';
+  return `--user 10001:10001 --cap-drop ALL --security-opt no-new-privileges --network host --env WAGO_HARDWARE_PROFILE=${profile} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly`)} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DOUT},dst=/run/attraccess-wago/io/dout`)}${serial}`;
 }
 
 function provisionLock(token: string, testRoot: string): string {
@@ -200,8 +222,8 @@ root=${rootValue(testRoot)}
 config="$root/etc/attraccess-wago"
 journal="$config/docker-provision"
 fail() { echo "$*" >&2; exit 1; }
-${wagoShellFilesystemGuard()}
-for path in "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup" "$config/delivery"; do
+ ${wagoShellFilesystemGuard({ waitForLock: true })}
+ for path in "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup" "$config/delivery"; do
   test ! -e "$path" || fail 'Finish runtime delivery/recovery before Docker provisioning'
 done
 token=${quote(token)}
@@ -266,7 +288,7 @@ test "$(stat -c '%u:%g:%a' "$root${WAGO_DIN}")" = 10001:10001:400 &&
  * (161064ms host IO, 8995ms CODESYS), within the 30-minute operation limit.
  * This timing allowance is not safety certification or physical qualification.
  */
-export function wagoRuntimeBootScript(testRoot = ''): string {
+export function wagoRuntimeBootScript(testRoot = '', profile: Cc100HardwareProfile = WAGO_HARDWARE_PROFILE): string {
   return `#!/bin/sh
 set -eu
 umask 077
@@ -297,12 +319,13 @@ contain_supervisor_failure() (
     fi
   }
   ${wagoShellFilesystemGuard()}
-  rm -f "$config/runtime-enabled"
+  # Enablement is durable operator intent, not a transient observation result.
+  # Only an explicit stop, installation rollback or replacement disables it.
   contain_runtime
 )
 # Direct exits and errexit from every embedded observation use the same bounded
 # containment path. Failure to verify stopping is never a successful receipt.
-trap 'status=$?; trap - EXIT; if test "$status" -ne 0; then if test "$supervisor_owner" = 1; then contain_supervisor_failure || echo "Runtime supervisor containment unverified; recovery required" >&2; elif test "$may_stop" = 1; then rm -f "$config/runtime-enabled"; contain_runtime || echo "Runtime containment unverified; recovery required" >&2; fi; fi; exit "$status"' EXIT
+trap 'status=$?; trap - EXIT; if test "$status" -ne 0; then if test "$supervisor_owner" = 1; then if contain_supervisor_failure; then if test "$action" = start && test -f "$config/runtime-enabled"; then nohup "$hook" supervise </dev/null >/dev/null 2>&1 9>&- & fi; else echo "Runtime supervisor containment unverified; recovery required" >&2; fi; elif test "$may_stop" = 1; then contain_runtime || echo "Runtime containment unverified; recovery required" >&2; fi; fi; exit "$status"' EXIT
 trap 'exit 130' HUP INT TERM
 action=\${1:-}
 case "$action" in
@@ -311,7 +334,12 @@ case "$action" in
     supervisor_owner=1
     test -f "$hook" && test ! -L "$hook" && test "$(stat -c '%u:%g:%a:%h' "$hook")" = 0:0:700:1 || fail 'Unsafe runtime boot hook'
     retries=0
-    busy=0
+    record_failure() {
+      report=$(mktemp "$config/supervisor-report.XXXXXX")
+      { date -u '+%Y-%m-%dT%H:%M:%SZ'; printf 'exit=%s action=%s\\n' "$status" "$cycle"; dd if="$gate_error" bs=1 count=4096 2>/dev/null; } > "$report"
+      test ! -d "$config/supervisor.last-error" || fail 'Unsafe supervisor diagnostic path'
+      mv -f "$report" "$config/supervisor.last-error"
+    }
     while test -f "$config/runtime-enabled"; do
       # Only requests present before this gate may use its observation. A new
       # transaction can run between the child releasing install.lock and our
@@ -319,22 +347,32 @@ case "$action" in
       set -- "$config"/supervisor-start.*
       cycle=cycle
       test "$retries" -lt 5 || cycle=watch
-      if observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&-); then
-        busy=0
+      gate_error=$(mktemp "$config/supervisor-error.XXXXXX")
+      if observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&- 2>"$gate_error"); then
+        rm -f "$gate_error"
         case "$observation" in
           started) retries=$((retries + 1)) ;;
-          running) ;;
+          running) retries=0 ;;
           disabled) exit 0 ;;
           *) fail 'Invalid runtime supervisor observation' ;;
         esac
         ${wagoRuntimeSupervisorAcknowledgeShell()}
       else
         status=$?
+        record_failure
+        rm -f "$gate_error"
         if test "$status" = 75; then
-          busy=$((busy + 1)); test "$busy" -lt 15 || fail 'Runtime transaction did not finish'
+          # The other transaction owns the writer. Never stop it on lock contention.
+          sleep 2
         else
-          exit "$status"
+          # A timed-out child may not have run its trap. Verify OFF before retrying.
+          contain_supervisor_failure || fail 'Runtime supervisor containment unverified; recovery required'
+          # Retry only through a new complete hardware gate. Keep crash loops bounded
+          # to five starts per burst, with a cooldown rather than permanent disablement.
+          sleep 30
+          retries=0
         fi
+        continue
       fi
       sleep 2
     done
@@ -347,6 +385,12 @@ case "$action" in
     # Bound the complete gate, including host /proc and filesystem observations.
     # The outer owner contains a timeout even if the child cannot run its trap.
     if timeout -k 5 300 "$hook" "$action-checked"; then
+      if test "$action" = start; then
+        # Readiness runs a second full gate. Its 330s acknowledgement and 300s
+        # lock-reacquisition budgets must not be nested in the first gate's 300s.
+        ${wagoShellFilesystemGuard()}
+        ${wagoRuntimeSupervisorLaunchShell()}
+      fi
       exit 0
     else
       status=$?
@@ -393,7 +437,7 @@ done
 ${checks(testRoot, true, false)}
 [ "$exclusivity" = clear ] || fail "$exclusivity"
 ${hardwareOwnership()}
-${wagoHardwareDeploymentPreflightScript(testRoot, true)}
+${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 test "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' attraccess-wago)" = no || fail 'Invalid runtime restart policy'
 running=$(docker inspect --format '{{.State.Running}}' attraccess-wago) || fail 'Cannot observe runtime'
 case "$running" in
@@ -406,7 +450,8 @@ case "$running" in
   *) fail 'Invalid runtime state' ;;
 esac
 if test "$action" = start; then
-  ${wagoRuntimeSupervisorLaunchShell()}
+  # The outer start action performs the separately bounded supervisor handoff.
+  :
 else
   echo "$observation"
 fi
@@ -434,13 +479,18 @@ function runtimeContainment(): string {
  * Only the firmware-installed vendor components are used; no package is downloaded.
  * The journal records ownership/retry state, never promises restoration of old workloads.
  */
-export function wagoCommissioningPreparationScript(token: string, testRoot = ''): string {
+export function wagoCommissioningPreparationScript(
+  token: string,
+  testRoot = '',
+  profile: Cc100HardwareProfile = WAGO_HARDWARE_PROFILE,
+): string {
   return `${provisionLock(token, testRoot)}
 ${checks(testRoot)}
 [ "$platform" = supported ] || fail "$platform"
 case "$provision" in prepare-controller|install-vendor-runtime) ;; *) fail "$provision" ;; esac
 command -v timeout >/dev/null || fail 'bounded-vendor-command-unavailable'
 case "$hardware" in accessible|uid10001-access-denied) ;; *) fail "$hardware" ;; esac
+${profile === CC100_MODBUS_PROFILE_ID ? wagoSerialDeploymentPreflight() : ''}
 test -f "$root/etc/specific/rtsversion" && test ! -L "$root/etc/specific/rtsversion" || fail 'Invalid runtime selection'
 if test -e "$journal" || test -L "$journal"; then
   test -d "$journal" && test ! -L "$journal" || fail 'Invalid Docker provisioning journal'
@@ -504,12 +554,12 @@ done
 ${checks(testRoot)}
 [ "$exclusivity" = clear ] || fail "$exclusivity"
 ${hardwareOwnership()}
-${wagoHardwareDeploymentPreflightScript(testRoot)}
+${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 test ! -L "$root/etc/rc.d/S99_zz_attraccess_wago" || fail 'Invalid runtime boot hook'
 wago_require_root_directory "$root/etc/rc.d" || fail 'Unsafe boot directory'
 boot_stage=$(mktemp "$root/etc/rc.d/.attraccess-wago-stage.XXXXXX")
 cat > "$boot_stage" <<'ATTRACCESS_BOOT'
-${wagoRuntimeBootScript(testRoot)}ATTRACCESS_BOOT
+${wagoRuntimeBootScript(testRoot, profile)}ATTRACCESS_BOOT
 chmod 0700 "$boot_stage"
 test -f "$boot_stage" && test ! -L "$boot_stage" && test "$(stat -c '%u:%g:%a:%h' "$boot_stage")" = 0:0:700:1 || fail 'Unsafe runtime boot staging'
 mv -f "$boot_stage" "$root/etc/rc.d/S99_zz_attraccess_wago"
