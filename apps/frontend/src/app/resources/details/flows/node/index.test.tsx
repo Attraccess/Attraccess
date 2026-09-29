@@ -113,6 +113,26 @@ describe('AttraccessNode', () => {
     expect(card).not.toHaveClass('border-accent', 'ring-2');
   });
 
+  it('uses plugin handle names without requesting missing core translations', () => {
+    const translate = vi.fn(tStub);
+    render(
+      <AttraccessNode
+        schema={{
+          ...schema,
+          type: 'plugin.example.command',
+          label: 'Example command',
+          inputs: ['input'],
+          outputs: ['output', 'failure'],
+        }}
+        tNodeTranslations={translate}
+        tNodeExists={() => false}
+      />,
+    );
+    expect(translate).not.toHaveBeenCalledWith('nodes.plugin.example.command.inputs.input');
+    expect(translate).not.toHaveBeenCalledWith('nodes.plugin.example.command.outputs.failure');
+    expect(screen.getByText('Example command')).toBeInTheDocument();
+  });
+
   it.each([
     [ResourceFlowLogType.NODE_PROCESSING_STARTED, 'border-accent', 'bg-accent'],
     [ResourceFlowLogType.NODE_PROCESSING_COMPLETED, 'border-green-500', 'bg-green-500'],

@@ -67,7 +67,7 @@ export function AttraccessNode(props: Props) {
     [nodeId],
   );
 
-  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode } = useFlowContext();
+  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode, resourceId } = useFlowContext();
 
   useEffect(() => {
     if (!nodeId || previewMode) {
@@ -110,7 +110,9 @@ export function AttraccessNode(props: Props) {
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: inputName,
-        label: t('nodes.' + schema.type + '.inputs.' + inputName),
+        label: tNodeExists?.('nodes.' + schema.type + '.inputs.' + inputName)
+          ? t('nodes.' + schema.type + '.inputs.' + inputName)
+          : inputName,
         style: {
           left: `${leftPercentage}%`,
           top: 0,
@@ -118,7 +120,7 @@ export function AttraccessNode(props: Props) {
         },
       };
     });
-  }, [schema, t]);
+  }, [schema, t, tNodeExists]);
 
   const sourceHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
     return schema.outputs.map((outputName, index) => {
@@ -126,7 +128,9 @@ export function AttraccessNode(props: Props) {
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: outputName,
-        label: t('nodes.' + schema.type + '.outputs.' + outputName),
+        label: tNodeExists?.('nodes.' + schema.type + '.outputs.' + outputName)
+          ? t('nodes.' + schema.type + '.outputs.' + outputName)
+          : outputName,
         style: {
           left: `${leftPercentage}%`,
           bottom: 0,
@@ -134,7 +138,7 @@ export function AttraccessNode(props: Props) {
         },
       };
     });
-  }, [schema, t]);
+  }, [schema, t, tNodeExists]);
 
   const isEditable = useMemo(() => {
     if (previewMode) {
@@ -154,7 +158,7 @@ export function AttraccessNode(props: Props) {
     return true;
   }, [previewMode, schema]);
 
-  const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t });
+  const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t, resourceId });
 
   // Plugin-contributed node types have no entries in the static i18n JSON files.
   // Fall back to the label/description the plugin declared in its schema definition.

@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Konfiguration",
+    "loading": "Zusammenfassung wird geladen…",
+    "unavailable": "Vorschau nicht verfügbar"
+  },
   "editor": {
     "buttons": {
       "save": "Speichern",

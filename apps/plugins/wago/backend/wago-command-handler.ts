@@ -7,6 +7,7 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { outputBehavior, supportsOutputAction } from '../channel-behavior';
 import type { WagoConfigurationSnapshot } from './configuration';
+import { wagoFlowPreview } from './wago-flow-preview';
 
 const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
 const MAX_COMMAND_TIMEOUT_SECONDS = 300;
@@ -167,6 +168,7 @@ export class WagoCommandHandler {
     return {
       dynamic: true,
       type: 'object',
+      preview: wagoFlowPreview(config, 'command', controllers.find((item) => item.id === controllerId), snapshot, names),
       properties,
       required: [
         ...new Set([

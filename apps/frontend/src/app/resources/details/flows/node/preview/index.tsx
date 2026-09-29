@@ -1,11 +1,13 @@
 import { TFunction } from '@attraccess/plugins-frontend-ui';
-import { ResourceFlowNodeSchemaDto, ResourceFlowNodeType } from '@attraccess/react-query-client';
+import { ResourceFlowNodeSchemaDto, ResourceFlowNodeType, ResourceFlowsService } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 interface Props {
   tNodeTranslations: TFunction;
   schema: ResourceFlowNodeSchemaDto;
+  resourceId?: number;
 }
 
 export type NodePreviewEntryField = {
@@ -29,11 +31,46 @@ export type NodePreviewRow =
 export type NodePreviewData = Array<NodePreviewRow>;
 
 export function useNodePreviewRows(props: Props): NodePreviewData {
-  const { tNodeTranslations: t, schema } = props;
+  const { tNodeTranslations: t, schema, resourceId } = props;
   const nodeId = useNodeId();
   const nodeData = useNodesData(nodeId as string);
+  const resolvePreview = Boolean(
+    nodeId &&
+    nodeData &&
+    resourceId &&
+    schema.type.startsWith('plugin.') &&
+    schema.configSchema.dynamic === true &&
+    Array.isArray(schema.configSchema.preview),
+  );
+  const resolved = useQuery({
+    queryKey: ['flow-node-preview', resourceId, schema.type, nodeData?.data],
+    queryFn: () => {
+      if (!resourceId || !nodeData) throw new Error('A resource and node configuration are required');
+      return ResourceFlowsService.resolveNodeSchema({
+        resourceId,
+        nodeType: schema.type,
+        requestBody: { config: nodeData.data },
+      });
+    },
+    enabled: resolvePreview,
+    staleTime: 30_000,
+    retry: false,
+    placeholderData: undefined,
+  });
 
-  return useMemo(() => getNodePreviewRows(schema.type, t, nodeData), [schema, t, nodeData]);
+  return useMemo(() => {
+    if (resolvePreview && (resolved.isError || !resolved.data)) {
+      return [
+        { label: t('preview.configuration'), value: t(resolved.isError ? 'preview.unavailable' : 'preview.loading') },
+      ];
+    }
+    return getNodePreviewRows(
+      schema.type,
+      t,
+      nodeData,
+      resolvePreview ? resolved.data?.configSchema : schema.configSchema,
+    );
+  }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError]);
 }
 
 type PreviewNode = { data: Record<string, unknown> } | null;
@@ -273,7 +310,25 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
   },
 };
 
-export function getNodePreviewRows(type: string, t: TFunction, nodeData: PreviewNode): NodePreviewData {
+export function getNodePreviewRows(
+  type: string,
+  t: TFunction,
+  nodeData: PreviewNode,
+  configSchema?: Record<string, unknown>,
+): NodePreviewData {
+  if (type.startsWith('plugin.') && Array.isArray(configSchema?.preview)) {
+    return configSchema.preview
+      .filter(
+        (row): row is { label: string; value: string } =>
+          !!row &&
+          typeof row === 'object' &&
+          typeof row.label === 'string' &&
+          !!row.label.trim() &&
+          typeof row.value === 'string',
+      )
+      .slice(0, 4)
+      .map(({ label, value }) => ({ label, value }));
+  }
   if (!Object.hasOwn(previewBuilders, type)) return [];
   return previewBuilders[type as ResourceFlowNodeType](t, nodeData);
 }
