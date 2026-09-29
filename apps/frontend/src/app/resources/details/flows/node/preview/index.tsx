@@ -1,4 +1,4 @@
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TFunction, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, ResourceFlowNodeType, ResourceFlowsService } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
@@ -32,6 +32,7 @@ export type NodePreviewData = Array<NodePreviewRow>;
 
 export function useNodePreviewRows(props: Props): NodePreviewData {
   const { tNodeTranslations: t, schema, resourceId } = props;
+  const locale = useTranslationState((state) => state.language);
   const nodeId = useNodeId();
   const nodeData = useNodesData(nodeId as string);
   const resolvePreview = Boolean(
@@ -54,6 +55,8 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
     },
     enabled: resolvePreview,
     staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: false,
     placeholderData: undefined,
   });
@@ -69,8 +72,9 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       t,
       nodeData,
       resolvePreview ? resolved.data?.configSchema : schema.configSchema,
+      locale,
     );
-  }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError]);
+  }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError, locale]);
 }
 
 type PreviewNode = { data: Record<string, unknown> } | null;
@@ -315,6 +319,7 @@ export function getNodePreviewRows(
   t: TFunction,
   nodeData: PreviewNode,
   configSchema?: Record<string, unknown>,
+  locale = 'en',
 ): NodePreviewData {
   if (type.startsWith('plugin.') && Array.isArray(configSchema?.preview)) {
     return configSchema.preview
@@ -327,7 +332,15 @@ export function getNodePreviewRows(
           typeof row.value === 'string',
       )
       .slice(0, 4)
-      .map(({ label, value }) => ({ label, value }));
+      .map((row) => {
+        const translations = (row as { translations?: Record<string, unknown> }).translations;
+        const translated = translations?.[locale] ?? translations?.[locale.split('-')[0]];
+        if (translated && typeof translated === 'object') {
+          const { label, value } = translated as { label?: unknown; value?: unknown };
+          if (typeof label === 'string' && label.trim() && typeof value === 'string') return { label, value };
+        }
+        return { label: row.label, value: row.value };
+      });
   }
   if (!Object.hasOwn(previewBuilders, type)) return [];
   return previewBuilders[type as ResourceFlowNodeType](t, nodeData);

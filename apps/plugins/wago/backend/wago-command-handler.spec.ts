@@ -44,7 +44,7 @@ describe('WAGO command form', () => {
 
   it.each([true, false])('previews the selected device, channel and set %s operation', async (value) => {
     const schema = await handler.schema({ controllerId: 1, channelId: 'lamp', action: 'set', value }, 2);
-    expect(schema.preview).toEqual([
+    expect(schema.preview).toMatchObject([
       { label: 'Device', value: 'Workshop' },
       { label: 'Channel', value: 'lamp' },
       { label: 'Action', value: value ? 'Turn ON' : 'Turn OFF' },
@@ -53,7 +53,7 @@ describe('WAGO command form', () => {
 
   it('previews a pulse using the applied channel name and duration', async () => {
     const schema = await handler.schema({ controllerId: 1, channelId: 'door-lock', action: 'pulse' }, 2);
-    expect(schema.preview).toEqual([
+    expect(schema.preview).toMatchObject([
       { label: 'Device', value: 'Workshop' },
       { label: 'Channel', value: 'Workshop door lock' },
       { label: 'Action', value: 'Pulse · 500 ms' },

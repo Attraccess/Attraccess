@@ -1,8 +1,9 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ResourceFlowsService, type ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useNodePreviewRows } from './index';
 
 const node = vi.hoisted(() => ({ id: 'node' as string | null, data: { value: true } as Record<string, unknown> }));
@@ -96,4 +97,44 @@ it('does not resolve catalog cards or plugins that did not opt in', () => {
   node.id = 'node';
   mount({ ...schema, configSchema: { dynamic: true, properties: {} } });
   expect(ResourceFlowsService.resolveNodeSchema).not.toHaveBeenCalled();
+});
+
+it('does not refetch stale previews on focus or reconnect, but refreshes after invalidation', async () => {
+  const { result } = mount();
+  await waitFor(() => expect(pending).toHaveLength(1));
+  await act(async () => pending[0].resolve(response('Turn ON')));
+  await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'Turn ON' }));
+  const query = client.getQueryCache().find({ queryKey: ['flow-node-preview'], exact: false });
+  expect(query).toBeDefined();
+  query?.setState({ dataUpdatedAt: Date.now() - 60_000 });
+  await act(async () => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+    onlineManager.setOnline(false);
+    onlineManager.setOnline(true);
+  });
+  expect(pending).toHaveLength(1);
+  act(() => {
+    void client.invalidateQueries({ queryKey: ['flow-node-preview'] });
+  });
+  await waitFor(() => expect(pending).toHaveLength(2));
+  await act(async () => pending[1].resolve(response('New channel name')));
+  await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'New channel name' }));
+  focusManager.setFocused(undefined);
+});
+
+it('updates localized rows when the language changes without another schema request', async () => {
+  useTranslationState.setState({ language: 'en' });
+  const { result } = mount();
+  await waitFor(() => expect(pending).toHaveLength(1));
+  const localized = response('Turn OFF');
+  localized.configSchema.preview = [
+    { label: 'Action', value: 'Turn OFF', translations: { de: { label: 'Aktion', value: 'Ausschalten' } } },
+  ];
+  await act(async () => pending[0].resolve(localized));
+  await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'Turn OFF' }));
+  act(() => useTranslationState.setState({ language: 'de' }));
+  expect(result.current[0]).toEqual({ label: 'Aktion', value: 'Ausschalten' });
+  expect(pending).toHaveLength(1);
+  act(() => useTranslationState.setState({ language: 'en' }));
 });

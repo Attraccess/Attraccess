@@ -121,7 +121,7 @@ describe('WagoFlowService', () => {
       },
       kind,
     );
-    expect(schema.preview).toEqual([
+    expect(schema.preview).toMatchObject([
       { label: 'Device', value: 'cc100-01' },
       { label: 'Channel', value: 'door' },
       ...(kind === 'event'
@@ -158,7 +158,7 @@ describe('WagoFlowService', () => {
       },
       'wait',
     );
-    expect(schema.preview).toEqual([
+    expect(schema.preview).toMatchObject([
       { label: 'Device', value: 'cc100-01' },
       { label: 'Channel', value: 'Active power · WAGO 879-3000' },
       { label: 'Wait for', value: 'Measurement = 0 (wire value)' },

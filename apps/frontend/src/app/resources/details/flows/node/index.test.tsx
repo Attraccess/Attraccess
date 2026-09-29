@@ -171,3 +171,18 @@ describe('AttraccessNode', () => {
     expect(screen.getByText('Invalid node')).toHaveClass('text-danger');
   });
 });
+
+
+it('retains translated input and output handle labels when tNodeExists is omitted', () => {
+  const translate = vi.fn((key: string) => `Translated ${key}`);
+  render(<AttraccessNode schema={{ ...schema, inputs: ['in'] }} tNodeTranslations={translate} />);
+  expect(translate).toHaveBeenCalledWith('nodes.input.event.inputs.in');
+  expect(translate).toHaveBeenCalledWith('nodes.input.event.outputs.out');
+});
+
+it('uses raw plugin handle names only for explicitly missing translations', () => {
+  const translate = vi.fn((key: string) => key);
+  render(<AttraccessNode schema={{ ...schema, inputs: ['in'] }} tNodeTranslations={translate} tNodeExists={() => false} />);
+  expect(translate).not.toHaveBeenCalledWith('nodes.input.event.inputs.in');
+  expect(translate).not.toHaveBeenCalledWith('nodes.input.event.outputs.out');
+});

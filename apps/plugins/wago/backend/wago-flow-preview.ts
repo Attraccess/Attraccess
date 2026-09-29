@@ -1,3 +1,4 @@
+import type { PluginFlowNodePreviewRow } from '@attraccess/plugins-backend-sdk';
 import type { WagoConfigurationSnapshot } from './configuration';
 import { DIGITAL_TERMINALS } from './configuration-digital';
 
@@ -13,7 +14,21 @@ export function wagoFlowPreview(
   controller: { name?: string | null; hardwareId?: string } | undefined,
   snapshot: WagoConfigurationSnapshot | null,
   names: Record<string, unknown>,
+): PluginFlowNodePreviewRow[] {
+  const english = localizedPreview(config, kind, controller, snapshot, names, false);
+  const german = localizedPreview(config, kind, controller, snapshot, names, true);
+  return english.map((row, index) => ({ ...row, translations: { de: german[index] } }));
+}
+
+function localizedPreview(
+  config: Record<string, unknown>,
+  kind: PreviewKind,
+  controller: { name?: string | null; hardwareId?: string } | undefined,
+  snapshot: WagoConfigurationSnapshot | null,
+  names: Record<string, unknown>,
+  german: boolean,
 ): PreviewRow[] {
+  const text = (english: string, translated: string) => (german ? translated : english);
   const channel = snapshot?.logicalChannels.find((item) => item.id === config.channelId);
   const point = snapshot?.physicalPoints?.find((item) => item.id === channel?.physicalPointId);
   let channelName = channel
@@ -21,8 +36,8 @@ export function wagoFlowPreview(
       ? String(names[channel.id])
       : channel.id
     : typeof config.channelId === 'string'
-      ? `${config.channelId} (unavailable)`
-      : 'Not selected';
+      ? `${config.channelId} (${text('unavailable', 'nicht verfügbar')})`
+      : text('Not selected', 'Nicht ausgewählt');
   if (point?.modbus) {
     const device = snapshot?.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
     if (device) channelName = `${channelName} · ${device.name}`;
@@ -32,52 +47,68 @@ export function wagoFlowPreview(
   }
   const rows: PreviewRow[] = [
     {
-      label: 'Device',
+      label: text('Device', 'Gerät'),
       value:
         controller?.name ||
         controller?.hardwareId ||
-        (typeof config.controllerId === 'number' ? `Controller ${config.controllerId} (unavailable)` : 'Not selected'),
+        (typeof config.controllerId === 'number'
+          ? `Controller ${config.controllerId} (${text('unavailable', 'nicht verfügbar')})`
+          : text('Not selected', 'Nicht ausgewählt')),
     },
-    { label: 'Channel', value: channelName },
+    { label: text('Channel', 'Kanal'), value: channelName },
   ];
   if (kind === 'command') {
     const action =
       config.action === 'set'
         ? config.value === true
-          ? 'Turn ON'
+          ? text('Turn ON', 'Einschalten')
           : config.value === false
-            ? 'Turn OFF'
-            : 'Select ON/OFF'
+            ? text('Turn OFF', 'Ausschalten')
+            : text('Select ON/OFF', 'EIN/AUS auswählen')
         : config.action === 'pulse'
-          ? `Pulse${channel?.pulse ? ` · ${duration(channel.pulse.durationMs)}` : ''}`
-          : 'Not selected';
-    return [...rows, { label: 'Action', value: action }];
+          ? `${text('Pulse', 'Impuls')}${channel?.pulse ? ` · ${duration(channel.pulse.durationMs)}` : ''}`
+          : text('Not selected', 'Nicht ausgewählt');
+    return [...rows, { label: text('Action', 'Aktion'), value: action }];
   }
 
   const category =
     config.category === 'measurement'
-      ? 'Measurement'
+      ? text('Measurement', 'Messwert')
       : config.category === 'fault'
-        ? 'Fault'
+        ? text('Fault', 'Fehler')
         : config.category === 'state'
           ? channel?.capabilities.includes('input')
-            ? 'Input state'
-            : 'Output state'
+            ? text('Input state', 'Eingangszustand')
+            : text('Output state', 'Ausgangszustand')
           : undefined;
-  if (kind === 'event') return [...rows, { label: 'When', value: category ? `${category} received` : 'Not selected' }];
-  if (kind === 'read') return [...rows, { label: 'Read', value: category ?? 'Not selected' }];
+  if (kind === 'event')
+    return [
+      ...rows,
+      {
+        label: text('When', 'Wenn'),
+        value: category ? `${category} ${text('received', 'empfangen')}` : text('Not selected', 'Nicht ausgewählt'),
+      },
+    ];
+  if (kind === 'read')
+    return [...rows, { label: text('Read', 'Lesen'), value: category ?? text('Not selected', 'Nicht ausgewählt') }];
   const expected =
     typeof config.equals === 'boolean'
       ? config.equals
-        ? 'ON'
-        : 'OFF'
+        ? text('ON', 'EIN')
+        : text('OFF', 'AUS')
       : typeof config.equals === 'number' && Number.isFinite(config.equals)
-        ? `${config.equals} (wire value)`
-        : 'Not set';
+        ? `${config.equals} (${text('wire value', 'Rohwert')})`
+        : text('Not set', 'Nicht festgelegt');
   return [
     ...rows,
-    { label: 'Wait for', value: `${category ?? 'Not selected'} = ${expected}` },
-    { label: 'Timeout', value: duration(typeof config.timeoutMs === 'number' ? config.timeoutMs : 30_000) },
+    {
+      label: text('Wait for', 'Warten auf'),
+      value: `${category ?? text('Not selected', 'Nicht ausgewählt')} = ${expected}`,
+    },
+    {
+      label: text('Timeout', 'Zeitlimit'),
+      value: duration(typeof config.timeoutMs === 'number' ? config.timeoutMs : 30_000),
+    },
   ];
 }
 

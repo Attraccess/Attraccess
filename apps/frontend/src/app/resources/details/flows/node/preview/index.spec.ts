@@ -106,3 +106,23 @@ describe('flow node previews', () => {
     ).toEqual(rows.slice(0, 4));
   });
 });
+
+it('selects exact and base locale overrides with safe fallback to plain strings', () => {
+  const preview = [
+    {
+      label: 'Action',
+      value: 'Turn OFF',
+      translations: {
+        de: { label: 'Aktion', value: 'Ausschalten' },
+        'de-CH': { label: 'Aktion', value: 'Aus' },
+        fr: { label: 'Action', value: {} },
+      },
+    },
+  ];
+  const rows = (locale: string) =>
+    getNodePreviewRows('plugin.example.command', keyTranslation, null, { preview }, locale);
+  expect(rows('de-DE')).toEqual([{ label: 'Aktion', value: 'Ausschalten' }]);
+  expect(rows('de-CH')).toEqual([{ label: 'Aktion', value: 'Aus' }]);
+  expect(rows('fr')).toEqual([{ label: 'Action', value: 'Turn OFF' }]);
+  expect(rows('es')).toEqual([{ label: 'Action', value: 'Turn OFF' }]);
+});

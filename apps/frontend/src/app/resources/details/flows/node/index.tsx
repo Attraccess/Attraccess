@@ -110,7 +110,7 @@ export function AttraccessNode(props: Props) {
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: inputName,
-        label: tNodeExists?.('nodes.' + schema.type + '.inputs.' + inputName)
+        label: tNodeExists?.('nodes.' + schema.type + '.inputs.' + inputName) !== false
           ? t('nodes.' + schema.type + '.inputs.' + inputName)
           : inputName,
         style: {
@@ -128,7 +128,7 @@ export function AttraccessNode(props: Props) {
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: outputName,
-        label: tNodeExists?.('nodes.' + schema.type + '.outputs.' + outputName)
+        label: tNodeExists?.('nodes.' + schema.type + '.outputs.' + outputName) !== false
           ? t('nodes.' + schema.type + '.outputs.' + outputName)
           : outputName,
         style: {
