@@ -95,6 +95,10 @@ export class BillingTransaction {
   })
   correctionOfId!: number | null;
 
+  @ManyToOne(() => BillingTransaction, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'correctionOfId' })
+  correctionOf?: BillingTransaction | null;
+
   @Column({ type: 'text', nullable: true })
   @ApiProperty({ description: 'The external reference e.g. sumup transaction ID' })
   externalReference!: string | null;

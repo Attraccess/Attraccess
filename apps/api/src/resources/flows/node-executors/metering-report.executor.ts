@@ -10,11 +10,15 @@ export class MeteringReportExecutor implements NodeExecutor {
     const data = MeteringReportNodeDataSchema.parse(node.data ?? {});
     const render = (template?: string) =>
       template ? ctx.compileTemplate(template, input).trim() || undefined : undefined;
+    const observedAt = render(data.observedAt);
+    if (data.observedAt?.trim() && observedAt === undefined) {
+      throw new FlowExecutionError('The configured observed-at time rendered empty; refusing to report without it');
+    }
     await ctx.metering.complete({
       kind: 'reading',
       value: render(data.value) ?? '',
       unit: render(data.unit) ?? '',
-      observedAt: render(data.observedAt),
+      observedAt,
       source: render(data.source),
     });
     return { payload: input };

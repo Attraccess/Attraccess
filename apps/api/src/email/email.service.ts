@@ -262,11 +262,10 @@ export class EmailService {
     }
 
     const items = (transaction.items ?? []).map((item) => ({
-      name: item.name === 'ENERGY' ? 'Energy' : item.name,
-      description:
-        item.name === 'ENERGY' && item.energyMicroWh != null
-          ? `${formatKwh(BigInt(item.energyMicroWh))} kWh`
-          : item.description,
+      name: item.name,
+      description: item.description,
+      isEnergy: item.name === 'ENERGY',
+      energyKwh: item.energyMicroWh == null ? undefined : formatKwh(BigInt(item.energyMicroWh)),
       quantity: item.quantity,
       unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),

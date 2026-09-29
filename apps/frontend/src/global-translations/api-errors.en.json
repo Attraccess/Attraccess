@@ -27,6 +27,10 @@
     "title": "Energy still unavailable",
     "description": "{{error}}"
   },
+  "METER_SESSION_NOT_FOUND": {
+    "title": "Session not found",
+    "description": "This energy charge no longer exists."
+  },
   "METER_SESSION_NOT_PENDING": {
     "title": "Nothing left to settle",
     "description": "This energy charge has already been settled or waived."

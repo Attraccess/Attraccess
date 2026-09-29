@@ -258,7 +258,7 @@ describe('Flow-defined energy metering', () => {
   let startEffects: () => Promise<void>;
   let flows: { runFlow: jest.Mock; trackResourceActivity: jest.Mock };
   let configRate: number;
-  let audit: { recordBillingTransactionAfterCommit: jest.Mock };
+  let audit: { recordBillingTransactionAfterCommit: jest.Mock; recordResource: jest.Mock };
   let liveNotifications: { notifyTransactionUpdate: jest.Mock };
 
   const reading =
@@ -358,7 +358,7 @@ describe('Flow-defined energy metering', () => {
         },
       ),
     };
-    audit = { recordBillingTransactionAfterCommit: jest.fn() };
+    audit = { recordBillingTransactionAfterCommit: jest.fn(), recordResource: jest.fn() };
     liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
     metering = new ResourceMeteringService(
       source.getRepository(ResourceMeteringSession),
@@ -546,7 +546,9 @@ describe('Flow-defined energy metering', () => {
     it('times out an initialization that never answers', async () => {
       await seedMeter({ timeoutSeconds: 1 });
       onStart = () => new Promise(() => undefined);
-      await expect(start()).rejects.toThrow(expect.objectContaining({ message: 'METER_INITIALIZATION_FAILED' }));
+      await expect(start()).rejects.toThrow(
+        expect.objectContaining({ message: expect.stringMatching(/^METER_INITIALIZATION_FAILED/) }),
+      );
       expect(await source.getRepository(ResourceUsage).count()).toBe(0);
       expect(await source.getRepository(ResourceMeteringSession).count()).toBe(0);
     }, 10_000);
@@ -739,6 +741,7 @@ describe('Flow-defined energy metering', () => {
         expect(outgoing.transaction.amount).toBe(-60);
         expect((await sessionOf(first.id)).status).toBe(ResourceMeteringSessionStatus.Settled);
         expect((await sessionOf(second.id)).status).toBe(ResourceMeteringSessionStatus.Active);
+        expect((await sessionOf(first.id)).compromisedReason).toBeNull();
 
         onCollect = reading('0.5');
         const ended = await end(users[1]);
@@ -757,7 +760,13 @@ describe('Flow-defined energy metering', () => {
 
         onStart = ready;
         const ended = await end(users[0]);
-        expect((await sessionOf(ended.id)).status).toBe(ResourceMeteringSessionStatus.Pending);
+        expect(await sessionOf(ended.id)).toEqual(
+          expect.objectContaining({
+            status: ResourceMeteringSessionStatus.Failed,
+            failureReason: expect.stringMatching(/re-initialized by a takeover/),
+          }),
+        );
+        expect((await metering.getStatus(1)).unsettled).toEqual([expect.objectContaining({ retryable: false })]);
         expect((await items(ended.id)).items.some((item) => item.name === 'ENERGY')).toBe(false);
       });
 
@@ -835,7 +844,7 @@ describe('Flow-defined energy metering', () => {
         const ended = await endWithMissingFinal();
         onCollect = reading('1.5', 'kWh', { observedAt: '2020-01-01T00:00:00Z' });
         await expect(metering.retrySettlement(1, (await sessionOf(ended.id)).id, 1)).rejects.toThrow(
-          expect.objectContaining({ message: 'METER_SETTLEMENT_FAILED' }),
+          expect.objectContaining({ message: expect.stringMatching(/^METER_SETTLEMENT_FAILED/) }),
         );
         expect(await sessionOf(ended.id)).toEqual(
           expect.objectContaining({ status: 'pending', failureReason: expect.stringMatching(/observed at/) }),
@@ -856,10 +865,13 @@ describe('Flow-defined energy metering', () => {
           .getRepository(ResourceMeteringSession)
           .update(session.id, { status: ResourceMeteringSessionStatus.Pending });
         await expect(metering.retrySettlement(1, session.id, 1)).rejects.toThrow(
-          expect.objectContaining({ message: 'METER_SETTLEMENT_FAILED' }),
+          expect.objectContaining({ message: expect.stringMatching(/^METER_SETTLEMENT_FAILED/) }),
         );
-        expect((await metering.waive(1, session.id)).status).toBe(ResourceMeteringSessionStatus.Waived);
-        await expect(metering.waive(1, session.id)).rejects.toThrow(
+        expect((await metering.waive(1, session.id, 7)).status).toBe(ResourceMeteringSessionStatus.Waived);
+        expect(audit.recordResource).toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'energy_charge.waived', actorId: 7, subjectId: 1 }),
+        );
+        await expect(metering.waive(1, session.id, 7)).rejects.toThrow(
           expect.objectContaining({ message: 'METER_SESSION_NOT_PENDING' }),
         );
       });
@@ -1012,6 +1024,18 @@ describe('Flow-defined energy metering', () => {
       onCollect = reading('0.9');
       await metering.collectInterimReadings();
       expect((await metering.getStatus(1)).activeSession).toEqual(expect.objectContaining({ latestKwh: '0.7' }));
+    });
+
+    it('does not poll a meter that keeps failing more often than its interval', async () => {
+      const session = await activeSession();
+      await source
+        .getRepository(ResourceMeteringSession)
+        .update(session.id, { createdAt: new Date(Date.now() - 3_600_000) });
+      const collect = jest.fn().mockRejectedValue(new Error('meter unreachable'));
+      onCollect = collect;
+      await metering.collectInterimReadings();
+      await metering.collectInterimReadings();
+      expect(collect).toHaveBeenCalledTimes(1);
     });
   });
 });

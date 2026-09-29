@@ -56,8 +56,9 @@ export class ResourceMeteringController {
   async waive(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMeteringSettlementDto> {
-    return this.toDto(await this.metering.waive(resourceId, sessionId));
+    return this.toDto(await this.metering.waive(resourceId, sessionId, req.user.id));
   }
 
   private toDto(session: ResourceMeteringSession): ResourceMeteringSettlementDto {

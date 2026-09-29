@@ -11,6 +11,11 @@ export class MeteringReadyExecutor implements NodeExecutor {
     const render = (template?: string) =>
       template ? ctx.compileTemplate(template, input).trim() || undefined : undefined;
     const baselineValue = render(data.baselineValue);
+    if (data.baselineValue?.trim() && baselineValue === undefined) {
+      throw new FlowExecutionError(
+        'The configured baseline value rendered empty; refusing to start without a baseline',
+      );
+    }
     await ctx.metering.complete({
       kind: 'ready',
       baseline: baselineValue ? { value: baselineValue, unit: render(data.baselineUnit) ?? '' } : undefined,

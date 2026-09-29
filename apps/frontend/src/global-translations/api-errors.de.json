@@ -27,6 +27,10 @@
     "title": "Energie weiterhin nicht verfügbar",
     "description": "{{error}}"
   },
+  "METER_SESSION_NOT_FOUND": {
+    "title": "Sitzung nicht gefunden",
+    "description": "Diese Energieabrechnung existiert nicht mehr."
+  },
   "METER_SESSION_NOT_PENDING": {
     "title": "Nichts mehr abzugleichen",
     "description": "Diese Energieabrechnung wurde bereits abgeschlossen oder erlassen."

@@ -57,6 +57,8 @@ export class ResourceMeteringService implements OnModuleInit {
   private readonly queues = new Map<number, Promise<unknown>>();
   /** Freshness bound per pending operation. Pending operations never survive a restart, so memory is enough. */
   private readonly freshAfter = new Map<string, Date>();
+  // ponytail: in-memory; after a restart the cadence falls back to the last successful reading
+  private readonly interimAttempts = new Map<string, { at: number; running: boolean }>();
 
   constructor(
     @InjectRepository(ResourceMeteringSession) private readonly sessions: Repository<ResourceMeteringSession>,
@@ -139,12 +141,6 @@ export class ResourceMeteringService implements OnModuleInit {
       status: ResourceMeteringSessionStatus.Active,
       creditsPerKwh: input.creditsPerKwh,
     } as ResourceMeteringSession);
-    if (input.supersedes !== undefined) {
-      await this.sessions.update(
-        { usageId: input.supersedes },
-        { compromisedReason: 'The meter was re-initialized by a takeover that did not complete' },
-      );
-    }
     try {
       await this.runOperation(session, 'start', {
         trigger: ResourceFlowNodeType.INPUT_METERING_START,
@@ -152,7 +148,13 @@ export class ResourceMeteringService implements OnModuleInit {
       });
     } catch (error) {
       await this.sessions.delete({ id: session.id });
-      throw new BadRequestException('METER_INITIALIZATION_FAILED', { description: this.reason(error) });
+      if (input.supersedes !== undefined) {
+        await this.sessions.update(
+          { usageId: input.supersedes },
+          { compromisedReason: 'The meter was re-initialized by a takeover that did not complete' },
+        );
+      }
+      throw new BadRequestException(`METER_INITIALIZATION_FAILED: ${this.reason(error)}`);
     }
     // The meter now belongs to the new session; earlier unsettled totals can no longer be reconciled.
     await this.sessions.update(
@@ -206,13 +208,16 @@ export class ResourceMeteringService implements OnModuleInit {
       const superseded = await manager.count(ResourceMeteringSession, {
         where: { resourceId: session.resourceId, usageId: MoreThan(usageId) },
       });
+      const unrecoverable = superseded > 0 || !!session.compromisedReason;
       await manager.update(ResourceMeteringSession, session.id, {
-        status: superseded ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,
+        status: unrecoverable ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,
         failureReason: superseded
           ? 'The meter was re-initialized for a later session before the final reading was collected'
-          : final.status === 'unavailable'
-            ? final.reason
-            : 'No final reading was collected',
+          : session.compromisedReason
+            ? session.compromisedReason
+            : final.status === 'unavailable'
+              ? final.reason
+              : 'No final reading was collected',
       });
       return;
     }
@@ -284,7 +289,7 @@ export class ResourceMeteringService implements OnModuleInit {
     } catch (error) {
       const reason = this.reason(error);
       await this.sessions.update({ id: session.id }, { failureReason: reason });
-      throw new BadRequestException('METER_SETTLEMENT_FAILED', { description: reason });
+      throw new BadRequestException(`METER_SETTLEMENT_FAILED: ${reason}`);
     }
     return this.sessions.findOneByOrFail({ id: session.id });
   }
@@ -356,7 +361,7 @@ export class ResourceMeteringService implements OnModuleInit {
     }
   }
 
-  async waive(resourceId: number, sessionId: string): Promise<ResourceMeteringSession> {
+  async waive(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSession> {
     const result = await this.sessions.update(
       {
         id: sessionId,
@@ -366,7 +371,19 @@ export class ResourceMeteringService implements OnModuleInit {
       { status: ResourceMeteringSessionStatus.Waived, settledAt: new Date() },
     );
     if (!result.affected) throw new ConflictException('METER_SESSION_NOT_PENDING');
-    return this.sessions.findOneByOrFail({ id: sessionId });
+    const session = await this.sessions.findOneByOrFail({ id: sessionId });
+    void this.audit.recordResource({
+      action: 'energy_charge.waived',
+      actorId: initiatorId,
+      subjectId: resourceId,
+      details: {
+        usageId: session.usageId,
+        ...(session.latestMicroWh === null
+          ? {}
+          : { waivedCredits: energyCharge(BigInt(session.latestMicroWh), session.creditsPerKwh) }),
+      },
+    });
+    return session;
   }
 
   /** The running session's latest accepted total and what it costs so far; `session` is null when nothing is metered. */
@@ -440,20 +457,29 @@ export class ResourceMeteringService implements OnModuleInit {
         status: ResourceMeteringSessionStatus.Active,
       })
       .getMany();
+    const active = new Set(rows.map((session) => session.id));
+    for (const id of this.interimAttempts.keys()) if (!active.has(id)) this.interimAttempts.delete(id);
     for (const session of rows) {
       try {
         const { collect } = await this.getDefinition(session.resourceId);
         if (collect.interimIntervalMinutes === 0) continue;
-        const last = session.latestObservedAt ?? session.createdAt;
-        if (Date.now() - last.getTime() < collect.interimIntervalMinutes * 60_000) continue;
+        const attempt = this.interimAttempts.get(session.id);
+        if (attempt?.running) continue;
+        const last = Math.max((session.latestObservedAt ?? session.createdAt).getTime(), attempt?.at ?? 0);
+        if (Date.now() - last < collect.interimIntervalMinutes * 60_000) continue;
         const busy = await this.sessions.manager.findOne(ResourceUsageLifecycleAttempt, {
           where: { resourceId: session.resourceId },
         });
         if (busy) continue;
-        await this.runOperation(session, 'interim', {
-          trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
-          timeoutSeconds: collect.timeoutSeconds,
-        });
+        this.interimAttempts.set(session.id, { at: Date.now(), running: true });
+        try {
+          await this.runOperation(session, 'interim', {
+            trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
+            timeoutSeconds: collect.timeoutSeconds,
+          });
+        } finally {
+          this.interimAttempts.set(session.id, { at: Date.now(), running: false });
+        }
       } catch (error) {
         this.logger.warn(`Interim metering for resource ${session.resourceId} failed: ${this.reason(error)}`);
       }

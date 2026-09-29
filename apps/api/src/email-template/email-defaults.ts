@@ -342,6 +342,7 @@ export const SHIPPED_TRANSLATIONS: ShippedTranslation[] = [
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'item_operating_duration', value: 'Zugeordnete Betriebszeit' },
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'item_fixed_fee', value: 'Feste Sitzungsgebühr' },
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'item_billing_factor', value: 'Anpassung durch Abrechnungsfaktor' },
+  { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'item_energy', value: 'Energie' },
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'duration_measured', value: 'Gemessen: {seconds} s' },
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'duration_billed', value: 'Abgerechnet: {minutes} min' },
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'duration_rate', value: '{credits} Credits/min' },

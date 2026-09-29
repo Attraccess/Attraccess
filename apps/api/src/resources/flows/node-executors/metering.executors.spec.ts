@@ -75,6 +75,28 @@ describe('metering completion nodes', () => {
     });
   });
 
+  it('ready refuses a configured baseline that renders empty instead of billing the whole counter', async () => {
+    const ctx = context({ kind: 'start' });
+    await expect(
+      new MeteringReadyExecutor().execute(node({ baselineValue: '{{meter.missing}}', baselineUnit: 'kWh' }), {}, {
+        ...ctx,
+        compileTemplate: () => '',
+      } as never),
+    ).rejects.toThrow(/baseline value rendered empty/);
+    expect(ctx.complete).not.toHaveBeenCalled();
+  });
+
+  it('report refuses a configured observed-at time that renders empty', async () => {
+    const ctx = context({ kind: 'final' });
+    await expect(
+      new MeteringReportExecutor().execute(node({ value: '1', unit: 'kWh', observedAt: '{{at}}' }), {}, {
+        ...ctx,
+        compileTemplate: (template: string) => (template === '{{at}}' ? '' : template),
+      } as never),
+    ).rejects.toThrow(/observed-at time rendered empty/);
+    expect(ctx.complete).not.toHaveBeenCalled();
+  });
+
   it('ready refuses to run outside a start branch', async () => {
     await expect(new MeteringReadyExecutor().execute(node({}), {}, context({ kind: 'final' }))).rejects.toThrow(
       /Metering start/,
