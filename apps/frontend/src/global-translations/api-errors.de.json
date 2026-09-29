@@ -15,6 +15,22 @@
     "title": "Ressource nicht betriebsbereit",
     "description": "Die Ressource meldet derzeit einen fehlerhaften Zustand und kann nicht verwendet werden, bis sie sich erholt."
   },
+  "METER_NOT_CONFIGURED": {
+    "title": "Energiezähler nicht eingerichtet",
+    "description": "Für diese Ressource ist die Energieabrechnung aktiv, aber ihr Flow definiert keinen vollständigen Zähler. Bitten Sie eine Administratorin oder einen Administrator, die Knoten für Messstart und Messwertabfrage hinzuzufügen."
+  },
+  "METER_INITIALIZATION_FAILED": {
+    "title": "Energiezähler nicht gestartet",
+    "description": "Die Sitzung wurde nicht gestartet, weil der Energiezähler nicht initialisiert werden konnte: {{error}}"
+  },
+  "METER_SETTLEMENT_FAILED": {
+    "title": "Energie weiterhin nicht verfügbar",
+    "description": "{{error}}"
+  },
+  "METER_SESSION_NOT_PENDING": {
+    "title": "Nichts mehr abzugleichen",
+    "description": "Diese Energieabrechnung wurde bereits abgeschlossen oder erlassen."
+  },
   "INSUFFICIENT_BALANCE": {
     "title": "Nicht genügend Guthaben",
     "description": "Das Guthaben ist für diese Aktion nicht ausreichend."

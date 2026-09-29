@@ -49,6 +49,7 @@ Mark pages with [x] when completed.
 - [x] `flows/overview.md` — What are flows?
 - [x] `flows/flow-editor.md` — Using the visual flow editor
 - [x] `flows/node-types.md` — Available node types (HTTP, MQTT, Wait, Button, If, Error)
+- [x] `flows/energy-metering.md` — Energy metering and billing per kWh
 
 ### Forms (Workshop Personnel)
 - [x] `forms/overview.md` — Dynamic forms for resources

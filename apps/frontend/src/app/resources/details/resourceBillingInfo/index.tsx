@@ -25,6 +25,8 @@ import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { FlatSection } from '../../../../components/flatSection';
+import { LiveSessionBilling } from './metering/LiveSessionBilling';
+import { EnergySettlementNotices, MeterSetupNotice } from './metering/MeterNotices';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
@@ -91,14 +93,26 @@ export function ResourceBillingInfo(props: Props) {
     );
   }, [resourceBillingConfiguration, configuration]);
 
+  const creditsPerKwh = useMemo(() => {
+    if (!configuration) {
+      return 0;
+    }
+
+    return dbCurrencyToUserCurrency(
+      resourceBillingConfiguration?.configuration.creditsPerKwh ?? 0,
+      configuration.minorUnit,
+    );
+  }, [resourceBillingConfiguration, configuration]);
+
   const isFree = useMemo(() => {
     return (
       creditsPerUsage === 0 &&
       creditsPerMinute === 0 &&
       creditsPerOperatingMinute === 0 &&
+      creditsPerKwh === 0 &&
       resourceBillingConfiguration?.additionalItems.length === 0
     );
-  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, resourceBillingConfiguration]);
+  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, creditsPerKwh, resourceBillingConfiguration]);
 
   const [exampleSessionMinutes, setExampleSessionMinutes] = useState(10);
   const [exampleOperatingMinutes, setExampleOperatingMinutes] = useState(10);
@@ -205,6 +219,10 @@ export function ResourceBillingInfo(props: Props) {
             currency: configuration.currency,
           })}
         </dd>
+        <dt>{t('perKwh.label')}</dt>
+        <dd className={cn(valueClass, 'text-warning')}>
+          {t('billingValue', { credits: formatNumber(creditsPerKwh), currency: configuration.currency })}
+        </dd>
         {resourceBillingConfiguration.additionalItems.map((item) => (
           <Fragment key={JSON.stringify(item)}>
             <dt>{item.name}</dt>
@@ -221,6 +239,19 @@ export function ResourceBillingInfo(props: Props) {
           </Fragment>
         ))}
       </dl>
+
+      <MeterSetupNotice resourceId={resourceId} energyBillingEnabled={creditsPerKwh > 0} />
+      <EnergySettlementNotices resourceId={resourceId} />
+
+      <div className="border-t border-divider pt-3 empty:hidden">
+        <LiveSessionBilling
+          resourceId={resourceId}
+          currency={configuration.currency}
+          minorUnit={configuration.minorUnit}
+          dlClass={dlClass}
+          valueClass={valueClass}
+        />
+      </div>
 
       <dl className={cn(dlClass, 'border-t border-divider pt-3')}>
         <dt className="flex flex-col gap-2">

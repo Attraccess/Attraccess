@@ -37,8 +37,10 @@
       "PER_SESSION": "Pro Sitzung",
       "PER_MINUTE": "Pro Minute",
       "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Pro zugeordneter Betriebsminute",
+      "ENERGY": "Energie",
       "BILLING_FACTOR": "Zahlungsfaktor"
     },
+    "energyDescription": "{{kwh}} kWh zu {{rate}} pro kWh",
     "empty": "Keine Positionen",
     "total": "Summe Positionen"
   },

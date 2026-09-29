@@ -70,6 +70,30 @@ it('shows usage charges, item totals and refund action using minor currency unit
   fireEvent.click(screen.getByRole('button', { name: 'actions.refund' }));
   expect(state.refund).toHaveBeenCalledOnce();
 });
+it('describes an energy item from its kWh and captured rate instead of a stored text', async () => {
+  state.transaction = {
+    id: 7,
+    resourceUsageId: 8,
+    resourceUsage: { id: 8 },
+    status: 'completed',
+    amount: -45,
+    items: [
+      {
+        id: 1,
+        name: 'ENERGY',
+        description: null,
+        quantity: 1,
+        unitPrice: 45,
+        energyMicroWh: '1500000000',
+        energyCreditsPerKwh: 30,
+        externalReference: 'metering:s:o',
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={7} isOpen />);
+  expect(await screen.findByText('items.energyDescription')).toBeTruthy();
+  expect(screen.getByText('metering:s:o')).toBeTruthy();
+});
 it.each([
   ['refund', { refundOfId: 4, amount: 100, status: 'pending' }, 'type.refund'],
   ['manual', { initiatorId: 2, amount: 100, status: 'failed' }, 'type.manual'],

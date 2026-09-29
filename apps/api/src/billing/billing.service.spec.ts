@@ -790,6 +790,7 @@ describe('BillingService', () => {
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
+        creditsPerKwh: 0,
       });
       expect(resourceBillingConfigurationRepository.save).toHaveBeenCalledWith(created);
       expect(result).toBe(created);
@@ -960,6 +961,38 @@ describe('BillingService', () => {
       await expect(service.updateResourceBillingConfiguration(1, { creditsPerMinute: 2.2 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
+    });
+
+    it('stores the energy rate, coerces null to 0, and rejects negative or fractional rates', async () => {
+      const cfg = {
+        resourceId: 1,
+        creditsPerUsage: 0,
+        creditsPerMinute: 0,
+        creditsPerKwh: 0,
+      } as ResourceBillingConfiguration;
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(cfg);
+      resourceBillingConfigurationRepository.save.mockImplementation(
+        async (arg) => arg as ResourceBillingConfiguration,
+      );
+
+      expect((await service.updateResourceBillingConfiguration(1, { creditsPerKwh: 30 })).creditsPerKwh).toBe(30);
+      expect((await service.updateResourceBillingConfiguration(1, { creditsPerKwh: null })).creditsPerKwh).toBe(0);
+      await expect(service.updateResourceBillingConfiguration(1, { creditsPerKwh: -1 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(service.updateResourceBillingConfiguration(1, { creditsPerKwh: 0.3 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('treats an energy rate alone as billing being enabled', async () => {
+      jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 0,
+        creditsPerMinute: 0,
+        creditsPerOperatingMinute: 0,
+        creditsPerKwh: 30,
+      } as ResourceBillingConfiguration);
+      await expect(service.isBillingEnabled(1)).resolves.toBe(true);
     });
 
     it('allows partial update without validating undefined fields', async () => {

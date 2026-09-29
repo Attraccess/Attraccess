@@ -43,6 +43,7 @@
   - [Überblick](flows/overview.md)
   - [Flow-Editor](flows/flow-editor.md)
   - [Knotentypen](flows/node-types.md)
+  - [Energiemessung](flows/energy-metering.md)
 
 - **Formulare**
   - [Überblick](forms/overview.md)

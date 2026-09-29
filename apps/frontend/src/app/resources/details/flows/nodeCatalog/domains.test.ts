@@ -38,6 +38,10 @@ const cases: Array<[ResourceFlowNodeType, Domain]> = [
   [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, 'companion-device'],
   [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, 'companion-device'],
   [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, 'companion-device'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_METERING_START, 'billing'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_METERING_COLLECT, 'billing'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_METERING_READY, 'billing'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_METERING_REPORT, 'billing'],
 ];
 
 describe('nodeTypeDomain', () => {

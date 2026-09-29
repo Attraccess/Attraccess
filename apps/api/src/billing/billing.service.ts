@@ -210,6 +210,7 @@ export class BillingService {
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
+        creditsPerKwh: 0,
       });
       configuration = await repository.save(configuration);
     }
@@ -266,6 +267,19 @@ export class BillingService {
       throw new BadRequestException(
         'Credits per operating minute must be an integer (multiply by currency minor unit)',
       );
+    }
+
+    if (data.creditsPerKwh === null) {
+      data.creditsPerKwh = 0;
+    }
+    if (data.creditsPerKwh !== undefined) {
+      if (data.creditsPerKwh < 0) {
+        throw new BadRequestException('Credits per kWh cannot be negative');
+      }
+      if (data.creditsPerKwh % 1 !== 0) {
+        throw new BadRequestException('Credits per kWh must be an integer (multiply by currency minor unit)');
+      }
+      configuration.creditsPerKwh = data.creditsPerKwh;
     }
 
     const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
@@ -410,8 +424,8 @@ export class BillingService {
       return await doCalculation(transactionManager);
     }
 
-    const transaction = await this.billingTransactionItemRepository.manager.transaction(
-      (transactionalEntityManager) => doCalculation(transactionalEntityManager),
+    const transaction = await this.billingTransactionItemRepository.manager.transaction((transactionalEntityManager) =>
+      doCalculation(transactionalEntityManager),
     );
     if (transaction) await this.notifyResourceUsageCharge(transaction.id);
     return transaction;
@@ -500,7 +514,8 @@ export class BillingService {
     if (
       (usage?.creditsPerUsage ?? configuration.creditsPerUsage) > 0 ||
       (usage?.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute) > 0 ||
-      (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0
+      (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0 ||
+      (usage?.energyCreditsPerKwh ?? configuration.creditsPerKwh) > 0
     ) {
       return true;
     }

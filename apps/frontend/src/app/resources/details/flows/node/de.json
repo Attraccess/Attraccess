@@ -54,6 +54,41 @@
             }
           }
         },
+        "metering": {
+          "start": {
+            "title": "Messung starten",
+            "description": "Läuft, wenn eine abgerechnete Sitzung beginnt. Setzen Sie den Zähler zurück oder lesen Sie ihn hier aus und verbinden Sie dann „Messung bereit“.",
+            "outputs": { "output": "Ausgabe" },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Zeitlimit (Sekunden)",
+                "helpText": "Maximale Wartezeit auf „Messung bereit“. Eine Sitzung, deren Zähler nicht startet, startet nicht."
+              }
+            }
+          },
+          "collect": {
+            "title": "Messwert abfragen",
+            "description": "Läuft zum Auslesen des Zählers: regelmäßig für den Live-Wert und einmal beim Sitzungsende für die Abrechnung. Verbinden Sie „Energie melden“.",
+            "outputs": { "output": "Ausgabe" },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Zeitlimit (Sekunden)",
+                "helpText": "Maximale Wartezeit auf „Energie melden“."
+              },
+              "interimIntervalMinutes": {
+                "label": "Zwischenintervall (Minuten)",
+                "helpText": "Wie oft der Zählerstand der laufenden Sitzung aktualisiert wird. Live-Werte werden angezeigt, aber nie abgerechnet. 0 deaktiviert sie."
+              },
+              "finalAttempts": {
+                "label": "Versuche für den Endwert",
+                "helpText": "Versuche, beim Sitzungsende einen frischen Endstand zu erhalten, bevor die Energieabrechnung ausstehend bleibt."
+              },
+              "finalRetryDelaySeconds": {
+                "label": "Pause zwischen Endwert-Versuchen (Sekunden)"
+              }
+            }
+          }
+        },
         "activity": {
           "no-activity": {
             "title": "Inaktivitäts-Timeout erreicht",
@@ -659,6 +694,58 @@
                   "label": "Externe Referenz"
                 }
               }
+            }
+          }
+        },
+        "metering": {
+          "ready": {
+            "title": "Messung bereit",
+            "description": "Bestätigt, dass der Zähler initialisiert ist. Sitzungen starten erst, wenn dieser Knoten erreicht wird.",
+            "inputs": { "input": "Eingabe" },
+            "config": {
+              "baselineValue": {
+                "label": "Baseline-Wert",
+                "helpText": "Nur für Zähler, die sich nicht zurücksetzen lassen: der aktuelle Gesamtstand (Templates erlaubt). Der Verbrauch wird ab diesem Wert gezählt. Leer lassen, wenn der Zähler zurückgesetzt wurde."
+              },
+              "baselineUnit": {
+                "label": "Baseline-Einheit",
+                "helpText": "Energieeinheit des Zählerstands, z. B. kWh oder Wh."
+              },
+              "source": {
+                "label": "Quelle",
+                "helpText": "Optionale Bezeichnung des physischen Zählers (Templates erlaubt)."
+              }
+            },
+            "preview": {
+              "baselineValue": "Ausgangsstand",
+              "source": "Zähler"
+            }
+          },
+          "report": {
+            "title": "Energie melden",
+            "description": "Meldet die seit „Messung starten“ verbrauchte Gesamtenergie. Keine Leistung, kein Inkrement.",
+            "inputs": { "input": "Eingabe" },
+            "config": {
+              "value": {
+                "label": "Wert",
+                "helpText": "Templates erlaubt, z. B. {{reading.total}}. Muss Energie sein (Wh, kWh, ...), nie ein Leistungswert."
+              },
+              "unit": {
+                "label": "Einheit",
+                "helpText": "Wh, kWh, MWh, mWh, J, kJ oder MJ (Templates erlaubt). Leistungseinheiten wie W oder kW werden abgelehnt."
+              },
+              "observedAt": {
+                "label": "Gemessen am",
+                "helpText": "Optionale ISO-Zeit der Messung. Werte von vor dem Sitzungsende werden als veraltet abgelehnt. Standard: jetzt."
+              },
+              "source": {
+                "label": "Quelle",
+                "helpText": "Optionale Bezeichnung des physischen Zählers (Templates erlaubt)."
+              }
+            },
+            "preview": {
+              "value": "Wert",
+              "unit": "Einheit"
             }
           }
         },

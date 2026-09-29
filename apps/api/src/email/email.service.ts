@@ -23,6 +23,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatKwh } from '../resources/metering/energy';
 
 const EMAIL_LOGO_CID = 'attraccess-logo';
 const EMAIL_LOGO_PATH =
@@ -261,8 +262,11 @@ export class EmailService {
     }
 
     const items = (transaction.items ?? []).map((item) => ({
-      name: item.name,
-      description: item.description,
+      name: item.name === 'ENERGY' ? 'Energy' : item.name,
+      description:
+        item.name === 'ENERGY' && item.energyMicroWh != null
+          ? `${formatKwh(BigInt(item.energyMicroWh))} kWh`
+          : item.description,
       quantity: item.quantity,
       unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),

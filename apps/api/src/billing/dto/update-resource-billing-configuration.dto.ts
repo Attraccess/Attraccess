@@ -37,4 +37,16 @@ export class UpdateResourceBillingConfigurationDto {
   @IsOptional()
   @Min(0)
   creditsPerOperatingMinute?: number | null;
+
+  @ApiProperty({
+    description: 'The credit cost per metered kilowatt-hour (minor currency units); 0 or null disables energy billing',
+    example: 30,
+    required: false,
+    type: Number,
+    nullable: true,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  creditsPerKwh?: number | null;
 }

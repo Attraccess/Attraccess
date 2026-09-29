@@ -45,6 +45,10 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: state.refund };
   },
 }));
+vi.mock('../resources/details/resourceBillingInfo/metering/MeterNotices', () => ({
+  MeterSetupNotice: () => null,
+  EnergySettlementNotices: () => null,
+}));
 vi.mock('./dashboard/summary/live-updates', () => ({
   useLiveTransactionUpdates: ({ onUpdate }: { onUpdate: typeof state.live }) => {
     state.live = onUpdate;
@@ -149,7 +153,7 @@ it.each(['completed', 'failed'])(
   },
 );
 
-it('edits all three resource rates and converts them to minor units', async () => {
+it('edits all resource rates and converts them to minor units', async () => {
   render(
     <ResourceBillingInfoEditor resourceId={9}>
       {(open) => <button onClick={open}>Edit rates</button>}
@@ -160,6 +164,7 @@ it('edits all three resource rates and converts them to minor units', async () =
     ['EUR per usage', '1.25'],
     ['EUR per minute', '2.5'],
     ['EUR per operating minute', '3.75'],
+    ['EUR per kWh', '0.3'],
   ]) {
     const input = screen.getByRole('textbox', { name });
     fireEvent.change(input, { target: { value } });
@@ -168,7 +173,7 @@ it('edits all three resource rates and converts them to minor units', async () =
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(state.refund).toHaveBeenCalledWith({
     resourceId: 9,
-    requestBody: { creditsPerUsage: 125, creditsPerMinute: 250, creditsPerOperatingMinute: 375 },
+    requestBody: { creditsPerUsage: 125, creditsPerMinute: 250, creditsPerOperatingMinute: 375, creditsPerKwh: 30 },
   });
   const error = new Error('Rate rejected');
   act(() => state.callbacks.resource.onError(error));

@@ -53,6 +53,10 @@ import {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  MeteringStartNodeDataSchema,
+  MeteringCollectNodeDataSchema,
+  MeteringReadyNodeDataSchema,
+  MeteringReportNodeDataSchema,
   getExternalEffectFailureBehavior,
 } from './entities/resourceFlowNode';
 import { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from './entities/resourceHealthState.entity';
@@ -106,6 +110,15 @@ import { ApiTokenPermission } from './entities/api-token-permission.entity';
 import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
 export type { LifecycleBillingItem } from './entities/resource-usage-lifecycle-attempt.entity';
+import {
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
+  ResourceMeteringSessionStatus,
+} from './entities/resource-metering.entity';
+export type {
+  ResourceMeteringOperationKind,
+  ResourceMeteringOperationStatus,
+} from './entities/resource-metering.entity';
 
 // Export all entities individually
 export {
@@ -198,6 +211,10 @@ export {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  MeteringStartNodeDataSchema,
+  MeteringCollectNodeDataSchema,
+  MeteringReadyNodeDataSchema,
+  MeteringReportNodeDataSchema,
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,
@@ -224,6 +241,9 @@ export {
   ApiTokenPermission,
   ResourceOperatingInterval,
   ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
+  ResourceMeteringSessionStatus,
 };
 
 // Export the entities object
@@ -286,4 +306,6 @@ export const entities = {
   ApiTokenPermission,
   ResourceOperatingInterval,
   ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
 };

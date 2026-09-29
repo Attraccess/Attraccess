@@ -51,8 +51,12 @@ vi.mock('../../../../components/flatSection', () => ({
     </section>
   ),
 }));
+vi.mock('./metering/LiveSessionBilling', () => ({ LiveSessionBilling: () => null }));
+vi.mock('./metering/MeterNotices', () => ({ MeterSetupNotice: () => null, EnergySettlementNotices: () => null }));
 vi.mock('./editor', () => ({
-  ResourceBillingInfoEditor: ({ children }: { children: (onOpen: () => void) => ReactNode }) => <>{children(vi.fn())}</>,
+  ResourceBillingInfoEditor: ({ children }: { children: (onOpen: () => void) => ReactNode }) => (
+    <>{children(vi.fn())}</>
+  ),
 }));
 
 function mockData() {
@@ -61,7 +65,7 @@ function mockData() {
   } as ReturnType<typeof useBillingServiceGetBillingConfiguration>);
   vi.mocked(useBillingServiceGetResourceBillingConfiguration).mockReturnValue({
     data: {
-      configuration: { creditsPerUsage: 100, creditsPerMinute: 200, creditsPerOperatingMinute: 300 },
+      configuration: { creditsPerUsage: 100, creditsPerMinute: 200, creditsPerOperatingMinute: 300, creditsPerKwh: 30 },
       additionalItems: [],
     },
   } as ReturnType<typeof useBillingServiceGetResourceBillingConfiguration>);
@@ -88,6 +92,14 @@ describe('ResourceBillingInfo operating-minute billing', () => {
     expect(await screen.findByText(en.perOperatingMinute.label)).toBeInTheDocument();
     // 300 minor units at minorUnit 2 => 3 credits per operating minute
     expect(screen.getByText('3 credits')).toBeInTheDocument();
+  });
+
+  it('displays the configured per-kWh energy rate', async () => {
+    render(<ResourceBillingInfo resourceId={205} />);
+
+    expect(await screen.findByText(en.perKwh.label)).toBeInTheDocument();
+    // 30 minor units at minorUnit 2 => 0.3 credits per kWh
+    expect(screen.getByText('0.3 credits')).toBeInTheDocument();
   });
 
   it('includes the operating-minute rate in the default example cost', async () => {

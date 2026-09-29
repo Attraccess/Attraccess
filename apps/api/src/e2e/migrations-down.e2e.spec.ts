@@ -66,6 +66,9 @@ import {
   ResourceType,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringSessionStatus,
+  ResourceMeteringOperation,
   ResourceUsageAction,
   Session,
   Setting,
@@ -465,6 +468,28 @@ const seedDatabase = async (dataSource: DataSource) => {
     );
   }
 
+  const meteringSession = await ensureEntity(dataSource.getRepository(ResourceMeteringSession), () => ({
+    id: `seed-metering-session-${seedTag}`,
+    resourceId: resource.id,
+    usageId: usage.id,
+    status: ResourceMeteringSessionStatus.Active,
+    creditsPerKwh: 30,
+    baselineMicroWh: '1000000000',
+    latestMicroWh: '500000000',
+    latestObservedAt: new Date(),
+  }));
+  await ensureEntity(dataSource.getRepository(ResourceMeteringOperation), () => ({
+    id: `seed-metering-operation-${seedTag}`,
+    sessionId: meteringSession.id,
+    resourceId: resource.id,
+    kind: 'interim' as const,
+    status: 'completed' as const,
+    requestedAt: new Date(),
+    completedAt: new Date(),
+    totalMicroWh: '500000000',
+    observedAt: new Date(),
+  }));
+
   const billingTransaction = await ensureEntity(billingTransactionRepo, () => ({
     userId: primaryUser.id,
     amount: 100,
@@ -585,7 +610,6 @@ const seedDatabase = async (dataSource: DataSource) => {
     historySize: null,
     rotationDays: null,
   }));
-
 
   const conversation = await ensureEntity(conversationRepo, () => ({}));
 

@@ -141,14 +141,10 @@ export function TransactionDetailsModal(props: Props) {
                     <div>
                       <div className="text-small text-default-500">{t('meta.amount')}</div>
                       <div
-                        className={
-                          transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'
-                        }
+                        className={transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'}
                       >
                         {transaction.amount > 0 && '+'}
-                        {formatNumber(
-                          dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2),
-                        )}
+                        {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
                       </div>
                     </div>
                     {transaction.initiator && (
@@ -198,15 +194,25 @@ export function TransactionDetailsModal(props: Props) {
                               <TableRow key={item.id} id={item.id}>
                                 <TableCell>
                                   <div className="font-medium">
-                                    {tExists('items.system.' + item.name)
-                                      ? t('items.system.' + item.name)
-                                      : item.name}
+                                    {tExists('items.system.' + item.name) ? t('items.system.' + item.name) : item.name}
                                   </div>
                                   {item.externalReference && (
                                     <div className="text-tiny text-default-400">{item.externalReference}</div>
                                   )}
                                 </TableCell>
-                                <TableCell className="max-w-[28ch] truncate">{item.description}</TableCell>
+                                <TableCell className="max-w-[28ch] truncate">
+                                  {item.name === 'ENERGY' && item.energyMicroWh != null
+                                    ? t('items.energyDescription', {
+                                        kwh: formatNumber(Number(item.energyMicroWh) / 1e9),
+                                        rate: formatNumber(
+                                          dbCurrencyToUserCurrency(
+                                            item.energyCreditsPerKwh ?? 0,
+                                            configuration?.minorUnit ?? 2,
+                                          ),
+                                        ),
+                                      })
+                                    : item.description}
+                                </TableCell>
                                 <TableCell className="text-right">{item.quantity}</TableCell>
                                 <TableCell className="text-right">
                                   {formatNumber(
@@ -231,9 +237,7 @@ export function TransactionDetailsModal(props: Props) {
                       <div>
                         {t('items.total')}:{' '}
                         <span className="font-semibold text-foreground">
-                          {formatNumber(
-                            dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2),
-                          )}
+                          {formatNumber(dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
                         </span>
                       </div>
                     </div>

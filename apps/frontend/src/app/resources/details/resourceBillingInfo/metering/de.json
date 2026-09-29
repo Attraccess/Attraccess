@@ -1,0 +1,47 @@
+{
+  "live": {
+    "title": "Laufende Sitzung",
+    "sessionTime": "Sitzungsdauer",
+    "meter": "Zählerstand",
+    "meterValue": "{{value}} kWh",
+    "meterWaiting": "Warte auf die erste Messung",
+    "meterAsOf": "Stand {{time}}",
+    "energyCost": "Energiekosten bisher",
+    "estimate": "Voraussichtliche Kosten bisher",
+    "estimateNote": "Schätzung ohne zugeordnete Betriebsminuten und zusätzliche Flow-Positionen.",
+    "billingValue": "{{credits}} {{currency}}"
+  },
+  "setup": {
+    "title": "Zähler nicht eingerichtet",
+    "description": "Die Energieabrechnung ist aktiv, aber es kann keine Sitzung starten, bis der Flow dieser Ressource ihren Zähler definiert.",
+    "problems": {
+      "start-trigger-missing": "Fügen Sie einen Auslöser „Messung starten“ hinzu.",
+      "ready-unreachable": "Verbinden Sie „Messung starten“ mit einem Knoten „Messung bereit“.",
+      "collect-trigger-missing": "Fügen Sie einen Auslöser „Messwert abfragen“ hinzu.",
+      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Energie melden“."
+    },
+    "action": "Flows öffnen"
+  },
+  "unsettled": {
+    "pending": {
+      "title": "Energieabrechnung ausstehend",
+      "description": "Nutzung #{{usageId}} wurde ohne gültigen Abschluss-Zählerstand beendet, daher ist die Energie noch nicht abgerechnet."
+    },
+    "failed": {
+      "title": "Energieabrechnung fehlgeschlagen",
+      "description": "Nutzung #{{usageId}} kann nicht automatisch abgeglichen werden. Erlassen Sie die Energiekosten oder passen Sie die Abrechnung manuell an."
+    },
+    "reason": "Grund: {{reason}}",
+    "lastReading": "Letzter akzeptierter Zählerstand: {{value}} kWh (nicht abgerechnet)",
+    "retry": "Erneut abfragen und abrechnen",
+    "waive": "Energiekosten erlassen",
+    "retried": {
+      "title": "Energie abgerechnet",
+      "description": "Der Abschluss-Zählerstand wurde abgefragt und der Abrechnung hinzugefügt."
+    },
+    "waived": {
+      "title": "Energiekosten erlassen",
+      "description": "Für diese Nutzung wird keine Energie abgerechnet."
+    }
+  }
+}
