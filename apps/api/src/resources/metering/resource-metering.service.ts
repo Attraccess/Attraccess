@@ -29,6 +29,8 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
 import type { MeteringReport } from '../flows/node-executors';
+import { AuditService } from '../../audit/audit.service';
+import { LiveNotificationsService } from '../../billing/liveNotificationsService';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 import { energyCharge, formatKwh, MeteringValueError, toMicroWh } from './energy';
 
@@ -62,6 +64,8 @@ export class ResourceMeteringService implements OnModuleInit {
     @InjectRepository(ResourceFlowNode) private readonly nodes: Repository<ResourceFlowNode>,
     @InjectRepository(ResourceFlowEdge) private readonly edges: Repository<ResourceFlowEdge>,
     @Inject(forwardRef(() => ResourceFlowsExecutorService)) private readonly flows: ResourceFlowsExecutorService,
+    private readonly audit: AuditService,
+    private readonly liveNotifications: LiveNotificationsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -260,11 +264,7 @@ export class ResourceMeteringService implements OnModuleInit {
   // ---- reconciliation ---------------------------------------------------------------------------
 
   /** Retries the final collection of a usage that already ended and bills the energy as a separate correction. */
-  async retrySettlement(
-    resourceId: number,
-    sessionId: string,
-    initiatorId: number,
-  ): Promise<ResourceMeteringSession> {
+  async retrySettlement(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSession> {
     const session = await this.sessions.findOne({ where: { id: sessionId, resourceId } });
     if (!session) throw new BadRequestException('METER_SESSION_NOT_FOUND');
     if (session.status !== ResourceMeteringSessionStatus.Pending) {
@@ -299,9 +299,9 @@ export class ResourceMeteringService implements OnModuleInit {
 
   /** The usage's bill is completed and immutable: the energy goes onto a new correction transaction. */
   private async settleLate(sessionId: string, operationId: string, initiatorId: number): Promise<void> {
-    await runSerializedTransaction(this.sessions.manager, async (manager) => {
+    const correction = await runSerializedTransaction(this.sessions.manager, async (manager) => {
       const session = await manager.findOneOrFail(ResourceMeteringSession, { where: { id: sessionId } });
-      if (session.status !== ResourceMeteringSessionStatus.Pending) return;
+      if (session.status !== ResourceMeteringSessionStatus.Pending) return null;
       const operation = await manager.findOneOrFail(ResourceMeteringOperation, { where: { id: operationId } });
       const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, relations: ['user'] });
       const original = await manager.findOneOrFail(BillingTransaction, {
@@ -336,7 +336,24 @@ export class ResourceMeteringService implements OnModuleInit {
         failureReason: null,
         settledAt: new Date(),
       });
+      void this.audit.recordBillingTransactionAfterCommit(
+        {
+          transactionId: correction.id,
+          userId: correction.userId,
+          initiatorId,
+          amount: correction.amount,
+          status: correction.status,
+          source: 'energy-correction',
+        },
+        manager,
+      );
+      return correction;
     });
+    if (correction) {
+      this.liveNotifications
+        .notifyTransactionUpdate(correction.id)
+        .catch((error) => this.logger.warn(`Failed to publish energy correction ${correction.id}`, error));
+    }
   }
 
   async waive(resourceId: number, sessionId: string): Promise<ResourceMeteringSession> {

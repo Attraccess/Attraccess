@@ -6,6 +6,7 @@ import {
   ResourceMeteringOperation,
   ResourceMeteringSession,
 } from '@attraccess/database-entities';
+import { BillingModule } from '../../billing/billing.module';
 import { ResourceFlowsModule } from '../flows/resource-flows.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
 import { ResourceMeteringController } from './resource-metering.controller';
@@ -16,6 +17,7 @@ import { ResourceMeteringService } from './resource-metering.service';
     ResourceTransactionsModule,
     TypeOrmModule.forFeature([ResourceMeteringSession, ResourceMeteringOperation, ResourceFlowNode, ResourceFlowEdge]),
     forwardRef(() => ResourceFlowsModule),
+    forwardRef(() => BillingModule),
   ],
   controllers: [ResourceMeteringController],
   providers: [ResourceMeteringService],

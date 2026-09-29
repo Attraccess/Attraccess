@@ -258,6 +258,8 @@ describe('Flow-defined energy metering', () => {
   let startEffects: () => Promise<void>;
   let flows: { runFlow: jest.Mock; trackResourceActivity: jest.Mock };
   let configRate: number;
+  let audit: { recordBillingTransactionAfterCommit: jest.Mock };
+  let liveNotifications: { notifyTransactionUpdate: jest.Mock };
 
   const reading =
     (value: string, unit = 'kWh', extra: Partial<Extract<MeteringReport, { kind: 'reading' }>> = {}): Handler =>
@@ -356,12 +358,16 @@ describe('Flow-defined energy metering', () => {
         },
       ),
     };
+    audit = { recordBillingTransactionAfterCommit: jest.fn() };
+    liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
     metering = new ResourceMeteringService(
       source.getRepository(ResourceMeteringSession),
       source.getRepository(ResourceMeteringOperation),
       source.getRepository(ResourceFlowNode),
       source.getRepository(ResourceFlowEdge),
       flows as never,
+      audit as never,
+      liveNotifications as never,
     );
     const billing = {
       getResourceBillingConfiguration: jest.fn(async () => ({
@@ -795,6 +801,18 @@ describe('Flow-defined energy metering', () => {
           expect.objectContaining({ amount: -45, status: 'completed', initiatorId: 1, resourceUsageId: null }),
         ]);
         expect(corrections[0].userId).toBe(original.userId);
+        expect(audit.recordBillingTransactionAfterCommit).toHaveBeenCalledTimes(1);
+        expect(audit.recordBillingTransactionAfterCommit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            transactionId: corrections[0].id,
+            userId: original.userId,
+            initiatorId: 1,
+            amount: -45,
+            source: 'energy-correction',
+          }),
+          expect.anything(),
+        );
+        expect(liveNotifications.notifyTransactionUpdate).toHaveBeenCalledWith(corrections[0].id);
         expect(correctionItems.filter((item) => item.name === 'ENERGY')).toHaveLength(1);
         expect(await sessionOf(ended.id)).toEqual(expect.objectContaining({ status: 'settled', chargeCredits: 45 }));
         await expect(metering.retrySettlement(1, session.id, 1)).rejects.toThrow(
@@ -824,6 +842,8 @@ describe('Flow-defined energy metering', () => {
         );
         expect((await items(ended.id)).transaction.amount).toBe(0);
         expect((await correctionsOf(ended.id)).corrections).toEqual([]);
+        expect(audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+        expect(liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
       });
 
       it('refuses to reconcile after a later session started on the meter, and can be waived', async () => {
