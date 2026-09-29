@@ -60,6 +60,9 @@ import {
   MqttSendMessageExecutor,
   MqttWaitForMessageExecutor,
   OperatingTransitionExecutor,
+  MeteringReadyExecutor,
+  MeteringReportExecutor,
+  MeteringRunContext,
   NodeExecutionContext,
   NodeExecutor,
   NodeProcessingResult,
@@ -79,6 +82,7 @@ import { ExternalEffectFailureError } from './errors/external-effect-failure.err
 interface FlowExecutionOptions {
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
+  metering?: MeteringRunContext;
 }
 
 // Handlebars helpers
@@ -224,6 +228,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: passthrough,
       [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED]: passthrough,
       [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED]: passthrough,
+
+      [ResourceFlowNodeType.INPUT_METERING_START]: passthrough,
+      [ResourceFlowNodeType.INPUT_METERING_COLLECT]: passthrough,
+      [ResourceFlowNodeType.OUTPUT_METERING_READY]: new MeteringReadyExecutor(),
+      [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: new MeteringReportExecutor(),
     };
   }
 
@@ -641,6 +650,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       flowRunId,
       lifecycleAttemptId: options.lifecycleAttemptId,
       lifecycleCandidateCancellation: options.lifecycleCandidateCancellation,
+      metering: options.metering,
       transactionManager,
       compileTemplate: (template, data) => this.compileTemplate(template, data),
       getTemplateVariables: (data) => this.templateVariables.get(data),

@@ -18,9 +18,12 @@ export function getTranslationKeyForApiError(props: Props) {
 
   let fullKey = props.baseTranslationKey + '.' + errorMessageTranslationKey;
 
-  if (errorMessage.startsWith('FLOW_EXECUTION_ERROR: ')) {
-    errorMessageTranslationKey = 'FLOW_EXECUTION_ERROR';
-    errorMessage = errorMessage.replace('FLOW_EXECUTION_ERROR: ', '');
+  const prefixed = /^(FLOW_EXECUTION_ERROR|METER_INITIALIZATION_FAILED|METER_SETTLEMENT_FAILED): ([\s\S]*)$/.exec(
+    errorMessage,
+  );
+  if (prefixed) {
+    errorMessageTranslationKey = prefixed[1];
+    errorMessage = prefixed[2];
 
     fullKey = props.baseTranslationKey + '.' + errorMessageTranslationKey;
   }

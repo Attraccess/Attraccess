@@ -43,4 +43,16 @@ describe('getTranslationKeyForApiError', () => {
     expect(getTranslation(translations, 'INVALID_CSV.title')).toBe(expectedTitle);
     expect(getTranslation(translations, 'INVALID_CSV.description')).not.toBe('INVALID_CSV');
   });
+
+  it('splits the reason off a prefixed meter error', () => {
+    const result = getTranslationKeyForApiError({
+      error: { body: { message: 'METER_SETTLEMENT_FAILED: meter offline' } } as unknown as Error,
+      t: (key: string) => key,
+      tExists: () => true,
+      baseTranslationKey: 'api',
+    });
+
+    expect(result.key).toBe('api.METER_SETTLEMENT_FAILED');
+    expect(result.errorMessage).toBe('meter offline');
+  });
 });

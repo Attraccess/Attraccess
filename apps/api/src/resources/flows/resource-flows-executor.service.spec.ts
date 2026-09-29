@@ -319,6 +319,45 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
+  it('routes a metering start and collection branch to the reply channel of its operation', async () => {
+    const start = createNode({ id: 'start', type: ResourceFlowNodeType.INPUT_METERING_START });
+    const ready = createNode({
+      id: 'ready',
+      type: ResourceFlowNodeType.OUTPUT_METERING_READY,
+      data: { source: 'shelly' },
+    });
+    const collect = createNode({ id: 'collect', type: ResourceFlowNodeType.INPUT_METERING_COLLECT });
+    const report = createNode({
+      id: 'report',
+      type: ResourceFlowNodeType.OUTPUT_METERING_REPORT,
+      data: { value: '{{reading.wh}}', unit: 'Wh' },
+    });
+    nodesById = { start, ready, collect, report };
+    edgesBySourceAndHandle = {
+      'start|': [{ source: 'start', target: 'ready' }],
+      'collect|': [{ source: 'collect', target: 'report' }],
+    };
+    const complete = jest.fn().mockResolvedValue(undefined);
+
+    initialNodes = [start];
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_START, {}, undefined, {
+      metering: { operationId: 'op-1', kind: 'start', complete },
+    });
+    expect(complete).toHaveBeenLastCalledWith({ kind: 'ready', baseline: undefined, source: 'shelly' });
+
+    initialNodes = [collect];
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_COLLECT, { reading: { wh: 1500 } }, undefined, {
+      metering: { operationId: 'op-2', kind: 'final', complete },
+    });
+    expect(complete).toHaveBeenLastCalledWith({
+      kind: 'reading',
+      value: '1500',
+      unit: 'Wh',
+      observedAt: undefined,
+      source: undefined,
+    });
+  });
+
   it('carries lifecycle staging identity through downstream flow nodes', async () => {
     const inputNode = createNode({ id: 'lifecycle-input', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
     const operatingNode = createNode({

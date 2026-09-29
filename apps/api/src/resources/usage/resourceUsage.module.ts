@@ -20,6 +20,7 @@ import { ResourceHealthModule } from '../health/resource-health.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
+import { ResourceMeteringModule } from '../metering/resource-metering.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ResourceTransactionsModule } from '../../database/resource-transactions
     ResourceMaintenanceModule,
     forwardRef(() => BillingModule),
     forwardRef(() => ResourceFlowsModule),
+    forwardRef(() => ResourceMeteringModule),
     forwardRef(() => ProjectsModule),
     ResourceFormsModule,
     ResourceHealthModule,

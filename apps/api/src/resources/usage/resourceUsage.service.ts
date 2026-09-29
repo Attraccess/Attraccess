@@ -80,6 +80,7 @@ import { AuditService } from '../../audit/audit.service';
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
 import { randomUUID } from 'node:crypto';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { FinalCollection, ResourceMeteringService } from '../metering/resource-metering.service';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -128,7 +129,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         triggerNodeType,
         payload,
         manager,
-        lifecycleCandidateCancellation ? { lifecycleAttemptId, lifecycleCandidateCancellation: true } : { lifecycleAttemptId },
+        lifecycleCandidateCancellation
+          ? { lifecycleAttemptId, lifecycleCandidateCancellation: true }
+          : { lifecycleAttemptId },
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -215,6 +218,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
       if (!attempt) return false;
       if (attempt.candidateUsageId !== null) {
+        await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
         await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
       }
       await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
@@ -276,6 +280,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       const attempts = await manager.find(ResourceUsageLifecycleAttempt);
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {
+          await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
           await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
         }
         await manager.delete(ResourceUsageLifecycleAttempt, attempt.id);
@@ -316,6 +321,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly rbacService: RbacService,
     private readonly audit: AuditService,
     @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
+    @Optional()
+    @Inject(forwardRef(() => ResourceMeteringService))
+    private readonly metering?: ResourceMeteringService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -896,6 +904,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
         usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
         usageData.creditsPerUsage = billingConfiguration.creditsPerUsage;
+        usageData.energyCreditsPerKwh = billingConfiguration.creditsPerKwh;
 
         if (supervisorUserId !== null) {
           usageData.supervisorUserId = supervisorUserId;
@@ -975,6 +984,22 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     let newSession: ResourceUsage;
     try {
       const { createdSession, existingActiveSession, formSubmissions, attempt } = prepared;
+      // The outgoing session's total must be read before the meter is re-initialized for the next one.
+      const outgoingFinal: FinalCollection = existingActiveSession
+        ? ((await this.metering?.collectFinal(existingActiveSession.id, attempt.transitionTime)) ?? {
+            status: 'not-metered',
+          })
+        : { status: 'not-metered' };
+      // A billed session must not start unless its meter acknowledged the start; nothing is energized yet.
+      if ((createdSession.energyCreditsPerKwh ?? 0) > 0) {
+        if (!this.metering) throw new Error('Energy billing requires the metering service');
+        await this.metering.initialize({
+          resourceId,
+          usageId: createdSession.id,
+          creditsPerKwh: createdSession.energyCreditsPerKwh as number,
+          supersedes: existingActiveSession?.id,
+        });
+      }
       await this.runUsageFlow(
         undefined,
         resourceId,
@@ -1016,6 +1041,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
             relations: ['user', 'resource'],
           });
           await this.persistAttributedOperatingDuration(endedSession, manager);
+          await this.metering?.settleInTransaction(manager, endedSession.id, outgoingFinal);
           chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
           endedUsageIdToEmit = endedSession.id;
         } else {
@@ -1216,6 +1242,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         'end',
         attemptId,
       );
+      // Stop effects have run; only now read the final total. Failure leaves energy billing pending, not the stop undone.
+      const final: FinalCollection = (await this.metering?.collectFinal(
+        prepared.activeSession.id,
+        prepared.attempt.transitionTime,
+      )) ?? { status: 'not-metered' };
       updatedUsage = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
         await this.applyLifecycleDrafts(manager, attempt);
@@ -1230,6 +1261,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
           relations: ['user', 'resource'],
         });
         await this.persistAttributedOperatingDuration(endedSession, manager);
+        await this.metering?.settleInTransaction(manager, endedSession.id, final);
         chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
         return endedSession;

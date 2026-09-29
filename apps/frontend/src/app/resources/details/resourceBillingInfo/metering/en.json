@@ -1,0 +1,49 @@
+{
+  "live": {
+    "title": "Live session",
+    "sessionTime": "Session time",
+    "meter": "Meter reading",
+    "meterValue": "{{value}} kWh",
+    "meterWaiting": "Waiting for the first reading",
+    "meterAsOf": "as of {{time}}",
+    "energyCost": "Energy cost so far",
+    "estimate": "Estimated bill so far",
+    "estimateNote": "Estimate without attributable operating minutes and additional flow items.",
+    "billingValue": "{{credits}} {{currency}}"
+  },
+  "setup": {
+    "title": "Meter not set up",
+    "description": "Energy billing is enabled, but no session can start until this resource's flow defines its meter.",
+    "problems": {
+      "start-trigger-missing": "Add a \"Metering start\" trigger.",
+      "ready-unreachable": "Connect \"Metering start\" to a \"Metering ready\" node.",
+      "collect-trigger-missing": "Add a \"Metering collection\" trigger.",
+      "report-unreachable": "Connect \"Metering collection\" to a \"Report energy\" node."
+    },
+    "action": "Open flows"
+  },
+  "unsettled": {
+    "pending": {
+      "title": "Energy charge pending",
+      "description": "Usage #{{usageId}} has ended and its base charge is billed. The energy consumption is still missing because there was no valid meter reading when it ended."
+    },
+    "failed": {
+      "title": "Energy charge failed",
+      "description": "A later session has used the meter since, so the consumption of usage #{{usageId}} can no longer be measured."
+    },
+    "reason": "Reason: {{reason}}",
+    "lastReading": "Last accepted reading: {{value}} kWh (not billed)",
+    "retry": "Read meter again",
+    "retryHint": "Reads the meter once more. On success the consumption is billed as an additional correction transaction; the existing bill stays unchanged.",
+    "waive": "Waive energy charge",
+    "waiveHint": "The consumption is not billed and no transaction is created. This notice disappears.",
+    "retried": {
+      "title": "Energy billed",
+      "description": "The meter was read and the consumption was billed as a correction transaction."
+    },
+    "waived": {
+      "title": "Energy charge waived",
+      "description": "No energy will be billed for this usage."
+    }
+  }
+}

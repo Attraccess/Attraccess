@@ -54,4 +54,20 @@ export class BillingTransactionItem {
     required: false,
   })
   durationMs!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  @ApiProperty({
+    description: 'Metered energy in integer micro-watt-hours behind an energy charge; null for other items',
+    nullable: true,
+    required: false,
+  })
+  energyMicroWh!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Energy rate per kWh captured for an energy charge; null for other items',
+    nullable: true,
+    required: false,
+  })
+  energyCreditsPerKwh!: number | null;
 }

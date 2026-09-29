@@ -43,6 +43,7 @@
   - [Overview](flows/overview.md)
   - [Flow Editor](flows/flow-editor.md)
   - [Node Types](flows/node-types.md)
+  - [Energy Metering](flows/energy-metering.md)
 
 - **Forms**
   - [Overview](forms/overview.md)

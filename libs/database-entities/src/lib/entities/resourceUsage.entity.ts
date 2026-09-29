@@ -159,6 +159,14 @@ export class ResourceUsage {
   })
   billingFactor!: number | null;
 
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Energy rate per kWh snapshotted at session start; null or 0 when energy is not billed',
+    nullable: true,
+    required: false,
+  })
+  energyCreditsPerKwh!: number | null;
+
   @OneToOne(() => BillingTransaction, (billingTransaction) => billingTransaction.resourceUsage, {
     onDelete: 'CASCADE',
     nullable: true,

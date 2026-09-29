@@ -5,6 +5,7 @@ import {
   useBillingServiceUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
 import {
+  Description,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -26,6 +27,7 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
+import { MeterSetupNotice } from '../metering/MeterNotices';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
@@ -95,10 +97,21 @@ export function ResourceBillingInfoEditor(props: Props) {
     ),
   );
 
+  const [creditsPerKwh, setCreditsPerKwh] = useState(
+    dbCurrencyToUserCurrency(
+      resourceBillingConfiguration?.configuration.creditsPerKwh ?? 0,
+      configuration?.minorUnit ?? 1,
+    ),
+  );
+
   useEffect(() => {
     if (!configuration) {
       return;
     }
+
+    setCreditsPerKwh(
+      dbCurrencyToUserCurrency(resourceBillingConfiguration?.configuration.creditsPerKwh ?? 0, configuration.minorUnit),
+    );
 
     setCreditsPerUsage(
       dbCurrencyToUserCurrency(
@@ -132,9 +145,18 @@ export function ResourceBillingInfoEditor(props: Props) {
         creditsPerUsage: userCurrencyToDbCurrency(creditsPerUsage, configuration.minorUnit),
         creditsPerMinute: userCurrencyToDbCurrency(creditsPerMinute, configuration.minorUnit),
         creditsPerOperatingMinute: userCurrencyToDbCurrency(creditsPerOperatingMinute, configuration.minorUnit),
-      } as never,
+        creditsPerKwh: userCurrencyToDbCurrency(creditsPerKwh, configuration.minorUnit),
+      },
     });
-  }, [updateConfiguration, resourceId, creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, configuration]);
+  }, [
+    updateConfiguration,
+    resourceId,
+    creditsPerUsage,
+    creditsPerMinute,
+    creditsPerOperatingMinute,
+    creditsPerKwh,
+    configuration,
+  ]);
 
   const { hasPermission } = useAuth();
   if (!hasPermission('billing.manage')) {
@@ -193,6 +215,21 @@ export function ResourceBillingInfoEditor(props: Props) {
                 <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
               </NumberFieldGroup>
             </NumberField>
+            <NumberField
+              value={creditsPerKwh}
+              minValue={0}
+              onChange={(value) => setCreditsPerKwh(value)}
+              defaultValue={0}
+            >
+              <Label>{t('inputs.creditsPerKwh.label', { currency: configuration.currency })}</Label>
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+              <Description>{t('inputs.creditsPerKwh.description')}</Description>
+            </NumberField>
+            <MeterSetupNotice resourceId={resourceId} energyBillingEnabled={creditsPerKwh > 0} />
             <input hidden type="submit" />
           </Form>
         </DrawerBody>

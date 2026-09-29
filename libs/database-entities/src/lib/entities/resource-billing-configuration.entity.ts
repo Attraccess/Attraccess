@@ -38,4 +38,8 @@ export class ResourceBillingConfiguration {
   @Column({ type: 'integer', default: 0 })
   @ApiProperty({ description: 'The credit cost per attributable operating minute' })
   creditsPerOperatingMinute!: number;
+
+  @Column({ type: 'integer', default: 0 })
+  @ApiProperty({ description: 'The credit cost per metered kilowatt-hour; 0 disables energy billing' })
+  creditsPerKwh!: number;
 }

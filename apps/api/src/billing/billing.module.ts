@@ -26,6 +26,6 @@ import { LicenseModule } from '../license/license.module';
   ],
   controllers: [BillingController],
   providers: [BillingService, SumUpService, LiveNotificationsService],
-  exports: [BillingService, SumUpService],
+  exports: [BillingService, SumUpService, LiveNotificationsService],
 })
 export class BillingModule {}
