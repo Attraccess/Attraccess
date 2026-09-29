@@ -172,7 +172,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     validationContext = new Map<string, unknown>(),
     previewOnly = false,
   ): Promise<Record<string, unknown>> {
-    const controllers = await this.cached(validationContext, 'wago-flow-controllers', () =>
+    const controllerCacheKey = previewOnly ? `wago-flow-controllers:preview:${config.controllerId}` : 'wago-flow-controllers';
+    const controllers = await this.cached(validationContext, controllerCacheKey, () =>
       previewOnly && typeof config.controllerId !== 'number'
         ? Promise.resolve([])
         : this.controllers.find({

@@ -54,8 +54,48 @@ describe('WagoFlowService', () => {
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
+    return {
+      service: new WagoFlowService(context),
+      trigger,
+      context,
+      revisionQuery,
+      revisionRepository,
+      controllerRepository,
+    };
   }
+
+  it('isolates filtered preview controller lookups in a shared context', async () => {
+    const { service, controllerRepository } = createService();
+    controllerRepository.find.mockImplementation(async ({ where }: { where: { id: number } }) => [
+      { ...controller, id: where.id, hardwareId: `controller-${where.id}` },
+    ]);
+    const context = new Map<string, unknown>();
+    const first = await service.resolveConfigSchema(
+      { controllerId: 1, channelId: 'door', category: 'state' },
+      'read',
+      context,
+      true,
+    );
+    const second = await service.resolveConfigSchema(
+      { controllerId: 2, channelId: 'door', category: 'state' },
+      'read',
+      context,
+      true,
+    );
+    expect(first.preview).toMatchObject([
+      { label: 'Device', value: 'controller-1' },
+      { label: 'Channel', value: 'door' },
+      { label: 'Read', value: 'Output state' },
+    ]);
+    expect(second.preview).toMatchObject([
+      { label: 'Device', value: 'controller-2' },
+      { label: 'Channel', value: 'door' },
+      { label: 'Read', value: 'Output state' },
+    ]);
+    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+    await service.resolveConfigSchema({ controllerId: 1, channelId: 'door' }, 'read', context, true);
+    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+  });
 
   it('starts with an unavailable MQTT broker and retries flow subscriptions', async () => {
     const { service, context } = createService();
