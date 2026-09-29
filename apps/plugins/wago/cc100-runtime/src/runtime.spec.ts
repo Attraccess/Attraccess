@@ -168,6 +168,27 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('reports its launch image identity through a non-retained permanent heartbeat', async () => {
+    const runtimeImageId = `sha256:${'a'.repeat(64)}`;
+    const identified = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      runtimeImageId,
+      store: { load: async () => ({ outputs: {}, commandIds: [] }), save: async () => undefined },
+      transport,
+      device,
+    });
+    await identified.start();
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/heartbeat',
+        payload: expect.objectContaining({ runtimeImageId }),
+        retain: undefined,
+      }),
+    );
+  });
+
   it('activates disconnect handling before a stalled initial canonical heartbeat', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await store.save({

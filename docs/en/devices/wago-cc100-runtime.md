@@ -4,6 +4,68 @@
 
 ## Deployment Paths Must Not Be Mixed
 
+### Build-owned assets and managed-update engineering status (ATT-1099)
+
+The ATT-1099 draft supplies `release.json`, `wago-cc100-runtime.tar` and its
+`.sha256` file with the server image under `/app/share/cc100-runtime`. These
+assets are built from the checked-out source by
+`.github/actions/build-cc100-runtime`. They are outside the npm plugin package,
+whose host importer has a 50 MiB archive limit. The compressed Docker archive
+remains the `image.tar` member of the outer tar; Docker accepts that gzip member
+directly. Neither generated bundles nor management keys belong in Git.
+
+`WAGO_CC100_BUILD_ASSETS_PATH` selects this directory. The catalog verifies the
+bundle checksum, byte count, embedded compatibility manifest and build descriptor
+before use. In this mode administrator imports cannot replace the desired
+runtime, and the shared storage catalog's legacy `current` pointer is ignored.
+Missing or incompatible build assets fail plugin initialization. The Docker
+image verifies asset readability and checksum as its unprivileged application
+user during construction.
+
+For local development, build and package the same source explicitly:
+
+```sh
+BUILD_ID=$(git rev-parse HEAD)
+docker buildx build --platform linux/arm/v7 --load \
+  -t "ghcr.io/attraccess/wago-cc100-runtime:$BUILD_ID" \
+  -f apps/plugins/wago/cc100-runtime/Dockerfile .
+CC100_BUILD_ID="$BUILD_ID" node apps/plugins/wago/scripts/build-owned-runtime.mjs
+WAGO_CC100_BUILD_ASSETS_PATH="$PWD/apps/plugins/wago/runtime-assets/cc100-build" pnpm serve
+```
+
+Packaging refuses to overwrite an existing `cc100-build` directory. Stop the
+development server before replacing generated assets. The descriptor identifies
+the checked-out build, platform/profile/protocol compatibility, transport checksum,
+and Docker **config digest** (`imageId`). Its offline image reference is pinned
+by that config digest and is not a registry-pull reference. Recompression or a
+different tag/build ID with the same config digest does not constitute an upgrade.
+Managed launch supplies this identity as `WAGO_RUNTIME_IMAGE_ID`; fresh permanent
+heartbeats report it as `runtimeImageId`. Legacy heartbeats may omit the field.
+
+The update transaction primitives are separate from destructive commissioning.
+They bound/checksum transfers, verify Docker identity and ARMv7 compatibility,
+re-run the host gate, retain a stopped predecessor, and checkpoint enrolled state
+under the same `/var/lib` filesystem before starting a replacement through the
+supervisor. Activation also republishes the current build's boot hook and uses its
+current Docker device/bind-mount arguments, including optional RUN LED mounts.
+Rollback restores the previous hook along with the previous container/state.
+The root-owned journal is
+`/var/lib/attraccess-wago-update-transaction`. State mountpoints/nested mounts are
+rejected because restoration requires atomic renames. Acceptance retains recovery
+data until a durable server acknowledgement; cleanup uses a separate resumable
+ownership-marked directory. No update primitive reissues enrollment credentials,
+replaces `runtime.env`/CA, or prunes unrelated containers/images.
+
+**Automatic live updates are not enabled by this draft.** The reconciliation core
+and host scripts are not yet registered as a production updater. Dedicated-account
+provisioning, the fixed scoped privileged helper/transport, encrypted root recovery
+and its audited administrator action, shared durable operation persistence, startup
+and runtime-status reconciliation wiring, and the independent rollback/reboot
+watchdog remain unimplemented. Isolated shell tests and a real Docker load of the
+compressed member are software evidence, not FW31 hardware recovery evidence.
+Do not deploy this partial change or change an active controller's SSH policy
+before the complete ATT-1099 path passes its hardware acceptance gate.
+
 The first usable beta targets CC100 `751-9301` firmware **31**. Broader firmware references below are hardware background, not additional supported baselines. Guided commissioning uses a locally checksum-checked offline bundle, not a controller-side registry pull or mandatory WBM setup. It names its container `attraccess-wago` and bind-mounts the controller directory `/var/lib/attraccess-wago` there. As of **2026-09-06**, commissioning is destructive: existing applications/data may stop working or be erased, with no preservation, backup or restoration of preexisting CODESYS or other workloads by Attraccess. It always stops and permanently disables CODESYS and verifies this before I/O. Supported Docker setup and persistent narrow I/O permissions belong to the installer. See the current [platform contract](wago-commissioning-platform.md).
 
 The legacy manual example below names its container `attraccess-wago-cc100` and uses a named Docker volume instead. Those storage locations and its restart policy are **not interchangeable** with guided commissioning. Guided commissioning uses Docker restart policy `no` and a host supervisor that verifies CODESYS disablement, exclusive ownership and narrow register access before every start. Five consecutive crash starts trigger a 30-second cooldown; a healthy observation resets that count. It periodically checks the running writer and attempts containment on failed checks. The historical manual `unless-stopped` example does not provide that gate. Identify the actual installation before cleanup; do not run the manual install over a commissioned controller.

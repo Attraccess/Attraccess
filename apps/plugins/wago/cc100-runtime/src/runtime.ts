@@ -70,6 +70,8 @@ export class WagoRuntime {
       prefix: string;
       pairingCode: string;
       enrollmentSecret?: string;
+      /** Docker config identity supplied by the root-owned launch transaction. */
+      runtimeImageId?: string;
       store: StateStore;
       transport: Transport;
       device: DeviceAdapter;
@@ -78,6 +80,8 @@ export class WagoRuntime {
       onReadiness?: (readiness: { connected: boolean; configurationAccepted: boolean; ready: boolean }) => void;
     },
   ) {
+    if (options.runtimeImageId !== undefined && !/^sha256:[a-f0-9]{64}$/.test(options.runtimeImageId))
+      throw new Error('Invalid runtime image identity');
     this.outputs = new OutputController({
       device: options.device,
       getSnapshot: () => this.state.accepted?.snapshot,
@@ -537,6 +541,7 @@ export class WagoRuntime {
           pairingCode: this.options.pairingCode,
           protocolVersion: '1.0.0',
           runtimeVersion: '0.1.0',
+          ...(this.options.runtimeImageId ? { runtimeImageId: this.options.runtimeImageId } : {}),
           capabilities:
             this.credentialRotationSubscribed && this.state.credentials?.credentialEpoch
               ? CAPABILITIES

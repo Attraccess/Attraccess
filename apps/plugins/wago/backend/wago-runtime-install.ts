@@ -229,6 +229,9 @@ acceptedCleanup="$tx.accepted-cleanup"
 receipt="$tx.restored"
 fail() { echo "$*" >&2; exit 1; }
 ${wagoShellFilesystemGuard({ acquireLock: !locked, waitForLock })}
+for pending in "$root/var/lib/attraccess-wago-update-transaction" "$root/var/lib"/attraccess-wago-update-cleanup-*; do
+  test ! -e "$pending" && test ! -L "$pending" || fail 'Managed runtime update recovery or acknowledgement required'
+done
 wago_require_root_directory_or_alias "$root/var" && wago_require_root_directory_or_alias "$root/var/lib" || fail 'Unsafe runtime journal parent'
 for journal in "$tx" "$cleanup" "$acceptedCleanup" "$receipt" "$config/delivery" "$config/docker-provision" "$config"/docker-provision.completed-*; do
   if test -e "$journal" || test -L "$journal"; then

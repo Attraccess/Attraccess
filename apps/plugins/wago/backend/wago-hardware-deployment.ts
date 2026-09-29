@@ -143,6 +143,21 @@ if [ -n "$docker_cli" ] && [ -n "$daemon_cli" ]; then
         name=$(docker inspect --format '{{.Name}}' "$container") || exit 1
         # The installer stops this exact predecessor under the shared lock.
         [ "$name" != /attraccess-wago ] || continue
+        if [ "$name" = /attraccess-wago.previous ]; then
+          # A retained update predecessor is exempt only under a root-owned
+          # journal matching its full ID, and only while stopped with no restart
+          # manager. Names alone must never exempt an additional physical writer.
+          update_journal="$root/var/lib/attraccess-wago-update-transaction"
+          if test -d "$update_journal" && test ! -L "$update_journal" &&
+            test "$(stat -c '%u:%g:%a' "$update_journal")" = 0:0:700 &&
+            test -f "$update_journal/previous-id" && test ! -L "$update_journal/previous-id" &&
+            test "$(stat -c '%u:%g:%a:%h' "$update_journal/previous-id")" = 0:0:600:1 &&
+            test "$(cat "$update_journal/previous-id")" = "$container" &&
+            test "$(docker inspect --format '{{.State.Running}}' "$container")" = false &&
+            test "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$container")" = no; then
+            continue
+          fi
+        fi
         privileged=$(docker inspect --format '{{.HostConfig.Privileged}}' "$container") || exit 1
         case "$privileged" in true) exclusivity=output-container-conflict ;; false) ;; *) exit 1 ;; esac
         mounts=$(docker inspect --format '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}{{"\\n"}}{{end}}{{end}}' "$container") || exit 1
@@ -241,7 +256,7 @@ config="$root/etc/attraccess-wago"
 journal="$config/docker-provision"
 fail() { echo "$*" >&2; exit 1; }
  ${wagoShellFilesystemGuard({ waitForLock: true })}
- for path in "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup" "$config/delivery"; do
+ for path in "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup" "$config/delivery" "$root/var/lib/attraccess-wago-update-transaction" "$root/var/lib"/attraccess-wago-update-cleanup-*; do
   test ! -e "$path" || fail 'Finish runtime delivery/recovery before Docker provisioning'
 done
 token=${quote(token)}

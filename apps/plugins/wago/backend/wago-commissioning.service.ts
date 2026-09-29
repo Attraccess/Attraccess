@@ -27,7 +27,7 @@ import { commissioningVerification } from './wago-commissioning-verification';
 import { WagoController } from './wago-controller.entity';
 import { assertCommissioningBroker } from './wago-commissioning-preflight';
 import { auditCommissioning, commissioningPrincipal, CommissioningPrincipal } from './wago-commissioning-audit';
-import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
+import { WagoRuntimeArtifactsService, WagoRuntimeArtifactCatalog } from './wago-runtime-artifacts';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import type { CommissioningOperationGuard } from './wago-operation-guard';
 import { createWagoManagementService } from './wago-management-store';
@@ -92,6 +92,13 @@ export class WagoControllerLockError extends Error {
     super('The CC100 is busy with a runtime operation. Retry installation shortly; no preparation was started.');
   }
 }
+class RuntimeReleaseChangedError extends ConflictException {
+  constructor() {
+    super(
+      'The runtime release changed during delivery. Recover any retained installation and retry with the current release.',
+    );
+  }
+}
 type CommissioningSessionResponse = Omit<
   WagoCommissioningSession,
   'pairingCode' | 'deliveryToken' | 'initiatingPrincipal' | 'dockerProvisionToken'
@@ -115,7 +122,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
     @Inject(WagoService) private readonly wago: WagoService,
-    @Optional() @Inject(WagoRuntimeArtifactsService) private readonly artifacts?: WagoRuntimeArtifactsService,
+    @Optional() @Inject(WagoRuntimeArtifactsService) private readonly artifacts?: WagoRuntimeArtifactCatalog,
     @Optional() @Inject(WagoCommissioningReadiness) private readonly readiness?: WagoCommissioningReadiness,
   ) {}
 
@@ -722,6 +729,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       );
       safeFailure =
         'Controller preparation failed. Check staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.';
+      await this.assertCurrentRuntimeBundle(bundle);
       await this.prepareController(session, credential, bundle.bytes, bundle.hardwareProfile);
       safeFailure =
         'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.';
@@ -834,6 +842,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         await this.transferWrites.get(session.id);
       }
 
+      // A release change while SSH was transferring/loading must remain visible;
+      // never advance the obsolete installation to automatic enrollment/claim.
+      await this.assertCurrentRuntimeBundle(bundle);
+
       session.state = 'awaiting_discovery';
       session.enrollmentExpiresAt = enrollmentExpiresAt;
       session.failureReason = null;
@@ -845,6 +857,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     } catch (error) {
       if (
         error instanceof WagoRuntimeUploadError ||
+        error instanceof RuntimeReleaseChangedError ||
         error instanceof WagoStorageCapacityError ||
         error instanceof WagoControllerLockError
       )
@@ -898,8 +911,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
 
   private async assertCurrentRuntimeBundle(bundle: { digest: string; image?: string }): Promise<void> {
     if (!bundle.image || !this.artifacts) return;
-    if ((await this.artifacts.current())?.digest !== bundle.digest)
-      throw new ConflictException('The runtime release changed during delivery. Retry with the current release.');
+    if ((await this.artifacts.current())?.digest !== bundle.digest) throw new RuntimeReleaseChangedError();
   }
 
   async recover(

@@ -17,6 +17,8 @@ import {
 export { WAGO_RUNTIME_MAX_BYTES } from './wago-runtime-artifacts-verification';
 export type { RuntimeArtifactManifest } from './wago-runtime-artifacts-verification';
 export interface RuntimeArtifactMetadata {
+  readonly buildId?: string;
+  readonly imageId?: string;
   readonly digest: string;
   readonly bytes: number;
   readonly image: string;
@@ -282,6 +284,13 @@ export class WagoRuntimeArtifactCatalog {
     return metadata;
   }
   async import(upload: RuntimeArtifactUpload): Promise<RuntimeArtifactMetadata> {
+    return this.ingest(upload, true);
+  }
+  /** Immutable cache insertion must not change another server build's selection. */
+  protected async cache(upload: RuntimeArtifactUpload): Promise<RuntimeArtifactMetadata> {
+    return this.ingest(upload, false);
+  }
+  private async ingest(upload: RuntimeArtifactUpload, publish: boolean): Promise<RuntimeArtifactMetadata> {
     if (this.activeImports >= 2) {
       for (const source of Object.values(upload)) source.destroy();
       throw new ConflictException('Another runtime import is in progress; retry shortly');
@@ -326,18 +335,20 @@ export class WagoRuntimeArtifactCatalog {
         await objectsHandle.close();
       }
       // Complete immutable objects are published before the atomic current-pointer replacement.
-      const pointer = join(root, temporaryName('current'));
-      try {
-        await writeArtifactStream(pointer, Readable.from([metadata.digest]), 64);
-        await filesystem.rename(pointer, join(root, 'current'));
-        const handle = await open(root, constants.O_RDONLY);
+      if (publish) {
+        const pointer = join(root, temporaryName('current'));
         try {
-          await handle.sync();
+          await writeArtifactStream(pointer, Readable.from([metadata.digest]), 64);
+          await filesystem.rename(pointer, join(root, 'current'));
+          const handle = await open(root, constants.O_RDONLY);
+          try {
+            await handle.sync();
+          } finally {
+            await handle.close();
+          }
         } finally {
-          await handle.close();
+          await rm(pointer, { force: true });
         }
-      } finally {
-        await rm(pointer, { force: true });
       }
       return metadata;
     } catch (error) {
@@ -422,9 +433,52 @@ export class WagoRuntimeArtifactCatalog {
 /** Register alongside WagoArtifactsController. */
 @Injectable()
 export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
+  private readonly buildDirectory = process.env.WAGO_CC100_BUILD_ASSETS_PATH?.trim();
+  private owned?: Promise<WagoRuntimeArtifactCatalog>;
+
   constructor() {
     // Existing application setting and exact default from apps/api/src/config/storage.config.ts.
     // Plugin providers are constructed before the host ModuleRef is available.
     super(resolve(process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage')));
+  }
+
+  private buildCatalog(): Promise<WagoRuntimeArtifactCatalog> {
+    const directory = this.buildDirectory;
+    if (!directory) throw new Error('No build runtime assets configured');
+    // Lazy loading avoids a module cycle with the reusable base catalog.
+    this.owned ??= import('./wago-build-runtime').then(
+      ({ WagoBuildRuntimeCatalog }) =>
+        new WagoBuildRuntimeCatalog(
+          resolve(process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage')),
+          resolve(directory),
+        ),
+    );
+    return this.owned;
+  }
+
+  override async onModuleInit() {
+    await super.onModuleInit();
+    if (this.buildDirectory) await (await this.buildCatalog()).onModuleInit();
+  }
+
+  override async onModuleDestroy() {
+    await super.onModuleDestroy();
+    if (this.owned) await (await this.owned).onModuleDestroy();
+  }
+
+  override async current() {
+    return this.buildDirectory ? (await this.buildCatalog()).current() : super.current();
+  }
+
+  override async list() {
+    return this.buildDirectory ? (await this.buildCatalog()).list() : super.list();
+  }
+
+  override async acquire(digest?: string) {
+    return this.buildDirectory ? (await this.buildCatalog()).acquire(digest) : super.acquire(digest);
+  }
+
+  override async import(upload: RuntimeArtifactUpload) {
+    return this.buildDirectory ? (await this.buildCatalog()).import(upload) : super.import(upload);
   }
 }
