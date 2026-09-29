@@ -150,16 +150,26 @@ until the process emits `close`; an injected exchange must likewise settle only
 after teardown and should observe its optional `AbortSignal`.
 
 **RTU timeout or ambiguous framing/CRC/transport failure quarantines that serial
-endpoint for the rest of the process lifetime**, across new transport instances
-and configuration revisions. Queued and new requests fail immediately with
-`modbus_rtu_quarantined`, even if teardown never finishes. Late valid-looking
-frames are discarded. There is no automatic retry, reconnect, unquarantine API,
-or claim of safe resynchronization: RTU has no transaction ID and a delayed reply
-to a different same-width address cannot be distinguished. Before restarting a
-quarantined runtime, externally isolate/reset and establish a quiescent bus;
-merely restarting the process or changing the configured path is not proof of
-safe resynchronization. A valid protocol exception completes its transaction
-and does not by itself quarantine the bus. No RTU reconnect has been proven.
+endpoint** across new transport instances and configuration revisions. Queued and
+new requests fail immediately with `modbus_rtu_quarantined`, even if teardown never
+finishes. Late valid-looking frames are discarded. RTU has no transaction ID, so a
+delayed reply to a different same-width address cannot be distinguished from a fresh
+one. A valid protocol exception completes its transaction and does not quarantine
+the bus.
+
+Recovery depends on what failed:
+
+- **A failed read self-heals.** Reads are idempotent. After a quiet period
+  (`max(2 * timeoutMs, reconnectMs)`, so any late reply has already arrived) the
+  runtime sends the failed read once more as a probe; the serial exchange flushes
+  stale input and waits 3.5 character times first. Only a reply that passes
+  unit/CRC/length and function/byte-count validation lifts the quarantine. A failed
+  probe doubles the wait (capped at 60 s). Meanwhile requests keep failing fast
+  with `modbus_rtu_quarantined`, so a dead meter is visible rather than silent.
+- **A failed write never self-heals.** The command may have reached the device and
+  must not be replayed or raced by a probe. The quarantine lasts for the process
+  lifetime: externally isolate/reset and establish a quiescent bus before
+  restarting the runtime. Changing the configured path is not a recovery mechanism.
 
 RTU configuration requires a lexically canonical `/dev/...` path: no repeated
 slashes, `.` or `..` segments, or trailing slash. Transport bus keys additionally
