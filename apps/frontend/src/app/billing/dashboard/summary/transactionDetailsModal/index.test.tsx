@@ -96,6 +96,7 @@ it('describes an energy item from its kWh and captured rate instead of a stored 
 });
 it.each([
   ['refund', { refundOfId: 4, amount: 100, status: 'pending' }, 'type.refund'],
+  ['correction', { correctionOfId: 4, initiatorId: 2, amount: -45, status: 'completed' }, 'type.correction'],
   ['manual', { initiatorId: 2, amount: 100, status: 'failed' }, 'type.manual'],
   ['topup', { externalReference: 'sumup_topup_transaction-9', amount: 100, status: 'completed' }, 'type.sumupTopup'],
   ['unknown', { amount: 0, status: 'unknown' }, 'type.unknown'],

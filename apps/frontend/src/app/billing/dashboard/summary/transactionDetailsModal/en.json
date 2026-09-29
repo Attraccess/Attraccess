@@ -14,11 +14,13 @@
     "initiator": "Initiator",
     "resourceUsage": "Resource / Usage",
     "refundOf": "Refund of",
+    "correctionOf": "Correction of",
     "externalReference": "External reference",
     "type": "Type"
   },
   "type": {
     "refund": "Refund",
+    "correction": "Energy correction",
     "resourceUsage": "Resource usage",
     "manual": "Manual",
     "sumupTopup": "SumUp top-up",

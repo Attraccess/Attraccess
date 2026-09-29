@@ -8,6 +8,7 @@ export class EnergyMetering1790000000000 implements MigrationInterface {
       'ALTER TABLE "resource_billing_configuration" ADD "creditsPerKwh" integer NOT NULL DEFAULT 0',
     );
     await queryRunner.query('ALTER TABLE "resource_usage" ADD "energyCreditsPerKwh" integer');
+    await queryRunner.query('ALTER TABLE "billing_transaction" ADD "correctionOfId" integer');
     await queryRunner.query('ALTER TABLE "billing_transaction_item" ADD "energyMicroWh" varchar');
     await queryRunner.query('ALTER TABLE "billing_transaction_item" ADD "energyCreditsPerKwh" integer');
     await queryRunner.query(`CREATE TABLE "resource_metering_session" (
@@ -63,6 +64,7 @@ export class EnergyMetering1790000000000 implements MigrationInterface {
   async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('DROP TABLE "resource_metering_operation"');
     await queryRunner.query('DROP TABLE "resource_metering_session"');
+    await queryRunner.query('ALTER TABLE "billing_transaction" DROP COLUMN "correctionOfId"');
     await queryRunner.query('ALTER TABLE "billing_transaction_item" DROP COLUMN "energyCreditsPerKwh"');
     await queryRunner.query('ALTER TABLE "billing_transaction_item" DROP COLUMN "energyMicroWh"');
     await queryRunner.query('ALTER TABLE "resource_usage" DROP COLUMN "energyCreditsPerKwh"');

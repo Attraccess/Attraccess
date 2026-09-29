@@ -25,19 +25,21 @@
   "unsettled": {
     "pending": {
       "title": "Energieabrechnung ausstehend",
-      "description": "Nutzung #{{usageId}} wurde ohne gültigen Abschluss-Zählerstand beendet, daher ist die Energie noch nicht abgerechnet."
+      "description": "Nutzung #{{usageId}} ist beendet und die Grundgebühr ist abgerechnet. Der Energieverbrauch fehlt aber noch, weil beim Beenden kein gültiger Zählerstand vorlag."
     },
     "failed": {
       "title": "Energieabrechnung fehlgeschlagen",
-      "description": "Nutzung #{{usageId}} kann nicht automatisch abgeglichen werden. Erlassen Sie die Energiekosten oder passen Sie die Abrechnung manuell an."
+      "description": "Der Zähler wurde inzwischen von einer späteren Sitzung genutzt, deshalb lässt sich der Verbrauch von Nutzung #{{usageId}} nicht mehr nachmessen."
     },
     "reason": "Grund: {{reason}}",
     "lastReading": "Letzter akzeptierter Zählerstand: {{value}} kWh (nicht abgerechnet)",
-    "retry": "Erneut abfragen und abrechnen",
+    "retry": "Zähler erneut abfragen",
+    "retryHint": "Liest den Zähler noch einmal aus. Bei Erfolg wird der Verbrauch als zusätzliche Korrekturbuchung abgerechnet; die bestehende Abrechnung bleibt unverändert.",
     "waive": "Energiekosten erlassen",
+    "waiveHint": "Der Verbrauch wird nicht berechnet und es wird keine Buchung erstellt. Der Hinweis verschwindet.",
     "retried": {
       "title": "Energie abgerechnet",
-      "description": "Der Abschluss-Zählerstand wurde abgefragt und der Abrechnung hinzugefügt."
+      "description": "Der Zählerstand wurde abgefragt und der Verbrauch als Korrekturbuchung abgerechnet."
     },
     "waived": {
       "title": "Energiekosten erlassen",

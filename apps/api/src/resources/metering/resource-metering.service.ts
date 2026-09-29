@@ -259,8 +259,12 @@ export class ResourceMeteringService implements OnModuleInit {
 
   // ---- reconciliation ---------------------------------------------------------------------------
 
-  /** Retries the final collection of a usage that already ended and adds the energy to its bill. */
-  async retrySettlement(resourceId: number, sessionId: string): Promise<ResourceMeteringSession> {
+  /** Retries the final collection of a usage that already ended and bills the energy as a separate correction. */
+  async retrySettlement(
+    resourceId: number,
+    sessionId: string,
+    initiatorId: number,
+  ): Promise<ResourceMeteringSession> {
     const session = await this.sessions.findOne({ where: { id: sessionId, resourceId } });
     if (!session) throw new BadRequestException('METER_SESSION_NOT_FOUND');
     if (session.status !== ResourceMeteringSessionStatus.Pending) {
@@ -276,7 +280,7 @@ export class ResourceMeteringService implements OnModuleInit {
         timeoutSeconds: collect.timeoutSeconds,
         freshAfter: usage.endTime,
       });
-      await this.settleLate(session.id, operation.id);
+      await this.settleLate(session.id, operation.id, initiatorId);
     } catch (error) {
       const reason = this.reason(error);
       await this.sessions.update({ id: session.id }, { failureReason: reason });
@@ -293,22 +297,30 @@ export class ResourceMeteringService implements OnModuleInit {
     if (newer > 0) throw new MeteringOperationError('A later session already uses the meter');
   }
 
-  /** The usage's bill is already completed: add the energy item and move the amount atomically. */
-  private async settleLate(sessionId: string, operationId: string): Promise<void> {
+  /** The usage's bill is completed and immutable: the energy goes onto a new correction transaction. */
+  private async settleLate(sessionId: string, operationId: string, initiatorId: number): Promise<void> {
     await runSerializedTransaction(this.sessions.manager, async (manager) => {
       const session = await manager.findOneOrFail(ResourceMeteringSession, { where: { id: sessionId } });
       if (session.status !== ResourceMeteringSessionStatus.Pending) return;
       const operation = await manager.findOneOrFail(ResourceMeteringOperation, { where: { id: operationId } });
       const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, relations: ['user'] });
-      const transaction = await manager.findOneOrFail(BillingTransaction, {
+      const original = await manager.findOneOrFail(BillingTransaction, {
         where: { resourceUsageId: usage.id, status: BillingTransactionStatus.Completed },
       });
-      const charge = await this.addEnergyItem(manager, transaction, session, operation);
+      const charge = energyCharge(BigInt(operation.totalMicroWh as string), session.creditsPerKwh);
       const factor = usage.billingFactor ?? usage.user.billingFactor;
       const discount = Math.round(charge - charge * (factor / 100));
+      const correction = await manager.save(BillingTransaction, {
+        userId: original.userId,
+        initiatorId,
+        correctionOfId: original.id,
+        amount: -(charge - discount),
+        status: BillingTransactionStatus.Completed,
+      });
+      await this.addEnergyItem(manager, correction, session, operation);
       if (discount !== 0) {
         await manager.save(BillingTransactionItem, {
-          billingTransactionId: transaction.id,
+          billingTransactionId: correction.id,
           name: 'BILLING_FACTOR',
           description: `${factor}%`,
           externalReference: `metering:${session.id}:${operation.id}:discount`,
@@ -316,7 +328,6 @@ export class ResourceMeteringService implements OnModuleInit {
           quantity: 1,
         });
       }
-      await manager.update(BillingTransaction, transaction.id, { amount: transaction.amount - (charge - discount) });
       await manager.update(ResourceMeteringSession, session.id, {
         status: ResourceMeteringSessionStatus.Settled,
         consumedMicroWh: operation.totalMicroWh,

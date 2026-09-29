@@ -101,8 +101,10 @@ const schemas = [
     tableName: 'billing_transaction',
     columns: {
       id: { type: Number, primary: true, generated: true },
-      resourceUsageId: { type: Number },
+      resourceUsageId: { type: Number, nullable: true },
       userId: { type: Number },
+      initiatorId: { type: Number, nullable: true },
+      correctionOfId: { type: Number, nullable: true },
       amount: { type: Number },
       status: { type: String },
     },
@@ -287,6 +289,15 @@ describe('Flow-defined energy metering', () => {
         .find({ where: { billingTransactionId: transaction.id } }),
     };
   }
+
+  const correctionsOf = async (usageId: number) => {
+    const original = await source.getRepository(BillingTransaction).findOneByOrFail({ resourceUsageId: usageId });
+    const corrections = await source.getRepository(BillingTransaction).find({ where: { correctionOfId: original.id } });
+    const rows = await source.getRepository(BillingTransactionItem).find({
+      where: corrections.map((correction) => ({ billingTransactionId: correction.id })),
+    });
+    return { original, corrections, items: rows };
+  };
 
   const sessionOf = (usageId: number) => source.getRepository(ResourceMeteringSession).findOneByOrFail({ usageId });
 
@@ -754,7 +765,7 @@ describe('Flow-defined energy metering', () => {
         expect(await sessionOf(first.id)).toEqual(
           expect.objectContaining({ status: ResourceMeteringSessionStatus.Failed }),
         );
-        await expect(metering.retrySettlement(1, (await sessionOf(first.id)).id)).rejects.toThrow(
+        await expect(metering.retrySettlement(1, (await sessionOf(first.id)).id, 1)).rejects.toThrow(
           expect.objectContaining({ message: 'METER_SESSION_NOT_PENDING' }),
         );
       });
@@ -772,39 +783,47 @@ describe('Flow-defined energy metering', () => {
         return ended;
       }
 
-      it('retrying settles the pending energy into the completed bill exactly once', async () => {
+      it('retrying bills the pending energy as a separate correction exactly once and leaves the bill untouched', async () => {
         const ended = await endWithMissingFinal();
         const session = await sessionOf(ended.id);
+        const before = await items(ended.id);
 
-        await metering.retrySettlement(1, session.id);
-        expect((await items(ended.id)).transaction.amount).toBe(-45);
+        await metering.retrySettlement(1, session.id, 1);
+        expect(await items(ended.id)).toEqual(before);
+        const { original, corrections, items: correctionItems } = await correctionsOf(ended.id);
+        expect(corrections).toEqual([
+          expect.objectContaining({ amount: -45, status: 'completed', initiatorId: 1, resourceUsageId: null }),
+        ]);
+        expect(corrections[0].userId).toBe(original.userId);
+        expect(correctionItems.filter((item) => item.name === 'ENERGY')).toHaveLength(1);
         expect(await sessionOf(ended.id)).toEqual(expect.objectContaining({ status: 'settled', chargeCredits: 45 }));
-        await expect(metering.retrySettlement(1, session.id)).rejects.toThrow(
+        await expect(metering.retrySettlement(1, session.id, 1)).rejects.toThrow(
           expect.objectContaining({ message: 'METER_SESSION_NOT_PENDING' }),
         );
-        expect((await items(ended.id)).items.filter((item) => item.name === 'ENERGY')).toHaveLength(1);
+        expect((await correctionsOf(ended.id)).corrections).toHaveLength(1);
       });
 
       it('applies the usage billing factor to a late energy charge like every other item', async () => {
         const ended = await endWithMissingFinal();
         await source.getRepository(ResourceUsage).update(ended.id, { billingFactor: 50 });
-        await metering.retrySettlement(1, (await sessionOf(ended.id)).id);
-        const { transaction, items: rows } = await items(ended.id);
+        await metering.retrySettlement(1, (await sessionOf(ended.id)).id, 1);
+        const { corrections, items: rows } = await correctionsOf(ended.id);
         // 45 credits of energy, half price: round(45 - 22.5) = 23 discount, 22 charged.
-        expect(transaction.amount).toBe(-22);
+        expect(corrections[0].amount).toBe(-22);
         expect(rows.find((item) => item.name === 'BILLING_FACTOR')?.unitPrice).toBe(-23);
       });
 
       it('keeps the charge pending with the reason when the retry is stale or invalid', async () => {
         const ended = await endWithMissingFinal();
         onCollect = reading('1.5', 'kWh', { observedAt: '2020-01-01T00:00:00Z' });
-        await expect(metering.retrySettlement(1, (await sessionOf(ended.id)).id)).rejects.toThrow(
+        await expect(metering.retrySettlement(1, (await sessionOf(ended.id)).id, 1)).rejects.toThrow(
           expect.objectContaining({ message: 'METER_SETTLEMENT_FAILED' }),
         );
         expect(await sessionOf(ended.id)).toEqual(
           expect.objectContaining({ status: 'pending', failureReason: expect.stringMatching(/observed at/) }),
         );
         expect((await items(ended.id)).transaction.amount).toBe(0);
+        expect((await correctionsOf(ended.id)).corrections).toEqual([]);
       });
 
       it('refuses to reconcile after a later session started on the meter, and can be waived', async () => {
@@ -816,7 +835,7 @@ describe('Flow-defined energy metering', () => {
         await source
           .getRepository(ResourceMeteringSession)
           .update(session.id, { status: ResourceMeteringSessionStatus.Pending });
-        await expect(metering.retrySettlement(1, session.id)).rejects.toThrow(
+        await expect(metering.retrySettlement(1, session.id, 1)).rejects.toThrow(
           expect.objectContaining({ message: 'METER_SETTLEMENT_FAILED' }),
         );
         expect((await metering.waive(1, session.id)).status).toBe(ResourceMeteringSessionStatus.Waived);

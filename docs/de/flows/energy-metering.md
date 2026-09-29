@@ -87,7 +87,7 @@ Ein Zähler, der innerhalb einer Sitzung sinkt oder unter die Lifetime-Baseline 
 
 **Endwert nicht verfügbar.** Lässt sich nach den konfigurierten Versuchen kein gültiger Endwert ermitteln, endet die Nutzung trotzdem und die Grundgebühr (Pauschale und zeitabhängige Gebühren) wird abgerechnet. Die Energiekosten erscheinen in der Abrechnungskarte der Ressource als **ausstehend**, mit zwei Aktionen:
 
-- **Retry** -- führt die finale Erfassung erneut aus. Das funktioniert nur, solange keine spätere Sitzung den Zähler verwendet hat; andernfalls wird der Posten als **fehlgeschlagen** markiert.
+- **Retry** -- liest den Zähler erneut aus. Bei Erfolg werden die Energiekosten als separate **Korrekturbuchung** für denselben Benutzer abgerechnet; die ursprüngliche Abrechnung bleibt unverändert. Das funktioniert nur, solange keine spätere Sitzung den Zähler verwendet hat; andernfalls wird der Posten als **fehlgeschlagen** markiert.
 - **Waive** -- erlässt die Energiekosten, ohne sie abzurechnen. Auch für fehlgeschlagene Posten verfügbar.
 
 Fehlende oder ungültige Daten werden nie zu einer Null-Abrechnung. Ein gültiger Wert von 0 kWh ist dagegen eine gültige Abrechnung über null, erfasst als Energie-Posten mit dem Wert null.

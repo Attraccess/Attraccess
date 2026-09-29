@@ -87,7 +87,7 @@ A counter that decreases during a session, or that falls below the lifetime base
 
 **Final reading unavailable.** If no valid final total can be obtained after the configured attempts, the usage still ends and the base charge (fixed and time-based fees) is settled. The energy charge is shown as **pending** in the resource's billing card, with two actions:
 
-- **Retry** -- runs the final collection again. It only works while no later session has used the meter; otherwise the charge is marked **failed**.
+- **Retry** -- reads the meter again. On success the energy is billed as a separate **correction transaction** for the same user; the original bill is never changed. It only works while no later session has used the meter; otherwise the charge is marked **failed**.
 - **Waive** -- writes the energy charge off without billing it. Also available for failed charges.
 
 Missing or invalid data never becomes a zero charge. A valid reading of 0 kWh is a valid zero charge, recorded as a zero-value energy line item.

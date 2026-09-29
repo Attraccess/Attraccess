@@ -14,11 +14,13 @@
     "initiator": "Ausgelöst von",
     "resourceUsage": "Ressource / Nutzung",
     "refundOf": "Erstattung von",
+    "correctionOf": "Korrektur zu",
     "externalReference": "Externe Referenz",
     "type": "Art"
   },
   "type": {
     "refund": "Erstattung",
+    "correction": "Energiekorrektur",
     "resourceUsage": "Ressourcen-Nutzung",
     "manual": "Manuelle Transaktion",
     "sumupTopup": "SumUp-Aufladung",

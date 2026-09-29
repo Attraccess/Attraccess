@@ -105,7 +105,7 @@ describe('meter notices', () => {
     render(<EnergySettlementNotices resourceId={7} />);
 
     expect(
-      screen.getByText('Usage #11 ended without a valid final meter reading, so its energy is not billed yet.'),
+      screen.getByText(en.unsettled.pending.description.replace('{{usageId}}', '11')),
     ).toBeInTheDocument();
     expect(screen.getByText('Reason: meter unreachable')).toBeInTheDocument();
     expect(screen.getByText('Last accepted reading: 1.2 kWh (not billed)')).toBeInTheDocument();

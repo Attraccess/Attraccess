@@ -25,19 +25,21 @@
   "unsettled": {
     "pending": {
       "title": "Energy charge pending",
-      "description": "Usage #{{usageId}} ended without a valid final meter reading, so its energy is not billed yet."
+      "description": "Usage #{{usageId}} has ended and its base charge is billed. The energy consumption is still missing because there was no valid meter reading when it ended."
     },
     "failed": {
       "title": "Energy charge failed",
-      "description": "Usage #{{usageId}} cannot be reconciled automatically. Waive the energy charge or adjust the bill manually."
+      "description": "A later session has used the meter since, so the consumption of usage #{{usageId}} can no longer be measured."
     },
     "reason": "Reason: {{reason}}",
     "lastReading": "Last accepted reading: {{value}} kWh (not billed)",
-    "retry": "Collect again and bill",
+    "retry": "Read meter again",
+    "retryHint": "Reads the meter once more. On success the consumption is billed as an additional correction transaction; the existing bill stays unchanged.",
     "waive": "Waive energy charge",
+    "waiveHint": "The consumption is not billed and no transaction is created. This notice disappears.",
     "retried": {
       "title": "Energy billed",
-      "description": "The final meter reading was collected and added to the bill."
+      "description": "The meter was read and the consumption was billed as a correction transaction."
     },
     "waived": {
       "title": "Energy charge waived",

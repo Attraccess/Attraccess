@@ -123,13 +123,15 @@ export function TransactionDetailsModal(props: Props) {
                       <div className="font-medium">
                         {transaction.refundOfId
                           ? t('type.refund')
-                          : transaction.resourceUsageId
-                            ? t('type.resourceUsage')
-                            : transaction.initiatorId
-                              ? t('type.manual')
-                              : transaction.externalReference?.startsWith('sumup_topup_transaction')
-                                ? t('type.sumupTopup')
-                                : t('type.unknown')}
+                          : transaction.correctionOfId
+                            ? t('type.correction')
+                            : transaction.resourceUsageId
+                              ? t('type.resourceUsage')
+                              : transaction.initiatorId
+                                ? t('type.manual')
+                                : transaction.externalReference?.startsWith('sumup_topup_transaction')
+                                  ? t('type.sumupTopup')
+                                  : t('type.unknown')}
                       </div>
                     </div>
                     <div>
@@ -165,6 +167,12 @@ export function TransactionDetailsModal(props: Props) {
                       <div>
                         <div className="text-small text-default-500">{t('meta.refundOf')}</div>
                         <div className="font-medium">#{transaction.refundOfId}</div>
+                      </div>
+                    )}
+                    {transaction.correctionOfId && (
+                      <div>
+                        <div className="text-small text-default-500">{t('meta.correctionOf')}</div>
+                        <div className="font-medium">#{transaction.correctionOfId}</div>
                       </div>
                     )}
                     {transaction.externalReference && (

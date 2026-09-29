@@ -102,6 +102,8 @@ export function EnergySettlementNotices({ resourceId }: { resourceId: number }) 
               {session.latestKwh !== null && (
                 <AlertDescription>{t('unsettled.lastReading', { value: session.latestKwh })}</AlertDescription>
               )}
+              {session.retryable && <AlertDescription>{t('unsettled.retryHint')}</AlertDescription>}
+              <AlertDescription>{t('unsettled.waiveHint')}</AlertDescription>
               <div className="mt-2 flex flex-wrap gap-2">
                 {session.retryable && (
                   <Button

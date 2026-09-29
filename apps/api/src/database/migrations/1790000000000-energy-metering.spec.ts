@@ -11,6 +11,7 @@ describe('Energy metering migration', () => {
     await runner.query('CREATE TABLE resource (id integer PRIMARY KEY)');
     await runner.query('CREATE TABLE resource_usage (id integer PRIMARY KEY)');
     await runner.query('CREATE TABLE resource_billing_configuration (id integer PRIMARY KEY, creditsPerUsage integer)');
+    await runner.query('CREATE TABLE billing_transaction (id integer PRIMARY KEY)');
     await runner.query('CREATE TABLE billing_transaction_item (id integer PRIMARY KEY, unitPrice integer)');
     await runner.query('INSERT INTO resource_billing_configuration VALUES (1, 5)');
   });
