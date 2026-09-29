@@ -37,6 +37,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   client.clear();
+  focusManager.setFocused(undefined);
+  onlineManager.setOnline(true);
   vi.restoreAllMocks();
 });
 function mount(currentSchema = schema) {
@@ -138,3 +140,27 @@ it('updates localized rows when the language changes without another schema requ
   expect(pending).toHaveLength(1);
   act(() => useTranslationState.setState({ language: 'en' }));
 });
+
+it.each(['focus', 'reconnect'])(
+  'recovers a failed preview on %s without refetching successful previews',
+  async (event) => {
+    const { result } = mount();
+    await waitFor(() => expect(pending).toHaveLength(1));
+    await act(async () => pending[0].reject(new Error('temporary outage')));
+    await waitFor(() =>
+      expect(result.current).toEqual([{ label: 'preview.configuration', value: 'preview.unavailable' }]),
+    );
+    await act(async () => {
+      if (event === 'focus') {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      } else {
+        onlineManager.setOnline(false);
+        onlineManager.setOnline(true);
+      }
+    });
+    await waitFor(() => expect(pending).toHaveLength(2));
+    await act(async () => pending[1].resolve(response('Recovered')));
+    await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'Recovered' }));
+  },
+);

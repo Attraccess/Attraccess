@@ -55,8 +55,8 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
     },
     enabled: resolvePreview,
     staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnWindowFocus: (query) => query.state.status === 'error',
+    refetchOnReconnect: (query) => query.state.status === 'error',
     retry: false,
     placeholderData: undefined,
   });
