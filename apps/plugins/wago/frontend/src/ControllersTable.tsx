@@ -2,11 +2,7 @@ import {
   Alert,
   Button,
   Chip,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
@@ -21,6 +17,7 @@ import {
 } from '@heroui/react';
 import { useState } from 'react';
 import type { CommissioningSession, WagoCommissioningState, WagoController } from './api';
+import { StandardModal } from './modal';
 import { useCommissioningVerification } from './useCommissioningVerification';
 
 interface ControllersTableProps {
@@ -147,37 +144,31 @@ function RuntimeUpdateModal({
   onOpenChange: (open: boolean) => void;
 }) {
   return (
-    <Modal isOpen={controller !== null} onOpenChange={onOpenChange}>
-      <ModalBackdrop>
-        <ModalContainer size="sm">
-          <ModalDialog>
-            <ModalHeader>
-              <ModalHeading>Runtime update</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p className="wg:text-sm">
-                Running runtime: <strong>{controller?.runtimeVersion}</strong> · protocol {controller?.protocolVersion}
-              </p>
-              <Alert status="warning">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>No in-place update yet</Alert.Title>
-                  <Alert.Description>
-                    Attraccess cannot update this controller&apos;s runtime without a full reinstall. The only current
-                    path is re-running commissioning, which wipes applications, data and configuration on the CC100
-                    and reinstalls from scratch. That is why it is not offered here as a one-click action. Automatic,
-                    non-destructive runtime updates are tracked in ATT-1099.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert>
-            </ModalBody>
-            <ModalFooter>
-              <Button onPress={() => onOpenChange(false)}>Understood</Button>
-            </ModalFooter>
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+    <StandardModal isOpen={controller !== null} onOpenChange={onOpenChange} size="sm" ariaLabel="Runtime update">
+      <ModalHeader>
+        <ModalHeading>Runtime update</ModalHeading>
+      </ModalHeader>
+      <ModalBody>
+        <p className="wg:text-sm">
+          Running runtime: <strong>{controller?.runtimeVersion}</strong> · protocol {controller?.protocolVersion}
+        </p>
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>No in-place update yet</Alert.Title>
+            <Alert.Description>
+              Attraccess cannot update this controller&apos;s runtime without a full reinstall. The only current path
+              is re-running commissioning, which wipes applications, data and configuration on the CC100 and
+              reinstalls from scratch. That is why it is not offered here as a one-click action. Automatic,
+              non-destructive runtime updates are tracked in ATT-1099.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      </ModalBody>
+      <ModalFooter>
+        <Button onPress={() => onOpenChange(false)}>Understood</Button>
+      </ModalFooter>
+    </StandardModal>
   );
 }
 
