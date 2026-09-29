@@ -89,10 +89,13 @@ interface PluginFlowNodeDefinitionBase {
    * Builds a configuration schema from the values selected so far. The returned
    * schema must set `dynamic: true`; fields that should trigger a refresh set
    * `refreshesSchema: true`.
+   * Canvas requests set `context.purpose` to `preview`: return only the preview
+   * extension and skip editor-only lookups/validation. The host refreshes visible
+   * dynamic summaries every minute so asynchronously applied changes are reflected.
    */
   resolveConfigSchema?(
     currentConfig: Record<string, unknown>,
-    context: { resourceId: number },
+    context: { resourceId: number; purpose?: 'editor' | 'preview' },
   ): Promise<Record<string, unknown>>;
 
   /** Handle IDs accepted as inputs (e.g. ['input']). Empty for trigger nodes. */

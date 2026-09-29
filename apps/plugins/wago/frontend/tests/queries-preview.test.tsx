@@ -1,3 +1,4 @@
+import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -11,7 +12,7 @@ vi.mock('../src/api', () => ({
 
 it('invalidates cached canvas previews after publication and rollback', async () => {
   const client = new QueryClient();
-  const key = ['flow-node-preview', 6, 'plugin.wago.command', { controllerId: 7 }];
+  const key = [...FLOW_NODE_PREVIEW_QUERY_KEY, 6, 'plugin.wago.command', { controllerId: 7 }];
   const { result, unmount } = renderHook(() => useConfigurationActions(7), {
     wrapper: ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>

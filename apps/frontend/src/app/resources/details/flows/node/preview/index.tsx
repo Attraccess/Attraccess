@@ -1,3 +1,4 @@
+import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { TFunction, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, ResourceFlowNodeType, ResourceFlowsService } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
@@ -44,10 +45,10 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
     Array.isArray(schema.configSchema.preview),
   );
   const resolved = useQuery({
-    queryKey: ['flow-node-preview', resourceId, schema.type, nodeData?.data],
+    queryKey: [...FLOW_NODE_PREVIEW_QUERY_KEY, resourceId, schema.type, nodeData?.data],
     queryFn: () => {
       if (!resourceId || !nodeData) throw new Error('A resource and node configuration are required');
-      return ResourceFlowsService.resolveNodeSchema({
+      return ResourceFlowsService.resolveNodePreview({
         resourceId,
         nodeType: schema.type,
         requestBody: { config: nodeData.data },
@@ -55,6 +56,9 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
     },
     enabled: resolvePreview,
     staleTime: 30_000,
+    // Applied device revisions can arrive after publication and in other sessions.
+    // Refresh the lightweight summary while the canvas is visible.
+    refetchInterval: 60_000,
     refetchOnWindowFocus: (query) => query.state.status === 'error',
     refetchOnReconnect: (query) => query.state.status === 'error',
     retry: false,

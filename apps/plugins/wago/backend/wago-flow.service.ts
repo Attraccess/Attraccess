@@ -170,9 +170,15 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     config: Record<string, unknown>,
     kind: NodeKind,
     validationContext = new Map<string, unknown>(),
+    previewOnly = false,
   ): Promise<Record<string, unknown>> {
     const controllers = await this.cached(validationContext, 'wago-flow-controllers', () =>
-      this.controllers.find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } }),
+      previewOnly && typeof config.controllerId !== 'number'
+        ? Promise.resolve([])
+        : this.controllers.find({
+            where: { trustState: 'claimed', ...(previewOnly ? { id: config.controllerId as number } : {}) },
+            order: { name: 'ASC' },
+          }),
     );
     const selected =
       typeof config.controllerId === 'number'
@@ -196,6 +202,12 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     } catch {
       // Older configurations may not have visual editor labels.
     }
+    if (previewOnly) return {
+      dynamic: true,
+      type: 'object',
+      properties: {},
+      preview: wagoFlowPreview(config, kind, selected, snapshot, names),
+    };
     const channel = channels.find((item) => item.id === config.channelId);
     const properties: Record<string, unknown> = {
       controllerId: {

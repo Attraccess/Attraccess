@@ -1,3 +1,4 @@
+import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ResourceFlowsService, type ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
@@ -27,10 +28,10 @@ beforeEach(() => {
   node.id = 'node';
   node.data = { value: true };
   pending.length = 0;
-  vi.spyOn(ResourceFlowsService, 'resolveNodeSchema').mockImplementation(
+  vi.spyOn(ResourceFlowsService, 'resolveNodePreview').mockImplementation(
     () =>
       new Promise<ResourceFlowNodeSchemaDto>((resolve, reject) => pending.push({ resolve, reject })) as ReturnType<
-        typeof ResourceFlowsService.resolveNodeSchema
+        typeof ResourceFlowsService.resolveNodePreview
       >,
   );
 });
@@ -39,6 +40,7 @@ afterEach(() => {
   client.clear();
   focusManager.setFocused(undefined);
   onlineManager.setOnline(true);
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 function mount(currentSchema = schema) {
@@ -58,7 +60,7 @@ function response(value: string): ResourceFlowNodeSchemaDto {
 it('resolves saved configuration and never displays a late response for a previous selection', async () => {
   const { result, rerender } = mount();
   await waitFor(() => expect(pending).toHaveLength(1));
-  expect(ResourceFlowsService.resolveNodeSchema).toHaveBeenCalledWith({
+  expect(ResourceFlowsService.resolveNodePreview).toHaveBeenCalledWith({
     resourceId: 6,
     nodeType: schema.type,
     requestBody: { config: { value: true } },
@@ -82,7 +84,7 @@ it('shows an unavailable summary after a failed refresh instead of stale resolve
   await act(async () => pending[0].resolve(response('Turn ON')));
   await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'Turn ON' }));
   act(() => {
-    void client.invalidateQueries({ queryKey: ['flow-node-preview'] });
+    void client.invalidateQueries({ queryKey: FLOW_NODE_PREVIEW_QUERY_KEY });
   });
   await waitFor(() => expect(pending).toHaveLength(2));
   await act(async () => pending[1].reject(new Error('unavailable')));
@@ -98,7 +100,7 @@ it('does not resolve catalog cards or plugins that did not opt in', () => {
   catalog.unmount();
   node.id = 'node';
   mount({ ...schema, configSchema: { dynamic: true, properties: {} } });
-  expect(ResourceFlowsService.resolveNodeSchema).not.toHaveBeenCalled();
+  expect(ResourceFlowsService.resolveNodePreview).not.toHaveBeenCalled();
 });
 
 it('does not refetch stale previews on focus or reconnect, but refreshes after invalidation', async () => {
@@ -106,7 +108,7 @@ it('does not refetch stale previews on focus or reconnect, but refreshes after i
   await waitFor(() => expect(pending).toHaveLength(1));
   await act(async () => pending[0].resolve(response('Turn ON')));
   await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'Turn ON' }));
-  const query = client.getQueryCache().find({ queryKey: ['flow-node-preview'], exact: false });
+  const query = client.getQueryCache().find({ queryKey: FLOW_NODE_PREVIEW_QUERY_KEY, exact: false });
   expect(query).toBeDefined();
   query?.setState({ dataUpdatedAt: Date.now() - 60_000 });
   await act(async () => {
@@ -117,7 +119,7 @@ it('does not refetch stale previews on focus or reconnect, but refreshes after i
   });
   expect(pending).toHaveLength(1);
   act(() => {
-    void client.invalidateQueries({ queryKey: ['flow-node-preview'] });
+    void client.invalidateQueries({ queryKey: FLOW_NODE_PREVIEW_QUERY_KEY });
   });
   await waitFor(() => expect(pending).toHaveLength(2));
   await act(async () => pending[1].resolve(response('New channel name')));
@@ -164,3 +166,17 @@ it.each(['focus', 'reconnect'])(
     await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'Recovered' }));
   },
 );
+
+it('refreshes a visible summary after a delayed applied revision without a publication callback', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const { result } = mount();
+  await waitFor(() => expect(pending).toHaveLength(1));
+  await act(async () => pending[0].resolve(response('Old applied name')));
+  await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'Old applied name' }));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
+  await waitFor(() => expect(pending).toHaveLength(2));
+  await act(async () => pending[1].resolve(response('New applied name')));
+  await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'New applied name' }));
+});

@@ -14,7 +14,8 @@ export function createWagoStateNodes(service: () => WagoFlowService): PluginFlow
       isInput: true,
       inputs: [],
       outputs: ['output'],
-      resolveConfigSchema: (config) => service().resolveConfigSchema(config, 'event'),
+      resolveConfigSchema: (config, context) =>
+        service().resolveConfigSchema(config, 'event', undefined, context.purpose === 'preview'),
       validateConfig: (config, context) => service().validateConfig(config, 'event', context),
     },
     {
@@ -25,7 +26,8 @@ export function createWagoStateNodes(service: () => WagoFlowService): PluginFlow
       configSchema: WAGO_FLOW_PREVIEW_SCHEMA,
       inputs: ['input'],
       outputs: ['output', 'unavailable'],
-      resolveConfigSchema: (config) => service().resolveConfigSchema(config, 'read'),
+      resolveConfigSchema: (config, context) =>
+        service().resolveConfigSchema(config, 'read', undefined, context.purpose === 'preview'),
       validateConfig: (config, context) => service().validateConfig(config, 'read', context),
       execute: async (node, input) => {
         const state = service().read(node.data);
@@ -40,7 +42,8 @@ export function createWagoStateNodes(service: () => WagoFlowService): PluginFlow
       configSchema: WAGO_FLOW_PREVIEW_SCHEMA,
       inputs: ['input'],
       outputs: ['output', 'timeout'],
-      resolveConfigSchema: (config) => service().resolveConfigSchema(config, 'wait'),
+      resolveConfigSchema: (config, context) =>
+        service().resolveConfigSchema(config, 'wait', undefined, context.purpose === 'preview'),
       validateConfig: (config, context) => service().validateConfig(config, 'wait', context),
       execute: async (node, input) => {
         const state = await service().wait(node.data);
