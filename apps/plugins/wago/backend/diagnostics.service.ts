@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { ResourceFlowNode, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Resource, ResourceFlowNode, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
@@ -82,6 +82,20 @@ export function diagnosticReferences(
   return nodes.map((node) => {
     const channelId = typeof node.data.channelId === 'string' ? node.data.channelId : '';
     const control = node.type === 'plugin.wago.command';
+    const conflictResourceIds = control
+      ? [
+          ...new Set(
+            nodes
+              .filter(
+                (other) =>
+                  other.type === 'plugin.wago.command' &&
+                  other.resourceId !== node.resourceId &&
+                  other.data.channelId === channelId,
+              )
+              .map((other) => other.resourceId),
+          ),
+        ]
+      : [];
     return {
       nodeId: node.id,
       resourceId: node.resourceId,
@@ -95,14 +109,8 @@ export function diagnosticReferences(
             (capabilities &&
               (!own(capabilities, channelId)?.includes('output') ||
                 (node.data.action === 'pulse' && !own(capabilities, channelId)?.includes('pulse')))))),
-      conflict:
-        control &&
-        nodes.some(
-          (other) =>
-            other.type === 'plugin.wago.command' &&
-            other.resourceId !== node.resourceId &&
-            other.data.channelId === channelId,
-        ),
+      conflict: conflictResourceIds.length > 0,
+      conflictResourceIds,
     };
   });
 }
@@ -180,12 +188,24 @@ export class WagoDiagnosticsService {
     const referencesTruncated = conflictNodes.length > 1000;
     const conflictNodesByControllerId = new Map<number, ResourceFlowNode[]>();
     for (const node of conflictNodes.slice(0, 1000)) {
+      // This resource's own nodes are already in localNodes; including them again duplicates every reference.
+      if (node.resourceId === resourceId) continue;
       const controllerId = node.data.controllerId;
       if (typeof controllerId !== 'number') continue;
       const matchingNodes = conflictNodesByControllerId.get(controllerId) ?? [];
       matchingNodes.push(node);
       conflictNodesByControllerId.set(controllerId, matchingNodes);
     }
+    const conflictResourceIds = [...new Set([...conflictNodesByControllerId.values()].flat().map((n) => n.resourceId))];
+    const conflictResources = conflictResourceIds.length
+      ? await this.context.dataSource
+          .getRepository(Resource)
+          .createQueryBuilder('resource')
+          .select(['resource.id', 'resource.name'])
+          .where('resource.id IN (:...ids)', { ids: conflictResourceIds })
+          .getMany()
+      : [];
+    const resourceNames = new Map(conflictResources.map((resource) => [resource.id, resource.name]));
     const controllersResult = selectedControllerIds.map((controllerId) => {
       const controller = controllersById.get(controllerId);
       if (!controller)
@@ -207,7 +227,15 @@ export class WagoDiagnosticsService {
           Object.fromEntries(
             appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? [],
           ),
-        ).filter((reference) => reference.resourceId === resourceId);
+        )
+          .filter((reference) => reference.resourceId === resourceId)
+          .map((reference) => ({
+            ...reference,
+            conflictResources: reference.conflictResourceIds.map((id) => ({
+              id,
+              name: resourceNames.get(id) ?? `Resource ${id}`,
+            })),
+          }));
         return {
           controllerId,
           name: controller.name ?? controller.hardwareId,
