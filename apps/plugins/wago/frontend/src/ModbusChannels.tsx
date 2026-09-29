@@ -1,6 +1,9 @@
 import { Button } from '@heroui/react';
 import { findProfile, type ModbusConfiguration, type ModbusPoint } from '../../modbus/model';
 
+import { useWagoTranslations } from './i18n';
+import { modbusDisplayName } from './modbus-labels';
+
 export function ModbusChannels({
   configuration,
   onAdd,
@@ -10,10 +13,11 @@ export function ModbusChannels({
   deviceId?: string;
   onAdd: (binding: ModbusPoint, name: string) => void;
 }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   return (
-    <section aria-label="Named Modbus points" className="wg:flex wg:flex-col wg:gap-3">
-      <h3>Named Modbus points</h3>
-      <p>Add a named measurement or output to make it available as a logical channel. Save and publish separately.</p>
+    <section aria-label={t('modbus.points')} className="wg:flex wg:flex-col wg:gap-3">
+      <h3>{t('modbus.points')}</h3>
+      <p>{t('modbus.pointsDescription')}</p>
       {configuration.devices
         .filter((device) => !deviceId || device.id === deviceId)
         .map((device) => {
@@ -27,10 +31,10 @@ export function ModbusChannels({
                   className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
                   variant="secondary"
                   onPress={() =>
-                    onAdd({ deviceId: device.id, measurementId: measurement.id }, `${device.name}: ${measurement.name}`)
+                    onAdd({ deviceId: device.id, measurementId: measurement.id }, `${device.name}: ${modbusDisplayName(profile, measurement.name, tBackendMessage)}`)
                   }
                 >
-                  Add {measurement.name} from {device.name}
+                  {t('modbus.addPoint', { name: modbusDisplayName(profile, measurement.name, tBackendMessage), device: device.name })}
                 </Button>
               ))}
               {profile?.actions.map((action) => (
@@ -38,12 +42,12 @@ export function ModbusChannels({
                   key={action.id}
                   className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
                   variant="secondary"
-                  onPress={() => onAdd({ deviceId: device.id, actionId: action.id }, `${device.name}: ${action.name}`)}
+                  onPress={() => onAdd({ deviceId: device.id, actionId: action.id }, `${device.name}: ${modbusDisplayName(profile, action.name, tBackendMessage)}`)}
                 >
-                  Add {action.name} from {device.name}
+                  {t('modbus.addPoint', { name: modbusDisplayName(profile, action.name, tBackendMessage), device: device.name })}
                 </Button>
               ))}
-              {profile && !profile.actions.length && <p>This profile has no output actions.</p>}
+              {profile && !profile.actions.length && <p>{t('modbus.noActions')}</p>}
             </section>
           );
         })}

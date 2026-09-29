@@ -1,4 +1,6 @@
 import { Checkbox, Label } from '@heroui/react';
+import { useWagoTranslations } from './i18n';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import type { ConfigurationDiff, ConfigurationValidationError, WagoConfigurationSnapshot } from './api';
 import {
   configurationNames,
@@ -17,13 +19,14 @@ export function ConfigurationErrors({
   snapshot: WagoConfigurationSnapshot;
   names: Record<string, string>;
 }) {
-  names = configurationNames(snapshot, names);
+  const { t, tBackendMessage } = useWagoTranslations();
+  names = configurationNames(snapshot, names, t);
   return (
     <ul>
       {errors.map((error, index) => (
         <li key={error.path + error.code + index}>
-          {changeLabel({ path: error.path, previous: undefined, current: undefined }, snapshot, snapshot, names)}:{' '}
-          {Object.entries(names).reduce((message, [id, name]) => message.replaceAll(id, name), error.message)}
+          {changeLabel({ path: error.path, previous: undefined, current: undefined }, snapshot, snapshot, names, t)}:{' '}
+          {Object.entries(names).reduce((message, [id, name]) => message.replaceAll(id, name), tBackendMessage(error.message))}
         </li>
       ))}
     </ul>
@@ -45,9 +48,10 @@ export function ConfigurationChanges({
   selected?: string[];
   onSelect?: (path: string, selected: boolean) => void;
 }) {
-  names = configurationNames(after, configurationNames(before, names));
+  const { t } = useWagoTranslations();
+  names = configurationNames(after, configurationNames(before, names, t), t);
   const displayed = onSelect ? changes : readableStructuralChanges(changes, before, after);
-  if (!displayed.length) return <p>No configuration changes.</p>;
+  if (!displayed.length) return <p>{t('configuration.empty')}</p>;
   return (
     <ul className="wg:flex wg:flex-col wg:gap-3">
       {displayed.map((change) => (
@@ -58,14 +62,18 @@ export function ConfigurationChanges({
                 <Checkbox.Indicator />
               </Checkbox.Control>
               <Checkbox.Content>
-                <Label>{changeLabel(change, before, after, names)}</Label>
+                <Label>{changeLabel(change, before, after, names, t)}</Label>
               </Checkbox.Content>
             </Checkbox>
           ) : (
-            <p className="wg:font-medium">{changeLabel(change, before, after, names)}</p>
+            <p className="wg:font-medium">{changeLabel(change, before, after, names, t)}</p>
           )}
-          <p className="wg:text-sm">Before: {readableChangeValue(change.path, change.previous, before, names)}</p>
-          <p className="wg:text-sm">After: {readableChangeValue(change.path, change.current, after, names)}</p>
+          <p className="wg:text-sm">
+            {t('configuration.before')} {readableChangeValue(change.path, change.previous, before, names, t)}
+          </p>
+          <p className="wg:text-sm">
+            {t('configuration.after')} {readableChangeValue(change.path, change.current, after, names, t)}
+          </p>
         </li>
       ))}
     </ul>
@@ -79,16 +87,21 @@ export function ConfigurationMetadataChanges({
   changes: ConfigurationDiff[];
   names: Record<string, string>;
 }) {
+  const { t } = useWagoTranslations();
   if (!changes.length) return null;
   return (
-    <section aria-label="Names and presets">
-      <h3 className="wg:font-medium">Names and presets</h3>
+    <section aria-label={t('configuration.metadata')}>
+      <h3 className="wg:font-medium">{t('configuration.metadata')}</h3>
       <ul className="wg:flex wg:flex-col wg:gap-3">
         {changes.map((change) => (
           <li key={change.path}>
-            <p className="wg:font-medium">{metadataChangeLabel(change.path, names)}</p>
-            <p className="wg:text-sm">Before: {readableMetadataValue(change.path, change.previous, names)}</p>
-            <p className="wg:text-sm">After: {readableMetadataValue(change.path, change.current, names)}</p>
+            <p className="wg:font-medium">{metadataChangeLabel(change.path, names, t)}</p>
+            <p className="wg:text-sm">
+              {t('configuration.before')} {readableMetadataValue(change.path, change.previous, names, t)}
+            </p>
+            <p className="wg:text-sm">
+              {t('configuration.after')} {readableMetadataValue(change.path, change.current, names, t)}
+            </p>
           </li>
         ))}
       </ul>
@@ -96,14 +109,14 @@ export function ConfigurationMetadataChanges({
   );
 }
 
-function readableMetadataValue(path: string, value: unknown, names: Record<string, string>) {
+function readableMetadataValue(path: string, value: unknown, names: Record<string, string>, t: TFunction) {
   if (path.startsWith('$.names.') && typeof value === 'string') return value;
-  return readableValue(value, names);
+  return readableValue(value, names, t);
 }
 
-function metadataChangeLabel(path: string, names: Record<string, string>) {
+function metadataChangeLabel(path: string, names: Record<string, string>, t: TFunction) {
   const name = path.match(/^\$\.names\.([^.]*)$/);
-  if (name) return `Name for ${names[name[1]] ?? name[1]}`;
-  if (/^\$\.presets\[\d+\]/.test(path)) return 'Preset application';
-  return 'Names and presets';
+  if (name) return t('configuration.nameFor', { name: names[name[1]] ?? name[1] });
+  if (/^\$\.presets\[\d+\]/.test(path)) return t('configuration.presetApplication');
+  return t('configuration.metadata');
 }

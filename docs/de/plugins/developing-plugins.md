@@ -202,3 +202,36 @@ hängen sie als Release-Assets an.
 - [Plugins installieren](plugins/installing-plugins.md) -- Plugins hochladen und verwalten
 - [Entwicklerhandbuch](developer/overview.md) -- Attraccess-Architektur und -Entwicklung
 - [API-Referenz](developer/api-reference.md) -- Attraccess-REST-API
+## Übersetzungen und Sprachwechsel
+
+Verwende `useTranslations` aus `@attraccess/plugins-frontend-ui` mit eigenen
+englischen und deutschen Übersetzungskatalogen. Der Hook übernimmt die Sprache
+des Hosts und aktualisiert Plugin-Seiten, Dialoge und Slot-Beiträge automatisch
+beim Sprachwechsel. Plugins benötigen weder eigene Spracherkennung noch eine
+eigene gespeicherte Sprachpräferenz.
+
+```tsx
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
+
+export function DevicesPage() {
+  const { t } = useTranslations({ en, de });
+  return <h1>{t('title')}</h1>;
+}
+```
+
+Übersetze auch Beschreibungen, Platzhalter und Barrierefreiheitsbeschriftungen.
+Verwende `{{name}}` für dynamische Werte und den zurückgegebenen `language`-Wert
+für Datums- und Zahlenformatierung. Fehlende deutsche Einträge fallen auf Englisch
+zurück. Benutzereingaben und Protokollkennungen bleiben unverändert. Speichere
+für Meldungen im React-Zustand Übersetzungsschlüssel und Parameter statt bereits
+übersetzter Texte, damit sie beim Sprachwechsel ebenfalls aktualisiert werden.
+
+Teile **`@attraccess/plugins-frontend-ui` über Module Federation** mit
+`requiredVersion: '*'`, `import: false` und `generate: false`. Eine eigene Kopie
+würde einen separaten Sprachzustand erzeugen. Die gemeinsame Konfiguration
+`createPluginFederationConfig` enthält diesen Eintrag bereits. Deklariere die
+Bibliothek als Peer-Abhängigkeit und setze `attraccess.host` beziehungsweise
+`attraccessVersion.min` auf mindestens Version **1.11.0**, da ältere Hosts diese
+Bibliothek noch nicht teilen.

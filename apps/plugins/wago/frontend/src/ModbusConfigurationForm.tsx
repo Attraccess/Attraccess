@@ -1,6 +1,8 @@
 import { randomUUID } from './configuration-id';
 import { Button, Description, Input, Label, ListBox, Select, TextField } from '@heroui/react';
 import { useState, type ReactNode } from 'react';
+import { useWagoTranslations } from './i18n';
+import { modbusDisplayName } from './modbus-labels';
 import {
   BUILTIN_MODBUS_PROFILES,
   duplicateProfile,
@@ -34,12 +36,13 @@ export function ModbusPointForm({
   onChange: (value: ModbusPoint) => void;
   isDisabled?: boolean;
 }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   const device = configuration.devices.find((d) => d.id === value.deviceId);
   const profile = device && findProfile(configuration, device);
   return (
     <div className="wg:flex wg:flex-col wg:gap-3">
       <Choice
-        label="Modbus device"
+        label={t('modbus.device')}
         value={value.deviceId}
         options={configuration.devices.map((d) => d.id)}
         labels={Object.fromEntries(configuration.devices.map((d) => [d.id, d.name]))}
@@ -51,19 +54,19 @@ export function ModbusPointForm({
         value={value.measurementId ?? ''}
         onChange={(key) => onChange({ ...value, measurementId: key ? String(key) : undefined })}
       >
-        <Label>Named measurement</Label>
+        <Label>{t('modbus.measurement')}</Label>
         <Select.Trigger>
           <Select.Value />
           <Select.Indicator />
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
-            <ListBox.Item id="" textValue="None">
-              None
+            <ListBox.Item id="" textValue={t('modbus.none')}>
+              {t('modbus.none')}
             </ListBox.Item>
             {profile?.measurements.map((m) => (
-              <ListBox.Item id={m.id} key={m.id} textValue={m.name}>
-                {m.name} ({m.unit})
+              <ListBox.Item id={m.id} key={m.id} textValue={modbusDisplayName(profile, m.name, tBackendMessage)}>
+                {modbusDisplayName(profile, m.name, tBackendMessage)} ({m.unit})
               </ListBox.Item>
             ))}
           </ListBox>
@@ -74,28 +77,25 @@ export function ModbusPointForm({
         value={value.actionId ?? ''}
         onChange={(key) => onChange({ ...value, actionId: key ? String(key) : undefined })}
       >
-        <Label>Named action</Label>
+        <Label>{t('modbus.action')}</Label>
         <Select.Trigger>
           <Select.Value />
           <Select.Indicator />
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
-            <ListBox.Item id="" textValue="None">
-              None
+            <ListBox.Item id="" textValue={t('modbus.none')}>
+              {t('modbus.none')}
             </ListBox.Item>
             {profile?.actions.map((a) => (
-              <ListBox.Item id={a.id} key={a.id} textValue={a.name}>
-                {a.name}
+              <ListBox.Item id={a.id} key={a.id} textValue={modbusDisplayName(profile, a.name, tBackendMessage)}>
+                {modbusDisplayName(profile, a.name, tBackendMessage)}
               </ListBox.Item>
             ))}
           </ListBox>
         </Select.Popover>
       </Select>
-      <Description>
-        Measurement channels use the profile unit/kind, scale 1 and offset 0. Register scaling is applied once by the
-        device profile.
-      </Description>
+      <Description>{t('modbus.scalingHint')}</Description>
     </div>
   );
 }
@@ -161,6 +161,9 @@ function Choice({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
+  const { t, tExists } = useWagoTranslations();
+  const optionLabel = (option: string | number) =>
+    labels[String(option)] ?? (tExists(`modbus.options.${option}`) ? t(`modbus.options.${option}`) : String(option));
   return (
     <Select isDisabled={disabled} value={String(value)} onChange={(key) => key !== null && onChange(String(key))}>
       <Label>{label}</Label>
@@ -171,8 +174,8 @@ function Choice({
       <Select.Popover>
         <ListBox>
           {options.map((option) => (
-            <ListBox.Item id={String(option)} key={option} textValue={labels[String(option)] ?? String(option)}>
-              {labels[String(option)] ?? option}
+            <ListBox.Item id={String(option)} key={option} textValue={optionLabel(option)}>
+              {optionLabel(option)}
               <ListBox.ItemIndicator />
             </ListBox.Item>
           ))}
@@ -190,12 +193,13 @@ function FormatFields({
   onChange: (value: RegisterFormat) => void;
   disabled: boolean;
 }) {
+  const { t } = useWagoTranslations();
   return (
     <div className="wg:grid wg:gap-3 wg:md:grid-cols-2">
       {(['address', 'scale', 'offset'] as const).map((key) => (
         <Field
           key={key}
-          label={key === 'address' ? 'Register address (decimal)' : key}
+          label={t(`modbus.${key}`)}
           value={value[key]}
           numeric
           disabled={disabled}
@@ -203,14 +207,14 @@ function FormatFields({
         />
       ))}
       <Choice
-        label="Address convention: 0 = wire / 1 = one-based"
+        label={t('modbus.addressConvention')}
         value={value.addressBase}
         options={[0, 1]}
         disabled={disabled}
         onChange={(v) => onChange({ ...value, addressBase: Number(v) as 0 | 1 })}
       />
       <Choice
-        label="Data type"
+        label={t('modbus.dataType')}
         value={value.dataType}
         options={['uint16', 'int16', 'uint32', 'int32', 'float32']}
         disabled={disabled}
@@ -219,16 +223,14 @@ function FormatFields({
       {(['byteOrder', 'wordOrder'] as const).map((key) => (
         <Choice
           key={key}
-          label={key === 'byteOrder' ? 'Byte order' : 'Word order'}
+          label={t(`modbus.${key}`)}
           value={value[key]}
           options={['big', 'little']}
           disabled={disabled}
           onChange={(v) => onChange({ ...value, [key]: v })}
         />
       ))}
-      <Description>
-        Physical value = decoded register × scale + offset. No implicit register-prefix conversion.
-      </Description>
+      <Description>{t('modbus.formatHint')}</Description>
     </div>
   );
 }
@@ -245,34 +247,31 @@ export function ModbusProfileForm({
   showIdentifiers?: boolean;
   collapseSignals?: boolean;
 }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   const readonly = isDisabled || BUILTIN_MODBUS_PROFILES.includes(value);
   return (
     <section className="wg:flex wg:flex-col wg:gap-4">
       <header>
-        <h3>{value.name}</h3>
-        <p>
-          {readonly
-            ? 'Read-only profile. Duplicate to customize. Hardware qualification has not been established.'
-            : 'Custom register map — verify against the device manual before use.'}
-        </p>
+        <h3>{modbusDisplayName(value, value.name, tBackendMessage)}</h3>
+        <p>{t(readonly ? 'modbus.readonly' : 'modbus.customHint')}</p>
       </header>
       <div className="wg:flex wg:flex-col wg:gap-4">
         {showIdentifiers && (
           <Field
-            label="Profile ID"
+            label={t('modbus.profileId')}
             value={value.id}
             disabled={readonly}
             onChange={(id) => onChange({ ...value, id })}
           />
         )}
         <Field
-          label="Profile name"
-          value={value.name}
+          label={t('modbus.profileName')}
+          value={modbusDisplayName(value, value.name, tBackendMessage)}
           disabled={readonly}
           onChange={(name) => onChange({ ...value, name })}
         />
         <Field
-          label="Version"
+          label={t('modbus.version')}
           value={value.version}
           numeric
           disabled={readonly}
@@ -286,14 +285,26 @@ export function ModbusProfileForm({
             });
           return (
             <details key={index} open={!collapseSignals} className="wg:rounded-lg wg:border wg:border-border wg:p-3">
-              <summary className="wg:cursor-pointer wg:font-medium">Measurement: {m.name}</summary>
+              <summary className="wg:cursor-pointer wg:font-medium">
+                {t('modbus.measurementTitle', { name: modbusDisplayName(value, m.name, tBackendMessage) })}
+              </summary>
               <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
                 {showIdentifiers && (
-                  <Field label="Measurement ID" value={m.id} disabled={readonly} onChange={(id) => update({ id })} />
+                  <Field
+                    label={t('modbus.measurementId')}
+                    value={m.id}
+                    disabled={readonly}
+                    onChange={(id) => update({ id })}
+                  />
                 )}
-                <Field label="Name" value={m.name} disabled={readonly} onChange={(name) => update({ name })} />
+                <Field
+                  label={t('modbus.name')}
+                  value={modbusDisplayName(value, m.name, tBackendMessage)}
+                  disabled={readonly}
+                  onChange={(name) => update({ name })}
+                />
                 <Choice
-                  label="Read function"
+                  label={t('modbus.readFunction')}
                   value={m.functionCode}
                   options={[3, 4]}
                   disabled={readonly}
@@ -301,14 +312,14 @@ export function ModbusProfileForm({
                 />
                 <FormatFields value={m} disabled={readonly} onChange={update} />
                 <Choice
-                  label="Physical unit"
+                  label={t('modbus.unit')}
                   value={m.unit}
                   options={['ampere', 'volt', 'watt', 'watt-hour', 'percent']}
                   disabled={readonly}
                   onChange={(v) => update({ unit: v as typeof m.unit })}
                 />
                 <Choice
-                  label="Measurement kind"
+                  label={t('modbus.kind')}
                   value={m.kind}
                   options={['live', 'cumulative']}
                   disabled={readonly}
@@ -317,21 +328,21 @@ export function ModbusProfileForm({
                   }}
                 />
                 <Choice
-                  label="Reading precision (physical units)"
+                  label={t('modbus.precision')}
                   value={m.decimalPlaces ?? 'exact'}
                   options={['exact', 0, 1, 2, 3]}
                   labels={{
-                    exact: 'Exact (no rounding)',
-                    0: 'Whole units',
-                    1: '0.1 units',
-                    2: '0.01 units',
-                    3: '0.001 units',
+                    exact: t('modbus.exact'),
+                    0: t('modbus.whole'),
+                    1: t('modbus.units', { precision: '0.1' }),
+                    2: t('modbus.units', { precision: '0.01' }),
+                    3: t('modbus.units', { precision: '0.001' }),
                   }}
                   disabled={readonly}
                   onChange={(v) => update({ decimalPlaces: v === 'exact' ? undefined : Number(v) })}
                 />
                 <Field
-                  label="Polling interval (ms)"
+                  label={t('modbus.polling')}
                   value={m.pollIntervalMs}
                   numeric
                   disabled={readonly}
@@ -339,7 +350,7 @@ export function ModbusProfileForm({
                 />
                 {m.kind === 'cumulative' && (
                   <Field
-                    label="Documented raw rollover modulus (blank = fault on decrease)"
+                    label={t('modbus.rollover')}
                     allowEmpty
                     value={m.rollover ?? ''}
                     numeric
@@ -352,7 +363,7 @@ export function ModbusProfileForm({
                   variant="danger"
                   onPress={() => onChange({ ...value, measurements: value.measurements.filter((_, i) => i !== index) })}
                 >
-                  Remove measurement
+                  {t('modbus.removeMeasurement')}
                 </Button>
               </div>
             </details>
@@ -369,7 +380,7 @@ export function ModbusProfileForm({
                 {
                   ...emptyFormat,
                   id: randomUUID(),
-                  name: 'Measurement',
+                  name: t('modbus.defaultMeasurement'),
                   functionCode: 3,
                   unit: 'watt',
                   kind: 'live',
@@ -379,7 +390,7 @@ export function ModbusProfileForm({
             })
           }
         >
-          Add measurement
+          {t('modbus.addMeasurement')}
         </Button>
         {value.actions.map((a, index) => {
           const update = (patch: Partial<typeof a>) =>
@@ -389,14 +400,26 @@ export function ModbusProfileForm({
             });
           return (
             <details key={index} open={!collapseSignals} className="wg:rounded-lg wg:border wg:border-border wg:p-3">
-              <summary className="wg:cursor-pointer wg:font-medium">Action: {a.name}</summary>
+              <summary className="wg:cursor-pointer wg:font-medium">
+                {t('modbus.actionTitle', { name: modbusDisplayName(value, a.name, tBackendMessage) })}
+              </summary>
               <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
                 {showIdentifiers && (
-                  <Field label="Action ID" value={a.id} disabled={readonly} onChange={(id) => update({ id })} />
+                  <Field
+                    label={t('modbus.actionId')}
+                    value={a.id}
+                    disabled={readonly}
+                    onChange={(id) => update({ id })}
+                  />
                 )}
-                <Field label="Name" value={a.name} disabled={readonly} onChange={(name) => update({ name })} />
+                <Field
+                  label={t('modbus.name')}
+                  value={modbusDisplayName(value, a.name, tBackendMessage)}
+                  disabled={readonly}
+                  onChange={(name) => update({ name })}
+                />
                 <Choice
-                  label="Write function: 5 coil / 6 register / 16 registers"
+                  label={t('modbus.writeFunction')}
                   value={a.functionCode}
                   options={[5, 6, 16]}
                   disabled={readonly}
@@ -404,14 +427,14 @@ export function ModbusProfileForm({
                 />
                 <FormatFields value={a} disabled={readonly} onChange={update} />
                 <Field
-                  label="On value (physical units)"
+                  label={t('modbus.onValue')}
                   value={a.onValue}
                   numeric
                   disabled={readonly}
                   onChange={(v) => update({ onValue: Number(v) })}
                 />
                 <Field
-                  label="Off value (physical units)"
+                  label={t('modbus.offValue')}
                   value={a.offValue}
                   numeric
                   disabled={readonly}
@@ -422,7 +445,7 @@ export function ModbusProfileForm({
                   variant="danger"
                   onPress={() => onChange({ ...value, actions: value.actions.filter((_, i) => i !== index) })}
                 >
-                  Remove action
+                  {t('modbus.removeAction')}
                 </Button>
               </div>
             </details>
@@ -436,12 +459,19 @@ export function ModbusProfileForm({
               ...value,
               actions: [
                 ...value.actions,
-                { ...emptyFormat, id: randomUUID(), name: 'Switch', functionCode: 5, onValue: 1, offValue: 0 },
+                {
+                  ...emptyFormat,
+                  id: randomUUID(),
+                  name: t('modbus.defaultAction'),
+                  functionCode: 5,
+                  onValue: 1,
+                  offValue: 0,
+                },
               ],
             })
           }
         >
-          Add action
+          {t('modbus.addAction')}
         </Button>
       </div>
     </section>
@@ -458,6 +488,7 @@ export function ModbusConfigurationForm({
   focused = false,
   deviceChannels,
 }: ModbusConfigurationFormProps) {
+  const { t, tBackendMessage } = useWagoTranslations();
   const [openProfiles, setOpenProfiles] = useState<Set<number>>(new Set());
   const [section, setSection] = useState<'connections' | 'devices' | 'profiles'>(
     value.devices.length ? 'devices' : 'connections',
@@ -467,12 +498,15 @@ export function ModbusConfigurationForm({
   const profiles = [...BUILTIN_MODBUS_PROFILES, ...value.profiles];
   const items =
     section === 'profiles'
-      ? profiles.map((p) => ({ id: `${p.id}@${p.version}`, name: `${p.name} v${p.version}` }))
+      ? profiles.map((p) => ({ id: `${p.id}@${p.version}`, name: `${modbusDisplayName(p, p.name, tBackendMessage)} v${p.version}` }))
       : section === 'devices'
         ? value.devices
         : value.connections.map((c, i) => ({
             id: c.id,
-            name: `Connection ${i + 1}: ${c.transport === 'tcp' ? c.host || 'TCP' : c.path}`,
+            name: t('modbus.connectionTitle', {
+              index: i + 1,
+              address: c.transport === 'tcp' ? c.host || 'TCP' : c.path,
+            }),
           }));
   const selectedId = items.find((item) => item.id === selected[section])?.id ?? items[0]?.id;
   function change(next: ModbusConfiguration) {
@@ -496,16 +530,14 @@ export function ModbusConfigurationForm({
     onChange(next);
   }
   return (
-    <section aria-label="Modbus configuration" className="wg:flex wg:min-w-0 wg:flex-col wg:gap-4">
+    <section aria-label={t('modbus.title')} className="wg:flex wg:min-w-0 wg:flex-col wg:gap-4">
       {focused && (
         <>
           <header>
-            <h2 className="wg:text-xl wg:font-semibold">External devices</h2>
-            <p className="wg:text-sm wg:text-muted">
-              Connect a Modbus device, choose its register map, then add the signals you need as channels.
-            </p>
+            <h2 className="wg:text-xl wg:font-semibold">{t('editor.devices')}</h2>
+            <p className="wg:text-sm wg:text-muted">{t('modbus.description')}</p>
           </header>
-          <nav aria-label="External device settings" className="wg:flex wg:flex-wrap wg:gap-2">
+          <nav aria-label={t('modbus.settings')} className="wg:flex wg:flex-wrap wg:gap-2">
             {(['connections', 'devices', 'profiles'] as const).map((key) => (
               <Button
                 key={key}
@@ -513,16 +545,19 @@ export function ModbusConfigurationForm({
                 aria-current={section === key ? 'page' : undefined}
                 onPress={() => setSection(key)}
               >
-                {key === 'connections' ? 'Connections' : key === 'devices' ? 'Devices' : 'Device profiles'} (
-                {key === 'profiles' ? profiles.length : value[key].length})
+                {t(`modbus.${key}`)} ({key === 'profiles' ? profiles.length : value[key].length})
               </Button>
             ))}
           </nav>
           {!!items.length && (
             <Choice
-              label={
-                section === 'connections' ? 'Edit connection' : section === 'devices' ? 'Edit device' : 'Edit profile'
-              }
+              label={t(
+                section === 'connections'
+                  ? 'modbus.editConnections'
+                  : section === 'devices'
+                    ? 'modbus.editDevices'
+                    : 'modbus.editProfiles',
+              )}
               value={selectedId ?? ''}
               options={items.map((item) => item.id)}
               labels={Object.fromEntries(items.map((item) => [item.id, item.name]))}
@@ -532,17 +567,12 @@ export function ModbusConfigurationForm({
           )}
           {!items.length && (
             <p className="wg:py-4 wg:text-muted">
-              {section === 'connections'
-                ? 'Add a TCP network or RTU serial connection to get started.'
-                : 'Add a device and select its connection and profile.'}
+              {t(section === 'connections' ? 'modbus.emptyConnections' : 'modbus.emptyDevices')}
             </p>
           )}
         </>
       )}
-      <p className="wg:text-sm wg:text-muted">
-        WAGO 879-3000 uses its documented read-only register map. Profiles marked unverified are retained for existing
-        configurations.
-      </p>
+      <p className="wg:text-sm wg:text-muted">{t('modbus.builtinHint')}</p>
       {value.connections.map((c, index) => {
         if (focused && (section !== 'connections' || c.id !== selectedId)) return null;
         const update = (patch: object) =>
@@ -553,14 +583,22 @@ export function ModbusConfigurationForm({
         return (
           <section key={index} className="wg:flex wg:flex-col wg:gap-3">
             <h3>
-              Connection {index + 1}: {c.transport === 'tcp' ? c.host || 'TCP' : c.path}
+              {t('modbus.connectionTitle', {
+                index: index + 1,
+                address: c.transport === 'tcp' ? c.host || 'TCP' : c.path,
+              })}
             </h3>
             <div className="wg:grid wg:gap-3 wg:md:grid-cols-2">
               {showIdentifiers && (
-                <Field label="Connection ID" value={c.id} disabled={isDisabled} onChange={(id) => update({ id })} />
+                <Field
+                  label={t('modbus.connectionId')}
+                  value={c.id}
+                  disabled={isDisabled}
+                  onChange={(id) => update({ id })}
+                />
               )}
               <Choice
-                label="Transport"
+                label={t('modbus.transport')}
                 value={c.transport}
                 options={['tcp', 'rtu']}
                 disabled={isDisabled}
@@ -591,9 +629,14 @@ export function ModbusConfigurationForm({
               />
               {c.transport === 'tcp' ? (
                 <>
-                  <Field label="Host" value={c.host} disabled={isDisabled} onChange={(host) => update({ host })} />
                   <Field
-                    label="Port"
+                    label={t('modbus.host')}
+                    value={c.host}
+                    disabled={isDisabled}
+                    onChange={(host) => update({ host })}
+                  />
+                  <Field
+                    label={t('modbus.port')}
                     value={c.port}
                     numeric
                     disabled={isDisabled}
@@ -602,31 +645,29 @@ export function ModbusConfigurationForm({
                 </>
               ) : (
                 <>
-                  <p className="wg:text-sm wg:text-muted">
-                    CC100 two-wire RS-485: /dev/serial. WAGO 879-3000 factory settings: unit 1, 9600 baud, 8N1.
-                  </p>
+                  <p className="wg:text-sm wg:text-muted">{t('modbus.serialHint')}</p>
                   <Field
-                    label="Serial device path"
+                    label={t('modbus.path')}
                     value={c.path}
                     disabled={isDisabled}
                     onChange={(path) => update({ path })}
                   />
                   <Choice
-                    label="Baud rate"
+                    label={t('modbus.baud')}
                     value={c.baudRate}
                     options={[1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]}
                     disabled={isDisabled}
                     onChange={(v) => update({ baudRate: Number(v) })}
                   />
                   <Choice
-                    label="Parity"
+                    label={t('modbus.parity')}
                     value={c.parity}
                     options={['none', 'even', 'odd']}
                     disabled={isDisabled}
                     onChange={(parity) => update({ parity })}
                   />
                   <Choice
-                    label="Stop bits"
+                    label={t('modbus.stopBits')}
                     value={c.stopBits}
                     options={[1, 2]}
                     disabled={isDisabled}
@@ -637,13 +678,7 @@ export function ModbusConfigurationForm({
               {(['timeoutMs', 'reconnectMs', 'queueLimit'] as const).map((key) => (
                 <Field
                   key={key}
-                  label={
-                    {
-                      timeoutMs: 'Response timeout (ms)',
-                      reconnectMs: 'Reconnect delay (ms)',
-                      queueLimit: 'Queue limit',
-                    }[key]
-                  }
+                  label={t(`modbus.${key}`)}
                   value={c[key]}
                   numeric
                   disabled={isDisabled}
@@ -655,7 +690,7 @@ export function ModbusConfigurationForm({
                 variant="danger"
                 onPress={() => change({ ...value, connections: value.connections.filter((_, i) => i !== index) })}
               >
-                Remove connection
+                {t('modbus.removeConnection')}
               </Button>
             </div>
           </section>
@@ -683,7 +718,7 @@ export function ModbusConfigurationForm({
             })
           }
         >
-          Add connection
+          {t('modbus.addConnection')}
         </Button>
       )}
       {value.devices.map((d, index) => {
@@ -692,27 +727,40 @@ export function ModbusConfigurationForm({
           change({ ...value, devices: value.devices.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
         return (
           <section key={index} className="wg:flex wg:flex-col wg:gap-3">
-            <h3>Device: {d.name}</h3>
+            <h3>{t('modbus.deviceTitle', { name: d.name })}</h3>
             <div className="wg:grid wg:gap-3 wg:md:grid-cols-2">
               {showIdentifiers && (
-                <Field label="Device ID" value={d.id} disabled={isDisabled} onChange={(id) => update({ id })} />
+                <Field
+                  label={t('modbus.deviceId')}
+                  value={d.id}
+                  disabled={isDisabled}
+                  onChange={(id) => update({ id })}
+                />
               )}
-              <Field label="Device name" value={d.name} disabled={isDisabled} onChange={(name) => update({ name })} />
+              <Field
+                label={t('modbus.deviceName')}
+                value={d.name}
+                disabled={isDisabled}
+                onChange={(name) => update({ name })}
+              />
               <Choice
-                label="Connection"
+                label={t('modbus.connection')}
                 value={d.connectionId}
                 options={value.connections.map((c) => c.id)}
                 labels={Object.fromEntries(
                   value.connections.map((c, i) => [
                     c.id,
-                    `Connection ${i + 1}: ${c.transport === 'tcp' ? c.host || 'TCP' : c.path}`,
+                    t('modbus.connectionTitle', {
+                      index: i + 1,
+                      address: c.transport === 'tcp' ? c.host || 'TCP' : c.path,
+                    }),
                   ]),
                 )}
                 disabled={isDisabled}
                 onChange={(connectionId) => update({ connectionId })}
               />
               <Field
-                label="Unit ID (1–247)"
+                label={t('modbus.unitId')}
                 value={d.unitId}
                 numeric
                 disabled={isDisabled}
@@ -726,7 +774,7 @@ export function ModbusConfigurationForm({
                   if (p) update({ profileId: p.id, profileVersion: p.version });
                 }}
               >
-                <Label>Device profile</Label>
+                <Label>{t('modbus.profile')}</Label>
                 <Select.Trigger>
                   <Select.Value />
                   <Select.Indicator />
@@ -734,8 +782,8 @@ export function ModbusConfigurationForm({
                 <Select.Popover>
                   <ListBox>
                     {profiles.map((p) => (
-                      <ListBox.Item key={`${p.id}@${p.version}`} id={`${p.id}@${p.version}`} textValue={p.name}>
-                        {p.name} v{p.version}
+                      <ListBox.Item key={`${p.id}@${p.version}`} id={`${p.id}@${p.version}`} textValue={modbusDisplayName(p, p.name, tBackendMessage)}>
+                        {modbusDisplayName(p, p.name, tBackendMessage)} v{p.version}
                         <ListBox.ItemIndicator />
                       </ListBox.Item>
                     ))}
@@ -747,7 +795,7 @@ export function ModbusConfigurationForm({
                 variant="danger"
                 onPress={() => change({ ...value, devices: value.devices.filter((_, i) => i !== index) })}
               >
-                Remove device
+                {t('modbus.removeDevice')}
               </Button>
             </div>
             {deviceChannels?.(d.id)}
@@ -765,7 +813,7 @@ export function ModbusConfigurationForm({
                 ...value.devices,
                 {
                   id: randomUUID(),
-                  name: 'Modbus device',
+                  name: t('modbus.device'),
                   connectionId: value.connections[0]?.id ?? '',
                   unitId: 1,
                   profileId: profiles[0].id,
@@ -775,7 +823,7 @@ export function ModbusConfigurationForm({
             })
           }
         >
-          Add device
+          {t('modbus.addDevice')}
         </Button>
       )}
       {profiles.map(
@@ -796,7 +844,7 @@ export function ModbusConfigurationForm({
               }}
             >
               <summary className="wg:whitespace-normal wg:break-words">
-                {p.name} v{p.version}
+                {modbusDisplayName(p, p.name, tBackendMessage)} v{p.version}
               </summary>
               {(focused || !collapseProfiles || openProfiles.has(profileIndex)) && (
                 <ModbusProfileForm
@@ -820,7 +868,7 @@ export function ModbusConfigurationForm({
                 variant="secondary"
                 onPress={() => change({ ...value, profiles: [...value.profiles, duplicateProfile(p, randomUUID())] })}
               >
-                Duplicate {p.name}
+                {t('modbus.duplicate', { name: modbusDisplayName(p, p.name, tBackendMessage) })}
               </Button>
             </details>
           ),
@@ -834,19 +882,19 @@ export function ModbusConfigurationForm({
               ...value,
               profiles: [
                 ...value.profiles,
-                { id: randomUUID(), name: 'Custom profile', version: 1, measurements: [], actions: [] },
+                { id: randomUUID(), name: t('modbus.customProfile'), version: 1, measurements: [], actions: [] },
               ],
             })
           }
         >
-          Create custom profile
+          {t('modbus.createProfile')}
         </Button>
       )}
       {showValidationErrors && errors.length > 0 && (
         <ul role="alert">
           {errors.map((error, i) => (
             <li key={i}>
-              {error.path}: {error.message}
+              {error.path}: {tBackendMessage(error.message)}
             </li>
           ))}
         </ul>

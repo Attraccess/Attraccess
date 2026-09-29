@@ -8,6 +8,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
+import frontendPackage from './package.json';
 
 export function normalizeFederationFsUrlsPlugin(): Plugin {
   return {
@@ -75,6 +76,8 @@ export default defineConfig(({ command }) => {
           '@heroui/react': { requiredVersion: '*' },
           'lucide-react': { requiredVersion: '*' },
           '@tanstack/react-query': { requiredVersion: '*' },
+          // Workspace libraries follow the host release; aliases have no node_modules/package.json.
+          '@attraccess/plugins-frontend-ui': { requiredVersion: '*', version: frontendPackage.version },
         },
       }),
       normalizeFederationFsUrlsPlugin(),

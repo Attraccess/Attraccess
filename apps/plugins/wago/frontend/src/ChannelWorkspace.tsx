@@ -12,41 +12,36 @@ import {
 import { Choice, DigitalChannelEditor, NumericField, PhysicalAssignments } from './DigitalChannelEditor';
 import { ModbusPointForm } from './ModbusConfigurationForm';
 import { bindModbusPoint, emptyModbus } from './modbus-editor';
+import { useWagoTranslations } from './i18n';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
 
-export function channelAssignment(snapshot: WagoConfigurationSnapshot, channel: Channel) {
+export function channelAssignment(snapshot: WagoConfigurationSnapshot, channel: Channel, t: TFunction) {
   const point = snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-  if (!point) return 'Missing assignment';
+  if (!point) return t('channels.missingAssignment');
   if (point.hardwareProfile === '751-9301') return `CC100 · ${digitalTerminalLabel(point.channel)}`;
   if (point.hardwareProfile === 'modbus')
     return (
-      snapshot.modbus?.devices.find((device) => device.id === point.modbus?.deviceId)?.name ?? 'Missing external device'
+      snapshot.modbus?.devices.find((device) => device.id === point.modbus?.deviceId)?.name ??
+      t('channels.missingDevice')
     );
-  return `Module ${point.hardwareProfile} · channel ${point.channel}`;
+  return t('channels.module', { profile: point.hardwareProfile, channel: point.channel });
 }
 
 const purposes = [
   {
     id: 'output',
-    label: 'Switch an output',
-    description: 'Control a relay, contactor, or enable signal.',
     icon: ArrowUpFromLine,
   },
   {
     id: 'pulse',
-    label: 'Pulse a lock or relay',
-    description: 'Turn an output on for a defined duration.',
     icon: Radio,
   },
   {
     id: 'input',
-    label: 'Monitor an input',
-    description: 'Read a contact, switch, or feedback signal.',
     icon: ArrowDownToLine,
   },
   {
     id: 'guard',
-    label: 'Request an enable',
-    description: 'Allow an output only when an input permits it.',
     icon: ArrowUpFromLine,
   },
 ] as const;
@@ -97,6 +92,7 @@ function AddChannel({
   onCancel: () => void;
   onExternal: () => void;
 }) {
+  const { t } = useWagoTranslations();
   const [step, setStep] = useState(0);
   const [purpose, setPurpose] = useState<Purpose>(terminal !== undefined && terminal >= 4 ? 'input' : 'output');
   const [name, setName] = useState('');
@@ -152,22 +148,22 @@ function AddChannel({
   }
   return (
     <section
-      aria-label="Add channel"
+      aria-label={t('channels.add')}
       className="wg:w-full wg:min-w-0 wg:space-y-5 wg:rounded-xl wg:border wg:border-border wg:p-4 wg:[overflow-wrap:anywhere]"
     >
       <header className="wg:space-y-1">
-        <h3 className="wg:font-semibold">Add a channel</h3>
-        <p className="wg:text-sm wg:text-muted">Start with its purpose, then choose the wiring and behavior.</p>
+        <h3 className="wg:font-semibold">{t('channels.addTitle')}</h3>
+        <p className="wg:text-sm wg:text-muted">{t('channels.addDescription')}</p>
       </header>
       <div className="wg:flex wg:flex-col wg:gap-5">
-        <ol className="wg:flex wg:flex-wrap wg:gap-4 wg:text-sm" aria-label="Channel creation progress">
-          {['Purpose', 'Wiring & behavior', 'Confirm'].map((label, index) => (
+        <ol className="wg:flex wg:flex-wrap wg:gap-4 wg:text-sm" aria-label={t('channels.progress')}>
+          {['channels.purpose', 'channels.wiringBehavior', 'channels.confirm'].map((label, index) => (
             <li
               key={label}
               aria-current={step === index ? 'step' : undefined}
               className={step === index ? 'wg:font-semibold wg:text-accent' : 'wg:text-muted'}
             >
-              {index + 1}. {label}
+              {index + 1}. {t(label)}
             </li>
           ))}
         </ol>
@@ -184,76 +180,76 @@ function AddChannel({
                 >
                   <item.icon className="wg:size-5 wg:shrink-0" />
                   <span>
-                    <strong className="wg:block">{item.label}</strong>
-                    <span className="wg:font-normal wg:text-muted">{item.description}</span>
+                    <strong className="wg:block">{t(`channels.purposes.${item.id}.label`)}</strong>
+                    <span className="wg:font-normal wg:text-muted">
+                      {t(`channels.purposes.${item.id}.description`)}
+                    </span>
                   </span>
                 </Button>
               ))}
             </div>
-            <p className="wg:text-sm wg:text-muted">
-              For a meter or remote I/O, set up an external device and add its named measurements or actions.
-            </p>
+            <p className="wg:text-sm wg:text-muted">{t('channels.externalHint')}</p>
             <Button variant="ghost" onPress={onExternal}>
-              Set up an external device
+              {t('channels.external')}
             </Button>
           </>
         )}
         {step === 1 && (
           <>
             <TextField isRequired>
-              <Label>New channel name</Label>
+              <Label>{t('channels.newName')}</Label>
               <Input
                 autoFocus
                 maxLength={120}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder={direction === 'input' ? 'e.g. Door contact' : 'e.g. Workshop door lock'}
+                placeholder={t(direction === 'input' ? 'channels.inputPlaceholder' : 'channels.outputPlaceholder')}
               />
             </TextField>
             {!selectedTerminal ? (
-              <p role="alert">
-                All {direction} terminals are assigned. Release an unused assignment or choose another purpose.
-              </p>
+              <p role="alert">{t('channels.allAssigned', { direction: t(`channels.${direction}`) })}</p>
             ) : (
               <Choice
-                label="Assign terminal"
+                label={t('channels.assign')}
                 value={String(selectedTerminal.channel)}
                 options={terminals.map((item) => ({ id: String(item.channel), label: `CC100 ${item.label}` }))}
                 onChange={(value) => setAssignment(Number(value))}
               />
             )}
             {purpose === 'pulse' && (
-              <NumericField label="Pulse duration (ms)" value={pulseMs} min={1} onChange={setPulseMs} />
+              <NumericField label={t('channels.pulseDuration')} value={pulseMs} min={1} onChange={setPulseMs} />
             )}
             {purpose === 'guard' && (
               <>
                 <Choice
-                  label="Guard input"
+                  label={t('channels.guardInput')}
                   value={guardId}
                   options={inputs.map((item) => ({ id: item.id, label: metadata.names[item.id] || item.id }))}
                   onChange={setGuardId}
                 />
-                <p className="wg:text-sm wg:text-muted">
-                  The input must be on to allow the output. Operational guards do not replace certified electrical
-                  safety functions.
-                </p>
-                {!inputs.length && <p role="alert">Add an input channel first.</p>}
+                <p className="wg:text-sm wg:text-muted">{t('channels.guardHint')}</p>
+                {!inputs.length && <p role="alert">{t('channels.inputFirst')}</p>}
               </>
             )}
             {direction === 'output' && (
               <>
                 <Choice
-                  label="On disconnect"
+                  label={t('channels.disconnect')}
                   value={disconnect}
                   options={[
-                    { id: 'immediate', label: 'Immediately off' },
-                    { id: 'watchdog', label: 'Off after watchdog timeout' },
-                    { id: 'hold', label: 'Hold last state' },
+                    { id: 'immediate', label: t('channels.immediate') },
+                    { id: 'watchdog', label: t('channels.watchdog') },
+                    { id: 'hold', label: t('channels.hold') },
                   ]}
                   onChange={setDisconnect}
                 />
                 {disconnect === 'watchdog' && (
-                  <NumericField label="Watchdog timeout (ms)" min={1} value={timeoutMs} onChange={setTimeoutMs} />
+                  <NumericField
+                    label={t('channels.watchdogTimeout')}
+                    min={1}
+                    value={timeoutMs}
+                    onChange={setTimeoutMs}
+                  />
                 )}
               </>
             )}
@@ -263,38 +259,41 @@ function AddChannel({
           <div className="wg:flex wg:flex-col wg:gap-3">
             <h3 className="wg:text-lg wg:font-semibold">{name.trim()}</h3>
             <p>
-              {purposes.find((item) => item.id === purpose)?.label} · CC100 {selectedTerminal?.label}
+              {t(`channels.purposes.${purpose}.label`)} · CC100 {selectedTerminal?.label}
             </p>
-            {purpose === 'pulse' && <p>Pulse duration: {pulseMs} ms</p>}
-            {purpose === 'guard' && <p>Enabled when {metadata.names[guardId] || guardId} is on.</p>}
+            {purpose === 'pulse' && <p>{t('channels.pulseSummary', { duration: pulseMs })}</p>}
+            {purpose === 'guard' && <p>{t('channels.guardSummary', { name: metadata.names[guardId] || guardId })}</p>}
             <p>
               {direction === 'input'
-                ? 'Monitors the input state.'
-                : `On disconnect: ${disconnect === 'immediate' ? 'immediately off' : disconnect === 'hold' ? 'hold last state' : `off after ${timeoutMs} ms`}.`}
+                ? t('channels.monitorSummary')
+                : t('channels.disconnectSummary', {
+                    policy:
+                      disconnect === 'watchdog'
+                        ? t('channels.watchdogSummary', { timeout: timeoutMs })
+                        : t(`channels.${disconnect}`),
+                  })}
             </p>
-            <p className="wg:text-sm wg:text-muted">
-              This adds the channel to your local edits. Save and publish after reviewing the complete configuration.
-            </p>
+            <p className="wg:text-sm wg:text-muted">{t('channels.localHint')}</p>
           </div>
         )}
       </div>
       <footer className="wg:flex wg:flex-wrap wg:justify-between wg:gap-3">
         <Button variant="ghost" onPress={onCancel}>
-          Cancel adding channel
+          {t('channels.cancelAdd')}
         </Button>
         <div className="wg:flex wg:gap-2">
           {step > 0 && (
             <Button variant="secondary" onPress={() => setStep(step - 1)}>
-              Back
+              {t('channels.back')}
             </Button>
           )}
           {step < 2 ? (
             <Button isDisabled={step === 1 && !valid} onPress={() => setStep(step + 1)}>
-              Continue
+              {t('channels.continue')}
             </Button>
           ) : (
             <Button isDisabled={!valid} onPress={create}>
-              Add to configuration
+              {t('channels.addToConfiguration')}
             </Button>
           )}
         </div>
@@ -318,6 +317,7 @@ export function ChannelWorkspace({
   onMetadataChange: (metadata: ConfigurationEditorMetadata) => void;
   onExternal: () => void;
 }) {
+  const { t } = useWagoTranslations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   useEffect(() => {
     if (focusChannelId) setSelectedId(focusChannelId);
@@ -327,7 +327,7 @@ export function ChannelWorkspace({
   const [adding, setAdding] = useState<{ terminal?: number } | null>(null);
   const selected = snapshot.logicalChannels.find((item) => item.id === selectedId) ?? snapshot.logicalChannels[0];
   const channels = snapshot.logicalChannels.filter((item) =>
-    `${metadata.names[item.id] ?? item.id} ${channelAssignment(snapshot, item)} ${item.capabilities.join(' ')}`
+    `${metadata.names[item.id] ?? item.id} ${channelAssignment(snapshot, item, t)} ${item.capabilities.join(' ')}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -337,21 +337,24 @@ export function ChannelWorkspace({
   }
   const point = selected && snapshot.physicalPoints.find((item) => item.id === selected.physicalPointId);
   return (
-    <section aria-label="Channels" className="wg:flex wg:min-w-0 wg:flex-col wg:gap-5 wg:[overflow-wrap:anywhere]">
+    <section
+      aria-label={t('channels.title')}
+      className="wg:flex wg:min-w-0 wg:flex-col wg:gap-5 wg:[overflow-wrap:anywhere]"
+    >
       <header className="wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-3">
         <div>
-          <h2 className="wg:text-xl wg:font-semibold">Channels</h2>
-          <p className="wg:text-sm wg:text-muted">Name what each connection does, then define how it behaves.</p>
+          <h2 className="wg:text-xl wg:font-semibold">{t('channels.title')}</h2>
+          <p className="wg:text-sm wg:text-muted">{t('channels.description')}</p>
         </div>
         <div className="wg:flex wg:flex-wrap wg:gap-2">
           <Button variant="secondary" aria-pressed={view === 'list'} onPress={() => setView('list')}>
-            <List className="wg:size-4" /> Channel list
+            <List className="wg:size-4" /> {t('channels.list')}
           </Button>
           <Button variant="secondary" aria-pressed={view === 'terminals'} onPress={() => setView('terminals')}>
-            <LayoutGrid className="wg:size-4" /> Terminal map
+            <LayoutGrid className="wg:size-4" /> {t('channels.map')}
           </Button>
           <Button onPress={() => setAdding({})}>
-            <Plus className="wg:size-4" /> Add channel
+            <Plus className="wg:size-4" /> {t('channels.add')}
           </Button>
         </div>
       </header>
@@ -359,20 +362,24 @@ export function ChannelWorkspace({
         <div className="wg:flex wg:min-w-0 wg:flex-col wg:gap-4">
           <section className="wg:space-y-4 wg:rounded-xl wg:border wg:border-border wg:p-4">
             <header className="wg:space-y-1">
-              <h3 className="wg:font-semibold">{view === 'list' ? 'Your channels' : 'CC100 terminals'}</h3>
+              <h3 className="wg:font-semibold">
+                {t(view === 'list' ? 'channels.yourChannels' : 'channels.terminals')}
+              </h3>
               <p className="wg:text-sm wg:text-muted">
-                {availableDigitalTerminals(snapshot, 'input').length} of 8 inputs free ·{' '}
-                {availableDigitalTerminals(snapshot, 'output').length} of 4 outputs free
+                {t('channels.free', {
+                  inputs: availableDigitalTerminals(snapshot, 'input').length,
+                  outputs: availableDigitalTerminals(snapshot, 'output').length,
+                })}
               </p>
             </header>
             <div className="wg:flex wg:flex-col wg:gap-2">
               {view === 'list' ? (
                 <>
-                  <TextField aria-label="Search channels">
+                  <TextField aria-label={t('channels.search')}>
                     <Input
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search channels…"
+                      placeholder={t('channels.searchPlaceholder')}
                     />
                   </TextField>
                   {channels.map((channel) => (
@@ -389,18 +396,16 @@ export function ChannelWorkspace({
                         <ArrowDownToLine className="wg:size-4 wg:shrink-0" />
                       )}
                       <span className="wg:min-w-0 wg:break-words">
-                        <strong className="wg:block">{metadata.names[channel.id] || 'Unnamed channel'}</strong>
+                        <strong className="wg:block">{metadata.names[channel.id] || t('channels.unnamed')}</strong>
                         <span className="wg:text-xs wg:font-normal wg:text-muted">
-                          {channelAssignment(snapshot, channel)}
+                          {channelAssignment(snapshot, channel, t)}
                         </span>
                       </span>
                     </Button>
                   ))}
                   {!channels.length && (
                     <p className="wg:py-5 wg:text-sm wg:text-muted">
-                      {search
-                        ? 'No channels match your search.'
-                        : 'No channels yet. Add one to give a connection its purpose.'}
+                      {t(search ? 'channels.noMatch' : 'channels.empty')}
                     </p>
                   )}
                 </>
@@ -409,7 +414,7 @@ export function ChannelWorkspace({
                   {(['output', 'input'] as const).map((direction) => (
                     <div key={direction}>
                       <h3 className="wg:mb-2 wg:text-sm wg:font-medium">
-                        {direction === 'output' ? 'Digital outputs' : 'Digital inputs'}
+                        {t(direction === 'output' ? 'channels.digitalOutputs' : 'channels.digitalInputs')}
                       </h3>
                       <div className="wg:grid wg:grid-cols-2 wg:gap-2">
                         {DIGITAL_TERMINALS.filter((item) => item.direction === direction).map((terminal) => {
@@ -422,7 +427,7 @@ export function ChannelWorkspace({
                             <Button
                               key={terminal.channel}
                               variant={channel && !adding && selected?.id === channel.id ? 'secondary' : 'outline'}
-                              aria-label={`${terminal.label}: ${channel ? metadata.names[channel.id] || 'Unnamed channel' : assigned ? 'Reserved assignment' : 'Available'}`}
+                              aria-label={`${terminal.label}: ${channel ? metadata.names[channel.id] || t('channels.unnamed') : t(assigned ? 'channels.reservedAssignment' : 'channels.available')}`}
                               className="wg:h-auto wg:min-h-20 wg:w-full wg:flex-col wg:items-start wg:whitespace-normal wg:p-3 wg:text-left"
                               isDisabled={!!assigned && !channel}
                               onPress={() => (channel ? select(channel.id) : setAdding({ terminal: terminal.channel }))}
@@ -430,10 +435,10 @@ export function ChannelWorkspace({
                               <strong>{terminal.label}</strong>
                               <span className="wg:max-w-full wg:text-xs wg:font-normal wg:text-muted">
                                 {channel
-                                  ? metadata.names[channel.id] || 'Unnamed channel'
+                                  ? metadata.names[channel.id] || t('channels.unnamed')
                                   : assigned
-                                    ? 'Reserved'
-                                    : '+ Assign'}
+                                    ? t('channels.reserved')
+                                    : t('channels.assignAction')}
                               </span>
                             </Button>
                           );
@@ -457,9 +462,7 @@ export function ChannelWorkspace({
                         {metadata.names[channel.id] || channel.id}
                       </Button>
                     ))}
-                  <p className="wg:text-xs wg:text-muted">
-                    Assignment overview. This view does not show live electrical state.
-                  </p>
+                  <p className="wg:text-xs wg:text-muted">{t('channels.overview')}</p>
                 </>
               )}
             </div>
@@ -485,17 +488,19 @@ export function ChannelWorkspace({
             <header className="wg:space-y-1">
               <div className="wg:flex wg:flex-wrap wg:items-center wg:gap-2">
                 <h3 className="wg:min-w-0 wg:max-w-full wg:font-semibold">
-                  {metadata.names[selected.id] || 'Unnamed channel'}
+                  {metadata.names[selected.id] || t('channels.unnamed')}
                 </h3>
                 <Chip size="sm" variant="soft">
-                  {selected.capabilities.includes('output')
-                    ? 'Output'
-                    : selected.capabilities.includes('measurement')
-                      ? 'Measurement'
-                      : 'Input'}
+                  {t(
+                    selected.capabilities.includes('output')
+                      ? 'channels.output'
+                      : selected.capabilities.includes('measurement')
+                        ? 'channels.measurement'
+                        : 'channels.input',
+                  )}
                 </Chip>
               </div>
-              <p className="wg:text-sm wg:text-muted">{channelAssignment(snapshot, selected)}</p>
+              <p className="wg:text-sm wg:text-muted">{channelAssignment(snapshot, selected, t)}</p>
             </header>
             <div>
               {isEditableDigitalChannel(snapshot, selected) || point?.hardwareProfile === 'modbus' ? (
@@ -544,10 +549,7 @@ export function ChannelWorkspace({
                   }
                 />
               ) : (
-                <p>
-                  Existing {selected.profile.replaceAll('-', ' ')} configuration is preserved. This hardware module
-                  requires its dedicated editor.
-                </p>
+                <p>{t('channels.dedicatedEditor', { profile: selected.profile.replaceAll('-', ' ') })}</p>
               )}
             </div>
           </section>
@@ -555,12 +557,9 @@ export function ChannelWorkspace({
           <Card>
             <Card.Content className="wg:flex wg:items-start wg:gap-4 wg:py-10">
               <Radio className="wg:size-8 wg:text-accent" />
-              <h3 className="wg:text-lg wg:font-semibold">Give your first connection a purpose</h3>
-              <p className="wg:max-w-md wg:text-muted">
-                Start with a named input or output. You can return to wiring, behavior, and advanced settings at any
-                time.
-              </p>
-              <Button onPress={() => setAdding({})}>Create your first channel</Button>
+              <h3 className="wg:text-lg wg:font-semibold">{t('channels.firstTitle')}</h3>
+              <p className="wg:max-w-md wg:text-muted">{t('channels.firstDescription')}</p>
+              <Button onPress={() => setAdding({})}>{t('channels.firstAction')}</Button>
             </Card.Content>
           </Card>
         )}

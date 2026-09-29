@@ -24,6 +24,8 @@ export const HOST_SHARED = {
   '@heroui/react': { singleton: true, requiredVersion: '*', import: false, generate: false },
   'lucide-react': { singleton: true, requiredVersion: '*', import: false, generate: false },
   '@tanstack/react-query': { singleton: true, requiredVersion: '*', import: false, generate: false },
+  // Includes the core language store: a remote must never create its own copy.
+  '@attraccess/plugins-frontend-ui': { singleton: true, requiredVersion: '*', import: false, generate: false },
 };
 
 /**

@@ -40,6 +40,9 @@ export interface RabbitmqUserFormModalProps {
   onSaved: () => void;
 }
 
+import { useRabbitmqTranslations } from './i18n';
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+
 function parseTags(value: string): string[] {
   return value
     .split(',')
@@ -55,6 +58,7 @@ export function RabbitmqUserFormModal({
   onClose,
   onSaved,
 }: RabbitmqUserFormModalProps) {
+  const { t, tMessage } = useRabbitmqTranslations();
   const isEdit = user !== null;
 
   const [username, setUsername] = useState('');
@@ -63,7 +67,7 @@ export function RabbitmqUserFormModal({
   const [grantMqttDefaults, setGrantMqttDefaults] = useState(true);
   const [vhost, setVhost] = useState('/');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | TranslationMessage | null>(null);
 
   // Re-seed the form whenever it opens (for another user, or again after a
   // cancel) — modal state outlives a single open/close cycle.
@@ -83,11 +87,11 @@ export function RabbitmqUserFormModal({
     e.preventDefault();
     const name = username.trim();
     if (name.length === 0) {
-      setError('Username is required.');
+      setError({ key: 'form.usernameRequired' });
       return;
     }
     if (!isEdit && password.length === 0) {
-      setError('Password is required when creating a user.');
+      setError({ key: 'form.passwordRequired' });
       return;
     }
 
@@ -106,7 +110,7 @@ export function RabbitmqUserFormModal({
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Saving the user failed.');
+      setError(err instanceof Error ? err.message : { key: 'form.saveError' });
     } finally {
       setSaving(false);
     }
@@ -124,22 +128,22 @@ export function RabbitmqUserFormModal({
         <ModalContainer size="md">
           <ModalDialog>
             <ModalHeader>
-              <ModalHeading>{isEdit ? `Edit user "${user.name}"` : 'Create RabbitMQ user'}</ModalHeading>
+              <ModalHeading>{isEdit ? t('form.editTitle', { name: user.name }) : t('form.createTitle')}</ModalHeading>
             </ModalHeader>
             <Form onSubmit={handleSubmit}>
               <ModalBody className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
                 <TextField value={username} onChange={setUsername} className="rmq:w-full" isDisabled={isEdit}>
-                  <Label>Username</Label>
+                  <Label>{t('users.username')}</Label>
                   <Input
                     name="rabbitmq-username"
-                    placeholder="e.g. shop-floor-sensor"
+                    placeholder={t('form.usernamePlaceholder')}
                     autoComplete="off"
                     data-cy="rabbitmq-user-form-username-input"
                   />
                 </TextField>
 
                 <TextField value={password} onChange={setPassword} className="rmq:w-full">
-                  <Label>{isEdit ? 'New password (leave blank to keep current)' : 'Password'}</Label>
+                  <Label>{t(isEdit ? 'form.newPassword' : 'form.password')}</Label>
                   <Input
                     name="rabbitmq-password"
                     type="password"
@@ -149,10 +153,10 @@ export function RabbitmqUserFormModal({
                 </TextField>
 
                 <TextField value={tags} onChange={setTags} className="rmq:w-full">
-                  <Label>Tags (comma-separated, e.g. management, administrator)</Label>
+                  <Label>{t('form.tags')}</Label>
                   <Input
                     name="rabbitmq-tags"
-                    placeholder="none"
+                    placeholder={t('users.none')}
                     autoComplete="off"
                     data-cy="rabbitmq-user-form-tags-input"
                   />
@@ -165,16 +169,15 @@ export function RabbitmqUserFormModal({
                       onChange={setGrantMqttDefaults}
                       data-cy="rabbitmq-user-form-mqtt-defaults-checkbox"
                     >
-                      Grant default MQTT permissions
+                      {t('form.grant')}
                     </Checkbox>
-                    <p className="rmq:text-xs rmq:text-default-500">
-                      Allows the user to publish and subscribe over MQTT: configure{' '}
-                      <code>{DEFAULT_MQTT_PERMISSIONS.configure}</code>, write/read{' '}
-                      <code>{DEFAULT_MQTT_PERMISSIONS.write}</code>.
-                    </p>
+                    <p className="rmq:text-xs rmq:text-default-500">{t('form.defaults', DEFAULT_MQTT_PERMISSIONS)}</p>
                     {grantMqttDefaults && (
                       <TextField value={vhost} onChange={setVhost} className="rmq:w-full">
-                        <Label>Vhost{vhosts.length > 0 ? ` (available: ${vhosts.join(', ')})` : ''}</Label>
+                        <Label>
+                          {t('form.vhost')}
+                          {vhosts.length > 0 ? t('form.available', { vhosts: vhosts.join(', ') }) : ''}
+                        </Label>
                         <Input
                           name="rabbitmq-vhost"
                           placeholder="/"
@@ -189,17 +192,17 @@ export function RabbitmqUserFormModal({
                 {error && (
                   <Alert status="danger" data-cy="rabbitmq-user-form-error-alert">
                     <AlertContent>
-                      <AlertDescription>{error}</AlertDescription>
+                      <AlertDescription>{tMessage(error)}</AlertDescription>
                     </AlertContent>
                   </Alert>
                 )}
               </ModalBody>
               <ModalFooter>
                 <Button variant="secondary" onPress={onClose} data-cy="rabbitmq-user-form-cancel-button">
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button variant="primary" type="submit" isPending={saving} data-cy="rabbitmq-user-form-save-button">
-                  {isEdit ? 'Save changes' : 'Create user'}
+                  {t(isEdit ? 'form.save' : 'form.create')}
                 </Button>
               </ModalFooter>
             </Form>

@@ -2,6 +2,7 @@ import { randomUUID } from './configuration-id';
 import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
 import type { ConfigurationDiff, ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { availableDigitalTerminals, digitalTerminalLabel } from '../../backend/configuration-digital';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
 
 export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
 export type PhysicalPoint = WagoConfigurationSnapshot['physicalPoints'][number];
@@ -68,15 +69,18 @@ export function addDigitalChannel(
   };
 }
 
-export function pointLabel(point: PhysicalPoint, names: Record<string, string>) {
+export function pointLabel(point: PhysicalPoint, names: Record<string, string>, t?: TFunction) {
   return point.hardwareProfile === '751-9301'
     ? `${names[point.id] ?? 'CC100'} · ${digitalTerminalLabel(point.channel)}`
-    : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
+    : t
+      ? t('fields.externalAssignment', { name: names[point.id] ?? point.id, profile: point.hardwareProfile })
+      : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
 }
 
-export function readableValue(value: unknown, names: Record<string, string>): string {
-  if (value === undefined || value === null) return 'Not configured';
-  if (Array.isArray(value)) return value.map((item) => readableValue(item, names)).join(', ') || 'None';
+export function readableValue(value: unknown, names: Record<string, string>, t?: TFunction): string {
+  if (value === undefined || value === null) return t ? t('fields.notConfigured') : 'Not configured';
+  if (Array.isArray(value))
+    return value.map((item) => readableValue(item, names, t)).join(', ') || (t ? t('fields.none') : 'None');
   if (typeof value === 'object') {
     if (
       'hardwareProfile' in value &&
@@ -90,7 +94,7 @@ export function readableValue(value: unknown, names: Record<string, string>): st
     return Object.entries(value)
       .map(
         ([key, item]) =>
-          `${fieldLabels[key] ?? (key === 'id' ? 'Name' : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names)}`,
+          `${fieldLabel(key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t)}`,
       )
       .join('; ');
   }
@@ -103,12 +107,13 @@ export function readableChangeValue(
   value: unknown,
   snapshot: WagoConfigurationSnapshot | null,
   names: Record<string, string>,
+  t?: TFunction,
 ) {
   if (/\.(name|host|path)$/.test(path) && typeof value === 'string') return value;
   const point = path.match(/^(?:\$\.)?physicalPoints\[(\d+)\]\.channel$/);
   if (point && typeof value === 'number' && snapshot?.physicalPoints[Number(point[1])]?.hardwareProfile === '751-9301')
     return `CC100 ${digitalTerminalLabel(value)}`;
-  return readableValue(value, names);
+  return readableValue(value, names, t);
 }
 
 function words(value: string) {
@@ -151,6 +156,10 @@ const fieldLabels: Record<string, string> = {
   'feedback.expected': 'Expected feedback',
   'feedback.timeoutMs': 'Feedback timeout',
 };
+
+function fieldLabel(field: string, t?: TFunction) {
+  return fieldLabels[field] && (t ? t(`fields.${field.replaceAll('.', '_')}`) : fieldLabels[field]);
+}
 
 /** Read-only reviews match structural edits by identity, not shifting array positions. */
 export function readableStructuralChanges(
@@ -205,39 +214,57 @@ export function changeLabel(
   before: WagoConfigurationSnapshot | null,
   after: WagoConfigurationSnapshot,
   names: Record<string, string>,
+  t?: TFunction,
 ) {
   const structural = change.path.match(/^\$\.(logicalChannels|physicalPoints)\[id:(.*)\]$/);
   if (structural) {
     const id = decodeURIComponent(structural[2]);
     const label = names[id] ?? id;
-    return `${label} · ${change.current === undefined ? 'Removed' : change.previous === undefined ? 'Added' : 'Changed'}`;
+    return `${label} · ${t ? t(change.current === undefined ? 'fields.removed' : change.previous === undefined ? 'fields.added' : 'fields.changed') : change.current === undefined ? 'Removed' : change.previous === undefined ? 'Added' : 'Changed'}`;
   }
   const modbus = change.path.match(/^(?:\$\.)?modbus\.(connections|devices|profiles)\[(\d+)\](.*)$/);
   if (modbus) {
     const collection = modbus[1] as 'connections' | 'devices' | 'profiles';
     const index = Number(modbus[2]);
     const item = after.modbus?.[collection][index] ?? before?.modbus?.[collection][index];
-    const label = item && 'name' in item ? item.name : `Connection ${index + 1}`;
+    const label =
+      item && 'name' in item ? item.name : t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`;
     return `${label}${modbus[3] ? ` · ${names[modbus[3].slice(1)] ?? words(modbus[3].slice(1))}` : ''}`;
   }
   const match = change.path.match(/^(?:\$\.)?(logicalChannels|physicalPoints)\[(\d+)\](.*)$/);
-  if (!match) return change.path === '$' ? 'Configuration' : words(change.path.replace(/^\$\./, ''));
+  if (!match)
+    return change.path === '$'
+      ? t
+        ? t('fields.configuration')
+        : 'Configuration'
+      : words(change.path.replace(/^\$\./, ''));
   const collection = match[1] as 'logicalChannels' | 'physicalPoints';
   const item = after[collection][Number(match[2])] ?? before?.[collection][Number(match[2])];
   const label =
     item && names[item.id]
       ? names[item.id]
-      : `${collection === 'logicalChannels' ? 'Channel' : 'Physical point'} ${Number(match[2]) + 1}`;
+      : t
+        ? t(collection === 'logicalChannels' ? 'fields.channelTitle' : 'fields.pointTitle', {
+            index: Number(match[2]) + 1,
+          })
+        : `${collection === 'logicalChannels' ? 'Channel' : 'Physical point'} ${Number(match[2]) + 1}`;
   const field = match[3].slice(1);
-  return `${label}${field ? ` · ${fieldLabels[field] ?? words(field)}` : ''}`;
+  return `${label}${field ? ` · ${fieldLabel(field, t) ?? words(field)}` : ''}`;
 }
 
-export function configurationNames(snapshot: WagoConfigurationSnapshot | null, names: Record<string, string>) {
+export function configurationNames(
+  snapshot: WagoConfigurationSnapshot | null,
+  names: Record<string, string>,
+  t?: TFunction,
+) {
   const modbus = snapshot?.modbus;
   if (!modbus) return names;
   return {
     ...Object.fromEntries([
-      ...modbus.connections.map((c, index) => [c.id, `Connection ${index + 1}`]),
+      ...modbus.connections.map((c, index) => [
+        c.id,
+        t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`,
+      ]),
       ...modbus.devices.map((d) => [d.id, d.name]),
       ...[...BUILTIN_MODBUS_PROFILES, ...modbus.profiles].flatMap((p) => [
         [p.id, p.name],

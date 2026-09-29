@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useTranslations, useTranslationState } from './i18n';
+import { detectAndSetLanguage, useTranslations, useTranslationState } from './i18n';
 
 beforeEach(() => {
   const values = new Map<string, string>();
@@ -45,4 +45,24 @@ it('switches language, falls back to English, and resolves plural values', async
   expect(result.current.t('count', { count: 1 })).toBe('One');
   expect(result.current.tExists('count')).toBe(true);
   expect(localStorage.getItem('language')).toBe('de');
+});
+
+it('uses English for an unsupported detected locale so host and plugins can still translate', () => {
+  vi.stubGlobal('navigator', { language: 'fr-FR' });
+  vi.stubGlobal('sessionStorage', { getItem: () => null });
+  detectAndSetLanguage();
+  const { result } = renderHook(() => useTranslations({ en: { title: 'Devices' }, de: { title: 'Geräte' } }));
+  expect(result.current.language).toBe('en');
+  expect(result.current.t('title')).toBe('Devices');
+});
+
+it('preserves names in React text and retranslates retained message descriptors', () => {
+  const message = { key: 'saved', data: { name: 'R&D <Workshop>' } };
+  const { result } = renderHook(() => useTranslations({
+    en: { saved: 'Saved {{name}}' }, de: { saved: '{{name}} gespeichert' },
+  }, { escapeValues: false }));
+  expect(result.current.tMessage(message)).toBe('Saved R&D <Workshop>');
+  act(() => result.current.setLanguage('de'));
+  expect(result.current.tMessage(message)).toBe('R&D <Workshop> gespeichert');
+  expect(result.current.tMessage('Literal server error')).toBe('Literal server error');
 });

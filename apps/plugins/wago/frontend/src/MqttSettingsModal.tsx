@@ -18,6 +18,7 @@ import {
 import type { Key } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { useMqttServersQuery, useSettingsQuery, useUpdateSettingsMutation } from './queries';
+import { useWagoTranslations } from './i18n';
 
 interface MqttSettingsModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ interface MqttSettingsModalProps {
 }
 
 export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalProps) {
+  const { t } = useWagoTranslations();
   const settingsQuery = useSettingsQuery();
   const serversQuery = useMqttServersQuery();
   const updateSettingsMutation = useUpdateSettingsMutation();
@@ -52,7 +54,7 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
         <ModalContainer size="sm">
           <ModalDialog>
             <ModalHeader>
-              <ModalHeading>WAGO settings</ModalHeading>
+              <ModalHeading>{t('settings.title')}</ModalHeading>
             </ModalHeader>
             <Form
               onSubmit={(event) => {
@@ -61,10 +63,7 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
               }}
             >
               <ModalBody>
-                <p className="wg:text-sm wg:text-muted">
-                  Choose the MQTT server used for new WAGO commissioning sessions. Change it before commissioning a
-                  controller.
-                </p>
+                <p className="wg:text-sm wg:text-muted">{t('settings.description')}</p>
                 {isLoading ? (
                   <div className="wg:flex wg:justify-center wg:p-4">
                     <Spinner color="accent" size="sm" />
@@ -75,11 +74,11 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
                   <Select
                     className="wg:w-full"
                     name="defaultMqttServerId"
-                    placeholder="Select an MQTT server"
+                    placeholder={t('settings.select')}
                     value={defaultServerId}
                     onChange={setDefaultServerId}
                   >
-                    <Label>Default MQTT server</Label>
+                    <Label>{t('settings.server')}</Label>
                     <Select.Trigger>
                       <Select.Value />
                       <Select.Indicator />
@@ -87,7 +86,7 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
                     <Select.Popover>
                       <ListBox
                         renderEmptyState={() => (
-                          <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">No MQTT servers configured.</span>
+                          <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">{t('settings.empty')}</span>
                         )}
                       >
                         {(serversQuery.data ?? []).map((server) => (
@@ -110,14 +109,14 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
               </ModalBody>
               <ModalFooter>
                 <Button variant="secondary" onPress={close}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   isDisabled={isLoading || error !== null}
                   isPending={updateSettingsMutation.isPending}
                 >
-                  Save settings
+                  {t('settings.save')}
                 </Button>
               </ModalFooter>
             </Form>
@@ -129,11 +128,12 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
 }
 
 function ErrorAlert({ error }: { error: unknown }) {
+  const { t } = useWagoTranslations();
   return (
     <Alert status="danger">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Description>{error instanceof Error ? error.message : 'Please try again.'}</Alert.Description>
+        <Alert.Description>{error instanceof Error ? error.message : t('common.retry')}</Alert.Description>
       </Alert.Content>
     </Alert>
   );
