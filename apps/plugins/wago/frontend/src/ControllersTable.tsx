@@ -15,9 +15,9 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
+import { StandardModal } from '@attraccess/plugins-frontend-sdk';
 import { useState } from 'react';
 import type { CommissioningSession, WagoCommissioningState, WagoController } from './api';
-import { StandardModal } from './modal';
 import { useCommissioningVerification } from './useCommissioningVerification';
 
 interface ControllersTableProps {
@@ -144,7 +144,12 @@ function RuntimeUpdateModal({
   onOpenChange: (open: boolean) => void;
 }) {
   return (
-    <StandardModal isOpen={controller !== null} onOpenChange={onOpenChange} size="sm" ariaLabel="Runtime update">
+    <StandardModal
+      isOpen={controller !== null}
+      onOpenChange={onOpenChange}
+      size="sm"
+      dialogProps={{ 'aria-label': 'Runtime update' }}
+    >
       <ModalHeader>
         <ModalHeading>Runtime update</ModalHeading>
       </ModalHeader>
