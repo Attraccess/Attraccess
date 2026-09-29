@@ -72,6 +72,8 @@ export interface WagoDiagnostics {
     href: string;
     invalid: boolean;
     conflict: boolean;
+    /** Other resources whose flows command the same channel. */
+    conflictResourceIds: number[];
   }>;
   referencesTruncated: boolean;
   events: Array<{ kind: string; receivedAt: string }>;
@@ -84,7 +86,9 @@ export interface WagoResourceDiagnostics {
     controllerId: number;
     name: string;
     unavailable: boolean;
-    references: WagoDiagnostics['references'];
+    references: Array<
+      WagoDiagnostics['references'][number] & { conflictResources: Array<{ id: number; name: string }> }
+    >;
     referencesTruncated: boolean;
   }>;
   invalidControllerReferences: number;

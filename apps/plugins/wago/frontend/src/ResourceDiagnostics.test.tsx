@@ -1,13 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceDiagnostics } from './ResourceDiagnostics';
 import type { WagoResourceDiagnostics } from '../../diagnostics-types';
 
-vi.mock('./ControllerDiagnostics', () => ({
-  WagoDiagnosticsBoundary: ({ children }: { children: import('react').ReactNode }) => children,
-  ControllerDiagnostics: ({ controllerId }: { controllerId: number }) => <p>Details for controller {controllerId}</p>,
-}));
 let client: QueryClient;
 let allowed: boolean;
 let listeners: Set<() => void>;
@@ -39,6 +35,8 @@ const fixture: WagoResourceDiagnostics = {
           href: '/resources/4/flows',
           invalid: true,
           conflict: true,
+          conflictResourceIds: [9],
+          conflictResources: [{ id: 9, name: 'Workbench outlet' }],
         },
       ],
     },
@@ -64,38 +62,50 @@ const mount = () =>
       <ResourceDiagnostics resourceId={4} access={access} />
     </QueryClientProvider>,
   );
-it('shows reference warnings, opens scoped details, and unmounts cached data on permission loss', async () => {
+const respond = (body: unknown) => vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body)));
+it('groups problems per node, dedupes repeated references, and unmounts on permission loss', async () => {
+  const [reference] = fixture.controllers[0].references;
+  respond({ ...fixture, controllers: [{ ...fixture.controllers[0], references: [reference, reference] }] });
   mount();
-  const open = await screen.findByRole('button', { name: 'Open WAGO diagnostics: Workshop' });
-  expect(screen.getByText('Invalid flow reference. Open diagnostics to review.')).toBeTruthy();
-  expect(screen.getByText('Channel also controlled by another resource.')).toBeTruthy();
-  expect(screen.getByRole('link', { name: 'Review node node-1' }).getAttribute('href')).toBe('/resources/4/flows');
-  expect(screen.getByText(/Invalid controller references: 2/)).toBeTruthy();
-  fireEvent.click(open);
-  expect(screen.getByText('Details for controller 7')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'Close WAGO diagnostics: Workshop' }));
-  expect(screen.queryByText('Details for controller 7')).toBeNull();
+  expect(await screen.findByText('WAGO setup needs attention')).toBeTruthy();
+  expect(screen.getAllByRole('link', { name: 'node-1' })).toHaveLength(1);
+  expect(screen.getByRole('link', { name: 'node-1' }).getAttribute('href')).toBe('/resources/4/flows');
+  expect(screen.getByText(/channel missing or outdated/)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Workbench outlet' }).getAttribute('href')).toBe('/resources/9');
+  expect(screen.getByRole('link', { name: 'Workshop' }).getAttribute('href')).toBe('/wago/controllers/7/configuration');
+  expect(screen.getByText(/2 flow node\(s\) have no valid controller/)).toBeTruthy();
   act(() => {
     allowed = false;
     listeners.forEach((listener) => listener());
   });
-  expect(screen.queryByRole('region', { name: 'Resource WAGO diagnostics' })).toBeNull();
+  expect(screen.queryByText('WAGO setup needs attention')).toBeNull();
 });
 it('does not fetch diagnostics without permission', () => {
   allowed = false;
   mount();
   expect(fetch).not.toHaveBeenCalled();
 });
-it('keeps resource controls independent from failed diagnostics', async () => {
+it('stays silent when the lookup fails', async () => {
   vi.mocked(fetch).mockRejectedValue(new Error('Unavailable'));
-  mount();
-  expect(await screen.findByText('WAGO diagnostics unavailable. Resource controls remain available.')).toBeTruthy();
-});
-it('renders nothing for a resource with no controller references', async () => {
-  vi.mocked(fetch).mockResolvedValue(
-    new Response(JSON.stringify({ controllers: [], invalidControllerReferences: 0, truncated: false })),
-  );
-  mount();
+  const { container } = mount();
   await waitFor(() => expect(client.isFetching()).toBe(0));
-  expect(screen.queryByRole('region', { name: 'Resource WAGO diagnostics' })).toBeNull();
+  expect(container.textContent).toBe('');
+});
+it('stays silent for a healthy WAGO setup', async () => {
+  respond({
+    resourceId: 4,
+    invalidControllerReferences: 0,
+    truncated: false,
+    controllers: [
+      {
+        ...fixture.controllers[0],
+        unavailable: false,
+        referencesTruncated: false,
+        references: [{ ...fixture.controllers[0].references[0], invalid: false, conflict: false }],
+      },
+    ],
+  });
+  const { container } = mount();
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+  expect(container.textContent).toBe('');
 });
