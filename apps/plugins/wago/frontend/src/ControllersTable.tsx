@@ -1,6 +1,11 @@
 import {
+  Alert,
   Button,
   Chip,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
   Table,
   TableBody,
   TableCell,
@@ -10,6 +15,8 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
+import { StandardModal } from '@attraccess/plugins-frontend-sdk';
+import { useState } from 'react';
 import type { CommissioningSession, WagoCommissioningState, WagoController } from './api';
 import { useCommissioningVerification } from './useCommissioningVerification';
 
@@ -27,6 +34,7 @@ type TableRowData =
   | { key: string; kind: 'session'; session: CommissioningSession };
 
 export function ControllersTable({ controllers, sessions, onClaim, onConfigure, onRemove, onResume }: ControllersTableProps) {
+  const [runtimeUpdateController, setRuntimeUpdateController] = useState<WagoController | null>(null);
   const activeSessions = sessions.filter(
     (session) =>
       session.state !== 'completed' &&
@@ -45,31 +53,37 @@ export function ControllersTable({ controllers, sessions, onClaim, onConfigure, 
   ];
 
   return (
-    <Table>
-      <TableScrollContainer>
-        <TableContent aria-label="WAGO controllers and commissioning sessions">
-          <TableHeader>
-            <TableColumn isRowHeader>Controller</TableColumn>
-            <TableColumn>Trust</TableColumn>
-            <TableColumn>Connection</TableColumn>
-            <TableColumn className="wg:hidden wg:md:table-cell">Runtime</TableColumn>
-            <TableColumn className="wg:hidden wg:lg:table-cell">Last heartbeat</TableColumn>
-            <TableColumn className="wg:text-end">Actions</TableColumn>
-          </TableHeader>
-          <TableBody items={rows} renderEmptyState={EmptyControllers}>
-            {(row) => row.kind === 'session' ? (
-              <CommissioningRow row={row} onResume={onResume} />
-            ) : (
-               <ControllerRow row={row} onClaim={onClaim} onConfigure={onConfigure} onRemove={onRemove} onResume={onResume} />
-            )}
-          </TableBody>
-        </TableContent>
-      </TableScrollContainer>
-    </Table>
+    <>
+      <Table>
+        <TableScrollContainer>
+          <TableContent aria-label="WAGO controllers and commissioning sessions">
+            <TableHeader>
+              <TableColumn isRowHeader>Controller</TableColumn>
+              <TableColumn>Trust</TableColumn>
+              <TableColumn>Connection</TableColumn>
+              <TableColumn className="wg:hidden wg:md:table-cell">Runtime</TableColumn>
+              <TableColumn className="wg:hidden wg:lg:table-cell">Last heartbeat</TableColumn>
+              <TableColumn className="wg:text-end">Actions</TableColumn>
+            </TableHeader>
+            <TableBody items={rows} renderEmptyState={EmptyControllers}>
+              {(row) => row.kind === 'session' ? (
+                <CommissioningRow row={row} onResume={onResume} />
+              ) : (
+                 <ControllerRow row={row} onClaim={onClaim} onConfigure={onConfigure} onRemove={onRemove} onResume={onResume} onShowRuntimeUpdate={setRuntimeUpdateController} />
+              )}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
+      </Table>
+      <RuntimeUpdateModal
+        controller={runtimeUpdateController}
+        onOpenChange={(open) => !open && setRuntimeUpdateController(null)}
+      />
+    </>
   );
 }
 
-function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row: Extract<TableRowData, { kind: 'controller' }>; onClaim: (controllerId: number) => void; onConfigure: (controllerId: number) => void; onRemove: (controller: WagoController) => void; onResume: (session: CommissioningSession) => void }) {
+function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume, onShowRuntimeUpdate }: { row: Extract<TableRowData, { kind: 'controller' }>; onClaim: (controllerId: number) => void; onConfigure: (controllerId: number) => void; onRemove: (controller: WagoController) => void; onResume: (session: CommissioningSession) => void; onShowRuntimeUpdate: (controller: WagoController) => void }) {
   const { controller, session } = row;
   return (
     <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-primary/5' : undefined}>
@@ -89,14 +103,77 @@ function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row:
       <TableCell className="wg:hidden wg:lg:table-cell">{formatHeartbeat(controller.lastHeartbeatAt)}</TableCell>
       <TableCell>
         <div className="wg:flex wg:justify-end wg:gap-2">
-          {session && <Button size="sm" variant="secondary" onPress={() => onResume(session)}>View progress</Button>}
+          {session && <SessionProgressAction session={session} onResume={onResume} />}
           {controller.trustState === 'untrusted' ? (!session &&
             <Button size="sm" onPress={() => onClaim(controller.id)}>Claim</Button>
-          ) : <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>Configure</Button>}
+          ) : (
+            <>
+              <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>Configure</Button>
+              <Button size="sm" variant="ghost" onPress={() => onShowRuntimeUpdate(controller)}>Update runtime</Button>
+            </>
+          )}
           <Button size="sm" variant="danger" onPress={() => onRemove(controller)}>Remove</Button>
         </div>
       </TableCell>
     </TableRow>
+  );
+}
+
+/** Hides "View progress" once commissioning evidence is verified; a stuck backend state should not read as still in progress. */
+function SessionProgressAction({
+  session,
+  onResume,
+}: {
+  session: CommissioningSession;
+  onResume: (session: CommissioningSession) => void;
+}) {
+  const verification = useCommissioningVerification(session);
+  if (verification.enrollmentComplete) return null;
+  return (
+    <Button size="sm" variant="secondary" onPress={() => onResume(session)}>
+      View progress
+    </Button>
+  );
+}
+
+function RuntimeUpdateModal({
+  controller,
+  onOpenChange,
+}: {
+  controller: WagoController | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <StandardModal
+      isOpen={controller !== null}
+      onOpenChange={onOpenChange}
+      size="sm"
+      dialogProps={{ 'aria-label': 'Runtime update' }}
+    >
+      <ModalHeader>
+        <ModalHeading>Runtime update</ModalHeading>
+      </ModalHeader>
+      <ModalBody>
+        <p className="wg:text-sm">
+          Running runtime: <strong>{controller?.runtimeVersion}</strong> · protocol {controller?.protocolVersion}
+        </p>
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>No in-place update yet</Alert.Title>
+            <Alert.Description>
+              Attraccess cannot update this controller&apos;s runtime without a full reinstall. The only current path
+              is re-running commissioning, which wipes applications, data and configuration on the CC100 and
+              reinstalls from scratch. That is why it is not offered here as a one-click action. Automatic,
+              non-destructive runtime updates are tracked in ATT-1099.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      </ModalBody>
+      <ModalFooter>
+        <Button onPress={() => onOpenChange(false)}>Understood</Button>
+      </ModalFooter>
+    </StandardModal>
   );
 }
 
