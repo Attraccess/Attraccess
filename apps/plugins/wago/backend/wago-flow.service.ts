@@ -4,6 +4,7 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { WagoController } from './wago-controller.entity';
 import type { WagoConfigurationSnapshot } from './configuration';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
+import { wagoFlowPreview } from './wago-flow-preview';
 import { operationalWildcardTopic, parseOperationalMessage, type WagoOperationalMessage } from './protocol';
 import { WagoSettings } from './wago-settings.entity';
 import { WAGO_EVENT_NODE_TYPE } from './wago-state-nodes';
@@ -169,9 +170,16 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     config: Record<string, unknown>,
     kind: NodeKind,
     validationContext = new Map<string, unknown>(),
+    previewOnly = false,
   ): Promise<Record<string, unknown>> {
-    const controllers = await this.cached(validationContext, 'wago-flow-controllers', () =>
-      this.controllers.find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } }),
+    const controllerCacheKey = previewOnly ? `wago-flow-controllers:preview:${config.controllerId}` : 'wago-flow-controllers';
+    const controllers = await this.cached(validationContext, controllerCacheKey, () =>
+      previewOnly && typeof config.controllerId !== 'number'
+        ? Promise.resolve([])
+        : this.controllers.find({
+            where: { trustState: 'claimed', ...(previewOnly ? { id: config.controllerId as number } : {}) },
+            order: { name: 'ASC' },
+          }),
     );
     const selected =
       typeof config.controllerId === 'number'
@@ -187,15 +195,20 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
           return latest ?? null;
         })
       : null;
-    const channels: WagoConfigurationSnapshot['logicalChannels'] = revision
-      ? JSON.parse(revision.snapshot).logicalChannels
-      : [];
+    const snapshot: WagoConfigurationSnapshot | null = revision ? JSON.parse(revision.snapshot) : null;
+    const channels = snapshot?.logicalChannels ?? [];
     let names: Record<string, unknown> = {};
     try {
       names = JSON.parse(revision?.presetProvenance ?? 'null')?.editor?.names ?? {};
     } catch {
       // Older configurations may not have visual editor labels.
     }
+    if (previewOnly) return {
+      dynamic: true,
+      type: 'object',
+      properties: {},
+      preview: wagoFlowPreview(config, kind, selected, snapshot, names),
+    };
     const channel = channels.find((item) => item.id === config.channelId);
     const properties: Record<string, unknown> = {
       controllerId: {
@@ -252,6 +265,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     return {
       dynamic: true,
       type: 'object',
+      preview: wagoFlowPreview(config, kind, selected, snapshot, names),
       properties,
       required: ['controllerId', 'channelId', 'category', ...(kind === 'wait' ? ['equals', 'timeoutMs'] : [])],
     };

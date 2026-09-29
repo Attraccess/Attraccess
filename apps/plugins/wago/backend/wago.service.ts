@@ -144,8 +144,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     this.commands.destroy();
   }
 
-  async commandSchema(config: Record<string, unknown>, resourceId: number): Promise<Record<string, unknown>> {
-    return this.commands.schema(config, resourceId);
+  async commandSchema(config: Record<string, unknown>, resourceId: number, previewOnly = false): Promise<Record<string, unknown>> {
+    return this.commands.schema(config, resourceId, previewOnly);
   }
 
   async validateCommandConfig(config: Record<string, unknown>, validationContext = new Map<string, unknown>()) {

@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Configuration",
+    "loading": "Loading summary…",
+    "unavailable": "Preview unavailable"
+  },
   "editor": {
     "buttons": {
       "save": "Save",

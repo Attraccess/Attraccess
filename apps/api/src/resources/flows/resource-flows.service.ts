@@ -83,6 +83,7 @@ export class ResourceFlowsService {
     resourceId: number,
     nodeType: string,
     config: Record<string, unknown>,
+    purpose: 'editor' | 'preview' = 'editor',
   ): Promise<ResourceFlowNodeSchemaDto> {
     const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
     if (!resource) {
@@ -95,13 +96,18 @@ export class ResourceFlowsService {
     }
 
     const configSchema = definition.resolveConfigSchema
-      ? await definition.resolveConfigSchema(config, { resourceId })
+      ? await definition.resolveConfigSchema(config, purpose === 'preview' ? { resourceId, purpose } : { resourceId })
       : definition.configSchema;
     if (!configSchema) {
       throw new Error(`Plugin flow node type "${nodeType}" does not provide a configuration schema.`);
     }
 
-    return this.pluginNodeSchema(definition, configSchema);
+    return this.pluginNodeSchema(
+      definition,
+      purpose === 'preview'
+        ? { dynamic: true, type: 'object', properties: {}, preview: configSchema.preview ?? [] }
+        : configSchema,
+    );
   }
 
   private async validateNodeData(

@@ -1,3 +1,4 @@
+import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   claimController,
@@ -279,6 +280,7 @@ export function useConfigurationActions(controllerId: number) {
     await Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.revisions(controllerId) }),
       client.invalidateQueries({ queryKey: queryKeys.draft(controllerId) }),
+      client.invalidateQueries({ queryKey: FLOW_NODE_PREVIEW_QUERY_KEY }),
     ]);
   };
   const validate = useMutation({

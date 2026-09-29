@@ -15,8 +15,11 @@ import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import { initializeValue, isValueValid } from './property-input/schema-values';
 
-const configProperty = (schema: ResourceFlowNodeSchemaDto) =>
-  ({ ...schema.configSchema, type: 'object' }) as Property<unknown>;
+const configProperty = (schema: ResourceFlowNodeSchemaDto) => {
+  const configSchema = { ...schema.configSchema };
+  delete configSchema.preview;
+  return { ...configSchema, type: 'object' } as Property<unknown>;
+};
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;

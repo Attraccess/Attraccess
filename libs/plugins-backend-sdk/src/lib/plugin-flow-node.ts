@@ -23,10 +23,7 @@ export interface PluginNodeExecutionContext {
 }
 
 export type PluginFlowFailureKind =
-  | 'transport-dispatch'
-  | 'acknowledgement-timeout'
-  | 'controller-rejection'
-  | 'node-failure';
+  'transport-dispatch' | 'acknowledgement-timeout' | 'controller-rejection' | 'node-failure';
 
 export type PluginFlowFailureBehavior = 'fail-flow' | 'failure-output' | 'log-and-continue';
 
@@ -34,6 +31,14 @@ export interface PluginFlowNodeValidationError {
   field: string;
   message: string;
   value?: unknown;
+}
+
+/** Plain-text canvas summary with optional BCP 47 locale overrides. */
+export interface PluginFlowNodePreviewRow {
+  label: string;
+  value: string;
+  /** Exact locale, then base language, then the default label/value are used. */
+  translations?: Record<string, { label: string; value: string }>;
 }
 
 /** Request-scoped storage shared while validating all nodes in a flow. */
@@ -69,6 +74,14 @@ interface PluginFlowNodeDefinitionBase {
    *   { selectFromEntity: 'mqttServer', entityProperty: 'id' }
    *   { stringVariant: 'multiline' }
    *   { helpText: '...' }
+   *
+   * Canvas summaries use a top-level `preview: PluginFlowNodePreviewRow[]`
+   * (at most four plain-text rows). Include only the essential, non-secret fields.
+   * Optional `translations: { de: { label: 'Gerät', value: 'Nicht ausgewählt' } }`
+   * localizes each row; the host selects its current UI locale without another request.
+   * Default label/value strings remain required as the fallback for unsupported locales.
+   * Dynamic nodes opt in with `configSchema: { dynamic: true, properties: {}, preview: [] }`
+   * and return the summary from resolveConfigSchema for the selected configuration.
    */
   readonly configSchema?: Record<string, unknown>;
 
@@ -76,10 +89,13 @@ interface PluginFlowNodeDefinitionBase {
    * Builds a configuration schema from the values selected so far. The returned
    * schema must set `dynamic: true`; fields that should trigger a refresh set
    * `refreshesSchema: true`.
+   * Canvas requests set `context.purpose` to `preview`: return only the preview
+   * extension and skip editor-only lookups/validation. The host refreshes visible
+   * dynamic summaries every minute so asynchronously applied changes are reflected.
    */
   resolveConfigSchema?(
     currentConfig: Record<string, unknown>,
-    context: { resourceId: number },
+    context: { resourceId: number; purpose?: 'editor' | 'preview' },
   ): Promise<Record<string, unknown>>;
 
   /** Handle IDs accepted as inputs (e.g. ['input']). Empty for trigger nodes. */

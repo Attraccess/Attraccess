@@ -7,6 +7,7 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { outputBehavior, supportsOutputAction } from '../channel-behavior';
 import type { WagoConfigurationSnapshot } from './configuration';
+import { wagoFlowPreview } from './wago-flow-preview';
 
 const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
 const MAX_COMMAND_TIMEOUT_SECONDS = 300;
@@ -53,10 +54,13 @@ export class WagoCommandHandler {
   private async channelNames(
     controllerId: number | undefined,
     revision: WagoConfigurationRevision | null,
+    appliedOnly = false,
   ): Promise<Record<string, unknown>> {
     let names: Record<string, unknown> = {};
     if (controllerId) {
-      const draft = await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
+      const draft = appliedOnly
+        ? null
+        : await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
       try {
         const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
         if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;
@@ -67,16 +71,39 @@ export class WagoCommandHandler {
     return names;
   }
 
-  async schema(config: Record<string, unknown>, resourceId: number): Promise<Record<string, unknown>> {
-    const controllers = await this.dependencies
-      .controllers()
-      .find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } });
+  async schema(
+    config: Record<string, unknown>,
+    resourceId: number,
+    previewOnly = false,
+  ): Promise<Record<string, unknown>> {
     const controllerId = positiveInteger(config.controllerId);
+    const controllers =
+      previewOnly && !controllerId
+        ? []
+        : await this.dependencies
+            .controllers()
+            .find({
+              where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId } : {}) },
+              order: { name: 'ASC' },
+            });
     const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
     const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
     const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
     const outputChannels = snapshot?.logicalChannels.filter((item) => item.capabilities.includes('output')) ?? [];
-    const names = await this.channelNames(controllerId, revision);
+    const names = await this.channelNames(controllerId, revision, previewOnly);
+    if (previewOnly)
+      return {
+        dynamic: true,
+        type: 'object',
+        properties: {},
+        preview: wagoFlowPreview(
+          config,
+          'command',
+          controllers.find((item) => item.id === controllerId),
+          snapshot,
+          names,
+        ),
+      };
     const channel = outputChannels.find((item) => item.id === channelId);
     const references = channelId && controllerId ? await this.references(controllerId, channelId, resourceId) : [];
     const properties: Record<string, unknown> = {
@@ -167,6 +194,13 @@ export class WagoCommandHandler {
     return {
       dynamic: true,
       type: 'object',
+      preview: wagoFlowPreview(
+        config,
+        'command',
+        controllers.find((item) => item.id === controllerId),
+        snapshot,
+        names,
+      ),
       properties,
       required: [
         ...new Set([

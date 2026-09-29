@@ -54,8 +54,48 @@ describe('WagoFlowService', () => {
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
+    return {
+      service: new WagoFlowService(context),
+      trigger,
+      context,
+      revisionQuery,
+      revisionRepository,
+      controllerRepository,
+    };
   }
+
+  it('isolates filtered preview controller lookups in a shared context', async () => {
+    const { service, controllerRepository } = createService();
+    controllerRepository.find.mockImplementation(async ({ where }: { where: { id: number } }) => [
+      { ...controller, id: where.id, hardwareId: `controller-${where.id}` },
+    ]);
+    const context = new Map<string, unknown>();
+    const first = await service.resolveConfigSchema(
+      { controllerId: 1, channelId: 'door', category: 'state' },
+      'read',
+      context,
+      true,
+    );
+    const second = await service.resolveConfigSchema(
+      { controllerId: 2, channelId: 'door', category: 'state' },
+      'read',
+      context,
+      true,
+    );
+    expect(first.preview).toMatchObject([
+      { label: 'Device', value: 'controller-1' },
+      { label: 'Channel', value: 'door' },
+      { label: 'Read', value: 'Output state' },
+    ]);
+    expect(second.preview).toMatchObject([
+      { label: 'Device', value: 'controller-2' },
+      { label: 'Channel', value: 'door' },
+      { label: 'Read', value: 'Output state' },
+    ]);
+    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+    await service.resolveConfigSchema({ controllerId: 1, channelId: 'door' }, 'read', context, true);
+    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+  });
 
   it('starts with an unavailable MQTT broker and retries flow subscriptions', async () => {
     const { service, context } = createService();
@@ -107,6 +147,63 @@ describe('WagoFlowService', () => {
     await expect(service.validateConfig({ ...config, category: 'measurement' }, kind)).resolves.toEqual(
       expect.arrayContaining([expect.objectContaining({ field: 'category' })]),
     );
+  });
+
+  it.each(['event', 'read', 'wait'] as const)('provides a concise %s preview for the selected output', async (kind) => {
+    const { service } = createService();
+    const schema = await service.resolveConfigSchema(
+      {
+        controllerId: 1,
+        channelId: 'door',
+        category: 'state',
+        equals: false,
+        timeoutMs: 1500,
+      },
+      kind,
+    );
+    expect(schema.preview).toMatchObject([
+      { label: 'Device', value: 'cc100-01' },
+      { label: 'Channel', value: 'door' },
+      ...(kind === 'event'
+        ? [{ label: 'When', value: 'Output state received' }]
+        : kind === 'read'
+          ? [{ label: 'Read', value: 'Output state' }]
+          : [
+              { label: 'Wait for', value: 'Output state = OFF' },
+              { label: 'Timeout', value: '1.5 s' },
+            ]),
+    ]);
+  });
+
+  it('identifies an external meter and keeps a zero-valued wait condition visible', async () => {
+    const { service, revisionRepository } = createService();
+    revisionRepository.find.mockResolvedValue([
+      {
+        ...revision,
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'power', physicalPointId: 'meter-point', capabilities: ['measurement'] }],
+          physicalPoints: [{ id: 'meter-point', hardwareProfile: 'modbus', modbus: { deviceId: 'meter' } }],
+          modbus: { devices: [{ id: 'meter', name: 'WAGO 879-3000' }] },
+        }),
+        presetProvenance: JSON.stringify({ editor: { names: { power: 'Active power' } } }),
+      },
+    ]);
+    const schema = await service.resolveConfigSchema(
+      {
+        controllerId: 1,
+        channelId: 'power',
+        category: 'measurement',
+        equals: 0,
+        timeoutMs: 30_000,
+      },
+      'wait',
+    );
+    expect(schema.preview).toMatchObject([
+      { label: 'Device', value: 'cc100-01' },
+      { label: 'Channel', value: 'Active power · WAGO 879-3000' },
+      { label: 'Wait for', value: 'Measurement = 0 (wire value)' },
+      { label: 'Timeout', value: '30 s' },
+    ]);
   });
 
   it('uses current applied channel names in the form even when the runtime cache is populated', async () => {
