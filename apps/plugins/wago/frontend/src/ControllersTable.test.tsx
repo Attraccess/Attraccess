@@ -51,15 +51,25 @@ function mount(onResume = vi.fn(), onConfigure = vi.fn()) {
   );
 }
 
-it('shows completed enrollment while keeping verification/recovery and configuration reachable', async () => {
+it('hides "View progress" once enrollment is verified, keeping configuration and runtime info reachable', async () => {
   const onResume = vi.fn();
   const onConfigure = vi.fn();
   mount(onResume, onConfigure);
   expect(await screen.findByText('Enrollment complete · runtime verified')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'View progress' }));
-  expect(onResume).toHaveBeenCalledWith(session);
+  expect(screen.queryByRole('button', { name: 'View progress' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
   expect(onConfigure).toHaveBeenCalledWith(1);
+  expect(onResume).not.toHaveBeenCalled();
+});
+
+it('explains the destructive redeploy path instead of offering an in-place update', async () => {
+  mount();
+  await screen.findByText('Enrollment complete · runtime verified');
+  fireEvent.click(screen.getByRole('button', { name: 'Update runtime' }));
+  expect(screen.getByText('No in-place update yet')).toBeTruthy();
+  expect(screen.getByText(/wipes applications, data and configuration/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Understood' }));
+  expect(screen.queryByText('No in-place update yet')).toBeNull();
 });
 
 it('does not infer enrollment verification from an online claimed row', async () => {

@@ -323,80 +323,142 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
     isCancelConfirmationOpen,
     configureController,
   } = model;
+  // Fallback keeps this hook call unconditional across renders where session becomes null.
+  const verification = useCommissioningVerification(session ?? { id: -1, state: 'revoked' });
+  const isFullyDone = !!session && verification.runtimeVerified === true;
   return (
     <DrawerBody>
-      <div className="wg:grid wg:min-w-0 wg:gap-5 wg:md:grid-cols-[13rem_minmax(0,1fr)]">
-        <DevicePassport className="wg:hidden wg:md:block" name={title} step={activeStep} />
+      <div
+        className={`wg:grid wg:min-w-0 wg:gap-5 ${isFullyDone ? '' : 'wg:md:grid-cols-[13rem_minmax(0,1fr)]'}`}
+      >
+        {/* The step passport only makes sense while a step is still active; the summary below already
+            repeats identity/runtime/claim once commissioning is done. */}
+        {!isFullyDone && <DevicePassport className="wg:hidden wg:md:block" name={title} step={activeStep} />}
         <div className="wg:min-w-0 wg:space-y-5">
-          <StepHeading step={activeStep} />
-          {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
-          <ConnectionFields model={model} />
-          {session?.state === 'awaiting_identity_confirmation' && (
-            <HostKeyConfirmationStep
-              fingerprint={hostKeyFingerprint}
-              expectedFingerprint={session.hostKeyFingerprint}
-              onFingerprintChange={setHostKeyFingerprint}
-            />
-          )}
-          {session?.state === 'awaiting_identity_confirmation' && (
-            <Checkbox isSelected={isolatedIdentity} onChange={setIsolatedIdentity}>
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>
-                Alternatively, I verified the physical 751-9301 label and connected this controller as the only device
-                on an isolated service network. I accept first-key pinning on that connection, not independent
-                cryptographic identity verification. Do not select this on a shared LAN.
-              </Checkbox.Content>
-            </Checkbox>
-          )}
-          {session && activeStep === 4 && session.state !== 'awaiting_identity_confirmation' && (
-            <DeliveryStep
-              isDelivering={deliverSessionMutation.isPending}
+          {session && isFullyDone ? (
+            <CompletedSessionSummary
               session={session}
-              sshUsername={sshUsername}
-              sshPassword={sshPassword}
-              onSshUsernameChange={setSshUsername}
-              onSshPasswordChange={setSshPassword}
-              customSsh={customSsh}
-              onCustomSshChange={(custom) => {
-                setCustomSsh(custom);
-                setSshUsername(custom ? '' : DEFAULT_SSH.username);
-                setSshPassword(custom ? '' : DEFAULT_SSH.password);
-              }}
-              confirmInstall={confirmInstall}
-              onConfirmInstallChange={setConfirmInstall}
+              verification={verification}
+              onConfigure={onConfigure ? configureController : undefined}
             />
-          )}
-          {session && activeStep === 5 && <ProgressStep name={title} session={session} />}
-          {session && canInstall(session) && (
-            <details>
-              <summary className="wg:cursor-pointer">Optional: inspect controller before installation</summary>
-              <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
-            </details>
-          )}
-          {session && !canInstall(session) && session.dockerProvisionState && (
-            <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
-          )}
-          {session &&
-            (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
-              <VerificationStatus session={session} onConfigure={onConfigure ? configureController : undefined} />
-            )}
-          <RecoveryFields model={model} />
-          <CommissioningErrors model={model} />
-          {isCancelConfirmationOpen && (
-            <Alert status="warning">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>
-                  Canceling revokes the enrollment credential and deletes this commissioning session.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
+          ) : (
+            <>
+              <StepHeading step={activeStep} />
+              {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
+              <ConnectionFields model={model} />
+              {session?.state === 'awaiting_identity_confirmation' && (
+                <HostKeyConfirmationStep
+                  fingerprint={hostKeyFingerprint}
+                  expectedFingerprint={session.hostKeyFingerprint}
+                  onFingerprintChange={setHostKeyFingerprint}
+                />
+              )}
+              {session?.state === 'awaiting_identity_confirmation' && (
+                <Checkbox isSelected={isolatedIdentity} onChange={setIsolatedIdentity}>
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                  <Checkbox.Content>
+                    Alternatively, I verified the physical 751-9301 label and connected this controller as the only
+                    device on an isolated service network. I accept first-key pinning on that connection, not
+                    independent cryptographic identity verification. Do not select this on a shared LAN.
+                  </Checkbox.Content>
+                </Checkbox>
+              )}
+              {session && activeStep === 4 && session.state !== 'awaiting_identity_confirmation' && (
+                <DeliveryStep
+                  isDelivering={deliverSessionMutation.isPending}
+                  session={session}
+                  sshUsername={sshUsername}
+                  sshPassword={sshPassword}
+                  onSshUsernameChange={setSshUsername}
+                  onSshPasswordChange={setSshPassword}
+                  customSsh={customSsh}
+                  onCustomSshChange={(custom) => {
+                    setCustomSsh(custom);
+                    setSshUsername(custom ? '' : DEFAULT_SSH.username);
+                    setSshPassword(custom ? '' : DEFAULT_SSH.password);
+                  }}
+                  confirmInstall={confirmInstall}
+                  onConfirmInstallChange={setConfirmInstall}
+                />
+              )}
+              {session && activeStep === 5 && <ProgressStep name={title} session={session} />}
+              {session && canInstall(session) && (
+                <details>
+                  <summary className="wg:cursor-pointer">Optional: inspect controller before installation</summary>
+                  <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
+                </details>
+              )}
+              {session && !canInstall(session) && session.dockerProvisionState && (
+                <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
+              )}
+              {session &&
+                (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
+                  <VerificationStatus session={session} onConfigure={onConfigure ? configureController : undefined} />
+                )}
+              <RecoveryFields model={model} />
+              <CommissioningErrors model={model} />
+              {isCancelConfirmationOpen && (
+                <Alert status="warning">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>
+                      Canceling revokes the enrollment credential and deletes this commissioning session.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              )}
+            </>
           )}
         </div>
       </div>
     </DrawerBody>
+  );
+}
+
+/** Read-only recap once commissioning evidence and runtime setup are both verified; nothing here still needs action. */
+function CompletedSessionSummary({
+  session,
+  verification,
+  onConfigure,
+}: {
+  session: CommissioningSession;
+  verification: ReturnType<typeof useCommissioningVerification>;
+  onConfigure?: (controllerId: number) => void;
+}) {
+  const controllerId = verification.data?.controllerId ?? session.managementControllerId ?? null;
+  return (
+    <div className="wg:space-y-4">
+      <Alert status="success">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Commissioning complete</Alert.Title>
+          <Alert.Description>
+            {session.controllerName ?? session.hardwareId} is enrolled on permanent credentials, connected, and its
+            configuration is applied.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
+      <dl className="wg:grid wg:gap-3 wg:text-sm wg:sm:grid-cols-2">
+        <SummaryField label="Hardware ID" value={session.hardwareId} />
+        <SummaryField label="Firmware baseline" value={session.firmwareBaseline} />
+        <SummaryField label="Claimed" value={new Date(session.updatedAt).toLocaleString()} />
+        <SummaryField label="Management hardening" value={verification.data?.managementHardening ?? 'unverified'} />
+      </dl>
+      {onConfigure && controllerId && (
+        <Button onPress={() => onConfigure(controllerId)}>Configure inputs and outputs</Button>
+      )}
+    </div>
+  );
+}
+
+function SummaryField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="wg:text-xs wg:text-muted">{label}</dt>
+      <dd className="wg:font-medium">{value}</dd>
+    </div>
   );
 }
 
@@ -420,6 +482,17 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
     recoverSession,
     confirmHostKey,
   } = model;
+  // Fallback keeps this hook call unconditional across renders where session becomes null.
+  const verification = useCommissioningVerification(session ?? { id: -1, state: 'revoked' });
+  if (session && verification.runtimeVerified === true) {
+    return (
+      <DrawerFooter>
+        <Button variant="secondary" onPress={close}>
+          Close
+        </Button>
+      </DrawerFooter>
+    );
+  }
   return (
     <DrawerFooter className="wg:flex-wrap">
       {session && canRecover(session) && (
