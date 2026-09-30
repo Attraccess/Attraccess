@@ -15,6 +15,7 @@ export type Snapshot = {
     physicalPointId: string;
     profile: string;
     capabilities: string[];
+    invert?: boolean;
     disconnectPolicy: DisconnectPolicy;
     range?: { minimum: number; maximum: number };
     pulse?: { durationMs: number };
@@ -31,6 +32,7 @@ export type RuntimeState = {
   credentialRotation?: { revision: number; token: string };
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
+  manualOutputChannelIds?: string[];
   uncertainOutputChannelIds?: string[];
   /** Shutdown obligations use the accepted snapshot, whose routing remains locked until OFF is durable. */
   pendingPulseChannelIds?: string[];
@@ -62,6 +64,7 @@ export interface DeviceAdapter {
   checkAvailability?(): Promise<void>;
   write(point: Snapshot['physicalPoints'][number], value: boolean, admit?: WriteAdmission): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
+  readOutput?(point: Snapshot['physicalPoints'][number]): Promise<boolean>;
 }
 
 export interface StateStore {

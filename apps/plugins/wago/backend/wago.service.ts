@@ -172,15 +172,15 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (typeof input.channelId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(input.channelId))
       throw new BadRequestException('Invalid Logical Channel');
     const config = { ...input, controllerId, completionBehavior: 'acknowledged' };
-    const errors = await this.commands.validate(config);
+    const errors = await this.commands.validate(config, new Map(), true);
     if (errors.length) throw new BadRequestException('Manual command does not match the applied configuration');
     const commandId = randomUUID();
-    const details = { commandId, channelId: input.channelId, operation: input.action as 'set' | 'pulse' };
+    const details = { commandId, channelId: input.channelId, operation: input.action as 'set' | 'pulse' | 'release' };
     const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'manual_command', details);
     await lifecycle.attempt();
     let result: WagoManualCommandAuditResult['result'];
     try {
-      await this.commands.execute(config, commandId);
+      await this.commands.execute(config, commandId, 'manual');
       result = 'acknowledged';
     } catch (error) {
       result =

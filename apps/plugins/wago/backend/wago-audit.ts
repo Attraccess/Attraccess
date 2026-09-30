@@ -24,7 +24,7 @@ export interface WagoAuditDetails {
   presetId?: (typeof WAGO_PRESETS)[number]['id'];
   channelId?: string;
   commandId?: string;
-  operation?: 'set' | 'pulse';
+  operation?: 'set' | 'pulse' | 'release';
   result?: 'dispatched' | 'acknowledged' | 'rejected' | 'timeout' | 'transport_failure';
   before?: WagoAuditSummary;
   after?: WagoAuditSummary;
@@ -97,7 +97,7 @@ export function wagoAuditDetails(input: WagoAuditDetails): Record<string, string
   if (WAGO_PRESETS.some((preset) => preset.id === input.presetId)) details.presetId = input.presetId;
   if (typeof input.channelId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(input.channelId)) details.channelId = input.channelId;
   if (typeof input.commandId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.commandId)) details.commandId = input.commandId;
-  if (['set', 'pulse'].includes(input.operation)) details.operation = input.operation;
+  if (['set', 'pulse', 'release'].includes(input.operation)) details.operation = input.operation;
   if (['dispatched', 'acknowledged', 'rejected', 'timeout', 'transport_failure'].includes(input.result)) details.result = input.result;
   for (const side of ['before', 'after'] as const) {
     for (const key of ['physicalPointCount', 'logicalChannelCount'] as const) {

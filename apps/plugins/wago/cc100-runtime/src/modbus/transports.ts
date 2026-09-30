@@ -295,7 +295,7 @@ try:
   response+=os.read(fd,256)
   if len(response)>256: raise ValueError('oversized RTU frame')
   if len(response)>=3:
-   size=5 if response[1]&128 else (response[2]+5 if response[1] in (3,4) else 8)
+   size=5 if response[1]&128 else (response[2]+5 if response[1] in (1,3,4) else 8)
    if len(response)>=size: sys.stdout.buffer.write(response); break
  else: raise TimeoutError('serial read timeout')
  if not response: raise TimeoutError('serial read timeout')
