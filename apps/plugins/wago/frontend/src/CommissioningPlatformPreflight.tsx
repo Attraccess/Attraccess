@@ -82,7 +82,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           <dt>{t('security.clockObservation')}</dt>
           <dd>
             {t('security.observation', {
-              observation: report.clock.observation,
+              observation: tBackendMessage(report.clock.observation),
               seconds: report.clock.uncertaintySeconds,
             })}
           </dd>
@@ -96,7 +96,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           )}
           <dt>{t('security.clockAction')}</dt>
           <dd>
-            {report.clock.tool} / {report.clock.action}
+            {tBackendMessage(report.clock.tool)} / {tBackendMessage(report.clock.action)}
           </dd>
         </dl>
       )}

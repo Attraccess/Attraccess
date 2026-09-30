@@ -41,7 +41,7 @@ export function WagoStatus({
         <p>
           {t('diagnostics.heartbeat', {
             time: d.heartbeatAt ? new Date(d.heartbeatAt).toLocaleString(language) : t('controllers.never'),
-            freshness: d.heartbeatFreshness,
+            freshness: tBackendMessage(d.heartbeatFreshness),
           })}
         </p>
         <p>
@@ -142,7 +142,7 @@ export function ControllerDiagnostics(props: { controllerId: number; onConfigure
 }
 
 function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: number; onConfigure?: () => void }) {
-  const { t, language } = useWagoTranslations();
+  const { t, language, tBackendMessage } = useWagoTranslations();
   const query = useWagoDiagnostics(controllerId);
   const now = useDiagnosticsClock();
   const pollingStale = !!query.data && !pollFresh(query.dataUpdatedAt, now);
@@ -195,7 +195,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                         source: sample.sourceAt
                           ? new Date(sample.sourceAt).toLocaleString(language)
                           : t('diagnostics.unavailable'),
-                        freshness: sample.sourceFreshness,
+                        freshness: tBackendMessage(sample.sourceFreshness),
                         received: new Date(sample.receivedAt).toLocaleString(language),
                       })}
                     </p>
@@ -209,8 +209,8 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                 ))}
                 <p>
                   {t('diagnostics.safeState', {
-                    state: channel.safeState,
-                    mode: channel.disconnectPolicy.mode,
+                    state: tBackendMessage(channel.safeState),
+                    mode: tBackendMessage(channel.disconnectPolicy.mode),
                     timeout: channel.disconnectPolicy.timeoutMs
                       ? t('diagnostics.timeout', { timeout: channel.disconnectPolicy.timeoutMs })
                       : '',
@@ -219,7 +219,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                 <p>
                   {t('diagnostics.acknowledgement')}{' '}
                   {channel.acknowledgement
-                    ? `${channel.acknowledgement.status} · ${channel.acknowledgement.id} · ${channel.acknowledgement.receivedAt}`
+                    ? `${tBackendMessage(channel.acknowledgement.status)} · ${channel.acknowledgement.id} · ${new Date(channel.acknowledgement.receivedAt).toLocaleString(language)}`
                     : t('diagnostics.noAcknowledgement')}
                 </p>
               </Card.Content>
@@ -247,7 +247,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
             <summary>{t('diagnostics.events', { count: d.events.length })}</summary>
             {d.events.map((event, index) => (
               <p key={index}>
-                {event.receivedAt}: {event.kind}
+                {new Date(event.receivedAt).toLocaleString(language)}: {event.kind}
               </p>
             ))}
             <p>{d.sequenceExplanation}</p>

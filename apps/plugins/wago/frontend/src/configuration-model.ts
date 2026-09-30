@@ -120,7 +120,7 @@ export function readableValue(value: unknown, names: Record<string, string>, t?:
       const fallback = choiceCatalog.values[value as keyof typeof choiceCatalog.values];
       if (typeof fallback === 'string') return t ? t(`${choiceCatalog.prefix}.${value}`) : fallback;
     }
-    return words(value);
+    return value;
   }
   return String(value);
 }

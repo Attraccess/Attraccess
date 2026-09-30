@@ -427,7 +427,7 @@ function CompletedSessionSummary({
   verification: ReturnType<typeof useCommissioningVerification>;
   onConfigure?: (controllerId: number) => void;
 }) {
-  const { t, language } = useWagoTranslations();
+  const { t, language, tBackendMessage } = useWagoTranslations();
   const controllerId = verification.data?.controllerId ?? session.managementControllerId ?? null;
   return (
     <div className="wg:space-y-4">
@@ -449,7 +449,7 @@ function CompletedSessionSummary({
         />
         <SummaryField
           label={t('commissioningUI.management')}
-          value={verification.data?.managementHardening ?? t('commissioningUI.unverified')}
+          value={tBackendMessage(verification.data?.managementHardening ?? t('commissioningUI.unverified'))}
         />
       </dl>
       {onConfigure && controllerId && (
@@ -1128,7 +1128,7 @@ function VerificationStatus({
   session: CommissioningSession;
   onConfigure?: (controllerId: number) => void;
 }) {
-  const { t } = useWagoTranslations();
+  const { t, tBackendMessage } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   const controllerId = verification.data?.controllerId;
   const managementControllerId = controllerId ?? session.managementControllerId;
@@ -1181,10 +1181,14 @@ function VerificationStatus({
             </li>
             <li>
               {t('commissioningUI.hardwareProbe', {
-                status: verification.data.hardwareReadiness ?? t('commissioningUI.unverified'),
+                status: tBackendMessage(verification.data.hardwareReadiness ?? t('commissioningUI.unverified')),
               })}
             </li>
-            <li>{t('commissioningUI.managementStatus', { status: verification.data.managementHardening })}</li>
+            <li>
+              {t('commissioningUI.managementStatus', {
+                status: tBackendMessage(verification.data.managementHardening),
+              })}
+            </li>
             <li>{t('commissioningUI.physicalQualification')}</li>
           </ul>
         </section>

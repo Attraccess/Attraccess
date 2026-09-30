@@ -198,6 +198,78 @@ async function external(user: ReturnType<typeof userEvent.setup>, name: string) 
 }
 
 describe('visual configuration workflow', () => {
+  it('switches diagnostic status values with the host language while preserving source identifiers', async () => {
+    const diagnostics = diagnosticsFixture();
+    diagnostics.channels = [
+      {
+        id: 'sensor.v1',
+        profile: 'generic-digital-output',
+        capabilities: ['output'],
+        disconnectPolicy: { mode: 'hold' },
+        safeState: 'off (runtime default)',
+        samples: [
+          {
+            kind: 'output',
+            value: true,
+            sourceAt: null,
+            sourceFreshness: 'stale',
+            receivedAt: '2026-09-06T18:00:00.000Z',
+            streamId: 'boot.v1',
+            sequence: 1,
+            current: false,
+            availabilityReason: 'vendor.diagnostic-v2',
+          },
+        ],
+        current: false,
+        fault: null,
+        acknowledgement: null,
+      },
+    ];
+    state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostics)));
+    mount();
+    await section(userEvent.setup(), 'Diagnostics');
+    expect(await screen.findByText(/Permanent heartbeat:.*\(fresh\)/)).toBeInTheDocument();
+    expect(screen.getByText('Safe state: off (runtime default). Disconnect: hold.')).toBeInTheDocument();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText(/Dauerhaftes Lebenszeichen:.*\(Aktuell\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Quellzeit:.*\(Veraltet\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Sicherer Zustand: Aus (Standard der Laufzeitumgebung). Bei Verbindungsabbruch: Halten.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('sensor.v1')).toBeInTheDocument();
+    expect(screen.getByText(/vendor\.diagnostic-v2/)).toBeInTheDocument();
+    expect(screen.getByText(/boot\.v1/)).toBeInTheDocument();
+    expect(state.diagnostics).toHaveBeenCalledTimes(1);
+  });
+
+  it('localizes acknowledgement and protocol event dates when the host language changes', async () => {
+    const diagnostics = diagnosticsFixture();
+    diagnostics.channels = [
+      {
+        id: 'sensor.v1',
+        profile: 'generic-digital-output',
+        capabilities: ['output'],
+        disconnectPolicy: { mode: 'hold' },
+        safeState: 'on',
+        samples: [],
+        current: false,
+        fault: null,
+        acknowledgement: { id: 'command.v1', status: 'accepted', receivedAt: '2026-09-06T18:24:00.000Z' },
+      },
+    ];
+    diagnostics.events = [{ kind: 'state.changed', receivedAt: '2026-09-06T18:25:00.000Z' }];
+    state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostics)));
+    mount();
+    await section(userEvent.setup(), 'Diagnostics');
+    expect(await screen.findByText(/command\.v1/)).toHaveTextContent('9/6/2026');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('9/6/2026');
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText(/command\.v1/)).toHaveTextContent('6.9.2026');
+    expect(screen.getByText(/command\.v1/)).toHaveTextContent('Akzeptiert');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('6.9.2026');
+    expect(state.diagnostics).toHaveBeenCalledTimes(1);
+  });
+
   it('embeds real diagnostics polling without saving local edits or duplicating configuration controls', async () => {
     mount();
     const user = userEvent.setup();
@@ -664,7 +736,9 @@ describe('mounted Modbus configuration', () => {
       errors: [{ path: 'modbus.devices[0].unitId', code: 'invalid_modbus', message: 'Fixture unit is unavailable' }],
     });
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(await screen.findByText('Workshop meter · Unit ID (1–247): Fixture unit is unavailable')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Workshop meter · Unit ID (1–247): Fixture unit is unavailable'),
+    ).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
     await external(user, 'Devices');
     await user.click(screen.getByRole('button', { name: 'Remove device' }));

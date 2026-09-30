@@ -27,6 +27,8 @@ import {
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import { modbusDisplayName } from './modbus-labels';
 import type { ModbusConnection, RegisterFormat } from '../../modbus/model';
+import type { Freshness, WagoDiagnostics } from '../../diagnostics-types';
+import type { CommissioningVerification } from './api';
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', { setItem: vi.fn() });
@@ -66,6 +68,8 @@ it('translates retained backend messages, statuses and builtin names while prese
     'Eindeutige, nicht leere ID erforderlich',
   );
   expect(result.current.tBackendMessage('key_enrolled')).toBe('Schlüssel registriert');
+  expect(result.current.tBackendMessage('off (runtime default)')).toBe('Aus (Standard der Laufzeitumgebung)');
+  expect(result.current.tBackendMessage('not applicable')).toBe('Nicht zutreffend');
   expect(result.current.tBackendMessage('logical channel input-42 does not exist in this snapshot')).toBe(
     'Logischer Kanal input-42 ist in dieser Konfigurationsaufnahme nicht vorhanden',
   );
@@ -84,6 +88,36 @@ it('translates retained backend messages, statuses and builtin names while prese
   );
   act(() => useTranslationState.getState().setLanguage('en'));
   expect(result.current.tBackendMessage('Confirm controller identity')).toBe('Confirm controller identity');
+});
+
+it('translates every diagnostic freshness, acknowledgement and commissioning readiness status', () => {
+  const statuses = {
+    missing: 'Fehlend',
+    invalid: 'Ungültig',
+    future: 'In der Zukunft',
+    stale: 'Veraltet',
+    fresh: 'Aktuell',
+    unverified: 'Nicht verifiziert',
+    ready: 'Bereit',
+    not_ready: 'Nicht bereit',
+    accepted: 'Akzeptiert',
+    duplicate: 'Duplikat',
+    rejected: 'Abgelehnt',
+    'dispatch-failed': 'Versand fehlgeschlagen',
+    timeout: 'Zeitüberschreitung',
+  } satisfies Record<
+    | Freshness
+    | CommissioningVerification['hardwareReadiness']
+    | NonNullable<WagoDiagnostics['channels'][number]['acknowledgement']>['status'],
+    string
+  >;
+  const { result } = renderHook(() => useWagoTranslations());
+  for (const [status, german] of Object.entries(statuses)) {
+    expect(result.current.tBackendMessage(status)).toBe(status);
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(result.current.tBackendMessage(status)).toBe(german);
+    act(() => useTranslationState.getState().setLanguage('en'));
+  }
 });
 
 it('updates visible labels while preserving a channel creation form and its user-entered name', async () => {
@@ -140,6 +174,24 @@ it('translates configuration choices by field without translating user names or 
   expect(renderValue('$.logicalChannels[0].capabilities', ['input', 'feedback'])).toBe('Eingang, Rückmeldung');
   expect(renderValue('$.logicalChannels[0].name', 'on')).toBe('on');
   expect(renderValue('$.logicalChannels[0].id', 'immediate')).toBe('immediate');
+});
+
+it('preserves literal configuration identifiers and unknown values in both languages', () => {
+  const { result } = renderHook(() => useWagoTranslations());
+  for (const language of ['en', 'de'] as const) {
+    act(() => useTranslationState.getState().setLanguage(language));
+    for (const value of ['sensor.v1', 'meter-input_2', 'MixedCaseID', 'Unknown.Diagnostic-v2']) {
+      for (const field of ['id', 'physicalPointId', 'profile', 'mode']) {
+        expect(
+          readableChangeValue(`$.logicalChannels[0].${field}`, value, emptyConfiguration, {}, result.current.t),
+        ).toBe(value);
+      }
+      expect(
+        readableChangeValue('$.logicalChannels[0]', { id: value }, emptyConfiguration, {}, result.current.t),
+      ).toContain(value);
+      expect(readableChangeValue('$.logicalChannels[0].id', value, emptyConfiguration, {})).toBe(value);
+    }
+  }
 });
 
 it('covers every configuration enum and reuses editor labels in English and German reviews', () => {
