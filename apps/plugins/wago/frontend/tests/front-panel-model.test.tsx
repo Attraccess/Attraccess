@@ -93,6 +93,25 @@ describe('front panel configuration', () => {
     expect(validateEditorSnapshot(next.snapshot)).toEqual([]);
   });
 
+  it('reconciles every device when a shared custom profile loses registers', () => {
+    let configuration = addDevice(empty(), 'First meter').configuration;
+    configuration = addDevice(configuration, 'Second meter').configuration;
+    const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'shared-meter');
+    const devices = required(configuration.snapshot.modbus).devices;
+    for (const device of devices)
+      configuration = saveDevice(configuration, device, busConnection(configuration.snapshot), profile);
+    const retained = profile.measurements[0];
+    configuration = saveDevice(configuration, devices[0], busConnection(configuration.snapshot), {
+      ...profile,
+      measurements: [retained],
+    });
+    expect(configuration.snapshot.physicalPoints).toHaveLength(2);
+    expect(configuration.snapshot.physicalPoints.every((point) => point.modbus?.measurementId === retained.id)).toBe(
+      true,
+    );
+    expect(validateEditorSnapshot(configuration.snapshot)).toEqual([]);
+  });
+
   it('adds switch bindings, prunes removed registers and removes all bindings of a removed device', () => {
     const { configuration, id } = addDevice(empty(), 'Relay');
     const profile = {

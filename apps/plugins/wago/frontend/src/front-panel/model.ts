@@ -157,8 +157,12 @@ export function saveDevice(
       : previous.profiles,
   };
   let snapshot = updateModbusConfiguration(configuration.snapshot, modbus);
+  const affectedDevices = modbus.devices.filter(
+    (item) => item.profileId === profile.id && item.profileVersion === profile.version,
+  );
+  const affectedIds = new Set(affectedDevices.map((item) => item.id));
   const valid = (point: WagoConfigurationSnapshot['physicalPoints'][number]) => {
-    if (point.modbus?.deviceId !== device.id) return true;
+    if (!point.modbus || !affectedIds.has(point.modbus.deviceId)) return true;
     return (
       (!point.modbus.measurementId || profile.measurements.some((item) => item.id === point.modbus?.measurementId)) &&
       (!point.modbus.actionId || profile.actions.some((item) => item.id === point.modbus?.actionId))
@@ -171,18 +175,20 @@ export function saveDevice(
     logicalChannels: snapshot.logicalChannels.filter((channel) => !removed.has(channel.physicalPointId)),
   };
   const names = { ...configuration.metadata.names };
-  for (const [kind, registers] of [
-    ['measurementId', profile.measurements],
-    ['actionId', profile.actions],
-  ] as const) {
-    for (const register of registers) {
-      const point = snapshot.physicalPoints.find(
-        (point) => point.modbus?.deviceId === device.id && point.modbus[kind] === register.id,
-      );
-      if (point) continue;
-      const added = addModbusChannel(snapshot, { deviceId: device.id, [kind]: register.id });
-      snapshot = added.snapshot;
-      names[added.channel.id] = `${device.name} · ${register.name}`.slice(0, 120);
+  for (const affectedDevice of affectedDevices) {
+    for (const [kind, registers] of [
+      ['measurementId', profile.measurements],
+      ['actionId', profile.actions],
+    ] as const) {
+      for (const register of registers) {
+        const point = snapshot.physicalPoints.find(
+          (point) => point.modbus?.deviceId === affectedDevice.id && point.modbus[kind] === register.id,
+        );
+        if (point) continue;
+        const added = addModbusChannel(snapshot, { deviceId: affectedDevice.id, [kind]: register.id });
+        snapshot = added.snapshot;
+        names[added.channel.id] = `${affectedDevice.name} · ${register.name}`.slice(0, 120);
+      }
     }
   }
   const used = new Set(snapshot.modbus?.devices.map((device) => device.connectionId));

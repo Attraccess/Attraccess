@@ -111,12 +111,13 @@ describe('front panel runtime', () => {
     expect(state.manualOutputChannelIds).toEqual([]);
   });
 
-  it('polls switch readback without blocking application or command acknowledgements', async () => {
+  it('isolates switch acquisition and retains failed readback across heartbeats', async () => {
     const readOutput = jest.fn(async () => false);
     Object.assign(device, { readOutput });
     const next: Snapshot = {
       version: 1,
       physicalPoints: [
+        snapshot.physicalPoints[1],
         {
           id: 'switch-point',
           hardwareProfile: 'modbus',
@@ -124,7 +125,10 @@ describe('front panel runtime', () => {
           modbus: { deviceId: 'relay', actionId: 'switch' },
         },
       ],
-      logicalChannels: [{ ...snapshot.logicalChannels[0], physicalPointId: 'switch-point' }],
+      logicalChannels: [
+        { ...snapshot.logicalChannels[0], physicalPointId: 'switch-point' },
+        snapshot.logicalChannels[1],
+      ],
       modbus: {
         connections: [
           {
@@ -173,9 +177,45 @@ describe('front panel runtime', () => {
     await runtime.receiveCommand(command({ source: 'manual', expectedConfigurationRevision: 2 }));
     expect(acknowledgements.at(-1)).toMatchObject({ status: 'accepted' });
     expect(readOutput).not.toHaveBeenCalled();
-    await runtime.pollInputs();
+    await runtime.pollModbusOutputs();
+    await runtime.publishHeartbeat();
     expect(readOutput).toHaveBeenCalled();
     expect(state.outputs).toEqual({ output: false });
+    const clock = jest.spyOn(Date, 'now');
+    const now = Date.now();
+    try {
+      clock.mockReturnValue(now + 5001);
+      readOutput.mockRejectedValueOnce(new Error('No response'));
+      await runtime.pollModbusOutputs();
+      await runtime.publishHeartbeat();
+      expect(state.outputs).toEqual({});
+      expect(state.readiness).toMatchObject({ errors: [expect.objectContaining({ code: 'modbus_read_failed' })] });
+      await runtime.publishHeartbeat();
+      expect(state.outputs).toEqual({});
+      expect(state.readiness).toMatchObject({ errors: [expect.objectContaining({ code: 'modbus_read_failed' })] });
+      clock.mockReturnValue(now + 10002);
+      let complete: ((value: boolean) => void) | undefined;
+      readOutput.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            complete = resolve;
+          }),
+      );
+      const pending = runtime.pollModbusOutputs();
+      await runtime.pollInputs();
+      await runtime.publishHeartbeat();
+      expect(state.inputs).toEqual({ input: true });
+      expect(state.outputs).toEqual({});
+      complete?.(true);
+      await pending;
+      await runtime.publishHeartbeat();
+      expect(state.outputs).toEqual({ output: true });
+      clock.mockReturnValue(now + 21003);
+      await runtime.publishHeartbeat();
+      expect(state.outputs).toEqual({});
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('rejects release commands without a manual source', async () => {

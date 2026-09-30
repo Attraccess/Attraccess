@@ -56,6 +56,7 @@ export class WagoRuntime {
   private statePersistence = Promise.resolve();
   private lastPublishedState?: string;
   private polling = false;
+  private pollingModbusOutputs = false;
   private publishingHeartbeat = false;
   private credentialUpdates = Promise.resolve();
   private credentialRotationSubscribed = false;
@@ -628,6 +629,7 @@ export class WagoRuntime {
     if (this.polling || !this.connected) return;
     this.polling = true;
     try {
+      void this.pollModbusOutputs().catch(() => undefined);
       await this.publishState(false);
     } finally {
       this.polling = false;
@@ -666,8 +668,54 @@ export class WagoRuntime {
 
   private readonly modbusOutputSamples = new Map<
     string,
-    { revision: number; value: boolean; commanded: boolean | undefined }
+    { revision: number; value?: boolean; error?: string; acquiredAt: number; commanded: boolean | undefined }
   >();
+
+  /** Acquire switch values independently so transport timeouts never hold onboard telemetry. */
+  async pollModbusOutputs(): Promise<void> {
+    const accepted = this.state.accepted;
+    if (this.pollingModbusOutputs || !this.connected || !accepted || !this.options.device.readOutput) return;
+    this.pollingModbusOutputs = true;
+    try {
+      for (const channel of accepted.snapshot.logicalChannels) {
+        if (!channel.capabilities.includes('output')) continue;
+        const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
+        if (!point?.modbus) continue;
+        const device = accepted.snapshot.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
+        const sample = this.modbusOutputSamples.get(channel.id);
+        if (
+          sample?.revision === accepted.revision &&
+          Date.now() - sample.acquiredAt < (device?.pollIntervalMs ?? 5000) &&
+          sample.commanded === this.state.outputs[channel.id]
+        )
+          continue;
+        const commanded = this.state.outputs[channel.id];
+        try {
+          const value = await this.options.device.readOutput(point);
+          if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
+          if (accepted !== this.state.accepted) return;
+          this.modbusOutputSamples.set(channel.id, {
+            revision: accepted.revision,
+            value,
+            commanded,
+            acquiredAt: Date.now(),
+          });
+        } catch (error) {
+          if (accepted !== this.state.accepted) return;
+          // Replace the old success with the failure; heartbeats must retain the fault.
+          this.modbusOutputSamples.set(channel.id, {
+            revision: accepted.revision,
+            commanded,
+            acquiredAt: Date.now(),
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      this.requestStatePublication();
+    } finally {
+      this.pollingModbusOutputs = false;
+    }
+  }
 
   private async readAndPublishState(force: boolean): Promise<void> {
     const accepted = this.state.accepted;
@@ -696,28 +744,20 @@ export class WagoRuntime {
         const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
         if (!point) continue;
         if (point.modbus) {
-          if (!output || !this.options.device.readOutput) continue;
-          // Preview reads belong to the polling loop: offline devices must never
-          // block configuration acceptance, safety writes or command acknowledgements.
-          if (force) {
-            const sample = this.modbusOutputSamples.get(channel.id);
-            if (sample?.revision === accepted.revision && sample.commanded === this.state.outputs[channel.id])
+          const sample = this.modbusOutputSamples.get(channel.id);
+          const device = accepted.snapshot.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
+          const maxAge = (device?.pollIntervalMs ?? 5000) * 2;
+          if (sample?.revision === accepted.revision && Date.now() - sample.acquiredAt <= maxAge) {
+            if (sample.error) errors.push({ path: channel.id, code: 'modbus_read_failed', message: sample.error });
+            else if (sample.commanded === this.state.outputs[channel.id] && typeof sample.value === 'boolean')
               outputs[channel.id] = sample.value;
-            continue;
           }
+          continue;
         }
         try {
-          const value = point.modbus
-            ? await this.options.device.readOutput?.(point)
-            : await this.options.device.read(point);
+          const value = await this.options.device.read(point);
           if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
           (output ? outputs : inputs)[channel.id] = !output && channel.invert ? !value : value;
-          if (point.modbus)
-            this.modbusOutputSamples.set(channel.id, {
-              revision: accepted.revision,
-              value,
-              commanded: this.state.outputs[channel.id],
-            });
         } catch (error) {
           errors.push({
             path: channel.id,
