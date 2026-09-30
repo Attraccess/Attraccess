@@ -747,9 +747,13 @@ export class WagoRuntime {
           const sample = this.modbusOutputSamples.get(channel.id);
           const device = accepted.snapshot.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
           const maxAge = (device?.pollIntervalMs ?? 5000) * 2;
-          if (sample?.revision === accepted.revision && Date.now() - sample.acquiredAt <= maxAge) {
+          if (sample?.revision === accepted.revision) {
             if (sample.error) errors.push({ path: channel.id, code: 'modbus_read_failed', message: sample.error });
-            else if (sample.commanded === this.state.outputs[channel.id] && typeof sample.value === 'boolean')
+            else if (
+              Date.now() - sample.acquiredAt <= maxAge &&
+              sample.commanded === this.state.outputs[channel.id] &&
+              typeof sample.value === 'boolean'
+            )
               outputs[channel.id] = sample.value;
           }
           continue;
