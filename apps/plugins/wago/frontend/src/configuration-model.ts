@@ -4,6 +4,8 @@ import type { ConfigurationDiff, ConfigurationEditorMetadata, WagoConfigurationS
 import { availableDigitalTerminals, digitalTerminalLabel } from '../../backend/configuration-digital';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import englishFields from './fields.en.json';
+import englishChannels from './channels.en.json';
+import englishModbus from './modbus.en.json';
 
 export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
 export type PhysicalPoint = WagoConfigurationSnapshot['physicalPoints'][number];
@@ -102,9 +104,17 @@ export function readableValue(value: unknown, names: Record<string, string>, t?:
   if (typeof value === 'string') {
     if (names[value]) return names[value];
     // Only localize application-defined choices, never identifiers or user text.
-    if (['mode', 'capabilities', 'when', 'expected', 'kind', 'unit'].includes(field)) {
-      const fallback = englishFields.values[value as keyof typeof englishFields.values];
-      if (fallback && t) return t(`fields.values.${value}`);
+    const choiceCatalog =
+      field === 'unit' || field === 'kind'
+        ? { prefix: 'modbus.options', values: englishModbus.options }
+        : field === 'mode' || field === 'expected'
+          ? { prefix: 'channels', values: englishChannels }
+          : field === 'capabilities' || field === 'when'
+            ? { prefix: 'fields.values', values: englishFields.values }
+            : undefined;
+    if (choiceCatalog && Object.hasOwn(choiceCatalog.values, value)) {
+      const fallback = choiceCatalog.values[value as keyof typeof choiceCatalog.values];
+      if (typeof fallback === 'string') return t ? t(`${choiceCatalog.prefix}.${value}`) : fallback;
     }
     return words(value);
   }

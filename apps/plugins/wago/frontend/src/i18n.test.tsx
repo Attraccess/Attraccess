@@ -17,7 +17,7 @@ import rabbitmqEn from '../../../rabbitmq/frontend/src/en.json';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import rabbitmqDe from '../../../rabbitmq/frontend/src/de.json';
 import { ChannelWorkspace } from './ChannelWorkspace';
-import { emptyConfiguration, emptyMetadata, readableChangeValue } from './configuration-model';
+import { emptyConfiguration, emptyMetadata, readableChangeValue, type Channel } from './configuration-model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import { modbusDisplayName } from './modbus-labels';
 
@@ -114,14 +114,71 @@ it('translates configuration choices by field without translating user names or 
   const { result } = renderHook(() => useWagoTranslations());
   const renderValue = (path: string, value: unknown) =>
     readableChangeValue(path, value, emptyConfiguration, {}, result.current.t);
-  expect(renderValue('$.logicalChannels[0].disconnectPolicy.mode', 'immediate')).toBe('Immediate off');
+  expect(renderValue('$.logicalChannels[0].disconnectPolicy.mode', 'immediate')).toBe('Immediately off');
   act(() => useTranslationState.setState({ language: 'de' }));
   expect(renderValue('$.logicalChannels[0].disconnectPolicy.mode', 'immediate')).toBe('Sofort aus');
   expect(renderValue('$.logicalChannels[0].guard.when', 'on')).toBe('Ein');
-  expect(renderValue('$.logicalChannels[0].measurement.kind', 'cumulative')).toBe('Kumuliert');
+  expect(renderValue('$.logicalChannels[0].measurement.kind', 'cumulative')).toBe('kumulativ');
   expect(renderValue('$.logicalChannels[0].capabilities', ['input', 'feedback'])).toBe('Eingang, Rückmeldung');
   expect(renderValue('$.logicalChannels[0].name', 'on')).toBe('on');
   expect(renderValue('$.logicalChannels[0].id', 'immediate')).toBe('immediate');
+});
+
+it('covers every configuration enum and reuses editor labels in English and German reviews', () => {
+  const choices = {
+    mode: { hold: 'channels.hold', immediate: 'channels.immediate', watchdog: 'channels.watchdog' },
+    expected: { match: 'channels.match', inverse: 'channels.inverse' },
+    when: { on: 'fields.values.on', off: 'fields.values.off' },
+    capabilities: {
+      output: 'fields.values.output',
+      input: 'fields.values.input',
+      measurement: 'fields.values.measurement',
+      pulse: 'fields.values.pulse',
+      guard: 'fields.values.guard',
+      feedback: 'fields.values.feedback',
+    },
+    unit: {
+      ampere: 'modbus.options.ampere',
+      volt: 'modbus.options.volt',
+      watt: 'modbus.options.watt',
+      'watt-hour': 'modbus.options.watt-hour',
+      percent: 'modbus.options.percent',
+    },
+    kind: { live: 'modbus.options.live', cumulative: 'modbus.options.cumulative' },
+  } satisfies {
+    mode: Record<Channel['disconnectPolicy']['mode'], string>;
+    expected: Record<NonNullable<Channel['feedback']>['expected'], string>;
+    when: Record<NonNullable<Channel['guard']>['when'], string>;
+    capabilities: Record<Channel['capabilities'][number], string>;
+    unit: Record<NonNullable<Channel['measurement']>['unit'], string>;
+    kind: Record<NonNullable<NonNullable<Channel['measurement']>['kind']>, string>;
+  };
+  const { result } = renderHook(() => useWagoTranslations());
+  for (const language of ['en', 'de'] as const) {
+    act(() => useTranslationState.setState({ language }));
+    for (const [field, values] of Object.entries(choices)) {
+      for (const [value, key] of Object.entries(values)) {
+        expect(result.current.tExists(key), key).toBe(true);
+        expect(
+          readableChangeValue(`$.logicalChannels[0].${field}`, value, emptyConfiguration, {}, result.current.t),
+        ).toBe(result.current.t(key));
+        if (language === 'en') {
+          expect(readableChangeValue(`$.logicalChannels[0].${field}`, value, emptyConfiguration, {})).toBe(
+            result.current.t(key),
+          );
+        }
+      }
+    }
+    expect(
+      readableChangeValue(
+        '$.logicalChannels[0].measurement',
+        { unit: 'percent', kind: 'cumulative' },
+        emptyConfiguration,
+        {},
+        result.current.t,
+      ),
+    ).toContain(result.current.t('modbus.options.percent'));
+  }
 });
 
 it.each([

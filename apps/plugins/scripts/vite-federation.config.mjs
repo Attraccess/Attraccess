@@ -18,24 +18,25 @@ const tailwindcss = tailwindcssImport.default ?? tailwindcssImport;
 
 // Every host singleton a plugin may import at runtime. Sharing them keeps the
 // plugin bundle small and guarantees a single, host-themed instance.
+// Remote-only: federation transform emits shared chunks even with generate:false,
+// then generateBundle discards them. Resolve all seven to an inert build entry.
+// Never reuse this config for a host: packagePath suppresses host version detection.
+const hostOnly = {
+  singleton: true,
+  requiredVersion: '*',
+  import: false,
+  generate: false,
+  packagePath: fileURLToPath(new URL('./host-shared-placeholder.mjs', import.meta.url)),
+};
 export const HOST_SHARED = {
-  react: { singleton: true, requiredVersion: '*', import: false, generate: false },
-  'react-dom': { singleton: true, requiredVersion: '*', import: false, generate: false },
-  'react-router-dom': { singleton: true, requiredVersion: '*', import: false, generate: false },
-  '@heroui/react': { singleton: true, requiredVersion: '*', import: false, generate: false },
-  'lucide-react': { singleton: true, requiredVersion: '*', import: false, generate: false },
-  '@tanstack/react-query': { singleton: true, requiredVersion: '*', import: false, generate: false },
+  react: { ...hostOnly },
+  'react-dom': { ...hostOnly },
+  'react-router-dom': { ...hostOnly },
+  '@heroui/react': { ...hostOnly },
+  'lucide-react': { ...hostOnly },
+  '@tanstack/react-query': { ...hostOnly },
   // Includes the core language store: a remote must never create its own copy.
-  '@attraccess/plugins-frontend-ui': {
-    singleton: true,
-    requiredVersion: '*',
-    import: false,
-    generate: false,
-    // The federation bundler eagerly resolves shared chunks even with generate:false.
-    // Use an inert build-only entry; runtime imports still use the host's full UI
-    // module under this shared key, and import:false forbids a local fallback.
-    packagePath: fileURLToPath(new URL('./host-shared-placeholder.mjs', import.meta.url)),
-  },
+  '@attraccess/plugins-frontend-ui': { ...hostOnly },
 };
 
 /**

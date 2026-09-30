@@ -1,22 +1,13 @@
 {
   "values": {
-    "immediate": "Immediate off",
-    "hold": "Hold last state",
-    "watchdog": "Watchdog",
     "on": "On",
     "off": "Off",
-    "match": "Match output",
-    "inverse": "Inverse of output",
     "input": "Input",
     "output": "Output",
     "pulse": "Pulse",
     "guard": "Guard",
     "feedback": "Feedback",
-    "measurement": "Measurement",
-    "live": "Live",
-    "cumulative": "Cumulative",
-    "watt": "Watt",
-    "watt-hour": "Watt-hour"
+    "measurement": "Measurement"
   },
   "physicalPointId": "Physical terminal",
   "channel": "Physical terminal",
