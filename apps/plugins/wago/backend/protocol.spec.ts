@@ -39,6 +39,15 @@ describe('WAGO protocol', () => {
     expect(() => parseAnnouncement(payload)).toThrow('pairingCode');
   });
 
+  it('preserves Docker config identity while accepting legacy heartbeats without it', () => {
+    const runtimeImageId = `sha256:${'a'.repeat(64)}`;
+    expect(parseHeartbeat(Buffer.from(JSON.stringify({ ...valid, runtimeImageId })))).toMatchObject({ runtimeImageId });
+    expect(parseHeartbeat(Buffer.from(JSON.stringify(valid)))).not.toHaveProperty('runtimeImageId');
+    expect(() => parseHeartbeat(Buffer.from(JSON.stringify({ ...valid, runtimeImageId: 'latest' })))).toThrow(
+      'image identity',
+    );
+  });
+
   it('uses a versioned configuration protocol below the configurable operational prefix', () => {
     expect(configurationDesiredTopic('customer/wago/', 'cc100-01')).toBe(
       'customer/wago/v1/controllers/cc100-01/configuration/desired',

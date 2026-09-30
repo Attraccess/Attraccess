@@ -18,6 +18,7 @@ import { Test } from '@nestjs/testing';
 import { defer, lastValueFrom, of } from 'rxjs';
 import { WagoArtifactsController, WagoArtifactUploadInterceptor } from './wago-artifacts.controller';
 import request from 'supertest';
+import { WagoBuildRuntimeCatalog, sameRuntimeImage } from './wago-build-runtime';
 
 const image = `ghcr.io/attraccess/wago-cc100-runtime@sha256:${'a'.repeat(64)}`;
 const manifest = {
@@ -102,6 +103,99 @@ describe('runtime artifact catalog (isolated disk)', () => {
     await catalog.onModuleDestroy();
     await rm(root, { recursive: true, force: true });
     jest.restoreAllMocks();
+  });
+
+  describe('build-owned assets outside the plugin archive', () => {
+    const imageId = `sha256:${'b'.repeat(64)}`;
+    const buildId = 'c'.repeat(40);
+    let owned: WagoBuildRuntimeCatalog;
+    let directory: string;
+    async function assets(data = bundle(), descriptor: Record<string, unknown> = {}) {
+      const digest = createHash('sha256').update(data).digest('hex');
+      await writeFile(join(directory, 'wago-cc100-runtime.tar'), data);
+      await writeFile(join(directory, 'wago-cc100-runtime.tar.sha256'), digest);
+      await writeFile(
+        join(directory, 'release.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          buildId,
+          imageId,
+          manifest,
+          bundleBytes: data.length,
+          bundleSha256: digest,
+          ...descriptor,
+        }),
+      );
+      return digest;
+    }
+    beforeEach(async () => {
+      directory = await mkdtemp(join(root, 'build-'));
+      owned = new WagoBuildRuntimeCatalog(root, directory);
+    });
+    afterEach(async () => owned.onModuleDestroy());
+
+    it('selects only this build even when another build or a legacy importer changes shared storage', async () => {
+      const digest = await assets();
+      await owned.onModuleInit();
+      await catalog.import(
+        upload(
+          bundle(
+            { ...manifest, image: image.replace(/a{64}/, 'd'.repeat(64)) },
+            image.replace(/a{64}/, 'd'.repeat(64)),
+          ),
+        ),
+      );
+      expect((await catalog.current())?.digest).not.toBe(digest);
+      expect(await owned.current()).toMatchObject({ digest, imageId, buildId });
+      expect(await owned.list()).toHaveLength(1);
+      const snapshot = await owned.acquire();
+      expect(snapshot.imageId).toBe(imageId);
+      expect(await readFile(snapshot.path)).toEqual(bundle());
+      await snapshot.cleanup();
+    });
+
+    it('uses the next server build rather than a persisted old release pointer', async () => {
+      const previous = await catalog.import(upload());
+      const nextImage = image.replace(/a{64}/, 'e'.repeat(64));
+      const nextManifest = { ...manifest, image: nextImage };
+      const digest = await assets(bundle(nextManifest, nextImage), { manifest: nextManifest });
+      expect(await owned.current()).toMatchObject({ digest, image: nextImage });
+      expect((await catalog.current())?.digest).toBe(previous.digest);
+    });
+
+    it('rejects importing and acquiring a stale session digest', async () => {
+      await assets();
+      const source = upload();
+      await expect(owned.import(source)).rejects.toThrow('deployed server build owns');
+      expect(source.bundle.destroyed).toBe(true);
+      await expect(owned.acquire('f'.repeat(64))).rejects.toThrow('does not belong');
+    });
+
+    it.each([
+      { bundleSha256: 'f'.repeat(64) },
+      { bundleBytes: 1 },
+      { imageId: 'mutable:latest' },
+      { buildId: 'main' },
+      { manifest: { ...manifest, protocolVersion: '2.0.0' } },
+    ])('fails closed for mismatched/incompatible build metadata %j', async (descriptor) => {
+      await assets(bundle(), descriptor);
+      await expect(owned.onModuleInit()).rejects.toThrow();
+      expect(await owned.has()).toBe(false);
+    });
+
+    it('fails closed with missing assets and retries after they are made available', async () => {
+      expect(await owned.has()).toBe(false);
+      await assets();
+      expect(await owned.has()).toBe(true);
+    });
+
+    it('does not treat a changed tar, tag, or build ID as a new Docker image', () => {
+      expect(
+        sameRuntimeImage({ image, imageId }, { image: image.replace('runtime@', 'runtime:other@'), imageId }),
+      ).toBe(true);
+      expect(sameRuntimeImage({ image }, { image: image.replace('runtime@', 'runtime:other@') })).toBe(true);
+      expect(sameRuntimeImage({ image, imageId }, { image, imageId: `sha256:${'d'.repeat(64)}` })).toBe(false);
+    });
   });
   describe('loopback multipart lifecycle', () => {
     let app: INestApplication;
@@ -808,6 +902,40 @@ describe('runtime artifact catalog (isolated disk)', () => {
       ]),
     ).rejects.toThrow();
     expect(await readdir(join(root, 'releases'))).toHaveLength(2);
+  });
+
+  it('packages a fixed build-owned descriptor and verifies it without a manual import', async () => {
+    const exec = promisify(execFile);
+    await writeFile(
+      join(root, 'image.tar'),
+      Buffer.concat([tarMember('fixture', 'image fixture'), Buffer.alloc(1024)]),
+    );
+    const args = [
+      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+      '--image-archive',
+      join(root, 'image.tar'),
+      '--image',
+      image,
+      '--version',
+      '0.1.0',
+      '--build-id',
+      'a'.repeat(40),
+      '--image-id',
+      `sha256:${'b'.repeat(64)}`,
+      '--out',
+      join(root, 'build-assets'),
+    ];
+    await exec(process.execPath, args);
+    const directory = join(root, 'build-assets/cc100-build');
+    const owned = new WagoBuildRuntimeCatalog(root, directory);
+    try {
+      await owned.onModuleInit();
+      expect(await owned.current()).toMatchObject({ buildId: 'a'.repeat(40), imageId: `sha256:${'b'.repeat(64)}` });
+      // Reruns cannot replace assets already selected by a running build.
+      await expect(exec(process.execPath, args)).rejects.toThrow();
+    } finally {
+      await owned.onModuleDestroy();
+    }
   });
   const dockerImage = process.env.WAGO_DOCKER_TEST_IMAGE;
   (dockerImage ? it : it.skip)(

@@ -326,6 +326,23 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(artifacts.current).toHaveBeenCalledTimes(2);
   });
 
+  it('fails visibly instead of claiming an obsolete runtime when the release changes during SSH transfer', async () => {
+    jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockImplementation((async (_host, _pin, _credential, script: string) =>
+        script.includes("printf 'epoch=") ? clockOutput() : '') as never);
+    jest.spyOn(service as never, 'copyTo').mockImplementation((async () => {
+      artifacts.current.mockResolvedValue({ digest: 'b'.repeat(64) });
+    }) as never);
+    const result = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+    expect(result.state).toBe('delivery_failed');
+    expect(result.failureReason).toContain('runtime release changed');
+    expect(
+      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).deliveryToken,
+    ).not.toBeNull();
+    expect(wago.revokeEnrollmentById).toHaveBeenCalled();
+  });
+
   it('allows inactive Docker through staging, then activates before full hardware and capacity checks', async () => {
     let active = false;
     const order: string[] = [];

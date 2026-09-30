@@ -13,6 +13,7 @@ export interface WagoAnnouncement {
   fingerprint?: string;
   protocolVersion: string;
   runtimeVersion: string;
+  runtimeImageId?: string;
   capabilities: string[];
   sequence?: number;
 }
@@ -36,12 +37,18 @@ export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
     throw new Error('announcement capabilities must be an array of strings');
   if (input.sequence !== undefined && (!Number.isSafeInteger(input.sequence) || (input.sequence as number) < 0))
     throw new Error('announcement sequence must be a non-negative integer');
+  if (
+    input.runtimeImageId !== undefined &&
+    (typeof input.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(input.runtimeImageId))
+  )
+    throw new Error('Invalid runtime image identity');
   return {
     hardwareId: (input.hardwareId as string).trim(),
     enrollmentSecret: typeof input.enrollmentSecret === 'string' ? input.enrollmentSecret.trim() : undefined,
     fingerprint: typeof input.fingerprint === 'string' ? input.fingerprint.trim() : undefined,
     protocolVersion: (input.protocolVersion as string).trim(),
     runtimeVersion: (input.runtimeVersion as string).trim(),
+    ...(input.runtimeImageId ? { runtimeImageId: input.runtimeImageId as string } : {}),
     capabilities: input.capabilities,
     sequence: input.sequence as number | undefined,
   };

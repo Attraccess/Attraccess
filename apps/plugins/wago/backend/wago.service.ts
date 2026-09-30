@@ -94,6 +94,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly configurationLocks = new Map<number, Promise<void>>();
   private readonly configurationReportQueues = new Map<number, { pending: Map<number, Buffer>; processing: boolean }>();
   private commissioningDiscoveryHandler: ((controller: WagoController) => Promise<void>) | null = null;
+  private runtimeStatusHandler:
+    | ((
+        id: number,
+        heartbeat: { imageId: string; streamId: string; timestamp: number; receivedAt: number; sequence: number },
+      ) => void)
+    | null = null;
   private readonly commands = new WagoCommandHandler({
     context: this.context,
     controllers: () => this.controllers,
@@ -230,6 +236,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
 
   registerCommissioningDiscoveryHandler(handler: (controller: WagoController) => Promise<void>): void {
     this.commissioningDiscoveryHandler = handler;
+  }
+
+  registerRuntimeStatusHandler(handler: NonNullable<WagoService['runtimeStatusHandler']>): void {
+    this.runtimeStatusHandler = handler;
   }
 
   async getSettings(): Promise<WagoSettings> {
@@ -1622,6 +1632,21 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     )
       return;
     // Connectivity is process-local between bounded persistence checkpoints.
+    if (
+      canonical &&
+      (admitted || !canTrackDiagnostics) &&
+      heartbeat.runtimeImageId &&
+      typeof rawHeartbeat.streamId === 'string' &&
+      typeof rawHeartbeat.timestamp === 'string'
+    ) {
+      this.runtimeStatusHandler?.(controller.id, {
+        imageId: heartbeat.runtimeImageId,
+        streamId: rawHeartbeat.streamId,
+        timestamp: Date.parse(rawHeartbeat.timestamp),
+        receivedAt: Date.now(),
+        sequence: rawHeartbeat.sequence as number,
+      });
+    }
     // Avoid a database write for every permanent heartbeat.
     const metadataChanged =
       controller.protocolVersion !== heartbeat.protocolVersion ||

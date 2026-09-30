@@ -5,6 +5,7 @@ import { normalizeOperationalPrefix, parseOperationalMessage } from './protocol'
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 
 export interface CommissioningRuntimeState {
+  streamId?: string;
   timestamp: number;
   sequence: number;
   revision: number | null;
@@ -57,7 +58,11 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
     const key = `${serverId}:${topic}`;
     let entry = this.entries.get(key);
     if (!entry) {
-      if (this.entries.size >= 200) return undefined;
+      if (this.entries.size >= 200) {
+        const oldest = [...this.entries].sort((a, b) => a[1].lastRead - b[1].lastRead)[0];
+        oldest[1].subscription?.unsubscribe();
+        this.entries.delete(oldest[0]);
+      }
       entry = { lastRead: Date.now(), stream: emptyStream() };
       this.entries.set(key, entry);
       const current = entry;
@@ -102,6 +107,7 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
               return;
             }
             current.state = {
+              streamId: event.streamId,
               timestamp,
               sequence: event.sequence,
               revision: event.revision,

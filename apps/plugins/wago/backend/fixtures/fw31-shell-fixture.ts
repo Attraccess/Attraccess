@@ -13,6 +13,8 @@ export interface FixtureContainer {
   restart?: string;
   privileged?: boolean;
   pid?: number;
+  imageId?: string;
+  updateToken?: string;
 }
 
 /** Isolated FW31 interfaces: runtime has start/stop (status is a no-op),
@@ -56,8 +58,11 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     wc: '/usr/bin/wc',
     tr: '/usr/bin/tr',
     sed: '/usr/bin/sed',
+    head: '/usr/bin/head',
+    du: '/usr/bin/du',
     sort: '/usr/bin/sort',
     base64: '/usr/bin/base64',
+    openssl: '/usr/bin/openssl',
   }))
     symlinkSync(path, join(root, 'bin', name));
   file('bin/od', fw31MinimalOd, 0o700);
@@ -68,6 +73,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
   file('etc/nsswitch.conf', 'passwd: files\ngroup: files\n');
   file('proc/self/uid_map', '0 0 4294967295\n');
   file('proc/self/gid_map', '0 0 4294967295\n');
+  file('proc/self/mountinfo', '1 0 0:1 / / rw - ext4 fixture rw\n');
   file('proc/1/status', 'Uid:\t0\t0\t0\t0\nGid:\t0\t0\t0\t0\nGroups:\t0\n');
   file('proc/1/comm', 'init\n');
   file('proc/1/stat', '1 (init) S 0 ' + '0 '.repeat(17) + '1\n');
@@ -165,7 +171,8 @@ if(args[3]==='docker'&&args[6]==='load'&&fs.existsSync(loadDuration)&&Number(fs.
 const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';
 // Match the generated command's deadline. Shorter wall-clock caps measure host
 // process scheduling, except for the explicit isolated privilege lifecycle test.
-const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:privilegeLifecycle?1000:Number(args[2])*1000});
+const installerStall=args[3]==='dd'&&(process.env.FAULT==='installer-stalled'||(process.env.FAULT==='installer-eof-stalled'&&args.includes('count=1')));
+const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:installerStall?200:privilegeLifecycle?1000:Number(args[2])*1000});
 if(privilegeLifecycle)require('node:fs').appendFileSync(root+'/privilege-lifecycle.log',JSON.stringify({event:'reaped',tool:args[3].split('/').at(-1),pid:r.pid,status:r.status,error:r.error?.code})+'\\n');
 process.exit(r.status ?? 124);`,
   );
@@ -262,6 +269,8 @@ process.exit(process.env.FAULT==='locked'?1:0);`,
     'bin/sha256sum',
     `
 const fs=require('node:fs'),crypto=require('node:crypto');
+const args=process.argv.slice(2),file=args.find(arg=>!arg.startsWith('-'));
+if(file){console.log(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')+'  '+file);process.exit(0);}
 const [digest,path]=fs.readFileSync(0,'utf8').trim().split(/\\s+/);
 process.exit(crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex')===digest?0:1);`,
   );
@@ -351,12 +360,17 @@ const save=()=>{fs.writeFileSync(root+'/containers.json',JSON.stringify(state));
 if(args[0]==='container'&&args[1]==='ls'){
  if(fault==='docker-list-failed')process.exit(1);
  const filter=args.indexOf('--filter'),selected=filter===-1?state:state.filter(c=>args[filter+1]==='name=^/'+c.name+'$');
- selected.forEach(c=>console.log(args.at(-1)==='{{.ID}}'?(filter===-1?c.id:fullId(c)):c.id+' '+c.name));
+  selected.forEach(c=>console.log((args.includes('--no-trunc')?fullId(c):fullId(c).slice(0,12))+(args.at(-1)==='{{.ID}}'?'':' '+c.name)));
 }else if(args[0]==='inspect'){
- const c=find(args.at(-1));if(!c||fault==='docker-inspect-failed')process.exit(1);
+  const c=find(args.at(-1));if(!c||fault==='docker-inspect-failed')process.exit(1);
+  if(args[2]==='{{.Id}}'){console.log(fullId(c));process.exit(0);}
+  if(args[2]==='{{.Image}}'){console.log(c.imageId);process.exit(0);}
+  if(args[2].includes('update-token')){console.log(c.updateToken||'');process.exit(0);}
  console.log(args[2].includes('.State.Pid')?fullId(c)+' '+(c.running?(c.pid||42):0)+' '+String(c.running)+' ':args[2]==='{{.Name}}'?'/'+c.name:args[2].includes('.Mounts')?(c.mounts||[]).join('\\n'):args[2].includes('.Privileged')?String(c.privileged===true):args[2].includes('.State.Running')&&args[2].includes('.RestartPolicy')?String(c.running)+' '+(c.restart||'no'):args[2].includes('.RestartPolicy')?(c.restart||'no'):String(c.running));
 }else if(args[0]==='update'){
- const c=find(args.at(-1));if(!c||fault==='update-failed')process.exit(1);if(fault!=='update-stuck')c.restart='no';save();
+  const c=find(args.at(-1));if(!c||fault==='update-failed')process.exit(1);if(fault!=='update-stuck')c.restart='no';save();
+}else if(args[0]==='rename'){
+  const c=find(args[1]);if(!c||find(args[2]))process.exit(1);c.name=args[2];save();
 }else if(args[0]==='stop'||args[0]==='start'){
  const c=find(args.at(-1));if(!c||fault==='stop-failed')process.exit(1);
  if(fault!=='stop-stuck'||args[0]!=='stop')c.running=args[0]==='start';
@@ -366,18 +380,19 @@ if(args[0]==='container'&&args[1]==='ls'){
  if(fault==='remove')process.exit(1);
  const c=find(args.at(-1));if(!c)process.exit(1);if(fault!=='remove-stuck')state=state.filter(v=>v!==c);save();
 }else if(args[0]==='load'){
- console.log('Loaded image ID: sha256:fixture');if(fault==='load')process.exit(1);
+  console.log('Loaded image ID: '+(fs.existsSync(root+'/loaded-image-id')?fs.readFileSync(root+'/loaded-image-id','utf8'):'sha256:fixture'));if(fault==='load')process.exit(1);
 }else if(args[0]==='image'&&args[1]==='inspect'){
- if(fault==='inspect-image')process.exit(1);
+  if(fault==='inspect-image')process.exit(1);
+  if(args.includes('--format'))console.log(args[3]==='{{.Id}}'?fs.readFileSync(root+'/loaded-image-id','utf8'):(fs.existsSync(root+'/loaded-image-platform')?fs.readFileSync(root+'/loaded-image-platform','utf8'):'linux/arm/v7'));
 }else if(args[0]==='run'){
  if(find('attraccess-wago')||!args.includes('--pull=never'))process.exit(1);
  if(args[args.indexOf('--user')+1]!=='10001:10001'||args[args.indexOf('--cap-drop')+1]!=='ALL'||args[args.indexOf('--security-opt')+1]!=='no-new-privileges'||args[args.indexOf('--network')+1]!=='host'||args[args.indexOf('--restart')+1]!=='no')process.exit(98);
  const mounts=['type=bind,src='+root+'${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly','type=bind,src='+root+'${WAGO_DOUT},dst=/run/attraccess-wago/io/dout'];
  if(!mounts.every(m=>args.includes(m)))process.exit(98);
  const data=args[args.indexOf('-v')+1].split(':')[0];
- if(fs.existsSync(data+'/credentials.json'))process.exit(98);
+  if(fs.existsSync(data+'/credentials.json')&&!args.includes('--label'))process.exit(98);
  fs.writeFileSync(data+'/new-state','new enrollment state');
- state.push({id:'new-id',name:'attraccess-wago',running:fault!=='start',restart:'no',mounts:[root+'${WAGO_DIN}',root+'${WAGO_DOUT}']});save();
+  state.push({id:'new-id',name:'attraccess-wago',running:fault!=='start',restart:'no',...(args.includes('--label')?{imageId:args.at(-1),updateToken:args[args.indexOf('--label')+1].split('=')[1]}:{}),mounts:[root+'${WAGO_DIN}',root+'${WAGO_DOUT}']});save();
  if(fault==='kill')process.kill(Number(process.env.FIXTURE_CALLER_PID||process.ppid),'SIGKILL');
  if(fault==='start')process.exit(1);
  console.log('new-id');

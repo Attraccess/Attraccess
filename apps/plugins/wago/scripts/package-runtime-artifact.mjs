@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Release engineering only. Operators import the tar and checksum in the UI.
+// Build-owned offline assets; the server supplies these outside the npm plugin archive.
 // node scripts/package-runtime-artifact.mjs --image-archive image.tar --image ghcr.io/attraccess/wago-cc100-runtime@sha256:… --version 0.1.0 --out ./release
 import { constants, createReadStream, createWriteStream } from 'node:fs';
-import { open, mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
+import { open, mkdir, mkdtemp, rename, rm, writeFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
@@ -12,10 +12,19 @@ import { Transform } from 'node:stream';
 
 const { values } = parseArgs({
   options: Object.fromEntries(
-    ['image-archive', 'image', 'version', 'out', 'hardware-profile'].map((name) => [name, { type: 'string' }]),
+    ['image-archive', 'image', 'version', 'out', 'hardware-profile', 'build-id', 'image-id'].map((name) => [
+      name,
+      { type: 'string' },
+    ]),
   ),
 });
 const hardwareProfile = values['hardware-profile'] ?? 'cc100-751-9301-fw31-digital-v1';
+if (
+  (values['build-id'] || values['image-id']) &&
+  (!/^[a-f0-9]{40}$/.test(values['build-id'] ?? '') || !/^sha256:[a-f0-9]{64}$/.test(values['image-id'] ?? ''))
+) {
+  throw new Error('Build-owned assets require a commit --build-id and Docker config digest --image-id');
+}
 if (
   !['image-archive', 'image', 'version', 'out'].every((name) => values[name]) ||
   !['cc100-751-9301-fw31-digital-v1', 'cc100-751-9301-fw31-digital-rtu-v1'].includes(hardwareProfile) ||
@@ -148,16 +157,34 @@ try {
   }
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(join(stage, filename))) hash.update(chunk);
+  const digest = hash.digest('hex');
   const checksum = await open(join(stage, `${filename}.sha256`), 'wx', 0o600);
   try {
-    await checksum.writeFile(`${hash.digest('hex')}  ${filename}\n`);
+    await checksum.writeFile(`${digest}  ${filename}\n`);
     await checksum.sync();
   } finally {
     await checksum.close();
   }
-  // Publish a whole versioned directory. Never overwrite a previous release.
-  await rename(stage, join(output, `cc100-${values.version}-${Date.now()}`));
-  process.stdout.write('Runtime release packaged successfully. Import its .tar and .sha256 files.\n');
+  if (values['build-id']) {
+    await writeFile(
+      join(stage, 'release.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        buildId: values['build-id'],
+        imageId: values['image-id'],
+        bundleBytes: (await stat(join(stage, filename))).size,
+        bundleSha256: digest,
+        manifest,
+      }) + '\n',
+      { flag: 'wx', mode: 0o644 },
+    );
+    // CI and local dev use the same fixed directory. Never replace assets in place
+    // while a server is running; a deployed build owns them for its lifetime.
+    await rename(stage, join(output, 'cc100-build'));
+  } else {
+    await rename(stage, join(output, `cc100-${values.version}-${Date.now()}`));
+  }
+  process.stdout.write('Runtime release packaged successfully.\n');
 } finally {
   await rm(stage, { recursive: true, force: true });
 }

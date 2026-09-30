@@ -68,6 +68,7 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     prefix,
     pairingCode,
     enrollmentSecret,
+    runtimeImageId: process.env.WAGO_RUNTIME_IMAGE_ID,
     store,
     transport,
     device: adapter,
