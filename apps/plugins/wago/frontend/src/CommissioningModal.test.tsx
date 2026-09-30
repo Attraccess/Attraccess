@@ -174,6 +174,26 @@ function fillRecoveryCredentials() {
 }
 
 describe('FW31 software support boundary', () => {
+  it.each([
+    ['starting', 'Wird gestartet'],
+    ['started', 'Gestartet'],
+    ['recovering', 'Wird wiederhergestellt'],
+    ['restored', 'Wiederhergestellt'],
+    ['recovery_required', 'Wiederherstellung erforderlich'],
+    ['vendor.preparation-v2', 'vendor.preparation-v2'],
+  ])('switches the saved preparation status without another request (%s)', async (state, german) => {
+    activeSession.dockerProvisionState = state;
+    mount();
+    await screen.findByText((text) => text.startsWith(`Saved controller preparation: ${state}.`));
+    const requestCount = requests.length;
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText((text) => text.startsWith(`Gespeicherte Steuerungsvorbereitung: ${german}.`))).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('en'));
+    expect(screen.getByText((text) => text.startsWith(`Saved controller preparation: ${state}.`))).toBeTruthy();
+    expect(requests).toHaveLength(requestCount);
+    expect(requests.some(({ url }) => url.endsWith('/deliver') || url.endsWith('/inspect'))).toBe(false);
+  });
+
   it('shows saved UTC skew, action and result without claiming live synchronization', () => {
     activeSession.platformReport = JSON.stringify({
       clock: {

@@ -18,6 +18,8 @@ import rabbitmqEn from '../../../rabbitmq/frontend/src/en.json';
 import rabbitmqDe from '../../../rabbitmq/frontend/src/de.json';
 import { ChannelWorkspace } from './ChannelWorkspace';
 import { ConfigurationChanges } from './ConfigurationChanges';
+import englishPresets from './presets.en.json';
+import germanPresets from './presets.de.json';
 import {
   emptyConfiguration,
   emptyMetadata,
@@ -253,6 +255,60 @@ it('updates visible labels while preserving a channel creation form and its user
   expect(screen.getByRole('textbox', { name: 'Neuer Kanalname' })).toBe(input);
   expect(input.value).toBe('Workshop door');
   expect(screen.getByRole('button', { name: 'Weiter' })).toBeTruthy();
+});
+
+it.each([
+  ['751-9301', 'generic-digital-output'],
+  ['879-3000', 'generic-digital-output'],
+  ['751-9301', 'vendor-profile.v2'],
+  ['879-3000', 'vendor-profile.v2'],
+])('switches channel preset labels and preserves unknown identifiers (%s, %s)', (hardwareProfile, profile) => {
+  // A future saved profile can be unknown to this frontend version.
+  const snapshot: WagoConfigurationSnapshot = JSON.parse(
+    JSON.stringify({
+      version: 1,
+      physicalPoints: [{ id: 'point', hardwareProfile, channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'channel',
+          physicalPointId: 'point',
+          profile,
+          capabilities: ['output'],
+          disconnectPolicy: { mode: 'immediate' },
+        },
+      ],
+    }),
+  );
+  const onChange = vi.fn();
+  const onMetadataChange = vi.fn();
+  render(
+    <ChannelWorkspace
+      snapshot={snapshot}
+      metadata={emptyMetadata}
+      focusChannelId="channel"
+      onChange={onChange}
+      onMetadataChange={onMetadataChange}
+      onExternal={() => undefined}
+    />,
+  );
+  const builtin = profile === 'generic-digital-output';
+  const english = builtin ? englishPresets.items['generic-digital-output'].name : profile;
+  const german = builtin ? germanPresets.items['generic-digital-output'].name : profile;
+  const sentence = (name: string, language: 'en' | 'de') =>
+    hardwareProfile === '751-9301'
+      ? language === 'en'
+        ? `Setup preset: ${name}. Customize the behavior below.`
+        : `Einrichtungsvorlage: ${name}. Passe das Verhalten unten an.`
+      : language === 'en'
+        ? `Existing ${name} configuration is preserved. This hardware module requires its dedicated editor.`
+        : `Die vorhandene Konfiguration ${name} bleibt erhalten. Dieses Hardware-Modul benötigt seinen eigenen Editor.`;
+  expect(screen.getByText(sentence(english, 'en'))).toBeTruthy();
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(screen.getByText(sentence(german, 'de'))).toBeTruthy();
+  act(() => useTranslationState.getState().setLanguage('en'));
+  expect(screen.getByText(sentence(english, 'en'))).toBeTruthy();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(onMetadataChange).not.toHaveBeenCalled();
 });
 
 function leaves(record: Record<string, unknown>, prefix = ''): Record<string, string> {

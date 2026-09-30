@@ -1,7 +1,7 @@
 import { Button, Checkbox, Input, Label, ListBox, Select, TextField } from '@heroui/react';
 import type { ReactNode } from 'react';
 import type { Channel } from './configuration-model';
-import { pointLabel } from './configuration-model';
+import { pointLabel, presetDisplayName } from './configuration-model';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { ModbusPointForm } from './ModbusConfigurationForm';
 import { bindModbusPoint, emptyModbus } from './modbus-editor';
@@ -121,7 +121,7 @@ export function DigitalChannelEditor({
     <fieldset className="wg:flex wg:flex-col wg:gap-3">
       <legend className="wg:sr-only">{metadata.names[channel.id] ?? channel.id}</legend>
       <p className="wg:text-sm wg:text-muted">
-        {t('channels.preset', { preset: t(`presets.items.${channel.profile}.name`) })}
+        {t('channels.preset', { preset: presetDisplayName(channel.profile, t) })}
       </p>
       <TextField isRequired>
         <Label>{t('channels.name')}</Label>
