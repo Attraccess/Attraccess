@@ -135,7 +135,9 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
       )}
       {report?.provision === 'unsupported-lifecycle-dependencies' && <p>{t('security.lifecycle')}</p>}
       {current.dockerProvisionState && (
-        <p role="status">{t('security.savedPreparation', { state: current.dockerProvisionState })}</p>
+        <p role="status">
+          {t('security.savedPreparation', { state: tBackendMessage(current.dockerProvisionState) })}
+        </p>
       )}
       {current.failureReason && <p role="alert">{current.failureReason}</p>}
       <form ref={form} onSubmit={(event) => event.preventDefault()}>

@@ -83,6 +83,13 @@ export function pointLabel(point: PhysicalPoint, names: Record<string, string>, 
       : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
 }
 
+export function presetDisplayName(profile: string, t?: TFunction): string {
+  if (!Object.hasOwn(englishPresets.items, profile)) return profile;
+  return t
+    ? t(`presets.items.${profile}.name`)
+    : englishPresets.items[profile as keyof typeof englishPresets.items].name;
+}
+
 type ValueContext = {
   modbus?: ModbusConfiguration;
   profile?: ModbusProfile;
@@ -143,10 +150,7 @@ export function readableValue(
     }
     if (names[value]) return names[value];
     // Only localize application-defined choices, never identifiers or user text.
-    if (field === 'profile' && Object.hasOwn(englishPresets.items, value)) {
-      const fallback = englishPresets.items[value as keyof typeof englishPresets.items].name;
-      return t ? t(`presets.items.${value}.name`) : fallback;
-    }
+    if (field === 'profile') return presetDisplayName(value, t);
     const choiceCatalog = ['unit', 'kind', 'parity', 'byteOrder', 'wordOrder'].includes(field)
       ? { prefix: 'modbus.options', values: englishModbus.options }
       : field === 'mode' || field === 'expected'
