@@ -37,17 +37,28 @@ const updateSW = registerSW({
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
-root.render(
-  <Providers>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <PluginProvider>
-          <StrictMode>
-            <PWAInstall />
-            <App />
-          </StrictMode>
-        </PluginProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  </Providers>,
-);
+// PROTOTYPE — throwaway WAGO I/O design review. Dead code in production builds.
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('prototype') === 'wago-io') {
+  // eslint-disable-next-line @nx/enforce-module-boundaries -- throwaway prototype, archive branch only
+  void import('../../plugins/wago/frontend/src/io-prototype/IoPrototype').then(({ IoPrototype }) =>
+    root.render(
+      <Providers>
+        <IoPrototype />
+      </Providers>,
+    ),
+  );
+} else
+  root.render(
+    <Providers>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <PluginProvider>
+            <StrictMode>
+              <PWAInstall />
+              <App />
+            </StrictMode>
+          </PluginProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </Providers>,
+  );
