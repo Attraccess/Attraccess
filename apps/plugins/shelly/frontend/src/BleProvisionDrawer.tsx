@@ -239,7 +239,7 @@ export function BleProvisionDrawer({
             )}
 
             <div className="sh:flex sh:justify-end sh:gap-2 sh:pt-2">
-              <Button variant="secondary" onPress={close}>
+              <Button variant="secondary" onPress={close} isDisabled={running}>
                 {outcome ? 'Done' : 'Cancel'}
               </Button>
               <Button variant="primary" type="submit" isPending={running} onPress={submit} data-cy="shelly-ble-submit">

@@ -258,7 +258,11 @@ export async function provisionWifiOverBle(
   if (setResult?.restart_required) {
     // The BLE link dies with the reboot, so we cannot observe the join. The
     // operator finishes with Discover once the device is on the network.
-    await rpc.call('Shelly.Reboot').catch(() => undefined);
+    try {
+      await rpc.call('Shelly.Reboot');
+    } catch (err) {
+      if (!(err instanceof Error) || !/GATT server disconnected/i.test(err.message)) throw err;
+    }
     return { info, ipAddress: null, restartRequired: true };
   }
 

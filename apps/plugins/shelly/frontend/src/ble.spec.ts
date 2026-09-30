@@ -251,6 +251,18 @@ describe('provisionWifiOverBle', () => {
     });
   });
 
+  it('propagates a reboot failure when the device has not disconnected', async () => {
+    const rpc = {
+      call: async <T>(method: string): Promise<T> => {
+        if (method === 'Shelly.GetDeviceInfo') return { id: 'shelly1' } as T;
+        if (method === 'WiFi.SetConfig') return { restart_required: true } as T;
+        throw new Error('RPC timeout');
+      },
+    };
+
+    await expect(provisionWifiOverBle(rpc, { ssid: 'Workshop', password: 'x' })).rejects.toThrow('RPC timeout');
+  });
+
   it('rejects an address outside the private IPv4 ranges', async () => {
     const { rpc } = rpcStub({
       'Shelly.GetDeviceInfo': [{ id: 'shelly1' }],
