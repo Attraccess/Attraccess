@@ -676,6 +676,7 @@ export class WagoRuntime {
     const accepted = this.state.accepted;
     if (this.pollingModbusOutputs || !this.connected || !accepted || !this.options.device.readOutput) return;
     this.pollingModbusOutputs = true;
+    let acquired = false;
     try {
       for (const channel of accepted.snapshot.logicalChannels) {
         if (!channel.capabilities.includes('output')) continue;
@@ -690,6 +691,7 @@ export class WagoRuntime {
         )
           continue;
         const commanded = this.state.outputs[channel.id];
+        acquired = true;
         try {
           const value = await this.options.device.readOutput(point);
           if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
@@ -711,7 +713,7 @@ export class WagoRuntime {
           });
         }
       }
-      this.requestStatePublication();
+      if (acquired) await this.publishState(false);
     } finally {
       this.pollingModbusOutputs = false;
     }

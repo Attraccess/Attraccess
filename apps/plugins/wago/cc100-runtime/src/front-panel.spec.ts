@@ -41,9 +41,11 @@ describe('front panel runtime', () => {
   let device: MemoryDeviceAdapter;
   let persisted: RuntimeState;
   let state: Record<string, unknown>;
+  let statePublications: number;
   let acknowledgements: Array<Record<string, unknown>>;
   beforeEach(async () => {
     persisted = { outputs: {}, commandIds: [] };
+    statePublications = 0;
     acknowledgements = [];
     device = new MemoryDeviceAdapter();
     const store: StateStore = {
@@ -55,7 +57,10 @@ describe('front panel runtime', () => {
     const transport: Transport = {
       subscribe: async () => undefined,
       publish: async (topic, payload) => {
-        if (topic.endsWith('/state')) state = payload as Record<string, unknown>;
+        if (topic.endsWith('/state')) {
+          state = payload as Record<string, unknown>;
+          statePublications++;
+        }
         if (topic.endsWith('/acknowledgements')) acknowledgements.push(payload as Record<string, unknown>);
       },
     };
@@ -181,6 +186,11 @@ describe('front panel runtime', () => {
     await runtime.publishHeartbeat();
     expect(readOutput).toHaveBeenCalled();
     expect(state.outputs).toEqual({ output: false });
+    const publications = statePublications;
+    await runtime.pollModbusOutputs();
+    await runtime.pollInputs();
+    await runtime.pollInputs();
+    expect(statePublications).toBe(publications);
     const clock = jest.spyOn(Date, 'now');
     const now = Date.now();
     try {
