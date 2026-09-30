@@ -118,6 +118,7 @@ it('translates configuration choices by field without translating user names or 
   act(() => useTranslationState.setState({ language: 'de' }));
   expect(renderValue('$.logicalChannels[0].disconnectPolicy.mode', 'immediate')).toBe('Sofort aus');
   expect(renderValue('$.logicalChannels[0].guard.when', 'on')).toBe('Ein');
+  expect(renderValue('$.logicalChannels[0].measurement.kind', 'cumulative')).toBe('Kumuliert');
   expect(renderValue('$.logicalChannels[0].capabilities', ['input', 'feedback'])).toBe('Eingang, Rückmeldung');
   expect(renderValue('$.logicalChannels[0].name', 'on')).toBe('on');
   expect(renderValue('$.logicalChannels[0].id', 'immediate')).toBe('immediate');

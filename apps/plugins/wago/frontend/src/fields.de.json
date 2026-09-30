@@ -14,7 +14,7 @@
     "feedback": "Rückmeldung",
     "measurement": "Messung",
     "live": "Aktuell",
-    "counter": "Zähler",
+    "cumulative": "Kumuliert",
     "watt": "Watt",
     "watt-hour": "Wattstunde"
   },

@@ -14,7 +14,7 @@
     "feedback": "Feedback",
     "measurement": "Measurement",
     "live": "Live",
-    "counter": "Counter",
+    "cumulative": "Cumulative",
     "watt": "Watt",
     "watt-hour": "Watt-hour"
   },
