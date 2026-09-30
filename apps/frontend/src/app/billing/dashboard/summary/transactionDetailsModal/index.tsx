@@ -87,7 +87,7 @@ export function TransactionDetailsModal(props: Props) {
   return (
     <>
       {children && children(open)}
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="lg">
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="lg" dialogProps={{ className: 'max-w-4xl' }}>
         {() => (
           <>
             <ModalHeader>
@@ -221,10 +221,19 @@ export function TransactionDetailsModal(props: Props) {
                                       })
                                     : item.description}
                                 </TableCell>
-                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                <TableCell className="text-right">
+                                  {item.name === 'ENERGY' && item.energyMicroWh != null
+                                    ? formatNumber(Number(item.energyMicroWh) / 1e9)
+                                    : item.quantity}
+                                </TableCell>
                                 <TableCell className="text-right">
                                   {formatNumber(
-                                    dbCurrencyToUserCurrency(item.unitPrice, configuration?.minorUnit ?? 2),
+                                    dbCurrencyToUserCurrency(
+                                      item.name === 'ENERGY' && item.energyCreditsPerKwh != null
+                                        ? item.energyCreditsPerKwh
+                                        : item.unitPrice,
+                                      configuration?.minorUnit ?? 2,
+                                    ),
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">

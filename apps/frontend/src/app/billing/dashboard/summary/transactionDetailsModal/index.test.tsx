@@ -93,6 +93,10 @@ it('describes an energy item from its kWh and captured rate instead of a stored 
   render(<TransactionDetailsModal transactionId={7} isOpen />);
   expect(await screen.findByText('items.energyDescription')).toBeTruthy();
   expect(screen.getByText('metering:s:o')).toBeTruthy();
+  // quantity/unit price columns show the real kWh consumed and per-kWh rate,
+  // not the raw quantity=1 / unitPrice=total-charge fields (ATT-1103).
+  expect(screen.getByText('1.50')).toBeTruthy();
+  expect(screen.getByText('0.30')).toBeTruthy();
 });
 it.each([
   ['refund', { refundOfId: 4, amount: 100, status: 'pending' }, 'type.refund'],
