@@ -41,6 +41,8 @@
   "feedback_expected": "Erwartete Rückmeldung",
   "feedback_timeoutMs": "Rückmeldezeitüberschreitung",
   "notConfigured": "Nicht konfiguriert",
+  "measurement_unit": "Messwerteinheit",
+  "measurement_kind": "Messwertart",
   "none": "Keine",
   "name": "Name",
   "removed": "Entfernt",

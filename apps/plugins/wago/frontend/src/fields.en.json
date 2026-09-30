@@ -41,6 +41,8 @@
   "feedback_expected": "Expected feedback",
   "feedback_timeoutMs": "Feedback timeout",
   "notConfigured": "Not configured",
+  "measurement_unit": "Measurement unit",
+  "measurement_kind": "Measurement kind",
   "none": "None",
   "name": "Name",
   "removed": "Removed",

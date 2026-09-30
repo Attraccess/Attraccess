@@ -17,7 +17,13 @@ import rabbitmqEn from '../../../rabbitmq/frontend/src/en.json';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import rabbitmqDe from '../../../rabbitmq/frontend/src/de.json';
 import { ChannelWorkspace } from './ChannelWorkspace';
-import { emptyConfiguration, emptyMetadata, readableChangeValue, type Channel } from './configuration-model';
+import {
+  emptyConfiguration,
+  emptyMetadata,
+  readableChangeValue,
+  changeLabel,
+  type Channel,
+} from './configuration-model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import { modbusDisplayName } from './modbus-labels';
 
@@ -119,6 +125,17 @@ it('translates configuration choices by field without translating user names or 
   expect(renderValue('$.logicalChannels[0].disconnectPolicy.mode', 'immediate')).toBe('Sofort aus');
   expect(renderValue('$.logicalChannels[0].guard.when', 'on')).toBe('Ein');
   expect(renderValue('$.logicalChannels[0].measurement.kind', 'cumulative')).toBe('kumulativ');
+  for (const field of ['unit', 'kind']) {
+    expect(
+      changeLabel(
+        { path: `$.logicalChannels[0].measurement.${field}`, previous: null, current: null },
+        null,
+        emptyConfiguration,
+        {},
+        result.current.t,
+      ),
+    ).toContain(result.current.t(`fields.measurement_${field}`));
+  }
   expect(renderValue('$.logicalChannels[0].capabilities', ['input', 'feedback'])).toBe('Eingang, Rückmeldung');
   expect(renderValue('$.logicalChannels[0].name', 'on')).toBe('on');
   expect(renderValue('$.logicalChannels[0].id', 'immediate')).toBe('immediate');
