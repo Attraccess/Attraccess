@@ -6,6 +6,7 @@ import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import englishFields from './fields.en.json';
 import englishChannels from './channels.en.json';
 import englishModbus from './modbus.en.json';
+import englishPresets from './presets.en.json';
 
 export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
 export type PhysicalPoint = WagoConfigurationSnapshot['physicalPoints'][number];
@@ -104,14 +105,17 @@ export function readableValue(value: unknown, names: Record<string, string>, t?:
   if (typeof value === 'string') {
     if (names[value]) return names[value];
     // Only localize application-defined choices, never identifiers or user text.
-    const choiceCatalog =
-      field === 'unit' || field === 'kind'
-        ? { prefix: 'modbus.options', values: englishModbus.options }
-        : field === 'mode' || field === 'expected'
-          ? { prefix: 'channels', values: englishChannels }
-          : field === 'capabilities' || field === 'when'
-            ? { prefix: 'fields.values', values: englishFields.values }
-            : undefined;
+    if (field === 'profile' && Object.hasOwn(englishPresets.items, value)) {
+      const fallback = englishPresets.items[value as keyof typeof englishPresets.items].name;
+      return t ? t(`presets.items.${value}.name`) : fallback;
+    }
+    const choiceCatalog = ['unit', 'kind', 'parity', 'byteOrder', 'wordOrder'].includes(field)
+      ? { prefix: 'modbus.options', values: englishModbus.options }
+      : field === 'mode' || field === 'expected'
+        ? { prefix: 'channels', values: englishChannels }
+        : field === 'capabilities' || field === 'when'
+          ? { prefix: 'fields.values', values: englishFields.values }
+          : undefined;
     if (choiceCatalog && Object.hasOwn(choiceCatalog.values, value)) {
       const fallback = choiceCatalog.values[value as keyof typeof choiceCatalog.values];
       if (typeof fallback === 'string') return t ? t(`${choiceCatalog.prefix}.${value}`) : fallback;
@@ -148,9 +152,16 @@ function words(value: string) {
 }
 
 function fieldLabel(field: string, t?: TFunction) {
-  const key = field.replaceAll('.', '_');
-  const fallback = englishFields[key as keyof typeof englishFields];
-  return typeof fallback === 'string' ? (t ? t(`fields.${key}`) : fallback) : undefined;
+  const normalized = field.replace(/\[\d+\]/g, '');
+  for (const candidate of [normalized, normalized.split('.').at(-1) ?? normalized]) {
+    const key = candidate.replaceAll('.', '_');
+    const fallback = englishFields[key as keyof typeof englishFields];
+    if (typeof fallback === 'string') return t ? t(`fields.${key}`) : fallback;
+    const modbusFallback = englishModbus[key as keyof typeof englishModbus];
+    if (typeof modbusFallback === 'string' && !modbusFallback.includes('{{'))
+      return t ? t(`modbus.${key}`) : modbusFallback;
+  }
+  return undefined;
 }
 
 /** Read-only reviews match structural edits by identity, not shifting array positions. */
@@ -221,7 +232,8 @@ export function changeLabel(
     const item = after.modbus?.[collection][index] ?? before?.modbus?.[collection][index];
     const label =
       item && 'name' in item ? item.name : t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`;
-    return `${label}${modbus[3] ? ` · ${names[modbus[3].slice(1)] ?? words(modbus[3].slice(1))}` : ''}`;
+    const field = modbus[3].slice(1);
+    return `${label}${field ? ` · ${names[field] ?? fieldLabel(field, t) ?? words(field)}` : ''}`;
   }
   const match = change.path.match(/^(?:\$\.)?(logicalChannels|physicalPoints)\[(\d+)\](.*)$/);
   if (!match)

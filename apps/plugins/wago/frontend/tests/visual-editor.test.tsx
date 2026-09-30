@@ -664,7 +664,7 @@ describe('mounted Modbus configuration', () => {
       errors: [{ path: 'modbus.devices[0].unitId', code: 'invalid_modbus', message: 'Fixture unit is unavailable' }],
     });
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(await screen.findByText('Workshop meter · unit Id: Fixture unit is unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Workshop meter · Unit ID (1–247): Fixture unit is unavailable')).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
     await external(user, 'Devices');
     await user.click(screen.getByRole('button', { name: 'Remove device' }));

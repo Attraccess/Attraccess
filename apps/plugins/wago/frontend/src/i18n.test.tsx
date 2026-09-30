@@ -26,6 +26,7 @@ import {
 } from './configuration-model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import { modbusDisplayName } from './modbus-labels';
+import type { ModbusConnection, RegisterFormat } from '../../modbus/model';
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', { setItem: vi.fn() });
@@ -162,6 +163,16 @@ it('covers every configuration enum and reuses editor labels in English and Germ
       percent: 'modbus.options.percent',
     },
     kind: { live: 'modbus.options.live', cumulative: 'modbus.options.cumulative' },
+    parity: { none: 'modbus.options.none', even: 'modbus.options.even', odd: 'modbus.options.odd' },
+    byteOrder: { big: 'modbus.options.big', little: 'modbus.options.little' },
+    wordOrder: { big: 'modbus.options.big', little: 'modbus.options.little' },
+    profile: {
+      'metered-switched-load': 'presets.items.metered-switched-load.name',
+      'pulsed-lock-bank': 'presets.items.pulsed-lock-bank.name',
+      'guarded-enable-request': 'presets.items.guarded-enable-request.name',
+      'generic-digital-output': 'presets.items.generic-digital-output.name',
+      'generic-monitored-input': 'presets.items.generic-monitored-input.name',
+    },
   } satisfies {
     mode: Record<Channel['disconnectPolicy']['mode'], string>;
     expected: Record<NonNullable<Channel['feedback']>['expected'], string>;
@@ -169,6 +180,10 @@ it('covers every configuration enum and reuses editor labels in English and Germ
     capabilities: Record<Channel['capabilities'][number], string>;
     unit: Record<NonNullable<Channel['measurement']>['unit'], string>;
     kind: Record<NonNullable<NonNullable<Channel['measurement']>['kind']>, string>;
+    parity: Record<Extract<ModbusConnection, { transport: 'rtu' }>['parity'], string>;
+    byteOrder: Record<RegisterFormat['byteOrder'], string>;
+    wordOrder: Record<RegisterFormat['wordOrder'], string>;
+    profile: Record<Channel['profile'], string>;
   };
   const { result } = renderHook(() => useWagoTranslations());
   for (const language of ['en', 'de'] as const) {
@@ -195,6 +210,31 @@ it('covers every configuration enum and reuses editor labels in English and Germ
         result.current.t,
       ),
     ).toContain(result.current.t('modbus.options.percent'));
+  }
+});
+
+it('localizes nested and indexed diff headings while retaining full-path overrides', () => {
+  const { result } = renderHook(() => useWagoTranslations());
+  act(() => useTranslationState.setState({ language: 'de' }));
+  const headings = {
+    'logicalChannels[0].range.minimum': 'fields.minimum',
+    'logicalChannels[0].range.maximum': 'fields.maximum',
+    'logicalChannels[0].measurement.scale': 'fields.scale',
+    'logicalChannels[0].measurement.offset': 'fields.offset',
+    'logicalChannels[0].capabilities[1]': 'fields.capabilities',
+    'logicalChannels[0].disconnectPolicy.timeoutMs': 'fields.disconnectPolicy_timeoutMs',
+    'physicalPoints[0].hardwareProfile': 'fields.hardwareProfile',
+    'physicalPoints[0].modbus.deviceId': 'fields.modbus_deviceId',
+    'physicalPoints[0].modbus.measurementId': 'fields.modbus_measurementId',
+    'physicalPoints[0].modbus.actionId': 'fields.modbus_actionId',
+    'modbus.connections[0].parity': 'modbus.parity',
+    'modbus.profiles[0].measurements[0].byteOrder': 'modbus.byteOrder',
+  };
+  for (const [path, key] of Object.entries(headings)) {
+    expect(result.current.tExists(key), key).toBe(true);
+    expect(
+      changeLabel({ path: `$.${path}`, previous: null, current: null }, null, emptyConfiguration, {}, result.current.t),
+    ).toContain(result.current.t(key));
   }
 });
 
