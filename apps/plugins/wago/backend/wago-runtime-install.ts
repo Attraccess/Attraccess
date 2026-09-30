@@ -96,7 +96,10 @@ chmod 0600 "$config/runtime.env"
 # FW31 takes over 45s to decompress/import even a cached runtime image. Give
 # import its own bounded budget; ordinary Docker queries keep their short limit.
 # Do not pipe docker load into sed: POSIX sh would hide a failing load exit code.
-timeout -k 5 300 docker --host unix:///var/run/docker.sock load -i "$tx/bundle/image.tar" > "$tx/load-output" || fail 'Runtime image load failed or exceeded 300 seconds'
+if ! timeout -k 5 300 docker --host unix:///var/run/docker.sock load -i "$tx/bundle/image.tar" > "$tx/load-output" 2> "$tx/load-error"; then
+  ! grep -qi 'no space left on device' "$tx/load-error" || fail 'Runtime image load ran out of Docker storage'
+  fail 'Runtime image load failed or exceeded 300 seconds'
+fi
 sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p' "$tx/load-output" > "$tx/loaded-image"
 test "$(wc -l < "$tx/loaded-image" | tr -d ' ')" = 1 || fail 'Expected exactly one loaded image'
 runtime_image=$(cat "$tx/loaded-image")
@@ -345,10 +348,11 @@ export function runtimeBundleDeliveryScript(
   token: string,
   testRoot = '',
   profile: Cc100HardwareProfile = CC100_DIGITAL_PROFILE_ID,
+  imageBytes = bytes,
 ): string {
   if (!Number.isSafeInteger(bytes) || bytes <= 0 || !/^[a-f0-9]{64}$/.test(digest) || !/^[a-f0-9]{32}$/.test(token))
     throw new Error('Invalid delivery metadata');
-  return `${runtimeBundlePreflightScript(bytes, testRoot, profile)}
+  return `${runtimeBundlePreflightScript(bytes, testRoot, profile, imageBytes)}
 ${preamble(testRoot)}
 test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" && test ! -e "$config/runtime.env.next" && test ! -e "$config/runtime-ca.pem.next" || fail 'Recovery or acceptance required before delivery'
 if [ -e "$config/docker-provision" ]; then
@@ -388,9 +392,11 @@ rm -rf "$config/delivery"
  * Read-only capacity/tool checks. Staging is checked before preparation; the full
  * check requires activated Docker on its local socket and never guesses its root.
  *
- * B is the authenticated, plain outer tar size (bounds the extracted image.tar).
+ * B is the authenticated outer tar size (bounds the extracted, gzip-compressed
+ * image.tar). U is the manifest's uncompressed image size (B when absent).
  * Peak phases: upload E=B; move E=B,T=B (even equal st_dev can be bind mounts);
- * extraction/load T=B,V=B,D=3B. Sum by st_dev, then take the phase maximum,
+ * extraction/load T=B,V=B,D=max(3B,2U): the daemon unpacks the stream to its
+ * temporary directory and then applies the layers. Sum by st_dev, then take the phase maximum,
  * adding 16 MiB once per filesystem for configuration/journals and headroom.
  * No credit is taken for deleting old state, cached layers, or existing uploads.
  *
@@ -398,8 +404,15 @@ rm -rf "$config/delivery"
  * compressed/sparse layers and filesystem metadata can exceed it. A verified
  * image expansion bound is needed before claiming guaranteed Docker capacity.
  */
-function bundleCapacityPreflightScript(bytes: number, testRoot: string, includeDocker: boolean): string {
+function bundleCapacityPreflightScript(
+  bytes: number,
+  testRoot: string,
+  includeDocker: boolean,
+  imageBytes = bytes,
+): string {
   if (!Number.isSafeInteger(bytes) || bytes <= 0 || bytes > 512 * 1024 * 1024) throw new Error('Invalid bundle size');
+  if (!Number.isSafeInteger(imageBytes) || imageBytes <= 0 || imageBytes > 2048 * 1024 * 1024)
+    throw new Error('Invalid image size');
   if (testRoot && (!testRoot.startsWith('/') || testRoot === '/' || testRoot.includes('\n')))
     throw new Error('Test root must be an absolute isolated directory');
   return `set -eu
@@ -437,13 +450,14 @@ for storage_path in "$storage_config" ${['/tmp', '/var/lib'].map((path) => quote
   storage_rows="$storage_rows$storage_device $storage_free $storage_path
 "
 done
-printf '%s' "$storage_rows" | awk -v b=${Math.ceil(bytes / 1024)} '
+printf '%s' "$storage_rows" | awk -v b=${Math.ceil(bytes / 1024)} -v u=${Math.ceil(imageBytes / 1024)} '
   { dev[NR]=$1; available[NR]=$2; path[NR]=$3 }
   END {
     for (i=1; i<=NR; i++) {
       # Equal st_dev does not rule out EXDEV between distinct bind mounts.
       move=(dev[i]==dev[1] ? b : 0)+(dev[i]==dev[2] ? b : 0)
-      load=(dev[i]==dev[2] ? b : 0)+(dev[i]==dev[3] ? b : 0)+(NR==4 && dev[i]==dev[4] ? 3*b : 0)
+      docker=(3*b>2*u ? 3*b : 2*u)
+      load=(dev[i]==dev[2] ? b : 0)+(dev[i]==dev[3] ? b : 0)+(NR==4 && dev[i]==dev[4] ? docker : 0)
       required=(move>load ? move : load)+16384
       if (available[i]<required) {
         printf "Insufficient runtime storage: %s requires %.0f KiB, available %.0f KiB\\n", path[i], required, available[i]
@@ -462,8 +476,8 @@ export function runtimeBundleStagingCapacityPreflightScript(bytes: number, testR
 }
 
 /** After activation: recheck staging and the discovered Docker root together. */
-export function runtimeBundleCapacityPreflightScript(bytes: number, testRoot = ''): string {
-  return bundleCapacityPreflightScript(bytes, testRoot, true);
+export function runtimeBundleCapacityPreflightScript(bytes: number, testRoot = '', imageBytes = bytes): string {
+  return bundleCapacityPreflightScript(bytes, testRoot, true, imageBytes);
 }
 
 /** Delivery still requires the exclusive hardware gate after preparation. */
@@ -471,8 +485,9 @@ export function runtimeBundlePreflightScript(
   bytes: number,
   testRoot = '',
   profile: Cc100HardwareProfile = CC100_DIGITAL_PROFILE_ID,
+  imageBytes = bytes,
 ): string {
-  return `${runtimeBundleCapacityPreflightScript(bytes, testRoot)}
+  return `${runtimeBundleCapacityPreflightScript(bytes, testRoot, imageBytes)}
 ${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 `;
 }

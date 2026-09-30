@@ -54,6 +54,14 @@ describe('commissioning verification', () => {
     expect(result.configurationApplied).toBe(false);
   });
 
+  it('accepts a heartbeat within the controller clock tolerance but not beyond it', async () => {
+    const ahead = (ms: number) => new Date(Date.now() + ms).toISOString();
+    const verify = (ms: number) =>
+      commissioningVerification(context({ ...controller, lastHeartbeatAt: ahead(ms) }), session);
+    expect((await verify(3_000)).permanentConnection).toBe(true);
+    expect((await verify(60_000)).permanentConnection).toBe(false);
+  });
+
   it('requires a heartbeat from the current enrollment', async () => {
     const result = await commissioningVerification(context({ ...controller, enrollmentId: 99 }), session);
     expect(result.permanentConnection).toBe(false);

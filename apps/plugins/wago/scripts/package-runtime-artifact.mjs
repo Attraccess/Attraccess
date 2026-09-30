@@ -74,6 +74,8 @@ try {
     const magic = Buffer.alloc(2);
     await archive.read(magic, 0, magic.length, 0);
     if (magic.equals(Buffer.from([0x1f, 0x8b]))) throw new Error('Supply an uncompressed Docker image archive');
+    // The controller reserves Docker storage against the uncompressed image, not the gzip size.
+    manifest.imageBytes = info.size;
     // Compress before writing the outer header, whose size must be exact. gzip
     // -n omits source filename and timestamp; the CLI's -9 output is smaller
     // than Node's zlib output for this image and fits the controller's preflight.

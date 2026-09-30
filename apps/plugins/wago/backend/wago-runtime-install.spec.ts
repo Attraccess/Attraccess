@@ -145,6 +145,15 @@ describe('destructive runtime shell transaction and offline stream fixtures', ()
     expect(existsSync(join(fixture.root, data))).toBe(false);
   });
 
+  it('reports a Docker storage exhaustion during image load as storage, not a timeout', () => {
+    prior();
+    const result = install('load-enospc');
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Runtime image load ran out of Docker storage');
+    expect(result.stderr).not.toContain('exceeded 300 seconds');
+    expect(fixture.containers()).toEqual([]);
+  });
+
   it.each(['load', 'inspect-image', 'start', 'supervisor-launch-failed'])(
     'contains %s failures without restoring old workloads',
     (fault) => {

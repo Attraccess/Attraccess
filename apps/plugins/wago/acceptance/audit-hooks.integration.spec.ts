@@ -213,7 +213,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     const artifactDirectory = join(directory, 'artifact');
     await mkdir(artifactDirectory);
     const image = `ghcr.io/attraccess/wago-cc100-runtime@sha256:${'a'.repeat(64)}`;
-    jest.spyOn(artifacts, 'acquire').mockResolvedValue({
+    const release = {
       digest: 'a'.repeat(64),
       bytes: 512,
       image,
@@ -233,7 +233,9 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
           profile: WAGO_HARDWARE_PROFILE,
         },
       },
-    });
+    } as const;
+    jest.spyOn(artifacts, 'acquire').mockResolvedValue(release);
+    jest.spyOn(artifacts, 'current').mockResolvedValue(release);
     commissioning = new WagoCommissioningService(context, wago, artifacts);
     // Replace only transport boundaries; delivery, inspection, leases and automatic claim remain real.
     commissioning['run'] = jest.fn(async (_host, _fingerprint, _credential, _command, input) => {

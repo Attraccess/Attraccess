@@ -88,8 +88,13 @@ export class WagoStorageCapacityError extends Error {
   }
 }
 export class WagoControllerLockError extends Error {
-  constructor() {
-    super('The CC100 is busy with a runtime operation. Retry installation shortly; no preparation was started.');
+  /** retained: an earlier, already-started preparation journal stays on the controller. */
+  constructor(readonly retained = false) {
+    super(
+      retained
+        ? 'The CC100 is busy with a runtime operation. Retry installation shortly; the earlier controller preparation is retained.'
+        : 'The CC100 is busy with a runtime operation. Retry installation shortly; no preparation was started.',
+    );
   }
 }
 type CommissioningSessionResponse = Omit<
@@ -101,6 +106,7 @@ type DeliveryInput = { temporarySsh?: TemporarySshCredential; confirmInstall?: b
 type RuntimeDeliveryBundle = Awaited<ReturnType<typeof verifyRuntimeBundle>> & {
   image?: string;
   hardwareProfile?: Cc100HardwareProfile;
+  imageBytes?: number;
 };
 
 @Injectable()
@@ -350,7 +356,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               return this.toResponse(await this.save(session, `platform_${action}_succeeded`));
             } catch (error) {
               if (error instanceof ConflictException) throw error;
-              if (action !== 'inspect' && session.dockerProvisionToken)
+              if (action !== 'inspect' && session.dockerProvisionToken && !(error instanceof WagoControllerLockError))
                 session.dockerProvisionState = 'recovery_required';
               session.failureReason =
                 error instanceof WagoStorageCapacityError
@@ -416,6 +422,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       runtimeBundleStagingCapacityPreflightScript(verifiedBundleBytes),
       { timeoutMs: SSH_TIMEOUT_MS, maxOutputBytes: 65_536, storageDiagnostic: true },
     );
+    // A retry after successful preparation reuses the token already journaled on the controller.
+    const resumed = Boolean(session.dockerProvisionToken);
     session.dockerProvisionToken ??= randomBytes(16).toString('hex');
     session.dockerProvisionState = 'starting';
     await this.save(session, 'controller_preparation_started');
@@ -432,10 +440,15 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       await this.save(session, 'controller_prepared');
     } catch (error) {
       if (error instanceof WagoControllerLockError) {
-        session.dockerProvisionToken = null;
-        session.dockerProvisionState = null;
+        // Lock contention changed nothing. Forget only a token this call minted;
+        // a resumed token is still in the controller journal and needed for recovery.
+        if (resumed) session.dockerProvisionState = 'started';
+        else {
+          session.dockerProvisionToken = null;
+          session.dockerProvisionState = null;
+        }
         await this.save(session, 'controller_preparation_busy');
-        throw error;
+        throw resumed ? new WagoControllerLockError(true) : error;
       }
       session.dockerProvisionState = 'recovery_required';
       await this.save(session, 'controller_preparation_failed');
@@ -699,7 +712,13 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         throw new Error(safeFailure);
       }
       bundle = await this.acquireRuntimeBundle(session);
-      await this.assertCurrentRuntimeBundle(bundle);
+      try {
+        await this.assertCurrentRuntimeBundle(bundle);
+      } catch (error) {
+        // Nothing on the controller was touched yet; a plain retry is enough.
+        if (error instanceof ConflictException) safeFailure = error.message;
+        throw error;
+      }
       session.state = 'delivering';
       session.failureReason = null;
       await this.updateProgress(
@@ -729,7 +748,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         session.targetHost,
         session.hostKeyFingerprint,
         credential,
-        runtimeBundlePreflightScript(bundle.bytes, '', bundle.hardwareProfile),
+        runtimeBundlePreflightScript(bundle.bytes, '', bundle.hardwareProfile, bundle.imageBytes),
       );
       await this.sudoRunScript(
         session.targetHost,
@@ -827,6 +846,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             deliveryToken,
             '',
             bundle.hardwareProfile,
+            bundle.imageBytes,
           ),
           (percent) => this.reportTransferProgress(session, percent),
         );
@@ -868,7 +888,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         error instanceof WagoStorageCapacityError
           ? 'Free space on the CC100, then retry installation.'
           : error instanceof WagoControllerLockError
-            ? 'The CC100 was busy. No preparation started; retry installation.'
+            ? error.retained
+              ? 'The CC100 was busy. The earlier preparation is retained; retry installation.'
+              : 'The CC100 was busy. No preparation started; retry installation.'
             : 'Review the blocker. Clean up any interrupted preparation or runtime installation before retrying. Cleanup will not restore CODESYS or previous workloads.';
       session.failureReason = safeFailure;
       return this.toResponse(await this.save(session, 'delivery_failed'));
@@ -883,6 +905,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const bundle = {
       ...acquired,
       hardwareProfile: 'manifest' in acquired ? acquired.manifest.hardware.profile : CC100_DIGITAL_PROFILE_ID,
+      imageBytes: 'manifest' in acquired ? acquired.manifest.imageBytes : undefined,
     };
     try {
       if (session.runtimeArtifactDigest !== bundle.digest) {
@@ -1753,6 +1776,7 @@ export class WagoRuntimeUploadError extends Error {
     termination: 'remote-exit' | 'local-timeout' | 'operation-aborted' = 'remote-exit',
   ) {
     const known = [
+      'Runtime image load ran out of Docker storage',
       'Runtime image load failed or exceeded 300 seconds',
       'Runtime supervisor launch unverified: prerequisites',
       'Runtime supervisor launch unverified: readiness',

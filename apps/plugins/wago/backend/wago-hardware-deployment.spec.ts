@@ -635,6 +635,19 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
     expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(true);
   });
 
+  it('hands a started runtime to a detached supervisor when the handoff lock is taken', () => {
+    fixture.file('etc/attraccess-wago/runtime-enabled', '');
+    fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: false, restart: 'no' }]);
+    const result = fixture.run('set -- start\n' + wagoRuntimeBootScript(fixture.root), 'lock-reacquire');
+    expect(result.status).toBe(75);
+    expect(result.stderr).not.toContain('containment unverified');
+    expect(fixture.containers()[0].running).toBe(true);
+    // The supervisor is detached; allow it a bounded moment to start.
+    const log = join(fixture.root, 'supervisor.log');
+    for (let i = 0; i < 100 && !existsSync(log); i++) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    expect(fixture.read('supervisor.log')).toContain('S99_zz_attraccess_wago supervise');
+  });
+
   it.each(['active-plc', 'wrong-policy', 'permission-failure', 'missing-register'])(
     'blocks runtime boot for %s even if run-parts proceeds',
     (failure) => {

@@ -12,8 +12,8 @@ it('preserves interrupted credential revocation metadata through a full-registry
     await database.query(`INSERT INTO plugin_wago_controllers
       (hardware_id, trust_state, pairing_code_hash, protocol_version, runtime_version, capabilities, last_seen_at, created_at, updated_at, credential_mqtt_server_id)
       VALUES ('fixture', 'untrusted', 'fixture', '1', '1', '[]', 'fixture', 'fixture', 'fixture', 19)`);
-    await database.undoLastMigration();
-    await database.undoLastMigration();
+    const latest = async () => (await database.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1'))[0].name;
+    while ((await latest()) !== 'AddWagoClaimIntent1780010600000') await database.undoLastMigration();
     await expect(database.undoLastMigration()).rejects.toThrow('Revoke tracked WAGO credentials');
     expect(await database.query('SELECT hardware_id, credential_mqtt_server_id FROM plugin_wago_controllers')).toEqual([
       { hardware_id: 'fixture', credential_mqtt_server_id: 19 },

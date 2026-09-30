@@ -8,6 +8,8 @@ export interface RuntimeArtifactManifest {
   readonly runtimeVersion: string;
   readonly protocolVersion: '1.0.0';
   readonly image: string;
+  /** Uncompressed Docker image archive size; the bundled image.tar is gzip-compressed. */
+  readonly imageBytes?: number;
   readonly hardware: Readonly<{
     model: '751-9301';
     platform: 'linux/arm/v7';
@@ -23,8 +25,14 @@ export function validateRuntimeManifest(value: unknown): RuntimeArtifactManifest
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid();
   const data = value as Record<string, unknown>;
   const hardware = data.hardware as Record<string, unknown> | undefined;
+  const keys = Object.keys(data)
+    .filter((key) => key !== 'imageBytes')
+    .sort()
+    .join(',');
   if (
-    Object.keys(data).sort().join(',') !== 'hardware,image,protocolVersion,runtime,runtimeVersion,schemaVersion' ||
+    keys !== 'hardware,image,protocolVersion,runtime,runtimeVersion,schemaVersion' ||
+    (data.imageBytes !== undefined &&
+      (!Number.isSafeInteger(data.imageBytes) || (data.imageBytes as number) <= 0 || (data.imageBytes as number) > 4 * WAGO_RUNTIME_MAX_BYTES)) ||
     data.schemaVersion !== 1 ||
     data.runtime !== 'attraccess-wago-cc100' ||
     data.protocolVersion !== '1.0.0' ||
@@ -48,6 +56,7 @@ export function validateRuntimeManifest(value: unknown): RuntimeArtifactManifest
     runtimeVersion: data.runtimeVersion,
     protocolVersion: data.protocolVersion,
     image: data.image,
+    ...(data.imageBytes === undefined ? {} : { imageBytes: data.imageBytes as number }),
     hardware: Object.freeze({
       model: hardware.model,
       platform: hardware.platform,

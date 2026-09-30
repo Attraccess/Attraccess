@@ -110,6 +110,52 @@ describe('WagoCommissioningService', () => {
     expect(wago.createEnrollment).not.toHaveBeenCalled();
   });
 
+  it('reports a release change before any SSH call as a plain retry', async () => {
+    const { service, inspect } = securityHarness({ firmwareBaseline: '31', deliveryToken: null });
+    service['requireRuntimeArtifact'] = jest.fn().mockResolvedValue(undefined);
+    service['acquireRuntimeBundle'] = jest.fn().mockResolvedValue({
+      bytes: 512,
+      digest: 'a'.repeat(64),
+      image: 'fixture',
+      path: '/mock/runtime.tar',
+      directory: '/mock/staging',
+    });
+    service['artifacts'] = { current: jest.fn().mockResolvedValue({ digest: 'b'.repeat(64) }) } as never;
+    const result = await service.deliver(1, {
+      confirmInstall: true,
+      temporarySsh: { username: 'root', password: 'fixture-only' },
+    });
+    expect(result.state).toBe('delivery_failed');
+    expect(result.failureReason).toBe('The runtime release changed during delivery. Retry with the current release.');
+    expect(inspect).not.toHaveBeenCalled();
+  });
+
+  it('retains a started preparation token when a resumed preparation loses the lock', async () => {
+    const token = 'b'.repeat(32);
+    const { service, session, wago, inspect } = securityHarness({
+      firmwareBaseline: '31',
+      deliveryToken: null,
+      dockerProvisionToken: token,
+      dockerProvisionState: 'started',
+    });
+    inspect.mockResolvedValue({ firmware: fw31IdentityOutput(), codesys: 'inactive' });
+    service['requireRuntimeArtifact'] = jest.fn().mockResolvedValue(undefined);
+    service['acquireRuntimeBundle'] = jest
+      .fn()
+      .mockResolvedValue({ bytes: 512, path: '/mock/runtime.tar', directory: '/mock/staging' });
+    service['sudoRunScript'] = jest.fn().mockResolvedValueOnce('').mockRejectedValueOnce(new WagoControllerLockError());
+    const result = await service.deliver(1, {
+      confirmInstall: true,
+      temporarySsh: { username: 'root', password: 'fixture-only' },
+    });
+    expect(result.state).toBe('delivery_failed');
+    expect(result.failureReason).toContain('the earlier controller preparation is retained');
+    expect(result.progressDetail).not.toContain('No preparation started');
+    expect(session.dockerProvisionToken).toBe(token);
+    expect(session.dockerProvisionState).toBe('started');
+    expect(wago.createEnrollment).not.toHaveBeenCalled();
+  });
+
   it('maps only the bounded storage diagnostic from SSH stderr to a fixed message', async () => {
     const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
     jest.mocked(spawn).mockImplementation(((command: string) => {

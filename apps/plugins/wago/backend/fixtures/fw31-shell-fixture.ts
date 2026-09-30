@@ -252,9 +252,11 @@ if(process.env.FAULT==='supervisor-lock-held'){
   if(process.argv[2]==='9')require('node:child_process').spawnSync('/bin/sleep',['0.1']);
 }
 if(process.argv[3]==='8'&&fs.existsSync(root+'/supervisor-fixture-live'))process.exit(1);
-if(process.env.FAULT==='lock-handoff'){
+// lock-handoff: the checked child loses the lock; lock-reacquire: the parent's
+// supervisor handoff loses it after the child started the runtime.
+if(process.env.FAULT==='lock-handoff'||process.env.FAULT==='lock-reacquire'){
  const path=root+'/flock-calls',calls=fs.existsSync(path)?Number(fs.readFileSync(path,'utf8')):0;
- fs.writeFileSync(path,String(calls+1));process.exit(calls===1?1:0);
+ fs.writeFileSync(path,String(calls+1));process.exit(calls===(process.env.FAULT==='lock-handoff'?1:2)?1:0);
 }
 process.exit(process.env.FAULT==='locked'?1:0);`,
   );
@@ -367,6 +369,7 @@ if(args[0]==='container'&&args[1]==='ls'){
  const c=find(args.at(-1));if(!c)process.exit(1);if(fault!=='remove-stuck')state=state.filter(v=>v!==c);save();
 }else if(args[0]==='load'){
  console.log('Loaded image ID: sha256:fixture');if(fault==='load')process.exit(1);
+ if(fault==='load-enospc'){console.error('write /var/lib/docker/tmp/layer.tar: no space left on device');process.exit(1);}
 }else if(args[0]==='image'&&args[1]==='inspect'){
  if(fault==='inspect-image')process.exit(1);
 }else if(args[0]==='run'){

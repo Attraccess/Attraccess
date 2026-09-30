@@ -410,6 +410,18 @@ case "$action" in
       if test "$action" = start; then
         # Readiness runs a second full gate. Its 330s acknowledgement and 300s
         # lock-reacquisition budgets must not be nested in the first gate's 300s.
+        # A transaction queued on install.lock can take it as the child releases it.
+        # Containment would need that lock too, so never stop its writer: hand the
+        # started runtime to a detached supervisor, which waits out contention.
+        fail() {
+          echo "$*" >&2
+          case "$*" in 'Another runtime transaction holds the controller lock')
+            supervisor_owner=0
+            nohup "$hook" supervise </dev/null >/dev/null 2>&1 9>&- &
+            exit 75 ;;
+          esac
+          exit 1
+        }
         ${wagoShellFilesystemGuard()}
         ${wagoRuntimeSupervisorLaunchShell()}
       fi

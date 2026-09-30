@@ -116,6 +116,18 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
     expect(run().stderr).toContain(fixture.root + '/alternate-docker requires');
   });
 
+  it('reserves Docker storage against the uncompressed image size of a compressed release', () => {
+    const imageBytes = 236 * mib;
+    const u = Math.ceil(imageBytes / 1024);
+    const check = () => fixture.run(runtimeBundleCapacityPreflightScript(bytes, fixture.root, imageBytes));
+    layout([1, 2, 3, 4], [999999, 999999, 999999, 2 * u + reserve]);
+    expect(check().status).toBe(0);
+    layout([1, 2, 3, 4], [999999, 999999, 999999, 2 * u + reserve - 1]);
+    expect(check().stderr).toContain('Insufficient runtime storage');
+    // The compressed-size policy alone would have admitted this Docker root.
+    expect(3 * b + reserve).toBeLessThan(2 * u + reserve - 1);
+  });
+
   it.each(['', 'relative', '/missing-directory'])('rejects invalid or missing Docker root %j', (root) => {
     fixture.file('docker-root', root.startsWith('/') ? fixture.root + root : root);
     expect(run().status).not.toBe(0);

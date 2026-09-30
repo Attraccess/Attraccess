@@ -4,6 +4,7 @@ import { WagoController } from './wago-controller.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import type { CommissioningRuntimeState } from './wago-commissioning-readiness';
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 
 export async function commissioningVerification(
   context: PluginContext,
@@ -29,7 +30,7 @@ export async function commissioningVerification(
     controller?.trustState === 'claimed' &&
     controller.enrollmentId === session.enrollmentId &&
     heartbeat >= Date.parse(session.createdAt) &&
-    heartbeat <= Date.now() &&
+    heartbeat <= Date.now() + CONTROLLER_CLOCK_TOLERANCE_MS &&
     Date.now() - heartbeat < 90_000 &&
     !controller.compatibilityError,
   );
@@ -37,7 +38,7 @@ export async function commissioningVerification(
     runtime &&
     runtime.timestamp >= Date.parse(session.createdAt) &&
     Date.now() - runtime.timestamp < 90_000 &&
-    runtime.timestamp <= Date.now(),
+    runtime.timestamp <= Date.now() + CONTROLLER_CLOCK_TOLERANCE_MS,
   );
   const hardwareReadiness = !runtime
     ? 'unverified'
