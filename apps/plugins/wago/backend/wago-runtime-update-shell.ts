@@ -17,10 +17,12 @@ const imageIdPattern = /^sha256:[a-f0-9]{64}$/;
  * qualified management helper must expose only these fixed operations, never a
  * management-account arbitrary sudo executor.
  */
-function preamble(token: string, profile: Cc100HardwareProfile, testRoot: string) {
+function preamble(token: string, profile: Cc100HardwareProfile, testRoot: string, helperParameters = false) {
   if (!/^[a-f0-9]{32}$/.test(token) || !isCc100HardwareProfile(profile)) throw new Error('Invalid update ownership');
   if (testRoot && (!testRoot.startsWith('/') || testRoot === '/' || /[\n,]/.test(testRoot)))
     throw new Error('Invalid isolated root');
+  const tokenValue = helperParameters ? '${token}' : token;
+  const tokenWord = helperParameters ? '"${token}"' : quote(token);
   return `set -eu
 umask 077
 root=${quote(testRoot)}
@@ -28,7 +30,7 @@ config="$root/etc/attraccess-wago"
 hook="$root/etc/rc.d/S99_zz_attraccess_wago"
 data="$root/var/lib/attraccess-wago"
 tx="$root/var/lib/attraccess-wago-update-transaction"
-cleanup="$root/var/lib/attraccess-wago-update-cleanup-${token}"
+cleanup="$root/var/lib/attraccess-wago-update-cleanup-${tokenValue}"
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 docker() { timeout -k 5 45 docker --host unix:///var/run/docker.sock "$@"; }
 fail() { echo "$*" >&2; exit 1; }
@@ -42,7 +44,7 @@ require_transaction() {
   for field in token profile phase image-id previous-id previous-image-id; do
     test -f "$tx/$field" && test ! -L "$tx/$field" && test "$(stat -c '%u:%g:%a:%h' "$tx/$field")" = 0:0:600:1 || fail 'Unsafe update metadata'
   done
-  test "$(cat "$tx/token")" = ${quote(token)} && test "$(cat "$tx/profile")" = ${quote(profile)} || fail 'Foreign update transaction'
+   test "$(cat "$tx/token")" = ${tokenWord} && test "$(cat "$tx/profile")" = ${quote(profile)} || fail 'Foreign update transaction'
 }
 require_atomic_state_paths() {
   # Checkpoints/restoration share the real state parent. Forbid data mountpoints
@@ -58,7 +60,7 @@ require_atomic_state_paths() {
 }
 phase() { printf '%s\\n' "$1" > "$tx/phase.next"; chmod 0600 "$tx/phase.next"; sync; mv "$tx/phase.next" "$tx/phase"; sync; }
 owned_new_container() {
-  test "$(docker inspect --format '{{index .Config.Labels "io.attraccess.wago.update-token"}}' attraccess-wago)" = ${quote(token)}
+  test "$(docker inspect --format '{{index .Config.Labels "io.attraccess.wago.update-token"}}' attraccess-wago)" = ${tokenWord}
 }
 `;
 }
@@ -66,7 +68,12 @@ owned_new_container() {
 /** Bounded binary receiver. Load and verify the image before stopping the prior
  * runtime. A truncated stream, failed load or wrong config digest cannot activate.
  */
-export function runtimeUpdateStageScript(artifact: BuildRuntimeArtifact, token: string, testRoot = '') {
+export function runtimeUpdateStageScript(
+  artifact: BuildRuntimeArtifact,
+  token: string,
+  testRoot = '',
+  helperParameters = false,
+) {
   if (
     !imageIdPattern.test(artifact.imageId) ||
     !/^[a-f0-9]{64}$/.test(artifact.digest) ||
@@ -78,16 +85,20 @@ export function runtimeUpdateStageScript(artifact: BuildRuntimeArtifact, token: 
     throw new Error('Invalid update artifact');
   }
   const profile = artifact.manifest.hardware.profile;
-  return `${preamble(token, profile, testRoot)}
-${runtimeBundleCapacityPreflightScript(artifact.bytes, testRoot)}
+  const tokenWord = helperParameters ? '"${token}"' : quote(token);
+  const digestWord = helperParameters ? '"${digest}"' : quote(artifact.digest);
+  const imageWord = helperParameters ? '"${image}"' : quote(artifact.imageId);
+  const referenceWord = helperParameters ? '"${reference}"' : quote(artifact.image);
+  return `${preamble(token, profile, testRoot, helperParameters)}
+${runtimeBundleCapacityPreflightScript(artifact.bytes, testRoot, helperParameters)}
 # Update peaks differ from commissioning: both retained archives are on the
 # journal filesystem. Add the Docker reserve there only when it shares st_dev.
 journal_identity=$(stat -Lc '%d:%i' "$root/var/lib")
 docker_identity=$(stat -Lc '%d:%i' "$docker_root")
 journal_free=$(df -Pk "$root/var/lib" | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print $4}')
 case "$journal_free" in ''|*[!0-9]*) fail 'Invalid journal storage capacity' ;; esac
-journal_required=${2 * Math.ceil(artifact.bytes / 1024) + 16384}
-if test "\${journal_identity%%:*}" = "\${docker_identity%%:*}"; then journal_required=$((journal_required + ${3 * Math.ceil(artifact.bytes / 1024)})); fi
+journal_required=${helperParameters ? '$((2 * kib + 16384))' : 2 * Math.ceil(artifact.bytes / 1024) + 16384}
+if test "\${journal_identity%%:*}" = "\${docker_identity%%:*}"; then journal_required=$((journal_required + ${helperParameters ? '3 * kib' : 3 * Math.ceil(artifact.bytes / 1024)})); fi
 test "$journal_free" -ge "$journal_required" || fail 'Insufficient update journal storage'
 ${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 docker() { timeout -k 5 45 docker --host unix:///var/run/docker.sock "$@"; }
@@ -107,9 +118,9 @@ test "\${#prior}" = 64 || fail 'Invalid prior container identity'
 test -z "$(docker container ls -a --filter 'name=^/attraccess-wago.previous$' --format '{{.ID}}')" || fail 'Unowned previous runtime exists'
 stage=$(mktemp -d "$root/var/lib/attraccess-wago-update-stage.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
-printf '%s\\n' ${quote(token)} > "$stage/token"
+printf '%s\\n' ${tokenWord} > "$stage/token"
 printf '%s\\n' ${quote(profile)} > "$stage/profile"
-printf '%s\\n' ${quote(artifact.imageId)} > "$stage/image-id"
+printf '%s\\n' ${imageWord} > "$stage/image-id"
 printf '%s\\n' "$prior" > "$stage/previous-id"
 previous_image=$(docker inspect --format '{{.Image}}' "$prior")
 case "$previous_image" in sha256:*) ;; *) fail 'Invalid prior runtime image identity' ;; esac
@@ -127,17 +138,17 @@ mv "$stage" "$tx"
 sync
 trap - EXIT
 # At most B+1 bytes may reach disk, even if a trusted server stream malfunctions.
-timeout -k 5 300 head -c ${artifact.bytes + 1} > "$tx/bundle.tar"
-test "$(wc -c < "$tx/bundle.tar" | tr -d ' ')" = ${artifact.bytes} || fail 'Incomplete or oversized runtime transfer'
-printf '%s  %s\\n' ${quote(artifact.digest)} "$tx/bundle.tar" | sha256sum -c - >/dev/null || fail 'Runtime checksum mismatch'
+timeout -k 5 300 head -c ${helperParameters ? '"$((bytes + 1))"' : artifact.bytes + 1} > "$tx/bundle.tar"
+test "$(wc -c < "$tx/bundle.tar" | tr -d ' ')" = ${helperParameters ? '"$bytes"' : artifact.bytes} || fail 'Incomplete or oversized runtime transfer'
+printf '%s  %s\\n' ${digestWord} "$tx/bundle.tar" | sha256sum -c - >/dev/null || fail 'Runtime checksum mismatch'
 tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$tx/bundle.tar" image-reference > "$tx/reference"
-test "$(cat "$tx/reference")" = ${quote(artifact.image)} || fail 'Runtime reference mismatch'
+test "$(cat "$tx/reference")" = ${referenceWord} || fail 'Runtime reference mismatch'
 tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$tx/bundle.tar" image.tar > "$tx/image.tar"
 timeout -k 5 300 docker --host unix:///var/run/docker.sock load -i "$tx/image.tar" > "$tx/load-output" || fail 'Runtime load failed'
 sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p' "$tx/load-output" > "$tx/loaded-image"
 test "$(wc -l < "$tx/loaded-image" | tr -d ' ')" = 1 || fail 'Expected one runtime image'
-test "$(docker image inspect --format '{{.Id}}' "$(cat "$tx/loaded-image")")" = ${quote(artifact.imageId)} || fail 'Loaded image identity mismatch'
-test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}/{{.Variant}}' ${quote(artifact.imageId)})" = linux/arm/v7 || fail 'Incompatible runtime platform'
+test "$(docker image inspect --format '{{.Id}}' "$(cat "$tx/loaded-image")")" = ${imageWord} || fail 'Loaded image identity mismatch'
+test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}/{{.Variant}}' ${imageWord})" = linux/arm/v7 || fail 'Incompatible runtime platform'
 phase staged
 `;
 }
@@ -145,8 +156,17 @@ phase staged
 /** Preserve runtime.env, trust and enrolled state. Retain the old container and
  * checkpoint data only while stopped. No update path issues enrollment credentials.
  */
-export function runtimeUpdateActivateScript(token: string, profile: Cc100HardwareProfile, testRoot = '') {
-  return `${preamble(token, profile, testRoot)}
+export function runtimeUpdateActivateScript(
+  token: string,
+  profile: Cc100HardwareProfile,
+  testRoot = '',
+  helperParameters = false,
+) {
+  const tokenValue = helperParameters ? '${token}' : token;
+  const labelWord = helperParameters
+    ? '"io.attraccess.wago.update-token=${token}"'
+    : quote(`io.attraccess.wago.update-token=${token}`);
+  return `${preamble(token, profile, testRoot, helperParameters)}
 require_transaction
 test "$(cat "$tx/phase")" = staged || fail 'Update is not staged'
 require_atomic_state_paths
@@ -168,7 +188,7 @@ phase checkpointed
 docker rename "$(cat "$tx/previous-id")" attraccess-wago.previous
 # Hook and mounts belong to the deployed build too. Publish on its destination
 # filesystem, retaining the previous hook until server acknowledgement.
-hook_stage="$root/etc/rc.d/.attraccess-wago-hook-${token}"
+hook_stage="$root/etc/rc.d/.attraccess-wago-hook-${tokenValue}"
 test ! -e "$hook_stage" && test ! -L "$hook_stage" || fail 'Runtime hook publication recovery required'
 cp "$tx/hook.next" "$hook_stage"
 chmod 0700 "$hook_stage"
@@ -180,7 +200,7 @@ ${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 docker() { timeout -k 5 45 docker --host unix:///var/run/docker.sock "$@"; }
 set --
 if test -f "$config/runtime-ca.pem"; then set -- -v "$config/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro"; fi
-docker run -d --pull=never --name attraccess-wago --restart no --env-file "$config/runtime.env" --label ${quote(`io.attraccess.wago.update-token=${token}`)} --env "WAGO_RUNTIME_IMAGE_ID=$(cat "$tx/image-id")" ${wagoHardwareDeploymentDockerArgs(testRoot, profile)} -v "$data:/var/lib/attraccess-wago" "$@" "$(cat "$tx/image-id")"
+docker run -d --pull=never --name attraccess-wago --restart no --env-file "$config/runtime.env" --label ${labelWord} --env "WAGO_RUNTIME_IMAGE_ID=$(cat "$tx/image-id")" ${wagoHardwareDeploymentDockerArgs(testRoot, profile)} -v "$data:/var/lib/attraccess-wago" "$@" "$(cat "$tx/image-id")"
 phase verifying
 touch "$config/runtime-enabled"
 ${wagoRuntimeSupervisorLaunchShell()}
@@ -188,8 +208,13 @@ echo 'Runtime update started; permanent heartbeat and readiness unverified'
 `;
 }
 
-export function runtimeUpdateAcceptScript(token: string, profile: Cc100HardwareProfile, testRoot = '') {
-  return `${preamble(token, profile, testRoot)}
+export function runtimeUpdateAcceptScript(
+  token: string,
+  profile: Cc100HardwareProfile,
+  testRoot = '',
+  helperParameters = false,
+) {
+  return `${preamble(token, profile, testRoot, helperParameters)}
 require_transaction
 case "$(cat "$tx/phase")" in verifying|accepted) ;; *) fail 'Update is not ready for acceptance' ;; esac
 owned_new_container || fail 'Foreign runtime container'
@@ -204,21 +229,24 @@ export function runtimeUpdateRollbackScript(
   profile: Cc100HardwareProfile,
   previousImageId: string,
   testRoot = '',
+  helperParameters = false,
 ) {
   if (!imageIdPattern.test(previousImageId)) throw new Error('Invalid prior runtime image identity');
-  return `${preamble(token, profile, testRoot)}
+  const tokenValue = helperParameters ? '${token}' : token;
+  const previousWord = helperParameters ? '"${previous}"' : quote(previousImageId);
+  return `${preamble(token, profile, testRoot, helperParameters)}
 if test ! -e "$tx" && test ! -L "$tx"; then
   # Admission may fail before a journal exists. Absence alone proves nothing:
   # require the expected unchanged predecessor and the full host safety gate.
   for pending in "$root/var/lib"/attraccess-wago-update-cleanup-*; do test ! -e "$pending" && test ! -L "$pending" || fail 'Update cleanup acknowledgement required'; done
-  test "$(docker inspect --format '{{.Image}}' attraccess-wago)" = ${quote(previousImageId)} || fail 'No journal and prior image is not current'
+   test "$(docker inspect --format '{{.Image}}' attraccess-wago)" = ${previousWord} || fail 'No journal and prior image is not current'
   test "$(docker inspect --format '{{.State.Running}}' attraccess-wago)" = true || fail 'No journal and prior runtime is not running'
   ${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
   echo 'Prior runtime unchanged; no update journal'
   exit 0
 fi
 require_transaction
-test "$(cat "$tx/previous-image-id")" = ${quote(previousImageId)} || fail 'Prior image does not match recovery intent'
+test "$(cat "$tx/previous-image-id")" = ${previousWord} || fail 'Prior image does not match recovery intent'
 require_atomic_state_paths
 case "$(cat "$tx/phase")" in
   receiving|staged|stopping) phase restored; touch "$config/runtime-enabled" ;;
@@ -242,7 +270,7 @@ case "$(cat "$tx/phase")" in
     fi
     test -f "$tx/hook.previous" && test ! -L "$tx/hook.previous" && test "$(stat -c '%u:%g:%a:%h' "$tx/hook.previous")" = 0:0:700:1 || fail 'Prior runtime hook unavailable'
     wago_require_root_directory "$root/etc/rc.d" || fail 'Unsafe runtime hook parent'
-    hook_stage="$root/etc/rc.d/.attraccess-wago-hook-${token}"
+    hook_stage="$root/etc/rc.d/.attraccess-wago-hook-${tokenValue}"
     if test -e "$hook_stage" || test -L "$hook_stage"; then
       test -f "$hook_stage" && test ! -L "$hook_stage" && test "$(stat -c '%u:%g:%a:%h' "$hook_stage")" = 0:0:700:1 || fail 'Unsafe staged runtime hook'
       rm -f "$hook_stage"
@@ -271,8 +299,13 @@ echo 'Prior runtime restored; update receipt retained'
 /** Cleanup is separate from acceptance/restoration and follows a durable server
  * acknowledgement. Never prune Docker images, unrelated containers or host files.
  */
-export function runtimeUpdateAcknowledgeScript(token: string, profile: Cc100HardwareProfile, testRoot = '') {
-  return `${preamble(token, profile, testRoot)}
+export function runtimeUpdateAcknowledgeScript(
+  token: string,
+  profile: Cc100HardwareProfile,
+  testRoot = '',
+  helperParameters = false,
+) {
+  return `${preamble(token, profile, testRoot, helperParameters)}
 if test -e "$cleanup" || test -L "$cleanup"; then
   test ! -e "$tx" && test ! -L "$tx" || fail 'Conflicting cleanup journal'
   test -d "$cleanup" && test ! -L "$cleanup" && test "$(stat -c '%u:%g:%a' "$cleanup")" = 0:0:700 || fail 'Unsafe update cleanup journal'

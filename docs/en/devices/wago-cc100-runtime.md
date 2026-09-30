@@ -56,15 +56,66 @@ data until a durable server acknowledgement; cleanup uses a separate resumable
 ownership-marked directory. No update primitive reissues enrollment credentials,
 replaces `runtime.env`/CA, or prunes unrelated containers/images.
 
-**Automatic live updates are not enabled by this draft.** The reconciliation core
-and host scripts are not yet registered as a production updater. Dedicated-account
-provisioning, the fixed scoped privileged helper/transport, encrypted root recovery
-and its audited administrator action, shared durable operation persistence, startup
-and runtime-status reconciliation wiring, and the independent rollback/reboot
-watchdog remain unimplemented. Isolated shell tests and a real Docker load of the
-compressed member are software evidence, not FW31 hardware recovery evidence.
-Do not deploy this partial change or change an active controller's SSH policy
-before the complete ATT-1099 path passes its hardware acceptance gate.
+Automatic reconciliation is registered for **new managed enrolments**. Existing
+registrations are not migrated or silently adopted: remove and re-enrol them.
+The **Runtime updates** dialog shows managed-access state, desired image,
+durable update phase, failure and retry time. Startup, permanent runtime heartbeats
+and a 30-second retry sweep drive reconciliation, with at most two updates active.
+Database leases keyed by the pinned device identity serialize updates with
+commissioning, management transitions, removal and credential operations.
+
+Enrolment creates the dedicated non-root `attraccess` account with a unique
+Ed25519 key. The private key and random root recovery password are encrypted by
+the host secrets service in `plugin_wago_managed_access` before remote mutation.
+The temporary bootstrap password is never saved. The encrypted envelope is bound
+to the commissioning session, transaction and pinned device identity. The dedicated
+account has only a fixed, no-argument sudo helper; its root-owned public-key entry
+forces that helper and denies forwarding and PTY. Transport uses an isolated,
+short-lived agent, pinned host keys and key-only authentication, with no private-key
+temporary file or inherited agent/password fallback.
+
+After permanent identity, enrollment revocation, applied configuration and fresh
+runtime readiness are verified, commissioning accepts its installation journals.
+Only then does it replace the Dropbear startup script with the Attraccess wrapper
+using `-G attraccess -w -s`. A second fresh managed connection, authenticated
+daemon/listening-socket policy inspection, a negative root-password probe and a
+further managed connection precede commit. An independent three-minute watchdog
+and early boot hook restore the previous SSH policy if cutover is not committed.
+The password remains rotated and its recovery copy remains encrypted.
+
+The **Administrator recovery** section contains **Reveal root password (audited)**,
+an explicit administrator action.
+It requires a recorded durable audit receipt before decrypting/returning the
+password, sends `Cache-Control: no-store`, and never returns the SSH private key.
+The secret is displayed only until hidden or the dialog closes. Root SSH is denied
+after cutover. For remote recovery/re-enrolment, **Restore bootstrap SSH (audited)**
+uses the retained managed key to restore the prior SSH policy, proves the generated
+root password on a fresh pinned connection and retires automatic management. Use
+that recovered password as the next enrolment's temporary credential; the next
+session generates a new key/password, rather than adopting the retired identity.
+Removal retains the recovery session and encrypted record and refuses an update
+whose rollback/acknowledgement is still pending.
+
+The root-owned helper exposes fixed operations and never evaluates SSH commands
+or executes files extracted from a runtime bundle. Enrolment also creates a separate
+per-controller installer publication authority. Its private key is encrypted in the
+same bound database envelope; only its public key is installed on the controller.
+The scoped SSH key alone cannot publish executable code. When the deployed build
+changes its compiled installer, the server signs that exact helper for the enrolment
+token. The fixed publisher verifies the signature, digest, length, syntax and root
+ownership under the installation lock, refuses outstanding transactions, then
+atomically replaces the helper. No API accepts installer source or returns either
+private key. Unknown protocol versions fail visibly. Each runtime update then uses
+the current-build boot hook and device/bind arguments, so installer fixes reach
+controllers already enrolled without another commissioning attempt. The independent update watchdog restores
+unaccepted updates after interruption; the reboot recovery hook runs after vendor
+Docker startup and before the runtime hook, leaving runtime enablement absent if
+recovery cannot be proved. Retained MQTT samples, the old boot's stream, loaded
+images alone, and recompressed identical images cannot establish update success.
+
+These are software/isolated-fixture guarantees. No bench controller was available
+for this implementation, so physical FW31 cutover, reboot, I/O and recovery
+qualification remain explicitly **unverified**, independently of software status.
 
 The first usable beta targets CC100 `751-9301` firmware **31**. Broader firmware references below are hardware background, not additional supported baselines. Guided commissioning uses a locally checksum-checked offline bundle, not a controller-side registry pull or mandatory WBM setup. It names its container `attraccess-wago` and bind-mounts the controller directory `/var/lib/attraccess-wago` there. As of **2026-09-06**, commissioning is destructive: existing applications/data may stop working or be erased, with no preservation, backup or restoration of preexisting CODESYS or other workloads by Attraccess. It always stops and permanently disables CODESYS and verifies this before I/O. Supported Docker setup and persistent narrow I/O permissions belong to the installer. See the current [platform contract](wago-commissioning-platform.md).
 

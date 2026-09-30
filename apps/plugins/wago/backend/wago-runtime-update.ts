@@ -3,6 +3,7 @@ import type { BuildRuntimeArtifact } from './wago-build-runtime';
 
 export type RuntimeUpdatePhase =
   | 'blocked'
+  | 'preparing'
   | 'staging'
   | 'activating'
   | 'verifying'
@@ -32,12 +33,16 @@ export interface RuntimeUpdateRecord {
   desiredImageId: string;
   desiredDigest: string;
   buildId: string;
+  installerSha256?: string;
   previousImageId: string | null;
   attempt: number;
   startedAt: number;
   updatedAt: number;
   retryAt: number;
   failure: RuntimeUpdateFailure | null;
+  /** Independent cleanup backoff preserves the accepted rollout and its receipt. */
+  cleanupAttempt?: number;
+  cleanupRetryAt?: number;
 }
 
 export interface RuntimeUpdateStore {
@@ -67,11 +72,13 @@ export interface RuntimeUpdateInspection {
  */
 export interface ManagedRuntimeUpdateHost {
   inspect(controllerId: number, signal: AbortSignal): Promise<RuntimeUpdateInspection>;
+  /** Publish the authenticated build installer only after durable intent and audit. */
+  prepare?(controllerId: number, artifact: BuildRuntimeArtifact, signal: AbortSignal): Promise<void>;
   stage(controllerId: number, token: string, artifact: BuildRuntimeArtifact, signal: AbortSignal): Promise<void>;
   activate(controllerId: number, token: string, artifact: BuildRuntimeArtifact, signal: AbortSignal): Promise<void>;
   verify(
     controllerId: number,
-    token: string,
+    token: string | null,
     imageId: string,
     since: number,
     signal: AbortSignal,
@@ -154,14 +161,31 @@ export class WagoRuntimeUpdateCoordinator {
       await this.audit(Object.freeze({ ...record }));
       assertOwned();
     };
+    const acknowledge = async (record: RuntimeUpdateRecord): Promise<boolean> => {
+      if (!record.token) return true;
+      if ((record.cleanupRetryAt ?? 0) > this.now()) return false;
+      try {
+        await this.host.acknowledge(controllerId, record.token, operation.signal);
+        assertOwned();
+      } catch {
+        assertOwned();
+        record.cleanupAttempt = (record.cleanupAttempt ?? 0) + 1;
+        record.cleanupRetryAt = this.retryAt(record.cleanupAttempt);
+        await persist(record);
+        return false;
+      }
+      record.token = null;
+      record.cleanupAttempt = 0;
+      record.cleanupRetryAt = 0;
+      await persist(record);
+      return true;
+    };
     try {
       acquired = await this.store.acquire(controllerId, owner, this.now(), this.now() + LEASE_MS);
       if (!acquired) return 'busy';
       let record = await this.store.load(controllerId);
       if (record && ['current', 'failed'].includes(record.phase) && record.token) {
-        await this.host.acknowledge(controllerId, record.token, operation.signal);
-        record.token = null;
-        await persist(record);
+        if (!(await acknowledge(record))) return 'deferred';
       }
       if (record && active.has(record.phase)) {
         if (record.phase === 'recovery_required' && record.retryAt > this.now()) return 'deferred';
@@ -184,9 +208,7 @@ export class WagoRuntimeUpdateCoordinator {
         record.failure = 'interrupted';
         record.retryAt = this.now();
         await persist(record);
-        await this.host.acknowledge(controllerId, record.token, operation.signal);
-        record.token = null;
-        await persist(record);
+        if (!(await acknowledge(record))) return 'deferred';
       }
       const desired = await this.desired();
       assertOwned();
@@ -220,12 +242,15 @@ export class WagoRuntimeUpdateCoordinator {
         desiredImageId: desired.imageId,
         desiredDigest: desired.digest,
         buildId: desired.buildId,
+        ...(desired.installerSha256 ? { installerSha256: desired.installerSha256 } : {}),
         previousImageId: inspection.imageId,
         attempt,
         startedAt: this.now(),
         updatedAt: this.now(),
         retryAt: 0,
         failure: null,
+        cleanupAttempt: 0,
+        cleanupRetryAt: 0,
       };
       // A claimed identity is mandatory even when the Docker image is already current.
       const blocker: RuntimeUpdateFailure | null =
@@ -242,7 +267,46 @@ export class WagoRuntimeUpdateCoordinator {
         await persist(record);
         return 'settled';
       }
+      if (this.host.prepare) {
+        record.phase = 'preparing';
+        await persist(record);
+        try {
+          await this.host.prepare(controllerId, desired, operation.signal);
+          await this.assertCurrent(desired.imageId);
+          assertOwned();
+        } catch (error) {
+          assertOwned();
+          record.phase = 'blocked';
+          record.failure = error instanceof RuntimeUpdateError ? error.failure : 'incompatible';
+          record.retryAt = this.retryAt(attempt);
+          await persist(record);
+          return 'settled';
+        }
+      }
       if (inspection.imageId === desired.imageId) {
+        // Read-only proof permits the existing boot, but requires a recent
+        // permanent heartbeat and matching readiness. No restart or staging.
+        const since = record.startedAt;
+        try {
+          const proof = await this.host.verify(controllerId, null, desired.imageId, since, operation.signal);
+          if (
+            !proof.permanent ||
+            !proof.ready ||
+            proof.imageId !== desired.imageId ||
+            !Number.isSafeInteger(proof.observedAt) ||
+            proof.observedAt <= since ||
+            proof.observedAt > this.now()
+          )
+            throw new RuntimeUpdateError('readiness');
+          await this.assertCurrent(desired.imageId);
+        } catch (error) {
+          assertOwned();
+          record.phase = 'blocked';
+          record.failure = error instanceof RuntimeUpdateError ? error.failure : 'readiness';
+          record.retryAt = this.retryAt(attempt);
+          await persist(record);
+          return 'settled';
+        }
         record.phase = 'current';
         record.attempt = 0;
         await persist(record);
@@ -287,9 +351,7 @@ export class WagoRuntimeUpdateCoordinator {
         await persist(record);
         // This last cleanup cannot turn a durably accepted rollout into a failed
         // rollout. If interrupted, the next owner retries acknowledgement only.
-        await this.host.acknowledge(controllerId, record.token, operation.signal);
-        record.token = null;
-        await persist(record);
+        if (!(await acknowledge(record))) return 'deferred';
       } catch (error) {
         if (record.phase === 'current') throw error;
         // Never roll back after losing the lease/deadline. Leave the durable token
@@ -308,9 +370,7 @@ export class WagoRuntimeUpdateCoordinator {
         record.retryAt = this.retryAt(attempt);
         await persist(record);
         if (record.phase === 'failed') {
-          await this.host.acknowledge(controllerId, token, operation.signal);
-          record.token = null;
-          await persist(record);
+          if (!(await acknowledge(record))) return 'deferred';
         }
       }
       return 'settled';

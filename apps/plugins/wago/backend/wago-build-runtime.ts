@@ -8,6 +8,8 @@ export interface BuildRuntimeArtifact extends RuntimeArtifactMetadata {
   readonly buildId: string;
   /** Docker config digest, not the outer tar digest or a mutable repository tag. */
   readonly imageId: string;
+  /** Computed by the deployed plugin for durable installer intent/audit. */
+  readonly installerSha256?: string;
 }
 
 /** The server build supplies assets outside the size-limited npm plugin archive.

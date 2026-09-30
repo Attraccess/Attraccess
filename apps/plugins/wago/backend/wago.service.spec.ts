@@ -492,6 +492,8 @@ describe('WagoService', () => {
   it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {
     const claimed = { ...controller(), id: 257, trustState: 'claimed' as const };
     const { service, controllerRepository } = createService([claimed]);
+    const updateEvidence = jest.fn();
+    service.registerRuntimeStatusHandler(updateEvidence);
     const timestamp = new Date().toISOString();
     const streamId = '00000000-0000-4000-8000-000000000001';
     for (let id = 1; id <= 256; id++) {
@@ -513,11 +515,16 @@ describe('WagoService', () => {
           timestamp,
           streamId,
           sequence: 1,
+          runtimeImageId: `sha256:${'a'.repeat(64)}`,
         }),
       ),
     );
 
     expect(service.diagnostics.read(claimed.id).heartbeatAt).toBeUndefined();
+    expect(updateEvidence).toHaveBeenCalledWith(
+      claimed.id,
+      expect.objectContaining({ imageId: `sha256:${'a'.repeat(64)}`, streamId, sequence: 1 }),
+    );
     expect(controllerRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({ lastHeartbeatAt: timestamp, lastSeenAt: expect.any(String) }),
     );

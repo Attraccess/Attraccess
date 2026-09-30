@@ -197,8 +197,8 @@ fi
 }
 
 /** Call only after the coordinator accepts the new runtime; discards recovery metadata. */
-export function runtimeBundleAcceptScript(testRoot = ''): string {
-  return `${preamble(testRoot, false, true)}
+export function runtimeBundleAcceptScript(testRoot = '', locked = false): string {
+  return `${preamble(testRoot, locked, true)}
 test ! -e "$cleanup" || fail 'Recovery cleanup is pending; acceptance is unavailable'
 if [ -d "$acceptedCleanup" ]; then rm -rf "$acceptedCleanup"; exit 0; fi
 test -f "$tx/started" || fail 'No started runtime transaction to accept'
@@ -401,7 +401,12 @@ rm -rf "$config/delivery"
  * compressed/sparse layers and filesystem metadata can exceed it. A verified
  * image expansion bound is needed before claiming guaranteed Docker capacity.
  */
-function bundleCapacityPreflightScript(bytes: number, testRoot: string, includeDocker: boolean): string {
+function bundleCapacityPreflightScript(
+  bytes: number,
+  testRoot: string,
+  includeDocker: boolean,
+  helperParameters = false,
+): string {
   if (!Number.isSafeInteger(bytes) || bytes <= 0 || bytes > 512 * 1024 * 1024) throw new Error('Invalid bundle size');
   if (testRoot && (!testRoot.startsWith('/') || testRoot === '/' || testRoot.includes('\n')))
     throw new Error('Test root must be an absolute isolated directory');
@@ -440,7 +445,7 @@ for storage_path in "$storage_config" ${['/tmp', '/var/lib'].map((path) => quote
   storage_rows="$storage_rows$storage_device $storage_free $storage_path
 "
 done
-printf '%s' "$storage_rows" | awk -v b=${Math.ceil(bytes / 1024)} '
+printf '%s' "$storage_rows" | awk -v b=${helperParameters ? '"$kib"' : Math.ceil(bytes / 1024)} '
   { dev[NR]=$1; available[NR]=$2; path[NR]=$3 }
   END {
     for (i=1; i<=NR; i++) {
@@ -465,8 +470,8 @@ export function runtimeBundleStagingCapacityPreflightScript(bytes: number, testR
 }
 
 /** After activation: recheck staging and the discovered Docker root together. */
-export function runtimeBundleCapacityPreflightScript(bytes: number, testRoot = ''): string {
-  return bundleCapacityPreflightScript(bytes, testRoot, true);
+export function runtimeBundleCapacityPreflightScript(bytes: number, testRoot = '', helperParameters = false): string {
+  return bundleCapacityPreflightScript(bytes, testRoot, true, helperParameters);
 }
 
 /** Delivery still requires the exclusive hardware gate after preparation. */

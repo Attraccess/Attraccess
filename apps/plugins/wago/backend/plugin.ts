@@ -21,6 +21,9 @@ import { createWagoCommandNode } from './wago-command-node';
 import { WagoFlowService } from './wago-flow.service';
 import { createWagoStateNodes } from './wago-state-nodes';
 import { WAGO_AUDIT_DOMAIN } from './wago-audit-policy';
+import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './wago-managed-access.entity';
+import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
+import { WagoUpdatesController } from './wago-updates.controller';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -44,6 +47,9 @@ const plugin: PluginBackendModule = {
     WagoCredentialRotationEntity,
     WagoCommissioningSession,
     WagoManagementEntity,
+    WagoManagedAccess,
+    WagoRuntimeUpdateEntity,
+    WagoDeviceOperation,
   ],
   flowNodes: (context) => [
     createWagoCommandNode(() => services(context).command),
@@ -53,7 +59,7 @@ const plugin: PluginBackendModule = {
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi, WagoArtifactsController, WagoDiagnosticsController],
+      controllers: [WagoControllerApi, WagoArtifactsController, WagoDiagnosticsController, WagoUpdatesController],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         WagoService,
@@ -75,6 +81,7 @@ const plugin: PluginBackendModule = {
         WagoArtifactUploadInterceptor,
         WagoCommissioningReadiness,
         WagoDiagnosticsService,
+        WagoManagedRuntimeService,
         WagoCommissioningService,
         WagoCredentialRotationService,
       ],

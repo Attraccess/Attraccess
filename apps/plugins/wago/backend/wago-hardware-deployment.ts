@@ -247,7 +247,7 @@ export function wagoHardwareDeploymentDockerArgs(
   return `--user 10001:10001 --cap-drop ALL --security-opt no-new-privileges --network host --env WAGO_HARDWARE_PROFILE=${profile} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly`)} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DOUT},dst=/run/attraccess-wago/io/dout`)}${leds}${serial}`;
 }
 
-function provisionLock(token: string, testRoot: string): string {
+function provisionLock(token: string, testRoot: string, helperParameters = false, locked = false): string {
   if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid provisioning token');
   return `set -eu
 umask 077
@@ -255,11 +255,11 @@ root=${rootValue(testRoot)}
 config="$root/etc/attraccess-wago"
 journal="$config/docker-provision"
 fail() { echo "$*" >&2; exit 1; }
- ${wagoShellFilesystemGuard({ waitForLock: true })}
+ ${wagoShellFilesystemGuard({ waitForLock: true, acquireLock: !locked })}
  for path in "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup" "$config/delivery" "$root/var/lib/attraccess-wago-update-transaction" "$root/var/lib"/attraccess-wago-update-cleanup-*; do
   test ! -e "$path" || fail 'Finish runtime delivery/recovery before Docker provisioning'
 done
-token=${quote(token)}
+token=${helperParameters ? '"${token}"' : quote(token)}
 for preparation_path in "$journal" "$config/docker-provision.completed-$token"; do
   if test -e "$preparation_path" || test -L "$preparation_path"; then
     test -d "$preparation_path" && test ! -L "$preparation_path" && test "$(stat -c '%u:%g:%a' "$preparation_path")" = 0:0:700 || fail 'Unsafe preparation journal ownership or permissions'
@@ -681,9 +681,11 @@ export function wagoDockerProvisionFinishScript(
   token: string,
   outcome: 'accepted' | 'restored',
   testRoot = '',
+  helperParameters = false,
+  locked = false,
 ): string {
   if (outcome !== 'accepted' && outcome !== 'restored') throw new Error('Invalid provisioning outcome');
-  return `${provisionLock(token, testRoot)}
+  return `${provisionLock(token, testRoot, helperParameters, locked)}
 ${dockerRecoveryHelpers()}
 if test ! -e "$journal" && test ! -L "$journal"; then
   ${outcome === 'restored' ? `completed_recovery || fail 'No preparation recovery receipt'` : `test -d "$completed" && test ! -L "$completed" && test -f "$completed/token" && test ! -L "$completed/token" && test "$(cat "$completed/token")" = "$token" && test -f "$completed/accepted" || fail 'No preparation acceptance receipt'`}

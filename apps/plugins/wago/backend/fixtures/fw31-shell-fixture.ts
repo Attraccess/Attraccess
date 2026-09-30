@@ -62,6 +62,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     du: '/usr/bin/du',
     sort: '/usr/bin/sort',
     base64: '/usr/bin/base64',
+    openssl: '/usr/bin/openssl',
   }))
     symlinkSync(path, join(root, 'bin', name));
   file('bin/od', fw31MinimalOd, 0o700);
@@ -170,7 +171,8 @@ if(args[3]==='docker'&&args[6]==='load'&&fs.existsSync(loadDuration)&&Number(fs.
 const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';
 // Match the generated command's deadline. Shorter wall-clock caps measure host
 // process scheduling, except for the explicit isolated privilege lifecycle test.
-const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:privilegeLifecycle?1000:Number(args[2])*1000});
+const installerStall=args[3]==='dd'&&(process.env.FAULT==='installer-stalled'||(process.env.FAULT==='installer-eof-stalled'&&args.includes('count=1')));
+const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:installerStall?200:privilegeLifecycle?1000:Number(args[2])*1000});
 if(privilegeLifecycle)require('node:fs').appendFileSync(root+'/privilege-lifecycle.log',JSON.stringify({event:'reaped',tool:args[3].split('/').at(-1),pid:r.pid,status:r.status,error:r.error?.code})+'\\n');
 process.exit(r.status ?? 124);`,
   );
@@ -267,6 +269,8 @@ process.exit(process.env.FAULT==='locked'?1:0);`,
     'bin/sha256sum',
     `
 const fs=require('node:fs'),crypto=require('node:crypto');
+const args=process.argv.slice(2),file=args.find(arg=>!arg.startsWith('-'));
+if(file){console.log(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')+'  '+file);process.exit(0);}
 const [digest,path]=fs.readFileSync(0,'utf8').trim().split(/\\s+/);
 process.exit(crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex')===digest?0:1);`,
   );

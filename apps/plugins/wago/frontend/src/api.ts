@@ -50,6 +50,7 @@ export type WagoCommissioningState =
   | 'revoked';
 export interface CommissioningSession {
   runtimeRecoveryAvailable?: boolean;
+  managedAccessAvailable?: boolean;
   managementControllerId?: number | null;
   dockerProvisionState?: string | null;
   platformReport?: string | null;
@@ -215,6 +216,49 @@ export const revokeCommissioningSession = (id: number) =>
 export const removeCommissioningSession = (id: number) =>
   api.request<void>(`/commissioning/sessions/${id}`, { method: 'DELETE' });
 export const removeController = (id: number) => api.request<void>(`/controllers/${id}`, { method: 'DELETE' });
+
+export interface RuntimeUpdateStatus {
+  sessionId: number | null;
+  management: 'pending' | 'verified' | 'managed' | 'recovery_required' | 'retired' | 'reenrol_required';
+  keyFingerprint: string | null;
+  physicalQualification: 'unverified';
+  update: {
+    phase:
+      | 'blocked'
+      | 'staging'
+      | 'activating'
+      | 'verifying'
+      | 'accepting'
+      | 'recovering'
+      | 'recovery_required'
+      | 'failed'
+      | 'current';
+    desiredImageId: string;
+    previousImageId: string | null;
+    buildId: string;
+    attempt: number;
+    failure: string | null;
+    retryAt: number;
+    cleanupAttempt?: number;
+    cleanupRetryAt?: number;
+  } | null;
+}
+export const getRuntimeUpdateStatus = (id: number) =>
+  api.request<RuntimeUpdateStatus>(`/controllers/${id}/runtime-update`);
+export const getManagedAccessStatus = (id: number) =>
+  api.request<RuntimeUpdateStatus>(`/commissioning/sessions/${id}/managed-access`);
+export const getRootRecoveryPassword = (sessionId: number) =>
+  api.request<{ password: string }>(`/commissioning/sessions/${sessionId}/root-recovery`, {
+    method: 'POST',
+    body: { confirm: true },
+  });
+export const retryManagedAccess = (sessionId: number) =>
+  api.request<void>(`/commissioning/sessions/${sessionId}/managed-access/retry`, { method: 'POST' });
+export const restoreManagedAccess = (sessionId: number) =>
+  api.request<void>(`/commissioning/sessions/${sessionId}/managed-access/restore`, {
+    method: 'POST',
+    body: { confirm: true },
+  });
 
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);
