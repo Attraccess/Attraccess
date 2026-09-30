@@ -207,6 +207,15 @@
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/wago"
       }
+    },
+    "load-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "node ../scripts/load-dev.mjs package"
+      }
     }
   }
 }

@@ -137,6 +137,15 @@
       "options": {
         "command": "vitest run --config apps/plugins/rabbitmq/frontend/vitest.config.ts"
       }
+    },
+    "load-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "apps/plugins/rabbitmq",
+        "command": "node ../scripts/load-dev.mjs package"
+      }
     }
   }
 }
