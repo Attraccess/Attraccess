@@ -38,6 +38,8 @@ import { admitEnvelope, emptyStream, type DiagnosticStream } from './diagnostics
 
 type Credentials = {
   sessionId: number;
+  host: string;
+  hardwareId: string;
   fingerprint: string;
   token: string;
   privateKey: string;
@@ -66,6 +68,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   private destroyed = false;
   private scanning = false;
   private rootProbe?: RootProbe;
+  private retirementProbe?: RootProbe;
   private readonly connections = new Set<AbortController>();
 
   constructor(
@@ -118,6 +121,10 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     this.rootProbe = probe;
   }
 
+  registerRetirementProbe(probe: RootProbe): void {
+    this.retirementProbe = probe;
+  }
+
   async bind(sessionId: number, controllerId: number): Promise<void> {
     const access = await this.loadSession(sessionId);
     if (!access) return;
@@ -141,13 +148,15 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       access &&
       (access.fingerprint !== session.hostKeyFingerprint ||
         access.host !== session.targetHost ||
-        access.state === 'retired')
+        ['retiring', 'retired'].includes(access.state))
     )
       throw new ConflictException('Managed identity changed; create a fresh enrolment session.');
     if (!access) {
       const key = generateManagementKey();
       const credentials: Credentials = {
         sessionId: session.id,
+        host: session.targetHost,
+        hardwareId: session.hardwareId,
         fingerprint: session.hostKeyFingerprint,
         token: randomBytes(16).toString('hex'),
         privateKey: key.privateKey,
@@ -181,6 +190,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       if (!access) throw new ConflictException('Managed credential storage verification failed.');
     }
     const credentials = this.credentials(access);
+    if (credentials.hardwareId !== session.hardwareId)
+      throw new ConflictException('Managed credentials belong to another controller identity');
     try {
       if (access.state !== 'verified' && access.state !== 'managed') {
         const key = restoreManagementKey(credentials.privateKey, access.keyFingerprint);
@@ -222,6 +233,16 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   private async publicStatus(access: WagoManagedAccess | null) {
+    if (access && !['retiring', 'retired'].includes(access.state)) {
+      try {
+        const stored = await this.loadSession(access.sessionId);
+        if (!stored) throw new Error();
+        this.credentials(stored);
+      } catch {
+        await this.access.update(access.sessionId, { state: 'recovery_required' });
+        access.state = 'recovery_required';
+      }
+    }
     const row = access?.controllerId ? await this.updates.findOneBy({ controllerId: access.controllerId }) : null;
     return {
       sessionId: access?.sessionId ?? null,
@@ -255,6 +276,13 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   async assertRemovable(controllerId: number): Promise<void> {
+    await this.assertUpdateSettled(controllerId);
+    const access = await this.access.findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
+    if (access && access.state !== 'retired')
+      throw new ConflictException('Restore bootstrap SSH and retire managed access before removing this controller');
+  }
+
+  private async assertUpdateSettled(controllerId: number): Promise<void> {
     const row = await this.updates.findOneBy({ controllerId });
     const update = row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null;
     if (update?.token) throw new ConflictException('Finish runtime update recovery before removing this controller');
@@ -266,8 +294,9 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
 
   async restoreAccess(sessionId: number, principal: PluginAuditPrincipal): Promise<void> {
     const access = await this.loadSession(sessionId);
-    if (!access || !this.rootProbe) throw new NotFoundException('Managed recovery access not found');
-    if (access.controllerId) await this.assertRemovable(access.controllerId);
+    if (!access || !this.rootProbe || !this.retirementProbe)
+      throw new NotFoundException('Managed recovery access not found');
+    if (access.controllerId) await this.assertUpdateSettled(access.controllerId);
     const owner = randomBytes(16).toString('hex');
     if (!(await this.operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 60_000)))
       throw new ConflictException('Controller is busy');
@@ -276,17 +305,27 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     const operationId = randomUUID();
     let attempted = false;
     try {
-      if (access.controllerId) await this.assertRemovable(access.controllerId);
+      if (access.controllerId) await this.assertUpdateSettled(access.controllerId);
       await this.securityAudit(sessionId, 'security_recover', principal, operationId, 'attempted');
       attempted = true;
       // Retire automatic access durably before restoring bootstrap policy. A
       // restarted reconciler must not immediately harden it again during recovery.
-      await this.access.update(sessionId, { state: 'retired' });
-      await this.connection(access, `access-restore ${access.token}`, operation.signal);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      if (!(await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword)))
-        throw new ConflictException('Bootstrap SSH restoration is unverified; retry administrator recovery');
+      await this.access.update(sessionId, { state: 'retiring' });
+      const password = this.credentials(access).recoveryPassword;
+      // An interrupted key removal may have succeeded. Verify its durable remote
+      // result through restored pinned root access before trying the old key again.
+      if (!(await this.retirementProbe(access.host, access.fingerprint, password))) {
+        await this.connection(access, `access-restore ${access.token}`, operation.signal);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        if (!(await this.rootProbe(access.host, access.fingerprint, password)))
+          throw new ConflictException('Bootstrap SSH restoration is unverified; retry administrator recovery');
+        await this.operations.assertOwned(access.fingerprint, owner);
+        await this.connection(access, `access-retire ${access.token}`, operation.signal).catch(() => undefined);
+      }
+      if (!(await this.retirementProbe(access.host, access.fingerprint, password)))
+        throw new ConflictException('Managed key retirement is unverified; retry administrator recovery');
       await this.operations.assertOwned(access.fingerprint, owner);
+      await this.access.update(sessionId, { state: 'retired' });
       await this.securityAudit(sessionId, 'security_recover', principal, operationId, 'succeeded');
     } catch (error) {
       if (attempted)
@@ -303,7 +342,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
 
   async retryAccess(sessionId: number): Promise<void> {
     const access = await this.loadSession(sessionId);
-    if (!access || access.state === 'retired') throw new ConflictException('Managed access cannot be retried');
+    if (!access || ['retiring', 'retired'].includes(access.state))
+      throw new ConflictException('Managed access cannot be retried');
     const owner = randomBytes(16).toString('hex');
     if (!(await this.operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 60_000)))
       throw new ConflictException('Controller is busy');
@@ -378,6 +418,9 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       const value = JSON.parse(this.context.secrets.decrypt(access.encryptedCredentials)) as Credentials;
       if (
         value.sessionId !== access.sessionId ||
+        value.host !== access.host ||
+        typeof value.hardwareId !== 'string' ||
+        !value.hardwareId ||
         value.fingerprint !== access.fingerprint ||
         value.token !== access.token ||
         !/^[A-Za-z0-9_-]{43}$/.test(value.recoveryPassword)
@@ -465,7 +508,13 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     if (!session || !['awaiting_verification', 'completed'].includes(session.state)) return false;
     if (session.hardwareId !== controller.hardwareId || session.mqttServerId !== controller.mqttServerId) return false;
     const access = await this.loadSession(session.id);
-    if (!access || access.state === 'retired' || access.state === 'pending') return false;
+    if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return false;
+    try {
+      if (this.credentials(access).hardwareId !== controller.hardwareId) throw new Error();
+    } catch {
+      await this.access.update(access.sessionId, { state: 'recovery_required' });
+      return false;
+    }
     if (access.state === 'managed') {
       if (session.deliveryToken || session.dockerProvisionToken || session.state !== 'completed')
         await this.finishSession(session.id);
@@ -528,6 +577,34 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       if (await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword))
         throw new Error('Root SSH remains enabled');
       await this.prove(access, operation.signal);
+      if (!committed) {
+        const boot = await this.connection(access, `access-boot ${access.token}`, operation.signal);
+        if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\n$/.test(boot))
+          throw new Error('Controller boot identity unavailable');
+        await this.connection(access, `access-reboot ${access.token}`, operation.signal).catch(() => undefined);
+        let rebootVerified = false;
+        for (let attempt = 0; attempt < 60; attempt++) {
+          operation.signal.throwIfAborted();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          try {
+            const next = await this.connection(access, `access-boot ${access.token}`, operation.signal);
+            if (next !== boot && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\n$/.test(next)) {
+              await this.prove(access, operation.signal);
+              if ((await this.connection(access, `access-policy ${access.token}`, operation.signal)) !== 'OK\n')
+                throw new Error('Post-reboot SSH policy unverified');
+              if (await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword))
+                throw new Error('Root SSH enabled after reboot');
+              await this.prove(access, operation.signal);
+              rebootVerified = true;
+              break;
+            }
+          } catch {
+            // Reboot disconnects are expected. The deadline and host watchdog
+            // remain independent; no ambiguous result can commit the policy.
+          }
+        }
+        if (!rebootVerified) throw new Error('Managed reboot verification failed');
+      }
       await this.operations.assertOwned(access.fingerprint, owner);
       if (!committed) await this.connection(access, `access-commit ${access.token}`, operation.signal);
       await this.access.update(access.sessionId, { state: 'managed' });

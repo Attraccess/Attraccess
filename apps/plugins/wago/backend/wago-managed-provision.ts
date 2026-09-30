@@ -39,7 +39,11 @@ restore_access() {
   /etc/init.d/dropbear restart 7>&-
 }
 if test "\${1:-}" = boot; then
-  restore_access
+  # Give the server a bounded opportunity to prove hardened access after reboot.
+  # A lost server still restores the known-working policy without remote input.
+  if test -f "$base/cutover" && test ! -f "$base/committed"; then
+    nohup "$base/watchdog" </dev/null >/dev/null 2>&1 &
+  fi
 elif test "\${1:-}" = runtime-boot; then
   tx=/var/lib/attraccess-wago-update-transaction
   if test -d "$tx" && test ! -L "$tx" && test "$(stat -c '%u:%g:%a' "$tx")" = 0:0:700; then
@@ -100,10 +104,10 @@ wago_require_root_directory /etc/rc.d
 test "$(/usr/sbin/dropbear -V 2>&1)" = 'Dropbear v2025.88'
 base=/etc/attraccess-wago-management
 if test ! -e "$base"; then mkdir -m 0700 "$base"; fi
-test -d "$base" && test ! -L "$base" && test "$(stat -c '%u:%g:%a' "$base")" = 0:0:700
-test ! -e "$base/cutover" || test -e "$base/committed"
+test -d "$base" && test ! -L "$base" && test "$(stat -c '%u:%g:%a' "$base")" = 0:0:700 || exit 1
+test ! -e "$base/cutover" || test -e "$base/committed" || exit 1
 if id attraccess >/dev/null 2>&1; then
-  test -f "$base/owned-account" && test ! -L "$base/owned-account"
+  test -f "$base/owned-account" && test ! -L "$base/owned-account" || exit 1
   test "$(id -u attraccess)" -gt 0
   test "$(id -u attraccess)" != 10001
   test "$(id -g attraccess)" -gt 0
@@ -120,16 +124,16 @@ getent passwd | awk -F: -v gid="$managed_gid" '$4 == gid && $1 != "attraccess" {
 # Keep the dedicated account usable for key authentication, but its random
 # password is never issued and Dropbear password authentication is disabled later.
 printf 'attraccess:%s\\n' ${quote(randomBytes(32).toString('base64url'))} | chpasswd
-test -d /home/attraccess && test ! -L /home/attraccess
+test -d /home/attraccess && test ! -L /home/attraccess || exit 1
 mkdir -p /home/attraccess/.ssh
-test -d /home/attraccess/.ssh && test ! -L /home/attraccess/.ssh
+test -d /home/attraccess/.ssh && test ! -L /home/attraccess/.ssh || exit 1
 test ! -L /home/attraccess/.ssh/authorized_keys
 printf '%s\\n' ${quote(`command="/usr/bin/sudo -n ${MANAGEMENT_HELPER}",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ${publicKey}`)} > "$base/key.pending"
 chmod 0600 "$base/key.pending"
 # Keep the known-working key until the server durably verifies its replacement.
 # The account and directory are owned by Attraccess; no unowned key is adopted.
 if test -e /home/attraccess/.ssh/authorized_keys; then
-  test -f /home/attraccess/.ssh/authorized_keys && test "$(stat -c '%u:%g:%a:%h' /home/attraccess/.ssh/authorized_keys)" = 0:0:644:1
+  test -f /home/attraccess/.ssh/authorized_keys && test "$(stat -c '%u:%g:%a:%h' /home/attraccess/.ssh/authorized_keys)" = 0:0:644:1 || exit 1
   cat /home/attraccess/.ssh/authorized_keys > "$base/authorized_keys.next"
 else
   : > "$base/authorized_keys.next"
@@ -142,7 +146,7 @@ chmod 0644 "$base/authorized_keys.next"
 mv "$base/authorized_keys.next" /home/attraccess/.ssh/authorized_keys
 chown root:root /home/attraccess /home/attraccess/.ssh
 chmod 0755 /home/attraccess /home/attraccess/.ssh
-test -d /etc/sudoers.d && test ! -L /etc/sudoers.d
+test -d /etc/sudoers.d && test ! -L /etc/sudoers.d || exit 1
 test ! -L /etc/sudoers.d/attraccess-wago
 printf '%s\\n' 'attraccess ALL=(root) NOPASSWD: ${MANAGEMENT_HELPER} ""' > "$base/sudoers.next"
 chmod 0440 "$base/sudoers.next"
@@ -194,9 +198,9 @@ fail() { exit 1; }
 ${wagoShellFilesystemGuard()}
 base=/etc/attraccess-wago-management
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
-test -f "$base/key.pending" && test ! -L "$base/key.pending" && test "$(stat -c '%u:%g:%a:%h' "$base/key.pending")" = 0:0:600:1
-test -d /home/attraccess/.ssh && test ! -L /home/attraccess/.ssh
-test -f /home/attraccess/.ssh/authorized_keys && test ! -L /home/attraccess/.ssh/authorized_keys
+test -f "$base/key.pending" && test ! -L "$base/key.pending" && test "$(stat -c '%u:%g:%a:%h' "$base/key.pending")" = 0:0:600:1 || exit 1
+test -d /home/attraccess/.ssh && test ! -L /home/attraccess/.ssh || exit 1
+test -f /home/attraccess/.ssh/authorized_keys && test ! -L /home/attraccess/.ssh/authorized_keys || exit 1
 test "$(stat -c '%u:%g:%a:%h' /home/attraccess/.ssh/authorized_keys)" = 0:0:644:1
 cp "$base/key.pending" "$base/authorized_keys.next"
 chmod 0644 "$base/authorized_keys.next"
@@ -221,8 +225,8 @@ root=''; config=/etc/attraccess-wago
 fail() { exit 1; }
 ${wagoShellFilesystemGuard()}
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
-test ! -e "$base/cutover" && test ! -e "$base/committed"
-test -f /etc/init.d/dropbear && test ! -L /etc/init.d/dropbear
+test ! -e "$base/cutover" && test ! -e "$base/committed" || exit 1
+test -f /etc/init.d/dropbear && test ! -L /etc/init.d/dropbear || exit 1
 cp /etc/init.d/dropbear "$base/dropbear.previous"
 chmod 0700 "$base/dropbear.previous"
 printf '%s' ${quote(Buffer.from(isolated(dropbearWrapper, testRoot)).toString('base64'))} | base64 -d > "$base/dropbear.next"
@@ -271,6 +275,49 @@ if test -f "$base/dropbear.previous"; then
   sync
   nohup "$base/watchdog" boot 7>&- </dev/null >/dev/null 2>&1 &
 fi
+printf 'OK\\n'
+`,
+    testRoot,
+  );
+}
+
+/** Retirement follows a server-side proof of restored root recovery access.
+ * Keep the encrypted recovery envelope and remote receipt after dropping keys.
+ */
+export function managedRetireScript(token: string, testRoot = '', helperParameters = false): string {
+  if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid management token');
+  return isolated(
+    `set -eu
+umask 077
+root=''; config=/etc/attraccess-wago
+fail() { exit 1; }
+${wagoShellFilesystemGuard()}
+base=/etc/attraccess-wago-management
+test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
+test ! -e "$base/cutover" && test ! -e "$base/committed" || exit 1
+test -f "$base/owned-account" && test ! -L "$base/owned-account" || exit 1
+test -d /home/attraccess/.ssh && test ! -L /home/attraccess/.ssh || exit 1
+keys=/home/attraccess/.ssh/authorized_keys
+if test -e "$keys" || test -L "$keys"; then
+  test -f "$keys" && test ! -L "$keys" && test "$(stat -c '%u:%g:%a:%h' "$keys")" = 0:0:644:1 || exit 1
+  rm -f "$keys"
+fi
+rm -f "$base/key.pending"
+sync
+printf 'OK\\n'
+`,
+    testRoot,
+  );
+}
+
+export function managedRebootScript(token: string, testRoot = '', helperParameters = false): string {
+  if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid management token');
+  return isolated(
+    `set -eu
+base=/etc/attraccess-wago-management
+test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
+test -f "$base/cutover" && test ! -e "$base/committed" || exit 1
+nohup sh -c ${quote(`sleep 2; ${quote(testRoot + '/sbin/reboot')}`)} 9>&- </dev/null >/dev/null 2>&1 &
 printf 'OK\\n'
 `,
     testRoot,

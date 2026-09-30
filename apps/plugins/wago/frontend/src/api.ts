@@ -219,7 +219,7 @@ export const removeController = (id: number) => api.request<void>(`/controllers/
 
 export interface RuntimeUpdateStatus {
   sessionId: number | null;
-  management: 'pending' | 'verified' | 'managed' | 'recovery_required' | 'retired' | 'reenrol_required';
+  management: 'pending' | 'verified' | 'managed' | 'recovery_required' | 'retiring' | 'retired' | 'reenrol_required';
   keyFingerprint: string | null;
   physicalQualification: 'unverified';
   update: {

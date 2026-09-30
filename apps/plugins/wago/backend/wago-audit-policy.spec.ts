@@ -76,6 +76,7 @@ describe('WAGO audit domain declaration', () => {
         'commandId',
         'buildId',
         'imageId',
+        'installerSha256',
         'phase',
         'failure',
         'operation',

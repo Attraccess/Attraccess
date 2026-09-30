@@ -146,6 +146,22 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         return false;
       }
     });
+    this.managedRuntime?.registerRetirementProbe(async (host, fingerprint, password) => {
+      try {
+        return (
+          (await this.run(
+            host,
+            fingerprint,
+            { username: 'root', password },
+            'set -eu; test "$(id -u)" = 0; test ! -e /home/attraccess/.ssh/authorized_keys; test ! -L /home/attraccess/.ssh/authorized_keys; test ! -e /etc/attraccess-wago-management/key.pending; test ! -e /etc/attraccess-wago-management/cutover; test ! -e /etc/attraccess-wago-management/committed; printf "0\\n"',
+            undefined,
+            { timeoutMs: 15000, maxOutputBytes: 1024 },
+          )) === '0\n'
+        );
+      } catch {
+        return false;
+      }
+    });
     this.management = createWagoManagementService(this.context, {
       execute: (target, credential, command, limits) =>
         this.run(target.host, target.hostKeyFingerprint, credential, command, undefined, limits),

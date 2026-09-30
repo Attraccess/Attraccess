@@ -15,6 +15,8 @@ import {
   managedCommitScript,
   managedRestoreScript,
   managedKeyCommitScript,
+  managedRetireScript,
+  managedRebootScript,
 } from './wago-managed-provision';
 
 const tokenExample = 'a'.repeat(32);
@@ -49,6 +51,10 @@ root=${quote(testRoot)}
 fail() { exit 1; }
 ${wagoShellFilesystemGuard({ acquireLock: false })}
 case "$action" in
+  access-boot)
+    test "$digest$bytes$image$reference$previous" = '' || exit 1
+    test "$(cat ${quote(testRoot + '/etc/attraccess-wago-management/token')})" = "$token"
+    cat ${quote(testRoot + '/proc/sys/kernel/random/boot_id')}; exit 0 ;;
   access-policy)
     test "$digest$bytes$image$reference$previous" = '' || exit 1
     test "$(cat ${quote(testRoot + '/etc/attraccess-wago-management/token')})" = "$token"
@@ -78,13 +84,15 @@ case "$action" in
     if test -f "$base/committed" && test "$(cat "$base/committed")" = "$token"; then printf 'committed\\n';
     elif test -f "$base/cutover"; then printf 'cutover\\n'; else printf 'open\\n'; fi
     exit 0 ;;
-  access-key-commit|access-cutover|access-commit|access-restore)
+  access-key-commit|access-cutover|access-commit|access-restore|access-retire|access-reboot)
     test "$digest$bytes$image$reference$previous" = '' || exit 1
     case "$action" in
       access-key-commit) ${update(managedKeyCommitScript(tokenExample, testRoot, true))} ;;
       access-cutover) ${update(managedCutoverScript(tokenExample, testRoot, true))} ;;
       access-commit) ${update(managedCommitScript(tokenExample, testRoot, true))} ;;
       access-restore) ${update(managedRestoreScript(tokenExample, testRoot, true))} ;;
+      access-retire) ${update(managedRetireScript(tokenExample, testRoot, true))} ;;
+      access-reboot) ${update(managedRebootScript(tokenExample, testRoot, true))} ;;
     esac
     exit 0 ;;
   commissioning-accept)

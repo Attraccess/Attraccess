@@ -80,7 +80,11 @@ Only then does it replace the Dropbear startup script with the Attraccess wrappe
 using `-G attraccess -w -s`. A second fresh managed connection, authenticated
 daemon/listening-socket policy inspection, a negative root-password probe and a
 further managed connection precede commit. An independent three-minute watchdog
-and early boot hook restore the previous SSH policy if cutover is not committed.
+then remains armed while the fixed helper reboots the controller. A changed host
+boot ID, fresh independent key-only connections, daemon/socket policy inspection
+and root-password rejection must all pass after reboot before commit. The early
+boot hook starts a fresh three-minute rollback window; a lost server restores the
+previous SSH policy without remote input if cutover is not committed.
 The password remains rotated and its recovery copy remains encrypted.
 
 The **Administrator recovery** section contains **Reveal root password (audited)**,
@@ -93,8 +97,13 @@ uses the retained managed key to restore the prior SSH policy, proves the genera
 root password on a fresh pinned connection and retires automatic management. Use
 that recovered password as the next enrolment's temporary credential; the next
 session generates a new key/password, rather than adopting the retired identity.
-Removal retains the recovery session and encrypted record and refuses an update
-whose rollback/acknowledgement is still pending.
+Retirement removes the dedicated account's authorized keys only after restored
+root access is independently proved. A durable `retiring` state blocks automatic
+updates and key retries until pinned root inspection verifies the removal, even
+after a lost SSH response or server restart. Removal requires that completed
+retirement, retains the recovery session and encrypted record, and refuses an
+update whose rollback/acknowledgement is still pending. Unreadable encrypted
+credentials report recovery-required rather than healthy managed access.
 
 The root-owned helper exposes fixed operations and never evaluates SSH commands
 or executes files extracted from a runtime bundle. Enrolment also creates a separate
@@ -116,6 +125,11 @@ images alone, and recompressed identical images cannot establish update success.
 These are software/isolated-fixture guarantees. No bench controller was available
 for this implementation, so physical FW31 cutover, reboot, I/O and recovery
 qualification remain explicitly **unverified**, independently of software status.
+The remote bootstrap-restoration action is not a local recovery route. No local
+root recovery route has yet been qualified for FW31 when both managed SSH and the
+server are unavailable. Before shipment, identify the supported physical/vendor
+recovery interface and prove the generated root password works there; do not
+assume root SSH, WBM or a serial console remains available.
 
 The first usable beta targets CC100 `751-9301` firmware **31**. Broader firmware references below are hardware background, not additional supported baselines. Guided commissioning uses a locally checksum-checked offline bundle, not a controller-side registry pull or mandatory WBM setup. It names its container `attraccess-wago` and bind-mounts the controller directory `/var/lib/attraccess-wago` there. As of **2026-09-06**, commissioning is destructive: existing applications/data may stop working or be erased, with no preservation, backup or restoration of preexisting CODESYS or other workloads by Attraccess. It always stops and permanently disables CODESYS and verifies this before I/O. Supported Docker setup and persistent narrow I/O permissions belong to the installer. See the current [platform contract](wago-commissioning-platform.md).
 

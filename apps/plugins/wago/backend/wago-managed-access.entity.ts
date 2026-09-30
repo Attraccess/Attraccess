@@ -8,7 +8,8 @@ export class WagoManagedAccess {
   @Column({ type: 'varchar' }) host!: string;
   @Column({ type: 'varchar' }) fingerprint!: string;
   @Column({ type: 'varchar' }) token!: string;
-  @Column({ type: 'varchar' }) state!: 'pending' | 'verified' | 'managed' | 'recovery_required' | 'retired';
+  @Column({ type: 'varchar' }) state!:
+    'pending' | 'verified' | 'managed' | 'recovery_required' | 'retiring' | 'retired';
   @Column({ type: 'text', name: 'encrypted_credentials', select: false }) encryptedCredentials!: string;
   @Column({ type: 'varchar', name: 'key_fingerprint' }) keyFingerprint!: string;
 }

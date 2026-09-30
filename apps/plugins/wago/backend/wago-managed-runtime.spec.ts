@@ -29,7 +29,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WAGO_DIN, WAGO_DOUT } from './wago-hardware-deployment';
 import { runtimeBundleDeliveryScript } from './wago-runtime-install';
-import { generateInstallerAuthority, signInstaller, MANAGED_HELPER_PROTOCOL } from './wago-managed-installer';
+import { signInstaller, MANAGED_HELPER_PROTOCOL } from './wago-managed-installer';
 
 jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
 jest.mock('./wago.service', () => ({ WagoService: class {} }));
@@ -241,6 +241,36 @@ describe('managed enrolment and durable credential lifecycle', () => {
     await expect(service.recoverPassword(1, principal)).rejects.toThrow('does not match');
   });
 
+  it('visibly blocks unreadable managed credentials without exposing the envelope', async () => {
+    await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+    await db.getRepository(WagoManagedAccess).update(1, {
+      controllerId: 1,
+      state: 'managed',
+      encryptedCredentials: 'corrupt-secret-envelope',
+    });
+    const status = await service.status(1);
+    expect(status.management).toBe('recovery_required');
+    expect(JSON.stringify(status)).not.toContain('corrupt-secret-envelope');
+    await expect(service.assertRemovable(1)).rejects.toThrow('retire managed');
+  });
+
+  it('retains retirement intent and recovery secrets until remote key removal is independently verified', async () => {
+    await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+    await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'managed' });
+    await expect(service.assertRemovable(1)).rejects.toThrow('retire managed');
+    const probe = jest.fn(async () => false);
+    service.registerRetirementProbe(probe);
+    await expect(service.restoreAccess(1, principal)).rejects.toThrow('retirement is unverified');
+    expect((await service.sessionStatus(1)).management).toBe('retiring');
+    await expect(service.retryAccess(1)).rejects.toThrow('cannot be retried');
+    // A restarted request can observe the removal, even after losing its SSH reply.
+    probe.mockResolvedValue(true);
+    await service.restoreAccess(1, principal);
+    expect((await service.sessionStatus(1)).management).toBe('retired');
+    await expect(service.assertRemovable(1)).resolves.toBeUndefined();
+    expect(await service.recoverPassword(1, principal)).toEqual({ password: expect.any(String) });
+  });
+
   it('shares device ownership across processes and fences expired owners without releasing a successor', async () => {
     const first = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
     const second = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
@@ -253,87 +283,98 @@ describe('managed enrolment and durable credential lifecycle', () => {
     expect(await first.acquire('device-a', 'third', 202, 500)).toBe(false);
   });
 
-  it('automatically reconciles a committed cutover after losing the SSH commit response', async () => {
-    const current = await db.getRepository(WagoController).save(
-      Object.assign(new WagoController(), {
-        id: 1,
-        hardwareId: 'cc100-1',
-        trustState: 'claimed',
-        mqttServerId: 7,
-        pairingCodeHash: 'fixture',
-        protocolVersion: '1',
-        runtimeVersion: '1',
-        capabilities: '[]',
-        lastSeenAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }),
-    );
-    await db.getRepository(WagoCommissioningSession).save(
-      Object.assign(session(), {
-        mqttServerId: 7,
-        firmwareBaseline: '31',
-        state: 'awaiting_verification',
-        initiatingPrincipal: JSON.stringify(principal),
-        deliveryToken: 'a'.repeat(32),
-        dockerProvisionToken: 'a'.repeat(32),
-        auditLog: '[]',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }),
-    );
-    await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'recovery_required' });
-    const now = Date.now();
-    service['heartbeats'].set(1, { imageId: artifact.imageId, streamId: 'boot-new', timestamp: now, receivedAt: now });
-    service['readiness'].observe = jest.fn(() => ({
-      timestamp: now,
-      streamId: 'boot-new',
-      sequence: 1,
-      revision: 1,
-      contentHash: 'a'.repeat(64),
-      connected: true,
-      configurationAccepted: true,
-      hardwareAvailable: true,
-      ready: true,
-    }));
-    jest.mocked(commissioningVerification).mockResolvedValue({
-      controllerId: 1,
-      permanentConnection: true,
-      enrollmentRevoked: true,
-      configurationApplied: true,
-      hardwareReadiness: 'ready',
-      managementHardening: 'unverified',
-      physicalQualification: 'required',
-      ready: false,
-    });
-    rootProbe.mockResolvedValue(false);
-    jest
-      .mocked(managedSsh)
-      .mockImplementation(async (_access, _key, header) =>
-        header.startsWith('access-status ')
-          ? 'committed\n'
-          : header.startsWith('proof ')
-            ? `OK ${header.split(' ')[1]}\n`
-            : 'OK\n',
+  it.each(['committed', 'open'] as const)(
+    'reconciles %s cutover with reboot proof before a new commit',
+    async (remoteStatus) => {
+      const current = await db.getRepository(WagoController).save(
+        Object.assign(new WagoController(), {
+          id: 1,
+          hardwareId: 'cc100-1',
+          trustState: 'claimed',
+          mqttServerId: 7,
+          pairingCodeHash: 'fixture',
+          protocolVersion: '1',
+          runtimeVersion: '1',
+          capabilities: '[]',
+          lastSeenAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
       );
-    expect(await service['completeEnrolment'](current)).toBe(true);
-    expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).toMatchObject({
-      state: 'managed',
-    });
-    expect(await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).toMatchObject({
-      state: 'completed',
-      deliveryToken: null,
-    });
-    expect(jest.mocked(managedSsh).mock.calls.map((call) => call[2])).not.toContain(
-      expect.stringMatching(/^access-cutover/),
-    );
-    const securityEvents = audit.mock.calls
-      .map((call) => call[0])
-      .filter((event) => event.action === 'wago.commissioning.security_apply');
-    expect(securityEvents.map((event) => event.outcome)).toEqual(['attempted', 'succeeded']);
-    expect(securityEvents[0].operationId).toBe(securityEvents[1].operationId);
-  });
+      await db.getRepository(WagoCommissioningSession).save(
+        Object.assign(session(), {
+          mqttServerId: 7,
+          firmwareBaseline: '31',
+          state: 'awaiting_verification',
+          initiatingPrincipal: JSON.stringify(principal),
+          deliveryToken: 'a'.repeat(32),
+          dockerProvisionToken: 'a'.repeat(32),
+          auditLog: '[]',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+      await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'recovery_required' });
+      const now = Date.now();
+      service['heartbeats'].set(1, {
+        imageId: artifact.imageId,
+        streamId: 'boot-new',
+        timestamp: now,
+        receivedAt: now,
+      });
+      service['readiness'].observe = jest.fn(() => ({
+        timestamp: now,
+        streamId: 'boot-new',
+        sequence: 1,
+        revision: 1,
+        contentHash: 'a'.repeat(64),
+        connected: true,
+        configurationAccepted: true,
+        hardwareAvailable: true,
+        ready: true,
+      }));
+      jest.mocked(commissioningVerification).mockResolvedValue({
+        controllerId: 1,
+        permanentConnection: true,
+        enrollmentRevoked: true,
+        configurationApplied: true,
+        hardwareReadiness: 'ready',
+        managementHardening: 'unverified',
+        physicalQualification: 'required',
+        ready: false,
+      });
+      rootProbe.mockResolvedValue(remoteStatus === 'open');
+      let boot = '00000000-0000-4000-8000-000000000001\n';
+      jest.mocked(managedSsh).mockImplementation(async (_access, _key, header) => {
+        if (header.startsWith('access-status ')) return remoteStatus + '\n';
+        if (header.startsWith('access-cutover ')) rootProbe.mockResolvedValue(false);
+        if (header.startsWith('access-boot ')) return boot;
+        if (header.startsWith('access-reboot ')) boot = '00000000-0000-4000-8000-000000000002\n';
+        return header.startsWith('proof ') ? `OK ${header.split(' ')[1]}\n` : 'OK\n';
+      });
+      expect(await service['completeEnrolment'](current)).toBe(true);
+      expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).toMatchObject({
+        state: 'managed',
+      });
+      expect(await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).toMatchObject({
+        state: 'completed',
+        deliveryToken: null,
+      });
+      const commands = jest.mocked(managedSsh).mock.calls.map((call) => call[2].split(' ')[0]);
+      if (remoteStatus === 'committed') expect(commands).not.toContain('access-cutover');
+      else {
+        expect(commands.indexOf('access-reboot')).toBeLessThan(commands.indexOf('access-commit'));
+        expect(commands.filter((command) => command === 'access-boot')).toHaveLength(2);
+      }
+      const securityEvents = audit.mock.calls
+        .map((call) => call[0])
+        .filter((event) => event.action === 'wago.commissioning.security_apply');
+      expect(securityEvents.map((event) => event.outcome)).toEqual(['attempted', 'succeeded']);
+      expect(securityEvents[0].operationId).toBe(securityEvents[1].operationId);
+    },
+    15_000,
+  );
 
   it('uses the bound identity after restart despite a newer unused session, publishing installer changes and updating with only the stored key', async () => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
@@ -513,6 +554,26 @@ describe('fixed managed executor and recovery programs', () => {
         password = 'b'.repeat(43);
       const success = (result: ReturnType<typeof fixture.run>) =>
         expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+      fixture.file(
+        'accounts.json',
+        JSON.stringify({
+          root: { uid: 0, gid: 0, home: '/root' },
+          attraccess: { uid: 1111, gid: 1111, home: fixture.root + '/home/attraccess' },
+        }),
+      );
+      expect(
+        fixture.run(
+          managedProvisionScript(
+            token,
+            key.publicKey,
+            password,
+            managedHostHelper(artifact, fixture.root),
+            fixture.root,
+          ),
+        ).status,
+      ).not.toBe(0);
+      expect(existsSync(join(fixture.root, 'password-hashes.json'))).toBe(false);
+      fixture.file('accounts.json', JSON.stringify({ root: { uid: 0, gid: 0, home: '/root' } }));
       success(
         fixture.run(
           managedProvisionScript(
@@ -554,6 +615,9 @@ describe('fixed managed executor and recovery programs', () => {
       success(fixture.run(managedCutoverScript(token, fixture.root)));
       expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess -w -s');
       success(fixture.run(`set -- boot\n${managedWatchdogScript(fixture.root)}`));
+      // Boot arms a fresh bounded watchdog, allowing managed reboot verification.
+      expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess');
+      success(fixture.run(`set --\n${managedWatchdogScript(fixture.root)}`));
       expect(fixture.read('etc/init.d/dropbear')).not.toContain('-G attraccess');
       // Retrying with the same verified generated identity must survive a second cutover.
       success(fixture.run(managedCutoverScript(token, fixture.root)));
@@ -561,6 +625,15 @@ describe('fixed managed executor and recovery programs', () => {
       success(fixture.run(`set -- boot\n${managedWatchdogScript(fixture.root)}`));
       expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess -w -s');
       expect(fixture.read('password-hashes.json')).not.toContain(password);
+      const helper = managedHostHelper(artifact, fixture.root);
+      expect(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)).status).not.toBe(0);
+      expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(replacement.publicKey);
+      success(fixture.run(helper, '', Buffer.from(`access-restore ${token}\n`)));
+      success(fixture.run(`set --\n${managedWatchdogScript(fixture.root)}`));
+      success(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)));
+      expect(existsSync(join(fixture.root, 'home/attraccess/.ssh/authorized_keys'))).toBe(false);
+      expect(existsSync(join(fixture.root, 'etc/attraccess-wago-management/key.pending'))).toBe(false);
+      success(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)));
     } finally {
       fixture.dispose();
     }
