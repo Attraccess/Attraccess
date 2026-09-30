@@ -52,8 +52,8 @@ export class ResourceHealthState {
 
   @Column({ type: 'text', default: '' })
   @ApiProperty({
-    description: 'Identifier for the source reporting health (e.g. "Shelly", "internal-temp"). Empty string for the resource default.',
-    example: 'Shelly',
+    description: 'Identifier for the source reporting health (e.g. "ir-bridge", "internal-temp"). Empty string for the resource default.',
+    example: 'ir-bridge',
   })
   identifier!: string;
 

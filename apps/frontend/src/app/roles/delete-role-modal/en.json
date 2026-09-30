@@ -1,0 +1,30 @@
+{
+  "title": "Delete role",
+  "message": "Are you sure you want to delete the role \"{{roleName}}\"?",
+  "impact": {
+    "one": "{{count}} user is currently assigned to this role.",
+    "many": "{{count}} users are currently assigned to this role."
+  },
+  "noImpact": "No users are currently assigned to this role.",
+  "options": {
+    "remove": {
+      "label": "Remove assignments",
+      "description": "Affected users simply lose this role"
+    },
+    "reassign": {
+      "label": "Reassign to another role",
+      "description": "Affected users get the selected role instead"
+    }
+  },
+  "reassignSelect": {
+    "label": "Reassign users to",
+    "placeholder": "Select a role"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "delete": "Delete role"
+  },
+  "messages": {
+    "deleted": "Role deleted"
+  }
+}

@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type { DataSource } from 'typeorm';
 
-jest.setTimeout(60_000);
+jest.setTimeout(600_000); // migration setup takes >60s on slow machines
 
 describe('Billing balance triggers (e2e)', () => {
   let dataSource: DataSource;

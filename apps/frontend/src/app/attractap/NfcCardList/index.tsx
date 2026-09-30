@@ -1,8 +1,4 @@
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
   Button,
   DrawerBody,
   DrawerFooter,
@@ -30,6 +26,7 @@ import {
   NFCCard,
   useAttractapServiceEnrollNfcCard,
   useUsersServiceGetOneUserById,
+  useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -40,7 +37,6 @@ import en from './en.json';
 import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -270,6 +266,8 @@ export function NfcCardList() {
     en,
   });
 
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+
   const { data: cards, error: cardsError } = useAttractapServiceGetAllCards(undefined, {
     refetchInterval: 5000,
   });
@@ -296,6 +294,10 @@ export function NfcCardList() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
+  if (license && !license.modules.includes('attractap')) {
+    return null;
+  }
+
   return (
     <>
       <PageHeader
@@ -316,7 +318,7 @@ export function NfcCardList() {
               key: 'readers',
               label: t('readers'),
               icon: <ServerIcon />,
-              isHidden: !hasPermission('canManageResources'),
+              isHidden: !hasPermission('resources.update'),
               onPress: () => navigate('/attractap/readers'),
             },
           ] satisfies PageAction[]

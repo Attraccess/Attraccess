@@ -17,7 +17,7 @@ export function MqttServersPage() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const canManageMqtt = hasPermission('canManageResources');
+  const canManageMqtt = hasPermission('resources.update');
 
   const close = useCallback(() => setIsCreateOpen(false), []);
 

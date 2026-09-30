@@ -3,7 +3,8 @@
     "category": "Benachrichtigung",
     "email": "E-Mail",
     "push": "Push",
-    "toast": "In-App"
+    "toast": "In-App",
+    "all": "Alle"
   },
   "groups": {
     "general": {
@@ -58,7 +59,7 @@
     }
   },
   "description": {
-    "push": "Push-Einstellungen werden für dein Konto gespeichert. Unterstützte Browser werden automatisch abonniert, wenn du die App nutzt."
+    "push": "Push-Einstellungen werden für dein Konto gespeichert. Aktiviere Benachrichtigungen mit deiner Zustimmung auf jedem Gerät separat."
   },
   "messagesEmailOnOffline": {
     "label": "Benachrichtige mich per E-Mail über Nachrichten, wenn ich offline bin",
@@ -71,7 +72,15 @@
     "permissionDenied": "Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in deinen Browser-Einstellungen, um Push-Benachrichtigungen zu aktivieren.",
     "errors": {
       "subscribeFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden. Bitte prüfe die Benachrichtigungs-Berechtigungen deines Browsers."
-    }
+    },
+    "enable": "Auf diesem Gerät aktivieren",
+    "enabled": "Push-Benachrichtigungen sind auf diesem Gerät aktiviert."
+  },
+  "toggleAll": {
+    "label": "Alle Benachrichtigungen",
+    "description": "Alle Benachrichtigungen auf einmal aktivieren oder deaktivieren.",
+    "toggleGroup": "Alle Benachrichtigungen in",
+    "toggleChannel": "Alle umschalten"
   },
   "messages": {
     "updated": "Benachrichtigungseinstellungen aktualisiert"

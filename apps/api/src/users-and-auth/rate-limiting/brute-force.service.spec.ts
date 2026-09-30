@@ -61,6 +61,34 @@ describe('BruteForceProtectionService', () => {
       await expect(service.assertIpAllowed('login', '5.5.5.5')).rejects.toBeInstanceOf(TooManyAuthAttemptsException);
       await expect(service.assertIpAllowed('register', '5.5.5.5')).resolves.toBeUndefined();
     });
+
+    it('uses separate counters per username — shared NAT IP does not lock out other users', async () => {
+      for (let i = 0; i < 3; i += 1) {
+        await service.recordFailure('login', '10.0.0.1', null, 'attacker');
+      }
+      await expect(service.assertIpAllowed('login', '10.0.0.1', 'attacker')).rejects.toBeInstanceOf(TooManyAuthAttemptsException);
+      await expect(service.assertIpAllowed('login', '10.0.0.1', 'admin')).resolves.toBeUndefined();
+      await expect(service.assertIpAllowed('login', '10.0.0.1', null)).resolves.toBeUndefined();
+    });
+
+    it('locks out IP after username spraying exceeds coarse threshold (maxAttempts * 10)', async () => {
+      // Attacker rotates 30 usernames (3 attempts each = 30 total failures, hitting 3*10 coarse threshold)
+      for (let i = 0; i < 30; i += 1) {
+        await service.recordFailure('login', '10.0.0.2', null, `user${i}`);
+      }
+      await expect(service.assertIpAllowed('login', '10.0.0.2', 'victim')).rejects.toBeInstanceOf(TooManyAuthAttemptsException);
+    });
+
+    it('per-username isolation preserved below coarse threshold', async () => {
+      // 9 failures spread across 3 usernames — each fine-locked but coarse not yet hit (9 < 30)
+      for (let i = 0; i < 3; i += 1) {
+        await service.recordFailure('login', '10.0.0.3', null, `userA`);
+        await service.recordFailure('login', '10.0.0.3', null, `userB`);
+        await service.recordFailure('login', '10.0.0.3', null, `userC`);
+      }
+      await expect(service.assertIpAllowed('login', '10.0.0.3', 'userA')).rejects.toBeInstanceOf(TooManyAuthAttemptsException);
+      await expect(service.assertIpAllowed('login', '10.0.0.3', 'innocent')).resolves.toBeUndefined();
+    });
   });
 
   describe('account lockout', () => {
@@ -112,8 +140,8 @@ describe('BruteForceProtectionService', () => {
         setNow(1000 + 70 * 1000);
         await service.recordFailure('login', '9.9.9.9', null);
         const internalIp = (service as unknown as { ipCounters: Map<string, unknown> }).ipCounters;
-        expect(internalIp.has('login:8.8.8.8')).toBe(false);
-        expect(internalIp.has('login:9.9.9.9')).toBe(true);
+        expect(internalIp.has('login:8.8.8.8:')).toBe(false);
+        expect(internalIp.has('login:9.9.9.9:')).toBe(true);
       } finally {
         (Date.now as unknown as { mockRestore?: () => void }).mockRestore?.();
         Date.now = originalNow;

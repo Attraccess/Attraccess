@@ -12,6 +12,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { EmailService } from '../../email/email.service';
+import { AuditService } from '../../audit/audit.service';
 
 export interface RetrainingPolicy {
   retrainingMaxAgeDays: number | null;
@@ -59,6 +60,7 @@ export class ResourceRetrainingService {
     private readonly historyRepository: Repository<ResourceIntroductionHistoryItem>,
     private readonly resourceGroupsService: ResourceGroupsService,
     private readonly emailService: EmailService,
+    private readonly audit: AuditService,
   ) {}
 
   public evaluate(
@@ -119,6 +121,11 @@ export class ResourceRetrainingService {
     return { ...this.combine(evaluations), hasIntroduction: true };
   }
 
+  public async getGroupRetrainingStatus(groupId: number, userId: number): Promise<ResourceRetrainingStatus> {
+    const evaluation = await this.evaluateGroupIntroduction(groupId, userId, new Date());
+    return evaluation ? { ...evaluation, hasIntroduction: true } : { ...EMPTY_EVALUATION, hasIntroduction: false };
+  }
+
   public async isResourceIntroductionBlocked(resourceId: number, userId: number): Promise<boolean> {
     const evaluation = await this.evaluateResourceIntroduction(resourceId, userId, new Date());
     return Boolean(evaluation && evaluation.applies && evaluation.isDue && evaluation.blocksAccess);
@@ -153,6 +160,9 @@ export class ResourceRetrainingService {
   }
 
   private async notifyIfDue(introduction: ResourceIntroduction, now: Date): Promise<void> {
+    if (!(await this.isValid(introduction.id))) {
+      return;
+    }
     const trainedAt = await this.getTrainedAt(introduction);
     if (!trainedAt) {
       return;
@@ -172,10 +182,27 @@ export class ResourceRetrainingService {
       return;
     }
 
+    // This marker survives audit retention but is reset by a newer training cycle.
+    if (!introduction.retrainingRequiredAuditedAt || introduction.retrainingRequiredAuditedAt < trainedAt) {
+      const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
+      const recorded = await this.audit.recordResource({
+        action: 'retraining.required',
+        actorId: null,
+        subjectId,
+        ...(introduction.resourceId ? {} : { subjectType: 'resource_group' }),
+        details: {
+          introductionId: introduction.id,
+          usageUserId: introduction.receiverUserId,
+          retrainingReason: evaluation.reason ?? 'unknown',
+        },
+      });
+      if (recorded) {
+        await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
+      }
+    }
     if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
       return;
     }
-
     if (introduction.receiverUser?.email) {
       await this.emailService.sendUserRetrainingEmail(
         introduction.receiverUser,
@@ -183,8 +210,21 @@ export class ResourceRetrainingService {
         { reason: evaluation.reason, blocksAccess: evaluation.blocksAccess },
       );
     }
-
+    // A failed delivery must remain eligible for the next scheduled retry.
     await this.resourceIntroductionRepository.update(introduction.id, { retrainingNotifiedAt: now });
+  }
+
+  public async getIntroductionRetrainingStatus(introductionId: number): Promise<RetrainingEvaluation | null> {
+    const introduction = await this.resourceIntroductionRepository.findOne({ where: { id: introductionId } });
+    if (!introduction || !(await this.isValid(introduction.id))) return null;
+    const trainedAt = await this.getTrainedAt(introduction);
+    if (!trainedAt) return null;
+    const target = await this.getIntroductionPolicyTarget(introduction);
+    if (!target) return null;
+    const lastUsedAt = introduction.resourceId
+      ? await this.getResourceLastUsedAt(introduction.resourceId, introduction.receiverUserId)
+      : await this.getGroupLastUsedAt(introduction.resourceGroupId, introduction.receiverUserId);
+    return this.evaluate(target.policy, trainedAt, lastUsedAt);
   }
 
   private async evaluateResourceIntroduction(

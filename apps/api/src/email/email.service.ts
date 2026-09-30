@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailTemplateService } from '../email-template/email-template.service';
+import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { createTransport } from 'nodemailer';
 import {
   User,
@@ -14,13 +15,20 @@ import {
 } from '@attraccess/database-entities';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
-import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { formatKwh } from '../resources/metering/energy';
+
+const EMAIL_LOGO_CID = 'attraccess-logo';
+const EMAIL_LOGO_PATH =
+  [join(__dirname, 'assets', 'logo.png'), join(__dirname, '..', 'assets', 'logo.png')].find(existsSync) ??
+  join(__dirname, 'assets', 'logo.png');
 
 @Injectable()
 export class EmailService {
@@ -29,7 +37,7 @@ export class EmailService {
   constructor(
     private readonly settingsService: SettingsService,
     private readonly emailTemplateService: EmailTemplateService,
-    private readonly mjmlService: MjmlService,
+    private readonly emailLayoutService: EmailLayoutService,
     private readonly metricsService: MetricsService,
     private readonly externalCallTimer: ExternalCallTimer,
     @InjectRepository(User)
@@ -39,20 +47,26 @@ export class EmailService {
     this.logger.debug('EmailService initialized');
   }
 
-  private async convertTemplate(template: EmailTemplate, context: Record<string, unknown>) {
-    const subjectTemplate = Handlebars.compile(template.subject);
-    const subject = subjectTemplate(context);
+  private async convertTemplate(template: EmailTemplate, context: Record<string, unknown>, locale: string) {
+    const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
 
-    // Compile Handlebars first so all template variables (e.g. dynamic colors) are
-    // resolved before MJML validates attribute values.
-    const rawBodyTemplate = Handlebars.compile(template.body);
-    const resolvedMjml = rawBodyTemplate(context);
-    const body = await this.mjmlService.validateAndConvert(resolvedMjml);
-
-    return {
-      subject,
-      body,
+    const tHelper = (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
+      const safeDefault = typeof defaultValue === 'string' ? defaultValue : '';
+      const raw = translationsMap[key] || safeDefault;
+      const hash = options?.hash ?? {};
+      const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
+        Object.hasOwn(hash, name) ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
+      );
+      return new Handlebars.SafeString(result);
     };
+
+    const renderOpts = { helpers: { t: tHelper } };
+    const subject = Handlebars.compile(template.subject)(context, renderOpts);
+
+    const bodyHtml = await this.emailLayoutService.renderWithTemplate(template);
+    const body = Handlebars.compile(bodyHtml)(context, renderOpts);
+
+    return { subject, body };
   }
 
   private async sendEmail(
@@ -62,9 +76,10 @@ export class EmailService {
     manager?: EntityManager,
   ) {
     try {
+      const locale = user.locale ?? 'en';
       const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
-      const { subject, body } = await this.convertTemplate(dbTemplate, context);
+      const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
       const { transporter, from } = await this.createTransporter();
 
       this.logger.debug(
@@ -76,6 +91,14 @@ export class EmailService {
           from,
           subject,
           html: body,
+          attachments: [
+            {
+              filename: 'logo.png',
+              path: EMAIL_LOGO_PATH,
+              contentType: 'image/png',
+              cid: EMAIL_LOGO_CID,
+            },
+          ],
         }),
       );
       if (typeof transporter.close === 'function') {
@@ -104,6 +127,8 @@ export class EmailService {
       host: {
         frontend: url,
         backend: url,
+        notificationPreferencesUrl: `${url}/account`,
+        logoUrl: `cid:${EMAIL_LOGO_CID}`,
       },
       url,
     } as const;
@@ -225,16 +250,36 @@ export class EmailService {
       return;
     }
 
-    const roundedMinutes = Math.ceil(usage.usageInMinutes ?? 0);
+    // Receipts describe the settled transaction, including its original rounding.
+    const roundedMinutes = transaction.items?.find((item) => item.name === 'PER_MINUTE')?.quantity;
+    const secondsFormatOptions = { maximumFractionDigits: 3 };
+    let secondsFormatter: Intl.NumberFormat;
+    try {
+      secondsFormatter = new Intl.NumberFormat(user.locale ?? 'en', secondsFormatOptions);
+    } catch {
+      // Persisted locales are not restricted to valid Intl tags. Match the default email language.
+      secondsFormatter = new Intl.NumberFormat('en', secondsFormatOptions);
+    }
 
     const items = (transaction.items ?? []).map((item) => ({
       name: item.name,
+      description: item.description,
+      isEnergy: item.name === 'ENERGY',
+      energyKwh: item.energyMicroWh == null ? undefined : formatKwh(BigInt(item.energyMicroWh)),
       quantity: item.quantity,
       unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
+      isFixedFee: item.name === 'PER_SESSION',
+      isSessionDuration: item.name === 'PER_MINUTE',
+      isOperatingDuration: item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      isBillingFactor: item.name === 'BILLING_FACTOR',
+      isDuration: item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      durationMs: item.durationMs,
+      hasDuration: item.durationMs != null,
+      durationSeconds: item.durationMs == null ? undefined : secondsFormatter.format(item.durationMs / 1000),
     }));
 
-    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit); // transaction.amount is negative when charging user
+    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit);
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -246,10 +291,11 @@ export class EmailService {
         startTime: usage.startTime?.toISOString?.() ?? usage.startTime,
         endTime: usage.endTime?.toISOString?.() ?? usage.endTime,
         roundedMinutes,
+        billingFactor: usage.billingFactor == null ? undefined : `${usage.billingFactor}%`,
       },
       items,
       totalCredits,
-      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit), // already updated by DB triggers for completed tx
+      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit),
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);
@@ -285,9 +331,8 @@ export class EmailService {
         previousStatus: change.previousStatus ?? 'unknown',
         reason: change.reason,
         identifier: change.identifier,
-        headline: becameUnhealthy ? 'Resource degraded' : 'Resource recovered',
+        isDegraded: becameUnhealthy,
         headerColor: becameUnhealthy ? '#B91C1C' : '#047857',
-        bodyAction: becameUnhealthy ? 'has become degraded' : 'is healthy again',
       },
     };
 
@@ -307,13 +352,6 @@ export class EmailService {
     const path = target.isGroup ? 'resource-groups' : 'resources';
     const resourceUrl = `${base.host.frontend}/${path}/${target.id}`;
 
-    const reasonText =
-      info.reason === 'age'
-        ? 'Your training has reached its maximum age and must be renewed.'
-        : info.reason === 'inactivity'
-          ? 'You have not used this resource for the configured period and must be retrained.'
-          : 'Your training must be renewed.';
-
     const context = {
       ...base,
       resource: {
@@ -322,7 +360,8 @@ export class EmailService {
         url: resourceUrl,
       },
       retraining: {
-        reason: reasonText,
+        isAge: info.reason === 'age',
+        isInactivity: info.reason === 'inactivity',
         blocksAccess: info.blocksAccess,
       },
     };
@@ -370,7 +409,6 @@ export class EmailService {
 
     const base = await this.getBaseContext(recipient);
     const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
-    const phaseAction = note.phase === 'start' ? 'starting' : 'finishing';
 
     const context = {
       ...base,
@@ -381,8 +419,7 @@ export class EmailService {
       },
       note: {
         content: note.content,
-        phase: note.phase,
-        phaseAction,
+        isStart: note.phase === 'start',
         authorName: note.authorName,
       },
     };
@@ -415,10 +452,7 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
   }
 
-  async sendAccessChangeEmail(
-    recipient: User,
-    accessChange: { title: string; body: string; url?: string },
-  ) {
+  async sendAccessChangeEmail(recipient: User, accessChange: { title: string; body: string; url?: string }) {
     const resolvedRecipient = recipient?.email
       ? recipient
       : await this.userRepository.findOne({ where: { id: recipient.id } });
@@ -428,9 +462,7 @@ export class EmailService {
     }
 
     const base = await this.getBaseContext(resolvedRecipient);
-    const url = accessChange.url
-      ? new URL(accessChange.url, base.host.frontend).toString()
-      : undefined;
+    const url = accessChange.url ? new URL(accessChange.url, base.host.frontend).toString() : undefined;
 
     const context = {
       ...base,
@@ -444,10 +476,7 @@ export class EmailService {
     await this.sendEmail(resolvedRecipient, EmailTemplateType.ACCESS_CHANGE, context);
   }
 
-  async sendNewMessageEmail(
-    recipient: User,
-    message: { conversationId: number; senderName: string; preview: string },
-  ) {
+  async sendNewMessageEmail(recipient: User, message: { conversationId: number; senderName: string; preview: string }) {
     if (!recipient?.email) {
       return;
     }
@@ -495,6 +524,10 @@ export class EmailService {
     };
 
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_SESSION_ENDED, context);
+  }
+
+  async assertSmtpConfigured(): Promise<void> {
+    await this.createTransporter();
   }
 
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {

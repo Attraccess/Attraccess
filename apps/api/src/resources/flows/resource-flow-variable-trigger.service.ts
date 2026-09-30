@@ -8,7 +8,7 @@ import {
   ResourceFlowVariableScope,
   VariableChangedNodeDataSchema,
 } from '@attraccess/database-entities';
-import { FlowVariableChangedEvent } from './events/flow-variable-changed.event';
+import { ResourceFlowVariableChangedEvent } from './events/flow-variable-changed.event';
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 
@@ -23,8 +23,8 @@ export class ResourceFlowVariableTriggerService {
     private readonly variables: ResourceFlowVariablesService,
   ) {}
 
-  @OnEvent(FlowVariableChangedEvent.EVENT_NAME)
-  async handle(event: FlowVariableChangedEvent): Promise<void> {
+  @OnEvent(ResourceFlowVariableChangedEvent.EVENT_NAME)
+  async handle(event: ResourceFlowVariableChangedEvent): Promise<void> {
     const where: FindOptionsWhere<ResourceFlowNode> = { type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED };
     if (event.scope === ResourceFlowVariableScope.RESOURCE && event.resourceId !== null) {
       where.resourceId = event.resourceId;

@@ -1,33 +1,42 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceSessionEndedEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from './events/resource-usage.events';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './resource-session-notification.en.json';
+import * as de from './resource-session-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceSessionNotificationListener {
   constructor(private readonly notifications: NotificationDispatchService) {}
 
-  @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
-  async handleTakenOver(event: ResourceUsageTakenOverEvent): Promise<void> {
+  @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
+  async handleTakenOver(event: ResourceUsageSessionTakenOverEvent): Promise<void> {
+    const newUserUsername = event.newUser.username;
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_TAKEOVER,
       recipients: [event.previousUser],
       actorId: event.newUser.id,
-      title: `${event.resource.name} was taken over`,
-      body: `${event.newUser.username ?? 'Another user'} took over your active resource session.`,
+      title: (recipient) => t(recipient.locale, 'takeoverTitle', { resourceName: event.resource.name }),
+      body: (recipient) => {
+        const userName = newUserUsername ?? t(recipient.locale, 'fallbackUser');
+        return t(recipient.locale, 'takeoverBody', { userName });
+      },
       url: `/resources/${event.resource.id}`,
       severity: 'warning',
       sendEmail: (recipient) =>
         this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_TAKEOVER, {
           resource: { id: event.resource.id, name: event.resource.name },
-          takeover: { actorName: event.newUser.username ?? 'Another user' },
+          takeover: { actorName: newUserUsername ?? t(recipient.locale, 'fallbackUser') },
         }),
     });
   }
 
-  @OnEvent(ResourceSessionEndedEvent.EVENT_NAME)
-  async handleSessionEnded(event: ResourceSessionEndedEvent): Promise<void> {
+  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
+  async handleSessionEnded(event: ResourceUsageSessionEndedEvent): Promise<void> {
     const recipient = event.usage.user;
     const resource = event.usage.resource;
     if (!recipient || !resource) {
@@ -39,21 +48,28 @@ export class ResourceSessionNotificationListener {
       return;
     }
 
-    const endedBy = event.endedBy?.username ?? 'The system';
+    const endedByUsername = event.endedBy?.username;
 
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_SESSION_ENDED,
       recipients: [recipient],
       actorId: event.endedBy?.id,
-      title: `${resource.name} session ended`,
-      body: `${endedBy} ended your active resource session.`,
+      title: (r) => t(r.locale, 'sessionEndedTitle', { resourceName: resource.name }),
+      body: (r) => {
+        const endedBy = endedByUsername ?? t(r.locale, 'fallbackSystem');
+        return t(r.locale, 'sessionEndedBody', { endedBy });
+      },
       url: `/resources/${resource.id}`,
       severity: 'warning',
       dedupeKey: `resource_session_ended:${event.usage.id}`,
-      sendEmail: (recipient) =>
-        this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_SESSION_ENDED, {
+      sendEmail: (r) =>
+        this.notifications.sendEmailTemplate(r, NotificationCategory.RESOURCE_SESSION_ENDED, {
           resource: { id: resource.id, name: resource.name },
-          session: { id: event.usage.id, endedAt: event.usage.endTime, endedBy },
+          session: {
+            id: event.usage.id,
+            endedAt: event.usage.endTime,
+            endedBy: endedByUsername ?? t(r.locale, 'fallbackSystem'),
+          },
         }),
     });
   }

@@ -7,6 +7,7 @@ import {
   JoinColumn,
   OneToOne,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
@@ -16,6 +17,10 @@ import { BillingTransaction } from './billing-transaction.entity';
 import { Project } from './project';
 import { FormSubmission } from './form';
 
+@Index('IDX_resource_usage_resourceId', ['resourceId'])
+@Index('IDX_resource_usage_endTime', ['endTime'])
+@Index('IDX_resource_usage_userId', ['userId'])
+@Index('IDX_resource_usage_resourceId_endTime', ['resourceId', 'endTime'])
 @Entity()
 export class ResourceUsage {
   @PrimaryGeneratedColumn()
@@ -114,6 +119,54 @@ export class ResourceUsage {
   })
   usageInMinutes!: number;
 
+  @Column({ type: 'float', nullable: true })
+  @ApiProperty({
+    description: 'Operating duration attributed to this usage session in minutes',
+    required: false,
+    nullable: true,
+  })
+  attributedOperatingDurationInMinutes!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Snapshot of the session-duration rate when this usage session started',
+    required: false,
+    nullable: true,
+  })
+  sessionDurationCreditsPerMinute!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Snapshot of the attributable-operating-duration rate when this usage session started',
+    required: false,
+    nullable: true,
+  })
+  operatingDurationCreditsPerMinute!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Fixed usage fee snapshotted at session start; null for legacy sessions',
+    nullable: true,
+    required: false,
+  })
+  creditsPerUsage!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'User billing percentage snapshotted at session start; null for legacy sessions',
+    nullable: true,
+    required: false,
+  })
+  billingFactor!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Energy rate per kWh snapshotted at session start; null or 0 when energy is not billed',
+    nullable: true,
+    required: false,
+  })
+  energyCreditsPerKwh!: number | null;
+
   @OneToOne(() => BillingTransaction, (billingTransaction) => billingTransaction.resourceUsage, {
     onDelete: 'CASCADE',
     nullable: true,
@@ -148,6 +201,10 @@ export class ResourceUsage {
   @Column({ type: 'boolean', default: false })
   @ApiProperty({ description: 'Whether the resource usage is finalized' })
   isFinalized!: boolean;
+
+  /** Internal lifecycle reservation; excluded from public usage and duration calculations. */
+  @Column({ type: 'boolean', default: false })
+  lifecyclePending!: boolean;
 
   @Column({ nullable: true, type: 'integer' })
   @ApiProperty({

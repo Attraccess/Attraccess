@@ -1,0 +1,204 @@
+{
+  "title": "Plugins",
+  "description": "Auf dieser Instanz installierte Plugins und was davon geladen wurde.",
+  "disabledWarning": {
+    "title": "Plugins sind deaktiviert",
+    "description": "Plugins sind durch die Einstellung DISABLE_PLUGINS deaktiviert und werden erst geladen, wenn die Anwendung mit deaktivierter Einstellung neu gestartet wird."
+  },
+  "installPlugin": "Plugin installieren",
+  "uploadButton": "ZIP-Datei hochladen",
+  "docsButton": "Dokumentation",
+  "manageVersion": "Version verwalten",
+  "classification": {
+    "official": {
+      "label": "Offiziell",
+      "tooltip": "Von Attraccess gepflegt oder freigegeben. Dieses Label bedeutet nicht, dass das Plugin isoliert oder garantiert sicher ist."
+    },
+    "community": {
+      "label": "Community",
+      "tooltip": "Nicht in der freigegebenen Paketquellen-Whitelist von Attraccess. Prüfen Sie Quelle und angeforderte Berechtigungen vor der Installation."
+    }
+  },
+  "marketplace": {
+    "title": "Plugin-Marktplatz",
+    "description": "Kompatible Plugins aus konfigurierten Paket-Registries finden.",
+    "official": "Offizielle Plugins",
+    "community": "Community-Plugins",
+    "registry": "Registry",
+    "allRegistries": "Alle Registries",
+    "open": "Marktplatz durchsuchen",
+    "search": "Plugins suchen",
+    "searchPlaceholder": "Plugins suchen oder genauen Paketnamen eingeben",
+    "loading": "Plugins werden gesucht...",
+    "back": "Zurück",
+    "about": "Über dieses Plugin",
+    "links": "Paketlinks",
+    "versionLabel": "Version",
+    "publisherLabel": "Herausgeber",
+    "hostCompatibilityLabel": "Host-Kompatibilität",
+    "sdkCompatibilityLabel": "SDK-Kompatibilität",
+    "sdkCompatibilityValue": "Backend {{backend}}, Frontend {{frontend}}",
+    "licenseLabel": "Lizenz",
+    "sourceLabel": "Quelle",
+    "permissionsLabel": "Angeforderte Berechtigungen",
+    "safetyWarning": "Überprüfen Sie die Quelle und die angeforderten Berechtigungen vor der Installation.",
+    "details": "Details",
+    "installed": "Installiert",
+    "update": "Plugin aktualisieren",
+    "updateDescription": "Prüfe kompatible veröffentlichte Versionen und aktualisiere dieses installierte Marketplace-Plugin.",
+    "install": "Installieren",
+    "noResults": "Keine Pakete gefunden. Inkompatible Pakete bleiben mit dem Grund sichtbar.",
+    "loadError": "Der Marktplatz konnte nicht geladen werden.",
+    "lookupError": "Dieses Paket wurde in der ausgewählten Registry nicht gefunden.",
+    "registryManagement": "Registries verwalten",
+    "registryName": "Name der Registry",
+    "registryUrl": "URL der Registry",
+    "registryToken": "Zugriffstoken (nur schreibbar)",
+    "addRegistry": "Registry hinzufügen",
+    "testRegistry": "Testen",
+    "removeRegistry": "Entfernen",
+    "tokenConfigured": "Token konfiguriert",
+    "noToken": "Kein Token",
+    "registryAdded": "Registry hinzugefügt.",
+    "registryLoadError": "Konfigurierte Registries konnten nicht geladen werden.",
+    "registrySaveError": "Die Registry konnte nicht hinzugefügt werden.",
+    "registryTestSuccess": "Verbindung zur Registry erfolgreich.",
+    "registryTestError": "Verbindung zur Registry nicht möglich.",
+    "registryRemoveError": "Die Registry konnte nicht entfernt werden.",
+    "detailTitle": "Details zu {{pluginName}}",
+    "source": "Quelle: {{registry}}",
+    "version": "Version: {{version}}",
+    "publisher": "Herausgeber: {{publisher}}",
+    "hostCompatibility": "Host-Kompatibilität: {{range}}",
+    "sdkCompatibility": "SDK-Kompatibilität: Backend {{backend}}, Frontend {{frontend}}",
+    "license": "Lizenz: {{license}}",
+    "repository": "Repository",
+    "homepage": "Homepage",
+    "integrity": "Integrität: {{integrity}}",
+    "provenance": "Herkunft: {{provenance}}",
+    "deprecated": "Dieses Paket ist veraltet.",
+    "permissions": "Angeforderte Berechtigungen: {{permissions}}",
+    "installTitle": "{{pluginName}} installieren?",
+    "installDescription": "Prüfen Sie die Paketquelle und die angeforderten Berechtigungen vor der Installation.",
+    "installApproval": "Ich bestätige diese Quelle und die angeforderten Berechtigungen.",
+    "restartWarning": "Die Installation dieses Plugins erfordert zur Aktivierung einen Neustart der Anwendung.",
+    "cancel": "Abbrechen",
+    "confirmInstall": "Plugin installieren",
+    "installSuccess": "Plugin installiert. Die App startet in wenigen Sekunden zur Aktivierung neu.",
+    "installError": "Das Plugin wurde nicht installiert.",
+    "installPermissionHelp": "Melden Sie sich mit einer Rolle an, die Plugins verwalten darf, und versuchen Sie es erneut.",
+    "installRouteHelp": "Laden Sie Attraccess neu, um den aktuellen Client zu verwenden. Falls der Fehler bleibt, prüfen Sie, ob Frontend und API dieselbe Version haben.",
+    "installCompatibilityHelp": "Wählen Sie eine Plugin-Version, die mit dieser Attraccess-Version kompatibel ist.",
+    "installVersionHelp": "Aktualisieren Sie den Marketplace und wählen Sie eine verfügbare Version.",
+    "installServerHelp": "Prüfen Sie die API-Serverprotokolle auf den Installationsfehler und versuchen Sie es erneut.",
+    "installRetryHelp": "Prüfen Sie die Verbindung zur Registry und versuchen Sie es erneut."
+  },
+  "columns": {
+    "name": "Name",
+    "version": "Version",
+    "directory": "Verzeichnis",
+    "permissions": "Berechtigungen",
+    "source": "Quelle",
+    "status": "Status",
+    "actions": "Aktionen"
+  },
+  "status": {
+    "loaded": "Geladen",
+    "error": "Laden fehlgeschlagen",
+    "unknown": "Nur Frontend",
+    "errorTooltip": "Serverfehler beim Laden anzeigen",
+    "viewError": "Ladefehler für {{pluginName}} anzeigen",
+    "errorTitle": "{{pluginName}} konnte nicht geladen werden",
+    "errorDescription": "Der Server hat beim Start diesen Fehler gemeldet:",
+    "close": "Schließen",
+    "retry": "Erneut versuchen und neu starten",
+    "retrySuccess": "Das Plugin wird beim Neustart der App erneut geladen.",
+    "retryError": "Das Plugin konnte nicht erneut geladen werden."
+  },
+  "noPermissions": "Keine angefordert",
+  "updatePolicy": {
+    "title": "Automatische Updates",
+    "description": "Installierte Pakete werden nur in ihrer ursprünglichen Registry geprüft. Hauptversionen, neue Berechtigungen, Vorabversionen und veraltete Pakete werden nie automatisch installiert.",
+    "enabled": "Nach Updates suchen",
+    "enabledHint": "Deaktivierte Prüfungen lassen installierte Pakete unverändert.",
+    "mode": "Standard-Update-Regel",
+    "modeHint": "Ein Plugin kann eine strengere Regel verwenden.",
+    "prerelease": "Vorabversionen erlauben",
+    "prereleaseHint": "Vorabversionen werden nie automatisch installiert.",
+    "checkNow": "Alle jetzt prüfen",
+    "checked": "Plugin-Update-Prüfungen abgeschlossen",
+    "checkError": "Plugin-Updates konnten nicht geprüft werden",
+    "saved": "Update-Regel gespeichert",
+    "saveError": "Update-Regel konnte nicht gespeichert werden",
+    "available": "Update verfügbar",
+    "availableTitle": "Plugin-Updates sind verfügbar",
+    "availableDescription": "{{count}} installiertes Marketplace-Plugin kann aktualisiert werden. Prüfe die verfügbare Version vor der Installation.",
+    "reviewUpdates": "Updates prüfen",
+    "modes": { "off": "Aus", "patch": "Nur Patches", "minor": "Patches und Minor", "follow": "Paketregel folgen" }
+  },
+  "deleteTooltip": "Plugin entfernen",
+  "aside": {
+    "title": "Ein Plugin schreiben",
+    "description": "Plugins erweitern API und Frontend aus einem einzigen Bundle. Der Entwicklerleitfaden beschreibt Manifest, Berechtigungsmodell und lokale Entwicklung."
+  },
+  "deleteConfirmation": {
+    "title": "Plugin entfernen?",
+    "message": "Das Plugin {{pluginName}} entfernen? Sein Code und seine Laufzeitregistrierungen werden entfernt und die App wird neu geladen. Plugin-Daten und Geheimnisse bleiben zur Wiederherstellung erhalten.",
+    "cancel": "Abbrechen",
+    "delete": "Entfernen"
+  },
+  "error": {
+    "versions": {
+      "title": "Versionen konnten nicht geladen werden",
+      "description": "Das installierte Paket wurde nicht verändert. Bitte erneut versuchen."
+    },
+    "replace": {
+      "title": "Plugin konnte nicht ersetzt werden",
+      "description": "Die aktuelle Version ist weiterhin aktiv. Bitte erneut versuchen."
+    },
+    "delete": {
+      "title": "Plugin konnte nicht entfernt werden",
+      "description": "Das Plugin ist weiterhin installiert. Bitte erneut versuchen."
+    }
+  },
+  "success": {
+    "replace": {
+      "title": "Plugin-Version ersetzt",
+      "description": "Die App startet in wenigen Sekunden neu, um die ausgewählte Version zu aktivieren."
+    },
+    "delete": {
+      "title": "Plugin entfernt",
+      "description": "Die App lädt in wenigen Sekunden neu, um den Code des Plugins zu verwerfen."
+    }
+  },
+  "versionManagement": {
+    "title": "Version von {{pluginName}} verwalten",
+    "current": "Aktuelle Version: {{version}}",
+    "loading": "Verfügbare Versionen werden geladen...",
+    "selected": "Ausgewählte Version: {{version}}",
+    "spec": "Gewünschte Version oder Kanal",
+    "autoUpdate": "Automatische Update-Regel des Plugins",
+    "savePolicy": "Versionsregel speichern",
+    "policySaved": "Plugin-Versionsregel gespeichert",
+    "policyError": "Plugin-Versionsregel konnte nicht gespeichert werden",
+    "overrides": {
+      "inherit": "Globale Regel übernehmen",
+      "off": "Aus",
+      "patch": "Nur Patches",
+      "minor": "Patches und Minor",
+      "follow": "Paketregel folgen"
+    },
+    "published": "Veröffentlicht: {{date}}",
+    "permissionApproval": "Ich genehmige diese neuen Berechtigungen: {{permissions}}",
+    "permissionRemovals": "Entfernte Berechtigungen: {{permissions}}",
+    "majorApproval": "Ich genehmige dieses Major-Update und den Neustart/Ausfall.",
+    "deprecated": "Vom Herausgeber veraltet: {{notice}}",
+    "integrity": "Integrität: {{integrity}}",
+    "repository": "Release-Repository",
+    "downgradeWarning": "Ein Downgrade kann Plugin-Daten beeinträchtigen und erfordert einen Neustart der Anwendung.",
+    "cancel": "Abbrechen",
+    "update": "Aktualisieren",
+    "downgrade": "Downgrade",
+    "direction": { "current": "Aktuell", "newer": "Neuer", "older": "Älter" }
+  }
+}

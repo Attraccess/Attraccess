@@ -43,6 +43,7 @@
   - [Überblick](flows/overview.md)
   - [Flow-Editor](flows/flow-editor.md)
   - [Knotentypen](flows/node-types.md)
+  - [Energiemessung](flows/energy-metering.md)
 
 - **Formulare**
   - [Überblick](forms/overview.md)
@@ -55,6 +56,7 @@
 
 - **Attractap NFC-Leser**
   - [Überblick](attractap/overview.md)
+  - [Leser benutzen](attractap/using-the-reader.md)
   - [Hardware](attractap/hardware.md)
   - [Einrichtung](attractap/setup.md)
   - [NFC-Karten](attractap/nfc-cards.md)
@@ -84,6 +86,7 @@
 - **Systemeinstellungen**
   - [Überblick](settings/overview.md)
   - [Sicherheit](settings/security.md)
+  - [Audit-Protokoll](settings/audit-log.md)
 
 - **Für Entwickler**
   - [Überblick](developer/overview.md)

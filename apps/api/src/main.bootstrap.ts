@@ -9,6 +9,7 @@ import appConfiguration, { AppConfigType } from './config/app.config';
 import { DataSource } from 'typeorm';
 import { PluginService } from './plugin-system/plugin.service';
 import { PluginModule } from './plugin-system/plugin.module';
+import { NpmPluginService } from './plugin-system/npm-plugin.service';
 import { PluginMigrationService } from './plugin-system/plugin-migration.service';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
 import { readFile, writeFile } from 'fs/promises';
@@ -54,6 +55,7 @@ class PluginBootstrapConfigModule {}
 export async function bootstrap() {
   const bootstrapLogger = new Logger('Bootstrap');
   bootstrapLogger.log('Starting bootstrap process...');
+  const skipDatabaseMigrations = process.env.SKIP_DATABASE_MIGRATIONS === 'true';
 
   const initialLogLevels = (process.env.LOG_LEVELS || 'error,warn,log')
     .split(',')
@@ -82,16 +84,25 @@ export async function bootstrap() {
   PluginModule.configure({
     DISABLE_PLUGINS: earlyConfig.DISABLE_PLUGINS,
   });
+  // Restore a known-good package before migrations or module discovery can load
+  // code left behind by an interrupted npm plugin replacement.
+  if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
+
+  // Record active plugins before migrations or module loading execute plugin code.
+  const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
+  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
   // plugin's tables exist before any plugin code (its onModuleInit) runs. This
   // uses a standalone DataSource per plugin against the same DB, so it does not
   // interfere with the host DataSource (which opens later, inside AppModule).
   // Per-plugin failures are isolated inside the service and never abort boot.
-  if (!earlyConfig.DISABLE_PLUGINS) {
+  if (!earlyConfig.DISABLE_PLUGINS && !skipDatabaseMigrations) {
     bootstrapLogger.log('Running plugin database migrations...');
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
+  } else if (skipDatabaseMigrations) {
+    bootstrapLogger.log('Skipping plugin database migrations.');
   }
 
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
@@ -99,13 +110,18 @@ export async function bootstrap() {
 
   const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: initialLogLevels,
+    abortOnError: false,
   });
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
-  const settingsService = appForConfig.get(SettingsService);
-  const backendUrlFromDb = await settingsService.getUrl();
+  const backendUrlFromDb = skipDatabaseMigrations
+    ? appConfig.ATTRACCESS_URL
+    : await appForConfig.get(SettingsService).getUrl();
   await appForConfig.close();
+  // AppModule is constructed again below. Plugin providers in that application
+  // must not receive repositories from the closed configuration DataSource.
+  PluginModule.resetHostReferences();
 
   let httpsOptions: undefined | HttpsOptions = undefined;
 
@@ -142,6 +158,7 @@ export async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: initialLogLevels,
     httpsOptions,
+    abortOnError: false,
   });
   bootstrapLogger.log('Main application instance created.');
 
@@ -183,32 +200,37 @@ export async function bootstrap() {
     credentials: true, // Allow cookies to be sent
   });
 
-  // Run migrations before the app fully starts
-  try {
-    bootstrapLogger.log('Running database migrations...');
-    const dataSource = app.get(DataSource);
+  if (skipDatabaseMigrations) {
+    bootstrapLogger.log('Skipping database migrations.');
+  } else {
+    // Run migrations before the app fully starts
+    try {
+      bootstrapLogger.log('Running database migrations...');
+      const dataSource = app.get(DataSource);
 
-    if (!dataSource.isInitialized) {
-      await dataSource.initialize();
-      bootstrapLogger.log('Database connection initialized.');
-    }
+      if (!dataSource.isInitialized) {
+        await dataSource.initialize();
+        bootstrapLogger.log('Database connection initialized.');
+      }
 
-    const pendingMigrations = await dataSource.showMigrations();
-    if (pendingMigrations) {
-      const allMigrations = dataSource.migrations;
-      const executedMigrations = dataSource.migrations;
-      bootstrapLogger.log(
-        `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
-      );
-      await dataSource.runMigrations();
-      bootstrapLogger.log('Migrations completed successfully.');
-    } else {
-      bootstrapLogger.log('No pending migrations found.');
+      const pendingMigrations = await dataSource.showMigrations();
+      if (pendingMigrations) {
+        const allMigrations = dataSource.migrations;
+        const executedMigrations = dataSource.migrations;
+        bootstrapLogger.log(
+          `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
+        );
+        await dataSource.runMigrations();
+        bootstrapLogger.log('Migrations completed successfully.');
+      } else {
+        bootstrapLogger.log('No pending migrations found.');
+      }
+    } catch (error) {
+      bootstrapLogger.error('Failed to run database migrations');
+      bootstrapLogger.error(error);
+      PluginService.recordBootFailure(error);
+      process.exit(1);
     }
-  } catch (error) {
-    bootstrapLogger.error('Failed to run database migrations');
-    bootstrapLogger.error(error);
-    process.exit(1);
   }
 
   const globalPrefix = appConfig.GLOBAL_PREFIX;
@@ -216,8 +238,7 @@ export async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
-  const appSettingsService = app.get(SettingsService);
-  const appUrl = await appSettingsService.getUrl();
+  const appUrl = skipDatabaseMigrations ? appConfig.ATTRACCESS_URL : await app.get(SettingsService).getUrl();
 
   // Session middleware is used for SAML SSO state persistence only (not for regular auth).
   // OIDC state is handled by OidcCookieStateStore (a signed oidc-state cookie) instead.
@@ -267,7 +288,14 @@ export async function bootstrap() {
   const port = appConfig.PORT;
   // Listening and related logging will be handled by startListening function
   bootstrapLogger.log('Bootstrap process completed.');
-  return { app, globalPrefix, swaggerDocumentFactory: documentFactory, port, nodeEnv: appConfig.NODE_ENV };
+  return {
+    app,
+    globalPrefix,
+    swaggerDocumentFactory: documentFactory,
+    port,
+    nodeEnv: appConfig.NODE_ENV,
+    shouldGuardPluginLifecycle,
+  };
 }
 
 export async function startListening(app: NestExpressApplication, port: number, globalPrefix: string, nodeEnv: string) {

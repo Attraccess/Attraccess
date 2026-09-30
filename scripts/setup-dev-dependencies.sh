@@ -1,6 +1,7 @@
 #!/bin/bash
 # Setup script for Attraccess development environment
-# Installs: Docker, Node.js, pnpm, Python, PlatformIO, esptool
+# Installs: Docker, Node.js, pnpm, and project dependencies.
+# Set INSTALL_ESP_IDF=true to also install the Attractap firmware toolchain.
 # Run from repo root: ./scripts/setup-dev-dependencies.sh
 
 set -e
@@ -159,38 +160,58 @@ install_python() {
     fi
 }
 
-# --- PlatformIO & esptool ---
-check_platformio() {
-    if command -v pio &>/dev/null || command -v platformio &>/dev/null; then
-        echo "✓ PlatformIO is installed"
-        (pio --version 2>/dev/null || platformio --version 2>/dev/null) || true
+# --- ESP-IDF & esptool (Attractap firmware toolchain) ---
+ESP_IDF_VERSION="v6.0.2"
+ESP_IDF_PATH="$REPO_ROOT/.tools/esp-idf"
+INSTALL_ESP_IDF="${INSTALL_ESP_IDF:-false}"
+
+check_esp_idf() {
+    if [[ -f "$ESP_IDF_PATH/export.sh" ]] && \
+        [[ "$(git -C "$ESP_IDF_PATH" describe --tags --exact-match HEAD 2>/dev/null || true)" == "$ESP_IDF_VERSION" ]]; then
+        echo "✓ ESP-IDF $ESP_IDF_VERSION is installed at $ESP_IDF_PATH"
         return 0
     fi
     return 1
 }
 
-check_esptool() {
-    if python3 -c "import esptool" 2>/dev/null || command -v esptool.py &>/dev/null; then
-        echo "✓ esptool is installed"
-        return 0
+install_esp_idf() {
+    echo "Installing ESP-IDF $ESP_IDF_VERSION at $ESP_IDF_PATH (Attractap firmware toolchain)..."
+    # Optional convenience: an esptool on PATH. Skipped when the system Python
+    # has no pip (e.g. NixOS) — ESP-IDF's install.sh below always bundles
+    # esptool inside its own Python environment, which build_firmwares.py
+    # falls back to automatically.
+    if python3 -m pip --version &>/dev/null; then
+        python3 -m pip install --user --upgrade esptool || true
+        # Ensure ~/.local/bin is in PATH
+        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            echo "  Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
+            export PATH="$HOME/.local/bin:$PATH"
+        fi
+    else
+        echo "  System Python has no pip — skipping user-level esptool install"
+        echo "  (ESP-IDF provides esptool in its own Python environment)"
     fi
-    return 1
-}
-
-install_platformio() {
-    echo "Installing PlatformIO and esptool..."
-    if ! python3 -m pip --version &>/dev/null; then
-        echo "  pip not found. Install it with: sudo apt install python3-pip"
-        echo "  Then re-run this script or: pip3 install --user platformio esptool"
+    if [[ ! -e "$ESP_IDF_PATH" ]]; then
+        mkdir -p "$(dirname "$ESP_IDF_PATH")"
+        git clone --depth 1 --shallow-submodules --recursive -b "$ESP_IDF_VERSION" \
+            https://github.com/espressif/esp-idf.git "$ESP_IDF_PATH"
+    elif [[ -d "$ESP_IDF_PATH/.git" ]]; then
+        git -C "$ESP_IDF_PATH" fetch --depth 1 origin tag "$ESP_IDF_VERSION"
+        git -C "$ESP_IDF_PATH" checkout --detach "$ESP_IDF_VERSION"
+        git -C "$ESP_IDF_PATH" submodule sync --recursive
+        git -C "$ESP_IDF_PATH" submodule update --init --recursive --depth 1
+    else
+        echo "Error: $ESP_IDF_PATH exists but is not an ESP-IDF Git checkout." >&2
         return 1
     fi
-    python3 -m pip install --user --upgrade pip
-    python3 -m pip install --user --upgrade platformio esptool
-    # Ensure ~/.local/bin is in PATH
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        echo "  Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
-        export PATH="$HOME/.local/bin:$PATH"
+    "$ESP_IDF_PATH/install.sh" esp32s3
+    # ESP-IDF's Linux installer marks cmake/ninja "on request" and skips them,
+    # assuming the system provides them (NixOS et al. don't) — install them
+    # into the IDF tool set explicitly when absent.
+    if ! command -v cmake &>/dev/null || ! command -v ninja &>/dev/null; then
+        python3 "$ESP_IDF_PATH/tools/idf_tools.py" install cmake ninja
     fi
+    printf '  To use idf.py directly in a shell: . %q\n' "$ESP_IDF_PATH/export.sh"
 }
 
 # --- Git submodules ---
@@ -218,9 +239,9 @@ setup_project() {
     echo "✓ pnpm install complete"
 
     echo "Running database migrations..."
-    pnpm nx run api:migrations-run || {
-        echo "  (migrations may fail if DB not configured - that's OK for initial setup)"
-    }
+    storage_root=$(node --env-file="$REPO_ROOT/.env" -e 'process.stdout.write(process.env.STORAGE_ROOT || "storage")')
+    mkdir -p "$storage_root"
+    pnpm nx run api:migrations-run
 }
 
 # --- Main ---
@@ -253,15 +274,20 @@ main() {
     fi
     echo ""
 
-    # Python
+    # Python is also required by node-gyp when native module prebuilds are unavailable.
     if ! check_python; then
         install_python
     fi
     echo ""
 
-    # PlatformIO
-    if ! check_platformio || ! check_esptool; then
-        install_platformio || echo "⚠ PlatformIO install failed. Install manually: pip3 install --user platformio esptool"
+    # ESP-IDF is only needed for Attractap firmware work. Keeping it opt-in
+    # avoids a large toolchain install for routine API/frontend worktrees.
+    if [[ "$INSTALL_ESP_IDF" == "true" ]]; then
+        if ! check_esp_idf; then
+            install_esp_idf
+        fi
+    else
+        echo "Skipping ESP-IDF. Install it when needed with: INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh"
     fi
     echo ""
 
@@ -276,7 +302,7 @@ main() {
     echo "=== Setup complete ==="
     echo ""
     echo "Next steps:"
-    echo "  1. Ensure PATH includes ~/.local/bin (for pio, esptool)"
+    echo "  1. For Attractap firmware work: INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh"
     echo "  2. If Docker was just installed: log out and back in, or run: newgrp docker"
     echo "  3. Start dev services (optional): pnpm services"
     echo "  4. Run full precommit: pnpm precommit:all"

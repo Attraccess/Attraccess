@@ -1,0 +1,6 @@
+{
+  "demo": {
+    "title": "Demo firmware",
+    "description": "Runs a local mock without a server — for demos and testing only."
+  }
+}

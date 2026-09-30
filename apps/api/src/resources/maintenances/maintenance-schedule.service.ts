@@ -1,17 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleTimeIntervalConfig,
+  ResourceMaintenance,
   Resource,
+  ResourceType,
   UsageDurationUnit,
 } from '@attraccess/database-entities';
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
+import { AuditService } from '../../audit/audit.service';
+import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 
 @Injectable()
 export class MaintenanceScheduleService {
@@ -26,7 +31,9 @@ export class MaintenanceScheduleService {
     private readonly timeIntervalConfigRepository: Repository<ResourceMaintenanceScheduleTimeIntervalConfig>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
-  ) { }
+    private readonly audit: AuditService,
+    private readonly evaluator: MaintenanceScheduleEvaluatorService,
+  ) {}
 
   async findAllByResourceId(resourceId: number): Promise<ResourceMaintenanceSchedule[]> {
     await this.ensureResourceExists(resourceId);
@@ -48,13 +55,21 @@ export class MaintenanceScheduleService {
     return schedule;
   }
 
-  async create(resourceId: number, dto: CreateMaintenanceScheduleDto): Promise<ResourceMaintenanceSchedule> {
-    await this.ensureResourceExists(resourceId);
+  async create(
+    resourceId: number,
+    dto: CreateMaintenanceScheduleDto,
+    actorId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ResourceMaintenanceSchedule> {
+    const resource = await this.ensureResourceExists(resourceId);
+    this.validateDurationBasis(resource, dto.durationBasis);
 
     const schedule = this.scheduleRepository.create({
       resourceId,
       name: dto.name ?? null,
       triggerType: dto.triggerType,
+      durationBasis: dto.durationBasis ?? ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
       enabled: dto.enabled ?? true,
     });
     const saved = await this.scheduleRepository.save(schedule);
@@ -65,18 +80,36 @@ export class MaintenanceScheduleService {
       timeIntervalConfig: dto.timeIntervalConfig,
     });
 
-    return this.getOne(resourceId, saved.id);
+    const result = await this.getOne(resourceId, saved.id);
+    await this.audit.recordResource({
+      action: 'maintenance_schedule.created',
+      actorId,
+      authenticationMethod,
+      apiTokenId,
+      subjectId: resourceId,
+      details: this.scheduleDetails(result),
+    });
+    if (result.enabled) await this.evaluator.evaluateResource(resourceId);
+    return result;
   }
 
   async update(
     resourceId: number,
     scheduleId: number,
     dto: UpdateMaintenanceScheduleDto,
+    actorId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
     const schedule = await this.getOne(resourceId, scheduleId);
+    const durationBasis = dto.durationBasis ?? schedule.durationBasis;
+    if (durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION) {
+      this.validateDurationBasis(await this.ensureResourceExists(resourceId), durationBasis);
+    }
 
     if (dto.name !== undefined) schedule.name = dto.name ?? null;
     if (dto.enabled !== undefined) schedule.enabled = dto.enabled;
+    if (dto.durationBasis !== undefined) schedule.durationBasis = dto.durationBasis;
     const triggerType = dto.triggerType ?? schedule.triggerType;
     if (dto.triggerType !== undefined) schedule.triggerType = triggerType;
 
@@ -93,31 +126,89 @@ export class MaintenanceScheduleService {
         usageHoursConfig:
           dto.usageHoursConfig ??
           (schedule.usageHoursConfig as { duration: number; unit: UsageDurationUnit } | undefined),
-        usageCountConfig: dto.usageCountConfig ?? (schedule.usageCountConfig as { thresholdSessions: number } | undefined),
+        usageCountConfig:
+          dto.usageCountConfig ?? (schedule.usageCountConfig as { thresholdSessions: number } | undefined),
         timeIntervalConfig:
           dto.timeIntervalConfig ??
           (schedule.timeIntervalConfig as { duration: number; unit: UsageDurationUnit } | undefined),
       });
     }
 
-    return this.getOne(resourceId, scheduleId);
-  }
-
-  async delete(resourceId: number, scheduleId: number): Promise<void> {
-    const schedule = await this.scheduleRepository.findOne({
-      where: { id: scheduleId, resourceId },
+    const result = await this.getOne(resourceId, scheduleId);
+    await this.audit.recordResource({
+      action: 'maintenance_schedule.updated',
+      actorId,
+      authenticationMethod,
+      apiTokenId,
+      subjectId: resourceId,
+      details: this.scheduleDetails(result),
     });
-    if (!schedule) {
-      throw new NotFoundException('Maintenance schedule not found');
-    }
-    await this.scheduleRepository.remove(schedule);
+    if (result.enabled) await this.evaluator.evaluateResource(resourceId);
+    return result;
   }
 
-  private async ensureResourceExists(resourceId: number): Promise<void> {
-    const exists = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!exists) {
+  async delete(
+    resourceId: number,
+    scheduleId: number,
+    actorId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<void> {
+    const schedule = await this.getOne(resourceId, scheduleId);
+    const details = this.scheduleDetails(schedule);
+    await this.scheduleRepository.manager.transaction(async (manager) => {
+      await manager
+        .getRepository(ResourceMaintenance)
+        .update({ maintenanceSchedule: { id: scheduleId } }, { maintenanceSchedule: null });
+      await manager.getRepository(ResourceMaintenanceScheduleUsageHoursConfig).delete({ scheduleId });
+      await manager.getRepository(ResourceMaintenanceScheduleUsageCountConfig).delete({ scheduleId });
+      await manager.getRepository(ResourceMaintenanceScheduleTimeIntervalConfig).delete({ scheduleId });
+      await manager.getRepository(ResourceMaintenanceSchedule).remove(schedule);
+    });
+    await this.audit.recordResource({
+      action: 'maintenance_schedule.deleted',
+      actorId,
+      authenticationMethod,
+      apiTokenId,
+      subjectId: resourceId,
+      details,
+    });
+  }
+
+  private async ensureResourceExists(resourceId: number): Promise<Resource> {
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
+    return resource;
+  }
+
+  private validateDurationBasis(resource: Resource, basis?: ResourceMaintenanceScheduleDurationBasis): void {
+    if (
+      basis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION &&
+      resource.type !== ResourceType.Machine
+    ) {
+      throw new BadRequestException('Operating duration is only supported for machine resources');
+    }
+  }
+
+  private scheduleDetails(schedule: ResourceMaintenanceSchedule): Record<string, string | number> {
+    const details: Record<string, string | number> = {
+      scheduleId: schedule.id,
+      enabled: schedule.enabled ? 1 : 0,
+      triggerType: schedule.triggerType,
+    };
+    if (schedule.name) details.name = schedule.name.slice(0, 512);
+    if (schedule.usageHoursConfig) {
+      details.usageDuration = schedule.usageHoursConfig.duration;
+      details.usageUnit = schedule.usageHoursConfig.unit;
+    }
+    if (schedule.usageCountConfig) details.usageThreshold = schedule.usageCountConfig.thresholdSessions;
+    if (schedule.timeIntervalConfig) {
+      details.usageDuration = schedule.timeIntervalConfig.duration;
+      details.usageUnit = schedule.timeIntervalConfig.unit;
+    }
+    return details;
   }
 
   private async removeConfigsForSchedule(scheduleId: number): Promise<void> {

@@ -8,9 +8,14 @@ env:
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
   DOCKER_BUILDKIT: 1
+  # Nx remote cache — main is the only branch that writes it. Falls back to the
+  # read-only token if RW is missing, so a rotation gap degrades to reads.
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
 
 permissions:
   contents: read
+  id-token: write
   packages: write
 
 jobs:
@@ -18,10 +23,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Lint all projects
         run: pnpm nx run-many --target=lint --parallel=5 --exclude=tag:scope:hardware
 
@@ -29,10 +36,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Typecheck all projects
         run: pnpm nx run-many --target=typecheck --parallel=5 --exclude=tag:scope:hardware
 
@@ -40,10 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Test all projects
         run: pnpm nx run-many --target=test,e2e --parallel=5 --exclude=tag:scope:hardware
 
@@ -51,58 +62,67 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Build all projects
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware
+        run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:scope:companion
 
-  containerize:
+  plugins:
     needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        uses: actions/checkout@v7
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          esp-idf: 'false'
+      - name: Publish nightly official plugin packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: next
+          NPM_NIGHTLY: 'true'
+        run: |
+          set -o pipefail
+          git diff --name-only "${{ github.event.before }}" "$GITHUB_SHA" -- . ':(exclude).github/workflows/**' |
+            pnpm nx affected --target=publish --parallel=3 --stdin --exclude='*,!tag:type:plugin'
 
-      - name: Get Node.js Version
-        id: node-version
-        run: echo "NODE_VERSION=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
+
+  build-attractap-desktop:
+    uses: ./.github/workflows/build-attractap-desktop.yml
+
+  containerize:
+    needs: [build, plugins, build-companion]
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/build-attractap-firmware
+
+      - uses: ./.github/actions/download-companion
 
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          push: true
           tags: |
             ghcr.io/${{ env.GHCR_IMAGE_NAME }}:nightly-latest
             ghcr.io/${{ env.GHCR_IMAGE_NAME }}:nightly-${{ steps.vars.outputs.SHORT_SHA }}
             ${{ env.DOCKERHUB_IMAGE_NAME }}:nightly-latest
             ${{ env.DOCKERHUB_IMAGE_NAME }}:nightly-${{ steps.vars.outputs.SHORT_SHA }}
-          build-args: |
-            NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          ghcr-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}

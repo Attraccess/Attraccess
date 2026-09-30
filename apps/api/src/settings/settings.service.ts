@@ -1,11 +1,12 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { auditSettingsUpdateSchema, readAuditSettings } from '../audit/audit.config';
+import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { AppSettingsDto } from './dto/app-settings.dto';
-import { SmtpSettingsDto } from './dto/smtp-settings.dto';
+import { SmtpServiceType, SmtpSettingsDto } from './dto/smtp-settings.dto';
 import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
@@ -44,6 +45,19 @@ import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-
 
 @Injectable()
 export class SettingsService {
+  getAuditSettings() {
+    return readAuditSettings(this.settingsStore);
+  }
+
+  async updateAuditSettings(update: unknown) {
+    const parsed = auditSettingsUpdateSchema.safeParse(update);
+    if (!parsed.success) throw new BadRequestException('Invalid audit settings');
+    for (const [key, value] of Object.entries(parsed.data)) {
+      if (value !== undefined) await this.settingsStore.setPlainSetting('audit', key, JSON.stringify(value));
+    }
+    return this.getAuditSettings();
+  }
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -74,9 +88,10 @@ export class SettingsService {
         !!app.url?.trim() &&
         app.licenseKeyConfigured === true,
       smtp:
-        !!smtp.service &&
-        !!smtp.user?.trim() &&
-        !!smtp.from?.trim(),
+        !!smtp.from?.trim() &&
+        (!smtp.passConfigured || !!smtp.user?.trim()) &&
+        (smtp.service === SmtpServiceType.Outlook365 ||
+          (smtp.service === SmtpServiceType.SMTP && !!smtp.host?.trim() && !!smtp.port)),
       admin: userCount > 0,
       adminEmailVerified,
     };

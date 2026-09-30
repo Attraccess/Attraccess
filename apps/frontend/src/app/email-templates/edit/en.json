@@ -1,5 +1,4 @@
 {
-  "subtitle": "Modify the subject and body (MJML) content of the template.",
   "templateType": {
     "verify-email": "Email Verification",
     "reset-password": "Password Reset",
@@ -7,34 +6,73 @@
     "password-changed": "Password Changed",
     "resource-usage-billing-transaction-summary": "Resource Usage Billing Transaction Summary",
     "user-invitation": "User Invitation",
-    "project-invitation": "Project Invitation"
+    "project-invitation": "Project Invitation",
+    "delete-account-confirmation": "Delete Account Confirmation",
+    "resource-health-changed": "Resource Health Changed",
+    "user-retraining-required": "User Retraining Required",
+    "maintenance-request-created": "Maintenance Request Created",
+    "message-received": "New Message (Offline Fallback)",
+    "resource-usage-note-added": "Resource Usage Note Added",
+    "resource-takeover": "Resource Takeover",
+    "resource-session-ended": "Resource Session Ended",
+    "access-change": "Access Change"
   },
   "form": {
-    "subject": "Subject",
-    "mjmlDocumentation": "MJML Documentation"
+    "subject": "Subject"
   },
   "sections": {
-    "template": "Template",
-    "preview": "Preview"
-  },
-  "preview": {
-    "iframeTitle": "Body Preview",
-    "loading": "Loading...",
-    "errorPrefix": "Error loading preview.",
-    "emptyPlaceholder": "Start editing the MJML body to see a preview."
+    "translations": "Translations"
   },
   "variables": {
-    "title": "Available variables",
-    "hint": "Click a chip to copy the variable to your clipboard.",
-    "empty": "No variables for this template.",
+    "title": "Variables",
     "copied": "Copied {{name}}",
-    "copyFailed": "Could not copy {{name}}",
-    "completionDetail": "Template variable"
+    "copyFailed": "Could not copy {{name}}"
+  },
+  "translations": {
+    "noKeys": "No \\{{t}} helper calls found in this template. Use \\{{t \"key\" \"Default text\"}} in the template body or subject to add translatable strings.",
+    "explainer": "Recipients get the translation matching their language. If a text is not translated, the default text from the template is used.",
+    "emptyTitle": "No languages added yet",
+    "emptyHint": "This template is only sent with its default text. Add a language to translate it for recipients who use that language.",
+    "addLanguage": "Add language",
+    "unsavedLanguageHint": "{{language}} is not saved yet — fill in translations and press \"Save translations\".",
+    "keyColumn": "Key",
+    "defaultColumn": "Default text",
+    "translationColumn": "Translation ({{language}})",
+    "save": "Save translations",
+    "saveFailed": "Failed to save translations",
+    "saved": "Translations saved",
+    "removeLanguage": "Remove {{language}}",
+    "deleteFailed": "Failed to delete translations",
+    "deleteConfirm": "Remove {{language}} and delete all of its saved translations?",
+    "deleteConfirmButton": "Remove",
+    "emptyTranslation": "Falls back to default",
+    "loadFailed": "Existing translations could not be loaded.",
+    "retry": "Retry",
+    "customLocale": "Other language…",
+    "customLocaleTitle": "Add another language",
+    "customLocaleHint": "Enter a language tag such as \"de-CH\", \"en-GB\" or \"sw\". Regional tags override the base language for recipients in that region.",
+    "customLocaleInvalid": "Must be a lowercase language code, optionally with an uppercase region (e.g. \"de\" or \"de-CH\").",
+    "customLocaleAdd": "Add"
   },
   "actions": {
+    "back": "Back to templates",
     "close": "Close",
     "cancel": "Cancel",
-    "save": "Save Changes",
-    "expand": "Expand editor"
+    "save": "Save",
+    "translations": "Translations",
+    "resetToDefault": "Reset to Default"
+  },
+  "resetConfirm": {
+    "title": "Reset template to default?",
+    "message": "This will overwrite your customizations with the bundled default template. Custom translations will be removed; shipped translations (e.g. German) will be restored. This cannot be undone.",
+    "confirm": "Reset",
+    "cancel": "Cancel"
+  },
+  "toast": {
+    "saveSuccess": "Template saved.",
+    "saveError": "Failed to save template.",
+    "extractError": "Could not separate the template content from the layout frame. Please reload the page and try again.",
+    "resetSuccess": "Template reset to default.",
+    "resetError": "Failed to reset template."
   }
 }

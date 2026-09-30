@@ -5,7 +5,7 @@ import { ResourceUsage } from '@attraccess/database-entities';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { UpdateUsageSessionProjectDto } from './dtos/updateUsageSessionProject.dto';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { GetResourceHistoryQueryDto } from './dtos/getResourceHistoryQuery.dto';
 import { GetResourceHistoryResponseDto } from './dtos/GetResourceHistoryResponse.dto';
 import { GetActiveUsageSessionDto } from './dtos/getActiveUsageSession.dto';
@@ -41,7 +41,13 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.startSession(resourceId, req.user, dto);
+    return this.resourceUsageService.startSession(resourceId, req.user, dto, {
+      auditOrigin: {
+        actorId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+      },
+    });
   }
 
   @Put('end')
@@ -69,7 +75,13 @@ export class ResourceUsageController {
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.endSession(resourceId, req.user, dto);
+    return this.resourceUsageService.endSession(resourceId, req.user, dto, {
+      auditOrigin: {
+        actorId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+      },
+    });
   }
 
   @Put('sessions/:usageId/project')
@@ -215,16 +227,16 @@ export class ResourceUsageController {
     @Req() req: AuthenticatedRequest,
   ): Promise<GetResourceHistoryResponseDto> {
     // Allow users to see their own history, or admins to see all history
-    const canManageResources = req.user.systemPermissions?.canManageResources === true;
+    const canUpdateResources = (req.user as AuthenticatedUser).effectivePermissions?.has('resources.update') === true;
     const isViewingOwnHistory = query.userId === req.user.id || query.userId === undefined;
 
     // If not an admin and trying to view someone else's history, deny access
-    if (!canManageResources && !isViewingOwnHistory) {
+    if (!canUpdateResources && !isViewingOwnHistory) {
       throw new ForbiddenException('You can only view your own usage history');
     }
 
     // If not an admin, force filtering by the current user's ID
-    if (!canManageResources) {
+    if (!canUpdateResources) {
       query.userId = req.user.id;
     }
 

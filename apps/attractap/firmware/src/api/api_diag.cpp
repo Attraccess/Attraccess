@@ -2,10 +2,13 @@
 // FEATURE: api-diag
 
 #include "api.hpp"
+#include <cstdio>
 
 #ifdef ESP_PLATFORM
-#include <Preferences.h>
+#include "settings/kvstore.hpp"
+#include <cstring>
 #include <memory>
+#include <string>
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
@@ -28,8 +31,17 @@ struct CrashBootRecord
 
 #define BOOT_DIAG_NAMESPACE "bootdiag"
 #define BOOT_DIAG_PENDING_KEY "pending"
+#define BOOT_DIAG_PENDING_REASON_KEY "pendingreason"
 #define BOOT_DIAG_REBOOT_REASON_KEY "rebootreason"
 #define BOOT_DIAG_MAGIC 0x41545431
+#define BOOT_DIAG_PENDING_VERSION 1
+
+struct PendingCrashBootRecord
+{
+    CrashBootRecord record;
+    uint8_t resetReason;
+    uint8_t version;
+};
 
 // Cap the coredump we are willing to base64-encode and hold in RAM at once.
 // Larger dumps stay in flash (readable over USB on the bench) and only the
@@ -135,29 +147,74 @@ void API::sendPendingCrashReport()
         return;
     }
 
-    CrashBootRecord rec = {0};
-    Preferences prefs;
+    PendingCrashBootRecord pending = {};
+    KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, true);
-    size_t read = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &rec, sizeof(rec));
+    size_t read = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &pending, sizeof(pending));
     prefs.end();
-    if (read != sizeof(rec) || rec.magic != BOOT_DIAG_MAGIC)
+
+    CrashBootRecord rec = {};
+    uint8_t pendingReason = 0;
+    if (read == sizeof(pending) && pending.version == BOOT_DIAG_PENDING_VERSION &&
+        pending.record.magic == BOOT_DIAG_MAGIC)
+    {
+        rec = pending.record;
+        pendingReason = pending.resetReason;
+    }
+    else if (read == sizeof(rec))
+    {
+        memcpy(&rec, &pending, sizeof(rec));
+        if (rec.magic != BOOT_DIAG_MAGIC)
+        {
+            return;
+        }
+
+        KVStore legacyPrefs;
+        legacyPrefs.begin(BOOT_DIAG_NAMESPACE, true);
+        uint8_t legacyReason = legacyPrefs.getUChar(BOOT_DIAG_PENDING_REASON_KEY, 0);
+        legacyPrefs.end();
+
+        if (legacyReason == ESP_RST_SW)
+        {
+            // Legacy records stored the reset reason separately. An intentional
+            // software reset is not crash telemetry, so discard this old pair.
+            legacyPrefs.begin(BOOT_DIAG_NAMESPACE, false);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_KEY);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
+            legacyPrefs.end();
+            return;
+        }
+        else if (legacyReason != 0)
+        {
+            pendingReason = legacyReason;
+        }
+        else if (esp_reset_reason() == ESP_RST_SW)
+        {
+            legacyPrefs.begin(BOOT_DIAG_NAMESPACE, false);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_KEY);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
+            legacyPrefs.end();
+            return;
+        }
+        else
+        {
+            pendingReason = (uint8_t)esp_reset_reason();
+        }
+    }
+    else
     {
         return;
     }
-
-    // esp_reset_reason() reports what ENDED the previous session (the crash we
-    // are reporting). The stored record's resetReason is what started it, so the
-    // live reset reason is the correct label to pair with the pre-freeze snapshot.
-    const char *resetStr = crashResetReasonToString((uint8_t)esp_reset_reason());
+    const char *resetStr = crashResetReasonToString(pendingReason);
 
     // Optional deliberate-reboot reason left behind by the firmware before it
     // rebooted itself (e.g. the websocket reconnect heap-recovery reboot). Absent
     // for ordinary/unexpected resets, in which case the field is omitted.
-    char rebootReason[64] = {0};
+    std::string rebootReason;
     {
-        Preferences reasonPrefs;
+        KVStore reasonPrefs;
         reasonPrefs.begin(BOOT_DIAG_NAMESPACE, true);
-        reasonPrefs.getString(BOOT_DIAG_REBOOT_REASON_KEY, rebootReason, sizeof(rebootReason));
+        rebootReason = reasonPrefs.getString(BOOT_DIAG_REBOOT_REASON_KEY);
         reasonPrefs.end();
     }
 
@@ -166,7 +223,7 @@ void API::sendPendingCrashReport()
     this->crashReportSentCoredump = (bool)coredump;
 
     this->logger.infof("Uploading crash report: reset=%s rebootReason=%s uptime=%ums heap=%u coredump=%s",
-                       resetStr, rebootReason[0] ? rebootReason : "(none)", rec.uptimeMs,
+                       resetStr, rebootReason.empty() ? "(none)" : rebootReason.c_str(), rec.uptimeMs,
                        rec.freeInternalHeap, coredump ? "yes" : "no");
 
     // Build the event manually into a single heap buffer: an oversized coredump
@@ -175,9 +232,9 @@ void API::sendPendingCrashReport()
     const char *wifi = rec.wifiConnected ? "CONNECTED" : "DISCONNECTED";
 
     char rebootReasonField[96] = {0};
-    if (rebootReason[0] != '\0')
+    if (!rebootReason.empty())
     {
-        snprintf(rebootReasonField, sizeof(rebootReasonField), ",\"rebootReason\":\"%s\"", rebootReason);
+        snprintf(rebootReasonField, sizeof(rebootReasonField), ",\"rebootReason\":\"%s\"", rebootReason.c_str());
     }
 
     char head[416];
@@ -234,7 +291,7 @@ void API::sendPendingCrashReport()
     }
     buf.get()[pos] = '\0';
 
-    this->websocket.sendMessage(buf.get(), pos);
+    this->transport.sendMessage(buf.get(), pos);
     this->crashReportAwaitingAck = true;
 }
 
@@ -250,9 +307,10 @@ void API::onCrashReportResponse(JsonObject data)
     }
 
     this->logger.info("Crash report accepted; clearing stored record");
-    Preferences prefs;
+    KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, false);
     prefs.remove(BOOT_DIAG_PENDING_KEY);
+    prefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
     prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);
     prefs.end();
 

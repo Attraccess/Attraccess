@@ -2,7 +2,7 @@
 
 #include <lvgl.h>
 #include "../IScreen.hpp"
-#include <Arduino.h>
+#include <string>
 
 class BootScreen : public IScreen
 {
@@ -11,7 +11,7 @@ public:
     void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
 private:

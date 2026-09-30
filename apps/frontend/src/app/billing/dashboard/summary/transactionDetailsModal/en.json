@@ -14,11 +14,13 @@
     "initiator": "Initiator",
     "resourceUsage": "Resource / Usage",
     "refundOf": "Refund of",
+    "correctionOf": "Correction of",
     "externalReference": "External reference",
     "type": "Type"
   },
   "type": {
     "refund": "Refund",
+    "correction": "Energy correction",
     "resourceUsage": "Resource usage",
     "manual": "Manual",
     "sumupTopup": "SumUp top-up",
@@ -36,8 +38,11 @@
     "system": {
       "PER_SESSION": "Per session",
       "PER_MINUTE": "Per minute",
+      "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Per attributable operating minute",
+      "ENERGY": "Energy",
       "BILLING_FACTOR": "Billing factor"
     },
+    "energyDescription": "{{kwh}} kWh at {{rate}} per kWh",
     "empty": "No items",
     "total": "Items total"
   },

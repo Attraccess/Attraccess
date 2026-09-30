@@ -1,4 +1,7 @@
 #include "display.hpp"
+#include "display/theme.hpp"
+#include <functional>
+#include "shared/powerOff/powerOffButton.hpp"
 
 // Hidden maintenance drawer rendered on the LVGL top layer. It is revealed by a
 // pull-down gesture that starts at the very top edge of the screen and drags
@@ -19,31 +22,22 @@ namespace
     constexpr int16_t DRAWER_OPEN_THRESHOLD_PX = 90;  // and drag down at least this far
     constexpr int32_t DRAWER_HEIGHT = 230;            // panel height / off-screen offset
 
-    void anim_set_y_cb(void *obj, int32_t v)
-    {
-        lv_obj_set_y((lv_obj_t *)obj, (lv_coord_t)v);
-    }
-
     lv_obj_t *makeDrawerButton(lv_obj_t *parent, const char *symbol, const char *text,
                                lv_color_t color, lv_event_cb_t cb)
     {
         lv_obj_t *btn = lv_button_create(parent);
         lv_obj_set_size(btn, lv_pct(44), 110);
-        lv_obj_set_style_bg_color(btn, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_opa(btn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_radius(btn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+        DisplayTheme::button(btn, color);
         lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_row(btn, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_t *icon = lv_label_create(btn);
         lv_label_set_text(icon, symbol);
-        lv_obj_set_style_text_color(icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(icon, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_t *lbl = lv_label_create(btn);
         lv_label_set_text(lbl, text);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
@@ -54,6 +48,25 @@ namespace
 void Display::setOnOpenSettingsCallback(std::function<void()> callback)
 {
     Display::onOpenSettingsCallback = callback;
+}
+
+void Display::setDrawerAvailableCallback(std::function<bool()> callback)
+{
+    Display::drawerAvailableCallback = std::move(callback);
+}
+
+bool Display::isDrawerAvailable()
+{
+    return !Display::drawerAvailableCallback || Display::drawerAvailableCallback();
+}
+
+void Display::updateDrawerAvailability()
+{
+    if (Display::isDrawerAvailable())
+        return;
+    Display::closeDrawer();
+    if (Display::rebootConfirmOverlay)
+        lv_obj_delete(Display::rebootConfirmOverlay);
 }
 
 void Display::initDrawer()
@@ -85,9 +98,7 @@ void Display::initDrawer()
     lv_obj_set_height(Display::drawerPanel, DRAWER_HEIGHT);
     lv_obj_set_align(Display::drawerPanel, LV_ALIGN_TOP_MID);
     lv_obj_set_y(Display::drawerPanel, -DRAWER_HEIGHT);
-    lv_obj_set_style_bg_color(Display::drawerPanel, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(Display::drawerPanel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(Display::drawerPanel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::applySurface(Display::drawerPanel);
     lv_obj_set_style_border_width(Display::drawerPanel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(Display::drawerPanel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_row(Display::drawerPanel, 14, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -98,7 +109,7 @@ void Display::initDrawer()
 
     lv_obj_t *titleLbl = lv_label_create(Display::drawerPanel);
     lv_label_set_text(titleLbl, "Maintenance");
-    lv_obj_set_style_text_color(titleLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *row = lv_obj_create(Display::drawerPanel);
@@ -109,10 +120,10 @@ void Display::initDrawer()
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
 
-    makeDrawerButton(row, LV_SYMBOL_SETTINGS, "Settings", lv_color_hex(0x2563EB),
+    makeDrawerButton(row, LV_SYMBOL_SETTINGS, "Settings", DisplayTheme::primary(),
                      [](lv_event_t *e)
                      {
-                         if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+                         if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
                              return;
                          Display::logger.info("Drawer: open settings requested");
                          Display::closeDrawer();
@@ -120,10 +131,10 @@ void Display::initDrawer()
                              Display::onOpenSettingsCallback();
                      });
 
-    makeDrawerButton(row, LV_SYMBOL_POWER, "Reboot", lv_color_hex(0xF31260),
+    makeDrawerButton(row, LV_SYMBOL_POWER, "Reboot", DisplayTheme::danger(),
                      [](lv_event_t *e)
                      {
-                         if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+                         if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
                              return;
                          Display::closeDrawer();
                          Display::showRebootConfirm();
@@ -135,8 +146,8 @@ void Display::initDrawer()
     lv_obj_set_size(grabber, 46, 5);
     lv_obj_set_align(grabber, LV_ALIGN_TOP_MID);
     lv_obj_set_y(grabber, 4);
-    lv_obj_set_style_radius(grabber, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(grabber, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(grabber, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(grabber, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(grabber, 60, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(grabber, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(grabber, LV_OBJ_FLAG_SCROLLABLE);
@@ -146,20 +157,20 @@ void Display::openDrawer()
 {
     if (Display::drawerOpen || !Display::drawerPanel || !Display::drawerBackdrop)
         return;
+    // This passive gesture bypasses LVGL hit testing and screen overlays.
+    if (!Display::isDrawerAvailable())
+        return;
 
     Display::drawerOpen = true;
     Display::logger.info("Maintenance drawer opened (top-edge pull-down)");
     lv_obj_remove_flag(Display::drawerBackdrop, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN);
 
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, Display::drawerPanel);
-    lv_anim_set_exec_cb(&a, anim_set_y_cb);
-    lv_anim_set_values(&a, -DRAWER_HEIGHT, 0);
-    lv_anim_set_time(&a, 250);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-    lv_anim_start(&a);
+    // Instant open (no slide): each animation frame re-renders the moving
+    // panel + the revealed screen area beneath on the software renderer,
+    // which reads as rebuild flicker (PERFORMANCE_ANALYSIS.md A-3, measured
+    // on hardware). A single direct placement renders one frame.
+    lv_obj_set_y(Display::drawerPanel, 0);
 }
 
 void Display::closeDrawer()
@@ -170,24 +181,20 @@ void Display::closeDrawer()
     Display::drawerOpen = false;
     lv_obj_add_flag(Display::drawerBackdrop, LV_OBJ_FLAG_HIDDEN);
 
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, Display::drawerPanel);
-    lv_anim_set_exec_cb(&a, anim_set_y_cb);
-    lv_anim_set_values(&a, lv_obj_get_y(Display::drawerPanel), -DRAWER_HEIGHT);
-    lv_anim_set_time(&a, 200);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
-    lv_anim_set_ready_cb(&a, [](lv_anim_t *)
-                         {
-        if (Display::drawerPanel)
-            lv_obj_add_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN); });
-    lv_anim_start(&a);
+    // Instant close (no slide) — see openDrawer: avoids per-frame re-render
+    // flicker on the software renderer.
+    lv_obj_set_y(Display::drawerPanel, -DRAWER_HEIGHT);
+    lv_obj_add_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN);
 }
 
 void Display::showRebootConfirm()
 {
+    if (!Display::isDrawerAvailable() || Display::rebootConfirmOverlay)
+        return;
     lv_obj_t *top = lv_layer_top();
     lv_obj_t *overlay = lv_obj_create(top);
+    Display::rebootConfirmOverlay = overlay;
+    lv_obj_add_event_cb(overlay, [](lv_event_t *) { Display::rebootConfirmOverlay = nullptr; }, LV_EVENT_DELETE, nullptr);
     lv_obj_remove_style_all(overlay);
     lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
     lv_obj_set_align(overlay, LV_ALIGN_CENTER);
@@ -201,9 +208,7 @@ void Display::showRebootConfirm()
     lv_obj_set_width(dialog, lv_pct(80));
     lv_obj_set_height(dialog, LV_SIZE_CONTENT);
     lv_obj_set_align(dialog, LV_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(dialog, lv_color_hex(0x2A2A2A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(dialog, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(dialog, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::applySurface(dialog);
     lv_obj_set_style_pad_all(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_row(dialog, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_flex_flow(dialog, LV_FLEX_FLOW_COLUMN);
@@ -211,12 +216,12 @@ void Display::showRebootConfirm()
 
     lv_obj_t *titleLbl = lv_label_create(dialog);
     lv_label_set_text(titleLbl, "Reboot device?");
-    lv_obj_set_style_text_color(titleLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *msgLbl = lv_label_create(dialog);
     lv_label_set_text(msgLbl, "The reader will restart now.");
-    lv_obj_set_style_text_color(msgLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
@@ -231,8 +236,7 @@ void Display::showRebootConfirm()
     lv_obj_t *cancelBtn = lv_button_create(footer);
     lv_obj_set_height(cancelBtn, LV_SIZE_CONTENT);
     lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(cancelBtn, lv_color_hex(0x6B7280), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(cancelBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::secondaryButton(cancelBtn);
     lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
     lv_label_set_text(cancelLbl, "Cancel");
     lv_obj_add_event_cb(cancelBtn, [](lv_event_t *e)
@@ -246,21 +250,35 @@ void Display::showRebootConfirm()
     lv_obj_t *rebootBtn = lv_button_create(footer);
     lv_obj_set_height(rebootBtn, LV_SIZE_CONTENT);
     lv_obj_set_width(rebootBtn, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(rebootBtn, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(rebootBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::button(rebootBtn, DisplayTheme::danger());
     lv_obj_t *rebootLbl = lv_label_create(rebootBtn);
     lv_label_set_text(rebootLbl, "Reboot");
     lv_obj_add_event_cb(rebootBtn, [](lv_event_t *e)
                         {
-        if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+        if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
             return;
         Display::logger.info("Drawer: reboot confirmed, restarting");
-        esp_restart(); }, LV_EVENT_CLICKED, NULL);
+#ifndef ATTRACTAP_HOST
+        esp_restart();
+#endif
+    }, LV_EVENT_CLICKED, NULL);
 }
 
 void Display::handleGestureSample(int16_t x, int16_t y, bool pressed)
 {
     (void)x;
+
+#ifdef HAS_POWER_BUTTON
+    // The power-off confirm modal also lives on the top layer, above the drawer.
+    // This gesture is not LVGL hit-tested, so without this check a top-edge
+    // swipe would open the drawer behind the modal, completely invisibly.
+    if (PowerOffButton::isConfirmVisible())
+    {
+        Display::gesturePrevPressed = pressed;
+        Display::gestureCandidate = false;
+        return;
+    }
+#endif
 
     if (!pressed)
     {

@@ -3,7 +3,8 @@
     "category": "Notification",
     "email": "Email",
     "push": "Push",
-    "toast": "In-app"
+    "toast": "In-app",
+    "all": "All"
   },
   "groups": {
     "general": {
@@ -58,7 +59,7 @@
     }
   },
   "description": {
-    "push": "Push preferences are saved for your account. Supported browsers are subscribed automatically when you use the app."
+    "push": "Push preferences are saved for your account. Enable notifications separately on each device with your permission."
   },
   "messagesEmailOnOffline": {
     "label": "Email me about messages when I'm offline",
@@ -71,7 +72,15 @@
     "permissionDenied": "Notifications are blocked for this site. Allow them in your browser settings to enable push notifications.",
     "errors": {
       "subscribeFailed": "Could not enable push notifications. Please check your browser notification permissions."
-    }
+    },
+    "enable": "Enable on this device",
+    "enabled": "Push notifications are enabled on this device."
+  },
+  "toggleAll": {
+    "label": "All notifications",
+    "description": "Enable or disable all notifications at once.",
+    "toggleGroup": "Toggle all notifications in",
+    "toggleChannel": "Toggle all"
   },
   "messages": {
     "updated": "Notification preferences updated"

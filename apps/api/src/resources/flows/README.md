@@ -111,7 +111,7 @@ Deletes the complete flow configuration for a resource, removing all nodes and e
 
 ## Authentication
 
-All endpoints require the `canManageResources` permission.
+All endpoints require the `resources.update` permission.
 
 ## Database Schema
 

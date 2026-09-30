@@ -13,12 +13,11 @@ import {
   UseProjectsServiceListProjectInvitationsKeyFn,
   UseProjectsServiceListProjectMembersKeyFn,
   useProjectsServiceCreateProjectInvitation,
-  User,
   ProjectMember,
   ApiError,
   ProjectMemberRole,
 } from '@attraccess/react-query-client';
-import { useTranslations, UserSearch } from '@attraccess/plugins-frontend-ui';
+import { type UserIdentity, useTranslations, UserSearch } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
@@ -33,7 +32,7 @@ type InviteProjectMemberModalProps = {
 export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModalProps>) {
   const { projectId, children } = props;
   const { isOpen, open, close } = useOverlayState();
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserIdentity | null>(null);
   const [role, setRole] = useState<ProjectMember['role']>(ProjectMemberRole.VIEWER);
   const queryClient = useQueryClient();
   const toast = useToastMessage();
@@ -112,6 +111,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
         <DrawerBody className="flex flex-col gap-4">
           <p className="text-small text-default-500">{t('description')}</p>
           <UserSearch
+            resetSignal={isOpen}
             label={t('inputs.user')}
             onSelectionChange={setSelectedUser}
             afterSelection={

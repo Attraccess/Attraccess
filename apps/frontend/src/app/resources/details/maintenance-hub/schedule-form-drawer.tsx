@@ -8,13 +8,14 @@ import en from './en.json';
 
 interface Props {
   resourceId: number;
+  supportsOperatingDuration: boolean;
   scheduleId?: number;
   isOpen: boolean;
   onClose: () => void;
 }
 
 export function ScheduleFormDrawer(props: Props) {
-  const { resourceId, scheduleId, isOpen, onClose } = props;
+  const { resourceId, supportsOperatingDuration, scheduleId, isOpen, onClose } = props;
   const { t } = useTranslations({ de, en });
 
   const { data: existing } = useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule(
@@ -40,6 +41,7 @@ export function ScheduleFormDrawer(props: Props) {
         {isOpen && (
           <ScheduleForm
             resourceId={resourceId}
+            supportsOperatingDuration={supportsOperatingDuration}
             scheduleId={scheduleId}
             onSaved={onClose}
             onCancel={onClose}

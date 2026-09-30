@@ -5,17 +5,21 @@ import { useTranslations } from '../../i18n';
 import { Avatar, AvatarFallback, AvatarImage, Button, Popover } from '@heroui/react';
 import { toSvg } from 'jdenticon';
 import { useMemo, ReactNode, useCallback } from 'react';
-import { AlertTriangleIcon, MessageCircleIcon } from 'lucide-react';
+import { AlertTriangleIcon, ChevronDownIcon, MessageCircleIcon } from 'lucide-react';
 import { useAttraccessUserActions } from './AttraccessUserActionsContext';
 import en from './en.json';
 import de from './de.json';
 
+export type UserIdentity = Pick<User, 'id' | 'username'>;
+
 interface AttraccessUserProps {
-  user?: User;
+  user?: UserIdentity & Partial<Pick<User, 'deletedAt'>>;
   description?: ReactNode;
   className?: string;
-  onStartDirectMessage?: (user: User) => void;
+  onStartDirectMessage?: (user: UserIdentity) => void;
   variant?: 'full' | 'mini';
+  /** When false, render as plain display without the direct-message popover. Defaults to true. */
+  interactive?: boolean;
 }
 
 export function AttraccessUser({
@@ -24,6 +28,7 @@ export function AttraccessUser({
   className,
   onStartDirectMessage,
   variant = 'full',
+  interactive = true,
 }: Readonly<AttraccessUserProps>) {
   const { t } = useTranslations({ en, de });
   const actions = useAttraccessUserActions();
@@ -45,7 +50,7 @@ export function AttraccessUser({
       actions.onStartDirectMessage(user);
     }
   }, [user, onStartDirectMessage, actions]);
-  const isInteractive = !!user && !!startDirectMessage;
+  const isInteractive = interactive && !!user && !!startDirectMessage;
 
   const avatar = (
     <Avatar>
@@ -60,11 +65,9 @@ export function AttraccessUser({
     <div className={`flex items-center gap-2 ${className ?? ''}`}>
       {avatar}
       <div className="flex flex-col">
-        <div className="flex flex-row items-center">
-          <span className="text-sm font-medium">{isDeleted ? <del>{name}</del> : name}</span>
-          <Button isIconOnly variant="ghost" size="sm" onPress={startDirectMessage}>
-            <MessageCircleIcon />
-          </Button>
+        <div className="flex flex-row items-center gap-1">
+          <span className="text-sm font-medium group-hover:underline">{isDeleted ? <del>{name}</del> : name}</span>
+          {isInteractive && <ChevronDownIcon className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" focusable="false" />}
         </div>
         {description && (
           <span className="text-xs text-muted-foreground">{isDeleted ? <del>{description}</del> : description}</span>
@@ -81,7 +84,7 @@ export function AttraccessUser({
 
   return (
     <Popover>
-      <Popover.Trigger className="inline-flex w-fit cursor-pointer rounded-md outline-none focus-visible:ring-2">
+      <Popover.Trigger className="group inline-flex w-fit cursor-pointer rounded-md outline-none focus-visible:ring-2">
         {finalComponent}
       </Popover.Trigger>
       <Popover.Content>

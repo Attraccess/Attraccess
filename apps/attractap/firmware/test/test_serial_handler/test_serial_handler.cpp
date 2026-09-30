@@ -1,9 +1,11 @@
 #include <unity.h>
-#include <Arduino.h>
+#include "serial_capture.hpp"
 #include <string>
 #include <cstring>
 
+#define private public
 #include "serial/serialCommandHandler.hpp"
+#undef private
 
 // Forward declarations for test helpers defined in mock_*.cpp
 void mock_settings_reset();
@@ -33,7 +35,7 @@ static std::string get_resp(const std::string& out) {
 
 static std::string run(const char* line) {
     Serial.clear();
-    SerialCommandHandler::processLine(String(line));
+    SerialCommandHandler::processLine(line);
     return get_resp(Serial._out);
 }
 
@@ -99,7 +101,7 @@ void test_validate_code_invalid_empty() {
 void test_process_line_no_cmnd_prefix() {
     // Lines without "CMND" are silently dropped — no RESP emitted
     Serial.clear();
-    SerialCommandHandler::processLine(String("HELLO auth.status.get {}"));
+    SerialCommandHandler::processLine("HELLO auth.status.get {}");
     TEST_ASSERT_EQUAL_STRING("", get_resp(Serial._out).c_str());
 }
 
@@ -112,7 +114,7 @@ void test_process_line_garbage_before_cmnd() {
 void test_process_line_cmnd_without_topic() {
     // "CMND" with no space (nothing after it) → no RESP (logged as error)
     Serial.clear();
-    SerialCommandHandler::processLine(String("CMND"));
+    SerialCommandHandler::processLine("CMND");
     TEST_ASSERT_EQUAL_STRING("", get_resp(Serial._out).c_str());
 }
 
@@ -166,8 +168,10 @@ void test_auth_code_change_valid_current() {
     std::string resp = run(R"(CMND auth.code.set {"newCode":"2222","currentCode":"1111"})");
     TEST_ASSERT_TRUE_MESSAGE(resp.find(R"("success":true)") != std::string::npos, resp.c_str());
     // Verify new PIN is active
-    std::string status = run_with_auth("auth.status.get", "", "2222");
-    TEST_ASSERT_TRUE_MESSAGE(status.find("auth.status.get") != std::string::npos, status.c_str());
+    std::string status = run_with_auth("network.status.get", "", "2222");
+    TEST_ASSERT_TRUE_MESSAGE(status.find("wifi_connected") != std::string::npos, status.c_str());
+    std::string oldPin = run_with_auth("network.status.get", "", "1111");
+    TEST_ASSERT_TRUE_MESSAGE(oldPin.find("INVALID_AUTH_CODE") != std::string::npos, oldPin.c_str());
 }
 
 // ============================================================

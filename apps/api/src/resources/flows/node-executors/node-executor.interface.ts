@@ -6,6 +6,20 @@ export interface NodeProcessingResult {
   outputHandle?: string;
 }
 
+export type FlowFailureKind =
+  'transport-dispatch' | 'acknowledgement-timeout' | 'controller-rejection' | 'node-failure';
+
+export type MeteringReport =
+  | { kind: 'ready'; baseline?: { value: string; unit: string }; source?: string }
+  | { kind: 'reading'; value: string; unit: string; observedAt?: string; source?: string };
+
+/** Identity of the metering operation a flow run belongs to; completion nodes reply through it. */
+export interface MeteringRunContext {
+  operationId: string;
+  kind: 'start' | 'interim' | 'final';
+  complete(report: MeteringReport): Promise<void>;
+}
+
 export interface TemplateVariables {
   resource: Record<string, unknown>;
   global: Record<string, unknown>;
@@ -17,6 +31,10 @@ export interface TemplateVariables {
  * executors stay free of the Handlebars/variable plumbing.
  */
 export interface NodeExecutionContext {
+  flowRunId?: string;
+  lifecycleAttemptId?: string;
+  lifecycleCandidateCancellation?: boolean;
+  metering?: MeteringRunContext;
   transactionManager?: EntityManager;
   compileTemplate(template: string, data: object): string;
   getTemplateVariables(data: object): TemplateVariables | undefined;
@@ -29,4 +47,5 @@ export interface NodeExecutionContext {
  */
 export interface NodeExecutor {
   execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult>;
+  getFailureKind?(error: unknown): FlowFailureKind;
 }

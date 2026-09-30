@@ -1,0 +1,52 @@
+name: Companion App
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'apps/companion/**'
+      - '.github/workflows/companion.yml'
+      - '.github/workflows/build-companion-binaries.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
+
+  pr-comment:
+    needs: [build-companion]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build PR comment body
+        id: comment-body
+        run: |
+          set -euo pipefail
+          out="$(mktemp)"
+          {
+            echo "## Companion app artifacts"
+            echo ""
+            echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            echo "Unsigned binaries are available in the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}):"
+            echo ""
+            echo "| Artifact | Platform |"
+            echo "| --- | --- |"
+            echo "| \`companion-linux-${{ github.run_id }}\` | Linux x64 + arm64 AppImage |"
+            echo "| \`companion-macos-${{ github.run_id }}\` | macOS universal DMG |"
+            echo "| \`companion-windows-${{ github.run_id }}\` | Windows x64 NSIS installer |"
+          } > "$out"
+          {
+            echo 'body<<EOF_BODY'
+            cat "$out"
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky PR comment with companion artifacts
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: companion-artifacts
+          message: ${{ steps.comment-body.outputs.body }}

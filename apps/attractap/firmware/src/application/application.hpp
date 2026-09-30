@@ -1,8 +1,13 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Preferences.h>
-#include "../nfc/nfc.hpp"
+#include <string>
+#include "settings/kvstore.hpp"
+
+#ifdef DEMO_MODE
+#include "../demo/demo_store.hpp"
+#endif
+
+#include "../nfc/nfc_contract.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
 #include "../network/network.hpp"
@@ -20,6 +25,7 @@
 
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
+#include "supervision.hpp"
 #else
 #define NFC_CARD_LONG_PRESENTATION_TIME_MS 1500
 #endif
@@ -29,18 +35,21 @@
 class Application
 {
 public:
-    Application() : logger("Application"),
-                    api(),
+    Application(INfc &nfc, API &api) : nfc(nfc),
+                    logger("Application"),
+                    api(api),
                     externalState(EXTERNAL_STATE_NONE),
                     firmwareUpdateProgressPct(0),
+#ifdef HAS_LVGL_DISPLAY
+                    bootDone(false),
+#endif
                     unlocked(false)
 #ifdef HAS_LVGL_DISPLAY
                     ,
                     resourceCount(0),
                     resourceIsSelected(false),
-                    bootDone(false),
-                    resourceListUpdated(false),
-                    selectedResourceChanged(false)
+                    selectedResourceChanged(false),
+                    resourceListUpdated(false)
 #endif
     {
     }
@@ -52,10 +61,14 @@ private:
 #ifdef HAS_IO_EXPANDER
     IOExpander ioExpander;
 #endif
-    NFC nfc;
+    INfc &nfc;
     Logger logger;
-    API api;
+    API &api;
     Beeper beeper;
+
+#ifdef HAS_LVGL_DISPLAY
+    SupervisionFlow supervision{api, nfc, beeper, logger, Display::supervisionScreen};
+#endif
 
 #ifdef HAS_WS2812_LED
     LedController led;
@@ -78,7 +91,7 @@ private:
 #ifdef HAS_LVGL_DISPLAY
     struct ApiEnrollNewCardGetAvailableKeyNoData_t
     {
-        String username;
+        std::string username;
     };
     ApiEnrollNewCardGetAvailableKeyNoData_t apiEnrollNewCardGetAvailableKeyNoData;
     uint32_t apiEnrollNewCardGetAvailableKeyNoStartTimeMs;
@@ -114,8 +127,8 @@ private:
     volatile bool enrollKeyMaterialReady = false;
     volatile bool enrollCancelRequested = false;
     volatile bool enrollErrorPending = false;
-    // Fixed buffer, not an Arduino String: the producer runs on the websocket
-    // task and the consumer on the main loop. A String would reallocate its
+    // Fixed buffer, not an Arduino std::string: the producer runs on the websocket
+    // task and the consumer on the main loop. A std::string would reallocate its
     // heap buffer on assignment, which the main loop could observe mid-update
     // (dangling pointer / torn read). A plain char[] has no pointer to dangle.
     char enrollErrorMessage[64] = {0};
@@ -134,7 +147,7 @@ private:
     // factory key back as soon as a card is presented.
     struct ApiResetNfcCardData_t
     {
-        String username;
+        std::string username;
         uint8_t keyNo;
         uint8_t keyBytes[16];
     };
@@ -163,68 +176,20 @@ private:
     void processReset();
     void exitReset();
 
-    // Two-card supervision (ATT-493). A sticky, self-contained sub-flow — like enrollment/reset it
-    // owns the display until success, cancel or timeout. Started when a non-introduced user
-    // authenticates at a resource that requires supervision. The reader asks the server to broadcast
-    // a supervision request to eligible supervisors (who can approve from the web) while also waiting
-    // for a supervisor to tap their card here. Whichever channel resolves first wins.
-    struct ApiSupervisorCardData_t
-    {
-        uint8_t keyNo;
-        uint8_t keyBytes[16];
-    };
-    ApiSupervisorCardData_t apiSupervisorCardData;
+#endif
 
-    enum SupervisionPhase_t
-    {
-        SUPERVISION_PHASE_NONE,
-        SUPERVISION_PHASE_WAIT_FOR_CARD,  // screen up, waiting for a supervisor card (or web approval)
-        SUPERVISION_PHASE_REQUESTED_AUTH, // sent the supervisor UID, awaiting key material
-        SUPERVISION_PHASE_STARTING,       // supervisor card verified, session start sent
-        SUPERVISION_PHASE_SUCCESS,        // approved, dwelling before handing off to the session screen
-        SUPERVISION_PHASE_ERROR,          // error shown, dwelling before retry
-    };
-    SupervisionPhase_t supervisionPhase = SUPERVISION_PHASE_NONE;
-    // Set by the card-detection callback when a (supervisor) card enters the field during
-    // SUPERVISION_PHASE_WAIT_FOR_CARD; consumed on the main loop. The UID is captured alongside it.
-    volatile bool supervisionCardDetected = false;
-    uint8_t supervisionCardUid[7] = {0};
-    uint8_t supervisionCardUidLength = 0;
-    // Set by the supervisor-card-auth API callback once key material is available; consumed on loop.
-    volatile bool supervisionKeyReady = false;
-    // Set by the SUPERVISION_RESOLVED callback when the web channel approved (session already started).
-    volatile bool supervisionResolvedByWeb = false;
-    // Set by the request-result / resolved callbacks on an unrecoverable failure (e.g. no supervisors).
-    volatile bool supervisionFailed = false;
-    // Set by the supervisor-card-auth callback when the presented card is not an authorised supervisor.
-    // Recoverable: the screen shows the error briefly, then returns to waiting for another card.
-    volatile bool supervisionCardRejected = false;
-    // True while dwelling on a terminal error (vs a recoverable card rejection); decided on the loop.
-    bool supervisionTerminalError = false;
-    volatile bool supervisionCancelRequested = false;
-    // Producer (websocket task) / consumer (main loop) — fixed buffers, not Arduino String (see the
-    // enrollment error buffer rationale).
-    char supervisionErrorMessage[64] = {0};
-    char supervisionHintMessage[160] = {0};
-    volatile bool supervisionHintReady = false;
-    uint32_t supervisionStartTimeMs = 0;
-    uint32_t supervisionPhaseChangedMs = 0;
-    static constexpr uint32_t SUPERVISION_TIMEOUT_MS = 30000;
-    static constexpr uint32_t SUPERVISION_SUCCESS_DWELL_MS = 1200;
-    static constexpr uint32_t SUPERVISION_ERROR_DWELL_MS = 1800;
-    // When set, the next entry into APPLICATION_STATE_UNLOCKED auto-starts the session (the supervisor
-    // approved by tapping their card; the web channel starts the session server-side instead).
-    bool autoStartAfterSupervision = false;
-    void beginSupervision();
-    void processSupervision();
-    void exitSupervision(bool unlockResource, bool autoStart);
+#ifdef DEMO_MODE
+    // Demo-mode card scan for the settings screen (register card → role)
+    volatile bool demoPendingScanActive = false;
+    volatile bool demoPendingScanReady = false;
+    std::string demoScanUid;
 #endif
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;
 
     int firmwareUpdateProgressPct;
 
-    String availableFirmwareVersion;
+    std::string availableFirmwareVersion;
 
     static void
     networkTask(void *parameter);
@@ -249,7 +214,7 @@ private:
         bool wifiConnected;
     };
 
-    Preferences bootDiagPreferences;
+    KVStore bootDiagPreferences;
     uint32_t lastBootSnapshotMs = 0;
 
     void setupBootDiagnostics();
@@ -279,10 +244,27 @@ private:
 
     uint8_t resourceCount;
     bool resourceIsSelected;
+    bool returnToListAfterAction = false;
+    bool waitingForResourceRefresh = false;
+    uint32_t resourceRefreshRequestId = 0;
+    std::string actionCompletionMessage;
+    bool cardAuthenticationPending = false;
+    uint32_t cardAuthenticationStartedAt = 0;
+    uint32_t authenticationResourceId = 0;
+    std::string pendingUiAction;
+    uint32_t pendingUiResourceId = 0;
+    uint32_t pendingUiStartedAt = 0;
+    void handleResourceListAction(const API::ResourceBrief &resource, ResourceListAction action);
+    void updateSelectedResourceDetails();
+    void showReaderActionProgress(const char *title);
+    void finishReaderAction(bool success);
+    void logoutReader();
+    void finishCardAuthentication(bool success);
+
 #else
     bool resourceIsDoor = false;
 #endif
-    uint32_t selectedResourceId;
+    uint32_t selectedResourceId = 0;
 
 #ifndef HAS_LVGL_DISPLAY
     bool cardDetected = false;
@@ -300,11 +282,11 @@ private:
     API::ProjectsOfUserResponse projectsOfUserResponse;
     bool projectsOfUserResponseUpdated = false;
     uint32_t selectedProjectId = 0;
-    String selectedProjectName;
+    std::string selectedProjectName;
     uint32_t projectsCurrentPage = 1;
     uint32_t projectsTotalCount = 0;
     bool projectsHasMore = false;
-    String currentProjectsUser;
+    std::string currentProjectsUser;
 
     enum pending_action_t
     {
@@ -315,13 +297,17 @@ private:
     pending_action_t pendingActionType = PENDING_ACTION_NONE;
     uint32_t pendingActionResourceId = 0;
     uint32_t pendingActionProjectId = 0;
+    bool pendingActionIsTakeover = false;
     bool hasPendingFormRequest = false;
     // True once the form for the in-flight action has been fully submitted and the
     // START/STOP message sent. Guards against a re-delivered (retried by the server)
     // RESOURCE_USAGE_FORM_REQUEST reopening the form from the beginning (ATT-545).
     bool formFlowSubmitted = false;
-    // Flags set by websocket callbacks when form events arrive; processed by LVGL thread
-    volatile bool pendingFormRequestReady = false;
+    // Preserved before deferred LVGL activation so cancellation can clear the server draft.
+    bool hasPendingServerFormFlow = false;
+    uint32_t pendingFormRequestResourceId = 0;
+    API::ResourceUsageFormActionType pendingFormRequestAction =
+        API::ResourceUsageFormActionType::UNKNOWN;
     volatile bool pendingFormFieldsReady = false;
     volatile bool pendingFormPageResultReady = false;
     API::ResourceUsageFormRequest pendingFormRequest;
@@ -358,7 +344,8 @@ private:
 
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();
-    void handleProjectSelection(uint32_t projectId, const String &projectName);
+    void clearSelectedProject();
+    void handleProjectSelection(uint32_t projectId, const std::string &projectName);
     void handleFormsRequest(const API::ResourceUsageFormRequest &request);
     void handleFormFields(const API::ResourceUsageFormFieldsPage &page);
     void handleFormPageResult(const API::ResourceUsageFormPageResult &result);
@@ -372,7 +359,7 @@ private:
     uint32_t totalFormFields() const;
     uint32_t globalFormFieldNumber() const;
     bool isLastFormField() const;
-    void onActionResult(const String &eventType);
+    void onActionResult(const std::string &eventType);
 #endif
 
     enum applicationState_t
@@ -391,6 +378,7 @@ private:
         APPLICATION_STATE_NO_RESOURCES,
 #ifdef HAS_LVGL_DISPLAY
         APPLICATION_STATE_RESOURCE_LIST,
+        APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED,
         APPLICATION_STATE_UNLOCKED,
         APPLICATION_STATE_ENROLLMENT,
         APPLICATION_STATE_RESET,

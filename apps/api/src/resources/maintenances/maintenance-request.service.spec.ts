@@ -5,7 +5,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MaintenanceRequestService } from './maintenance-request.service';
 import { ResourceMaintenanceService } from './maintenance.service';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { ResolveMaintenanceRequestAction } from './dtos/resolve-maintenance-request.dto';
 import { MaintenanceRequestStatus, Resource, ResourceMaintenanceRequest } from '@attraccess/database-entities';
 
@@ -69,7 +69,7 @@ describe('MaintenanceRequestService', () => {
       expect(result.status).toBe(MaintenanceRequestStatus.OPEN);
       expect(requestRepository.save).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(
-        MaintenanceRequestCreatedEvent.EVENT_NAME,
+        ResourceMaintenanceRequestCreatedEvent.EVENT_NAME,
         expect.objectContaining({ resourceId: 1, requestId: 10 }),
       );
     });

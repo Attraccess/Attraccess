@@ -1,39 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { User } from '@attraccess/database-entities';
-
-export class CsvInvitePermissionMappingDto {
-  @ApiProperty({ description: 'CSV column header that maps to this permission' })
-  @IsString()
-  keyMapping!: string;
-
-  @ApiProperty({ description: 'CSV value that represents a YES for this permission' })
-  @IsString()
-  yesValue!: string;
-}
-
-export class CsvInvitePermissionsDto {
-  @ApiProperty({ type: () => CsvInvitePermissionMappingDto })
-  @ValidateNested()
-  @Type(() => CsvInvitePermissionMappingDto)
-  canManageResources!: CsvInvitePermissionMappingDto;
-
-  @ApiProperty({ type: () => CsvInvitePermissionMappingDto })
-  @ValidateNested()
-  @Type(() => CsvInvitePermissionMappingDto)
-  canManageSystemConfiguration!: CsvInvitePermissionMappingDto;
-
-  @ApiProperty({ type: () => CsvInvitePermissionMappingDto })
-  @ValidateNested()
-  @Type(() => CsvInvitePermissionMappingDto)
-  canManageUsers!: CsvInvitePermissionMappingDto;
-
-  @ApiProperty({ type: () => CsvInvitePermissionMappingDto })
-  @ValidateNested()
-  @Type(() => CsvInvitePermissionMappingDto)
-  canManageBilling!: CsvInvitePermissionMappingDto;
-}
 
 export class CsvInviteConfigDto {
   @ApiProperty({ description: 'CSV column header containing the email' })
@@ -43,11 +10,6 @@ export class CsvInviteConfigDto {
   @ApiProperty({ description: 'CSV column header containing the username' })
   @IsString()
   usernameKey!: string;
-
-  @ApiProperty({ type: () => CsvInvitePermissionsDto })
-  @ValidateNested()
-  @Type(() => CsvInvitePermissionsDto)
-  permissions!: CsvInvitePermissionsDto;
 
   @ApiProperty({
     required: false,
@@ -59,6 +21,15 @@ export class CsvInviteConfigDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   ignoredRows?: number[];
+
+  @ApiProperty({
+    required: false,
+    description: 'CSV column header whose value is an RBAC role key to assign to each invited user (in addition to default roles)',
+    example: 'role',
+  })
+  @IsOptional()
+  @IsString()
+  roleKeyColumn?: string;
 }
 
 export class CsvInviteRowErrorDto {

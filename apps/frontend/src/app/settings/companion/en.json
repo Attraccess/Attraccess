@@ -1,0 +1,89 @@
+{
+  "title": "Companion App",
+  "subtitle": "Manage companion devices and download the desktop app",
+  "devices": {
+    "title": "Registered Devices",
+    "subtitle": "Companion app instances that have connected to this server",
+    "columns": {
+      "name": "Name",
+      "platform": "Platform",
+      "lastSeen": "Last Seen",
+      "status": "Status",
+      "version": "Version",
+      "actions": "Actions"
+    },
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "actions": {
+      "rename": "Rename",
+      "delete": "Delete"
+    },
+    "rename": {
+      "title": "Rename Device",
+      "placeholder": "Device name",
+      "save": "Save",
+      "cancel": "Cancel",
+      "label": "New name for \"{{name}}\"",
+      "success": "Device renamed",
+      "error": "Failed to rename device"
+    },
+    "delete": {
+      "success": "Device deleted",
+      "error": "Failed to delete device"
+    }
+  },
+  "version": {
+    "label": "Version {{version}}"
+  },
+  "download": {
+    "title": "Download",
+    "subtitle": "Download the companion app for your platform",
+    "noBinaries": "No download available — binaries are not bundled in this server build.",
+    "button": "Download",
+    "platforms": {
+      "windows-x64": "Windows x64",
+      "macos-universal": "macOS (Universal)",
+      "linux-x64": "Linux x64",
+      "linux-arm64": "Linux arm64"
+    }
+  },
+  "setup": {
+    "title": "Setup Instructions",
+    "subtitle": "How to connect a new device",
+    "steps": {
+      "download": {
+        "title": "Download & install",
+        "description": "Download the companion app for your platform and run the installer."
+      },
+      "run": {
+        "title": "Launch the companion app",
+        "description": "Open the installed companion app. A setup wizard will appear on first launch."
+      },
+      "url": {
+        "title": "Enter your Attraccess server URL",
+        "description": "When prompted, enter the URL of this Attraccess server."
+      },
+      "register": {
+        "title": "Automatic registration",
+        "description": "The companion app registers itself — it will appear in the \"Registered Devices\" table above."
+      },
+      "name": {
+        "title": "Name the device",
+        "description": "Click Rename in the table to give the device a recognisable name."
+      },
+      "flow": {
+        "title": "Add a flow node",
+        "description": "Go to the resource whose flow should control this PC → open the Flows tab → add a \"Lock PC\" or \"Unlock PC\" node and select this device."
+      }
+    }
+  },
+  "updateAvailable": "Update available",
+  "deleteConfirm": {
+    "title": "Delete device",
+    "message": "Are you sure you want to delete <bold>{{name}}</bold>? Its token will be revoked and any active connection will be terminated.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  }
+}

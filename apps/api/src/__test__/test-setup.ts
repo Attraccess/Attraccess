@@ -52,18 +52,12 @@ export class TestSetup {
     return response.status === 200;
   }
 
-  async createUser(username: string, permissions?: User['systemPermissions']) {
-    let user = await TestSetup.usersService.createOne({
+  async createUser(username: string) {
+    const user = await TestSetup.usersService.createOne({
       username: `${username}-${this.testInstanceIdentifier}`,
       email: `${username}-${this.testInstanceIdentifier}@attraccess.org`,
       externalIdentifier: null,
     });
-
-    if (permissions) {
-      user = await TestSetup.usersService.updateOne(user.id, {
-        systemPermissions: permissions,
-      });
-    }
 
     await TestSetup.authService.addAuthenticationDetails(user.id, {
       type: AuthenticationType.LOCAL_PASSWORD,

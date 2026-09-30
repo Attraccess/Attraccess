@@ -13,6 +13,7 @@ import { SumupTransactionEventType } from './dto/sumup/sumup-transaction-callbac
 import { SettingsService } from '../settings/settings.service';
 import { CronTimer } from '../metrics/instrumentation/cron/cron.helper';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { AuditService } from '../audit/audit.service';
 
 const mockSumUpGet = jest.fn();
 const mockMerchantsGet = jest.fn();
@@ -68,6 +69,8 @@ describe('SumUpService', () => {
   const mockSettingsService: any = {
     getPublicInternetUrl: jest.fn(),
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockAuditService: any = { recordBillingTransaction: jest.fn() };
 
   let service: SumUpService;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,6 +104,7 @@ describe('SumUpService', () => {
     mockLiveNotificationsService.notifyTransactionUpdate.mockReset();
     mockBillingService.getConfiguration.mockReset();
     mockSettingsService.getPublicInternetUrl.mockReset();
+    mockAuditService.recordBillingTransaction.mockReset();
   };
 
   beforeEach(async () => {
@@ -117,6 +121,7 @@ describe('SumUpService', () => {
         { provide: SettingsService, useValue: mockSettingsService },
         { provide: LiveNotificationsService, useValue: mockLiveNotificationsService },
         { provide: BillingService, useValue: mockBillingService },
+        { provide: AuditService, useValue: mockAuditService },
         { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
         {
           provide: ExternalCallTimer,
@@ -135,7 +140,7 @@ describe('SumUpService', () => {
 
   describe('setApiKey', () => {
     it('stores encrypted API key and merchant code via update when existing', async () => {
-      mockSumUpGet.mockResolvedValue({ merchant_code: 'M123' });
+      mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
       settingRepository.findOneBy.mockResolvedValue({ id: 1, value: 'enc' });
       encryptionService.encrypt.mockReturnValue('encrypted');
 
@@ -147,7 +152,7 @@ describe('SumUpService', () => {
     });
 
     it('stores encrypted API key and merchant code via insert when missing', async () => {
-      mockSumUpGet.mockResolvedValue({ merchant_code: 'M123' });
+      mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
       settingRepository.findOneBy.mockResolvedValue(null);
       encryptionService.encrypt.mockReturnValue('encrypted');
 
@@ -155,6 +160,21 @@ describe('SumUpService', () => {
 
       expect(settingRepository.insert).toHaveBeenCalledWith({ parent: 'sumup', key: 'apiKey', value: 'encrypted' });
       expect(settingRepository.insert).toHaveBeenCalledWith({ parent: 'sumup', key: 'merchantCode', value: 'M123' });
+      expect(settingRepository.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['merchant_profile is absent', { account: { username: 'x' }, personal_profile: { first_name: 'A' } }],
+      [
+        'merchant_profile carries no merchant_code',
+        { account: { username: 'x' }, merchant_profile: { company_name: 'Attraccess' } },
+      ],
+    ])('throws and stores nothing when %s', async (_case, meResponse) => {
+      mockSumUpGet.mockResolvedValue(meResponse);
+      settingRepository.findOneBy.mockResolvedValue(null);
+
+      await expect(service.setApiKey('token')).rejects.toBeInstanceOf(BadRequestException);
+      expect(settingRepository.insert).not.toHaveBeenCalled();
       expect(settingRepository.update).not.toHaveBeenCalled();
     });
 
@@ -294,6 +314,13 @@ describe('SumUpService', () => {
         status: BillingTransactionStatus.Pending,
       });
       expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+      expect(mockAuditService.recordBillingTransaction).toHaveBeenCalledWith({
+        transactionId: 1,
+        userId: 42,
+        amount: 500,
+        status: BillingTransactionStatus.Pending,
+        source: 'sumup-topup',
+      });
       expect(tx).toEqual(expect.objectContaining({ id: 1, userId: 42 }));
     });
 
@@ -350,6 +377,8 @@ describe('SumUpService', () => {
     it('maps SUCCESSFUL to Completed and notifies', async () => {
       const transaction = {
         id: 10,
+        userId: 42,
+        amount: 500,
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:tx1`,
         status: BillingTransactionStatus.Pending,
       };
@@ -363,6 +392,14 @@ describe('SumUpService', () => {
       expect(transaction.status).toBe(BillingTransactionStatus.Completed);
       expect(billingTransactionRepository.save).toHaveBeenCalledWith(transaction);
       expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(transaction);
+      expect(mockAuditService.recordBillingTransaction).toHaveBeenCalledWith({
+        transactionId: 10,
+        userId: 42,
+        amount: 500,
+        status: BillingTransactionStatus.Completed,
+        previousStatus: BillingTransactionStatus.Pending,
+        source: 'sumup-topup',
+      });
     });
 
     it('maps FAILED to Failed', async () => {

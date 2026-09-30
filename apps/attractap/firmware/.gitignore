@@ -10,3 +10,9 @@ src/certs/
 .cache/
 platformio_temp.ini
 compile_commands.json
+dependencies.lock
+managed_components/
+sdkconfig
+test/build/
+test-results/
+test/helpers/__pycache__/

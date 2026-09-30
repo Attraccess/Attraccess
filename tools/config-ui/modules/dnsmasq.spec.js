@@ -12,7 +12,9 @@ function buildFsMock({ files = {} } = {}) {
       if (files[p] !== undefined) return files[p];
       throw new Error(`ENOENT: ${p}`);
     }),
-    writeFileSync: jest.fn((p, content) => { writes[p] = content; }),
+    writeFileSync: jest.fn((p, content) => {
+      writes[p] = content;
+    }),
     mkdirSync: jest.fn(),
   };
   return { mockFs, writes };
@@ -221,8 +223,129 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     expect(spawn).toHaveBeenCalledWith(
       'dnsmasq',
       expect.arrayContaining(['--conf-dir=/etc/dnsmasq.d/,*.conf']),
-      expect.anything()
+      expect.anything(),
     );
+  });
+
+  // loadModule resets modules, so the spawn mock must be grabbed after it.
+  function mockSpawnedProcesses() {
+    const { spawn } = require('child_process');
+    const procs = [];
+    spawn.mockImplementation(() => {
+      const handlers = {};
+      const proc = {
+        pid: 100 + procs.length,
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        kill: jest.fn(),
+        on: (event, cb) => {
+          handlers[event] = cb;
+        },
+        emit: (event, arg) => handlers[event](arg),
+      };
+      procs.push(proc);
+      return proc;
+    });
+    return { spawn, procs };
+  }
+
+  it('respawns dnsmasq after an unexpected exit, and stops once shut down', () => {
+    // On balena reboot the LAN interface / port 53 isn't ready yet, dnsmasq exits
+    // immediately, and without a retry it stayed dead until someone hit Save.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, procs } = mockSpawnedProcesses();
+
+    mod.init();
+    restore();
+    expect(spawn).toHaveBeenCalledTimes(1);
+
+    procs[0].emit('exit', 1);
+    jest.advanceTimersByTime(1000);
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    mod.shutdown();
+    procs[1].emit('exit', 0);
+    jest.advanceTimersByTime(60000);
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    jest.useRealTimers();
+  });
+
+  it('retries when spawn reports a failed exec via the async error event', () => {
+    // A failed exec (ENOENT, or EAGAIN under boot memory pressure) emits 'error'
+    // and no 'exit'. Unhandled, it would kill config-ui instead of retrying.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, procs } = mockSpawnedProcesses();
+
+    mod.init();
+    restore();
+
+    procs[0].emit('error', new Error('spawn dnsmasq EAGAIN'));
+    jest.advanceTimersByTime(1000);
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    mod.shutdown();
+    jest.useRealTimers();
+  });
+
+  it('survives an EMFILE spawn, where stdio is never created', () => {
+    // On EMFILE/ENFILE spawn returns a process with no stdout/stderr but still
+    // queues an error emit. Wiring stdio throws, so the error listener has to be
+    // attached first or the emit is unhandled and takes config-ui down.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, procs } = mockSpawnedProcesses();
+    spawn.mockImplementationOnce(() => {
+      const handlers = {};
+      const proc = {
+        pid: undefined,
+        stdout: undefined,
+        stderr: undefined,
+        kill: jest.fn(),
+        on: (event, cb) => {
+          handlers[event] = cb;
+        },
+        emit: (event, arg) => handlers[event](arg),
+      };
+      procs.push(proc);
+      return proc;
+    });
+
+    mod.init();
+    restore();
+
+    // Would throw "handlers.error is not a function" if stdio wiring came first.
+    expect(() => procs[0].emit('error', new Error('spawn dnsmasq EMFILE'))).not.toThrow();
+    jest.advanceTimersByTime(1000);
+    expect(spawn).toHaveBeenCalledTimes(2); // one retry, not two
+
+    mod.shutdown();
+    jest.useRealTimers();
+  });
+
+  it('ignores the exit of a process that a restart already replaced', async () => {
+    // The killed process exits only after its replacement is spawned. Acting on
+    // that late event would drop the live process and respawn a second dnsmasq.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, procs } = mockSpawnedProcesses();
+
+    mod.init();
+    await invokeHandler(mod, 'PUT', '/settings', ['settings'], { upstream1: '9.9.9.9' });
+    restore();
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    procs[0].emit('exit', null); // old process finally reports its SIGTERM exit
+    jest.advanceTimersByTime(60000);
+
+    expect(spawn).toHaveBeenCalledTimes(2);
+    // The replacement is still the tracked process, so shutdown reaches it.
+    mod.shutdown();
+    expect(procs[1].kill).toHaveBeenCalledWith('SIGTERM');
+
+    jest.useRealTimers();
   });
 
   it('emits listen-address when DNS_LISTEN_ADDRESS is set', () => {
@@ -269,5 +392,38 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     restore();
 
     expect(Object.keys(writes)).toHaveLength(0);
+  });
+});
+
+describe('updating DNS records', () => {
+  const record = { id: 'existing', hostname: 'old.local', ip: '192.0.2.1' };
+  it.each([
+    [{ hostname: 'bad host' }, 400, 'invalid hostname'],
+    [{ ip: '999.1.1.1' }, 400, 'invalid ip'],
+    [{ hostname: 'new.local', ip: '192.0.2.2' }, 200, undefined],
+    [{}, 200, undefined],
+  ])('validates and persists updates %j', async (update, expectedStatus, error) => {
+    const { mod, writes, restore } = loadModule({}, { files: { '/data/dns-records.json': JSON.stringify([record]) } });
+    try {
+      const response = await invokeHandler(mod, 'PUT', '/records/existing', ['records', 'existing'], update);
+      expect(response.status).toBe(expectedStatus);
+      if (error) {
+        expect(response.body.error).toBe(error);
+        expect(writes['/data/dns-records.json']).toBeUndefined();
+      } else {
+        expect(response.body).toEqual({ ...record, ...update });
+        expect(JSON.parse(writes['/data/dns-records.json'])).toEqual([{ ...record, ...update }]);
+      }
+    } finally {
+      restore();
+    }
+  });
+  it('rejects updates for a missing record', async () => {
+    const { mod, restore } = loadModule();
+    try {
+      expect((await invokeHandler(mod, 'PUT', '/records/missing', ['records', 'missing'], {})).status).toBe(404);
+    } finally {
+      restore();
+    }
   });
 });

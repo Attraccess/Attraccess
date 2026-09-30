@@ -1,0 +1,13 @@
+{
+  "noDeviceId": "Keine Geräte-ID angegeben.",
+  "loadError": "Ressourcen für dieses Gerät konnten nicht geladen werden.",
+  "empty": {
+    "title": "Keine Ressourcen verknüpft",
+    "description": "Dieses Companion-Gerät ist noch nicht mit einem Ressource-Flow verbunden. Bitten Sie Ihren Administrator, einen Lock-PC- oder Unlock-PC-Knoten in einem Ressource-Flow hinzuzufügen und dieses Gerät auszuwählen."
+  },
+  "title": "Ressource auswählen",
+  "status": {
+    "inUse": "In Verwendung",
+    "available": "Verfügbar"
+  }
+}

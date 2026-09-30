@@ -72,10 +72,15 @@ Maintenance schedules automatically create maintenance reminders based on usage 
 |---------|-------------|
 | **Trigger Type** | One of USAGE_HOURS, USAGE_COUNT, or TIME_INTERVAL |
 | **Trigger Value** | The threshold that triggers maintenance (e.g. 100 hours, 500 sessions, 30 days) |
+| **Duration Basis** | For duration schedules: session duration or machine operating duration |
 | **Enabled** | Whether the schedule is currently active |
 
+Session duration counts usage sessions. Operating duration counts recorded machine operation, including time without an active user session. Existing schedules keep session duration; session history is never converted into operating history.
+
+Both bases include live elapsed time from open intervals. Only time after the last maintenance completion counts toward the next cycle: a session or operating interval that crosses that timestamp is split at the timestamp, without rounding. Before the first completion, the baseline is the resource's creation time. The periodic evaluation runs every five minutes, so detecting a crossed threshold can lag by that interval.
+
 > [!NOTE]
-> Disabling a schedule does not delete it. You can re-enable it at any time. The schedule will resume tracking from where it left off.
+> Disabling a schedule pauses reminders, not duration accumulation. Re-enabling it includes time since the unchanged maintenance baseline.
 
 ### How Automated Schedules Work
 

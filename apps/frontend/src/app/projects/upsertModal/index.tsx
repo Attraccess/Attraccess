@@ -164,11 +164,10 @@ export function UpsertProjectModal(props: Props) {
               <Label>{t('inputs.name.label')}</Label>
               <Input name="name" />
             </TextField>
-            <TextArea
-              name="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            <TextField value={description} onChange={setDescription}>
+              <Label>{t('inputs.description.label')}</Label>
+              <TextArea name="description" />
+            </TextField>
             <ImageUpload
               id="project-logo-image-upload"
               label={t('inputs.logo.label')}

@@ -13,7 +13,7 @@ Attraccess helps you manage machines, tools and other resources in your workshop
 | **End Users** (Members) | [End User Guide](end-user/overview.md) |
 | **Workshop Personnel** | [Resources](resources/overview.md), [Flows](flows/overview.md), [Forms](forms/overview.md) |
 | **Administrators** | [First-Time Setup](setup/first-time-setup.md), [User Management](user-management/overview.md), [Settings](settings/overview.md) |
-| **IT Administrators** | [Installation](installation/docker-compose.md), [SSL](installation/ssl-setup.md), [MQTT](mqtt/overview.md) |
+| **IT Administrators** | [Installation](installation/docker-compose.md), [SSL](installation/ssl-setup.md), [MQTT](devices/mqtt/overview.md) |
 | **Developers** | [Developer Guide](developer/overview.md), [API Reference](developer/api-reference.md) |
 
 ## Quick Start

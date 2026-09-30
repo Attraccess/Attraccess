@@ -1,0 +1,75 @@
+diff --git a/dist/crap/html-report/html-report.service.js b/dist/crap/html-report/html-report.service.js
+index 6655fc63e18d1ec85f10ba4708f84066e22a2e29..ae23392acc990c8bb3296ff15eab4246f2f86b6b 100644
+--- a/dist/crap/html-report/html-report.service.js
++++ b/dist/crap/html-report/html-report.service.js
+@@ -60,7 +60,7 @@ let HtmlReportService = class HtmlReportService {
+                 prismStyles,
+                 prismScript,
+             });
+-            this.fileSystemService.writeHtmlReport(join(htmlReportDir, functionReport.filePath, `${functionReport.fileIndex}.html`), html);
++            await this.fileSystemService.writeHtmlReport(join(htmlReportDir, functionReport.filePath, `${functionReport.fileIndex}.html`), html);
+         }));
+         const result = pageTemplate({ functions, content: "overview", title: "CRAP", prismStyles, prismScript });
+         await this.fileSystemService.writeHtmlReport(join(htmlReportDir, "index.html"), result, { logLevel: "log" });
+diff --git a/dist/crap/lint.service.js b/dist/crap/lint.service.js
+index 96bfae6ca0c6deba2c6513df4d847f57fd76b90c..516cd0868be000c3f056d54bc6019f0418d7cc03 100644
+--- a/dist/crap/lint.service.js
++++ b/dist/crap/lint.service.js
+@@ -8,7 +8,6 @@ var __metadata = (this && this.__metadata) || function (k, v) {
+     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+ };
+ import { Injectable, Logger } from "@nestjs/common";
+-import { locationIsInRange } from "./location-in-range.js";
+ let LintService = class LintService {
+     logger;
+     constructor(logger) {
+@@ -36,33 +35,22 @@ let LintService = class LintService {
+         return null;
+     }
+     match({ coverageFunction, lintReport, type, }) {
+-        const overlappingLintFunctions = lintReport.filter((lintFunction) => {
+-            if (!lintFunction || lintFunction.type !== type) {
+-                return false;
+-            }
+-            /*
+-             * The istanbul function is reported sometimes to start just before the range reported by ESLint,
+-             * so we also check for the end of the range.
+-             */
+-            return (locationIsInRange({ location: coverageFunction.loc.start, range: lintFunction }) ||
+-                locationIsInRange({ location: coverageFunction.loc.end, range: lintFunction }));
+-        });
+-        /*
+-         * Filter out lint functions that contain other matching functions,
+-         * so when matching functions inside functions we find the inner-most function that matches the position of the
+-         * coverage function.
+-         */
+-        return overlappingLintFunctions.filter((lintFunction) => {
+-            return !overlappingLintFunctions.some((containedLintFunction) => {
+-                if (containedLintFunction === lintFunction) {
+-                    return false;
+-                }
+-                return locationIsInRange({
+-                    location: containedLintFunction.start,
+-                    range: lintFunction,
+-                });
+-            });
+-        });
++        // Istanbul columns are zero-based; ESLint columns are one-based.
++        // Declaration identity handles parenthesized expression bodies and
++        // curried arrows whose inner and outer functions share an end point.
++        const declaration = { line: coverageFunction.decl.start.line, column: coverageFunction.decl.start.column + 1 };
++        const end = { line: coverageFunction.loc.end.line, column: coverageFunction.loc.end.column + 1 };
++        const candidates = lintReport.filter((fn) => fn?.type === type);
++        const exactDeclaration = candidates.filter((fn) => fn.start.line === declaration.line && fn.start.column === declaration.column);
++        if (exactDeclaration.length) return exactDeclaration;
++        // Methods can report the name in Istanbul and the parameter list in
++        // ESLint. Their exact end still identifies the same source function.
++        const exactEnd = candidates.filter((fn) => fn.end.line === end.line && fn.end.column === end.column);
++        if (exactEnd.length === 1) return exactEnd;
++        const before = (a, b) => a.line < b.line || (a.line === b.line && a.column <= b.column);
++        const containingDeclaration = exactEnd.filter((fn) => before(fn.start, declaration) && before(declaration, fn.end));
++        return containingDeclaration.filter((fn) => !containingDeclaration.some((other) => other !== fn && before(fn.start, other.start) && before(other.end, fn.end)));
++
+     }
+ };
+ LintService = __decorate([

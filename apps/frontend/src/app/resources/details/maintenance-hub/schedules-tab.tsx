@@ -7,11 +7,13 @@ import {
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
   useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule,
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleTriggerType,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ScheduleAccordionItem } from './schedule-accordion-item';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
 import { SectionCard } from './section-card';
+import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness';
 import de from './de.json';
 import en from './en.json';
 
@@ -27,6 +29,12 @@ export function SchedulesTab(props: Props) {
   const { resourceId, schedules, isLoading, onCreate, onEdit } = props;
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
+  const hasOperatingSchedule = schedules.some(
+    (schedule) =>
+      schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
+      (schedule as { durationBasis?: string }).durationBasis === 'ATTRIBUTABLE_OPERATING_DURATION',
+  );
+  const trackingReadiness = useOperatingTrackingReadiness(resourceId, hasOperatingSchedule);
 
   const [deleteTarget, setDeleteTarget] = useState<ResourceMaintenanceSchedule | null>(null);
 
@@ -71,6 +79,7 @@ export function SchedulesTab(props: Props) {
             key={schedule.id}
             schedule={schedule}
             resourceId={resourceId}
+            trackingReadiness={trackingReadiness}
             onEdit={() => onEdit(schedule.id)}
             onDelete={() => setDeleteTarget(schedule)}
           />
@@ -85,6 +94,9 @@ export function SchedulesTab(props: Props) {
       title={t('tabs.schedules')}
       count={schedules.length}
     >
+      {hasOperatingSchedule && (
+        <OperatingTrackingNotice resourceId={resourceId} readiness={trackingReadiness} schedule />
+      )}
       {renderBody()}
 
       <DeleteConfirmationModal

@@ -28,4 +28,5 @@ Wenn Sie Attraccess zum ersten Mal nutzen, befolgen Sie diese Schritte:
 - [Anmeldung](end-user/login.md) – So melden Sie sich bei Attraccess an
 - [Mein Konto](end-user/account.md) – Profil- und Sicherheitseinstellungen verwalten
 - [Ressourcen nutzen](end-user/using-resources.md) – So nutzen Sie Maschinen und Werkzeuge
+- [Leser benutzen](attractap/using-the-reader.md) – Mit der Karte anmelden und Maschinen oder Türen nutzen
 - [Mobile Nutzung (PWA)](end-user/mobile-pwa.md) – Attraccess auf dem Handy installieren

@@ -1,5 +1,7 @@
 // Import entities
+import { AuditLog } from './entities/audit-log.entity';
 import { EmailTemplate } from './entities/email-template.entity';
+import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NFCCard } from './entities/nfcCard.entity';
@@ -17,7 +19,7 @@ import { SupervisionMode, AutoIntroductionTarget } from './entities/resource.sup
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
-import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
+import { User } from './entities/user.entity';
 import { Session } from './entities/session.entity';
 import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
@@ -39,6 +41,7 @@ import {
   ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceOperatingTransitionNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   HealthStateOptionEnum,
@@ -46,23 +49,26 @@ import {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
+  CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
+  MeteringStartNodeDataSchema,
+  MeteringCollectNodeDataSchema,
+  MeteringReadyNodeDataSchema,
+  MeteringReportNodeDataSchema,
+  getExternalEffectFailureBehavior,
 } from './entities/resourceFlowNode';
-import {
-  ResourceHealthState,
-  ResourceHealthStatus,
-  ResourceHealthSource,
-} from './entities/resourceHealthState.entity';
+import { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from './entities/resourceHealthState.entity';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
-import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
 import {
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
 } from './entities/resource-maintenance-schedule.entity';
-import {
-  ResourceMaintenanceScheduleUsageHoursConfig,
-} from './entities/resource-maintenance-schedule-usage-hours-config.entity';
+import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
 import { UsageDurationUnit } from './types/usageDurationUnit.enum';
 import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
 import { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
@@ -87,18 +93,36 @@ import {
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
 } from './entities/password-policy-override.entity';
-import {
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
-} from './entities/password-policy-audit.entity';
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
+import { Passkey, PasskeyChallenge } from './entities/passkey.entity';
+import { CompanionDevice } from './entities/companion-device.entity';
+import { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
+import { Permission } from './entities/permission.entity';
+import { Role } from './entities/role.entity';
+import { RolePermission } from './entities/role-permission.entity';
+import { UserRole, UserRoleSource } from './entities/user-role.entity';
+import { ApiToken } from './entities/api-token.entity';
+import { ApiTokenPermission } from './entities/api-token-permission.entity';
+import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
+import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
+export type { LifecycleBillingItem } from './entities/resource-usage-lifecycle-attempt.entity';
+import {
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
+  ResourceMeteringSessionStatus,
+} from './entities/resource-metering.entity';
+export type {
+  ResourceMeteringOperationKind,
+  ResourceMeteringOperationStatus,
+} from './entities/resource-metering.entity';
 
 // Export all entities individually
 export {
+  AuditLog,
   AuthenticationDetail,
   MqttServer,
   Resource,
@@ -114,13 +138,12 @@ export {
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   User,
-  SystemPermissions,
-  SystemPermission,
   Session,
   NFCCard,
   Attractap,
   AttractapCrashReport,
   EmailTemplate,
+  EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceFlowEdge,
@@ -129,13 +152,12 @@ export {
   HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   AttractapFirmwareVersion,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   MaintenanceRequestStatus,
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleUsageHoursConfig,
   UsageDurationUnit,
@@ -156,6 +178,7 @@ export {
   BillingTransactionItemCreateSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
+  getExternalEffectFailureBehavior,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
   Project,
@@ -170,6 +193,7 @@ export {
   ResourceFormAction,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceOperatingTransitionNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   HealthStateOptionEnum,
@@ -183,24 +207,48 @@ export {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
+  CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
+  MeteringStartNodeDataSchema,
+  MeteringCollectNodeDataSchema,
+  MeteringReadyNodeDataSchema,
+  MeteringReportNodeDataSchema,
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,
   PasswordPolicyOverride,
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
   Conversation,
   ConversationParticipant,
   Message,
   MessageReferenceType,
   NotificationPreference,
   PushSubscription,
+  Passkey,
+  PasskeyChallenge,
+  CompanionDevice,
+  EmailLayout,
+  EMAIL_LAYOUT_SINGLETON_ID,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
+  UserRoleSource,
+  ApiToken,
+  ApiTokenPermission,
+  ResourceOperatingInterval,
+  ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
+  ResourceMeteringSessionStatus,
 };
 
 // Export the entities object
 export const entities = {
+  AuditLog,
   User,
   AuthenticationDetail,
   Session,
@@ -218,9 +266,9 @@ export const entities = {
   Attractap,
   AttractapCrashReport,
   EmailTemplate,
+  EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
-  ResourceFlowLog,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
@@ -242,10 +290,22 @@ export const entities = {
   PasswordPolicy,
   PasswordHistory,
   PasswordPolicyOverride,
-  PasswordPolicyAudit,
   Conversation,
   ConversationParticipant,
   Message,
   NotificationPreference,
   PushSubscription,
+  Passkey,
+  PasskeyChallenge,
+  CompanionDevice,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
+  ApiToken,
+  ApiTokenPermission,
+  ResourceOperatingInterval,
+  ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
 };

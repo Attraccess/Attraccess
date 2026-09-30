@@ -11,12 +11,7 @@ import { Server } from 'ws';
 import { closeSync } from 'fs';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
-import {
-  AuthenticatedWebSocket,
-  AttractapEvent,
-  AttractapMessage,
-  AttractapEventType,
-} from './websocket.types';
+import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
 import { randomBytes } from 'crypto';
 import { Mutex } from 'async-mutex';
@@ -99,27 +94,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
 
-    // Step 1: Explicit language-aware replacements (keep before diacritic removal)
+    // Step 1: Explicit replacements for unsupported punctuation and symbols
     const explicitReplacements: Array<[RegExp, string]> = [
-      // German umlauts and sharp s
-      [/ä/g, 'ae'],
-      [/ö/g, 'oe'],
-      [/ü/g, 'ue'],
-      [/Ä/g, 'Ae'],
-      [/Ö/g, 'Oe'],
-      [/Ü/g, 'Ue'],
-      [/ß/g, 'ss'],
-
       // Common symbols and punctuation
-      [/\u00A0/g, ' '], // NBSP -> space
       [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
       [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
       [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
       [/\u2026/g, '...'], // ellipsis
       [/\u2022/g, '-'], // bullet -> hyphen
-      [/\u00B0/g, 'deg'], // degree
       [/\u2122/g, 'TM'], // trademark
-      [/\u00AE/g, '(R)'], // registered
     ];
 
     let output = input;
@@ -127,14 +110,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       output = output.replace(pattern, replacement);
     }
 
-    // Step 2: Remove remaining diacritics (NFD decomposition)
-    output = output.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    // The reader's Latin-1 fonts cover printable ASCII plus U+00A0-U+00FF.
+    // Normalize only unsupported code points so existing Latin-1 glyphs survive.
+    return Array.from(output)
+      .map((character) => {
+        if (/^[\n\r\t\x20-\x7E\xA0-\xFF]$/.test(character)) {
+          return character;
+        }
 
-    // Step 3: Replace any remaining non-ASCII characters with '?'
-    // Allow printable ASCII range only (space 0x20 to tilde 0x7E)
-    output = output.replace(/[^\x20-\x7E]/g, '?');
-
-    return output;
+        const fallback = character.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return /^[\x20-\x7E]*$/.test(fallback) ? fallback : '?';
+      })
+      .join('');
   }
 
   private sanitizeForLVGL<T>(value: T): T {
@@ -150,7 +137,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         seen.add(obj);
         const out: Record<string, unknown> = {};
         for (const [k, val] of Object.entries(obj)) {
-          out[k] = sanitize(val);
+          // Select options and draft values are protocol values: changing them
+          // prevents the firmware from submitting the value the API validates.
+          // Object-based options contain display metadata such as placeholders.
+          out[k] = (k === 'options' && Array.isArray(val)) || k === 'value' || k === 'answers' ? val : sanitize(val);
         }
         return out;
       }
@@ -191,8 +181,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
           message.data.payload,
         );
-        const sanitized = this.sanitizeForLVGL(message);
-        const stringifiedMessage = JSON.stringify(sanitized);
+        const stringifiedMessage = JSON.stringify(this.sanitizeForLVGL(message));
         client.send(stringifiedMessage);
 
         this.logger.debug(
@@ -212,8 +201,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         this.logger.error(
           `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
         );
-        return;
+        return false;
       }
+
+      return true;
     };
 
     const sendBinaryData = (data: Buffer) => {
@@ -228,10 +219,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       id,
       messageCount,
       readerId: null,
+      readerName: null,
       sendMessage,
       sendBinaryData,
       state: {
         lastAuthenticatedUserId: null,
+        enrollment: null,
         enrollNewCardData: null,
         resetNfcCardData: null,
         ota: null,
@@ -336,8 +329,20 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
 
     const readerId = socket.readerId;
+    const readerName = socket.readerName;
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
+      // ponytail: only zero gauge when no other socket for this reader exists —
+      // prevents a stale-socket disconnect from marking a reconnected reader offline.
+      const hasOtherSocket = Array.from(this.websocketService.sockets.values()).some(
+        (other) => other.id !== socket.id && other.readerId === readerId,
+      );
+      if (!hasOtherSocket) {
+        this.metricsService.attractapReaderConnected.set(
+          { reader_id: String(readerId), reader_name: readerName ?? '' },
+          0,
+        );
+      }
     } else {
       this.logger.log('An unidentified client disconnected.');
     }
@@ -402,116 +407,93 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
 
-    switch (eventData.type) {
-      case AttractapEventType.READER_REGISTER:
-        await this.authHandler.handleReaderRegister(socket, eventData);
-        break;
-      case AttractapEventType.READER_AUTHENTICATE:
-        await this.authHandler.handleAuthentication(socket, eventData);
-        break;
-      case AttractapEventType.READER_FIRMWARE_INFO:
-        await this.firmwareHandler.handleFirmwareInfo(socket, eventData);
-        break;
-      case AttractapEventType.READER_CRASH_REPORT:
-        await this.crashReportHandler.handleCrashReport(socket, eventData);
-        break;
-      case AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA:
-        await this.cardHandler.handleCardAuthenticationRequest(socket, eventData);
-        break;
-      case AttractapEventType.SUPERVISION_REQUEST:
-        await this.supervisionHandler.handleSupervisionRequest(socket, eventData);
-        break;
-      case AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA:
-        await this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData);
-        break;
-      case AttractapEventType.SUPERVISION_CANCEL:
-        await this.supervisionHandler.handleSupervisionCancel(socket);
-        break;
-      case AttractapEventType.START_RESOURCE_USAGE_SESSION:
-        await this.sessionHandler.handleStartResourceUsageSession(socket, eventData);
-        break;
-      case AttractapEventType.STOP_RESOURCE_USAGE_SESSION:
-        await this.sessionHandler.handleStopResourceUsageSession(socket, eventData);
-        break;
-      case AttractapEventType.LOCK_DOOR:
-        await this.sessionHandler.handleLockDoor(socket, eventData);
-        break;
-      case AttractapEventType.UNLOCK_DOOR:
-        await this.sessionHandler.handleUnlockDoor(socket, eventData);
-        break;
-      case AttractapEventType.UNLATCH_DOOR:
-        await this.sessionHandler.handleUnlatchDoor(socket, eventData);
-        break;
-      case AttractapEventType.TRIGGER_FLOW_BUTTON:
-        await this.sessionHandler.handleTriggerFlowButton(socket, eventData);
-        break;
-      case AttractapEventType.BILLING_REQUEST_TOPUP:
-        await this.billingHandler.handleBillingRequestTopup(socket, eventData);
-        break;
-      case AttractapEventType.FIRMWARE_REQUEST_CHUNK:
-        await this.firmwareHandler.handleFirmwareChunkRequest(socket, eventData);
-        break;
-      case AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY:
-        await this.cardHandler.onEnrollNewCardRequestNFCKey(socket, eventData);
-        break;
-
-      case AttractapEventType.ENROLL_NEW_CARD:
-        await this.cardHandler.onEnrollNewCard(socket, eventData);
-        break;
-      case AttractapEventType.ENROLL_NEW_CARD_CANCEL:
-        await this.cardHandler.onEnrollNewCardCancel(socket);
-        break;
-
-      case AttractapEventType.RESET_NFC_CARD:
-        await this.cardHandler.onResetNfcCard(socket, eventData);
-        break;
-      case AttractapEventType.RESET_NFC_CARD_CANCEL:
-        await this.cardHandler.onResetNfcCardCancel(socket);
-        break;
-
-      case AttractapEventType.PROJECTS_OF_USER:
-        await this.projectsHandler.handleProjectsOfUserRequest(socket, eventData);
-        break;
-
-      case AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS:
-        await this.formsHandler.handleResourceUsageFormGetFields(socket, eventData);
-        break;
-
-      case AttractapEventType.RESOURCE_USAGE_FORM_SUBMIT_PAGE:
-        await this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData);
-        break;
-
-      case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
-        // no-op on server; metadata-only event sent by server
-        break;
-      case AttractapEventType.RESOURCE_LIST:
-      case AttractapEventType.READER_UNAUTHORIZED:
-      case AttractapEventType.READER_REQUEST_AUTHENTICATION:
-      case AttractapEventType.READER_AUTHENTICATED:
-      case AttractapEventType.CARD_AUTHENTICATION_DATA:
-      case AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA:
-      case AttractapEventType.SUPERVISION_RESOLVED:
-      case AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO:
-      case AttractapEventType.RESOURCE_USAGE_FORM_REQUEST:
-      case AttractapEventType.RESOURCE_USAGE_FORM_FIELDS:
-      case AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT:
-        this.logger.error(
-          `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
-        );
-        throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
-      default: {
-        const exhaustiveCheck: never = eventData.type;
-        throw new Error(`Unknown event type: ${exhaustiveCheck}`);
-      }
-    }
+    if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
+    await this.eventHandlers[eventData.type](socket, eventData);
   }
+
+  private rejectServerEvent(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']): never {
+    this.logger.error(
+      `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
+    );
+    throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
+  }
+
+  private readonly eventHandlers: Record<
+    AttractapEventType,
+    (socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) => unknown
+  > = {
+    [AttractapEventType.READER_REGISTER]: (socket, eventData) =>
+      this.authHandler.handleReaderRegister(socket, eventData),
+    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) =>
+      this.authHandler.handleAuthentication(socket, eventData),
+    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
+      this.firmwareHandler.handleFirmwareInfo(socket, eventData),
+    [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
+      this.crashReportHandler.handleCrashReport(socket, eventData),
+    [AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.cardHandler.handleCardAuthenticationRequest(socket, eventData),
+    [AttractapEventType.SUPERVISION_REQUEST]: (socket, eventData) =>
+      this.supervisionHandler.handleSupervisionRequest(socket, eventData),
+    [AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData),
+    [AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
+      this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData),
+    [AttractapEventType.SUPERVISION_CANCEL]: (socket) => this.supervisionHandler.handleSupervisionCancel(socket),
+    [AttractapEventType.START_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
+      this.sessionHandler.handleStartResourceUsageSession(socket, eventData),
+    [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
+      this.sessionHandler.handleStopResourceUsageSession(socket, eventData),
+    [AttractapEventType.LOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleLockDoor(socket, eventData),
+    [AttractapEventType.UNLOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlockDoor(socket, eventData),
+    [AttractapEventType.UNLATCH_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlatchDoor(socket, eventData),
+    [AttractapEventType.TRIGGER_FLOW_BUTTON]: (socket, eventData) =>
+      this.sessionHandler.handleTriggerFlowButton(socket, eventData),
+    [AttractapEventType.BILLING_REQUEST_TOPUP]: (socket, eventData) =>
+      this.billingHandler.handleBillingRequestTopup(socket, eventData),
+    [AttractapEventType.FIRMWARE_REQUEST_CHUNK]: (socket, eventData) =>
+      this.firmwareHandler.handleFirmwareChunkRequest(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY]: (socket, eventData) =>
+      this.cardHandler.onEnrollNewCardRequestNFCKey(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD]: (socket, eventData) => this.cardHandler.onEnrollNewCard(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD_CANCEL]: (socket) => this.cardHandler.onEnrollNewCardCancel(socket),
+    [AttractapEventType.RESET_NFC_CARD]: (socket, eventData) => this.cardHandler.onResetNfcCard(socket, eventData),
+    [AttractapEventType.RESET_NFC_CARD_CANCEL]: (socket) => this.cardHandler.onResetNfcCardCancel(socket),
+    [AttractapEventType.PROJECTS_OF_USER]: (socket, eventData) =>
+      this.projectsHandler.handleProjectsOfUserRequest(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS]: (socket, eventData) =>
+      this.formsHandler.handleResourceUsageFormGetFields(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_SUBMIT_PAGE]: (socket, eventData) =>
+      this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_CANCEL]: (socket, eventData) => {
+      this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
+    },
+    [AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]: () => undefined,
+    [AttractapEventType.REQUEST_RESOURCE_LIST]: (socket, eventData) =>
+      this.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId }),
+    [AttractapEventType.RESOURCE_LIST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_UNAUTHORIZED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.SUPERVISION_RESOLVED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.SUPERVISION_START]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_REQUEST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_FIELDS]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+  };
 
   public async sendResourceList(readerId: number) {
     return this.resourceListService.sendResourceList(readerId);
   }
 
-  public async sendResourceListToReadersWithResource(resourceId: number) {
-    return this.resourceListService.sendResourceListToReadersWithResource(resourceId);
+  public async sendResourceListToReadersWithResources(resourceIds: number[]) {
+    return this.resourceListService.sendResourceListToReadersWithResources(resourceIds);
   }
 
   public async disconnectReader(readerId: number) {
@@ -523,11 +505,22 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await Promise.all(sockets.map((socket) => socket.close()));
   }
 
-  public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
+  public async startEnrollOfNewNfcCard(data: {
+    readerId: number;
+    userId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     return this.cardHandler.startEnrollOfNewNfcCard(data);
   }
 
-  public async startResetOfNfcCard(data: { readerId: number; userId: number; cardId: number }) {
+  public async startResetOfNfcCard(data: {
+    readerId: number;
+    userId: number;
+    cardId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     return this.cardHandler.startResetOfNfcCard(data);
   }
 }

@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Arduino_GFX_Library.h>
-#include <TouchDrvGT911.hpp>
-#include <Wire.h>
+#include <cstdint>
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_io.h"
 #include "../../../logger/logger.hpp"
 #include "../display_driver.hpp"
+#include "gt911_touch.hpp"
 
 #ifdef HAS_IO_EXPANDER
 class IOExpander;
@@ -32,12 +32,9 @@ private:
 #ifdef HAS_IO_EXPANDER
     IOExpander *ioExpander = nullptr;
 #endif
-    Arduino_DataBus *bus = nullptr;
-    Arduino_ESP32RGBPanel *rgbpanel = nullptr;
-    Arduino_RGB_Display *gfx = nullptr;
-    TouchDrvGT911 touch;
-    int16_t x[5] = {0};
-    int16_t y[5] = {0};
+    esp_lcd_panel_io_handle_t panelIo = nullptr;
+    esp_lcd_panel_handle_t panel = nullptr;
+    Gt911Touch touch;
     uint32_t screenWidth = 0;
     uint32_t screenHeight = 0;
     bool initialized = false;
@@ -47,7 +44,15 @@ private:
     // cadence, so a 15 ms LVGL poll can land before a fresh sample exists.
     // Such "stale" polls hold the last pressed state instead of reporting a
     // release; the cap keeps a wedged controller from leaving a press stuck.
-    static constexpr uint32_t TOUCH_STALE_HOLD_MS = 100;
+    //
+    // Sized above the worst-case I2C hold, not above the GT911 scan period: the
+    // NFC task takes the shared bus for a full NFC::detectionPollTimeoutMs
+    // (100 ms) per card-detection poll, so a 100 ms window was exactly one poll
+    // away from fabricating a release mid-press and splitting a held finger into
+    // two clicks (ATT-867). A genuine release is a fresh empty sample and is
+    // still reported the moment the bus frees up, so the larger cap only delays
+    // the unstick of a permanently wedged controller.
+    static constexpr uint32_t TOUCH_STALE_HOLD_MS = 300;
     TouchPoint lastTouchPoint{};
     bool lastTouchPressed = false;
     uint32_t lastFreshSampleMs = 0;

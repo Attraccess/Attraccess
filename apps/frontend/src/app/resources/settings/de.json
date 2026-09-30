@@ -1,0 +1,20 @@
+{
+  "title": "Einstellungen · {{name}}",
+  "subtitle": "Wählen Sie aus, was Sie konfigurieren möchten.",
+  "search": "Einstellung suchen…",
+  "noResults": "Keine passenden Einstellungen",
+  "save": "Änderungen speichern",
+  "notFound": "Ressource nicht gefunden",
+  "groups": { "general": "Allgemein", "access": "Zugang und Nutzung", "automation": "Automatisierung und Support" },
+  "topics": {
+    "details": { "title": "Details", "description": "Name, Beschreibung und Bild" },
+    "behavior": { "title": "Ressourcentyp und Verhalten", "description": "Optionen für Maschine oder Tür" },
+    "metadata": { "title": "Metadaten", "description": "Werte für Integrationen und Flows" },
+    "retraining": { "title": "Nachschulung", "description": "Wann Einweisungen ablaufen" },
+    "supervision": { "title": "Beaufsichtigung", "description": "Wer eine Nutzung starten darf" },
+    "groups": { "title": "Gruppen", "description": "Ressource Gruppen zuordnen" },
+    "forms": { "title": "Formulare", "description": "Nutzungsformulare konfigurieren" },
+    "flows": { "title": "Flows", "description": "Automatisierung konfigurieren" },
+    "diagnostics": { "title": "Diagnose", "description": "Betriebs- und Flow-Diagnose prüfen" }
+  }
+}

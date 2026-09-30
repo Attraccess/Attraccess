@@ -14,11 +14,13 @@
     "initiator": "Ausgelöst von",
     "resourceUsage": "Ressource / Nutzung",
     "refundOf": "Erstattung von",
+    "correctionOf": "Korrektur zu",
     "externalReference": "Externe Referenz",
     "type": "Art"
   },
   "type": {
     "refund": "Erstattung",
+    "correction": "Energiekorrektur",
     "resourceUsage": "Ressourcen-Nutzung",
     "manual": "Manuelle Transaktion",
     "sumupTopup": "SumUp-Aufladung",
@@ -36,8 +38,11 @@
     "system": {
       "PER_SESSION": "Pro Sitzung",
       "PER_MINUTE": "Pro Minute",
+      "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Pro zugeordneter Betriebsminute",
+      "ENERGY": "Energie",
       "BILLING_FACTOR": "Zahlungsfaktor"
     },
+    "energyDescription": "{{kwh}} kWh zu {{rate}} pro kWh",
     "empty": "Keine Positionen",
     "total": "Summe Positionen"
   },

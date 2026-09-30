@@ -19,7 +19,7 @@ const uint32_t Wifi::RECONNECT_INTERVAL_MS = 5000;
 const uint32_t Wifi::WAITING_FOR_IP_TIMEOUT_MS = 15000;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[Wifi::MAX_KNOWN_WIFI_NETWORKS] = {};
 uint8_t Wifi::knownWifiNetworksCount = 0;
-String Wifi::_lastSSID;
+std::string Wifi::_lastSSID;
 esp_netif_t* Wifi::wifi_interface = nullptr;
 Logger Wifi::logger("Wifi");
 
@@ -27,7 +27,7 @@ Logger Wifi::logger("Wifi");
 
 void Wifi::setup() {}
 void Wifi::loop() {}
-void Wifi::connectToNetwork(const String&, const String&) {}
+void Wifi::connectToNetwork(const std::string&, const std::string&) {}
 Wifi::WifiState Wifi::getState() { return _state; }
 esp_ip4_addr_t Wifi::getIPAddress() { return {}; }
 void Wifi::startScan() {}

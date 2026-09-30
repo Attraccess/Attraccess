@@ -10,6 +10,8 @@ import { Injectable } from '@nestjs/common';
 import type { AuthState, ProbeResult } from './types';
 
 const PROBE_TIMEOUT_MS = 5000;
+/** Shorter budget for scans, where most addresses are dead and probed in bulk. */
+export const SCAN_PROBE_TIMEOUT_MS = 1000;
 
 /** Loosely-typed shape of the `GET /shelly` response across generations. */
 interface ShellyInfoResponse {
@@ -29,12 +31,12 @@ export class ShellyProbeService {
    * Error with a human-readable message if the device is unreachable or returns
    * a non-OK / non-JSON response.
    */
-  async probe(ipAddress: string): Promise<ProbeResult> {
+  async probe(ipAddress: string, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<ProbeResult> {
     const url = `http://${ipAddress}/shelly`;
     let json: ShellyInfoResponse;
     try {
       const res = await fetch(url, {
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
         headers: { Accept: 'application/json' },
       });
       if (!res.ok) {

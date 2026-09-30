@@ -43,6 +43,7 @@
   - [Overview](flows/overview.md)
   - [Flow Editor](flows/flow-editor.md)
   - [Node Types](flows/node-types.md)
+  - [Energy Metering](flows/energy-metering.md)
 
 - **Forms**
   - [Overview](forms/overview.md)
@@ -55,16 +56,19 @@
 
 - **Attractap NFC Reader**
   - [Overview](attractap/overview.md)
+  - [Using the Reader](attractap/using-the-reader.md)
   - [Hardware](attractap/hardware.md)
   - [Setup](attractap/setup.md)
   - [NFC Cards](attractap/nfc-cards.md)
   - [Firmware Updates](attractap/firmware-updates.md)
   - [LED Guide (Lite)](attractap/led-guide.md)
 
-- **MQTT & IoT**
-  - [Overview](mqtt/overview.md)
-  - [Server Setup](mqtt/server-setup.md)
-  - [Examples](mqtt/examples.md)
+- **Devices**
+  - [MQTT](devices/mqtt/overview.md)
+  - [MQTT Server Setup](devices/mqtt/server-setup.md)
+  - [MQTT Examples](devices/mqtt/examples.md)
+  - [Guided WAGO CC100 Commissioning](devices/wago-cc100-commissioning.md)
+  - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
 
 - **Billing**
   - [Overview](billing/overview.md)
@@ -86,6 +90,7 @@
 - **System Settings**
   - [Overview](settings/overview.md)
   - [Security](settings/security.md)
+  - [Audit log](settings/audit-log.md)
 
 - **Developer Guide**
   - [Overview](developer/overview.md)

@@ -1,0 +1,18 @@
+{
+  "title": "Create resource",
+  "name": "Name",
+  "namePlaceholder": "e.g. Laser cutter",
+  "type": "Resource type",
+  "machine": "Machine",
+  "door": "Door",
+  "later": "Set up access, forms, flows and other options in resource settings after creation.",
+  "cancel": "Cancel",
+  "createAndOpen": "Create and open",
+  "createAnother": "Create and add another",
+  "createOptions": "Other create actions",
+  "nameRequired": "Enter a resource name.",
+  "successTitle": "Resource created",
+  "successDescription": "{{name}} was created.",
+  "errorTitle": "Could not create resource",
+  "errorDescription": "Please try again. {{message}}"
+}

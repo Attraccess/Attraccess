@@ -16,6 +16,7 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { BillingService } from './billing.service';
 import { CronTimer } from '../metrics/instrumentation/cron/cron.helper';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { AuditService } from '../audit/audit.service';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
@@ -35,19 +36,25 @@ export class SumUpService {
     private readonly billingService: BillingService,
     private readonly cronTimer: CronTimer,
     private readonly externalCallTimer: ExternalCallTimer,
+    private readonly auditService: AuditService,
   ) {}
 
   async setApiKey(token: string): Promise<void> {
     const sumUp = new SumUp({ apiKey: token });
-    let merchantCode: string;
-    try {
-      const me = await this.externalCallTimer.time('sumup', 'me', () =>
-        sumUp.get<{ merchant_code: string }>({ path: '/v0.1/me' }),
-      );
-      merchantCode = me.merchant_code;
-    } catch (error) {
-      this.logger.error('Invalid API key', { error });
-      throw new BadRequestException('Invalid API key');
+    const me = await this.externalCallTimer
+      .time('sumup', 'me', () =>
+        sumUp.get<{ merchant_profile?: { merchant_code?: string } }>({ path: '/v0.1/me' }),
+      )
+      .catch((error) => {
+        this.logger.error('Invalid API key', { error });
+        throw new BadRequestException('Invalid API key');
+      });
+
+    // /v0.1/me nests the code under merchant_profile, it is not a top-level field
+    const merchantCode = me.merchant_profile?.merchant_code;
+    if (!merchantCode) {
+      this.logger.error('SumUp /v0.1/me returned no merchant_profile.merchant_code');
+      throw new BadRequestException('SumUp returned no merchant code for this API key');
     }
 
     const encryptedApiKey = this.encryptionService.encrypt(token);
@@ -187,6 +194,13 @@ export class SumUpService {
       this.hasPendingTransactions = true;
 
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
+      void this.auditService.recordBillingTransaction({
+        transactionId: transaction.id,
+        userId: transaction.userId,
+        amount: transaction.amount,
+        status: transaction.status,
+        source: 'sumup-topup',
+      });
 
       return transaction;
     } catch (error) {
@@ -231,6 +245,7 @@ export class SumUpService {
       }),
     );
 
+    const previousStatus = transaction.status;
     switch (sumUpTransactionData.status) {
       case 'CANCELLED':
       case 'FAILED':
@@ -252,12 +267,22 @@ export class SumUpService {
       }
     }
 
+    if (transaction.status === previousStatus) return;
+
     this.logger.debug(
       `updateTransactionStatusBySumupServer: Updating transaction status of ${sumupTransactionId} to ${transaction.status}`,
     );
     const updatedTransaction = await this.billingTransactionRepository.save(transaction);
     this.hasPendingTransactions = true;
     this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
+    void this.auditService.recordBillingTransaction({
+      transactionId: updatedTransaction.id,
+      userId: updatedTransaction.userId,
+      amount: updatedTransaction.amount,
+      status: updatedTransaction.status,
+      previousStatus,
+      source: 'sumup-topup',
+    });
 
     this.logger.debug(
       `updateTransactionStatusBySumupServer: Transaction status updated of ${sumupTransactionId} to ${transaction.status}`,
@@ -292,6 +317,14 @@ export class SumUpService {
           transaction.status = BillingTransactionStatus.Failed;
           const updatedTransaction = await this.billingTransactionRepository.save(transaction);
           this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
+          void this.auditService.recordBillingTransaction({
+            transactionId: updatedTransaction.id,
+            userId: updatedTransaction.userId,
+            amount: updatedTransaction.amount,
+            status: updatedTransaction.status,
+            previousStatus: BillingTransactionStatus.Pending,
+            source: 'sumup-topup',
+          });
           continue;
         }
 

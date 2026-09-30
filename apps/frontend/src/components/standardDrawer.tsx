@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
   DrawerBackdrop,
   DrawerContent,
@@ -17,12 +17,7 @@ interface Props {
   dialogProps?: Omit<DrawerDialogProps, 'children'>;
 }
 
-const DEFAULT_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-surface-secondary';
-
-const FIELD_CONTRAST_STYLE: CSSProperties = {
-  ['--field-border' as never]: 'var(--border-secondary)',
-  ['--border-width-field' as never]: '1px',
-};
+const DEFAULT_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-overlay';
 
 export function StandardDrawer(props: Props) {
   const { isOpen, onOpenChange, children, backdropProps, contentProps, dialogProps } = props;
@@ -31,12 +26,10 @@ export function StandardDrawer(props: Props) {
     ? `${DEFAULT_DIALOG_CLASSNAME} ${dialogProps.className}`
     : DEFAULT_DIALOG_CLASSNAME;
 
-  const mergedStyle = { ...FIELD_CONTRAST_STYLE, ...dialogProps?.style };
-
   return (
     <DrawerBackdrop {...backdropProps} isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerContent {...contentProps}>
-        <DrawerDialog {...dialogProps} className={mergedDialogClassName} style={mergedStyle}>
+        <DrawerDialog {...dialogProps} className={mergedDialogClassName}>
           {children}
         </DrawerDialog>
       </DrawerContent>

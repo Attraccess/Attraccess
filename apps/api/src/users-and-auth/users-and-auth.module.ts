@@ -18,10 +18,21 @@ import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { TwoFactorController } from './auth/two-factor.controller';
 import { SessionService } from './auth/session.service';
+import { SESSION_STORE, SessionStore } from './auth/session-store/session-store';
+import { SqliteSessionStore } from './auth/session-store/sqlite.session-store';
+import { ValkeySessionStore } from './auth/session-store/valkey.session-store';
+import { VALKEY_CLIENT } from '../valkey/valkey.module';
+import { TokenHashService } from '../encryption/token-hash.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import type { Redis } from 'ioredis';
 
 // Strategies
 import { LocalStrategy } from './strategies/local.strategy';
 import { SessionStrategy } from './strategies/session.strategy';
+
+import { RbacModule } from './rbac/rbac.module';
+import { RbacController } from './rbac/rbac.controller';
 
 // Constants and Entities
 
@@ -34,11 +45,16 @@ import {
   Session,
   ResourceUsage,
   Setting,
+  Passkey,
+  PasskeyChallenge,
+  ApiToken,
+  ApiTokenPermission,
+  Permission,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
 import { SSOOIDCStrategy } from './auth/sso/oidc/oidc.strategy';
-import { ModuleRef } from '@nestjs/core';
+import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
@@ -52,6 +68,8 @@ import { EncryptionModule } from '../encryption/encryption.module';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
 import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
 import { TwoFactorService } from './auth/two-factor.service';
+import { PasskeyService } from './auth/passkey/passkey.service';
+import { PasskeyController } from './auth/passkey/passkey.controller';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
 import { BruteForceProtectionService } from './rate-limiting/brute-force.service';
@@ -60,6 +78,10 @@ import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interc
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 import { PasswordPolicyModule } from './password-policy/password-policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ApiTokenService } from './auth/api-token/api-token.service';
+import { ApiTokenController } from './auth/api-token/api-token.controller';
+import { ApiTokenRequestRateLimitService } from './auth/api-token/api-token-request-rate-limit.service';
+import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-request-rate-limit.interceptor';
 
 @Module({
   imports: [
@@ -72,6 +94,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Session,
       ResourceUsage,
       Setting,
+      Passkey,
+      PasskeyChallenge,
+      ApiToken,
+      ApiTokenPermission,
+      Permission,
     ]),
     PassportModule,
     EmailModule,
@@ -80,8 +107,29 @@ import { NotificationsModule } from '../notifications/notifications.module';
     SettingsModule,
     PasswordPolicyModule,
     NotificationsModule,
+    RbacModule,
   ],
   providers: [
+    {
+      provide: SESSION_STORE,
+      inject: [
+        { token: VALKEY_CLIENT, optional: true },
+        getRepositoryToken(Session),
+        getRepositoryToken(User),
+        TokenHashService,
+      ],
+      useFactory: (
+        valkeyClient: Redis | null,
+        sessionRepo: Repository<Session>,
+        userRepo: Repository<User>,
+        tokenHashService: TokenHashService,
+      ): SessionStore => {
+        if (valkeyClient) {
+          return new ValkeySessionStore(valkeyClient, userRepo, tokenHashService);
+        }
+        return new SqliteSessionStore(sessionRepo, tokenHashService);
+      },
+    },
     UsersService,
     SignupDomainService,
     UserRegistrationService,
@@ -91,6 +139,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AuthService,
     SessionService,
     TwoFactorService,
+    PasskeyService,
+    ApiTokenService,
+    ApiTokenRequestRateLimitService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ApiTokenRequestRateLimitInterceptor,
+    },
     LocalStrategy,
     SessionStrategy,
     SSOService,
@@ -130,12 +185,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
       inject: [ModuleRef, SettingsService, OidcCookieStateStore],
     },
   ],
-  // Controller order is load-bearing: NestJS registers routes per-controller in
-  // array order, and Express matches first-registered-wins. Controllers holding
-  // static GET/PATCH routes (me, local-signup-*) MUST precede the ones holding
-  // ':id'/':id/*' routes so those static paths are not shadowed by ':id'.
-  // UserPermissionsController is intentionally kept last so GET 'with-permission'
-  // stays shadowed by GET ':id' — preserving the existing (pre-refactor) behavior.
   controllers: [
     UsersRegistrationController,
     UserInvitationsController,
@@ -144,8 +193,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
     UserPermissionsController,
     AuthController,
     TwoFactorController,
+    PasskeyController,
+    ApiTokenController,
     SSOController,
+    RbacController,
   ],
-  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger],
+  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger, RbacModule],
 })
 export class UsersAndAuthModule {}

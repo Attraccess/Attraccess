@@ -83,10 +83,14 @@ describe('Node.js version consistency', () => {
       dockerfileContent = readFile('tools/hetzner-dns-updater/Dockerfile');
     });
 
-    it('should use a FROM image with the same Node.js version as .nvmrc', () => {
-      const match = dockerfileContent.match(/FROM\s+node:(\S+)/);
+    it('should set NODE_VERSION ARG matching .nvmrc', () => {
+      const match = dockerfileContent.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
-      expect(match![1]).toContain(nvmrcVersion);
+      expect(match![1]).toBe(nvmrcVersion);
+    });
+
+    it('should use NODE_VERSION in FROM', () => {
+      expect(dockerfileContent).toContain('FROM node:${NODE_VERSION}-alpine');
     });
 
     it(`should reference Node ${EXPECTED_NODE_MAJOR}+ in comments`, () => {
@@ -108,10 +112,14 @@ describe('Node.js version consistency', () => {
       dockerfileContent = readFile('tools/config-ui/Dockerfile');
     });
 
-    it('should use a FROM image with the same Node.js version as .nvmrc', () => {
-      const match = dockerfileContent.match(/FROM\s+node:(\S+)/);
+    it('should set NODE_VERSION ARG matching .nvmrc', () => {
+      const match = dockerfileContent.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
-      expect(match![1]).toContain(nvmrcVersion);
+      expect(match![1]).toBe(nvmrcVersion);
+    });
+
+    it('should use NODE_VERSION in FROM', () => {
+      expect(dockerfileContent).toContain('FROM node:${NODE_VERSION}-alpine');
     });
 
     it('should not reference an older Node.js major version', () => {
@@ -179,11 +187,44 @@ describe('Node.js version consistency', () => {
     });
   });
 
-  describe('GitHub Actions workflows read Node.js version from .nvmrc', () => {
+  describe('GitHub Actions Docker builds read Node.js version from .nvmrc', () => {
+    describe('docker-build-push composite action', () => {
+      let content: string;
+
+      beforeAll(() => {
+        content = readFile('.github/actions/docker-build-push/action.yml');
+      });
+
+      it('should read NODE_VERSION from .nvmrc', () => {
+        expect(content).toContain('cat .nvmrc');
+      });
+
+      it('should pass NODE_VERSION as a Docker build-arg', () => {
+        expect(content).toContain(
+          'NODE_VERSION=${{ steps.node-version.outputs.value }}'
+        );
+      });
+
+      it('should not hardcode a Node.js version in build-args', () => {
+        const buildArgLines = content
+          .split('\n')
+          .filter(
+            (l) =>
+              l.includes('NODE_VERSION=') &&
+              !l.includes('${{') &&
+              !l.includes('cat .nvmrc')
+          );
+        const hardcodedVersionArgs = buildArgLines.filter((l) =>
+          /NODE_VERSION=\d+/.test(l)
+        );
+        expect(hardcodedVersionArgs).toHaveLength(0);
+      });
+    });
+
     const workflowsWithDocker = [
+      'docker-nightly-latest.yml',
       'pull-requests.yml',
       'release.yml',
-      'docker-nightly-latest.yml',
     ];
 
     workflowsWithDocker.forEach((workflowFile) => {
@@ -194,14 +235,8 @@ describe('Node.js version consistency', () => {
           content = readFile(`.github/workflows/${workflowFile}`);
         });
 
-        it('should read NODE_VERSION from .nvmrc', () => {
-          expect(content).toContain('cat .nvmrc');
-        });
-
-        it('should pass NODE_VERSION as a Docker build-arg', () => {
-          expect(content).toContain(
-            'NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}'
-          );
+        it('should build Docker images via the docker-build-push action', () => {
+          expect(content).toContain('./.github/actions/docker-build-push');
         });
 
         it('should not hardcode a Node.js version in build-args', () => {
@@ -228,6 +263,7 @@ describe('Node.js version consistency', () => {
       'tools/hetzner-dns-updater/Dockerfile',
       'tools/config-ui/Dockerfile',
       '.github/actions/setup/action.yml',
+      '.github/actions/docker-build-push/action.yml',
       '.github/workflows/pull-requests.yml',
       '.github/workflows/release.yml',
       '.github/workflows/docker-nightly-latest.yml',
@@ -252,16 +288,16 @@ describe('Node.js version consistency', () => {
       expect(match![1]).toBe(nvmrcVersion);
     });
 
-    it('hetzner Dockerfile FROM version matches .nvmrc exactly', () => {
+    it('hetzner Dockerfile default NODE_VERSION matches .nvmrc exactly', () => {
       const dockerfile = readFile('tools/hetzner-dns-updater/Dockerfile');
-      const match = dockerfile.match(/FROM\s+node:([^\s-]+)/);
+      const match = dockerfile.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
       expect(match![1]).toBe(nvmrcVersion);
     });
 
-    it('config-ui Dockerfile FROM version matches .nvmrc exactly', () => {
+    it('config-ui Dockerfile default NODE_VERSION matches .nvmrc exactly', () => {
       const dockerfile = readFile('tools/config-ui/Dockerfile');
-      const match = dockerfile.match(/FROM\s+node:([^\s-]+)/);
+      const match = dockerfile.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
       expect(match![1]).toBe(nvmrcVersion);
     });

@@ -210,7 +210,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  log(String(err.message || err));
-  process.exitCode = 1;
-});
+module.exports = { getEnvNumber, normalizeName, pickLanIPv4, httpJson, upsertARecord, main };
+
+if (require.main === module) {
+  main().catch((err) => {
+    log(String(err.message || err));
+    process.exitCode = 1;
+  });
+}

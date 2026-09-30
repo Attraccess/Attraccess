@@ -5,17 +5,17 @@ jest.mock('crypto', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, LessThan, MoreThan } from 'typeorm';
 import { SessionService, SessionMetadata } from './session.service';
-import { Session, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
+import { SESSION_STORE, SessionStore } from './session-store/session-store';
 
 describe('SessionService', () => {
   let service: SessionService;
-  let sessionRepository: jest.Mocked<Repository<Session>>;
+  let store: jest.Mocked<SessionStore>;
+  let metrics: { authActiveSessions: { inc: jest.Mock; dec: jest.Mock; set: jest.Mock } };
 
   const mockUser: User = {
     id: 1,
@@ -23,467 +23,219 @@ describe('SessionService', () => {
     email: 'test@example.com',
   } as User;
 
-  const mockSession: Session = {
-    id: 1,
-    token: 'test-session-token',
-    userId: 1,
-    userAgent: 'Mozilla/5.0',
-    ipAddress: '192.168.1.1',
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    createdAt: new Date(),
-    lastAccessedAt: new Date(),
-    user: mockUser,
-  };
+  function makeStore(): jest.Mocked<SessionStore> {
+    return {
+      createSession: jest.fn().mockResolvedValue(undefined),
+      validateSession: jest.fn().mockResolvedValue(null),
+      rotateSession: jest.fn().mockResolvedValue(false),
+      revokeSession: jest.fn().mockResolvedValue(false),
+      revokeAllUserSessions: jest.fn().mockResolvedValue(0),
+      cleanupExpired: jest.fn().mockResolvedValue(null),
+      getUserSessions: jest.fn().mockResolvedValue([]),
+      getStats: jest.fn().mockResolvedValue({ totalActiveSessions: 0, expiredSessions: 0 }),
+      countActive: jest.fn().mockResolvedValue(0),
+    };
+  }
 
   beforeEach(async () => {
-    const mockRepository = {
-      create: jest.fn(),
-      save: jest.fn(),
-      findOne: jest.fn(),
-      remove: jest.fn(),
-      delete: jest.fn(),
-      find: jest.fn(),
-      count: jest.fn(),
-    };
+    mockRandomBytes.mockReturnValue({
+      toString: jest.fn().mockImplementation((enc?: string) =>
+        enc === 'base64url' ? 'mocked-random-token' : 'mocked-random-token'
+      ),
+    } as unknown as Buffer);
+
+    store = makeStore();
+    metrics = { authActiveSessions: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() } };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SessionService,
-        {
-          provide: getRepositoryToken(Session),
-          useValue: mockRepository,
-        },
-        {
-          provide: TokenHashService,
-          useValue: {
-            hashToken: jest.fn((token: string) => `hashed:${token}`),
-          },
-        },
-        {
-          provide: MetricsService,
-          useValue: {
-            authActiveSessions: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
-          },
-        },
+        { provide: SESSION_STORE, useValue: store },
+        { provide: TokenHashService, useValue: { hashToken: jest.fn((t: string) => `hashed:${t}`) } },
+        { provide: MetricsService, useValue: metrics },
         { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
       ],
     }).compile();
 
     service = module.get<SessionService>(SessionService);
-    sessionRepository = module.get(getRepositoryToken(Session));
-    // Reset mocks
     jest.clearAllMocks();
+
+    // Re-apply default mock return values after clearAllMocks
+    store.createSession.mockResolvedValue(undefined);
+    store.validateSession.mockResolvedValue(null);
+    store.rotateSession.mockResolvedValue(false);
+    store.revokeSession.mockResolvedValue(false);
+    store.revokeAllUserSessions.mockResolvedValue(0);
+    store.cleanupExpired.mockResolvedValue(null);
+    store.getUserSessions.mockResolvedValue([]);
+    store.getStats.mockResolvedValue({ totalActiveSessions: 0, expiredSessions: 0 });
+    store.countActive.mockResolvedValue(0);
+
+    mockRandomBytes.mockReturnValue({
+      toString: jest.fn().mockImplementation((enc?: string) =>
+        enc === 'base64url' ? 'mocked-random-token' : 'mocked-random-token'
+      ),
+    } as unknown as Buffer);
+  });
+
+  describe('onModuleInit', () => {
+    it('should set active sessions metric from store', async () => {
+      store.countActive.mockResolvedValue(7);
+      await service.onModuleInit();
+      expect(metrics.authActiveSessions.set).toHaveBeenCalledWith(7);
+    });
   });
 
   describe('createSession', () => {
-    beforeEach(() => {
-      // Clear all mocks before each test
-      mockRandomBytes.mockClear();
-
-      // Mock randomBytes to return an object that behaves like a Buffer
-      mockRandomBytes.mockReturnValue({
-        toString: jest.fn().mockImplementation((encoding?: string) => {
-          if (encoding === 'base64url') {
-            return 'mocked-random-token';
-          }
-          return 'mocked-random-token';
-        }),
-      } as unknown as Buffer);
-    });
-
-    it('should create a session with default expiration', async () => {
-      const mockCreatedSession = { ...mockSession };
-      sessionRepository.create.mockReturnValue(mockCreatedSession);
-      sessionRepository.save.mockResolvedValue(mockCreatedSession);
-
+    it('should return raw token and delegate to store', async () => {
       const result = await service.createSession(mockUser);
-
       expect(result).toBe('mocked-random-token');
-      expect(sessionRepository.create).toHaveBeenCalledWith({
-        token: 'hashed:mocked-random-token',
-        userId: 1,
-        userAgent: null,
-        ipAddress: null,
-        expiresAt: expect.any(Date),
-      });
-      expect(sessionRepository.save).toHaveBeenCalledWith(mockCreatedSession);
+      expect(store.createSession).toHaveBeenCalledWith(
+        'hashed:mocked-random-token',
+        1,
+        undefined,
+        expect.any(Date),
+      );
+      expect(metrics.authActiveSessions.inc).toHaveBeenCalled();
     });
 
-    it('should create a session with custom metadata', async () => {
-      const metadata: SessionMetadata = {
-        userAgent: 'Custom User Agent',
-        ipAddress: '10.0.0.1',
-        expiresIn: 3600, // 1 hour
-      };
-
-      const mockCreatedSession = { ...mockSession };
-      sessionRepository.create.mockReturnValue(mockCreatedSession);
-      sessionRepository.save.mockResolvedValue(mockCreatedSession);
-
-      const result = await service.createSession(mockUser, metadata);
-
-      expect(result).toBe('mocked-random-token');
-      expect(sessionRepository.create).toHaveBeenCalledWith({
-        token: 'hashed:mocked-random-token',
-        userId: 1,
-        userAgent: 'Custom User Agent',
-        ipAddress: '10.0.0.1',
-        expiresAt: expect.any(Date),
-      });
-
-      // Check that expiration is approximately 1 hour from now
-      const createCall = sessionRepository.create.mock.calls[0][0];
-      const expectedExpiration = Date.now() + 3600 * 1000;
-      const actualExpiration = (createCall.expiresAt as Date).getTime();
-      expect(Math.abs(actualExpiration - expectedExpiration)).toBeLessThan(1000); // Within 1 second
-    });
-
-    it('should enforce maximum expiration limit', async () => {
-      const metadata: SessionMetadata = {
-        expiresIn: 200 * 3600, // 200 hours (exceeds 168 hour limit)
-      };
-
-      const mockCreatedSession = { ...mockSession };
-      sessionRepository.create.mockReturnValue(mockCreatedSession);
-      sessionRepository.save.mockResolvedValue(mockCreatedSession);
-
+    it('should pass metadata to store', async () => {
+      const metadata: SessionMetadata = { userAgent: 'UA', ipAddress: '1.2.3.4', expiresIn: 3600 };
       await service.createSession(mockUser, metadata);
-
-      const createCall = sessionRepository.create.mock.calls[0][0];
-      const maxExpiration = Date.now() + 168 * 3600 * 1000; // 168 hours max
-      const actualExpiration = (createCall.expiresAt as Date).getTime();
-      expect(actualExpiration).toBeLessThanOrEqual(maxExpiration + 1000); // Allow 1 second tolerance
+      expect(store.createSession).toHaveBeenCalledWith(
+        'hashed:mocked-random-token',
+        1,
+        metadata,
+        expect.any(Date),
+      );
     });
 
-    it('should generate unique tokens', () => {
-      const mockBuffer1 = Buffer.from('token1');
-      const mockBuffer2 = Buffer.from('token2');
-
-      // Test that different buffers would generate different tokens
-      expect(mockBuffer1.toString('base64url')).not.toBe(mockBuffer2.toString('base64url'));
+    it('should clamp expiration to 168 hours max', async () => {
+      const metadata: SessionMetadata = { expiresIn: 200 * 3600 };
+      await service.createSession(mockUser, metadata);
+      const [, , , expiresAt] = store.createSession.mock.calls[0];
+      const maxExpiry = Date.now() + 168 * 3600 * 1000;
+      expect((expiresAt as Date).getTime()).toBeLessThanOrEqual(maxExpiry + 1000);
     });
   });
 
   describe('validateSession', () => {
-    it('should return user for valid session', async () => {
-      const validSession = {
-        ...mockSession,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
-      };
-
-      sessionRepository.findOne.mockResolvedValue(validSession);
-      sessionRepository.save.mockResolvedValue(validSession);
-
-      const result = await service.validateSession('valid-token');
-
-      expect(result).toEqual(mockUser);
-      expect(sessionRepository.findOne).toHaveBeenCalledWith({
-        where: { token: 'hashed:valid-token' },
-        relations: ['user'],
-      });
-      expect(sessionRepository.save).toHaveBeenCalledWith({
-        ...validSession,
-        lastAccessedAt: expect.any(Date),
-      });
+    it('should delegate to store and return user', async () => {
+      store.validateSession.mockResolvedValue(mockUser);
+      const result = await service.validateSession('some-token');
+      expect(result).toBe(mockUser);
+      expect(store.validateSession).toHaveBeenCalledWith('some-token');
     });
 
-    it('should return null for non-existent session', async () => {
-      sessionRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.validateSession('non-existent-token');
-
-      expect(result).toBeNull();
-      expect(sessionRepository.findOne).toHaveBeenNthCalledWith(1, {
-        where: { token: 'hashed:non-existent-token' },
-        relations: ['user'],
-      });
-      expect(sessionRepository.findOne).toHaveBeenNthCalledWith(2, {
-        where: { token: 'non-existent-token' },
-        relations: ['user'],
-      });
-      expect(sessionRepository.save).not.toHaveBeenCalled();
+    it('should return null for empty token without calling store', async () => {
+      expect(await service.validateSession('')).toBeNull();
+      expect(store.validateSession).not.toHaveBeenCalled();
     });
 
-    it('should return null and remove expired session', async () => {
-      const expiredSession = {
-        ...mockSession,
-        expiresAt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-      };
-
-      sessionRepository.findOne.mockResolvedValue(expiredSession);
-      sessionRepository.remove.mockResolvedValue(expiredSession);
-
-      const result = await service.validateSession('expired-token');
-
-      expect(result).toBeNull();
-      expect(sessionRepository.remove).toHaveBeenCalledWith(expiredSession);
-      expect(sessionRepository.save).not.toHaveBeenCalled();
-    });
-
-    it('should return null for empty token', async () => {
-      const result = await service.validateSession('');
-
-      expect(result).toBeNull();
-      expect(sessionRepository.findOne).not.toHaveBeenCalled();
-    });
-
-    it('should return null for null token', async () => {
-      const result = await service.validateSession(null as string);
-
-      expect(result).toBeNull();
-      expect(sessionRepository.findOne).not.toHaveBeenCalled();
+    it('should return null for null token without calling store', async () => {
+      expect(await service.validateSession(null as string)).toBeNull();
+      expect(store.validateSession).not.toHaveBeenCalled();
     });
   });
 
   describe('refreshSession', () => {
-    it('should refresh valid session with new token', async () => {
-      // Clear any previous mocks
-      mockRandomBytes.mockClear();
-
-      const existingSession = {
-        ...mockSession,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
-      };
-
-      // Mock randomBytes to return 'new-refreshed-token' when converted to base64url
-      mockRandomBytes.mockReturnValue({
-        toString: jest.fn().mockImplementation((encoding?: string) => {
-          if (encoding === 'base64url') {
-            return 'new-refreshed-token';
-          }
-          return 'new-refreshed-token';
-        }),
-      } as unknown as Buffer);
-
-      sessionRepository.findOne.mockResolvedValue(existingSession);
-      sessionRepository.save.mockResolvedValue({
-        ...existingSession,
-        token: 'new-refreshed-token',
-      });
-
-      const result = await service.refreshSession('current-token');
-
-      expect(result).toBe('new-refreshed-token');
-      expect(sessionRepository.save).toHaveBeenCalledWith({
-        ...existingSession,
-        token: 'hashed:new-refreshed-token',
-        expiresAt: expect.any(Date),
-        lastAccessedAt: expect.any(Date),
-      });
+    it('should return new token when store rotates successfully', async () => {
+      store.rotateSession.mockResolvedValue(true);
+      const result = await service.refreshSession('old-token');
+      expect(result).toBe('mocked-random-token');
+      expect(store.rotateSession).toHaveBeenCalledWith(
+        'old-token',
+        'hashed:mocked-random-token',
+        expect.any(Date),
+      );
     });
 
-    it('should return null for non-existent session', async () => {
-      sessionRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.refreshSession('non-existent-token');
-
-      expect(result).toBeNull();
-      expect(sessionRepository.save).not.toHaveBeenCalled();
+    it('should return null when store signals session not found', async () => {
+      store.rotateSession.mockResolvedValue(false);
+      expect(await service.refreshSession('bad-token')).toBeNull();
     });
 
-    it('should return null and remove expired session', async () => {
-      const expiredSession = {
-        ...mockSession,
-        expiresAt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-      };
-
-      sessionRepository.findOne.mockResolvedValue(expiredSession);
-      sessionRepository.remove.mockResolvedValue(expiredSession);
-
-      const result = await service.refreshSession('expired-token');
-
-      expect(result).toBeNull();
-      expect(sessionRepository.remove).toHaveBeenCalledWith(expiredSession);
-      expect(sessionRepository.save).not.toHaveBeenCalled();
-    });
-
-    it('should return null for empty token', async () => {
-      const result = await service.refreshSession('');
-
-      expect(result).toBeNull();
-      expect(sessionRepository.findOne).not.toHaveBeenCalled();
+    it('should return null for empty token without calling store', async () => {
+      expect(await service.refreshSession('')).toBeNull();
+      expect(store.rotateSession).not.toHaveBeenCalled();
     });
   });
 
   describe('revokeSession', () => {
-    it('should revoke existing active session and delete by id', async () => {
-      const futureSession = { id: 42, expiresAt: new Date(Date.now() + 60 * 60 * 1000) } as Session;
-      sessionRepository.findOne.mockResolvedValue(futureSession);
-      sessionRepository.delete.mockResolvedValue({ affected: 1, raw: {} });
-
-      await service.revokeSession('token-to-revoke');
-
-      expect(sessionRepository.findOne).toHaveBeenCalledWith({
-        where: [{ token: 'hashed:token-to-revoke' }, { token: 'token-to-revoke' }],
-        select: ['id', 'expiresAt'],
-      });
-      expect(sessionRepository.delete).toHaveBeenCalledWith({ id: 42 });
+    it('should decrement metric when session was active', async () => {
+      store.revokeSession.mockResolvedValue(true);
+      await service.revokeSession('active-token');
+      expect(store.revokeSession).toHaveBeenCalledWith('active-token');
+      expect(metrics.authActiveSessions.dec).toHaveBeenCalled();
     });
 
-    it('should handle non-existent session gracefully', async () => {
-      sessionRepository.findOne.mockResolvedValue(null);
-
-      await service.revokeSession('non-existent-token');
-
-      expect(sessionRepository.delete).not.toHaveBeenCalled();
+    it('should not decrement metric when session was already inactive', async () => {
+      store.revokeSession.mockResolvedValue(false);
+      await service.revokeSession('expired-token');
+      expect(metrics.authActiveSessions.dec).not.toHaveBeenCalled();
     });
 
-    it('should handle empty token gracefully', async () => {
+    it('should handle empty token without calling store', async () => {
       await service.revokeSession('');
-
-      expect(sessionRepository.findOne).not.toHaveBeenCalled();
-      expect(sessionRepository.delete).not.toHaveBeenCalled();
+      expect(store.revokeSession).not.toHaveBeenCalled();
     });
   });
 
   describe('revokeAllUserSessions', () => {
-    it('should revoke all sessions for a user', async () => {
-      sessionRepository.count.mockResolvedValue(2);
-      sessionRepository.delete.mockResolvedValue({ affected: 3, raw: {} });
-
+    it('should decrement metric by active count', async () => {
+      store.revokeAllUserSessions.mockResolvedValue(3);
       await service.revokeAllUserSessions(1);
-
-      expect(sessionRepository.delete).toHaveBeenCalledWith({ userId: 1 });
+      expect(store.revokeAllUserSessions).toHaveBeenCalledWith(1);
+      expect(metrics.authActiveSessions.dec).toHaveBeenCalledWith(3);
     });
 
-    it('should handle user with no sessions', async () => {
-      sessionRepository.count.mockResolvedValue(0);
-      sessionRepository.delete.mockResolvedValue({ affected: 0, raw: {} });
-
+    it('should not decrement when no active sessions', async () => {
+      store.revokeAllUserSessions.mockResolvedValue(0);
       await service.revokeAllUserSessions(999);
-
-      expect(sessionRepository.delete).toHaveBeenCalledWith({ userId: 999 });
+      expect(metrics.authActiveSessions.dec).not.toHaveBeenCalled();
     });
   });
 
   describe('cleanupExpiredSessions', () => {
-    it('should remove expired sessions', async () => {
-      sessionRepository.delete.mockResolvedValue({ affected: 5, raw: {} });
-
+    it('should update metric when store returns count (SQLite path)', async () => {
+      store.cleanupExpired.mockResolvedValue({ remainingActive: 5 });
       await service.cleanupExpiredSessions();
-
-      expect(sessionRepository.delete).toHaveBeenCalledWith({
-        expiresAt: LessThan(expect.any(Date)),
-      });
+      expect(metrics.authActiveSessions.set).toHaveBeenCalledWith(5);
     });
 
-    it('should handle no expired sessions', async () => {
-      sessionRepository.delete.mockResolvedValue({ affected: 0, raw: {} });
-
+    it('should not update metric when store returns null (Valkey TTL path)', async () => {
+      store.cleanupExpired.mockResolvedValue(null);
       await service.cleanupExpiredSessions();
-
-      expect(sessionRepository.delete).toHaveBeenCalledWith({
-        expiresAt: LessThan(expect.any(Date)),
-      });
+      expect(metrics.authActiveSessions.set).not.toHaveBeenCalled();
     });
   });
 
   describe('getUserSessions', () => {
-    it('should return active sessions for user', async () => {
-      const activeSessions = [
-        { ...mockSession, id: 1 },
-        { ...mockSession, id: 2 },
-      ];
-
-      sessionRepository.find.mockResolvedValue(activeSessions);
-
+    it('should delegate to store', async () => {
+      const sessions = [{ id: 1 }, { id: 2 }] as unknown as import('@attraccess/database-entities').Session[];
+      store.getUserSessions.mockResolvedValue(sessions);
       const result = await service.getUserSessions(1);
-
-      expect(result).toEqual(activeSessions);
-      expect(sessionRepository.find).toHaveBeenCalledWith({
-        where: {
-          userId: 1,
-          expiresAt: MoreThan(expect.any(Date)),
-        },
-        order: { lastAccessedAt: 'DESC' },
-      });
-    });
-
-    it('should return empty array for user with no sessions', async () => {
-      sessionRepository.find.mockResolvedValue([]);
-
-      const result = await service.getUserSessions(999);
-
-      expect(result).toEqual([]);
+      expect(result).toBe(sessions);
+      expect(store.getUserSessions).toHaveBeenCalledWith(1);
     });
   });
 
   describe('getSessionStats', () => {
-    it('should return session statistics', async () => {
-      sessionRepository.count
-        .mockResolvedValueOnce(10) // active sessions
-        .mockResolvedValueOnce(3); // expired sessions
-
+    it('should delegate to store', async () => {
+      const stats = { totalActiveSessions: 10, expiredSessions: 3 };
+      store.getStats.mockResolvedValue(stats);
       const result = await service.getSessionStats();
-
-      expect(result).toEqual({
-        totalActiveSessions: 10,
-        expiredSessions: 3,
-      });
-
-      expect(sessionRepository.count).toHaveBeenCalledTimes(2);
-      expect(sessionRepository.count).toHaveBeenNthCalledWith(1, {
-        where: { expiresAt: MoreThan(expect.any(Date)) },
-      });
-      expect(sessionRepository.count).toHaveBeenNthCalledWith(2, {
-        where: { expiresAt: LessThan(expect.any(Date)) },
-      });
+      expect(result).toBe(stats);
     });
   });
 
   describe('token generation', () => {
-    it('should generate cryptographically secure tokens', async () => {
-      // Clear any previous mocks
-      mockRandomBytes.mockClear();
-      sessionRepository.create.mockClear();
-      sessionRepository.save.mockClear();
-
-      const toStringMock = jest.fn().mockImplementation((encoding?: string) => {
-        if (encoding === 'base64url') {
-          return 'secure-random-token';
-        }
-        return 'secure-random-token';
-      });
-
-      mockRandomBytes.mockReturnValue({
-        toString: toStringMock,
-      } as unknown as Buffer);
-
-      sessionRepository.create.mockReturnValue(mockSession);
-      sessionRepository.save.mockResolvedValue(mockSession);
-
-      // Call a method that generates a token
+    it('should call randomBytes(32) with base64url encoding', async () => {
+      const toStringMock = jest.fn().mockReturnValue('secure-token');
+      mockRandomBytes.mockReturnValue({ toString: toStringMock } as unknown as Buffer);
       await service.createSession(mockUser);
-
       expect(mockRandomBytes).toHaveBeenCalledWith(32);
       expect(toStringMock).toHaveBeenCalledWith('base64url');
-    });
-
-    it('should generate different tokens on subsequent calls', async () => {
-      // Clear any previous mocks
-      mockRandomBytes.mockClear();
-      sessionRepository.create.mockClear();
-      sessionRepository.save.mockClear();
-
-      let callCount = 0;
-      mockRandomBytes.mockImplementation(() => {
-        callCount++;
-        return {
-          toString: jest.fn().mockImplementation((encoding?: string) => {
-            if (encoding === 'base64url') return `token${callCount}`;
-            return `token${callCount}`;
-          }),
-        } as unknown as Buffer;
-      });
-
-      sessionRepository.create.mockReturnValue(mockSession);
-      sessionRepository.save.mockResolvedValue(mockSession);
-
-      // Generate two tokens
-      await service.createSession(mockUser);
-      await service.createSession(mockUser);
-
-      expect(mockRandomBytes).toHaveBeenCalledTimes(2);
     });
   });
 });

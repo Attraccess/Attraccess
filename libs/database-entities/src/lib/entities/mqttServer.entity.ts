@@ -32,6 +32,18 @@ export class MqttServer {
   })
   port!: number;
 
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Optional management API port on the broker host. Null uses the provider default.',
+    type: 'integer',
+    required: false,
+    nullable: true,
+    minimum: 1,
+    maximum: 65535,
+    example: 25671,
+  })
+  managementPort!: number | null;
+
   @Column({ nullable: true, type: 'text' })
   @ApiProperty({
     description: 'Optional authentication username',
@@ -64,6 +76,30 @@ export class MqttServer {
     example: false,
   })
   useTls!: boolean;
+
+  // ponytail: CA certs are public material, so no EncryptionService round-trip like `password`.
+  @Column({ nullable: true, type: 'text' })
+  @ApiProperty({
+    description: 'Optional PEM-encoded CA certificate used to verify the broker (for private/self-signed CAs)',
+    example: '-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----',
+    required: false,
+  })
+  caCert!: string | null;
+
+  @Column({ default: false, type: 'boolean' })
+  @ApiProperty({
+    description: 'Skip TLS certificate verification for this server. Unsafe - only for trusted networks.',
+    example: false,
+  })
+  tlsInsecure!: boolean;
+
+  @Column({ nullable: true, type: 'text' })
+  @ApiProperty({
+    description: 'Optional TLS SNI/hostname to verify against, for brokers reached by IP',
+    example: 'mqtt.example.com',
+    required: false,
+  })
+  tlsServername!: string | null;
 
   @Column({ type: 'integer', default: 0 })
   @ApiProperty({

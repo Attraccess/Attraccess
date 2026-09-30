@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 // Headless render glTF binary GLB file to PNG via Playwright and model-viewer
 // FEATURE: hardware/render — visual 3D PNG for PR previews and Linear comments
 
@@ -7,13 +8,12 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { argv, cwd, exit } from 'node:process';
 
 const requireFromCwd = createRequire(`${cwd()}/`);
-const { chromium } = requireFromCwd('playwright');
 
 const MODEL_VIEWER_VERSION = '4.1.0';
 const DEFAULT_WIDTH = 1200;
 const DEFAULT_HEIGHT = 900;
 
-function parseArgs(args) {
+export function parseArgs(args) {
   const opts = {
     inputs: [],
     outDir: null,
@@ -40,7 +40,9 @@ function parseArgs(args) {
     }
   }
   if (opts.inputs.length === 0 || !opts.outDir) {
-    throw new Error('usage: render-glb-png.mjs --out-dir <dir> [--width <px>] [--height <px>] [--camera-orbit <orbit>] <glb> [<glb> ...]');
+    throw new Error(
+      'usage: render-glb-png.mjs --out-dir <dir> [--width <px>] [--height <px>] [--camera-orbit <orbit>] <glb> [<glb> ...]',
+    );
   }
   return opts;
 }
@@ -99,6 +101,7 @@ async function renderOne(browser, glbPath, outDir, width, height, cameraOrbit) {
 
 async function main() {
   const { inputs, outDir, width, height, cameraOrbit } = parseArgs(argv.slice(2));
+  const { chromium } = requireFromCwd('playwright');
   const browser = await chromium.launch({ headless: true });
   try {
     for (const glb of inputs) {
@@ -110,7 +113,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`${err.message}\n`);
-  exit(1);
-});
+if (argv[1] && import.meta.url === pathToFileURL(resolve(argv[1])).href) {
+  main().catch((err) => {
+    process.stderr.write(`${err.message}\n`);
+    exit(1);
+  });
+}

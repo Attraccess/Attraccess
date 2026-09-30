@@ -1,6 +1,6 @@
 import { Input, Label, Spinner, TextField } from '@heroui/react';
 import { Navigate, useParams } from 'react-router-dom';
-import { SSOProviderType } from '@attraccess/react-query-client';
+import { SSOProviderType, useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { Button } from '../../../components/button';
@@ -9,7 +9,7 @@ import { PageHeader } from '../../../components/pageHeader';
 import { OIDCConfigForm } from './form/OIDCConfigForm';
 import { SAMLConfigForm } from './form/SAMLConfigForm';
 import { SetupInstructionsSection } from './form/SetupInstructionsSection';
-import { SSO_PROVIDERS_PATH, useSSOProviderForm } from './useSSOProviderForm';
+import { SSO_PROVIDERS_LIST_PATH, useSSOProviderForm } from './useSSOProviderForm';
 import { useSSOProviderSetupUrls } from './useSSOProviderSetupUrls';
 import en from './en.json';
 import de from './de.json';
@@ -17,7 +17,8 @@ import de from './de.json';
 export const SSOProviderFormPage = () => {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const canManageSSO = hasPermission('canManageSystemConfiguration');
+  const canManageSSO = hasPermission('system.sso.manage');
+  const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const { providerId: providerIdParam } = useParams<{ providerId: string }>();
   const parsedProviderId = providerIdParam ? Number(providerIdParam) : undefined;
@@ -45,6 +46,10 @@ export const SSOProviderFormPage = () => {
     return <Navigate to="/" />;
   }
 
+  if (license && !license.modules.includes('sso')) {
+    return null;
+  }
+
   if (isEditing && isLoadingProvider) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 flex justify-center">
@@ -55,10 +60,7 @@ export const SSOProviderFormPage = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8" data-cy="sso-provider-form-page">
-      <PageHeader
-        title={isEditing ? t('editProvider') : t('createNewProvider')}
-        backTo={SSO_PROVIDERS_PATH}
-      />
+      <PageHeader title={isEditing ? t('editProvider') : t('createNewProvider')} backTo={SSO_PROVIDERS_LIST_PATH} />
 
       <div className="flex flex-col gap-8" data-cy="sso-provider-form">
         <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">

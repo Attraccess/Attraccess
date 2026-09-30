@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceMaintenanceController } from './maintenance.controller';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { LicenseService } from '../../license/license.service';
 
 // Mock the decorator
 jest.mock('./canManageMaintenance.decorator', () => ({
@@ -44,6 +45,10 @@ describe('ResourceMaintenanceController', () => {
             finishMaintenance: jest.fn(),
             canManageMaintenance: jest.fn(),
           },
+        },
+        {
+          provide: LicenseService,
+          useValue: { verifyLicense: jest.fn().mockResolvedValue({ valid: true, modules: [] }) },
         },
       ],
     }).compile();

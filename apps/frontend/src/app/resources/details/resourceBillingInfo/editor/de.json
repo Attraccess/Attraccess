@@ -8,6 +8,14 @@
     "creditsPerMinute": {
       "label": "{{currency}} pro Minute",
       "description": "Dieser Betrag wird pro Minute der Sitzungsdauer abgezogen."
+    },
+    "creditsPerOperatingMinute": {
+      "label": "{{currency}} pro Betriebsminute",
+      "description": "Dieser Betrag wird pro Betriebsminute abgezogen, die der Nutzung zugeordnet ist."
+    },
+    "creditsPerKwh": {
+      "label": "{{currency}} pro kWh",
+      "description": "Dieser Betrag wird pro Kilowattstunde berechnet, die der Zähler für die Sitzung meldet. Erfordert einen im Flow der Ressource definierten Zähler (Messung starten / Messwert abfragen)."
     }
   },
   "actions": {

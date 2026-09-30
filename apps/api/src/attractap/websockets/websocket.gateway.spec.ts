@@ -33,6 +33,8 @@ import { AttractapSupervisionHandler } from './handlers/supervision.handler';
 import { SupervisionService } from '../../resources/supervision/supervision.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource } from '@attraccess/database-entities';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { AuditService } from '../../audit/audit.service';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -59,6 +61,7 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     close: jest.fn(),
     state: {
       lastAuthenticatedUserId: null,
+      enrollment: null,
       enrollNewCardData: null,
       resetNfcCardData: null,
       ota: null,
@@ -105,6 +108,8 @@ describe('AttractapGateway', () => {
         { provide: WS_METRICS, useValue: mockWsMetrics },
         { provide: MetricsToggleService, useValue: mockMetricsToggle },
         { provide: SupervisionService, useValue: {} },
+        { provide: RbacService, useValue: {} },
+        { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
         { provide: getRepositoryToken(Resource), useValue: {} },
         ResourceListService,
         ResourceActionGuard,
@@ -126,6 +131,50 @@ describe('AttractapGateway', () => {
 
   it('should be defined', () => {
     expect(gateway).toBeDefined();
+  });
+
+  describe('LVGL output sanitization', () => {
+    const sanitize = (value: string) =>
+      (gateway as unknown as { makeStringLVGLReady: (input: string) => string }).makeStringLVGLReady(value);
+
+    it('preserves printable Latin-1 characters', () => {
+      expect(sanitize('ÄÖÜ äöü ß \u00A0°®')).toBe('ÄÖÜ äöü ß \u00A0°®');
+    });
+
+    it('uses readable fallbacks for unsupported characters', () => {
+      expect(sanitize('“München” — Größe™')).toBe('"München" - GrößeTM');
+      expect(sanitize('Cafe\u0301 ☃')).toBe('Cafe ?');
+    });
+
+    it('preserves layout controls', () => {
+      expect(sanitize('First line\nSecond line\r\n\tIndented')).toBe('First line\nSecond line\r\n\tIndented');
+    });
+
+    it('preserves form protocol values while sanitizing display metadata', () => {
+      const message = new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_FIELDS, {
+        fields: [
+          {
+            name: '“Größe”',
+            description: null,
+            options: ['Size™'],
+            value: 'Size™',
+          },
+          {
+            name: 'Note',
+            description: null,
+            options: { placeholder: '“Use Size™” — optional' },
+            value: null,
+          },
+        ],
+      });
+      const sanitized = (gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }).sanitizeForLVGL(message);
+      const field = sanitized.data.payload.fields[0];
+
+      expect(field.name).toBe('"Größe"');
+      expect(field.options).toEqual(['Size™']);
+      expect(field.value).toBe('Size™');
+      expect(sanitized.data.payload.fields[1].options).toEqual({ placeholder: '"Use SizeTM" - optional' });
+    });
   });
 
   describe('handleConnection', () => {
@@ -230,11 +279,25 @@ describe('AttractapGateway', () => {
 
       await gateway.onHeartbeat(socket);
 
-      expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(JSON.stringify({ event: 'HEARTBEAT' }));
+      expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(
+        JSON.stringify({ event: 'HEARTBEAT' }),
+      );
     });
   });
 
   describe('onClientEvent', () => {
+    it('passes the resource refresh request identity to the list service', async () => {
+      const socket = createMockSocket({ readerId: 42 });
+      const refresh = jest
+        .spyOn(gateway['resourceListService'], 'sendResourceListToSocket')
+        .mockResolvedValue(undefined);
+      await gateway.onClientEvent(
+        { type: AttractapEventType.REQUEST_RESOURCE_LIST, payload: { requestId: 880 } },
+        socket,
+      );
+      expect(refresh).toHaveBeenCalledWith(socket, { requestId: 880 });
+    });
+
     it('rejects server-only event types from clients', async () => {
       const socket = createMockSocket({ id: 'ev-1', readerId: 1 });
 
@@ -250,9 +313,7 @@ describe('AttractapGateway', () => {
 
       for (const type of serverOnlyEvents) {
         const event = new AttractapEvent(type, {});
-        await expect(
-          gateway.onClientEvent(event.data, socket),
-        ).rejects.toThrow('THIS IS A SERVER SIDE ONLY EVENT');
+        await expect(gateway.onClientEvent(event.data, socket)).rejects.toThrow('THIS IS A SERVER SIDE ONLY EVENT');
       }
     });
 

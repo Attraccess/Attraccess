@@ -1,12 +1,22 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Header, Post, StreamableFile } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 @ApiTags('System')
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
+
+  @Get('/logo.png')
+  @Header('Content-Type', 'image/png')
+  @Header('Cache-Control', 'public, max-age=86400')
+  @ApiOperation({ summary: 'Return the Attraccess logo', operationId: 'getLogo' })
+  getLogo(): StreamableFile {
+    return new StreamableFile(readFileSync(join(__dirname, 'assets', 'logo.png')));
+  }
 
   @Get('/info')
   @ApiOperation({ summary: 'Return API information', operationId: 'info' })
@@ -26,7 +36,7 @@ export class AppController {
   }
 
   @Post('/balena/device/reboot')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Reboot the host machine (only for balena devices)', operationId: 'rebootHost' })
   @ApiResponse({ status: 200, description: 'Host rebooted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
@@ -37,7 +47,7 @@ export class AppController {
   }
 
   @Post('/balena/device/shutdown')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Shutdown the host machine (only for balena devices)', operationId: 'shutdownHost' })
   @ApiResponse({ status: 200, description: 'Host shutdown successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })

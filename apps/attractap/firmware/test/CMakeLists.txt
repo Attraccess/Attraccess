@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.20)
+project(attractap_serial_tests LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
+include(FetchContent)
+FetchContent_Declare(arduinojson GIT_REPOSITORY https://github.com/bblanchon/ArduinoJson.git GIT_TAG v7.4.3 GIT_SHALLOW TRUE)
+FetchContent_Declare(unity GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git GIT_TAG v2.6.1 GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(arduinojson unity)
+add_executable(serial_tests test_serial_handler/test_serial_handler.cpp
+  test_serial_handler/mock_settings.cpp test_serial_handler/mock_wifi.cpp
+  test_serial_handler/mock_state.cpp test_serial_handler/compile_sources.cpp)
+target_include_directories(serial_tests PRIVATE mocks ../src)
+target_link_libraries(serial_tests PRIVATE ArduinoJson unity)
+target_compile_definitions(serial_tests PRIVATE LOGGER_LEVEL_NUM=3)
+enable_testing()
+add_test(NAME serial_protocol COMMAND serial_tests)

@@ -6,6 +6,7 @@ import { TwoFactorPolicy } from './two-factor.dto';
 import { SettingsService } from '../../settings/settings.service';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 @Injectable()
 export class TwoFactorService {
@@ -205,10 +206,15 @@ export class TwoFactorService {
   }
 
   private isPrivilegedUser(user: User): boolean {
-    if (!user?.systemPermissions) {
+    const effectivePerms = (user as AuthenticatedUser).effectivePermissions;
+    if (!effectivePerms) {
+      this.logger.warn(`isPrivilegedUser: effectivePermissions missing for user ${user.id} — treating as not privileged`);
       return false;
     }
-    return Object.values(user.systemPermissions).some((value) => value === true);
+    if (effectivePerms.size === 0) return false;
+    // privileged = holds any permission outside the basic resources.* namespace
+    // (avoids coupling to seed-data assumptions about which permissions the default role carries)
+    return [...effectivePerms].some((p) => !p.startsWith('resources.'));
   }
 
   private async isCodeValid(secret: string, code: string): Promise<boolean> {

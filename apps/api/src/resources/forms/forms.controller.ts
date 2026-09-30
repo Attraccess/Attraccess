@@ -10,7 +10,7 @@ export class ResourceFormsController {
   constructor(private readonly resourceFormsService: ResourceFormsService) {}
 
   @Get()
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({
     summary: 'List forms for a resource',
     operationId: 'resourceFormsList',
@@ -21,7 +21,7 @@ export class ResourceFormsController {
   }
 
   @Post()
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({
     summary: 'Create a form',
     operationId: 'resourceFormsCreate',
@@ -49,7 +49,7 @@ export class ResourceFormsController {
   }
 
   @Get(':formId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({
     summary: 'Get a form by id',
     operationId: 'resourceFormsGetOne',
@@ -64,7 +64,7 @@ export class ResourceFormsController {
   }
 
   @Put(':formId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({
     summary: 'Update a form',
     operationId: 'resourceFormsUpdate',
@@ -79,7 +79,7 @@ export class ResourceFormsController {
   }
 
   @Delete(':formId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @HttpCode(204)
   @ApiOperation({
     summary: 'Delete a form',

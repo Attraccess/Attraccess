@@ -1,0 +1,88 @@
+/* Shared by the web app and companion. RAL 5021 is a physical paint standard;
+   #256d7b is our sRGB approximation, with 5.91:1 contrast against white. */
+@layer base {
+  :root,
+  .light,
+  .default,
+  [data-theme='light'],
+  [data-theme='default'] {
+    color-scheme: light;
+
+    --background: #ffffff;
+    --foreground: #202729;
+    --surface: #ffffff;
+    --surface-secondary: #f5f7f7;
+    --surface-tertiary: #edf1f1;
+    --overlay: #ffffff;
+    --muted: #5d6b6e;
+    --default: #edf1f1;
+    --default-foreground: var(--foreground);
+
+    --accent: #256d7b;
+    --accent-foreground: #ffffff;
+    --accent-hover: #1c5864;
+    --accent-soft: #eaf3f4;
+    --accent-soft-foreground: #1c5864;
+    --accent-soft-hover: #ddecef;
+    --focus: var(--accent);
+    --link: var(--accent);
+
+    --chart-sessions: #9a5500;
+    --chart-sessions-active: #7a4300;
+    --chart-minutes: #256d7b;
+    --chart-minutes-active: #1c5260;
+    --chart-spend: #775799;
+
+    --border: #d5dede;
+    --separator: #e0e6e6;
+    --field-background: #ffffff;
+    --field-foreground: var(--foreground);
+    --field-border: #8a989b;
+    --field-border-width: 1px;
+    --field-border-hover: #5d6b6e;
+    --field-border-focus: var(--accent);
+    --field-shadow: 0 0 0 0 transparent;
+
+    --radius: 0.125rem;
+    --field-radius: 0.25rem;
+    --surface-shadow: 0 0 0 1px var(--border);
+    --overlay-shadow: 0 8px 32px rgb(32 39 41 / 12%), 0 0 0 1px var(--border);
+  }
+
+  /* Water-blue tints retain contrast on dark surfaces without changing status colors. */
+  .dark,
+  [data-theme='dark'] {
+    color-scheme: dark;
+    --background: #162124;
+    --foreground: #f4f8f8;
+    --surface: #1e2c2f;
+    --surface-secondary: #26363a;
+    --surface-tertiary: #304348;
+    --muted: #afc0c3;
+    --default: #304348;
+    --default-foreground: var(--foreground);
+    --border: #42575c;
+    --separator: #34484d;
+    --field-background: var(--surface);
+    --field-foreground: var(--foreground);
+    --accent: #82c4ce;
+    --accent-foreground: #142e34;
+    --accent-hover: #a1d5dc;
+    --accent-soft: #203c42;
+    --accent-soft-foreground: #b8e1e6;
+    --accent-soft-hover: #294c53;
+    --focus: var(--accent);
+    --link: var(--accent);
+    --field-border: #64787c;
+    --field-border-hover: #9fb1b5;
+    --field-border-focus: var(--accent);
+    --overlay: #293639;
+    --overlay-shadow: 0 8px 32px rgb(0 0 0 / 30%), 0 0 0 1px var(--field-border);
+
+    --chart-sessions: #e8b36d;
+    --chart-sessions-active: #f5cd95;
+    --chart-minutes: #82c4ce;
+    --chart-minutes-active: #a1d5dc;
+    --chart-spend: #c3a0e0;
+  }
+}

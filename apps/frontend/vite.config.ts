@@ -1,5 +1,5 @@
 /// <reference types='vitest' />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
@@ -9,25 +9,41 @@ import { VitePWA } from 'vite-plugin-pwa';
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
 
+export function normalizeFederationFsUrlsPlugin(): Plugin {
+  return {
+    name: 'attraccess:normalize-federation-fs-urls',
+    enforce: 'post',
+    transform(code, id) {
+      if (id !== '\0virtual:__federation__') return;
+      return code.replaceAll('/@fs//', '/@fs/');
+    },
+  };
+}
+
+function configuredPort(name: string, fallback: number): number {
+  return Number(process.env[name]) || fallback;
+}
+
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
+  const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000';
 
   return {
     root: __dirname,
     cacheDir: '../../node_modules/.vite/apps/frontend',
     server: {
-      port: Number(process.env.VITE_PORT) || 4200,
+      port: configuredPort('VITE_PORT', 4200),
       host: '0.0.0.0',
       ...(isDev
         ? {
             proxy: {
               '/api': {
-                target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+                target: apiProxyTarget,
                 changeOrigin: true,
                 ws: true,
               },
               '/cdn': {
-                target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+                target: apiProxyTarget,
                 changeOrigin: true,
               },
             },
@@ -35,7 +51,7 @@ export default defineConfig(({ command }) => {
         : {}),
     },
     preview: {
-      port: Number(process.env.VITE_PREVIEW_PORT) || 4300,
+      port: configuredPort('VITE_PREVIEW_PORT', 4300),
       host: '0.0.0.0',
     },
     plugins: [
@@ -61,10 +77,13 @@ export default defineConfig(({ command }) => {
           '@tanstack/react-query': { requiredVersion: '*' },
         },
       }),
+      normalizeFederationFsUrlsPlugin(),
       VitePWA({
         workbox: {
           clientsClaim: true,
           skipWaiting: true,
+          // Deliberately excludes `wasm`: apps/frontend/public/openscad/openscad.wasm
+          // is 10.3 MB and is fetched on demand by the /printables page only.
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
           cleanupOutdatedCaches: true,
         },
@@ -78,6 +97,13 @@ export default defineConfig(({ command }) => {
           minify: process.env.NODE_ENV === 'production',
           enableWorkboxModulesLogs: false,
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          // With strategies: 'injectManifest', workbox-build reads globPatterns from
+          // *this* object, not from the `workbox` option above (that one only applies
+          // to the 'generateSW' strategy and is otherwise inert here). Its own default
+          // is ['**/*.{js,wasm,css,html}'], which WOULD precache openscad.wasm.
+          // Deliberately excludes `wasm`: apps/frontend/public/openscad/openscad.wasm
+          // is 10.3 MB and is fetched on demand by the /printables page only.
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
         },
         devOptions: {
           enabled: true,
@@ -85,10 +111,10 @@ export default defineConfig(({ command }) => {
         },
       }),
     ],
-    // Uncomment this if you are using workers.
-    // worker: {
-    //  plugins: [ nxViteTsPaths() ],
-    // },
+    worker: {
+      format: 'es',
+      plugins: () => [nxViteTsPaths()],
+    },
     build: {
       outDir: '../../dist/apps/frontend',
       emptyOutDir: true,

@@ -1,5 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Checkbox, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Checkbox, Description, FieldError, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { MqttManagementPort, parseManagementPort } from './managementPort';
+import { TlsSection } from './TlsSection';
 import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
@@ -26,6 +28,9 @@ export function EditMqttServerPage() {
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
+  const [managementPortInput, setManagementPortInput] = useState('');
+  const [clearPassword, setClearPassword] = useState(false);
+  const managementPort = parseManagementPort(managementPortInput);
 
   const [formValues, setFormValues] = useState<CreateMqttServerDto>({
     name: '',
@@ -35,6 +40,9 @@ export function EditMqttServerPage() {
     username: '',
     password: '',
     useTls: false,
+    caCert: '',
+    tlsInsecure: false,
+    tlsServername: '',
     defaultPublishQos: 0,
     defaultPublishRetain: false,
     defaultSubscribeQos: 0,
@@ -48,14 +56,19 @@ export function EditMqttServerPage() {
 
   useEffect(() => {
     if (server) {
+      setClearPassword(false);
+      setManagementPortInput(String((server as typeof server & MqttManagementPort).managementPort ?? ''));
       setFormValues({
         name: server.name,
         host: server.host,
         port: server.port,
         clientId: server.clientId ?? '',
         username: server.username ?? '',
-        password: server.password ?? '',
+        password: '',
         useTls: server.useTls,
+        caCert: server.caCert ?? '',
+        tlsInsecure: server.tlsInsecure ?? false,
+        tlsServername: server.tlsServername ?? '',
         defaultPublishQos: server.defaultPublishQos ?? 0,
         defaultPublishRetain: server.defaultPublishRetain ?? false,
         defaultSubscribeQos: server.defaultSubscribeQos ?? 0,
@@ -72,7 +85,7 @@ export function EditMqttServerPage() {
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      navigate('/mqtt/servers');
+      navigate('/devices/mqtt/servers');
     },
     onError: (err: Error) => {
       showError({
@@ -86,16 +99,21 @@ export function EditMqttServerPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!serverId) return;
+    if (!serverId || managementPort === undefined) return;
 
+    const { password, ...otherValues } = formValues;
+    const requestBody: CreateMqttServerDto & MqttManagementPort = { ...otherValues, managementPort };
+    // Omission keeps the saved secret; an explicit empty string clears it.
+    if (clearPassword) requestBody.password = '';
+    else if (password) requestBody.password = password;
     updateMqttServer.mutate({
       id: Number(serverId),
-      requestBody: formValues,
+      requestBody,
     });
   };
 
   const handleCancel = () => {
-    navigate('/mqtt/servers');
+    navigate('/devices/mqtt/servers');
   };
 
   if (isLoadingServer) {
@@ -165,6 +183,24 @@ export function EditMqttServerPage() {
               />
             </TextField>
           </div>
+          <TextField
+            value={managementPortInput}
+            onChange={setManagementPortInput}
+            isInvalid={managementPort === undefined}
+            className="w-full"
+          >
+            <Label>{t('managementPortLabel')}</Label>
+            <Input
+              name="managementPort"
+              type="number"
+              min={1}
+              max={65535}
+              step={1}
+              data-cy="edit-mqtt-server-form-management-port-input"
+            />
+            <Description>{t('managementPortDescription')}</Description>
+            <FieldError>{t('managementPortInvalid')}</FieldError>
+          </TextField>
         </section>
 
         <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
@@ -201,6 +237,8 @@ export function EditMqttServerPage() {
 
             <PasswordInput
               label={t('passwordLabel')}
+              description={t('passwordDescription')}
+              isDisabled={clearPassword}
               id="password"
               name="password"
               placeholder={t('passwordPlaceholder')}
@@ -210,17 +248,30 @@ export function EditMqttServerPage() {
               autoComplete="off"
             />
           </div>
-
           <Checkbox
-            id="useTls"
-            name="useTls"
-            isSelected={formValues.useTls}
-            onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
-            data-cy="edit-mqtt-server-form-use-tls-checkbox"
+            isSelected={clearPassword}
+            onChange={(selected) => {
+              setClearPassword(selected);
+              if (selected) setFormValues((prev) => ({ ...prev, password: '' }));
+            }}
+            data-cy="edit-mqtt-server-form-clear-password-checkbox"
           >
-            {t('useTls')}
+            <Checkbox.Content>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Label>{t('clearPasswordLabel')}</Label>
+            </Checkbox.Content>
+            <Description>{t('clearPasswordDescription')}</Description>
           </Checkbox>
         </section>
+
+        <TlsSection
+          values={formValues}
+          onChange={(patch) => setFormValues((prev) => ({ ...prev, ...patch }))}
+          t={t}
+          dataCyPrefix="edit-mqtt-server-form"
+        />
 
         <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
           <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">

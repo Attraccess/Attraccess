@@ -1,25 +1,64 @@
 #pragma once
 
 #include <esp_netif.h>
-#include <Arduino.h>
 #include <ArduinoJson.h>
+#include <string>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
 class State
 {
 public:
-    static void setWifiState(bool connected, esp_ip4_addr_t ip, String ssid);
+    static void setWifiState(bool connected, esp_ip4_addr_t ip, std::string ssid);
     static void setEthernetState(bool connected, esp_ip4_addr_t ip);
     struct NetworkState
     {
         bool wifi_connected;
         esp_ip4_addr_t wifi_ip;
-        String wifi_ssid;
+        std::string wifi_ssid;
         bool ethernet_connected;
         esp_ip4_addr_t ethernet_ip;
     };
     static NetworkState getNetworkState();
+
+    enum NetworkQuality
+    {
+        NETWORK_QUALITY_GOOD,
+        NETWORK_QUALITY_DEGRADED,
+        NETWORK_QUALITY_OFFLINE,
+    };
+
+    struct NetworkQualityState
+    {
+        NetworkQuality quality;
+        uint32_t lastInboundAgeMs;
+        uint8_t reconnectsLastMinute;
+        uint8_t txQueueDepth;
+        uint8_t txQueueFullEventsLastMinute;
+        uint8_t sendFailuresLastMinute;
+        uint8_t livenessTimeoutsLastMinute;
+        uint32_t lastPongRttMs;
+        uint32_t averagePongRttMs;
+        int32_t pongRttTrendMs;
+        uint8_t pongTimeoutsLastMinute;
+        uint8_t pongProbeLossPercentLastMinute;
+        uint8_t missedHeartbeatsLastMinute;
+    };
+
+    static void setNetworkQualityState(NetworkQuality quality,
+                                       uint32_t lastInboundAgeMs,
+                                       uint8_t reconnectsLastMinute,
+                                       uint8_t txQueueDepth,
+                                       uint8_t txQueueFullEventsLastMinute,
+                                       uint8_t sendFailuresLastMinute,
+                                       uint8_t livenessTimeoutsLastMinute,
+                                       uint32_t lastPongRttMs,
+                                       uint32_t averagePongRttMs,
+                                       int32_t pongRttTrendMs,
+                                       uint8_t pongTimeoutsLastMinute,
+                                       uint8_t pongProbeLossPercentLastMinute,
+                                       uint8_t missedHeartbeatsLastMinute);
+    static NetworkQualityState getNetworkQualityState();
 
     // Connection phase of the websocket client. Mirrors Websocket::ConnectionState
     // so the connecting screen can show where the device is without depending on
@@ -31,32 +70,33 @@ public:
         WS_CONNECTED,
     };
 
-    static void setWebsocketState(bool connected, String hostname, uint16_t port, bool useSSL);
+    static void setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL);
     static void setWebsocketPhase(WebsocketPhase phase);
     // Cert sweep progress (only meaningful while connecting over SSL).
-    static void setWebsocketCertProgress(String certName, int certIndex, int certCount, int rememberedRetryCount);
+    static void setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount, bool certLocked);
     // Seconds until the next reconnect attempt (negative/zero means "now").
     static void setWebsocketNextAttemptSeconds(int seconds);
     struct WebsocketState
     {
         bool connected;
-        String hostname;
+        std::string hostname;
         uint16_t port;
         bool useSSL;
         WebsocketPhase phase;
-        String certName;
+        std::string certName;
         int certIndex;
         int certCount;
         int rememberedRetryCount;
+        bool certLocked;
         int secondsUntilNextAttempt;
     };
     static WebsocketState getWebsocketState();
 
-    static void setApiState(bool authenticated, String deviceName);
+    static void setApiState(bool authenticated, std::string deviceName);
     struct ApiState
     {
         bool authenticated;
-        String deviceName;
+        std::string deviceName;
     };
     static ApiState getApiState();
 
@@ -67,22 +107,37 @@ private:
 
     static esp_ip4_addr_t wifi_ip;
     static bool wifi_connected;
-    static String wifi_ssid;
+    static std::string wifi_ssid;
 
     static esp_ip4_addr_t ethernet_ip;
     static bool ethernet_connected;
 
-    static String websocket_hostname;
+    static std::string websocket_hostname;
+    static NetworkQuality network_quality;
+    static uint32_t network_quality_last_inbound_age_ms;
+    static uint8_t network_quality_reconnects_last_minute;
+    static uint8_t network_quality_tx_queue_depth;
+    static uint8_t network_quality_tx_queue_full_events_last_minute;
+    static uint8_t network_quality_send_failures_last_minute;
+    static uint8_t network_quality_liveness_timeouts_last_minute;
+    static uint32_t network_quality_last_pong_rtt_ms;
+    static uint32_t network_quality_average_pong_rtt_ms;
+    static int32_t network_quality_pong_rtt_trend_ms;
+    static uint8_t network_quality_pong_timeouts_last_minute;
+    static uint8_t network_quality_pong_probe_loss_percent_last_minute;
+    static uint8_t network_quality_missed_heartbeats_last_minute;
+
     static uint16_t websocket_port;
     static bool websocket_use_ssl;
     static bool websocket_connected;
     static WebsocketPhase websocket_phase;
-    static String websocket_cert_name;
+    static std::string websocket_cert_name;
     static int websocket_cert_index;
     static int websocket_cert_count;
     static int websocket_remembered_retry_count;
+    static bool websocket_cert_locked;
     static int websocket_next_attempt_seconds;
 
     static bool api_authenticated;
-    static String api_device_name;
+    static std::string api_device_name;
 };

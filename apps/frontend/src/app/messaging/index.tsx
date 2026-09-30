@@ -4,11 +4,11 @@ import {
   useMessagingServiceMessagingListConversations,
   useMessagingServiceMessagingMarkConversationRead,
 } from '@attraccess/react-query-client';
-import { Card, cn } from '@heroui/react';
+import { cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MailIcon, ArrowLeftIcon } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MailIcon, ArrowLeftIcon, Settings2Icon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -21,7 +21,8 @@ import { markConversationReadInCache } from './messageCache';
 
 export function MessagesPage() {
   const { t } = useTranslations({ en, de });
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -85,12 +86,28 @@ export function MessagesPage() {
     [setSearchParams],
   );
 
+  // Fills the scroll container exactly rather than guessing viewport math, so the
+  // composer stays on screen when the mobile keyboard shrinks the visible area.
   return (
-    <div>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<MailIcon />} />
+    <div className="flex h-full min-h-0 flex-col">
+      {/* On phones an open thread needs every pixel — the keyboard leaves ~430px. */}
+      <div className={cn(selectedConversationId ? 'hidden lg:block' : 'block')}>
+        <PageHeader
+          title={t('title')}
+          subtitle={t('subtitle')}
+          icon={<MailIcon />}
+          actions={
+            hasPermission('system.settings.manage')
+              ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/settings/messaging') }]
+              : undefined
+          }
+        />
+      </div>
 
-      <Card className="overflow-hidden">
-        <div className="grid h-[calc(100vh-13rem)] min-h-[28rem] grid-cols-1 lg:h-[70vh] lg:grid-cols-[320px_1fr]">
+      {/* Outlined rather than a Card: the composer TextArea inside renders at --field-background,
+          which equals --surface, so on a Card it would be invisible (ATT-834). */}
+      <section className="min-h-0 flex-1 overflow-hidden rounded-lg border border-separator">
+        <div className="grid h-full grid-cols-1 lg:grid-cols-[320px_1fr]">
           <div
             className={cn(
               'overflow-y-auto border-zinc-200 dark:border-zinc-700 lg:border-r',
@@ -142,7 +159,7 @@ export function MessagesPage() {
             )}
           </div>
         </div>
-      </Card>
+      </section>
     </div>
   );
 }

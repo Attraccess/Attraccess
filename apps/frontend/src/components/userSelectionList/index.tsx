@@ -1,4 +1,4 @@
-import { AttraccessUser, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, UserIdentity, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { User } from '@attraccess/react-query-client';
 import {
   ButtonProps,
@@ -39,7 +39,7 @@ export interface Column<TUser> {
 interface Props<TUser> {
   selectedUsers?: TUser[];
   selectedUserIsLoading?: boolean;
-  onAddToSelection: (user: User) => void;
+  onAddToSelection: (user: UserIdentity) => void;
   addToSelectionIsLoading?: boolean;
   actions?: Action<TUser>[] | ((user: TUser) => Action<TUser>[]);
   tableProps?: Omit<TableProps, 'children'>;
@@ -63,11 +63,16 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     en,
   });
 
-  const [userSearchSelection, setUserSearchSelection] = useState<User | null>(null);
+  const [userSearchSelection, setUserSearchSelection] = useState<UserIdentity | null>(null);
+  const [pickerResetSignal, setPickerResetSignal] = useState(0);
 
   const onAddUser = useCallback(() => {
     if (userSearchSelection) {
       onAddToSelection(userSearchSelection);
+      // Clear the picker after adding so a repeat click cannot silently re-add
+      // the same user; matches the reset behavior of the drawer consumers.
+      setUserSearchSelection(null);
+      setPickerResetSignal((signal) => signal + 1);
     }
   }, [userSearchSelection, onAddToSelection]);
 
@@ -104,8 +109,9 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     <div className="flex flex-col gap-2">
       <UserSearch
         wrapperProps={{ className: 'w-full' }}
+        size="sm"
+        resetSignal={pickerResetSignal}
         onSelectionChange={setUserSearchSelection}
-        autocompleteProps={{ size: 'sm' }}
         afterSelection={
           userSearchSelection && (
             <Button variant="primary" onPress={onAddUser} isPending={addToSelectionIsLoading} isIconOnly>

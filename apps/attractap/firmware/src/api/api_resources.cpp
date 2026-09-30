@@ -2,9 +2,26 @@
 // FEATURE: api-resources
 
 #include "api.hpp"
+#include <functional>
+#include <string.h>
+#include <string>
 
 void API::onResourceList(JsonObject data)
 {
+    const uint32_t revision = data["payload"]["revision"] | 0u;
+    if (revision && resourceListRevision && static_cast<int32_t>(revision - resourceListRevision) < 0) {
+        // A newer broadcast can overtake an explicit refresh. Acknowledge that
+        // refresh with the retained newer snapshot, never its obsolete data.
+        const uint32_t requestId = data["payload"]["requestId"] | 0u;
+        if (requestId && resourceListUpdateCallback) {
+            const auto previousRequestId = resourceListScratch.requestId;
+            resourceListScratch.requestId = requestId;
+            resourceListUpdateCallback(resourceListScratch);
+            resourceListScratch.requestId = previousRequestId;
+        }
+        return;
+    }
+    if (revision) resourceListRevision = revision;
     uint32_t messageCounter = data["payload"]["messageId"].is<uint32_t>() ? data["payload"]["messageId"].as<uint32_t>() : 0;
     if (messageCounter <= this->resourceListMessageCounter && this->resourceListMessageCounter != 0)
     {
@@ -13,10 +30,10 @@ void API::onResourceList(JsonObject data)
     }
     this->resourceListMessageCounter = messageCounter;
 
-    if (data["payload"]["readerName"].is<String>())
+    if (data["payload"]["readerName"].is<const char *>())
     {
         this->logger.info("Received updated reader name");
-        String readerName = data["payload"]["readerName"].as<String>();
+        std::string readerName = data["payload"]["readerName"].as<std::string>();
 
         if (this->deviceNameCallback != nullptr)
         {
@@ -47,7 +64,10 @@ void API::onResourceList(JsonObject data)
     }
 
     ResourceList &result = this->resourceListScratch;
-    memset(&result, 0, sizeof(ResourceList));
+    result = ResourceList{};
+    result.requestId = data["payload"]["requestId"] | 0u;
+    const char *authenticatedUsername = data["payload"]["authenticatedUsername"].as<const char *>();
+    strlcpy(result.authenticatedUsername, authenticatedUsername ? authenticatedUsername : "", sizeof(result.authenticatedUsername));
 
     JsonArray arr = data["payload"]["resources"].as<JsonArray>();
     if (arr.isNull())
@@ -71,6 +91,12 @@ void API::onResourceList(JsonObject data)
         dst.type = (typeStr && strcmp(typeStr, "door") == 0) ? 1 : 0;
         dst.separateUnlockAndUnlatch = resource["separateUnlockAndUnlatch"].is<bool>() ? resource["separateUnlockAndUnlatch"].as<bool>() : false;
         dst.allowTakeOver = resource["allowTakeOver"].is<bool>() ? resource["allowTakeOver"].as<bool>() : false;
+        dst.accessKnown = resource["hasIntroduction"].is<bool>();
+        dst.canManageMaintenance = resource["canManageMaintenance"] | false;
+        dst.hasIntroduction = resource["hasIntroduction"] | false;
+        dst.isIntroducer = resource["isIntroducer"] | false;
+        dst.canManageResource = resource["canManageResource"] | false;
+        dst.requiresSupervisor = resource["requiresSupervisor"] | false;
 
         const char *name = resource["name"].as<const char *>();
         const char *desc = resource["description"].as<const char *>();
@@ -82,14 +108,7 @@ void API::onResourceList(JsonObject data)
         {
             dst.name[0] = '\0';
         }
-        if (desc)
-        {
-            strlcpy(dst.description, desc, sizeof(dst.description));
-        }
-        else
-        {
-            dst.description[0] = '\0';
-        }
+        dst.description = desc ? desc : "";
 
         dst.isUnderMaintenance = resource["isUnderMaintenance"].is<bool>() ? resource["isUnderMaintenance"].as<bool>() : false;
 
@@ -118,25 +137,18 @@ void API::onResourceList(JsonObject data)
         }
 
         // Parse introducers: array of strings (usernames)
-        dst.introducerCount = 0;
         JsonArray introducers = resource["introducers"].as<JsonArray>();
         if (!introducers.isNull())
         {
-            uint8_t idx = 0;
+            dst.introducers.reserve(introducers.size());
             for (JsonVariant v : introducers)
             {
-                if (idx >= MAX_INTRODUCERS)
-                {
-                    break;
-                }
                 const char *introName = v.is<const char *>() ? v.as<const char *>() : nullptr;
                 if (introName && introName[0] != '\0')
                 {
-                    strlcpy(dst.introducers[idx], introName, sizeof(dst.introducers[idx]));
-                    idx++;
+                    dst.introducers.emplace_back(introName);
                 }
             }
-            dst.introducerCount = idx;
         }
 
         // Parse flowButtons: array of { id, label }
@@ -183,7 +195,24 @@ void API::triggerFlowButton(uint32_t resourceId, const char *buttonId)
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
     payload["buttonId"] = buttonId ? buttonId : "";
-    this->sendMessage("TRIGGER_FLOW_BUTTON", payload);
+    this->sendResourceAction("TRIGGER_FLOW_BUTTON", payload);
+}
+
+uint32_t API::requestResourceList()
+{
+    JsonDocument doc;
+    auto payload = doc.to<JsonObject>();
+    const uint32_t requestId = ++nextRequestId;
+    payload["requestId"] = requestId;
+    this->sendMessage("REQUEST_RESOURCE_LIST", payload);
+    return requestId;
+}
+
+void API::sendResourceAction(const char *type, JsonObject payload)
+{
+    activeActionRequestId = ++nextRequestId;
+    payload["requestId"] = activeActionRequestId.load();
+    this->sendMessage(type, payload);
 }
 
 void API::requestBillingTopup(uint32_t amountCents)
@@ -200,7 +229,7 @@ void API::setResourceListUpdateCallback(std::function<void(const ResourceList &)
     this->resourceListUpdateCallback = callback;
 }
 
-void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId)
+void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver)
 {
     this->logger.info("Starting resource usage session");
     JsonDocument doc;
@@ -210,7 +239,11 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId)
     {
         payload["projectId"] = projectId;
     }
-    this->sendMessage("START_RESOURCE_USAGE_SESSION", payload);
+    if (forceTakeOver)
+    {
+        payload["forceTakeOver"] = true;
+    }
+    this->sendResourceAction("START_RESOURCE_USAGE_SESSION", payload);
 }
 
 void API::stopResourceUsageSession(uint32_t resourceId)
@@ -219,7 +252,7 @@ void API::stopResourceUsageSession(uint32_t resourceId)
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
-    this->sendMessage("STOP_RESOURCE_USAGE_SESSION", payload);
+    this->sendResourceAction("STOP_RESOURCE_USAGE_SESSION", payload);
 }
 
 void API::lockDoor(uint32_t resourceId)
@@ -228,7 +261,7 @@ void API::lockDoor(uint32_t resourceId)
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
-    this->sendMessage("LOCK_DOOR", payload);
+    this->sendResourceAction("LOCK_DOOR", payload);
 }
 
 void API::unlockDoor(uint32_t resourceId)
@@ -237,7 +270,7 @@ void API::unlockDoor(uint32_t resourceId)
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
-    this->sendMessage("UNLOCK_DOOR", payload);
+    this->sendResourceAction("UNLOCK_DOOR", payload);
 }
 
 void API::unlatchDoor(uint32_t resourceId)
@@ -246,7 +279,7 @@ void API::unlatchDoor(uint32_t resourceId)
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
-    this->sendMessage("UNLATCH_DOOR", payload);
+    this->sendResourceAction("UNLATCH_DOOR", payload);
 }
 
 void API::setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback)

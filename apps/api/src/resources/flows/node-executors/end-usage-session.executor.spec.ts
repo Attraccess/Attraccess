@@ -18,7 +18,9 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
 
 describe('EndUsageSessionExecutor', () => {
   let executor: EndUsageSessionExecutor;
-  let resourceUsageService: jest.Mocked<Pick<ResourceUsageService, 'getActiveSession' | 'endSession'>>;
+  let resourceUsageService: jest.Mocked<
+    Pick<ResourceUsageService, 'endLifecycleCandidate' | 'getActiveSession' | 'endSession'>
+  >;
   let ctx: NodeExecutionContext;
   let compileTemplate: jest.Mock;
 
@@ -29,6 +31,7 @@ describe('EndUsageSessionExecutor', () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
     resourceUsageService = {
+      endLifecycleCandidate: jest.fn(),
       getActiveSession: jest.fn(),
       endSession: jest.fn(),
     };
@@ -59,6 +62,33 @@ describe('EndUsageSessionExecutor', () => {
     await executor.execute(node, {}, ctx);
 
     expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(42, false, txManager);
+  });
+
+  it('runs the stopped flow before cancelling a tentative session in a usage lifecycle flow', async () => {
+    ctx.lifecycleAttemptId = 'attempt-id';
+
+    await expect(
+      executor.execute(
+        createNode({ resourceId: 42, data: { notes: 'Stopped by {{source}}' } as never }),
+        { source: 'start' },
+        ctx,
+      ),
+    ).resolves.toEqual({
+      payload: { source: 'start' },
+    });
+
+    expect(resourceUsageService.endLifecycleCandidate).toHaveBeenCalledWith('attempt-id', 42, 'Stopped by {{source}}');
+    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    expect(resourceUsageService.endSession).not.toHaveBeenCalled();
+  });
+
+  it('does not recursively cancel the candidate from its stopped flow', async () => {
+    ctx.lifecycleAttemptId = 'attempt-id';
+    ctx.lifecycleCandidateCancellation = true;
+
+    await executor.execute(createNode({ resourceId: 42 }), { source: 'stop' }, ctx);
+
+    expect(resourceUsageService.endLifecycleCandidate).not.toHaveBeenCalled();
   });
 
   it('throws NoUsageSessionError when there is no active session', async () => {
@@ -93,7 +123,7 @@ describe('EndUsageSessionExecutor', () => {
       5,
       user,
       { notes: 'compiled notes' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
     expect(result).toEqual({ payload: input });
   });
@@ -111,7 +141,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: 'raw value' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 
@@ -128,7 +158,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 
@@ -145,7 +175,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 
@@ -162,7 +192,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
     expect(result).toEqual({ payload: { foo: 'bar' } });
   });

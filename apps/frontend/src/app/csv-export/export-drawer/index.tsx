@@ -38,6 +38,8 @@ interface Props<TData extends Row> {
   setOption?: (key: string, nextValue: boolean) => void;
   filename: string;
   queryStatus: QueryStatus;
+  onFetchAllPages?: () => void;
+  isFetchingAllPages?: boolean;
 }
 
 interface ItemRow {
@@ -46,7 +48,8 @@ interface ItemRow {
 }
 
 export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
-  const { columns, items, refetch, options, setOption, filename, queryStatus } = props;
+  const { columns, items, refetch, options, setOption, filename, queryStatus, onFetchAllPages, isFetchingAllPages } =
+    props;
 
   const { t } = useTranslations({ de, en });
 
@@ -75,10 +78,9 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
 
   const downloadCsv = useCallback(() => {
     const headerRow = selectedColumns.map((column) => column.label);
-    const csv = [
-      headerRow.join(';'),
-      ...itemRows.map((row) => row.columns.map((col) => col.value).join(';')),
-    ].join('\n');
+    const csv = [headerRow.join(';'), ...itemRows.map((row) => row.columns.map((col) => col.value).join(';'))].join(
+      '\n',
+    );
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -86,6 +88,30 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
     a.download = filename.endsWith('.csv') ? filename : `${filename}.csv`;
     a.click();
   }, [selectedColumns, itemRows, filename]);
+
+  const [pendingDownload, setPendingDownload] = useState(false);
+
+  // When all pages finish loading after user triggered export, auto-download
+  useEffect(() => {
+    if (pendingDownload && queryStatus === 'error') {
+      setPendingDownload(false);
+    } else if (pendingDownload && !isFetchingAllPages && queryStatus === 'success') {
+      setPendingDownload(false);
+      downloadCsv();
+    }
+  }, [pendingDownload, isFetchingAllPages, queryStatus, downloadCsv]);
+
+  const handleExport = useCallback(() => {
+    if (onFetchAllPages) {
+      setPendingDownload(true);
+      onFetchAllPages();
+    } else {
+      downloadCsv();
+    }
+  }, [onFetchAllPages, downloadCsv]);
+
+  const isExporting = pendingDownload || !!isFetchingAllPages;
+  const cannotExport = queryStatus !== 'success';
 
   const columnsLite = useMemo(() => columns.map((c) => ({ key: c.key, label: c.label })), [columns]);
 
@@ -124,8 +150,9 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
         <Button
           variant="primary"
           className="w-full sm:w-auto"
-          onPress={() => downloadCsv()}
-          isDisabled={selectedColumns.length === 0 || items.length === 0}
+          onPress={handleExport}
+          isDisabled={selectedColumns.length === 0 || items.length === 0 || isExporting || cannotExport}
+          isPending={isExporting}
           data-cy="resource-usage-export-download-csv-button"
         >
           <DownloadIcon className="size-4" />

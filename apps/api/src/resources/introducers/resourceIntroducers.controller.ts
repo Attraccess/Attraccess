@@ -24,7 +24,7 @@ export class ResourceIntroducersController {
   async isIntroducer(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number,
-    @Query('includeGroups') includeGroups: boolean
+    @Query('includeGroups') includeGroups: boolean,
   ): Promise<IsResourceIntroducerResponseDto> {
     const isResourceIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, userId, includeGroups);
 
@@ -49,7 +49,7 @@ export class ResourceIntroducersController {
   })
   async getMany(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Query('type') type?: ResourceIntroducerType
+    @Query('type') type?: ResourceIntroducerType,
   ): Promise<ResourceIntroducer[]> {
     return await this.resourceIntroducersService.getMany(resourceId, type);
   }
@@ -64,11 +64,11 @@ export class ResourceIntroducersController {
     description: 'Introduction permissions granted',
     type: ResourceIntroducer,
   })
-  @Auth('canManageResources')
+  @Auth('resources.access.manage')
   async grant(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number,
-    @Body() body?: GrantIntroducerDto
+    @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
     return await this.resourceIntroducersService.grant(resourceId, userId, body?.type);
   }
@@ -82,12 +82,13 @@ export class ResourceIntroducersController {
     status: 200,
     description: 'Introduction permissions revoked',
   })
-  @Auth('canManageResources')
+  @Auth('resources.access.manage')
   async revoke(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() body?: GrantIntroducerDto,
   ): Promise<{ OK: true }> {
-    await this.resourceIntroducersService.revoke(resourceId, userId);
+    await this.resourceIntroducersService.revoke(resourceId, userId, body?.type);
 
     return {
       OK: true,

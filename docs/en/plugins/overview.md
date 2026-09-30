@@ -14,7 +14,7 @@ A plugin can:
 
 ## Plugin Management
 
-Plugins are managed in the **Plugins** section of the sidebar. From there, administrators can:
+Plugins are managed in the **Plugins** section of **Settings**. From there, administrators can:
 
 - View all installed plugins
 - Upload new plugins

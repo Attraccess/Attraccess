@@ -1,18 +1,21 @@
-import { Body, Controller, Delete, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Optional, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { SessionService } from './session.service';
 import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Authentication')
 @Controller('/auth')
 export class AuthController {
   constructor(
     private readonly sessionService: SessionService,
-    private readonly cookieConfigService: CookieConfigService
+    private readonly cookieConfigService: CookieConfigService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @Post('/session/local')
@@ -41,7 +44,7 @@ export class AuthController {
   async createSession(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
-    @Body() body: { tokenLocation: 'cookie' | 'body'; twoFactorCode?: string }
+    @Body() body: { tokenLocation: 'cookie' | 'body'; twoFactorCode?: string },
   ): Promise<CreateSessionResponse> {
     // Create session token using SessionService
     const sessionToken = await this.sessionService.createSession(request.user, {
@@ -68,7 +71,7 @@ export class AuthController {
   }
 
   @Get('/session/refresh')
-  @Auth()
+  @SessionAuth()
   @ApiOperation({ summary: 'Refresh the current session', operationId: 'refreshSession' })
   @ApiOkResponse({
     description: 'The session has been refreshed',
@@ -77,7 +80,7 @@ export class AuthController {
   async refreshSession(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
-    @Query('tokenLocation') tokenLocation: 'cookie' | 'body'
+    @Query('tokenLocation') tokenLocation: 'cookie' | 'body',
   ): Promise<CreateSessionResponse> {
     // Get current session token from cookie or header
     const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
@@ -141,7 +144,7 @@ export class AuthController {
   }
 
   @Delete('/session')
-  @Auth()
+  @SessionAuth()
   @ApiOperation({ summary: 'Logout and invalidate the current session', operationId: 'endSession' })
   @ApiOkResponse({
     description: 'The session has been deleted',
@@ -156,7 +159,7 @@ export class AuthController {
   })
   async endSession(
     @Req() request: AuthenticatedRequest,
-    @Res({ passthrough: true }) response: Response
+    @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     // Get session token from cookie or header
     const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
@@ -174,7 +177,24 @@ export class AuthController {
       await this.sessionService.revokeSession(sessionToken);
     }
 
-    // Logout from passport session
-    await new Promise<void>((resolve) => request.logout(resolve));
+    // Passport clears request.user as part of logout, so retain the principal for the audit record.
+    const principal = {
+      userId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+    };
+    const logout = request.logout as unknown as (callback: (error?: Error) => void) => void;
+    await new Promise<void>((resolve, reject) => logout.call(request, (error) => (error ? reject(error) : resolve())));
+    await this.identityAudit?.record({
+      action: 'logout',
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: principal.userId,
+      authenticationMethod: principal.authenticationMethod,
+      apiTokenId: principal.apiTokenId,
+      subjectId: principal.userId,
+      details: {},
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    });
   }
 }

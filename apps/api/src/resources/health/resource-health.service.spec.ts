@@ -11,6 +11,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
+import { AuditService } from '../../audit/audit.service';
 
 type MockRepository<T = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -21,11 +22,13 @@ describe('ResourceHealthService', () => {
   let healthRepo: MockRepository<ResourceHealthState>;
   let resourceRepo: MockRepository<Resource>;
   let eventEmitter: EventEmitter2;
+  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
 
   const records: ResourceHealthState[] = [];
 
   beforeEach(async () => {
     records.length = 0;
+    audit.recordResource.mockClear();
 
     healthRepo = {
       findOne: jest.fn(async ({ where }: { where: Partial<ResourceHealthState> }) =>
@@ -78,6 +81,7 @@ describe('ResourceHealthService', () => {
         { provide: getRepositoryToken(ResourceHealthState), useValue: healthRepo },
         { provide: getRepositoryToken(Resource), useValue: resourceRepo },
         EventEmitter2,
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -89,12 +93,12 @@ describe('ResourceHealthService', () => {
     it('creates a new healthy entry when none exists', async () => {
       const result = await service.reportHealth({
         resourceId: 1,
-        identifier: 'Shelly',
+        identifier: 'ir-bridge',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
 
-      expect(result.identifier).toBe('Shelly');
+      expect(result.identifier).toBe('ir-bridge');
       expect(result.status).toBe(ResourceHealthStatus.HEALTHY);
       expect(result.reason).toBeNull();
       expect(records).toHaveLength(1);
@@ -181,6 +185,7 @@ describe('ResourceHealthService', () => {
         source: ResourceHealthSource.MANUAL,
       });
       expect(emitSpy).not.toHaveBeenCalled();
+      expect(audit.recordResource).toHaveBeenCalledTimes(1);
 
       await service.reportHealth({
         resourceId: 1,
@@ -196,6 +201,14 @@ describe('ResourceHealthService', () => {
           status: ResourceHealthStatus.UNHEALTHY,
           previousStatus: ResourceHealthStatus.HEALTHY,
           reason: 'ka-pow',
+        }),
+      );
+      expect(audit.recordResource).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          action: 'health.transition',
+          actorId: null,
+          subjectId: 1,
+          details: expect.objectContaining({ previousStatus: ResourceHealthStatus.HEALTHY, status: ResourceHealthStatus.UNHEALTHY }),
         }),
       );
     });
@@ -222,7 +235,7 @@ describe('ResourceHealthService', () => {
     it('keeps separate records per identifier', async () => {
       await service.reportHealth({
         resourceId: 1,
-        identifier: 'Shelly',
+        identifier: 'ir-bridge',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
@@ -280,7 +293,7 @@ describe('ResourceHealthService', () => {
       const emitSpy = jest.spyOn(eventEmitter, 'emit');
       await service.reportHealth({
         resourceId: 1,
-        identifier: 'Shelly',
+        identifier: 'ir-bridge',
         status: ResourceHealthStatus.UNHEALTHY,
         reason: 'gone',
         source: ResourceHealthSource.HEARTBEAT,
@@ -295,17 +308,20 @@ describe('ResourceHealthService', () => {
         ResourceHealthChangedEvent.EVENT_NAME,
         expect.objectContaining({
           resourceId: 1,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: ResourceHealthStatus.HEALTHY,
           previousStatus: ResourceHealthStatus.UNHEALTHY,
         }),
+      );
+      expect(audit.recordResource).toHaveBeenLastCalledWith(
+        expect.objectContaining({ action: 'health.transition', subjectId: 1 }),
       );
     });
 
     it('does not emit a transition event when entry was already healthy', async () => {
       await service.reportHealth({
         resourceId: 1,
-        identifier: 'Shelly',
+        identifier: 'ir-bridge',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
@@ -322,7 +338,7 @@ describe('ResourceHealthService', () => {
     it('does not delete entries belonging to other resources', async () => {
       await service.reportHealth({
         resourceId: 1,
-        identifier: 'Shelly',
+        identifier: 'ir-bridge',
         status: ResourceHealthStatus.UNHEALTHY,
         reason: 'broken',
         source: ResourceHealthSource.MANUAL,

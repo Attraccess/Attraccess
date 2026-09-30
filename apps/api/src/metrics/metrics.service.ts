@@ -24,6 +24,8 @@ export class MetricsService implements OnModuleInit {
 
   public readonly usersTotal: Gauge;
   public readonly usersRegisteredTotal: Counter;
+  public readonly usersLocaleSyncsTotal: Counter;
+  public readonly usersPerLocale: Gauge;
 
   public readonly resourcesTotal: Gauge;
   public readonly resourceUsageSessionsActive: Gauge;
@@ -35,6 +37,7 @@ export class MetricsService implements OnModuleInit {
   public readonly resourceMaintenanceOverdue: Gauge;
 
   public readonly attractapDevicesConnected: Gauge;
+  public readonly attractapReaderConnected: Gauge;
   public readonly attractapNfcTapsTotal: Counter;
   public readonly attractapFirmwareUpdatesTotal: Counter;
   public readonly attractapCrashReportsTotal: Counter;
@@ -50,6 +53,12 @@ export class MetricsService implements OnModuleInit {
   public readonly mqttServersHealthy: Gauge;
 
   public readonly pluginsLoaded: Gauge;
+
+  public readonly companionDownloadsTotal: Counter;
+
+  public readonly authorizationCacheRequestsTotal: Counter;
+  public readonly authorizationCacheSize: Gauge;
+  public readonly maintenanceUsageQueryWindowDays: Histogram;
 
   constructor(
     @InjectRepository(User)
@@ -116,6 +125,20 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.usersLocaleSyncsTotal = new Counter({
+      name: 'attraccess_users_locale_syncs_total',
+      help: 'Total number of user locale sync calls, labelled by locale',
+      labelNames: ['locale'],
+      registers: [this.registry],
+    });
+
+    this.usersPerLocale = new Gauge({
+      name: 'attraccess_users_per_locale',
+      help: 'Number of users with each locale set',
+      labelNames: ['locale'],
+      registers: [this.registry],
+    });
+
     this.resourcesTotal = new Gauge({
       name: 'attraccess_resources_total',
       help: 'Total number of resources',
@@ -173,22 +196,31 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.attractapReaderConnected = new Gauge({
+      name: 'attraccess_attractap_reader_connected',
+      help: 'Connection state per Attractap reader (1 = connected, 0 = disconnected)',
+      labelNames: ['reader_id', 'reader_name'],
+      registers: [this.registry],
+    });
+
     this.attractapNfcTapsTotal = new Counter({
       name: 'attraccess_attractap_nfc_taps_total',
       help: 'Total number of NFC tap events',
+      labelNames: ['reader_id'],
       registers: [this.registry],
     });
 
     this.attractapFirmwareUpdatesTotal = new Counter({
       name: 'attraccess_attractap_firmware_updates_total',
       help: 'Total number of firmware update events',
+      labelNames: ['reader_id'],
       registers: [this.registry],
     });
 
     this.attractapCrashReportsTotal = new Counter({
       name: 'attraccess_attractap_crash_reports_total',
       help: 'Total number of crash reports received from Attractap readers',
-      labelNames: ['reset_reason'],
+      labelNames: ['reader_id', 'reset_reason'],
       registers: [this.registry],
     });
 
@@ -237,18 +269,50 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.companionDownloadsTotal = new Counter({
+      name: 'attraccess_companion_downloads_total',
+      help: 'Total number of companion app binary download attempts',
+      labelNames: ['platform', 'arch', 'status'],
+      registers: [this.registry],
+    });
+
+    this.authorizationCacheRequestsTotal = new Counter({
+      name: 'attraccess_authorization_cache_requests_total',
+      help: 'Total number of canControllResource() authorization cache lookups',
+      labelNames: ['result'],
+      registers: [this.registry],
+    });
+
+    this.authorizationCacheSize = new Gauge({
+      name: 'attraccess_authorization_cache_size',
+      help: 'Current number of entries in the authorization cache',
+      registers: [this.registry],
+    });
+
+    this.maintenanceUsageQueryWindowDays = new Histogram({
+      name: 'attraccess_maintenance_usage_query_window_days',
+      help: 'Lookback window in days for usage data fetched per resource during bulk maintenance schedule evaluation; watch for unexpectedly large values',
+      buckets: [1, 7, 30, 90, 180, 365, 730, 1825],
+      registers: [this.registry],
+    });
   }
 
   async onModuleInit(): Promise<void> {
     this.logger.log('Initializing gauge metrics from database...');
-    const [users, resources, projects, groups, mqttServers, activeUsageSessions, activeAuthSessions] = await Promise.all([
+    const [users, resources, projects, groups, mqttServers, activeUsageSessions, activeAuthSessions, localeCounts] = await Promise.all([
       this.userRepository.count(),
       this.resourceRepository.count(),
       this.projectRepository.count(),
       this.resourceGroupRepository.count(),
       this.mqttServerRepository.count(),
-      this.resourceUsageRepository.count({ where: { endTime: IsNull() } }),
+      this.resourceUsageRepository.count({ where: { endTime: IsNull(), lifecyclePending: false } }),
       this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
+      this.userRepository
+        .createQueryBuilder('user')
+        .select('user.locale', 'locale')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('user.locale')
+        .getRawMany<{ locale: string; count: string }>(),
     ]);
 
     this.usersTotal.set(users);
@@ -258,6 +322,9 @@ export class MetricsService implements OnModuleInit {
     this.mqttServersTotal.set(mqttServers);
     this.resourceUsageSessionsActive.set(activeUsageSessions);
     this.authActiveSessions.set(activeAuthSessions);
+    for (const row of localeCounts) {
+      this.usersPerLocale.set({ locale: row.locale ?? 'en' }, parseInt(row.count, 10));
+    }
 
     try {
       this.pluginsLoaded.set(PluginService.getPlugins().length);

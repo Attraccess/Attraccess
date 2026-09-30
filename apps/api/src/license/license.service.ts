@@ -22,6 +22,7 @@ export enum LicenseModuleType {
   ATTRACTAP = 'attractap',
   SSO = 'sso',
   BILLING = 'billing',
+  MAINTENANCE = 'maintenance',
 }
 
 interface LicenseRequirements {

@@ -18,17 +18,22 @@ import { GlobalPushNotifications } from '../notifications/GlobalPushNotification
 
 interface LayoutProps {
   children: React.ReactNode;
-  noLayout?: boolean;
 }
 
-export function Layout({ children, noLayout }: LayoutProps) {
-  // Initialize with closed sidebar on mobile, open on desktop
-  const [isOpen, setIsOpen] = useState(false);
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'attraccess.sidebar-collapsed';
+
+export function Layout({ children }: LayoutProps) {
+  // Initialize synchronously from the viewport so the first paint is correct —
+  // a false initial value would animate the sidebar open/collapsed on every load.
+  const [isOpen, setIsOpen] = useState(() => window.innerWidth >= 768);
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
 
   // Set the initial sidebar state based on screen size
   useEffect(() => {
     const handleResize = () => {
-      setIsOpen(window.innerWidth >= 768); // 768px is the md breakpoint in Tailwind
+      const desktop = window.innerWidth >= 768; // 768px is the md breakpoint in Tailwind
+      setIsOpen(desktop);
+      setIsDesktop(desktop);
     };
 
     // Set initial state
@@ -42,6 +47,15 @@ export function Layout({ children, noLayout }: LayoutProps) {
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
+
+  // Desktop-only: collapse the sidebar to an icon rail for more content space
+  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true');
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed((prev) => {
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(!prev));
+      return !prev;
+    });
+  }, []);
 
   const location = useLocation();
   const isFirstRender = useRef(true);
@@ -70,22 +84,32 @@ export function Layout({ children, noLayout }: LayoutProps) {
     enabled: isAuthenticated && !needsTwoFactorSetup,
   });
 
-  if (noLayout) {
+  if (!isAuthenticated) {
     return (
-      <div className="bg-background h-screen min-h-0 flex flex-col overflow-y-auto app-scroll-container">
+      <div className="bg-background h-[var(--vvh,100dvh)] min-h-0 flex flex-col overflow-y-auto app-scroll-container">
         <ServerNotAvailable />
         {children}
       </div>
     );
   }
 
+  // --vvh tracks the visually-visible height, so the shell shrinks when the mobile
+  // keyboard opens instead of leaving bottom-anchored UI underneath it.
   return (
-    <div className="flex h-screen min-h-0 bg-background">
+    <div className="flex h-[var(--vvh,100dvh)] min-h-0 bg-background">
       {/* Sidebar */}
-      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      <Sidebar
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        isCollapsed={isDesktop && isCollapsed}
+        toggleCollapsed={toggleCollapsed}
+      />
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* min-w-0: without it this flex item keeps min-width:auto and wide content
+          (e.g. the resource detail tab bar) pushes the column past the viewport
+          instead of scrolling inside it. */}
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         {/* Mobile Header */}
         <Header toggleSidebar={toggleSidebar} />
 
@@ -97,10 +121,12 @@ export function Layout({ children, noLayout }: LayoutProps) {
 
         <GlobalMessagingLive enabled={isAuthenticated && !needsTwoFactorSetup} />
         <GlobalSystemNotificationsLive enabled={isAuthenticated && !needsTwoFactorSetup} />
-        <GlobalPushNotifications enabled={isAuthenticated && !needsTwoFactorSetup} />
+        <GlobalPushNotifications enabled={isAuthenticated && !needsTwoFactorSetup} userId={currentUser?.id} />
 
         {/* Page Content */}
-        <main className="flex-1 min-h-0 overflow-auto p-4 bg-background app-scroll-container">{children}</main>
+        <main className="flex-1 min-h-0 overflow-auto p-4 md:p-6 lg:p-8 bg-background app-scroll-container">
+          {children}
+        </main>
 
         {/* Global donation prompt for eligible users */}
         <DonationPrompt />

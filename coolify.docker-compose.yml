@@ -23,6 +23,7 @@ services:
       - ATTRACCESS_URL=$SERVICE_URL_ATTRACCESS
       - ATTRACCESS_PUBLIC_INTERNET_URL=${ATTRACCESS_PUBLIC_INTERNET_URL:-$SERVICE_URL_ATTRACCESS}
       - AUTH_SESSION_SECRET=$SERVICE_BASE64_64_AUTHSESSION
+      - VALKEY_URL=redis://valkey:6379
       - TZ=${TZ:-UTC}
       - LOG_LEVELS=${LOG_LEVELS:-error,warn,log}
     volumes:
@@ -40,6 +41,20 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    volumes:
+      - valkey-data:/data
+    command: valkey-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
   rabbitmq:
     image: rabbitmq:4.3.0-management
@@ -184,6 +199,7 @@ services:
 
 volumes:
   attraccess-storage:
+  valkey-data:
   rabbitmq-data:
   zigbee2mqtt-data:
   prometheus-data:

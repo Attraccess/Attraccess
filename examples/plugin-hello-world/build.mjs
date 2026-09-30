@@ -1,10 +1,9 @@
 // One-command build for the Hello World example plugin.
 //
-// Produces a ./package/ directory laid out exactly as the host expects inside
-// the uploaded ZIP, then zips it to ./plugin-hello-world.zip:
+// Produces a ./package/ directory ready for npm pack:
 //
-//   plugin-hello-world.zip
-//   ├── plugin.json
+//   package/
+//   ├── package.json
 //   ├── dist/index.js          (backend, CommonJS)
 //   └── frontend/              (frontend module-federation remote)
 //       ├── remoteEntry.js
@@ -16,7 +15,6 @@ import { build as viteBuild } from 'vite';
 import { cpSync, mkdirSync, rmSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { spawnSync } from 'child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, 'package');
@@ -36,7 +34,6 @@ const HOST_SHARED_EXTERNALS = [
 ];
 
 rmSync(PACKAGE, { recursive: true, force: true });
-rmSync(join(HERE, 'plugin-hello-world.zip'), { force: true });
 mkdirSync(join(PACKAGE, 'dist'), { recursive: true });
 
 // 1. Backend — single CommonJS bundle with host-shared packages externalized.
@@ -70,19 +67,6 @@ try {
   process.chdir(cwdBeforeBuild);
 }
 
-// 3. Manifest at the package root.
-cpSync(join(HERE, 'plugin.json'), join(PACKAGE, 'plugin.json'));
-
-// 4. ZIP the package contents (not the package/ folder itself) for upload.
-const zip = spawnSync('zip', ['-r', join(HERE, 'plugin-hello-world.zip'), '.'], {
-  cwd: PACKAGE,
-  stdio: 'inherit',
-});
-if (zip.status !== 0) {
-  console.warn(
-    '\n`zip` CLI not available — the ./package directory is ready; zip its *contents* manually:\n' +
-      '  cd package && zip -r ../plugin-hello-world.zip .'
-  );
-} else {
-  console.log('\nBuilt plugin-hello-world.zip — upload it on the Plugins admin page.');
-}
+// 3. npm metadata at the package root. npm pack excludes source and dev files
+// through the package's files allowlist.
+cpSync(join(HERE, 'package.json'), join(PACKAGE, 'package.json'));

@@ -6,7 +6,7 @@ import { FlowVariableDto, FlowVariableUpsertDto } from './dto/flow-variable.dto'
 
 @ApiTags('Flow Variables')
 @Controller('resources/:resourceId/flow-variables')
-@Auth('canManageResources')
+@Auth('resources.update')
 export class ResourceFlowVariablesController {
   constructor(private readonly service: ResourceFlowVariablesService) {}
 

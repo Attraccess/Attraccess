@@ -15,7 +15,23 @@ describe('configSummary', () => {
       } as never,
       t,
     );
-    expect(result).toBe('configSummary.usageHoursHours:{"duration":50}');
+    expect(result).toBe(
+      'configSummary.usageHoursHours:{"duration":50,"durationBasis":"form.durationBasis.SESSION_DURATION"}',
+    );
+  });
+
+  it('formats USAGE_HOURS with the attributable operating duration basis', () => {
+    const result = configSummary(
+      {
+        triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+        durationBasis: 'ATTRIBUTABLE_OPERATING_DURATION',
+        usageHoursConfig: { duration: 1, unit: UsageDurationUnit.MINUTES },
+      } as never,
+      t,
+    );
+    expect(result).toBe(
+      'configSummary.usageHoursMinutes:{"duration":1,"durationBasis":"form.durationBasis.ATTRIBUTABLE_OPERATING_DURATION"}',
+    );
   });
 
   it('formats USAGE_COUNT', () => {
@@ -41,10 +57,7 @@ describe('configSummary', () => {
   });
 
   it('returns dash for missing config', () => {
-    const result = configSummary(
-      { triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS } as never,
-      t,
-    );
+    const result = configSummary({ triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS } as never, t);
     expect(result).toBe('—');
   });
 });

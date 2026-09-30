@@ -8,6 +8,14 @@
     "creditsPerMinute": {
       "label": "{{currency}} per minute",
       "description": "This amount will be deducted per minute of the session duration."
+    },
+    "creditsPerOperatingMinute": {
+      "label": "{{currency}} per operating minute",
+      "description": "This amount will be deducted per minute attributed to machine operation."
+    },
+    "creditsPerKwh": {
+      "label": "{{currency}} per kWh",
+      "description": "This amount is charged per kilowatt-hour the meter reports for the session. It needs a meter defined in the resource flow (Metering start / Metering collection)."
     }
   },
   "actions": {

@@ -10,7 +10,6 @@ describe('DualAuthGuard', () => {
     id: 1,
     username: 'testuser',
     email: 'test@example.com',
-    systemPermissions: {},
   } as User;
 
   beforeEach(async () => {

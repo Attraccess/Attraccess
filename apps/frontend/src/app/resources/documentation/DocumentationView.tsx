@@ -35,7 +35,7 @@ function DocumentationViewComponent() {
     navigate(`/resources/${resourceId}/documentation/edit`);
   }, [navigate, resourceId]);
 
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
 
   // Handle loading state
   if (isLoadingResource) {
@@ -107,7 +107,7 @@ function DocumentationViewComponent() {
             key: 'edit',
             label: t('actions.edit'),
             icon: <Edit size={16} />,
-            isHidden: !canManageResources,
+            isHidden: !canUpdateResources,
             onPress: handleEditDocumentation,
             dataCy: 'documentation-view-header-edit-button',
           },

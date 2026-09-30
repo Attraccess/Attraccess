@@ -23,7 +23,7 @@ const PREVIEW_CHAR_COUNT = 220;
 export function ResourceDocsPreviewCard({ resourceId, className }: ResourceDocsPreviewCardProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
   const navigate = useNavigate();
 
   const { data: resource, isLoading } = useResourcesServiceGetOneResourceById({ id: resourceId });
@@ -50,7 +50,7 @@ export function ResourceDocsPreviewCard({ resourceId, className }: ResourceDocsP
   }
 
   if (!hasContent) {
-    if (!canManageResources) return null;
+    if (!canUpdateResources) return null;
     return (
       <FlatSection
         className={className}

@@ -48,7 +48,7 @@ let hasPermissionMock = vi.fn((_: string) => true);
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
     hasPermission: hasPermissionMock,
-    user: { id: 1, systemPermissions: { canManageSystemConfiguration: true } },
+    user: { id: 1 },
     isAuthenticated: true,
     isInitialized: true,
     logout: vi.fn(),
@@ -93,7 +93,7 @@ function buildStatus(overrides: Partial<UpdateStatusDto> = {}): UpdateStatusDto 
 describe('UpdateNotificationBanner', () => {
   beforeEach(() => {
     localStorage.clear();
-    hasPermissionMock = vi.fn((permission: string) => permission === 'canManageSystemConfiguration');
+    hasPermissionMock = vi.fn((permission: string) => permission === 'system.settings.manage');
     updateStatusValue = undefined;
     mockLanguage = 'en';
   });

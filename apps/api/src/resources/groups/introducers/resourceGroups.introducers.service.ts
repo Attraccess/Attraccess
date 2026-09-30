@@ -27,20 +27,22 @@ export class ResourceGroupsIntroducersService {
       : `Your ${role} status for group #${groupId} was revoked.`;
     const url = `/resource-groups/${groupId}`;
 
-    void this.notifications.dispatch({
-      category: NotificationCategory.ACCESS_CHANGES,
-      recipients: [{ id: userId } as User],
-      title,
-      body,
-      url,
-      dedupeKey: `group-access-${groupId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
-      sendEmail: (recipient) =>
-        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-          accessChange: { title, body, url },
-        }),
-    }).catch((error) => {
-      this.logger.error(`Failed to notify user ${userId} about group access changes: ${(error as Error).message}`);
-    });
+    void this.notifications
+      .dispatch({
+        category: NotificationCategory.ACCESS_CHANGES,
+        recipients: [{ id: userId } as User],
+        title,
+        body,
+        url,
+        dedupeKey: `group-access-${groupId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+            accessChange: { title, body, url },
+          }),
+      })
+      .catch((error) => {
+        this.logger.error(`Failed to notify user ${userId} about group access changes: ${(error as Error).message}`);
+      });
   }
 
   public async getMany(groupId: number): Promise<ResourceIntroducer[]> {
@@ -59,22 +61,22 @@ export class ResourceGroupsIntroducersService {
     userId: number,
     type: ResourceIntroducerType = ResourceIntroducerType.INTRODUCER,
   ): Promise<ResourceIntroducer> {
-    const existingIntroducer = await this.getByResourceGroupIdAndUserId(groupId, userId);
+    const existingIntroducer = await this.getByResourceGroupIdAndUserId(groupId, userId, type);
 
     if (existingIntroducer) {
-      if (existingIntroducer.type !== type) {
-        existingIntroducer.type = type;
-        await this.resourceIntroducerRepository.save(existingIntroducer);
-        this.notifyAccessChange(groupId, userId, type, true);
-        this.eventEmitter.emit(
-          ResourceGroupIntroducerChangedEvent.EVENT_NAME,
-          new ResourceGroupIntroducerChangedEvent(groupId),
-        );
-      }
       return existingIntroducer;
     }
 
-    const savedIntroducer = await this.createOne(groupId, userId, type);
+    let savedIntroducer: ResourceIntroducer;
+    try {
+      savedIntroducer = await this.createOne(groupId, userId, type);
+    } catch (error) {
+      const concurrentGrant = await this.getByResourceGroupIdAndUserId(groupId, userId, type);
+      if (concurrentGrant) {
+        return concurrentGrant;
+      }
+      throw error;
+    }
     this.notifyAccessChange(groupId, userId, type, true);
     this.eventEmitter.emit(
       ResourceGroupIntroducerChangedEvent.EVENT_NAME,
@@ -83,11 +85,7 @@ export class ResourceGroupsIntroducersService {
     return savedIntroducer;
   }
 
-  private async createOne(
-    groupId: number,
-    userId: number,
-    type: ResourceIntroducerType,
-  ): Promise<ResourceIntroducer> {
+  private async createOne(groupId: number, userId: number, type: ResourceIntroducerType): Promise<ResourceIntroducer> {
     const introducer = this.resourceIntroducerRepository.create({
       resourceGroup: { id: groupId },
       user: { id: userId },
@@ -97,8 +95,12 @@ export class ResourceGroupsIntroducersService {
     return await this.resourceIntroducerRepository.save(introducer, { reload: true });
   }
 
-  public async revoke(groupId: number, userId: number): Promise<ResourceIntroducer> {
-    const introducer = await this.getByResourceGroupIdAndUserId(groupId, userId);
+  public async revoke(
+    groupId: number,
+    userId: number,
+    type: ResourceIntroducerType = ResourceIntroducerType.INTRODUCER,
+  ): Promise<ResourceIntroducer> {
+    const introducer = await this.getByResourceGroupIdAndUserId(groupId, userId, type);
 
     if (!introducer) {
       return;
@@ -113,18 +115,21 @@ export class ResourceGroupsIntroducersService {
     return savedIntroducer;
   }
 
-  public async getByResourceGroupIdAndUserId(groupId: number, userId: number): Promise<ResourceIntroducer | null> {
+  public async getByResourceGroupIdAndUserId(
+    groupId: number,
+    userId: number,
+    type?: ResourceIntroducerType,
+  ): Promise<ResourceIntroducer | null> {
     return await this.resourceIntroducerRepository.findOne({
       where: {
         resourceGroup: { id: groupId },
         user: { id: userId },
+        ...(type ? { type } : {}),
       },
     });
   }
 
   public async isIntroducer({ groupId, userId }: { groupId: number; userId: number }): Promise<boolean> {
-    const introducer = await this.getByResourceGroupIdAndUserId(groupId, userId);
-
-    return introducer?.type === ResourceIntroducerType.INTRODUCER;
+    return Boolean(await this.getByResourceGroupIdAndUserId(groupId, userId, ResourceIntroducerType.INTRODUCER));
   }
 }

@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ResourceFlowVariable, ResourceFlowVariableScope } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
-import { FlowVariableChangedEvent } from './events/flow-variable-changed.event';
+import { ResourceFlowVariableChangedEvent } from './events/flow-variable-changed.event';
 
 const isNullOp = (v: unknown): boolean =>
   v !== null && typeof v === 'object' && (v as Record<string, unknown>)['_type'] === 'isNull';
@@ -83,8 +83,8 @@ describe('ResourceFlowVariablesService', () => {
     await service.set(ResourceFlowVariableScope.RESOURCE, 7, 'k', { a: 1 }, 7);
     expect(emitter.emit).toHaveBeenCalledTimes(1);
     const [name, evt] = emitter.emit.mock.calls[0];
-    expect(name).toBe('flow-variable.changed');
-    expect(evt).toBeInstanceOf(FlowVariableChangedEvent);
+    expect(name).toBe('resource.flow.variable.changed');
+    expect(evt).toBeInstanceOf(ResourceFlowVariableChangedEvent);
     expect(evt.previousValue).toBeUndefined();
     expect(evt.newValue).toEqual({ a: 1 });
   });

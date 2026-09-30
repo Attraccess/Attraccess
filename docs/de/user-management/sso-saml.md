@@ -10,7 +10,7 @@ SAML (Security Assertion Markup Language) wird häufig in Unternehmens- und Bild
 
 ## Anbieter anlegen
 
-1. Navigieren Sie zu **SSO-Anbieter** in der Seitenleiste
+1. Öffnen Sie **Einstellungen** in der Seitenleiste und wählen Sie den Bereich **Single Sign-on**
 2. Klicken Sie auf **Neuen Anbieter hinzufügen**
 3. Wählen Sie **SAML** als Typ
 4. Geben Sie einen Namen für den Anbieter ein

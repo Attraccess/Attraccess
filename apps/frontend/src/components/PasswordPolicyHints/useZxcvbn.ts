@@ -22,7 +22,8 @@ async function loadZxcvbn() {
       translations: en.translations,
     });
   }
-  return (pw: string, inputs?: string[]) => factory!.check(pw, inputs);
+  const f = factory;
+  return (pw: string, inputs?: string[]) => f.check(pw, inputs);
 }
 
 export function useZxcvbn(password: string, userInputs: string[] = []): ZxcvbnState {

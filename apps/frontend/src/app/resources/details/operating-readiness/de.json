@@ -1,0 +1,16 @@
+{
+  "status": {
+    "missing": "Erfassung nicht eingerichtet",
+    "waiting": "Warten auf Betriebssignale",
+    "unavailable": "Betriebsdaten nicht verfügbar",
+    "available": "Betriebsdaten verfügbar",
+    "unknown": "Erfassungsbereitschaft nicht verfügbar"
+  },
+  "description": {
+    "missing": "Richten Sie Betriebs- und Leerlaufsignale in Flows ein, damit diese Maschine ihre Betriebsdauer erfassen kann.",
+    "waiting": "Betriebs-/Leerlaufaktionen sind in Flows eingerichtet. Es wurde noch kein Betriebsintervall erfasst; prüfen Sie, ob die Signale diese Aktionen erreichen.",
+    "unavailable": "Es wurde noch kein Betriebsintervall erfasst. Betriebs- und Leerlaufsignale in Flows liefern diese Daten."
+  },
+  "schedule": "Sie können diesen Zeitplan bereits speichern und aktivieren. Sein Betriebsdauer-Schwellenwert schreitet mit der erfassten Maschinenlaufzeit fort, auch außerhalb von Nutzungssitzungen.",
+  "setup": "Betriebs-/Leerlaufsignale einrichten"
+}

@@ -1,4 +1,7 @@
 #include "firmwareUpdateScreen.hpp"
+#include "display/fonts/attractap_fonts.hpp"
+#include "display/theme.hpp"
+#include <string>
 
 void FirmwareUpdateScreen::init()
 {
@@ -8,8 +11,7 @@ void FirmwareUpdateScreen::init()
     }
     this->screen = lv_obj_create(NULL);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(this->screen, lv_color_hex(0x9353D3), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(this->screen, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::applyScreen(this->screen);
 
     this->progressBar = lv_bar_create(this->screen);
     lv_bar_set_value(this->progressBar, 25, LV_ANIM_OFF);
@@ -17,6 +19,12 @@ void FirmwareUpdateScreen::init()
     lv_obj_set_width(this->progressBar, 400);
     lv_obj_set_height(this->progressBar, 50);
     lv_obj_set_align(this->progressBar, LV_ALIGN_CENTER);
+    lv_obj_set_style_bg_color(this->progressBar, DisplayTheme::surfaceSecondary(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(this->progressBar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(this->progressBar, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(this->progressBar, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(this->progressBar, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(this->progressBar, 6, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
     // Compensating for LVGL9.1 draw crash with bar/slider max value when top-padding is nonzero and right-padding is 0
     if (lv_obj_get_style_pad_top(this->progressBar, LV_PART_MAIN) > 0)
@@ -29,7 +37,7 @@ void FirmwareUpdateScreen::init()
     lv_obj_set_y(this->title, -50);
     lv_obj_set_align(this->title, LV_ALIGN_CENTER);
     lv_label_set_text(this->title, "Softwareaktualiesierung");
-    lv_obj_set_style_text_color(this->title, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(this->title, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -39,16 +47,16 @@ void FirmwareUpdateScreen::init()
     lv_obj_set_x(this->versionsLabel, 0);
     lv_obj_set_y(this->versionsLabel, 50);
     lv_obj_set_align(this->versionsLabel, LV_ALIGN_CENTER);
-    lv_obj_set_style_text_color(this->versionsLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->versionsLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(this->versionsLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(this->versionsLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->versionsLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
     if (this->availableVersionCache.length() > 0)
     {
         this->setAvailableVersion(this->availableVersionCache);
     }
     else
     {
-        String placeholder = String(FIRMWARE_VERSION) + " -> ??.??.??";
+        std::string placeholder = std::string(FIRMWARE_VERSION) + " -> ??.??.??";
         lv_label_set_text(this->versionsLabel, placeholder.c_str());
     }
 
@@ -69,15 +77,15 @@ void FirmwareUpdateScreen::loop()
 {
 }
 
-void FirmwareUpdateScreen::setAvailableVersion(String availablevVersion)
+void FirmwareUpdateScreen::setAvailableVersion(std::string availablevVersion)
 {
     this->availableVersionCache = availablevVersion;
-    this->logger.debugf("Updating available version to %s", availablevVersion);
+    this->logger.debugf("Updating available version to %s", availablevVersion.c_str());
     if (!this->versionsLabel)
     {
         return;
     }
-    String s = String(FIRMWARE_VERSION) + " -> " + availablevVersion;
+    std::string s = std::string(FIRMWARE_VERSION) + " -> " + availablevVersion;
     lv_label_set_text(this->versionsLabel, s.c_str());
 }
 

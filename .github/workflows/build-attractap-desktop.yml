@@ -1,0 +1,60 @@
+name: Build Attractap Desktop for macOS
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/attractap/desktop/**'
+      - 'apps/attractap/firmware/src/**'
+      - '.github/workflows/build-attractap-desktop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '15.0'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Install simulator build dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: brew install cmake sdl3 curl
+      - name: Build simulator
+        run: pnpm nx build attractap-desktop
+      - name: Test simulator
+        run: pnpm nx test attractap-desktop
+      - name: Package self-contained macOS app
+        run: apps/attractap/desktop/package-macos.sh
+      - name: Check package architecture
+        run: |
+          set -euo pipefail
+          dmg="dist/apps/attractap-desktop/packages/attractap-simulator-macos-${{ matrix.arch }}.dmg"
+          test -s "$dmg"
+          mkdir -p "$RUNNER_TEMP/attractap-dmg"
+          hdiutil attach -quiet -nobrowse -readonly -mountpoint "$RUNNER_TEMP/attractap-dmg" "$dmg"
+          trap 'hdiutil detach -quiet "$RUNNER_TEMP/attractap-dmg"' EXIT
+          app="$RUNNER_TEMP/attractap-dmg/Attractap Simulator.app"
+          test "$(lipo -archs "$app/Contents/MacOS/attractap-desktop")" = '${{ matrix.arch }}'
+          codesign --verify --deep --strict "$app"
+      - name: Upload macOS download
+        uses: actions/upload-artifact@v4
+        with:
+          name: attractap-simulator-macos-${{ matrix.arch }}-${{ github.run_id }}
+          path: dist/apps/attractap-desktop/packages/attractap-simulator-macos-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 30

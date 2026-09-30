@@ -11,6 +11,9 @@ import { LicenseService } from '../license/license.service';
 import { createMockResource } from '../test-utils/resource.fixtures';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../metrics/metrics.service';
+import { AuditService } from '../audit/audit.service';
+import { projectResourceAuditEvent } from '../audit/audit-policy';
+import { randomUUID } from 'node:crypto';
 
 const mockMetricsService = {
   resourcesTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -26,6 +29,7 @@ const mockMetricsService = {
 describe('ResourcesService', () => {
   let service: ResourcesService;
   let resourceRepository: jest.Mocked<Repository<Resource>>;
+  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
   // ResourceImageService is injected but not directly used in these tests
 
   const mockResourceRepository = () => ({
@@ -83,12 +87,52 @@ describe('ResourcesService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
     resourceRepository = module.get(getRepositoryToken(Resource)) as jest.Mocked<Repository<Resource>>;
+    audit.recordResource.mockClear();
     // ResourceImageService is available but not directly used in tests
+  });
+
+  it('creates a resource with uploaded image and records actor attribution after persistence', async () => {
+    const resource = createMockResource({ id: 8, name: 'Lathe', type: ResourceType.Machine });
+    resourceRepository.count.mockResolvedValue(2);
+    resourceRepository.create.mockReturnValue(resource);
+    resourceRepository.save.mockResolvedValue(resource);
+    mockResourceImageService.saveImage.mockResolvedValue('image.webp');
+    const file = { buffer: Buffer.from('image') };
+    const result = await service.createResource(
+      { name: 'Lathe', type: ResourceType.Machine } as CreateResourceDto,
+      file as never,
+      { id: 7, authenticationMethod: 'api-token', apiTokenId: 9 },
+    );
+    expect(result.imageFilename).toBe('image.webp');
+    expect(mockResourceImageService.saveImage).toHaveBeenCalledWith(8, file);
+    expect(resourceRepository.save).toHaveBeenCalledTimes(2);
+    expect(audit.recordResource).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'resource.created', actorId: 7, apiTokenId: 9, subjectId: 8 }),
+    );
+  });
+
+  it('removes the new resource if persisting its image filename fails', async () => {
+    const resource = createMockResource({ id: 8 });
+    resourceRepository.count.mockResolvedValue(2);
+    resourceRepository.create.mockReturnValue(resource);
+    resourceRepository.save
+      .mockResolvedValueOnce(resource)
+      .mockRejectedValueOnce(new Error('image metadata write failed'));
+    mockResourceImageService.saveImage.mockResolvedValue('image.webp');
+    await expect(
+      service.createResource(
+        { name: 'Lathe', type: ResourceType.Machine } as CreateResourceDto,
+        { buffer: Buffer.from('image') } as never,
+      ),
+    ).rejects.toThrow('image metadata write failed');
+    expect(resourceRepository.delete).toHaveBeenCalledWith(8);
+    expect(audit.recordResource).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {
@@ -142,7 +186,7 @@ describe('ResourcesService', () => {
         expect(result.limit).toEqual(10);
         expect(resourceRepository.createQueryBuilder).toHaveBeenCalledWith('resource');
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.groups', 'groups');
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.createdAt', 'DESC');
+        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.name', 'ASC');
         expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
         expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
       });
@@ -255,20 +299,32 @@ describe('ResourcesService', () => {
       it('should filter resources currently in use by specific user', async () => {
         await service.listResources({ onlyInUseByUserId: 10 });
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
+        );
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(expect.any(Brackets));
       });
 
       it('should not add in-use filter when onlyInUseByUserId is undefined', async () => {
         await service.listResources();
 
-        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
+        );
       });
 
       it('should filter resources currently in use (onlyInUse)', async () => {
         await service.listResources({ onlyInUse: true });
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
+        );
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
       });
@@ -276,14 +332,22 @@ describe('ResourcesService', () => {
       it('should return using user information when returnUsingUser is true', async () => {
         await service.listResources({ returnUsingUser: true });
 
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage');
+        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          'usage.lifecyclePending = FALSE',
+        );
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
       });
 
       it('should handle combination of onlyInUse and returnUsingUser', async () => {
         await service.listResources({ onlyInUse: true, returnUsingUser: true });
 
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage');
+        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          'usage.lifecyclePending = FALSE',
+        );
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
@@ -354,7 +418,11 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [1, 2, 3] });
 
         // Verify all joins for both in-use and permission filtering
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
+        );
         expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introducers', 'introducer');
 
         // Verify result structure
@@ -387,7 +455,11 @@ describe('ResourcesService', () => {
         });
 
         // Should use leftJoinAndSelect for usages when returnUsingUser is true
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage');
+        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          'usage.lifecyclePending = FALSE',
+        );
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
 
         // Should still add permission filtering joins
@@ -448,7 +520,7 @@ describe('ResourcesService', () => {
 
         // Verify that basic joins happen before filters
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.groups', 'groups');
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.createdAt', 'DESC');
+        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.name', 'ASC');
         expect(mockQueryBuilder.getManyAndCount).toHaveBeenCalled();
 
         // Verify that permission-related joins are called
@@ -542,6 +614,41 @@ describe('ResourcesService', () => {
       });
       expect(resourceRepository.save).toHaveBeenCalled();
     });
+
+    it('audits only the safe resource projection when an actor is available', async () => {
+      const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
+      resourceRepository.create.mockReturnValue(resource);
+      resourceRepository.save.mockResolvedValue(resource);
+
+      await service.createResource({ name: 'Lathe', type: ResourceType.Machine }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.created',
+          actorId: 9,
+          subjectId: 1,
+          details: { 'after.name': 'Lathe', 'after.type': ResourceType.Machine },
+        }),
+      );
+    });
+
+    it('bounds an oversized resource name in the audit projection', async () => {
+      const resource = createMockResource({ id: 1, name: '"\\\0🙂'.repeat(5000), type: ResourceType.Machine });
+      resourceRepository.create.mockReturnValue(resource);
+      resourceRepository.save.mockResolvedValue(resource);
+
+      await service.createResource({ name: resource.name, type: ResourceType.Machine }, undefined, { id: 9 });
+
+      const details = audit.recordResource.mock.calls[0][0].details;
+      expect(details['after.name']).toMatch(/\.\.\.$/);
+      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
+      expect(
+        projectResourceAuditEvent({
+          ...audit.recordResource.mock.calls[0][0],
+          operationId: randomUUID(),
+        }),
+      ).not.toBeNull();
+    });
   });
 
   describe('updateResource', () => {
@@ -588,6 +695,111 @@ describe('ResourcesService', () => {
       expect(resourceRepository.save).toHaveBeenCalled();
     });
 
+    it('audits changed safe fields without metadata or documentation', async () => {
+      const existingResource = createMockResource({ id: 1, name: 'Old', type: ResourceType.Lock });
+      const updatedResource = createMockResource({ id: 1, name: 'New', type: ResourceType.Machine });
+      updatedResource.metadata = { password: 'secret' };
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(
+        1,
+        { name: 'New', type: ResourceType.Machine, metadata: { password: 'secret' } },
+        undefined,
+        { id: 9 },
+      );
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.updated',
+          details: {
+            'before.name': 'Old',
+            'after.name': 'New',
+            'before.type': ResourceType.Lock,
+            'after.type': ResourceType.Machine,
+            changedFields: '["name","type","metadata"]',
+          },
+        }),
+      );
+    });
+
+    it('does not audit metadata that only normalized from absent to empty', async () => {
+      const existingResource = createMockResource({ id: 1, name: 'Old', metadata: null });
+      const updatedResource = createMockResource({ id: 1, name: 'New', metadata: {} });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { name: 'New', metadata: {} }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.updated',
+          details: { 'before.name': 'Old', 'after.name': 'New', changedFields: '["name"]' },
+        }),
+      );
+    });
+
+    it('bounds both names in a rename audit projection', async () => {
+      const existingResource = createMockResource({ id: 1, name: '"'.repeat(5000) });
+      const updatedResource = createMockResource({ id: 1, name: '\\'.repeat(5000) + '🚪'.repeat(5000) });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { name: updatedResource.name }, undefined, { id: 9 });
+
+      const details = audit.recordResource.mock.calls[0][0].details;
+      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
+      expect(
+        projectResourceAuditEvent({
+          ...audit.recordResource.mock.calls[0][0],
+          operationId: randomUUID(),
+        }),
+      ).not.toBeNull();
+    });
+
+    it('audits a non-name update without recording its value', async () => {
+      const existingResource = createMockResource({ id: 1, allowTakeOver: false });
+      const updatedResource = createMockResource({ id: 1, allowTakeOver: true });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { allowTakeOver: true }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.updated',
+          details: { changedFields: '["allowTakeOver"]' },
+        }),
+      );
+    });
+
+    it('does not audit an unchanged resubmission', async () => {
+      const resource = createMockResource({ id: 1, allowTakeOver: false });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      resourceRepository.save.mockResolvedValue(resource);
+
+      await service.updateResource(1, { allowTakeOver: false }, undefined, { id: 9 });
+
+      expect(audit.recordResource).not.toHaveBeenCalled();
+    });
+
+    it('audits an image-only update without persisting the filename', async () => {
+      const resource = createMockResource({ id: 1, imageFilename: null });
+      const updatedResource = createMockResource({ id: 1, imageFilename: 'resource-1.png' });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      mockResourceImageService.saveImage.mockResolvedValue('resource-1.png');
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, {}, {} as never, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.updated',
+          details: { changedFields: '["image"]' },
+        }),
+      );
+    });
+
     it('should throw ResourceNotFoundException if resource not found', async () => {
       const resourceId = 999;
       const updateDto: UpdateResourceDto = {
@@ -608,6 +820,44 @@ describe('ResourcesService', () => {
       await service.deleteResource(1);
 
       expect(resourceRepository.softDelete).toHaveBeenCalledWith(1);
+    });
+
+    it('audits deletion with the pre-delete safe projection', async () => {
+      const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+
+      await service.deleteResource(1, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.deleted',
+          actorId: 9,
+          details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine },
+        }),
+      );
+    });
+
+    it('bounds an oversized resource name in a deletion audit projection', async () => {
+      const resource = createMockResource({
+        id: 1,
+        name: '\0'.repeat(5000) + '🙂'.repeat(5000),
+        type: ResourceType.Machine,
+      });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+
+      await service.deleteResource(1, { id: 9 });
+
+      const details = audit.recordResource.mock.calls[0][0].details;
+      expect(details['before.name']).toMatch(/\.\.\.$/);
+      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
+      expect(
+        projectResourceAuditEvent({
+          ...audit.recordResource.mock.calls[0][0],
+          operationId: randomUUID(),
+        }),
+      ).not.toBeNull();
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {

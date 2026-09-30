@@ -6,9 +6,16 @@
     "updateFailed": "E-Mail konnte nicht aktualisiert werden"
   },
   "email": {
-    "label": "E-Mail"
+    "label": "Neue E-Mail-Adresse",
+    "privacyHint": "Die aktuelle E-Mail-Adresse wird zum Schutz der Privatsphäre dieses Benutzers nicht angezeigt."
   },
   "actions": {
-    "save": "Speichern"
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "confirm": "E-Mail-Adresse ändern"
+  },
+  "modal": {
+    "title": "Änderung der E-Mail-Adresse bestätigen",
+    "warning": "Nach der Änderung der E-Mail-Adresse kann sich dieser Benutzer erst wieder anmelden, nachdem er die neue Adresse über den per E-Mail gesendeten Link bestätigt hat."
   }
 }

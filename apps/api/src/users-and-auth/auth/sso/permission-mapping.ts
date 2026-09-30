@@ -1,51 +1,55 @@
-import { SystemPermission, SystemPermissions } from '@attraccess/database-entities';
 import { hasConfiguredPermissionMapping as hasConfiguredPermissionMappingShared } from '@attraccess/shared';
 
-export type SSOPermissionMapping = Partial<Record<SystemPermission, string[]>>;
+export type SsoRoleMapping = Record<string, string[]>;
 
-export const DEFAULT_PERMISSION_KEY_MAP: Record<string, SystemPermission> = {
-  canmanageresources: 'canManageResources',
-  canmanagesystemconfiguration: 'canManageSystemConfiguration',
-  canmanageusers: 'canManageUsers',
-  canmanagebilling: 'canManageBilling',
-};
+/** One Attraccess role granted by SSO claims, with the external claim value that granted it. */
+export interface ResolvedSsoRoleAssignment {
+  roleKey: string;
+  externalValue: string | null;
+}
 
 export const normalizePermissionToken = (token: string): string => {
   return token.toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
 export const hasConfiguredPermissionMapping = (
-  mapping?: SSOPermissionMapping | null,
-): boolean => hasConfiguredPermissionMappingShared(mapping);
+  mapping?: SsoRoleMapping | null,
+): boolean => hasConfiguredPermissionMappingShared(mapping as Record<string, unknown> | null | undefined);
 
-const normalizeRoleNames = (roleNames: string[]): Set<string> => {
-  return new Set(roleNames.map(normalizePermissionToken).filter((value) => value.length > 0));
-};
-
-export const resolvePermissionsFromRoles = (
+export const resolveSsoRoleAssignments = (
   roleNames: string[],
-  mapping?: SSOPermissionMapping | null,
-): Partial<SystemPermissions> => {
-  const normalizedRoles = normalizeRoleNames(roleNames);
-  const updates: Partial<SystemPermissions> = {};
-
-  if (hasConfiguredPermissionMapping(mapping)) {
-    (Object.keys(mapping ?? {}) as Array<keyof SystemPermissions>).forEach((permissionKey) => {
-      const configuredRoles = mapping?.[permissionKey] ?? [];
-      if (!configuredRoles || configuredRoles.length === 0) {
-        return;
-      }
-      updates[permissionKey] = configuredRoles.some((role) => normalizedRoles.has(normalizePermissionToken(role)));
-    });
-    return updates;
+  mapping?: SsoRoleMapping | null,
+): ResolvedSsoRoleAssignment[] => {
+  if (!hasConfiguredPermissionMapping(mapping)) {
+    return [];
   }
 
-  normalizedRoles.forEach((role) => {
-    const permissionKey = DEFAULT_PERMISSION_KEY_MAP[role];
-    if (permissionKey) {
-      updates[permissionKey] = true;
+  // normalized external claim value -> original spelling (first occurrence wins)
+  const normalizedToOriginal = new Map<string, string>();
+  for (const name of roleNames) {
+    const normalized = normalizePermissionToken(name);
+    if (normalized.length > 0 && !normalizedToOriginal.has(normalized)) {
+      normalizedToOriginal.set(normalized, name);
     }
-  });
+  }
 
-  return updates;
+  const result: ResolvedSsoRoleAssignment[] = [];
+  for (const [roleKey, configuredRoles] of Object.entries(mapping ?? {})) {
+    if (!Array.isArray(configuredRoles)) continue;
+    const matched = configuredRoles.find((r) => normalizedToOriginal.has(normalizePermissionToken(r)));
+    if (matched !== undefined) {
+      result.push({
+        roleKey,
+        externalValue: normalizedToOriginal.get(normalizePermissionToken(matched)) ?? matched,
+      });
+    }
+  }
+  return result;
+};
+
+export const resolveRoleKeysFromSsoRoles = (
+  roleNames: string[],
+  mapping?: SsoRoleMapping | null,
+): Set<string> => {
+  return new Set(resolveSsoRoleAssignments(roleNames, mapping).map((assignment) => assignment.roleKey));
 };

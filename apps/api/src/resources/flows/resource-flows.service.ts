@@ -1,42 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { getCoreNodeSchemas } from './core-node-schemas';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
   Resource,
-  ResourceFlowLog,
   getNodeDataSchema,
   ResourceFlowNodeType,
-  EventNodeDataSchema,
-  HttpRequestNodeDataSchema,
-  MqttSendMessageNodeDataSchema,
-  WaitNodeDataSchema,
-  ResourceType,
-  ButtonNodeDataSchema,
-  IfNodeDataSchema,
-  BillingTransactionItemCreateSchema,
-  SetPayloadNodeDataSchema,
-  MqttMessageReceivedNodeDataSchema,
-  MqttWaitForMessageNodeDataSchema,
-  ResourceUsageEndSessionNodeDataSchema,
-  ErrorNodeDataSchema,
-  InputResourceActivityNoActivityNodeDataSchema,
-  ResourceActivityTrackActivityNodeDataSchema,
-  ResourceHealthHeartbeatNodeDataSchema,
-  ResourceHealthSetNodeDataSchema,
-  SetVariablesNodeDataSchema,
-  GetVariablesNodeDataSchema,
-  VariableChangedNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
-import { PaginatedResponse } from '../../types/response';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
-import { z } from 'zod';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { getPluginFlowNode, getRegisteredPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 
 export interface ValidationError {
   nodeId: string;
@@ -63,8 +42,6 @@ export class ResourceFlowsService {
     private readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceFlowLog)
-    private readonly flowLogRepository: Repository<ResourceFlowLog>,
     private readonly mqttClientService: MqttClientService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -89,14 +66,85 @@ export class ResourceFlowsService {
       }),
     ]);
 
-    return { nodes, edges };
+    const validationContext = new Map<string, unknown>();
+    const validationErrors: ValidationError[] = [];
+    // Plugin validators may query external state, so bound the fanout without serializing the whole flow.
+    const validationConcurrency = 4;
+    for (let index = 0; index < nodes.length; index += validationConcurrency) {
+      const batch = nodes.slice(index, index + validationConcurrency);
+      validationErrors.push(
+        ...(await Promise.all(batch.map((node) => this.validateNodeData(node, validationContext)))).flat(),
+      );
+    }
+    return { nodes, edges, ...(validationErrors.length ? { validationErrors } : {}) };
   }
 
-  private validateNodeData(nodeData: { id: string; type: ResourceFlowNodeType; data: unknown }): ValidationError[] {
+  async resolveNodeSchema(
+    resourceId: number,
+    nodeType: string,
+    config: Record<string, unknown>,
+    purpose: 'editor' | 'preview' = 'editor',
+  ): Promise<ResourceFlowNodeSchemaDto> {
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    if (!resource) {
+      throw new ResourceNotFoundException(resourceId);
+    }
+
+    const definition = getPluginFlowNode(nodeType);
+    if (!definition) {
+      throw new NotFoundException(`Plugin flow node type "${nodeType}" was not found.`);
+    }
+
+    const configSchema = definition.resolveConfigSchema
+      ? await definition.resolveConfigSchema(config, purpose === 'preview' ? { resourceId, purpose } : { resourceId })
+      : definition.configSchema;
+    if (!configSchema) {
+      throw new Error(`Plugin flow node type "${nodeType}" does not provide a configuration schema.`);
+    }
+
+    return this.pluginNodeSchema(
+      definition,
+      purpose === 'preview'
+        ? { dynamic: true, type: 'object', properties: {}, preview: configSchema.preview ?? [] }
+        : configSchema,
+    );
+  }
+
+  private async validateNodeData(
+    nodeData: { id: string; type: string; data: unknown },
+    validationContext = new Map<string, unknown>(),
+  ): Promise<ValidationError[]> {
     const errors: ValidationError[] = [];
 
+    // Non-core types must belong to a registered plugin; reject unknown types at save time.
+    if (!Object.values(ResourceFlowNodeType).includes(nodeData.type as ResourceFlowNodeType)) {
+      if (!getPluginFlowNode(nodeData.type)) {
+        errors.push({
+          nodeId: nodeData.id,
+          nodeType: nodeData.type,
+          field: 'type',
+          message: `Unknown node type: ${nodeData.type}`,
+        });
+      }
+      const plugin = getPluginFlowNode(nodeData.type);
+      if (plugin?.validateConfig) {
+        const validationErrors = await plugin.validateConfig(
+          nodeData.data as Record<string, unknown>,
+          validationContext,
+        );
+        errors.push(
+          ...validationErrors.map((error) => ({
+            nodeId: nodeData.id,
+            nodeType: nodeData.type,
+            ...error,
+          })),
+        );
+      }
+      return errors;
+    }
+
     try {
-      const schema = getNodeDataSchema(nodeData.type);
+      const schema = getNodeDataSchema(nodeData.type as ResourceFlowNodeType);
       schema.parse(nodeData.data);
     } catch (error) {
       // Handle Zod validation errors
@@ -138,8 +186,9 @@ export class ResourceFlowsService {
 
     // Collect validation errors from all nodes
     const allValidationErrors: ValidationError[] = [];
+    const validationContext = new Map<string, unknown>();
     for (const nodeData of flowData.nodes) {
-      const nodeErrors = this.validateNodeData(nodeData);
+      const nodeErrors = await this.validateNodeData(nodeData, validationContext);
       allValidationErrors.push(...nodeErrors);
     }
 
@@ -191,7 +240,7 @@ export class ResourceFlowsService {
       const newNodes = flowData.nodes.map((nodeData) => {
         const node = new ResourceFlowNode();
         node.id = nodeData.id;
-        node.type = nodeData.type;
+        node.type = nodeData.type as ResourceFlowNodeType;
         node.position = {
           x: nodeData.position.x,
           y: nodeData.position.y,
@@ -271,39 +320,26 @@ export class ResourceFlowsService {
     return response;
   }
 
-  async getResourceFlowLogs(resourceId: number, page = 1, limit = 50): Promise<PaginatedResponse<ResourceFlowLog>> {
-    // Verify resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
-
-    if (!resource) {
-      throw new ResourceNotFoundException(resourceId);
-    }
-
-    // Calculate skip value for pagination
-    const skip = (page - 1) * limit;
-
-    // Get logs with pagination, ordered by creation time (newest first)
-    const [logs, total] = await this.flowLogRepository.findAndCount({
-      where: { resourceId },
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-    });
-
-    return {
-      data: logs,
-      total,
-      page,
-      limit,
-    };
-  }
-
   public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
     return await this.flowNodeRepository.find({
       where: { resourceId, type },
     });
+  }
+
+  public async getNodesForResources(
+    resourceIds: number[],
+    type: ResourceFlowNodeType,
+  ): Promise<Map<number, ResourceFlowNode[]>> {
+    const map = new Map<number, ResourceFlowNode[]>(resourceIds.map((id) => [id, []]));
+    if (resourceIds.length === 0) return map;
+    const nodes = await this.flowNodeRepository.find({
+      where: { resourceId: In(resourceIds), type },
+    });
+    for (const node of nodes) {
+      const bucket = map.get(node.resourceId);
+      if (bucket) bucket.push(node);
+    }
+    return map;
   }
 
   public async getNodeSchemas(resourceId: number): Promise<ResourceFlowNodeSchemaDto[]> {
@@ -315,163 +351,35 @@ export class ResourceFlowsService {
       throw new ResourceNotFoundException(resourceId);
     }
 
-    return Object.values(ResourceFlowNodeType).map((type) => {
-      const schema: ResourceFlowNodeSchemaDto = {
-        type,
-        configSchema: {},
-        inputs: [],
-        outputs: [],
-        supportedByResource: false,
-        isOutput: false,
-      };
+    const coreSchemas = getCoreNodeSchemas(resource.type);
 
-      switch (type) {
-        case ResourceFlowNodeType.INPUT_BUTTON:
-          schema.configSchema = z.toJSONSchema(ButtonNodeDataSchema, { io: 'input' });
-          schema.outputs = ['output'];
-          schema.supportedByResource = resource.type === ResourceType.Machine;
-          break;
-
-        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-          schema.configSchema = z.toJSONSchema(EventNodeDataSchema, { io: 'input' });
-          schema.outputs = ['output'];
-          schema.supportedByResource = resource.type === ResourceType.Machine;
-          break;
-
-        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-          schema.configSchema = z.toJSONSchema(EventNodeDataSchema, { io: 'input' });
-          schema.outputs = ['output'];
-          schema.supportedByResource = resource.type === ResourceType.Door;
-          break;
-
-        case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-          schema.configSchema = z.toJSONSchema(MqttMessageReceivedNodeDataSchema, { io: 'input' });
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
-          schema.configSchema = z.toJSONSchema(InputResourceActivityNoActivityNodeDataSchema, { io: 'input' });
-          schema.outputs = ['output'];
-          schema.supportedByResource = resource.type === ResourceType.Machine;
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-          schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.supportedByResource = resource.type === ResourceType.Machine;
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-          schema.configSchema = z.toJSONSchema(HttpRequestNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          schema.isOutput = true;
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-          schema.configSchema = z.toJSONSchema(MqttSendMessageNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.supportedByResource = true;
-          schema.isOutput = true;
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
-          schema.configSchema = z.toJSONSchema(ResourceUsageEndSessionNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.supportedByResource = resource.type === ResourceType.Machine;
-          schema.isOutput = true;
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
-          schema.configSchema = z.toJSONSchema(ResourceActivityTrackActivityNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.supportedByResource = resource.type === ResourceType.Machine;
-          schema.isOutput = true;
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_WAIT:
-          schema.configSchema = z.toJSONSchema(WaitNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_IF:
-          schema.configSchema = z.toJSONSchema(IfNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output-true', 'output-false'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
-          schema.configSchema = z.toJSONSchema(SetPayloadNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
-          schema.configSchema = z.toJSONSchema(MqttWaitForMessageNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_ERROR:
-          schema.configSchema = z.toJSONSchema(ErrorNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
-          schema.configSchema = z.toJSONSchema(ResourceHealthHeartbeatNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          schema.isOutput = true;
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
-          schema.configSchema = z.toJSONSchema(ResourceHealthSetNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          schema.isOutput = true;
-          break;
-
-        case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
-          schema.configSchema = z.toJSONSchema(VariableChangedNodeDataSchema, { io: 'input' });
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
-          schema.configSchema = z.toJSONSchema(SetVariablesNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
-          schema.configSchema = z.toJSONSchema(GetVariablesNodeDataSchema, { io: 'input' });
-          schema.inputs = ['input'];
-          schema.outputs = ['output'];
-          schema.supportedByResource = true;
-          break;
-
-        default: {
-          const exhaustiveCheck: never = type;
-          throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-        }
+    // Append plugin-contributed node schemas.
+    const pluginSchemas = getRegisteredPluginFlowNodes().map((definition) => {
+      const configSchema =
+        definition.configSchema ?? (definition.resolveConfigSchema ? { dynamic: true, properties: {} } : undefined);
+      if (!configSchema) {
+        throw new Error(`Plugin flow node type "${definition.type}" does not provide a configuration schema.`);
       }
-
-      return schema;
+      return this.pluginNodeSchema(definition, configSchema);
     });
+
+    return [...coreSchemas, ...pluginSchemas];
+  }
+
+  private pluginNodeSchema(
+    definition: NonNullable<ReturnType<typeof getPluginFlowNode>>,
+    configSchema: Record<string, unknown>,
+  ): ResourceFlowNodeSchemaDto {
+    return {
+      type: definition.type,
+      label: definition.label,
+      description: definition.description,
+      configSchema,
+      inputs: [...definition.inputs],
+      outputs: [...definition.outputs],
+      supportedByResource: definition.supportedByAllResources !== false,
+      isOutput: definition.isOutput ?? false,
+      isInput: definition.isInput ?? false,
+    };
   }
 }

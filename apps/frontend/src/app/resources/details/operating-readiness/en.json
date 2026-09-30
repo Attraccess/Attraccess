@@ -1,0 +1,16 @@
+{
+  "status": {
+    "missing": "Tracking not configured",
+    "waiting": "Waiting for operating signals",
+    "unavailable": "Operating data unavailable",
+    "available": "Operating data available",
+    "unknown": "Tracking readiness unavailable"
+  },
+  "description": {
+    "missing": "Configure operating and idle signals in Flows so this machine can record operating duration.",
+    "waiting": "Operating/idle flow actions are configured. No operating interval has been recorded yet; check that the signals reach these actions.",
+    "unavailable": "No operating interval has been recorded yet. Operating and idle signals in Flows supply this data."
+  },
+  "schedule": "You can save and enable this schedule now. Its operating-duration threshold advances with recorded machine operating time, including operation outside usage sessions.",
+  "setup": "Set up operating/idle signals"
+}

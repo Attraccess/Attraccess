@@ -1,16 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
-
-export class PreviewMjmlDto {
-  @ApiProperty({
-    description: 'The MJML content to preview',
-    example:
-      '<mjml><mj-body><mj-section><mj-column><mj-text>Hello, world!</mj-text></mj-column></mj-section></mj-body></mjml>',
-  })
-  @IsNotEmpty()
-  @IsString()
-  mjmlContent: string;
-}
 
 export class PreviewMjmlResponseDto {
   @ApiProperty({

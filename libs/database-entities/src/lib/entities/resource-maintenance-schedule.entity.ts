@@ -20,6 +20,12 @@ export enum ResourceMaintenanceScheduleTriggerType {
   TIME_INTERVAL = 'TIME_INTERVAL',
 }
 
+export enum ResourceMaintenanceScheduleDurationBasis {
+  SESSION_DURATION = 'SESSION_DURATION',
+  /** All machine operation, including unattributed time. Keep the legacy storage/API value. */
+  ATTRIBUTABLE_OPERATING_DURATION = 'ATTRIBUTABLE_OPERATING_DURATION',
+}
+
 @Entity()
 export class ResourceMaintenanceSchedule {
   @PrimaryGeneratedColumn()
@@ -65,6 +71,19 @@ export class ResourceMaintenanceSchedule {
     enumName: 'ResourceMaintenanceScheduleTriggerType',
   })
   triggerType!: ResourceMaintenanceScheduleTriggerType;
+
+  @Column({
+    type: 'simple-enum',
+    enum: ResourceMaintenanceScheduleDurationBasis,
+    default: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
+  })
+  @ApiProperty({
+    description: 'The duration source used for USAGE_HOURS schedules',
+    enum: ResourceMaintenanceScheduleDurationBasis,
+    enumName: 'ResourceMaintenanceScheduleDurationBasis',
+    default: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
+  })
+  durationBasis!: ResourceMaintenanceScheduleDurationBasis;
 
   @OneToOne(
     () => ResourceMaintenanceScheduleUsageHoursConfig,

@@ -3,6 +3,7 @@ import { ResourceUsageController } from './resourceUsage.controller';
 import { ResourceUsageService } from './resourceUsage.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
+import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 import { ResourceUsageNoteNotificationListener } from './resource-usage-note-notification.listener';
 import { ResourceSessionNotificationListener } from './resource-session-notification.listener';
 import { SupervisedUsageAutoPromotionListener } from './supervised-usage-auto-promotion.listener';
@@ -17,10 +18,15 @@ import { ProjectsModule } from '../../projects/projects.module';
 import { ResourceFormsModule } from '../forms/forms.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
+import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
+import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
+import { ResourceMeteringModule } from '../metering/resource-metering.module';
 
 @Module({
   imports: [
+    ResourceTransactionsModule,
     TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
+    RbacModule,
     NotificationsModule,
     ResourceIntroducersModule,
     ResourceIntroductionsModule,
@@ -29,9 +35,11 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
     ResourceMaintenanceModule,
     forwardRef(() => BillingModule),
     forwardRef(() => ResourceFlowsModule),
+    forwardRef(() => ResourceMeteringModule),
     forwardRef(() => ProjectsModule),
     ResourceFormsModule,
     ResourceHealthModule,
+    ResourceOperatingIntervalModule,
   ],
   controllers: [ResourceUsageController],
   providers: [

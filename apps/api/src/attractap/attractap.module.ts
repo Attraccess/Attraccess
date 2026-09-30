@@ -32,12 +32,14 @@ import { ResourceHealthModule } from '../resources/health/resource-health.module
 import { LicenseModule } from '../license/license.module';
 import { ResourceIntroductionsModule } from '../resources/introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from '../resources/introducers/resourceIntroducers.module';
+import { ResourceGroupsModule } from '../resources/groups/resourceGroups.module';
 import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
 import { BillingModule } from '../billing/billing.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
 import { SupervisionModule } from '../resources/supervision/supervision.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -51,12 +53,14 @@ import { NotificationsModule } from '../notifications/notifications.module';
     LicenseModule,
     ResourceIntroductionsModule,
     ResourceIntroducersModule,
+    ResourceGroupsModule,
     ResourceFlowsModule,
     BillingModule,
     ProjectsModule,
     ResourceFormsModule,
     SupervisionModule,
     NotificationsModule,
+    AuditModule,
   ],
   providers: [
     AttractapService,

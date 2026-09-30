@@ -15,6 +15,15 @@
         "config": ".verdaccio/config.yml",
         "storage": "tmp/local-registry/storage"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs ."
+      },
+      "outputs": [
+        "{workspaceRoot}/coverage/crap/@attraccess__source"
+      ]
     }
   }
 }

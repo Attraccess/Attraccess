@@ -1,8 +1,14 @@
 #pragma once
 
+#include <functional>
+
+#include <string>
+
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
-#include "../../images/lockscreen_background_image.hpp"
+#include "display/theme.hpp"
+#include "display/shared/sessionHeader.hpp"
+#include "display/shared/actionOverlay.hpp"
 #include "../../../utils.hpp"
 #include "../../../api/api.hpp"
 
@@ -24,6 +30,7 @@ public:
         BUTTON_CLICK_TYPE_UNLATCH_DOOR,
         BUTTON_CLICK_TYPE_FLOW_BUTTON,
         BUTTON_CLICK_TYPE_LOGOUT,
+        BUTTON_CLICK_TYPE_BACK,
     };
 
     ResourceDetailsScreen() : logger("ResourceDetailsScreen"), loginUsernameCache("INITIAL_VALUE")
@@ -34,7 +41,7 @@ public:
     void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     void setResourceAndUsageDetails(const API::ResourceBrief &resource);
@@ -44,7 +51,7 @@ public:
 
     struct UserDetails
     {
-        String username;
+        std::string username;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
@@ -60,7 +67,7 @@ public:
     };
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
     void setProjectsPageRequestCallback(std::function<void(uint32_t)> callback);
-    void setProjectSelectionCallback(std::function<void(uint32_t, const String &)> callback);
+    void setProjectSelectionCallback(std::function<void(uint32_t, const std::string &)> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
     void showFormsModal(const API::ResourceUsageFormRequest &meta);
     void renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields);
@@ -81,8 +88,10 @@ private:
     Logger logger;
     lv_obj_t *screen = nullptr;
 
-    String loginUsernameCache;
-    lv_obj_t *loginUserLabel = nullptr;
+    std::string loginUsernameCache;
+    SessionHeader sessionHeader;
+    ActionOverlay actionOverlay;
+    std::string actionTitle;
 
     lv_obj_t *sessionDetailsContainer = nullptr;
     time_t sessionStartTime = 0;
@@ -103,7 +112,7 @@ private:
 
     API::ProjectsOfUserResponse projectsCache;
     uint32_t selectedProjectId = 0;
-    String selectedProjectName;
+    std::string selectedProjectName;
     uint32_t projectsCurrentPage = 1;
     uint32_t projectsTotalCount = 0;
     uint32_t projectsPageLimit = API::MAX_PROJECTS_PER_PAGE;
@@ -119,7 +128,10 @@ private:
     lv_obj_t *projectsPrevButton = nullptr;
     lv_obj_t *projectsNextButton = nullptr;
     lv_obj_t *startSessionButton = nullptr;
+    lv_obj_t *startSessionButtonLabel = nullptr;
     lv_obj_t *stopSessionButton = nullptr;
+    lv_obj_t *stopSessionButtonLabel = nullptr;
+    lv_obj_t *stopOtherUserNote = nullptr;
     lv_obj_t *doorControls = nullptr;
 
     lv_obj_t *flowButtonsContainer = nullptr;
@@ -135,8 +147,7 @@ private:
     lv_obj_t *formsBackButton = nullptr;
     lv_obj_t *formsNextButton = nullptr;
     lv_obj_t *formsNextLabel = nullptr;
-    lv_obj_t *formsBusyOverlay = nullptr;
-    lv_obj_t *formsBusyLabel = nullptr;
+    lv_obj_t *formsNextSpinner = nullptr;
     // Fullscreen text editor overlay: textarea on top, keyboard pinned below.
     lv_obj_t *formsEditorOverlay = nullptr;
     lv_obj_t *formsEditorTitleLabel = nullptr;
@@ -144,6 +155,7 @@ private:
     lv_obj_t *formsEditorSpacer = nullptr; // pushes keyboard to the bottom for one-line fields
     lv_obj_t *formsEditorKeyboard = nullptr;
     uint16_t formsEditorWidgetIndex = 0;
+    std::string formsEditorInitialText;
     bool formsBusy = false;
     const API::ResourceUsageFormRequest *formsModalMeta = nullptr;
     const API::ResourceUsageFormFieldsPage *formsModalPage = nullptr;
@@ -164,7 +176,7 @@ private:
         bool isRequired;
         lv_obj_t *input = nullptr;
         lv_obj_t *previewLabel = nullptr; // value preview inside the tap-to-edit box (text/number fields)
-        String textValue;                 // committed value for text/number fields (edited via the fullscreen editor)
+        std::string textValue;            // committed value for text/number fields (edited via the fullscreen editor)
         lv_obj_t *errorLabel = nullptr;
         const API::ResourceUsageFormField *definition = nullptr;
         uint8_t selectedOptionIndex = 0; // For SELECT: 0 = no selection, 1+ = option index
@@ -184,15 +196,12 @@ private:
     void updateElapsedTimeDisplay();
     lv_obj_t *elapsedTime = nullptr;
 
-    uint32_t sessionTimeoutTime = 0;
-    bool sessionTimeoutPaused = false;
-    uint32_t pauseFrozenAtMs = 0;
-    lv_obj_t *sessionTimeoutIndicator = nullptr;
+
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
     std::function<void(uint32_t)> projectsPageRequestCallback;
-    std::function<void(uint32_t, const String &)> projectSelectionCallback;
+    std::function<void(uint32_t, const std::string &)> projectSelectionCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);
     static void onToastDelete(lv_event_t *e);
@@ -220,12 +229,14 @@ private:
     lv_obj_t *maintenanceIntroducersLabel = nullptr;
     lv_obj_t *healthPanel = nullptr;
     lv_obj_t *healthReasonLabel = nullptr;
-    String buildIntroducersText(const API::ResourceBrief &resource);
+    std::string buildIntroducersText(const API::ResourceBrief &resource);
     void refreshAccessState();
 
-    // overlay/toast state
-    lv_obj_t *actionOverlay = nullptr;
-    lv_obj_t *actionOverlayLabel = nullptr;
+    // The action that initiated the current request shows its progress inline.
+    lv_obj_t *activeActionButton = nullptr;
+    lv_obj_t *activeActionLabel = nullptr;
+    lv_obj_t *activeActionSpinner = nullptr;
+    bool actionInProgress = false;
     lv_obj_t *successToast = nullptr;
     lv_timer_t *successToastTimer = nullptr;
 
@@ -257,7 +268,7 @@ private:
     void applyCachedState();
     void disposeProjectsModal();
     void disposeFormsModal();
-    void disposeActionOverlay();
     void disposeSuccessToast();
+    void hideActionProgressVisual();
     void resetFormsModalState();
 };

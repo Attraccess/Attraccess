@@ -28,6 +28,9 @@ import { MaintenanceRequestService } from './maintenance-request.service';
 import { MaintenanceRequestController } from './maintenance-request.controller';
 import { MaintenanceRequestNotificationListener } from './maintenance-request-notification.listener';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { LicenseModule } from '../../license/license.module';
+import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
+import { ResourceOperatingAttributionModule } from '../operating-intervals/resource-operating-attribution.module';
 
 @Module({
   imports: [
@@ -43,7 +46,10 @@ import { NotificationsModule } from '../../notifications/notifications.module';
       ResourceUsage,
       User,
     ]),
+    ResourceOperatingAttributionModule,
     NotificationsModule,
+    LicenseModule,
+    RbacModule,
   ],
   controllers: [ResourceMaintenanceController, MaintenanceScheduleController, MaintenanceRequestController],
   providers: [
@@ -56,4 +62,4 @@ import { NotificationsModule } from '../../notifications/notifications.module';
   ],
   exports: [ResourceMaintenanceService, CanManageMaintenanceGuard, MaintenanceRequestService],
 })
-export class ResourceMaintenanceModule { }
+export class ResourceMaintenanceModule {}

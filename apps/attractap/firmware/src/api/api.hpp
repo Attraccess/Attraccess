@@ -1,21 +1,40 @@
 #pragma once
 
+#include <functional>
+#include <atomic>
+
 #include <ArduinoJson.h>
+#include <string>
+#include <vector>
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
-#include "../websocket/websocket.hpp"
+#include "reader_transport.hpp"
 #include "../utils.hpp"
+#ifdef ATTRACTAP_HOST
+class HostOtaUpdater
+{
+public:
+    template <typename... Args>
+    explicit HostOtaUpdater(Args &&...) {}
+    void tick() {}
+    bool inProgress() const { return false; }
+};
+#else
 #include "ota/ota_updater.hpp"
+#endif
 
 class API
 {
 public:
-    API() : logger("API"),
+    explicit API(IReaderTransport &transport) : logger("API"),
+             transport(transport),
             firmware(
                 logger,
                 [this](const char *type, JsonObject payload)
-                { this->sendMessage(type, payload); },
+                { return this->sendMessage(type, payload); },
+                [this](const char *reason)
+                { this->transport.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback) {}
@@ -25,8 +44,7 @@ public:
     void processIncomingMessage(const char *buf, size_t len);
     static constexpr size_t MAX_RESOURCES = 10;
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
-    static constexpr size_t MAX_DESC_LEN = 128;
-    static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_USERNAME_LEN = 33; // 32 username characters plus the terminator.
     static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
     static constexpr size_t MAX_INTRODUCERS = 8;
     static constexpr size_t MAX_FLOW_BUTTONS = 7;
@@ -48,8 +66,14 @@ public:
         uint8_t type; // 0: machine, 1: door (encode from API strings)
         bool separateUnlockAndUnlatch;
         bool allowTakeOver;
+        bool accessKnown = false;
+        bool canManageMaintenance = false;
+        bool hasIntroduction = false;
+        bool isIntroducer = false;
+        bool canManageResource = false;
+        bool requiresSupervisor = false;
         char name[MAX_RESOURCE_NAME_LEN];
-        char description[MAX_DESC_LEN];
+        std::string description;
         bool hasActiveUsage;
         bool isUnderMaintenance;
         bool isHealthy;
@@ -57,20 +81,21 @@ public:
         char activeUser[MAX_USERNAME_LEN];
         uint32_t activeStartEpoch;          // seconds since epoch (UTC)
         int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
-        uint8_t introducerCount;
-        char introducers[MAX_INTRODUCERS][MAX_USERNAME_LEN];
+        std::vector<std::string> introducers;
         uint8_t flowButtonCount;
         FlowButton flowButtons[MAX_FLOW_BUTTONS];
     };
     struct ResourceList
     {
+        uint32_t requestId = 0;
         uint16_t count;
+        char authenticatedUsername[MAX_USERNAME_LEN] = {};
         ResourceBrief items[MAX_RESOURCES];
     };
     struct Project
     {
         uint32_t id;
-        String name;
+        std::string name;
     };
     struct ProjectsOfUserResponse
     {
@@ -104,7 +129,7 @@ public:
         struct
         {
             bool hasPlaceholder = false;
-            String placeholder;
+            std::string placeholder;
             bool multiline = false;
         } text;
         struct
@@ -119,7 +144,7 @@ public:
         struct
         {
             uint8_t count = 0;
-            String values[MAX_SELECT_OPTIONS];
+            std::string values[MAX_SELECT_OPTIONS];
         } select;
     };
 
@@ -128,25 +153,26 @@ public:
         uint32_t id = 0;
         ResourceUsageFormFieldType type = ResourceUsageFormFieldType::UNKNOWN;
         bool isRequired = false;
-        String name;
-        String description;
+        std::string name;
+        std::string description;
         ResourceUsageFormFieldOptions options;
         bool hasValue = false;
-        String value;
+        std::string value;
     };
 
     struct ResourceUsageFormMeta
     {
         uint32_t id = 0;
-        String name;
+        std::string name;
         uint32_t fieldCount = 0;
     };
 
     struct ResourceUsageFormRequest
     {
+        uint32_t requestId = 0;
         uint32_t resourceId = 0;
         ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
-        String resourceName;
+        std::string resourceName;
         uint8_t formCount = 0;
         ResourceUsageFormMeta forms[MAX_FORMS_PER_REQUEST];
     };
@@ -171,7 +197,7 @@ public:
             NUMBER,
             BOOLEAN,
         } type = ValueType::STRING;
-        String stringValue;
+        std::string stringValue;
         double numberValue = 0;
         bool boolValue = false;
     };
@@ -195,11 +221,21 @@ public:
         struct Error
         {
             uint32_t fieldId = 0;
-            String message;
+            std::string message;
         } errors[MAX_FORM_PAGE_ERRORS];
     };
 
     void setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback);
+    uint32_t requestResourceList();
+    void cancelResourceAction() { activeActionRequestId = 0; }
+    bool isCurrentResourceAction(uint32_t requestId) const { return !requestId || requestId == activeActionRequestId.load(); }
+    struct ActionResult {
+        std::string type;
+        bool success = false;
+        uint32_t requestId = 0;
+        std::string error;
+        bool sumUpEnabled = false;
+    };
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
 
     struct CardAuthenticationDetailsResponse
@@ -207,15 +243,15 @@ public:
         uint8_t keyNo;
         uint8_t keyBytes[16];
         uint8_t keyLen;
-        String error;
-        String username;
+        std::string error;
+        std::string username;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
         // Two-card supervision (ATT-493). supervisionMode is the resource policy; requiresSupervisor
         // is the server's verdict for this user (true => starting a session requires supervisor
         // approval; authentication itself still unlocks the resource details screen).
-        String supervisionMode;
+        std::string supervisionMode;
         bool requiresSupervisor;
     };
     void setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback);
@@ -227,36 +263,48 @@ public:
     struct SupervisionRequestResult
     {
         bool success = false;
-        String error;
+        std::string error;
         uint32_t timeoutMs = 0;
         uint8_t supervisorCount = 0;
-        String supervisorNames[MAX_INTRODUCERS];
+        std::string supervisorNames[MAX_INTRODUCERS];
     };
     struct SupervisorCardAuthenticationResponse
     {
         uint8_t keyNo = 0;
         uint8_t keyBytes[16] = {0};
         uint8_t keyLen = 0;
-        String error;
-        String username;
+        std::string error;
+        std::string username;
     };
     struct SupervisionResolvedResult
     {
         bool success = false;
-        String error;
-        String supervisorUsername;
+        std::string error;
+        std::string supervisorUsername;
+    };
+
+    // Server-pushed arming (ATT-816): the requester started in the web UI and picked this reader,
+    // so there is no first card tap. The reader waits for a supervisor card exactly as usual, but
+    // must not start the session itself — it confirms the card auth and the server does the rest.
+    struct SupervisionStartCommand
+    {
+        uint32_t resourceId = 0;
+        uint32_t timeoutMs = 0;
+        std::string requesterUsername;
     };
 
     void requestSupervision(uint32_t resourceId);
     void requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
+    void confirmSupervisorCardAuth(uint32_t resourceId);
     void cancelSupervision();
+    void setSupervisionStartCallback(std::function<void(SupervisionStartCommand)> callback);
     void setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback);
     void setSupervisorCardAuthenticationResponseCallback(std::function<void(SupervisorCardAuthenticationResponse)> callback);
     void setSupervisionResolvedCallback(std::function<void(SupervisionResolvedResult)> callback);
 
-    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(String username)> callback);
-    void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, String key)> callback);
-    void setEnrollNewCardErrorCallback(std::function<void(String error)> callback);
+    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username)> callback);
+    void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, std::string key)> callback);
+    void setEnrollNewCardErrorCallback(std::function<void(std::string error)> callback);
 
     void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
     void sendEnrollNewCard(bool success);
@@ -265,14 +313,15 @@ public:
     // Card reset/deletion. The server already knows the card's stored key + slot
     // (it is being deleted from the DB), so it hands them to the reader in a
     // single RESET_NFC_CARD event — no key round-trip like enrollment.
-    void setResetNfcCardCallback(std::function<void(String username, uint8_t keyNo, String key)> callback);
+    void setResetNfcCardCallback(std::function<void(std::string username, uint8_t keyNo, std::string key)> callback);
     void sendResetNfcCard(bool success);
     void sendResetNfcCardCancel();
 
-    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
+    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false);
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);
+    void cancelForm(uint32_t resourceId, ResourceUsageFormActionType action);
     void lockDoor(uint32_t resourceId);
     void unlockDoor(uint32_t resourceId);
     void unlatchDoor(uint32_t resourceId);
@@ -280,16 +329,19 @@ public:
 
     void requestBillingTopup(uint32_t amountCents);
 
-    void onDeviceName(std::function<void(String)> callback);
+    void onDeviceName(std::function<void(std::string)> callback);
     void setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback);
 
     void disableConnectionAttempts();
     void enableConnectionAttempts();
 
+    // Clear the locked TLS certificate decision (device settings button).
+    void resetCertificateTrust();
+
     // Error callback for server responses carrying an error field
     void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
     // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)
-    void setActionResultCallback(std::function<void(const char *type, bool success)> callback);
+    void setActionResultCallback(std::function<void(const ActionResult &)> callback);
 
     // Special-case callback for insufficient balance with server-provided SumUp flag
     void setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback);
@@ -306,7 +358,7 @@ public:
 
 private:
     Logger logger;
-    Websocket websocket;
+    IReaderTransport &transport;
 
     void updateSateInfo();
 
@@ -317,6 +369,8 @@ private:
 
     std::function<void(const ResourceList &)> resourceListUpdateCallback;
     std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
+    std::function<void(SupervisionStartCommand)> supervisionStartCallback;
+    void onSupervisionStart(JsonObject data);
     std::function<void(SupervisionRequestResult)> supervisionRequestResultCallback;
     std::function<void(SupervisorCardAuthenticationResponse)> supervisorCardAuthenticationResponseCallback;
     std::function<void(SupervisionResolvedResult)> supervisionResolvedCallback;
@@ -324,7 +378,7 @@ private:
     void onSupervisorCardAuthenticationData(JsonObject data);
     void onSupervisionResolved(JsonObject data);
 
-    std::function<void(String)> deviceNameCallback;
+    std::function<void(std::string)> deviceNameCallback;
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
 
     uint32_t lastRequestedProjectsOfUserPage = -1;
@@ -332,12 +386,16 @@ private:
 
     void sendAck(const char *type);
     void sendMessage(const char *type);
-    void sendMessage(const char *type, JsonObject payload);
+    bool sendMessage(const char *type, JsonObject payload);
     static constexpr size_t JSON_INBUF = 4608;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;
 
     uint32_t resourceListMessageCounter = 0;
+    uint32_t resourceListRevision = 0;
+    uint32_t nextRequestId = 0;
+    std::atomic<uint32_t> activeActionRequestId{0};
+    void sendResourceAction(const char *type, JsonObject payload);
 
     // Persistent scratch buffer to avoid large stack allocations when parsing resource lists
     ResourceList resourceListScratch;
@@ -379,9 +437,9 @@ private:
     void resetResourceUsageFormField(ResourceUsageFormField &field);
     void serializeFormPageSubmission(JsonObject payload, const FormPageSubmission &page);
 
-    std::function<void(String username)> enrollNewCardGetAvailableKeyNoCallback;
-    std::function<void(uint8_t keyNo, String key)> enrollNewCardCallback;
-    std::function<void(String error)> enrollNewCardErrorCallback;
+    std::function<void(std::string username)> enrollNewCardGetAvailableKeyNoCallback;
+    std::function<void(uint8_t keyNo, std::string key)> enrollNewCardCallback;
+    std::function<void(std::string error)> enrollNewCardErrorCallback;
 
     void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
     void onEnrollNewCard(JsonObject data);
@@ -389,21 +447,25 @@ private:
     // back to the reader (e.g. CARD_ALREADY_ENROLLED).
     void onEnrollNewCardRequestNFCKeyError(JsonObject data);
 
-    std::function<void(String username, uint8_t keyNo, String key)> resetNfcCardCallback;
+    std::function<void(std::string username, uint8_t keyNo, std::string key)> resetNfcCardCallback;
     void onResetNfcCard(JsonObject data);
 
     std::function<void(const char *title, const char *message)> errorCallback;
-    std::function<void(const char *type, bool success)> actionResultCallback;
+    std::function<void(const ActionResult &)> actionResultCallback;
     std::function<void(bool)> insufficientBalanceCallback;
 
     // Firmware update progress callback with status enum
 public:
     void setFirmwareUpdateProgressCallback(std::function<void(int)> callback);
-    void setFirmwareUpdateMetaCallback(std::function<void(String availableVersion)> callback);
+    void setFirmwareUpdateMetaCallback(std::function<void(std::string availableVersion)> callback);
 
 private:
     std::function<void(int)> firmwareUpdateProgressCallback;
-    std::function<void(String availableVersion)> firmwareUpdateMetaCallback;
+    std::function<void(std::string availableVersion)> firmwareUpdateMetaCallback;
 
+#ifdef ATTRACTAP_HOST
+    HostOtaUpdater firmware;
+#else
     OtaUpdater firmware;
+#endif
 };

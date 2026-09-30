@@ -5,9 +5,15 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './maintenance-request-notification.en.json';
+import * as de from './maintenance-request-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class MaintenanceRequestNotificationListener {
@@ -23,10 +29,11 @@ export class MaintenanceRequestNotificationListener {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
-  @OnEvent(MaintenanceRequestCreatedEvent.EVENT_NAME)
-  async handleRequestCreated(event: MaintenanceRequestCreatedEvent): Promise<void> {
+  @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
+  async handleRequestCreated(event: ResourceMaintenanceRequestCreatedEvent): Promise<void> {
     try {
       const request = await this.requestRepository.findOne({
         where: { id: event.requestId },
@@ -50,18 +57,25 @@ export class MaintenanceRequestNotificationListener {
         return;
       }
 
-      const requestedBy = request.createdByUser?.username ?? 'A user';
+      const requestedByUsername = request.createdByUser?.username;
 
       await this.notifications.dispatch({
         category: NotificationCategory.MAINTENANCE_REQUESTS,
         recipients,
-        title: `Maintenance requested for ${resource.name}`,
-        body: `${requestedBy} requested maintenance: ${request.reason}`,
+        title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
+        body: (recipient) => {
+          const requestedBy = requestedByUsername ?? t(recipient.locale, 'fallbackUser');
+          return t(recipient.locale, 'body', { requestedBy, reason: request.reason });
+        },
         url: `/resources/${resource.id}/maintenance`,
         sendEmail: (recipient) =>
           this.notifications.sendEmailTemplate(recipient, NotificationCategory.MAINTENANCE_REQUESTS, {
             resource: { id: resource.id, name: resource.name },
-            request: { id: request.id, reason: request.reason, requestedBy },
+            request: {
+              id: request.id,
+              reason: request.reason,
+              requestedBy: requestedByUsername ?? t(recipient.locale, 'fallbackUser'),
+            },
           }),
       });
     } catch (error) {
@@ -75,10 +89,8 @@ export class MaintenanceRequestNotificationListener {
   private async collectRecipients(resource: Resource): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.canManageResources = :value', { value: true })
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

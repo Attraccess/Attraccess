@@ -5,8 +5,12 @@ import type { DataSource, DeepPartial, Repository } from 'typeorm';
 import {
   Attractap,
   AttractapCrashReport,
+  AuditLog,
+  CompanionDevice,
   AuthenticationDetail,
   AuthenticationType,
+  ApiToken,
+  ApiTokenPermission,
   BillingTransaction,
   BillingTransactionItem,
   BillingTransactionStatus,
@@ -23,11 +27,12 @@ import {
   MqttServer,
   NFCCard,
   NotificationPreference,
+  Passkey,
+  PasskeyChallenge,
   PasswordHistory,
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
   PasswordPolicyOverride,
   PasswordPolicyRole,
+  Permission,
   Project,
   ProjectInvitation,
   ProjectInvitationStatus,
@@ -37,8 +42,6 @@ import {
   Resource,
   ResourceBillingConfiguration,
   ResourceFlowEdge,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceFlowVariable,
@@ -59,8 +62,13 @@ import {
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleUsageHoursConfig,
+  ResourceOperatingInterval,
   ResourceType,
   ResourceUsage,
+  ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringSessionStatus,
+  ResourceMeteringOperation,
   ResourceUsageAction,
   Session,
   Setting,
@@ -71,6 +79,9 @@ import {
   User,
   entities,
   UsageDurationUnit,
+  Role,
+  UserRole,
+  UserRoleSource,
 } from '@attraccess/database-entities';
 
 jest.setTimeout(120_000);
@@ -99,19 +110,12 @@ const ensureEntity = async <T>(repo: Repository<T>, builder: () => DeepPartial<N
 const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
   const userRepo = dataSource.getRepository(User);
   let users = await userRepo.find({ take: 2, order: { id: 'ASC' } });
-  const defaults = {
-    canManageResources: false,
-    canManageSystemConfiguration: false,
-    canManageUsers: false,
-    canManageBilling: false,
-  };
   const newUsers: DeepPartial<User>[] = [];
 
   if (users.length < 1) {
     newUsers.push({
       username: `seed_user_${seedTag}_1`,
       email: `seed_user_${seedTag}_1@example.com`,
-      systemPermissions: defaults,
     });
   }
 
@@ -119,7 +123,6 @@ const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
     newUsers.push({
       username: `seed_user_${seedTag}_2`,
       email: `seed_user_${seedTag}_2@example.com`,
-      systemPermissions: defaults,
     });
   }
 
@@ -139,8 +142,24 @@ const seedDatabase = async (dataSource: DataSource) => {
   const seedTag = Date.now().toString(36);
   const { primaryUser, secondaryUser } = await ensureUsers(dataSource, seedTag);
 
+  await ensureEntity(dataSource.getRepository(AuditLog), () => ({
+    at: new Date(),
+    domain: 'demo',
+    pluginId: 'abcdefghijklmnopqrstu',
+    action: 'demo.publication',
+    operationId: '00000000-0000-4000-8000-000000000001',
+    actorId: primaryUser.id,
+    authenticationMethod: 'session',
+    apiTokenId: null,
+    outcome: 'succeeded',
+    subjectType: 'demo.device',
+    subjectId: 7,
+    details: { revision: 1 },
+  }));
+
   const resourceGroupRepo = dataSource.getRepository(ResourceGroup);
   const resourceRepo = dataSource.getRepository(Resource);
+  const operatingIntervalRepo = dataSource.getRepository(ResourceOperatingInterval);
   const projectRepo = dataSource.getRepository(Project);
   const mqttRepo = dataSource.getRepository(MqttServer);
   const ssoProviderRepo = dataSource.getRepository(SSOProvider);
@@ -153,18 +172,13 @@ const seedDatabase = async (dataSource: DataSource) => {
   const billingConfigRepo = dataSource.getRepository(ResourceBillingConfiguration);
   const resourceMaintenanceRepo = dataSource.getRepository(ResourceMaintenance);
   const maintenanceScheduleRepo = dataSource.getRepository(ResourceMaintenanceSchedule);
-  const maintenanceScheduleUsageHoursConfigRepo = dataSource.getRepository(
-    ResourceMaintenanceScheduleUsageHoursConfig,
-  );
-  const maintenanceScheduleUsageCountConfigRepo = dataSource.getRepository(
-    ResourceMaintenanceScheduleUsageCountConfig,
-  );
+  const maintenanceScheduleUsageHoursConfigRepo = dataSource.getRepository(ResourceMaintenanceScheduleUsageHoursConfig);
+  const maintenanceScheduleUsageCountConfigRepo = dataSource.getRepository(ResourceMaintenanceScheduleUsageCountConfig);
   const maintenanceScheduleTimeIntervalConfigRepo = dataSource.getRepository(
     ResourceMaintenanceScheduleTimeIntervalConfig,
   );
   const flowNodeRepo = dataSource.getRepository(ResourceFlowNode);
   const flowEdgeRepo = dataSource.getRepository(ResourceFlowEdge);
-  const flowLogRepo = dataSource.getRepository(ResourceFlowLog);
   const flowVariableRepo = dataSource.getRepository(ResourceFlowVariable);
   const usageRepo = dataSource.getRepository(ResourceUsage);
   const billingTransactionRepo = dataSource.getRepository(BillingTransaction);
@@ -181,12 +195,17 @@ const seedDatabase = async (dataSource: DataSource) => {
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
   const passwordHistoryRepo = dataSource.getRepository(PasswordHistory);
   const passwordPolicyOverrideRepo = dataSource.getRepository(PasswordPolicyOverride);
-  const passwordPolicyAuditRepo = dataSource.getRepository(PasswordPolicyAudit);
   const conversationRepo = dataSource.getRepository(Conversation);
   const conversationParticipantRepo = dataSource.getRepository(ConversationParticipant);
   const messageRepo = dataSource.getRepository(Message);
   const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
   const pushSubscriptionRepo = dataSource.getRepository(PushSubscription);
+  const companionDeviceRepo = dataSource.getRepository(CompanionDevice);
+  const passkeyRepo = dataSource.getRepository(Passkey);
+  const passkeyChallengeRepo = dataSource.getRepository(PasskeyChallenge);
+  const apiTokenRepo = dataSource.getRepository(ApiToken);
+  const apiTokenPermissionRepo = dataSource.getRepository(ApiTokenPermission);
+  const permissionRepo = dataSource.getRepository(Permission);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -199,6 +218,12 @@ const seedDatabase = async (dataSource: DataSource) => {
     description: 'Seed resource',
     allowTakeOver: false,
     separateUnlockAndUnlatch: false,
+  }));
+
+  await ensureEntity(operatingIntervalRepo, () => ({
+    resourceId: resource.id,
+    startTime: new Date(),
+    endTime: null,
   }));
 
   const project = await ensureEntity(projectRepo, () => ({
@@ -402,14 +427,6 @@ const seedDatabase = async (dataSource: DataSource) => {
     valueType: 'string' as const,
   }));
 
-  await ensureEntity(flowLogRepo, () => ({
-    flowRunId: `seed-flow-run-${seedTag}`,
-    type: ResourceFlowLogType.FLOW_START,
-    resourceId: flowNode.resourceId,
-    nodeId: flowNode.id,
-    payload: 'Seed log',
-  }));
-
   const usage = await ensureEntity(usageRepo, () => ({
     usageAction: ResourceUsageAction.Usage,
     resourceId: resource.id,
@@ -418,6 +435,59 @@ const seedDatabase = async (dataSource: DataSource) => {
     startNotes: 'Seed usage',
     endNotes: null,
     isFinalized: false,
+    creditsPerUsage: 5,
+    billingFactor: 50,
+  }));
+
+  const lifecycleAttemptRepo = dataSource.getRepository(ResourceUsageLifecycleAttempt);
+  if (!(await lifecycleAttemptRepo.existsBy({ resourceId: resource.id }))) {
+    // An interrupted takeover owns only a hidden candidate; the existing usage and bill stay intact.
+    const candidate = await usageRepo.save(
+      usageRepo.create({
+        usageAction: ResourceUsageAction.Usage,
+        resourceId: resource.id,
+        userId: secondaryUser.id,
+        projectId: project.id,
+        startTime: new Date(),
+        startNotes: 'Seed interrupted takeover',
+        isFinalized: false,
+        lifecyclePending: true,
+      }),
+    );
+    await lifecycleAttemptRepo.save(
+      lifecycleAttemptRepo.create({
+        id: `seed-lifecycle-attempt-${seedTag}`,
+        resourceId: resource.id,
+        kind: 'takeover',
+        candidateUsageId: candidate.id,
+        previousUsageId: usage.id,
+        transitionTime: candidate.startTime,
+        formSubmissions: [],
+        billingItems: [],
+      }),
+    );
+  }
+
+  const meteringSession = await ensureEntity(dataSource.getRepository(ResourceMeteringSession), () => ({
+    id: `seed-metering-session-${seedTag}`,
+    resourceId: resource.id,
+    usageId: usage.id,
+    status: ResourceMeteringSessionStatus.Active,
+    creditsPerKwh: 30,
+    baselineMicroWh: '1000000000',
+    latestMicroWh: '500000000',
+    latestObservedAt: new Date(),
+  }));
+  await ensureEntity(dataSource.getRepository(ResourceMeteringOperation), () => ({
+    id: `seed-metering-operation-${seedTag}`,
+    sessionId: meteringSession.id,
+    resourceId: resource.id,
+    kind: 'interim' as const,
+    status: 'completed' as const,
+    requestedAt: new Date(),
+    completedAt: new Date(),
+    totalMicroWh: '500000000',
+    observedAt: new Date(),
   }));
 
   const billingTransaction = await ensureEntity(billingTransactionRepo, () => ({
@@ -435,6 +505,7 @@ const seedDatabase = async (dataSource: DataSource) => {
     description: 'Seed billing item',
     unitPrice: 100,
     quantity: 1,
+    durationMs: 60_000,
   }));
 
   const introduction = await ensureEntity(introductionRepo, () => ({
@@ -540,19 +611,6 @@ const seedDatabase = async (dataSource: DataSource) => {
     rotationDays: null,
   }));
 
-  await ensureEntity(passwordPolicyAuditRepo, () => ({
-    event: PasswordPolicyAuditEvent.GLOBAL_POLICY_UPDATED,
-    actorId: primaryUser.id,
-    actorUsername: primaryUser.username,
-    ip: '127.0.0.1',
-    userAgent: 'seed-agent',
-    requestId: `seed-req-${seedTag}`,
-    role: null,
-    before: JSON.stringify({ minLength: 12 }),
-    after: JSON.stringify({ minLength: 16 }),
-    changedFields: JSON.stringify(['minLength']),
-  }));
-
   const conversation = await ensureEntity(conversationRepo, () => ({}));
 
   await ensureEntity(conversationParticipantRepo, () => ({
@@ -585,6 +643,54 @@ const seedDatabase = async (dataSource: DataSource) => {
     userAgent: 'Seed Browser/1.0',
     lastSeenAt: null,
   }));
+
+  await ensureEntity(companionDeviceRepo, () => ({
+    name: `Seed Companion ${seedTag}`,
+    tokenHash: '$2b$10$seed.hash.placeholder.for.migration.testing.only',
+  }));
+
+  await ensureEntity(passkeyRepo, () => ({
+    userId: primaryUser.id,
+    credentialId: `seed-credential-${seedTag}`,
+    publicKey: 'seed-cose-public-key',
+    counter: 0,
+    transports: 'internal,hybrid',
+    name: `Seed Passkey ${seedTag}`,
+    backedUp: true,
+    lastUsedAt: null,
+  }));
+
+  await ensureEntity(passkeyChallengeRepo, () => ({
+    challenge: `seed-challenge-${seedTag}`,
+    userId: primaryUser.id,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  }));
+
+  const apiToken = await ensureEntity(apiTokenRepo, () => ({
+    userId: primaryUser.id,
+    name: `Seed API token ${seedTag}`,
+    tokenHash: `seed-api-token-hash-${seedTag}`,
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
+  }));
+  const [permission] = await permissionRepo.find({ take: 1, order: { key: 'ASC' } });
+  if (!permission) throw new Error('Failed to seed an API token permission');
+  await ensureEntity(apiTokenPermissionRepo, () => ({ apiTokenId: apiToken.id, permissionKey: permission.key }));
+
+  const roleRepo = dataSource.getRepository(Role);
+  const userRoleRepo = dataSource.getRepository(UserRole);
+  const userRole = await roleRepo.findOne({ where: { key: 'user' } });
+  if (userRole) {
+    await ensureEntity(userRoleRepo, () => ({
+      userId: primaryUser.id,
+      roleId: userRole.id,
+      source: UserRoleSource.MANUAL,
+      ssoProviderType: null,
+      ssoProviderId: null,
+      externalValue: null,
+    }));
+  }
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {

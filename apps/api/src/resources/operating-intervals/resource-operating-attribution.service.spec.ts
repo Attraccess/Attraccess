@@ -1,0 +1,372 @@
+import {
+  ResourceOperatingInterval,
+  ResourceUsage,
+  ResourceUsageAction,
+  ResourceUsageLifecycleAttempt,
+} from '@attraccess/database-entities';
+import { MoreThan, Repository } from 'typeorm';
+import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
+
+const at = (time: string) => new Date(`2026-08-28T${time}.000Z`);
+
+const operating = (id: number, startTime: string, endTime: string | null): ResourceOperatingInterval =>
+  ({ id, resourceId: 1, startTime: at(startTime), endTime: endTime ? at(endTime) : null }) as ResourceOperatingInterval;
+
+const usage = (id: number, startTime: string, endTime: string | null): ResourceUsage =>
+  ({
+    id,
+    resourceId: 1,
+    usageAction: ResourceUsageAction.Usage,
+    startTime: at(startTime),
+    endTime: endTime ? at(endTime) : null,
+  }) as ResourceUsage;
+
+describe('ResourceOperatingAttributionService', () => {
+  const asOf = at('12:00:00');
+  let service: ResourceOperatingAttributionService;
+  let intervalRepository: jest.Mocked<
+    Pick<Repository<ResourceOperatingInterval>, 'createQueryBuilder' | 'find' | 'existsBy'>
+  >;
+  let usageRepository: jest.Mocked<Pick<Repository<ResourceUsage>, 'find'>>;
+  let lifecycleAttemptRepository: jest.Mocked<Pick<Repository<ResourceUsageLifecycleAttempt>, 'find'>>;
+  let availabilityQuery: {
+    select: jest.Mock;
+    where: jest.Mock;
+    getRawMany: jest.Mock;
+  };
+
+  beforeEach(() => {
+    availabilityQuery = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    };
+    intervalRepository = {
+      find: jest.fn(),
+      existsBy: jest.fn().mockResolvedValue(true),
+      createQueryBuilder: jest.fn().mockReturnValue(availabilityQuery),
+    };
+    usageRepository = { find: jest.fn() };
+    lifecycleAttemptRepository = { find: jest.fn().mockResolvedValue([]) };
+    service = new ResourceOperatingAttributionService(
+      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
+      usageRepository as unknown as Repository<ResourceUsage>,
+      lifecycleAttemptRepository as Repository<ResourceUsageLifecycleAttempt>,
+    );
+  });
+
+  it('derives exact closed intersections and the remaining operating duration', () => {
+    const result = service.derive([operating(1, '10:00:00', '11:00:00')], [usage(2, '10:15:00', '10:45:00')], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 60 * 60_000,
+      attributedOperatingDurationMs: 30 * 60_000,
+      unattributedOperatingDurationMs: 30 * 60_000,
+      isProvisional: false,
+      attributions: [
+        {
+          operatingIntervalId: 1,
+          usageId: 2,
+          startTime: at('10:15:00'),
+          endTime: at('10:45:00'),
+          durationMs: 30 * 60_000,
+          isProvisional: false,
+        },
+      ],
+    });
+  });
+
+  describe('getDurationsForWindows', () => {
+    it('clips independent service cycles and unions overlapping intervals without requiring attribution', async () => {
+      intervalRepository.find.mockResolvedValue([
+        operating(1, '09:00:00', null),
+        operating(2, '10:00:00', '11:00:00'),
+        { ...operating(3, '11:30:00', null), resourceId: 2 },
+      ]);
+      usageRepository.find.mockResolvedValue([usage(1, '10:15:00', '10:45:00')]);
+
+      const totals = await service.getDurationsForWindows(
+        [
+          { key: 'old:1', resourceId: 1, start: at('10:00:00') },
+          { key: 'new:1', resourceId: 1, start: at('11:00:00') },
+          { key: 'old:2', resourceId: 2, start: at('10:00:00') },
+        ],
+        asOf,
+      );
+
+      expect(totals).toEqual(
+        new Map([
+          ['old:1', { sessionDurationMs: 30 * 60_000, operatingDurationMs: 120 * 60_000 }],
+          ['new:1', { sessionDurationMs: 0, operatingDurationMs: 60 * 60_000 }],
+          ['old:2', { sessionDurationMs: 0, operatingDurationMs: 30 * 60_000 }],
+        ]),
+      );
+      expect(intervalRepository.find).toHaveBeenCalledTimes(1);
+      expect(usageRepository.find).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not query the database when there are no duration windows', async () => {
+      await expect(service.getDurationsForWindows([], asOf)).resolves.toEqual(new Map());
+      expect(intervalRepository.find).not.toHaveBeenCalled();
+      expect(usageRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('uses each resource service-cycle boundary when loading a batch', async () => {
+      intervalRepository.find.mockResolvedValue([]);
+      usageRepository.find.mockResolvedValue([]);
+
+      await service.getDurationsForWindows(
+        [
+          { key: 'old:1', resourceId: 1, start: at('01:00:00') },
+          { key: 'new:2', resourceId: 2, start: at('11:00:00') },
+        ],
+        asOf,
+      );
+
+      const intervalWhere = intervalRepository.find.mock.calls[0][0].where as Array<{
+        resourceId: number;
+        endTime: unknown;
+      }>;
+      expect(intervalWhere).toHaveLength(4);
+      expect(intervalWhere.filter(({ resourceId }) => resourceId === 1)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(at('01:00:00')) })]),
+      );
+      expect(intervalWhere.filter(({ resourceId }) => resourceId === 2)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(at('11:00:00')) })]),
+      );
+    });
+
+    it('propagates unavailable authoritative data instead of returning a zero duration', async () => {
+      intervalRepository.find.mockRejectedValue(new Error('interval read failed'));
+      usageRepository.find.mockResolvedValue([]);
+      await expect(
+        service.getDurationsForWindows([{ key: '1', resourceId: 1, start: at('10:00:00') }], asOf),
+      ).rejects.toThrow('interval read failed');
+    });
+  });
+
+  it('marks intersections provisional while either source interval is open', () => {
+    const result = service.derive([operating(1, '10:00:00', null)], [usage(2, '10:15:00', '11:00:00')], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 120 * 60_000,
+      attributedOperatingDurationMs: 45 * 60_000,
+      unattributedOperatingDurationMs: 75 * 60_000,
+      isProvisional: true,
+      attributions: [expect.objectContaining({ durationMs: 45 * 60_000, isProvisional: true })],
+    });
+  });
+
+  it('marks an otherwise closed operating interval provisional while its usage session remains open', () => {
+    const result = service.derive([operating(1, '10:00:00', '11:00:00')], [usage(2, '10:15:00', null)], asOf);
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 45 * 60_000,
+      isProvisional: true,
+      attributions: [expect.objectContaining({ isProvisional: true })],
+    });
+  });
+
+  it('does not attribute adjacent boundaries', () => {
+    const result = service.derive([operating(1, '10:00:00', '10:30:00')], [usage(2, '10:30:00', '11:00:00')], asOf);
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 0,
+      unattributedOperatingDurationMs: 30 * 60_000,
+      attributions: [],
+    });
+  });
+
+  it('retains the gap between takeover sessions as unattributed', () => {
+    const result = service.derive(
+      [operating(1, '10:00:00', '11:00:00')],
+      [usage(2, '10:00:00', '10:25:00'), usage(3, '10:35:00', '11:00:00')],
+      asOf,
+    );
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 50 * 60_000,
+      unattributedOperatingDurationMs: 10 * 60_000,
+    });
+  });
+
+  it('does not double-count operating duration when usage sessions overlap', () => {
+    const result = service.derive(
+      [operating(1, '10:00:00', '11:00:00')],
+      [usage(2, '10:10:00', '10:40:00'), usage(3, '10:30:00', '10:50:00')],
+      asOf,
+    );
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 40 * 60_000,
+      unattributedOperatingDurationMs: 20 * 60_000,
+    });
+    expect(result.attributions).toHaveLength(2);
+  });
+
+  it('sweeps interval endpoints without revisiting expired sessions', () => {
+    const intersection = jest.spyOn(
+      service as unknown as { intersection: (left: unknown, right: unknown) => unknown },
+      'intersection',
+    );
+    const operatingIntervals = Array.from({ length: 10 }, (_, index) => {
+      const minute = String(index + 10).padStart(2, '0');
+      return operating(index + 1, `10:${minute}:00`, `10:${String(index + 11).padStart(2, '0')}:00`);
+    });
+
+    const result = service.derive(
+      operatingIntervals,
+      [usage(1, '10:00:00', '11:00:00'), usage(2, '10:00:00', '10:05:00')],
+      asOf,
+    );
+
+    expect(result.attributions).toHaveLength(10);
+    expect(intersection).toHaveBeenCalledTimes(10);
+  });
+
+  it('does not report overlap between operating intervals as unattributed', () => {
+    const result = service.derive(
+      [operating(1, '10:00:00', '11:00:00'), operating(2, '10:30:00', '11:30:00')],
+      [usage(3, '10:00:00', '11:30:00')],
+      asOf,
+    );
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 90 * 60_000,
+      attributedOperatingDurationMs: 90 * 60_000,
+      unattributedOperatingDurationMs: 0,
+    });
+  });
+
+  it('ignores door-control audit rows', () => {
+    const doorAction = {
+      ...usage(2, '10:00:00', null),
+      usageAction: ResourceUsageAction.DoorUnlock,
+    };
+    const result = service.derive([operating(1, '10:00:00', '11:00:00')], [doorAction], asOf);
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 0,
+      unattributedOperatingDurationMs: 60 * 60_000,
+      attributions: [],
+    });
+  });
+
+  it('reports no derived duration for resources without an operating signal', () => {
+    const result = service.derive([], [usage(2, '10:00:00', '11:00:00')], asOf);
+
+    expect(result).toEqual({
+      asOf,
+      windowStart: null,
+      sessionDurationMs: 60 * 60_000,
+      operatingDataAvailable: false,
+      operatingDurationMs: null,
+      attributedOperatingDurationMs: null,
+      unattributedOperatingDurationMs: null,
+      isOperating: false,
+      isProvisional: false,
+      attributions: [],
+    });
+  });
+
+  it('marks a snapshot provisional for an unmatched open usage session', () => {
+    const result = service.derive([], [usage(2, '10:00:00', null)], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: null,
+      attributedOperatingDurationMs: null,
+      unattributedOperatingDurationMs: null,
+      isProvisional: true,
+      attributions: [],
+    });
+  });
+
+  it('clips closed intervals to the attribution snapshot time', () => {
+    const result = service.derive([operating(1, '10:00:00', '13:00:00')], [usage(2, '11:00:00', '13:00:00')], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 2 * 60 * 60_000,
+      attributedOperatingDurationMs: 60 * 60_000,
+      unattributedOperatingDurationMs: 60 * 60_000,
+      isProvisional: true,
+      attributions: [expect.objectContaining({ endTime: asOf, isProvisional: true })],
+    });
+  });
+
+  it('derives an explicit diagnostics range through the same sweep as the default window (ATT-1024)', async () => {
+    intervalRepository.find.mockResolvedValue([operating(1, '10:00:00', '11:00:00')] as ResourceOperatingInterval[]);
+    usageRepository.find.mockResolvedValue([usage(2, '10:15:00', '10:45:00')] as ResourceUsage[]);
+    intervalRepository.existsBy.mockResolvedValue(true);
+    const windowStart = at('09:00:00');
+
+    const result = await service.getForResource(1, asOf, windowStart);
+
+    expect(result.windowStart).toEqual(windowStart);
+    expect(result).toMatchObject({
+      operatingDurationMs: 60 * 60_000,
+      attributedOperatingDurationMs: 30 * 60_000,
+      unattributedOperatingDurationMs: 30 * 60_000,
+    });
+  });
+
+  it('calculates a completed usage session from its exact operating overlap', async () => {
+    const manager = {
+      getRepository: jest.fn(() => ({
+        find: jest.fn().mockResolvedValue([operating(1, '10:00:00', '11:00:00')]),
+      })),
+    };
+    const minutes = await service.getForUsage(usage(2, '10:15:00', '10:45:00'), manager as never);
+
+    expect(minutes).toBe(30);
+  });
+
+  it('loads only intervals that overlap the recent attribution window', async () => {
+    intervalRepository.find.mockResolvedValue([] as ResourceOperatingInterval[]);
+    usageRepository.find.mockResolvedValue([] as ResourceUsage[]);
+
+    const result = await service.getForResource(1, asOf);
+
+    expect(result.windowStart).toEqual(new Date('2026-07-28T12:00:00.000Z'));
+
+    expect(intervalRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.arrayContaining([
+          expect.objectContaining({ resourceId: 1 }),
+          expect.objectContaining({ resourceId: 1 }),
+        ]),
+      }),
+    );
+    expect(usageRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.arrayContaining([
+          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
+          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
+        ]),
+      }),
+    );
+  });
+
+  it('loads and derives reports for multiple resources in one query per source', async () => {
+    intervalRepository.find.mockResolvedValue([
+      operating(1, '10:00:00', '11:00:00'),
+      { ...operating(2, '10:00:00', '10:30:00'), resourceId: 2 },
+    ] as ResourceOperatingInterval[]);
+    usageRepository.find.mockResolvedValue([
+      usage(1, '10:00:00', '10:30:00'),
+      { ...usage(2, '10:00:00', '10:15:00'), resourceId: 2 },
+    ] as ResourceUsage[]);
+    availabilityQuery.getRawMany.mockResolvedValue([{ resourceId: 1 }, { resourceId: 2 }]);
+
+    const result = await service.getForResources([1, 2], at('09:00:00'), asOf);
+
+    expect(result.get(1)).toMatchObject({ sessionDurationMs: 30 * 60_000, operatingDurationMs: 60 * 60_000 });
+    expect(result.get(2)).toMatchObject({ sessionDurationMs: 15 * 60_000, operatingDurationMs: 30 * 60_000 });
+    expect(intervalRepository.find).toHaveBeenCalledTimes(1);
+    expect(usageRepository.find).toHaveBeenCalledTimes(1);
+    expect(intervalRepository.createQueryBuilder).toHaveBeenCalledWith('interval');
+    expect(availabilityQuery.select).toHaveBeenCalledWith('DISTINCT interval.resourceId', 'resourceId');
+    expect(availabilityQuery.where).toHaveBeenCalledWith('interval.resourceId IN (:...resourceIds)', {
+      resourceIds: [1, 2],
+    });
+  });
+});

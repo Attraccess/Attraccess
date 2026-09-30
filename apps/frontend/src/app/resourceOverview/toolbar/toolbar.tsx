@@ -1,32 +1,29 @@
 import { Button, TextField, InputGroup } from '@heroui/react';
-import { ListFilterIcon, PlusIcon, ScanQrCodeIcon, SearchIcon } from 'lucide-react';
-import { useAuth } from '../../../hooks/useAuth';
+import { ListFilterIcon, ScanQrCodeIcon, SearchIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ResourceEditModal } from '../../resources/editModal/resourceEditModal';
-import { useNavigate } from 'react-router-dom';
+import { CreateResourceButton } from '../createResourceButton';
 import en from './toolbar.en.json';
 import de from './toolbar.de.json';
 import { ResourceScanner } from './scanner';
 import { ResourceFilter } from './filter';
 import { FilterProps } from '../filterProps';
 import { cn } from '@heroui/react';
+import { PageHeader } from '../../../components/pageHeader';
 
 interface ToolbarProps {
+  onOpenCreate: () => void;
   searchIsLoading?: boolean;
   highlightSearch?: boolean;
   highlightFilter?: boolean;
 }
 
 export function Toolbar({
+  onOpenCreate,
   searchIsLoading,
   highlightSearch,
   highlightFilter,
   ...filterProps
 }: Readonly<ToolbarProps & FilterProps>) {
-  const { hasPermission } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
-  const navigate = useNavigate();
-
   const { t } = useTranslations({
     en,
     de,
@@ -34,8 +31,9 @@ export function Toolbar({
 
   return (
     <div>
-      <div className="mb-6 flex flex-row w-full items-center justify-between gap-4 rounded-full p-2 shadow-medium bg-content1">
-        <div className="relative flex-grow">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
+      <div className="mb-6 flex flex-wrap w-full items-center gap-3 border-b border-separator pb-6">
+        <div className="relative flex-1 min-w-48">
           <TextField
             value={filterProps.search}
             onChange={filterProps.onSearchChanged}
@@ -53,7 +51,7 @@ export function Toolbar({
                   onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
                 >
                   {({ onOpen }) => (
-                    <Button variant="ghost" isIconOnly onPress={onOpen}>
+                    <Button variant="ghost" isIconOnly aria-label={t('filter')} onPress={onOpen}>
                       <ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />
                     </Button>
                   )}
@@ -67,26 +65,12 @@ export function Toolbar({
 
         <ResourceScanner>
           {(onOpen: () => void) => (
-            <Button variant="ghost" onPress={onOpen} isIconOnly>
+            <Button variant="outline" onPress={onOpen} isIconOnly aria-label={t('scan')}>
               <ScanQrCodeIcon />
             </Button>
           )}
         </ResourceScanner>
-      </div>
-
-      <div className="flex flex-row gap-2 justify-end mb-6">
-        {canManageResources && (
-          <div className="flex items-center gap-2 mr-1 hidden md:flex">
-            <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
-              {(onOpen: () => void) => (
-                <Button variant="primary" onPress={onOpen} data-cy="toolbar-open-create-resource-modal-button">
-                  <PlusIcon size={18} />
-                  {t('addResource')}
-                </Button>
-              )}
-            </ResourceEditModal>
-          </div>
-        )}
+        <CreateResourceButton testId="toolbar-open-create-resource-modal-button" onOpen={onOpenCreate} />
       </div>
     </div>
   );

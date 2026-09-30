@@ -6,7 +6,6 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
-  PasswordPolicyAudit,
   PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
@@ -22,6 +21,7 @@ import { TokenHashService } from '../../encryption/token-hash.service';
 import { PasswordPolicyService } from './password-policy.service';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { RbacService } from '../rbac/rbac.service';
 import { PasswordPolicyViolationException } from './password-policy.errors';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
@@ -135,10 +135,6 @@ async function buildController(opts: BuildOpts = {}) {
         },
       },
       {
-        provide: getRepositoryToken(PasswordPolicyAudit),
-        useValue: { create: jest.fn((row) => row), save: jest.fn(async (row) => row) },
-      },
-      {
         provide: DataSource,
         useValue: {
           transaction: jest.fn(async (cb: never) =>
@@ -196,6 +192,7 @@ async function buildController(opts: BuildOpts = {}) {
         },
       },
       { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+      { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
     ],
   }).compile();
 
@@ -222,7 +219,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
         passwordService.setUserPassword(
           42,
           { password: WEAK_PASSWORD },
-          { id: 42, systemPermissions: { canManageUsers: false } } as never,
+          { id: 42 } as never,
         ),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
       expect(changePassword).not.toHaveBeenCalled();
@@ -233,7 +230,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
       await passwordService.setUserPassword(
         42,
         { password: STRONG_PASSWORD },
-        { id: 42, systemPermissions: { canManageUsers: false } } as never,
+        { id: 42 } as never,
       );
       expect(changePassword).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), STRONG_PASSWORD);
     });
@@ -249,7 +246,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
         passwordService.setUserPassword(
           42,
           { password: STRONG_PASSWORD },
-          { id: 42, systemPermissions: { canManageUsers: false } } as never,
+          { id: 42 } as never,
         ),
       ).rejects.toMatchObject({
         policyErrors: expect.arrayContaining([{ code: 'PASSWORD_REUSED', params: { historySize: 3 } }]),
@@ -267,7 +264,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
       await passwordService.setUserPassword(
         42,
         { password: STRONG_PASSWORD },
-        { id: 42, systemPermissions: { canManageUsers: false } } as never,
+        { id: 42 } as never,
       );
       expect(historyRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 42, passwordHash: currentHash }),
@@ -343,7 +340,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
         passwordService.setUserPassword(
           42,
           { password: 'SuperSecretLeakable123!' },
-          { id: 42, systemPermissions: { canManageUsers: false } } as never,
+          { id: 42 } as never,
         ),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
 

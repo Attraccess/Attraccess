@@ -1,0 +1,5 @@
+{
+  "title": "Usage note added for {resourceName}",
+  "body": "{authorName}: {note}",
+  "fallbackUser": "A user"
+}

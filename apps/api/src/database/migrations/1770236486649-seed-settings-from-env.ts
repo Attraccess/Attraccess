@@ -30,93 +30,65 @@ export class SeedSettingsFromEnv1770236486649 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Only seed when no app/smtp settings exist to avoid overwriting existing configuration.
-    const [{ count }] = await queryRunner.query(
-      `SELECT COUNT(*) as count FROM "setting" WHERE "parent" IN (?, ?)`,
-      [APP_PARENT, SMTP_PARENT],
-    );
+    const [{ count }] = await queryRunner.query(`SELECT COUNT(*) as count FROM "setting" WHERE "parent" IN (?, ?)`, [
+      APP_PARENT,
+      SMTP_PARENT,
+    ]);
     if (Number(count) > 0) {
       return;
     }
 
-    const frontendUrl = normalizeString(
-      process.env.ATTRACCESS_FRONTEND_URL ??
-      process.env.FRONTEND_URL ??
-      process.env.ATTRACCESS_URL ??
-      process.env.VITE_ATTRACCESS_URL ??
-      null,
-    );
-    const backendUrl = normalizeString(
-      process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL ?? null,
-    );
-    const publicInternetUrl = normalizeString(
-      process.env.ATTRACCESS_PUBLIC_INTERNET_URL ?? backendUrl ?? null,
-    );
-    const licenseKey = normalizeString(process.env.LICENSE_KEY ?? null);
-
-    const smtpService = normalizeString(process.env.SMTP_SERVICE ?? null);
-    const smtpHost = normalizeString(process.env.SMTP_HOST ?? null);
-    const smtpPort = normalizeString(process.env.SMTP_PORT ?? null);
-    const smtpSecure = normalizeString(process.env.SMTP_SECURE ?? null);
-    const smtpUser = normalizeString(process.env.SMTP_USER ?? null);
-    const smtpPass = normalizeString(process.env.SMTP_PASS ?? null);
-    const smtpFrom = normalizeString(process.env.SMTP_FROM ?? null);
-
-    const settings: Array<{ parent: string; key: string; value: string }> = [];
-
-    if (frontendUrl) {
-      settings.push({ parent: APP_PARENT, key: APP_KEYS.frontendUrl, value: frontendUrl });
-    }
-    if (backendUrl) {
-      settings.push({ parent: APP_PARENT, key: APP_KEYS.backendUrl, value: backendUrl });
-    }
-    if (publicInternetUrl) {
-      settings.push({ parent: APP_PARENT, key: APP_KEYS.publicInternetUrl, value: publicInternetUrl });
-    }
-    if (licenseKey) {
-      settings.push({
-        parent: APP_PARENT,
-        key: APP_KEYS.licenseKey,
-        value: encryptSecret(licenseKey),
-      });
-    }
-
-    if (smtpService) {
-      settings.push({ parent: SMTP_PARENT, key: SMTP_KEYS.service, value: smtpService });
-    }
-    if (smtpHost) {
-      settings.push({ parent: SMTP_PARENT, key: SMTP_KEYS.host, value: smtpHost });
-    }
-    if (smtpPort) {
-      settings.push({ parent: SMTP_PARENT, key: SMTP_KEYS.port, value: smtpPort });
-    }
-    if (smtpSecure) {
-      settings.push({ parent: SMTP_PARENT, key: SMTP_KEYS.secure, value: smtpSecure });
-    }
-    if (smtpUser) {
-      settings.push({ parent: SMTP_PARENT, key: SMTP_KEYS.user, value: smtpUser });
-    }
-    if (smtpPass) {
-      settings.push({
-        parent: SMTP_PARENT,
-        key: SMTP_KEYS.pass,
-        value: encryptSecret(smtpPass),
-      });
-    }
-    if (smtpFrom) {
-      settings.push({ parent: SMTP_PARENT, key: SMTP_KEYS.from, value: smtpFrom });
-    }
+    const settings = [...appSettingsFromEnv(), ...smtpSettingsFromEnv()];
 
     for (const setting of settings) {
-      await queryRunner.query(
-        `INSERT INTO "setting" ("parent", "key", "value") VALUES (?, ?, ?)`,
-        [setting.parent, setting.key, setting.value],
-      );
+      await queryRunner.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES (?, ?, ?)`, [
+        setting.parent,
+        setting.key,
+        setting.value,
+      ]);
     }
   }
 
   public async down(): Promise<void> {
     // Intentionally left empty; seeded settings should remain intact on rollback.
   }
+}
+
+type SeedSetting = { parent: string; key: string; value: string };
+
+function appSettingsFromEnv(): SeedSetting[] {
+  const frontendUrl = normalizeString(
+    process.env.ATTRACCESS_FRONTEND_URL ??
+      process.env.FRONTEND_URL ??
+      process.env.ATTRACCESS_URL ??
+      process.env.VITE_ATTRACCESS_URL,
+  );
+  const backendUrl = normalizeString(process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL);
+  const publicInternetUrl = normalizeString(process.env.ATTRACCESS_PUBLIC_INTERNET_URL ?? backendUrl);
+  const licenseKey = normalizeString(process.env.LICENSE_KEY);
+  return presentSettings(APP_PARENT, [
+    [APP_KEYS.frontendUrl, frontendUrl],
+    [APP_KEYS.backendUrl, backendUrl],
+    [APP_KEYS.publicInternetUrl, publicInternetUrl],
+    [APP_KEYS.licenseKey, licenseKey ? encryptSecret(licenseKey) : null],
+  ]);
+}
+
+function smtpSettingsFromEnv(): SeedSetting[] {
+  const password = normalizeString(process.env.SMTP_PASS);
+  return presentSettings(SMTP_PARENT, [
+    [SMTP_KEYS.service, normalizeString(process.env.SMTP_SERVICE)],
+    [SMTP_KEYS.host, normalizeString(process.env.SMTP_HOST)],
+    [SMTP_KEYS.port, normalizeString(process.env.SMTP_PORT)],
+    [SMTP_KEYS.secure, normalizeString(process.env.SMTP_SECURE)],
+    [SMTP_KEYS.user, normalizeString(process.env.SMTP_USER)],
+    [SMTP_KEYS.pass, password ? encryptSecret(password) : null],
+    [SMTP_KEYS.from, normalizeString(process.env.SMTP_FROM)],
+  ]);
+}
+
+function presentSettings(parent: string, values: [string, string | null][]): SeedSetting[] {
+  return values.flatMap(([key, value]) => (value ? [{ parent, key, value }] : []));
 }
 
 const normalizeString = (value: string | null | undefined): string | null => {

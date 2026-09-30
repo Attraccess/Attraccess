@@ -14,12 +14,13 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
     const dict: Record<string, string> = {
       title: 'Node catalog',
       empty: 'No nodes available.',
-      'domains.manual': 'Manual',
-      'domains.door': 'Door',
+      'domains.flow-control': 'Flow control',
+      'domains.access-doors': 'Access & doors',
       'nodes.input.button.title': 'Button',
       'nodes.input.button.description': 'User-triggered start',
       'nodes.input.resource.door.locked.title': 'Door locked',
       'nodes.input.resource.door.locked.description': 'Fires on lock',
+      loading: 'Loading nodes…',
       toggleOpen: 'Open catalog',
       toggleClose: 'Close catalog',
       collapse: 'Collapse',
@@ -31,15 +32,34 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   },
 }));
 
+let mockIsLoading = false;
+
 vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
   return {
     ...actual,
     useResourceFlowsServiceGetNodeSchemas: () => ({
-      data: [
-        { type: 'input.button', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'input.resource.door.locked', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
-      ],
+      isLoading: mockIsLoading,
+      data: mockIsLoading
+        ? undefined
+        : [
+            {
+              type: 'input.button',
+              inputs: [],
+              outputs: ['out'],
+              isOutput: false,
+              supportedByResource: true,
+              configSchema: {},
+            },
+            {
+              type: 'input.resource.door.locked',
+              inputs: [],
+              outputs: ['out'],
+              isOutput: false,
+              supportedByResource: true,
+              configSchema: {},
+            },
+          ],
     }),
   };
 });
@@ -56,26 +76,25 @@ const tNodeTranslations = ((key: string) => {
 
 describe('NodeCatalogPanel', () => {
   beforeEach(() => {
+    mockIsLoading = false;
     window.localStorage.clear();
   });
 
   it('renders domain headers and node rows in desktop shell', () => {
-    render(
-      <NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />,
-      { wrapper: TestWrapper },
-    );
-    expect(screen.getAllByText('Manual').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Door').length).toBeGreaterThan(0);
+    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+      wrapper: TestWrapper,
+    });
+    expect(screen.getAllByText('Flow control').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Access & doors').length).toBeGreaterThan(0);
   });
 
   it('renders icon rail when collapsed and expands + scrolls on icon click', async () => {
     window.localStorage.setItem('nodeCatalog.collapsed', 'true');
     const user = userEvent.setup();
-    render(
-      <NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />,
-      { wrapper: TestWrapper },
-    );
-    const manualButton = screen.getAllByRole('button', { name: 'Manual' })[0];
+    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+      wrapper: TestWrapper,
+    });
+    const manualButton = screen.getAllByRole('button', { name: 'Flow control' })[0];
     expect(manualButton).toBeInTheDocument();
     expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('true');
 
@@ -83,15 +102,58 @@ describe('NodeCatalogPanel', () => {
     expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('false');
   });
 
+  it('shows spinner while loading in desktop sidebar', () => {
+    mockIsLoading = true;
+    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+      wrapper: TestWrapper,
+    });
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByText('Flow control')).toBeNull();
+  });
+
+  it('shows content once loaded in desktop sidebar', () => {
+    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+      wrapper: TestWrapper,
+    });
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getAllByText('Flow control').length).toBeGreaterThan(0);
+  });
+
+  it('shows spinner in mobile drawer while loading', async () => {
+    mockIsLoading = true;
+    const ref = createRef<NodeCatalogHandle>();
+    render(<NodeCatalogPanel ref={ref} resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+      wrapper: TestWrapper,
+    });
+    act(() => {
+      ref.current?.open();
+    });
+    const statuses = screen.getAllByRole('status');
+    expect(statuses.length).toBeGreaterThan(0);
+    expect(screen.queryByText('Flow control')).toBeNull();
+  });
+
+  it('shows content in mobile drawer once loaded', async () => {
+    const ref = createRef<NodeCatalogHandle>();
+    render(<NodeCatalogPanel ref={ref} resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+      wrapper: TestWrapper,
+    });
+    act(() => {
+      ref.current?.open();
+    });
+    expect(screen.getAllByText('Flow control').length).toBeGreaterThan(0);
+  });
+
   it('opens mobile overlay via imperative ref and selects a node', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
     const ref = createRef<NodeCatalogHandle>();
-    render(
-      <NodeCatalogPanel ref={ref} resourceId={1} onSelect={onSelect} tNodeTranslations={tNodeTranslations} />,
-      { wrapper: TestWrapper },
-    );
-    act(() => { ref.current?.open(); });
+    render(<NodeCatalogPanel ref={ref} resourceId={1} onSelect={onSelect} tNodeTranslations={tNodeTranslations} />, {
+      wrapper: TestWrapper,
+    });
+    act(() => {
+      ref.current?.open();
+    });
     const buttons = screen.getAllByRole('button', { name: /Button/ });
     await user.click(buttons[buttons.length - 1]);
     expect(onSelect).toHaveBeenCalledWith('input.button');

@@ -91,7 +91,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(payload.title ?? 'Attraccess', {
       body: payload.body,
       icon: payload.icon ?? '/icon-192.png',
-      badge: '/icon-192.png',
+      badge: '/badge-72.png',
       tag: payload.tag,
       data: { url: payload.url ?? '/' },
     }),

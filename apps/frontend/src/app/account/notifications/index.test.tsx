@@ -1,12 +1,14 @@
+import { ApiError } from '@attraccess/react-query-client';
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationPreferencesForm } from './index';
 
 const hoisted = vi.hoisted(() => ({
   mutate: vi.fn(),
+  mutationOptions: {} as { onError: (error: unknown) => void },
   invalidateQueries: vi.fn(),
   subscribe: vi.fn(),
   unsubscribe: vi.fn(),
@@ -26,6 +28,7 @@ const hoisted = vi.hoisted(() => ({
     isSubscribed: true,
     isBusy: false,
     isLoadingKey: false,
+    publicKey: 'AQID',
   },
   locale: 'en',
 }));
@@ -70,7 +73,11 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   UseNotificationsServiceNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],
   useNotificationsServiceNotificationsGetPreferences: () => ({ data: hoisted.preferences, isLoading: false }),
-  useNotificationsServiceNotificationsUpdatePreferences: () => ({ mutate: hoisted.mutate, isPending: hoisted.isPending }),
+  useNotificationsServiceNotificationsUpdatePreferences: (options: typeof hoisted.mutationOptions) => {
+    hoisted.mutationOptions = options;
+    return { mutate: hoisted.mutate, isPending: hoisted.isPending };
+  },
+  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['maintenance'] } }),
 }));
 
 vi.mock('../../../components/toastProvider', () => ({
@@ -172,13 +179,17 @@ describe('NotificationPreferencesForm', () => {
 
     const resourceManagers = screen.getByTestId('notification-group-resourceManagers');
     expect(within(resourceManagers).getByText('Introducers and maintainers')).toBeInTheDocument();
-    expect(within(resourceManagers).getByText('Notifications for users who manage or supervise resources.')).toBeInTheDocument();
+    expect(
+      within(resourceManagers).getByText('Notifications for users who manage or supervise resources.'),
+    ).toBeInTheDocument();
     expect(within(resourceManagers).getByText('Maintenance requests')).toBeInTheDocument();
     expect(within(resourceManagers).getByText('Resource health')).toBeInTheDocument();
 
     const admins = screen.getByTestId('notification-group-admins');
     expect(within(admins).getByText('Admins')).toBeInTheDocument();
-    expect(within(admins).getByText('Notifications tied to system-level or access-management permissions.')).toBeInTheDocument();
+    expect(
+      within(admins).getByText('Notifications tied to system-level or access-management permissions.'),
+    ).toBeInTheDocument();
     expect(within(admins).getByText('Access changes')).toBeInTheDocument();
   });
 
@@ -236,4 +247,76 @@ describe('NotificationPreferencesForm', () => {
 
     expect(screen.getByTestId('notifications-resource_health-push')).toHaveAttribute('aria-pressed', 'true');
   });
+  it('requires an explicit action to enable this device after deferring the prompt', async () => {
+    hoisted.pushState.isSubscribed = false;
+    hoisted.pushState.permission = 'default';
+    localStorage.setItem('push-permission-dismissed:1', 'true');
+    renderForm();
+    expect(hoisted.subscribe).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Enable on this device' }));
+    expect(hoisted.subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains a blocked browser permission without requesting it again', () => {
+    hoisted.pushState.permission = 'denied';
+    hoisted.pushState.isSubscribed = false;
+    renderForm();
+    expect(screen.getByText(/Notifications are blocked for this site/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enable on this device' })).not.toBeInTheDocument();
+    expect(hoisted.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('shows actionable feedback if explicit subscription fails', async () => {
+    hoisted.pushState.isSubscribed = false;
+    hoisted.subscribe.mockResolvedValue(false);
+    renderForm();
+    await userEvent.click(screen.getByRole('button', { name: 'Enable on this device' }));
+    await waitFor(() =>
+      expect(hoisted.errorToast).toHaveBeenCalledWith({
+        title: 'Could not enable push notifications. Please check your browser notification permissions.',
+      }),
+    );
+  });
+  it('can register an existing browser subscription for this account and retry a failed registration', async () => {
+    // A previous account or failed upsert may leave a browser subscription behind.
+    hoisted.pushState.isSubscribed = true;
+    hoisted.pushState.permission = 'granted';
+    hoisted.subscribe.mockRejectedValueOnce(new Error('Registration failed')).mockResolvedValueOnce(true);
+    renderForm();
+    expect(hoisted.subscribe).not.toHaveBeenCalled();
+    expect(screen.queryByText('Push notifications are enabled on this device.')).not.toBeInTheDocument();
+    const enable = screen.getByRole('button', { name: 'Enable on this device' });
+    await userEvent.click(enable);
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledTimes(1));
+    expect(hoisted.successToast).not.toHaveBeenCalled();
+    await userEvent.click(enable);
+    await waitFor(() =>
+      expect(hoisted.successToast).toHaveBeenCalledWith({
+        title: 'Push notifications are enabled on this device.',
+      }),
+    );
+    expect(hoisted.subscribe).toHaveBeenCalledTimes(2);
+  });
+});
+
+it('shows single-category validation errors with a fallback for unusable server messages', () => {
+  renderForm();
+  const failure = (message: unknown) =>
+    Object.assign(
+      new ApiError(
+        { method: 'PATCH', url: '/preferences' },
+        { url: '/preferences', ok: false, status: 400, statusText: 'Bad Request', body: undefined },
+        'Rejected',
+      ),
+      { body: { message } },
+    );
+  for (const [error, title] of [
+    [failure(['Denied', 'Other']), 'Denied'],
+    [failure('Not permitted'), 'Not permitted'],
+    [failure('  '), 'Could not update notification preferences'],
+    [{}, 'Could not update notification preferences'],
+  ] as const) {
+    act(() => hoisted.mutationOptions.onError(error));
+    expect(hoisted.errorToast).toHaveBeenLastCalledWith({ title });
+  }
 });

@@ -13,7 +13,12 @@ void Application::processCardAuthenticationData() {
     this->led.triggerError();
 #endif
     this->nfc.enableCardDetection();
+#ifdef HAS_LVGL_DISPLAY
+    this->finishCardAuthentication(false);
+    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige NFC-Karte auflegen.");
+#else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+#endif
     return;
   }
 
@@ -28,7 +33,12 @@ void Application::processCardAuthenticationData() {
     this->led.triggerError();
 #endif
     this->nfc.enableCardDetection();
+#ifdef HAS_LVGL_DISPLAY
+    this->finishCardAuthentication(false);
+    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige NFC-Karte auflegen.");
+#else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+#endif
     return;
   }
 
@@ -41,6 +51,9 @@ void Application::processCardAuthenticationData() {
   this->externalState = EXTERNAL_STATE_NONE;
 
   this->unlocked = true;
+#ifdef HAS_LVGL_DISPLAY
+  this->finishCardAuthentication(true);
+#endif
 
 #ifndef HAS_LVGL_DISPLAY
   // Enable card detection to detect card removal in non-display mode

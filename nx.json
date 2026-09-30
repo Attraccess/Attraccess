@@ -90,6 +90,12 @@
     "e2e-ci--**/*": {
       "dependsOn": ["^build"]
     },
+    "publish": {
+      "inputs": [
+        "{workspaceRoot}/apps/plugins/scripts/publish-plugin.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/npm-dist-tag.mjs"
+      ]
+    },
     "lint": {
       "cache": true,
       "inputs": [
@@ -171,6 +177,22 @@
       "cache": true,
       "dependsOn": ["build-migration-datasource"],
       "outputs": ["{options.outputPath}"]
+    },
+    "crap-score": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/scripts/crap-score/**/*",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        {
+          "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
+        }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/crap/{projectName}"]
     }
   },
   "generators": {

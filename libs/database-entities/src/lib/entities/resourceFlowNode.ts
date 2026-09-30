@@ -2,7 +2,6 @@ import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn,
 import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
 import { Resource } from './resource.entity';
-import { EventNodeDataSchema } from '../entities-index';
 
 export enum ResourceFlowNodeType {
   INPUT_BUTTON = 'input.button',
@@ -20,6 +19,8 @@ export enum ResourceFlowNodeType {
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
   OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
   OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
+  OUTPUT_RESOURCE_ACTIVITY_OPERATING = 'output.resource.activity.operating',
+  OUTPUT_RESOURCE_ACTIVITY_IDLE = 'output.resource.activity.idle',
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
@@ -29,6 +30,17 @@ export enum ResourceFlowNodeType {
   PROCESSING_GET_VARIABLES = 'processing.variables.get',
   OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
   OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set',
+  OUTPUT_COMPANION_LOCK_PC = 'output.companion.lock-pc',
+  OUTPUT_COMPANION_UNLOCK_PC = 'output.companion.unlock-pc',
+  INPUT_COMPANION_IDLE = 'input.companion.idle',
+  INPUT_COMPANION_ACTIVE = 'input.companion.active',
+  INPUT_COMPANION_FOREGROUND_APP_CHANGED = 'input.companion.foreground_app_changed',
+  INPUT_COMPANION_USB_DEVICE_CONNECTED = 'input.companion.usb_device_connected',
+  INPUT_COMPANION_USB_DEVICE_DISCONNECTED = 'input.companion.usb_device_disconnected',
+  INPUT_METERING_START = 'input.resource.metering.start',
+  INPUT_METERING_COLLECT = 'input.resource.metering.collect',
+  OUTPUT_METERING_READY = 'output.resource.metering.ready',
+  OUTPUT_METERING_REPORT = 'output.resource.metering.report',
 }
 
 // Zod schemas for node data validation
@@ -42,33 +54,72 @@ export const ButtonNodeDataSchema = z.object({
   label: z.string().min(1, 'Label is required'),
 });
 
-export const HttpRequestNodeDataSchema = z.object({
-  url: z.string().url('Invalid URL format'),
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']),
-  headers: z.record(z.string(), z.string()).optional().default({}),
-  body: z.string().optional().default('').meta({
-    stringVariant: 'multiline',
-  }),
+export const ExternalEffectFailureBehaviorSchema = z
+  .enum(['fail-flow', 'failure-output', 'log-and-continue'])
+  .default('log-and-continue')
+  .meta({
+    helpText:
+      'fail-flow aborts the triggering operation, failure-output routes the error through the failure handle, and log-and-continue records the error and continues normally.',
+  });
+
+export const ExternalEffectPolicySchema = z.object({
+  failureBehavior: ExternalEffectFailureBehaviorSchema,
 });
+
+export type ExternalEffectFailureBehavior = z.infer<typeof ExternalEffectFailureBehaviorSchema>;
+
+const AcknowledgementTimeoutSecondsSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(2_147_483, 'Timeout exceeds the supported timer limit')
+  .optional()
+  .meta({
+    helpText: 'Maximum time to wait for an acknowledgement, in seconds. Leave empty to use the integration default.',
+  });
+
+const CompletionBehaviorSchema = z.enum(['dispatch', 'acknowledged']).default('acknowledged');
+
+export const HttpRequestNodeDataSchema = z
+  .object({
+    url: z.string().url('Invalid URL format'),
+    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']),
+    headers: z.record(z.string(), z.string()).optional().default({}),
+    body: z.string().optional().default('').meta({
+      stringVariant: 'multiline',
+    }),
+    timeoutSeconds: AcknowledgementTimeoutSecondsSchema,
+    completionBehavior: CompletionBehaviorSchema.meta({
+      helpText: 'Dispatch continues after the HTTP request is initiated. Acknowledged waits for the HTTP response.',
+    }),
+  })
+  .extend(ExternalEffectPolicySchema.shape);
 
 const MqttServerIdSchema = z.number().int().positive().meta({
   selectFromEntity: 'mqttServer',
   entityProperty: 'id',
 });
 
-export const MqttSendMessageNodeDataSchema = z.object({
-  serverId: MqttServerIdSchema,
-  topic: z.string().min(1, 'Topic is required'),
-  payload: z.string().optional().default('').meta({
-    stringVariant: 'multiline',
-  }),
-  qos: z.number().min(0).max(2).optional().meta({
-    helpText: 'Publish QoS: 0 (at most once), 1 (at least once), 2 (exactly once)',
-  }),
-  retain: z.boolean().optional().meta({
-    helpText: 'Retain publishes: broker stores last message for new subscribers',
-  }),
-});
+export const MqttSendMessageNodeDataSchema = z
+  .object({
+    serverId: MqttServerIdSchema,
+    topic: z.string().min(1, 'Topic is required'),
+    payload: z.string().optional().default('').meta({
+      stringVariant: 'multiline',
+    }),
+    qos: z.number().min(0).max(2).optional().meta({
+      helpText: 'Publish QoS: 0 (at most once), 1 (at least once), 2 (exactly once)',
+    }),
+    retain: z.boolean().optional().meta({
+      helpText: 'Retain publishes: broker stores last message for new subscribers',
+    }),
+    completionBehavior: CompletionBehaviorSchema.meta({
+      helpText:
+        'Dispatch continues after the broker accepts the publish call. Acknowledged waits for the MQTT publish callback.',
+    }),
+    acknowledgementTimeoutSeconds: AcknowledgementTimeoutSecondsSchema,
+  })
+  .extend(ExternalEffectPolicySchema.shape);
 
 export const WaitNodeDataSchema = z.object({
   duration: z.number().int().positive('Duration must be a positive integer'),
@@ -99,6 +150,7 @@ export const BillingTransactionItemCreateSchema = z.object({
 });
 
 export const ResourceActivityTrackActivityNodeDataSchema = z.object({});
+export const ResourceOperatingTransitionNodeDataSchema = z.object({});
 
 export const MqttMessageReceivedNodeDataSchema = z.object({
   topic: z.string().min(1, 'Topic is required'),
@@ -157,15 +209,17 @@ export const VariableChangedNodeDataSchema = z.object({
   source: z.enum(['any', 'exclude-self']).default('any'),
 });
 
-export const MqttWaitForMessageNodeDataSchema = z.object({
-  serverId: MqttServerIdSchema,
-  topic: z.string().min(1, 'Topic is required'),
-  timeoutSeconds: z.number().int().positive('Timeout must be a positive integer (seconds)'),
-  subscribeQos: z.number().min(0).max(2).optional().meta({
-    helpText:
-      'Subscribe QoS sets the maximum delivery level for received messages; effective QoS is the lower of publisher and subscriber QoS.',
-  }),
-});
+export const MqttWaitForMessageNodeDataSchema = z
+  .object({
+    serverId: MqttServerIdSchema,
+    topic: z.string().min(1, 'Topic is required'),
+    timeoutSeconds: z.number().int().positive('Timeout must be a positive integer (seconds)'),
+    subscribeQos: z.number().min(0).max(2).optional().meta({
+      helpText:
+        'Subscribe QoS sets the maximum delivery level for received messages; effective QoS is the lower of publisher and subscriber QoS.',
+    }),
+  })
+  .extend(ExternalEffectPolicySchema.shape);
 
 export const ErrorNodeDataSchema = z.object({
   message: z.string().min(1),
@@ -177,14 +231,37 @@ export const ResourceUsageEndSessionNodeDataSchema = z
       stringVariant: 'multiline',
     }),
   })
+  .extend(ExternalEffectPolicySchema.shape)
   .optional();
+
+export function getExternalEffectFailureBehavior(
+  nodeType: ResourceFlowNodeType,
+  data: unknown,
+): ExternalEffectFailureBehavior | undefined {
+  if (typeof data !== 'object' || data === null || !('failureBehavior' in data)) {
+    return undefined;
+  }
+
+  switch (nodeType) {
+    case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+      return HttpRequestNodeDataSchema.safeParse(data).data?.failureBehavior;
+    case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+      return MqttSendMessageNodeDataSchema.safeParse(data).data?.failureBehavior;
+    case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+      return MqttWaitForMessageNodeDataSchema.safeParse(data).data?.failureBehavior;
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+      return ResourceUsageEndSessionNodeDataSchema.safeParse(data).data?.failureBehavior;
+    default:
+      return undefined;
+  }
+}
 
 export const HealthStateOptionEnum = z.enum(['healthy', 'unhealthy']);
 
 export const ResourceHealthHeartbeatNodeDataSchema = z.object({
   identifier: z.string().optional().default('').meta({
     helpText:
-      'Optional label identifying which subsystem reports this heartbeat (e.g. "Shelly"). Leave empty for the resource default.',
+      'Optional label identifying which subsystem reports this heartbeat (e.g. "ir-bridge"). Leave empty for the resource default.',
   }),
   timeoutSeconds: z
     .number()
@@ -200,7 +277,7 @@ export const ResourceHealthSetNodeDataSchema = z.object({
   identifier: z.string().optional().default('').meta({
     overrideWithInput: 'health.identifier',
     helpText:
-      'Optional label identifying which subsystem this state refers to (e.g. "Shelly"). Overridable via payload path "health.identifier".',
+      'Optional label identifying which subsystem this state refers to (e.g. "ir-bridge"). Overridable via payload path "health.identifier".',
   }),
   status: HealthStateOptionEnum.meta({
     overrideWithInput: 'health.status',
@@ -215,76 +292,118 @@ export const ResourceHealthSetNodeDataSchema = z.object({
   }),
 });
 
-// Helper function to get the appropriate schema for a node type
+const CompanionDeviceIdSchema = z.number().int().positive().meta({
+  selectFromEntity: 'companionDevice',
+  entityProperty: 'id',
+});
+
+export const CompanionLockNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
+export const CompanionIdleActiveNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
+export const CompanionForegroundAppNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
+export const CompanionUsbDeviceNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+  vendorId: z.number().int().optional().meta({
+    helpText: 'Optional USB vendor ID filter (decimal). Leave empty to match any vendor.',
+  }),
+  productId: z.number().int().optional().meta({
+    helpText: 'Optional USB product ID filter (decimal). Leave empty to match any product.',
+  }),
+});
+
+const MeteringTimeoutSecondsSchema = z.number().int().positive().max(600).default(30).meta({
+  helpText: 'Maximum time to wait for the branch to acknowledge or report, in seconds.',
+});
+
+export const MeteringStartNodeDataSchema = z.object({ timeoutSeconds: MeteringTimeoutSecondsSchema });
+
+export const MeteringCollectNodeDataSchema = z.object({
+  timeoutSeconds: MeteringTimeoutSecondsSchema,
+  interimIntervalMinutes: z.number().int().min(0).max(1440).default(1).meta({
+    helpText:
+      'How often to take an interim reading while a session runs (shown live in the resource, never billed). 0 disables.',
+  }),
+  finalAttempts: z.number().int().min(1).max(10).default(3).meta({
+    helpText: 'Attempts to obtain a fresh final total when a session ends before energy billing is left pending.',
+  }),
+  finalRetryDelaySeconds: z.number().int().min(0).max(120).default(5).meta({
+    helpText: 'Pause between final collection attempts, in seconds.',
+  }),
+});
+
+export const MeteringReadyNodeDataSchema = z.object({
+  baselineValue: z.string().optional().meta({
+    helpText:
+      'Only for lifetime counters that cannot be reset: the counter reading right now (template). Later totals are counted from it. Leave empty when the source was reset.',
+  }),
+  baselineUnit: z.string().optional().meta({ helpText: 'Energy unit of the baseline, e.g. kWh or Wh (template).' }),
+  source: z.string().optional().meta({ helpText: 'Optional label identifying the physical meter (template).' }),
+});
+
+export const MeteringReportNodeDataSchema = z.object({
+  value: z.string().min(1, 'Value is required').meta({
+    helpText: 'Total energy consumed since the metering start, not power and not an increment (template).',
+  }),
+  unit: z.string().min(1, 'Unit is required').meta({
+    helpText: 'Energy unit: Wh, kWh, MWh, mWh, J, kJ or MJ (template). Power units such as W or kW are rejected.',
+  }),
+  observedAt: z.string().optional().meta({
+    helpText: 'When the source took the reading (ISO time, template). Defaults to the moment of reporting.',
+  }),
+  source: z.string().optional().meta({ helpText: 'Optional label identifying the physical meter (template).' }),
+});
+
+const nodeDataSchemas = {
+  [ResourceFlowNodeType.INPUT_BUTTON]: ButtonNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED]: MqttMessageReceivedNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY]: InputResourceActivityNoActivityNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: BillingTransactionItemCreateSchema,
+  [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST]: HttpRequestNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: MqttSendMessageNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_WAIT]: WaitNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_IF]: IfNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_SET_PAYLOAD]: SetPayloadNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE]: MqttWaitForMessageNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_ERROR]: ErrorNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: ResourceUsageEndSessionNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: ResourceActivityTrackActivityNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING]: ResourceOperatingTransitionNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: ResourceOperatingTransitionNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT]: ResourceHealthHeartbeatNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET]: ResourceHealthSetNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_SET_VARIABLES]: SetVariablesNodeDataSchema,
+  [ResourceFlowNodeType.PROCESSING_GET_VARIABLES]: GetVariablesNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED]: VariableChangedNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: CompanionLockNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: CompanionLockNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: CompanionIdleActiveNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: CompanionIdleActiveNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: CompanionForegroundAppNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED]: CompanionUsbDeviceNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED]: CompanionUsbDeviceNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_METERING_START]: MeteringStartNodeDataSchema,
+  [ResourceFlowNodeType.INPUT_METERING_COLLECT]: MeteringCollectNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_METERING_READY]: MeteringReadyNodeDataSchema,
+  [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: MeteringReportNodeDataSchema,
+} satisfies Record<ResourceFlowNodeType, z.ZodType>;
+
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
-  switch (nodeType) {
-    case ResourceFlowNodeType.INPUT_BUTTON:
-      return ButtonNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-      return EventNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-      return MqttMessageReceivedNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
-      return InputResourceActivityNoActivityNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-      return BillingTransactionItemCreateSchema;
-
-    case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-      return HttpRequestNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-      return MqttSendMessageNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_WAIT:
-      return WaitNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_IF:
-      return IfNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
-      return SetPayloadNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
-      return MqttWaitForMessageNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_ERROR:
-      return ErrorNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
-      return ResourceUsageEndSessionNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
-      return ResourceActivityTrackActivityNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
-      return ResourceHealthHeartbeatNodeDataSchema;
-
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
-      return ResourceHealthSetNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
-      return SetVariablesNodeDataSchema;
-
-    case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
-      return GetVariablesNodeDataSchema;
-
-    case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
-      return VariableChangedNodeDataSchema;
-
-    default: {
-      const exhaustiveCheck: never = nodeType;
-      throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-    }
-  }
+  if (!Object.hasOwn(nodeDataSchemas, nodeType)) throw new Error(`Unknown node type: ${nodeType}`);
+  return nodeDataSchemas[nodeType];
 }
 
 export class ResourceFlowNodePosition {

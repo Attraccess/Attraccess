@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested, IsArray, IsBoolean } from 'class-validator';
 import { SSOProviderType } from '@attraccess/database-entities';
 import { Type } from 'class-transformer';
-import { SSOPermissionMappingsDto } from './permission-mapping.dto';
+import { IsStringArrayRecord } from './validators';
 
 export class CreateOIDCConfigurationDto {
   @ApiProperty({
@@ -84,14 +84,16 @@ export class CreateOIDCConfigurationDto {
   emailClaimPaths?: string[];
 
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and role names',
+    description:
+      'Maps any Attraccess role key (system-provided or user-defined) to the IdP role/group claim values that should grant it.',
     required: false,
-    type: SSOPermissionMappingsDto,
+    type: Object,
+    additionalProperties: { type: 'array', items: { type: 'string' } },
+    example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
   })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => SSOPermissionMappingsDto)
-  permissionMappings?: SSOPermissionMappingsDto;
+  @IsStringArrayRecord()
+  roleMappings?: Record<string, string[]>;
 }
 
 export class CreateSAMLConfigurationDto {
@@ -180,14 +182,16 @@ export class CreateSAMLConfigurationDto {
   provisioningSecret?: string;
 
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and SAML role values',
+    description:
+      'Maps any Attraccess role key (system-provided or user-defined) to the SAML role/group attribute values that should grant it.',
     required: false,
-    type: SSOPermissionMappingsDto,
+    type: Object,
+    additionalProperties: { type: 'array', items: { type: 'string' } },
+    example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
   })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => SSOPermissionMappingsDto)
-  permissionMappings?: SSOPermissionMappingsDto;
+  @IsStringArrayRecord()
+  roleMappings?: Record<string, string[]>;
 
   @ApiProperty({
     description: 'PEM encoded Service Provider certificate used when signing requests',

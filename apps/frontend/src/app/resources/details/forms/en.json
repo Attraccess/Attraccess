@@ -32,6 +32,7 @@
     "resourceUsageEnd": "Require before ending a session",
     "fieldsTitle": "Fields",
     "addField": "Add field",
+    "reorderField": "Reorder field",
     "emptyFieldsTitle": "No fields",
     "emptyFieldsDescription": "Add at least one field so members have something to answer.",
     "save": "Save form",

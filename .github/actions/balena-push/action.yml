@@ -40,7 +40,7 @@ runs:
 
     - name: Install balena-cli
       run: |
-        BALENA_CLI_VERSION=v24.0.3
+        BALENA_CLI_VERSION=v25.1.9
         wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
       shell: bash
 

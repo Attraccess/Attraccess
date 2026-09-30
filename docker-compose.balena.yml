@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
   proxy:
-    image: 'jc21/nginx-proxy-manager:2.14.0'
+    image: 'jc21/nginx-proxy-manager:2.15.1'
     restart: unless-stopped
     ports:
       - '80:80' # HTTP
@@ -21,6 +21,20 @@ services:
     env_file:
       - .env.docker-compose
 
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    expose:
+      - '6379'
+    volumes:
+      - valkey-data:/data
+    command: valkey-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   attraccess:
     restart: unless-stopped
     build:
@@ -30,8 +44,15 @@ services:
       - '3000'
     volumes:
       - attraccess-storage:/app/storage
+    environment:
+      - VALKEY_URL=redis://valkey:6379
     env_file:
       - .env.docker-compose
+    # Balena only supports the short-form depends_on (service_started); the
+    # long-form `condition: service_healthy` is rejected (ATT-593-style). The app
+    # retries Valkey connections, and restart: unless-stopped covers startup races.
+    depends_on:
+      - valkey
 
   monitoring-init:
     build:
@@ -63,7 +84,7 @@ services:
       - grafana-dashboards:/grafana-dashboards
 
   mailpit:
-    image: axllent/mailpit:v1.29.7
+    image: axllent/mailpit:v1.30.7
     restart: unless-stopped
     expose:
       - '8025'
@@ -85,7 +106,7 @@ services:
       - .env.docker-compose
 
   rabbitmq:
-    image: rabbitmq:4.3.0-management
+    image: rabbitmq:4.3.4-management
     hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
@@ -114,7 +135,7 @@ services:
       interval: 30s
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt:2.10.1
+    image: ghcr.io/koenkk/zigbee2mqtt:2.13.0
     restart: unless-stopped
     expose:
       - '8080'
@@ -161,8 +182,37 @@ services:
     env_file:
       - .env.docker-compose
 
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    expose:
+      - '9100'
+    # io.balena.features.procfs/sysfs bind-mount the host OS /proc and /sys into
+    # the container, giving node-exporter access to host CPU/RAM/network metrics
+    # without privileged mode. Balena disallows arbitrary host bind mounts (e.g. /:/host),
+    # so filesystem collector metrics are limited to what procfs/sysfs expose.
+    labels:
+      io.balena.features.procfs: '1'
+      io.balena.features.sysfs: '1'
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    restart: unless-stopped
+    expose:
+      - '8080'
+    privileged: true
+    # io.balena.features.balena-socket mounts the balena engine socket at both
+    # /var/run/balena-engine.sock and /var/run/docker.sock (backwards-compat),
+    # so cadvisor can discover and collect per-container metrics without config changes.
+    # Balena disallows arbitrary host bind mounts (/:/rootfs, /dev/disk), so disk I/O
+    # metrics come from procfs/sysfs only.
+    labels:
+      io.balena.features.procfs: '1'
+      io.balena.features.sysfs: '1'
+      io.balena.features.balena-socket: '1'
+
   prometheus:
-    image: prom/prometheus:v3.11.3
+    image: prom/prometheus:v3.13.2
     restart: unless-stopped
     expose:
       - '9090'
@@ -172,13 +222,15 @@ services:
     depends_on:
       - config-ui
       - monitoring-init
+      - node-exporter
+      - cadvisor
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
 
   grafana:
-    image: grafana/grafana:13.0.1
+    image: grafana/grafana:13.1.3
     restart: unless-stopped
     expose:
       - '3001'
@@ -200,7 +252,7 @@ services:
       - monitoring-init
 
   duplicati:
-    image: duplicati/duplicati:2.3.0.1-stable
+    image: duplicati/duplicati:2.3.0.4-stable
     expose:
       - '8200'
     volumes:
@@ -222,6 +274,7 @@ volumes:
   proxy-data:
   proxy-letsencrypt:
   attraccess-storage:
+  valkey-data:
   webhook-site:
   rabbitmq_data:
   zigbee2mqtt:

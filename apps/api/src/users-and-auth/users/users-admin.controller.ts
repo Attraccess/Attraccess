@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   Logger,
+  Optional,
   Param,
   ParseIntPipe,
   Patch,
@@ -14,7 +15,7 @@ import {
   Req,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
@@ -22,12 +23,15 @@ import { UsersService } from './users.service';
 import { UserPasswordService } from './user-password.service';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
-import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { computeNextPage } from '../../types/response';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -38,6 +42,7 @@ export class UsersAdminController {
   constructor(
     private readonly usersService: UsersService,
     private readonly passwordService: UserPasswordService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @Auth()
@@ -60,8 +65,8 @@ export class UsersAdminController {
   async getOneById(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<User> {
     const authenticatedUser = request.user;
 
-    // Allow access if the user is requesting their own data or has canManageUsers permission
-    if (authenticatedUser?.id !== id && !authenticatedUser.systemPermissions.canManageUsers) {
+    // Allow access if the user is requesting their own data or has users.read permission
+    if (authenticatedUser?.id !== id && !authenticatedUser.effectivePermissions?.has('users.read')) {
       this.logger.debug(
         `Access denied - User ID ${authenticatedUser.id} attempting to access user ID ${id} without required permissions`,
       );
@@ -78,7 +83,7 @@ export class UsersAdminController {
   }
 
   @Delete(':id')
-  @Auth('canManageUsers')
+  @Auth('users.delete')
   @ApiOperation({ summary: 'Delete a user', operationId: 'deleteUser' })
   @ApiResponse({
     status: 200,
@@ -94,29 +99,71 @@ export class UsersAdminController {
     }
 
     await this.usersService.deleteOne(id);
+    await this.record('user_deleted', id, request);
   }
 
   @Get()
   @Auth()
+  @ApiExtraModels(PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto)
   @ApiOperation({ summary: 'Get a paginated list of users', operationId: 'findMany' })
   @ApiResponse({
     status: 200,
     description: 'List of users.',
-    type: PaginatedUsersResponseDto,
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(PaginatedUserSummariesResponseDto) },
+        { $ref: getSchemaPath(PaginatedUsersResponseDto) },
+      ],
+    },
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
+    description: 'Forbidden - user filters and role data require users.read permission.',
   })
-  async findMany(@Query() query: FindManyUsersQueryDto): Promise<PaginatedUsersResponseDto> {
-    const result = (await this.usersService.findMany({
+  async findMany(
+    @Query() query: FindManyUsersQueryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<PaginatedUserSummariesResponseDto | PaginatedUsersResponseDto> {
+    const canReadUsers = request.user.effectivePermissions?.has('users.read') ?? false;
+
+    // User filter criteria and role data are sensitive; only expose them to users.read holders.
+    if (
+      (query.includeRoles ||
+        query.roleId !== undefined ||
+        query.roleIds !== undefined ||
+        query.excludeRoleIds !== undefined ||
+        query.emailVerified !== undefined ||
+        query.ssoProviderIds !== undefined ||
+        query.excludeSsoProviderIds !== undefined ||
+        query.ssoProviderNone !== undefined ||
+        query.hasSsoProvider !== undefined) &&
+      !canReadUsers
+    ) {
+      throw new ForbiddenException();
+    }
+    const result = await this.usersService.findMany({
       page: query.page,
       limit: query.limit,
       search: query.search,
       ids: query.ids,
-    })) as PaginatedUsersResponseDto;
+      roleId: query.roleId,
+      roleIds: query.roleIds,
+      excludeRoleIds: query.excludeRoleIds,
+      roleMatch: query.roleMatch,
+      emailVerified: query.emailVerified,
+      ssoProviderIds: query.ssoProviderIds,
+      excludeSsoProviderIds: query.excludeSsoProviderIds,
+      ssoProviderNone: query.ssoProviderNone,
+      hasSsoProvider: query.hasSsoProvider,
+      ssoProviderMatch: query.ssoProviderMatch,
+      includeRoles: query.includeRoles,
+    });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
-    return result;
+    return {
+      ...result,
+      data: canReadUsers ? result.data : result.data.map(({ id, username }) => ({ id, username })),
+      nextPage: computeNextPage(result.page, result.limit, result.total),
+    };
   }
 
   @Post(':id/password')
@@ -146,11 +193,12 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     await this.passwordService.setUserPassword(id, body, request.user);
+    await this.record('user_updated', id, request, 'password');
     return { message: 'Password updated successfully' };
   }
 
   @Patch(':id/username')
-  @Auth('canManageUsers')
+  @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's username (no limit)", operationId: 'changeUserUsername' })
   @ApiResponse({ status: 200, description: 'Username changed.', type: User })
   async changeUserUsername(
@@ -158,11 +206,13 @@ export class UsersAdminController {
     @Body() body: ChangeUsernameDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    return await this.usersService.changeUsername(id, body.username, request.user);
+    const user = await this.usersService.changeUsername(id, body.username, request.user);
+    await this.record('user_updated', id, request, 'username');
+    return user;
   }
 
   @Patch(':id/email')
-  @Auth('canManageUsers')
+  @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's email address", operationId: 'changeUserEmail' })
   @ApiResponse({ status: 200, description: 'Email changed.', type: User })
   async changeUserEmail(
@@ -171,20 +221,44 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     try {
-      return await this.usersService.changeEmail(id, body.email, request.user);
+      const user = await this.usersService.changeEmail(id, body.email, request.user);
+      await this.record('user_updated', id, request, 'email');
+      return user;
     } catch (error) {
       throw mapEmailSendError(error);
     }
   }
 
   @Patch(':id/billing-factor')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({ summary: "Change a user's billing factor", operationId: 'changeUserBillingFactor' })
   @ApiResponse({ status: 200, description: 'Billing factor changed.', type: User })
   async changeUserBillingFactor(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ChangeBillingFactorDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    return await this.usersService.changeBillingFactor(id, body.billingFactor);
+    const user = await this.usersService.changeBillingFactor(id, body.billingFactor);
+    await this.record('user_updated', id, request, 'billingFactor');
+    return user;
+  }
+
+  private record(
+    action: 'user_deleted' | 'user_updated',
+    subjectId: number,
+    request: AuthenticatedRequest,
+    field?: 'username' | 'email' | 'password' | 'billingFactor',
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
+      action,
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+      subjectId,
+      details: field ? { field } : {},
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    })).then(() => undefined);
   }
 }

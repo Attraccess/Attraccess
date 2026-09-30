@@ -5,14 +5,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 
-export type ResourceTabKey =
-  | 'overview'
-  | 'history'
-  | 'people'
-  | 'groups'
-  | 'maintenance'
-  | 'flows'
-  | 'forms';
+export type ResourceTabKey = 'overview' | 'history' | 'people' | 'maintenance';
 
 export interface ResourceTabDescriptor {
   key: ResourceTabKey;
@@ -22,12 +15,14 @@ export interface ResourceTabDescriptor {
 
 export function useResourceTabs(resourceId: number): {
   tabs: ResourceTabDescriptor[];
-  canManageResources: boolean;
+  canUpdateResources: boolean;
+  canManageAccess: boolean;
   isIntroducer: boolean;
   canManageMaintenance: boolean;
 } {
   const { hasPermission, user } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
+  const canManageAccess = hasPermission('resources.access.manage');
 
   const { data: introducerData } = useAccessControlServiceResourceIntroducersIsIntroducer(
     {
@@ -50,21 +45,14 @@ export function useResourceTabs(resourceId: number): {
       { key: 'history', path: 'history', translationKey: 'tabs.history' },
     ];
 
-    if (isIntroducer || canManageResources) {
+    if (isIntroducer || canManageAccess || canUpdateResources) {
       list.push({ key: 'people', path: 'people', translationKey: 'tabs.people' });
-    }
-    if (canManageResources) {
-      list.push({ key: 'groups', path: 'groups', translationKey: 'tabs.groups' });
     }
     if (canManageMaintenance) {
       list.push({ key: 'maintenance', path: 'maintenance', translationKey: 'tabs.maintenance' });
     }
-    if (canManageResources) {
-      list.push({ key: 'flows', path: 'flows', translationKey: 'tabs.flows' });
-      list.push({ key: 'forms', path: 'forms', translationKey: 'tabs.forms' });
-    }
     return list;
-  }, [isIntroducer, canManageResources, canManageMaintenance]);
+  }, [isIntroducer, canManageAccess, canUpdateResources, canManageMaintenance]);
 
-  return { tabs, canManageResources, isIntroducer, canManageMaintenance };
+  return { tabs, canUpdateResources, canManageAccess, isIntroducer, canManageMaintenance };
 }

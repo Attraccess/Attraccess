@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
-import { DateRangeValue } from './dtos/dateRangeValue';
+import { AnalyticsQueryDto } from './dtos/analyticsQuery.dto';
+import { ResourceOperatingDurationsDto } from './dtos/resourceOperatingDurations.dto';
 
 describe('AnalyticsController', () => {
   let controller: AnalyticsController;
@@ -9,6 +10,8 @@ describe('AnalyticsController', () => {
 
   const mockAnalyticsService = {
     getResourceUsageHoursInDateRange: jest.fn(),
+    getBillingTransactionsInDateRange: jest.fn(),
+    getResourceOperatingDurations: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -35,63 +38,74 @@ describe('AnalyticsController', () => {
   });
 
   describe('getResourceUsageHoursInDateRange', () => {
-    it('should call service method with date range parameters', async () => {
-      const dateRange: DateRangeValue = {
+    const makeQuery = (overrides: Partial<AnalyticsQueryDto> = {}): AnalyticsQueryDto =>
+      Object.assign(new AnalyticsQueryDto(), {
         start: new Date('2023-01-01'),
         end: new Date('2023-01-31'),
-      };
+        page: 1,
+        limit: 500,
+        ...overrides,
+      });
 
-      const mockUser = { id: 1, name: 'User 1' };
-      const mockResource = { id: 1, name: 'Resource 1' };
+    it('should return a paginated response', async () => {
+      const query = makeQuery();
+      const mockUsage = [{ id: 1, resourceId: 1, userId: 1 }];
 
-      const expectedResult = [
-        {
-          id: 1,
-          resourceId: 1,
-          userId: 1,
-          startTime: new Date('2023-01-15'),
-          endTime: new Date('2023-01-15T02:00:00Z'),
-          startNotes: 'Starting session',
-          endNotes: 'Ending session',
-          usageInMinutes: 120,
-          user: mockUser,
-          resource: mockResource,
-        },
-      ];
+      mockAnalyticsService.getResourceUsageHoursInDateRange.mockResolvedValue([mockUsage, 1]);
 
-      mockAnalyticsService.getResourceUsageHoursInDateRange.mockResolvedValue(expectedResult);
+      const result = await controller.getResourceUsageHoursInDateRange(query);
 
-      const result = await controller.getResourceUsageHoursInDateRange(dateRange);
-
-      expect(service.getResourceUsageHoursInDateRange).toHaveBeenCalledWith(dateRange);
-      expect(result).toEqual(expectedResult);
+      expect(service.getResourceUsageHoursInDateRange).toHaveBeenCalledWith(
+        { start: query.start, end: query.end },
+        1,
+        500,
+      );
+      expect(result).toEqual({ data: mockUsage, total: 1, page: 1, limit: 500, nextPage: undefined });
     });
 
-    it('should return empty array when no usage data is found', async () => {
-      const dateRange: DateRangeValue = {
-        start: new Date('2023-02-01'),
-        end: new Date('2023-02-28'),
-      };
+    it('should set nextPage when more pages exist', async () => {
+      const query = makeQuery({ page: 1, limit: 10 });
 
-      mockAnalyticsService.getResourceUsageHoursInDateRange.mockResolvedValue([]);
+      mockAnalyticsService.getResourceUsageHoursInDateRange.mockResolvedValue([[], 25]);
 
-      const result = await controller.getResourceUsageHoursInDateRange(dateRange);
+      const result = await controller.getResourceUsageHoursInDateRange(query);
 
-      expect(service.getResourceUsageHoursInDateRange).toHaveBeenCalledWith(dateRange);
-      expect(result).toEqual([]);
+      expect(result.nextPage).toBe(2);
+    });
+
+    it('should not set nextPage on the last page', async () => {
+      const query = makeQuery({ page: 3, limit: 10 });
+
+      mockAnalyticsService.getResourceUsageHoursInDateRange.mockResolvedValue([[], 25]);
+
+      const result = await controller.getResourceUsageHoursInDateRange(query);
+
+      expect(result.nextPage).toBeUndefined();
     });
 
     it('should handle service errors appropriately', async () => {
-      const dateRange: DateRangeValue = {
-        start: new Date('2023-03-01'),
-        end: new Date('2023-03-31'),
-      };
-
+      const query = makeQuery({ start: new Date('2023-03-01'), end: new Date('2023-03-31') });
       const error = new Error('Database error');
+
       mockAnalyticsService.getResourceUsageHoursInDateRange.mockRejectedValue(error);
 
-      await expect(controller.getResourceUsageHoursInDateRange(dateRange)).rejects.toThrow(error);
-      expect(service.getResourceUsageHoursInDateRange).toHaveBeenCalledWith(dateRange);
+      await expect(controller.getResourceUsageHoursInDateRange(query)).rejects.toThrow(error);
+    });
+  });
+
+  it('returns exact operating durations for the requested resources and date range', async () => {
+    const body = Object.assign(new ResourceOperatingDurationsDto(), {
+      resourceIds: [1, 2],
+      start: new Date('2023-01-01T00:00:00Z'),
+      end: new Date('2023-01-31T23:59:59Z'),
+    });
+    const report = { 1: { sessionDurationMs: 60_000 } };
+    mockAnalyticsService.getResourceOperatingDurations.mockResolvedValue(report);
+
+    await expect(controller.getResourceOperatingDurations(body)).resolves.toBe(report);
+    expect(service.getResourceOperatingDurations).toHaveBeenCalledWith(body.resourceIds, {
+      start: body.start,
+      end: body.end,
     });
   });
 });

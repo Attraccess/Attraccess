@@ -50,6 +50,11 @@ describe('EncryptionService', () => {
     expect(/^[A-Za-z0-9_-]+$/.test(payload)).toBe(true);
   });
 
+  it('should encrypt for generated base64url plugin IDs', () => {
+    const pluginId = 'WILE7_rolkeNfuvPHfPs0';
+    expect(service.decryptForPlugin(pluginId, service.encryptForPlugin(pluginId, 'plugin secret'))).toBe('plugin secret');
+  });
+
   it('should fail decryption if token payload is tampered (auth tag mismatch)', () => {
     const token = service.encrypt('top secret');
     const [prefix, b64] = token.split('.', 2);

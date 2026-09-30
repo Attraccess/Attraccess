@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Configuration",
+    "loading": "Loading summary…",
+    "unavailable": "Preview unavailable"
+  },
   "editor": {
     "buttons": {
       "save": "Save",
@@ -33,31 +38,66 @@
       "resource": {
         "usage": {
           "started": {
-            "title": "Resource usage started",
-            "description": "This node is triggered when a resource is started.",
+            "title": "Usage started",
+            "description": "Triggers when a usage session starts.",
             "outputs": {
               "output": "Output"
             }
           },
           "stopped": {
-            "title": "Resource usage stopped",
-            "description": "This node is triggered when a resource is stopped.",
+            "title": "Usage stopped",
+            "description": "Triggers when a usage session stops.",
             "outputs": {
               "output": "Output"
             }
           },
           "takeover": {
-            "title": "Resource usage takeover",
-            "description": "This node is triggered when a resource is taken over.",
+            "title": "Usage taken over",
+            "description": "Triggers when a usage session is taken over.",
             "outputs": {
               "output": "Output"
             }
           }
         },
+        "metering": {
+          "start": {
+            "title": "Metering start",
+            "description": "Runs when a billed session begins. Reset or read the meter here, then connect Metering ready.",
+            "outputs": { "output": "Output" },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Timeout (seconds)",
+                "helpText": "Maximum time to wait for Metering ready. A session that cannot start its meter does not start."
+              }
+            }
+          },
+          "collect": {
+            "title": "Metering collection",
+            "description": "Runs to read the meter: periodically for the live value and once when a session ends for the final bill. Connect Report energy.",
+            "outputs": { "output": "Output" },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Timeout (seconds)",
+                "helpText": "Maximum time to wait for Report energy."
+              },
+              "interimIntervalMinutes": {
+                "label": "Interim interval (minutes)",
+                "helpText": "How often the running session's meter value is refreshed. Live readings are shown but never billed. 0 disables them."
+              },
+              "finalAttempts": {
+                "label": "Final attempts",
+                "helpText": "Attempts to obtain a fresh final total when a session ends before the energy charge is left pending."
+              },
+              "finalRetryDelaySeconds": {
+                "label": "Final retry delay (seconds)"
+              }
+            }
+          }
+        },
         "activity": {
           "no-activity": {
-            "title": "Resource is inactive",
-            "description": "This node is triggered when a resource is inactive for a certain time.",
+            "title": "Inactivity timeout reached",
+            "description": "Triggers after the resource has had no recorded activity for the configured duration.",
             "outputs": {
               "output": "Output"
             },
@@ -121,6 +161,85 @@
               "serverId": {
                 "label": "Server"
               }
+            }
+          }
+        }
+      },
+      "companion": {
+        "idle": {
+          "title": "Companion: machine idle",
+          "description": "Fires when a companion device's machine has been idle for the configured threshold.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "active": {
+          "title": "Companion: machine active",
+          "description": "Fires when a companion device's machine returns from idle.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "foreground_app_changed": {
+          "title": "Companion: foreground app changed",
+          "description": "Fires whenever the focused application changes on a companion device. Payload includes appName, bundleId (macOS only), and pid.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "usb_device_connected": {
+          "title": "Companion: USB device connected",
+          "description": "Fires when a USB device is connected to a companion device. Payload includes vendorId, productId, manufacturer, product and serialNumber.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            },
+            "vendorId": {
+              "label": "Vendor ID filter (optional, decimal)"
+            },
+            "productId": {
+              "label": "Product ID filter (optional, decimal)"
+            }
+          }
+        },
+        "usb_device_disconnected": {
+          "title": "Companion: USB device disconnected",
+          "description": "Fires when a USB device is disconnected from a companion device. Payload includes vendorId and productId.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            },
+            "vendorId": {
+              "label": "Vendor ID filter (optional, decimal)"
+            },
+            "productId": {
+              "label": "Product ID filter (optional, decimal)"
             }
           }
         }
@@ -195,7 +314,7 @@
           "title": "Wait for MQTT message",
           "description": "Waits for the next MQTT message matching the topic filter; forwards {topic, payload}.",
           "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" },
+          "outputs": { "output": "Output", "failure": "Failure" },
           "preview": {
             "topic": "Topic",
             "timeoutSeconds": "Timeout (s)"
@@ -210,6 +329,15 @@
                 "0": "0 - At most once (fire and forget)",
                 "1": "1 - At least once (acknowledged)",
                 "2": "2 - Exactly once (two-phase handshake)"
+              }
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
               }
             }
           }
@@ -298,7 +426,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "assignments": "Sets"
@@ -315,7 +444,7 @@
                 },
                 "value": {
                   "label": "Value template",
-                  "helpText": "Handlebars template. Reference payload as \\{{path.to.field}} and existing variables as \\{{variables.KEY}}. Plain text without \\{{ }} is stored as-is.",
+                  "helpText": "Handlebars template. Reference payload as \\{{path.to.field}} and existing variables as \\{{variables.KEY}}. Use \\{{json payload}} to serialize an object or array as JSON. Plain text without \\{{ }} is stored as-is.",
                   "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
                   "docsLabel": "Handlebars syntax reference"
                 },
@@ -380,7 +509,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "method": "Method",
@@ -409,6 +539,27 @@
             },
             "body": {
               "label": "Body"
+            },
+            "timeoutSeconds": {
+              "label": "Response timeout (seconds)",
+              "helpText": "Maximum time to wait for the controller response. Leave empty to wait without a node-specific timeout."
+            },
+            "completionBehavior": {
+              "label": "Completion",
+              "helpText": "Dispatch only continues after the HTTP request is initiated. Wait for response waits for the controller response.",
+              "enum": {
+                "dispatch": "Dispatch only",
+                "acknowledged": "Wait for response"
+              }
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
+              }
             }
           }
         }
@@ -421,7 +572,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "topic": "Topic"
@@ -444,19 +596,75 @@
                 "2": "2 - Exactly once (two-phase handshake)"
               }
             },
-            "retain": { "label": "Retain message" }
+            "retain": { "label": "Retain message" },
+            "completionBehavior": {
+              "label": "Completion",
+              "helpText": "Dispatch continues after MQTT accepts the publish call. Acknowledged waits for the broker publish callback.",
+              "enum": {
+                "dispatch": "Dispatch only",
+                "acknowledged": "Wait for acknowledgement"
+              }
+            },
+            "acknowledgementTimeoutSeconds": {
+              "label": "Acknowledgement timeout (seconds)",
+              "helpText": "Maximum time to wait for the MQTT publish acknowledgement. Leave empty to use the integration default."
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
+              }
+            }
+          }
+        }
+      },
+      "companion": {
+        "lock-pc": {
+          "title": "Lock PC",
+          "description": "Locks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "unlock-pc": {
+          "title": "Unlock PC",
+          "description": "Unlocks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
           }
         }
       },
       "resource": {
         "usage": {
           "end-session": {
-            "title": "End usage session",
-            "description": "Ends the active usage session. Optionally sends notes (template or static).",
+            "title": "End active session",
+            "description": "Ends the current usage session, optionally with a note.",
             "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" },
+            "outputs": { "output": "Output", "failure": "Failure" },
             "config": {
-              "notes": { "label": "Notes (templates allowed)" }
+              "notes": { "label": "Notes (templates allowed)" },
+              "failureBehavior": {
+                "label": "On failure",
+                "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+                "enum": {
+                  "fail-flow": "Fail flow",
+                  "failure-output": "Continue through failure output",
+                  "log-and-continue": "Log and continue"
+                }
+              }
             },
             "preview": {
               "notes": "Notes"
@@ -495,10 +703,74 @@
           }
         },
 
+        "metering": {
+          "ready": {
+            "title": "Metering ready",
+            "description": "Confirms the meter is initialized. Sessions only start once this is reached.",
+            "inputs": { "input": "Input" },
+            "config": {
+              "baselineValue": {
+                "label": "Baseline value",
+                "helpText": "Only for meters that cannot be reset: the counter's current total (templates allowed). Consumption is counted from it. Leave empty when the meter was reset."
+              },
+              "baselineUnit": {
+                "label": "Baseline unit",
+                "helpText": "Energy unit of the counter reading, e.g. kWh or Wh."
+              },
+              "source": {
+                "label": "Source",
+                "helpText": "Optional name of the physical meter (templates allowed)."
+              }
+            },
+            "preview": {
+              "baselineValue": "Baseline",
+              "source": "Meter"
+            }
+          },
+          "report": {
+            "title": "Report energy",
+            "description": "Reports the total energy consumed since Metering start. Not power, not an increment.",
+            "inputs": { "input": "Input" },
+            "config": {
+              "value": {
+                "label": "Value",
+                "helpText": "Templates allowed, e.g. {{reading.total}}. Must be energy (Wh, kWh, ...), never a power sample."
+              },
+              "unit": {
+                "label": "Unit",
+                "helpText": "Wh, kWh, MWh, mWh, J, kJ or MJ (templates allowed). Power units such as W or kW are rejected."
+              },
+              "observedAt": {
+                "label": "Observed at",
+                "helpText": "Optional ISO time the source took the reading. Readings from before the session ended are rejected as stale. Defaults to now."
+              },
+              "source": {
+                "label": "Source",
+                "helpText": "Optional name of the physical meter (templates allowed)."
+              }
+            },
+            "preview": {
+              "value": "Value",
+              "unit": "Unit"
+            }
+          }
+        },
         "activity": {
+          "operating": {
+            "title": "Record operation started",
+            "description": "Records that the resource began operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          },
+          "idle": {
+            "title": "Record operation stopped",
+            "description": "Records that the resource stopped operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          },
           "track-activity": {
-            "title": "Resource was active",
-            "description": "Use this node to indicate that the resource was active.",
+            "title": "Record activity",
+            "description": "Records activity for this resource at the current server time.",
             "inputs": {
               "input": "Input"
             },
@@ -509,7 +781,7 @@
         },
         "health": {
           "heartbeat": {
-            "title": "Health heartbeat",
+            "title": "Send health heartbeat",
             "description": "Marks the resource healthy when this node fires. If no heartbeat arrives within the configured timeout the resource is automatically marked unhealthy.",
             "inputs": { "input": "Input" },
             "outputs": { "output": "Output" },

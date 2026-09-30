@@ -56,58 +56,83 @@ describe('IfExecutor', () => {
     });
   });
 
+  // Relational operators read as `path <operator> comparisonValue` (ATT-790).
   describe('> operator', () => {
-    it('returns output-true when comparisonValue > sourceValue', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '>', comparisonValue: '10', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 5 });
+    it('returns output-true when sourceValue > comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '>', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 80 });
       expect(result.outputHandle).toBe('output-true');
     });
 
-    it('returns output-false when comparisonValue <= sourceValue', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '>', comparisonValue: '5', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 10 });
+    it('returns output-false when sourceValue < comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '>', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 20 });
+      expect(result.outputHandle).toBe('output-false');
+    });
+
+    it('returns output-false when the values are equal', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '>', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 50 });
       expect(result.outputHandle).toBe('output-false');
     });
   });
 
   describe('< operator', () => {
-    it('returns output-true when comparisonValue < sourceValue', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '<', comparisonValue: '5', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 10 });
+    it('returns output-true when sourceValue < comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '<', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 20 });
       expect(result.outputHandle).toBe('output-true');
     });
 
-    it('returns output-false when comparisonValue >= sourceValue', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '<', comparisonValue: '10', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 5 });
+    it('returns output-false when sourceValue > comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '<', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 80 });
+      expect(result.outputHandle).toBe('output-false');
+    });
+
+    it('returns output-false when the values are equal', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '<', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 50 });
       expect(result.outputHandle).toBe('output-false');
     });
   });
 
   describe('>= operator', () => {
-    it('returns output-true when comparisonValue >= sourceValue (equal)', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '>=', comparisonValue: '5', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 5 });
+    it('returns output-true when sourceValue > comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '>=', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 80 });
       expect(result.outputHandle).toBe('output-true');
     });
 
-    it('returns output-false when comparisonValue < sourceValue', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '>=', comparisonValue: '4', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 5 });
+    it('returns output-true when the values are equal', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '>=', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 50 });
+      expect(result.outputHandle).toBe('output-true');
+    });
+
+    it('returns output-false when sourceValue < comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '>=', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 20 });
       expect(result.outputHandle).toBe('output-false');
     });
   });
 
   describe('<= operator', () => {
-    it('returns output-true when comparisonValue <= sourceValue (equal)', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '<=', comparisonValue: '5', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 5 });
+    it('returns output-true when sourceValue < comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '<=', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 20 });
       expect(result.outputHandle).toBe('output-true');
     });
 
-    it('returns output-false when comparisonValue > sourceValue', async () => {
-      const node = makeNode({ path: 'a', comparisonOperator: '<=', comparisonValue: '6', comparisonValueIsPath: false });
-      const result = await executor.execute(node, { a: 5 });
+    it('returns output-true when the values are equal', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '<=', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 50 });
+      expect(result.outputHandle).toBe('output-true');
+    });
+
+    it('returns output-false when sourceValue > comparisonValue', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '<=', comparisonValue: '50', comparisonValueIsPath: false });
+      const result = await executor.execute(node, { a: 80 });
       expect(result.outputHandle).toBe('output-false');
     });
   });
@@ -123,6 +148,16 @@ describe('IfExecutor', () => {
       const node = makeNode({ path: 'a', comparisonOperator: '=', comparisonValue: 'b', comparisonValueIsPath: true });
       const result = await executor.execute(node, { a: 'x', b: 'y' });
       expect(result.outputHandle).toBe('output-false');
+    });
+
+    it('keeps path on the left for relational operators', async () => {
+      const node = makeNode({ path: 'a', comparisonOperator: '>', comparisonValue: 'b', comparisonValueIsPath: true });
+      await expect(executor.execute(node, { a: 80, b: 50 })).resolves.toMatchObject({
+        outputHandle: 'output-true',
+      });
+      await expect(executor.execute(node, { a: 20, b: 50 })).resolves.toMatchObject({
+        outputHandle: 'output-false',
+      });
     });
   });
 

@@ -1,3 +1,4 @@
+import { recordNpmBootMigrationOutcome } from './npm-plugin-audit-state';
 import { Logger } from '@nestjs/common';
 import { DataSource, DataSourceOptions, MigrationExecutor } from 'typeorm';
 import { mkdirSync } from 'fs';
@@ -58,11 +59,7 @@ export class PluginMigrationService {
   }
 
   private static migrationsEntryPath(manifest: LoadedPluginManifest): string {
-    return join(
-      PluginService.PLUGIN_PATH,
-      manifest.main.migrations.directory,
-      manifest.main.migrations.entryPoint
-    );
+    return join(PluginService.PLUGIN_PATH, manifest.main.migrations.directory, manifest.main.migrations.entryPoint);
   }
 
   /**
@@ -83,10 +80,7 @@ export class PluginMigrationService {
     return classes;
   }
 
-  private static buildDataSource(
-    manifest: LoadedPluginManifest,
-    migrations: PluginMigrationClass[]
-  ): DataSource {
+  private static buildDataSource(manifest: LoadedPluginManifest, migrations: PluginMigrationClass[]): DataSource {
     const base = (PluginMigrationService.baseConfigOverride ?? dataSourceConfig) as DataSourceOptions;
 
     const databaseFile = (base as { database?: unknown }).database;
@@ -134,10 +128,54 @@ export class PluginMigrationService {
         PluginMigrationService.logger.log(
           `Applied ${applied.length} migration(s) for plugin "${manifest.name}": ${applied
             .map((migration) => migration.name)
-            .join(', ')}`
+            .join(', ')}`,
         );
       }
       return applied.length;
+    } finally {
+      await dataSource.destroy();
+    }
+  }
+
+  /**
+   * A replacement may only activate when its migration bundle still knows every
+   * migration already applied for the plugin. Running down migrations here would
+   * discard data, so versions that need a schema rollback are deliberately blocked.
+   */
+  public static async assertReplacementMigrationHistory(
+    manifest: LoadedPluginManifest,
+    sourceDirectory: string,
+  ): Promise<void> {
+    const dataSource = PluginMigrationService.buildDataSource(manifest, []);
+    await dataSource.initialize();
+
+    try {
+      await PluginMigrationService.relaxBusyTimeout(dataSource);
+      const executed = await new MigrationExecutor(dataSource).getExecutedMigrations();
+      if (executed.length === 0) return;
+
+      if (!PluginMigrationService.hasMigrations(manifest)) {
+        throw new Error(
+          `Replacement blocked: target package does not contain applied migrations: ${executed
+            .map(({ name }) => name)
+            .join(', ')}.`,
+        );
+      }
+
+      const entry = join(sourceDirectory, manifest.main.migrations.directory, manifest.main.migrations.entryPoint);
+      const exports = loadPluginEntryExports(entry);
+      const candidates = Array.isArray(exports.default) ? exports.default : Object.values(exports);
+      const targetMigrationNames = new Set(
+        candidates
+          .filter((value): value is PluginMigrationClass => typeof value === 'function')
+          .map(({ name }) => name),
+      );
+      const missing = executed.map(({ name }) => name).filter((name) => !targetMigrationNames.has(name));
+      if (missing.length > 0) {
+        throw new Error(
+          `Replacement blocked: target package does not contain applied migrations: ${missing.join(', ')}.`,
+        );
+      }
     } finally {
       await dataSource.destroy();
     }
@@ -170,9 +208,7 @@ export class PluginMigrationService {
       await dataSource.query(`DROP TABLE IF EXISTS "${tableName}"`);
 
       if (executed.length > 0) {
-        PluginMigrationService.logger.log(
-          `Reverted ${executed.length} migration(s) for plugin "${manifest.name}".`
-        );
+        PluginMigrationService.logger.log(`Reverted ${executed.length} migration(s) for plugin "${manifest.name}".`);
       }
       return executed.length;
     } finally {
@@ -186,7 +222,18 @@ export class PluginMigrationService {
    * plugin can never block host boot.
    */
   public static async runPendingUpMigrationsForAllPlugins(): Promise<void> {
-    const plugins = PluginService.getPlugins().filter((manifest) => PluginMigrationService.hasMigrations(manifest));
+    for (const manifest of PluginService.getPlugins()) {
+      if (!PluginMigrationService.hasMigrations(manifest))
+        await recordNpmBootMigrationOutcome(
+          PluginService.PLUGIN_PATH,
+          manifest.name,
+          manifest.version,
+          'not-applicable',
+        );
+    }
+    const plugins = PluginService.getPlugins().filter(
+      (manifest) => PluginMigrationService.hasMigrations(manifest) && !PluginService.isPluginQuarantined(manifest),
+    );
 
     if (plugins.length === 0) {
       return;
@@ -197,12 +244,14 @@ export class PluginMigrationService {
     for (const manifest of plugins) {
       try {
         await PluginMigrationService.runUpMigrations(manifest);
+        await recordNpmBootMigrationOutcome(PluginService.PLUGIN_PATH, manifest.name, manifest.version, 'succeeded');
       } catch (error) {
         PluginMigrationService.logger.error(
           `Failed to run migrations for plugin "${manifest.name}"; the plugin will be flagged as failed.`,
-          error as Error
+          error as Error,
         );
-        PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
+        await recordNpmBootMigrationOutcome(PluginService.PLUGIN_PATH, manifest.name, manifest.version, 'failed');
+        PluginService.quarantinePlugin(manifest, error as Error);
       }
     }
   }

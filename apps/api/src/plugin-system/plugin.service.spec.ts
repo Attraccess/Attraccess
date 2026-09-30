@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
@@ -48,22 +48,24 @@ describe('PluginService', () => {
     mockSpawn.mockClear();
     capturedRestart = null;
     root = newPluginDir();
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation((((() => {
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit');
-    }) as unknown) as never));
+    }) as unknown as never);
     restartSpy = jest
       .spyOn(PluginService.prototype as unknown as { restartApp: () => void }, 'restartApp')
       .mockImplementation(() => undefined);
     const realSetTimeout = global.setTimeout;
-    jest
-      .spyOn(global, 'setTimeout')
-      .mockImplementation(((fn: (...a: unknown[]) => void, delay?: number, ...args: unknown[]) => {
-        if (delay === 1000) {
-          capturedRestart = () => fn();
-          return 0 as unknown as NodeJS.Timeout;
-        }
-        return realSetTimeout(fn, delay as number, ...args);
-      }) as unknown as typeof setTimeout);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((
+      fn: (...a: unknown[]) => void,
+      delay?: number,
+      ...args: unknown[]
+    ) => {
+      if (delay === 1000) {
+        capturedRestart = () => fn();
+        return 0 as unknown as NodeJS.Timeout;
+      }
+      return realSetTimeout(fn, delay as number, ...args);
+    }) as unknown as typeof setTimeout);
   });
 
   afterEach(() => {
@@ -72,12 +74,42 @@ describe('PluginService', () => {
   });
 
   describe('discovery', () => {
+    it('ignores an orphaned npm directory when the same plugin is installed manually', () => {
+      writePlugin(root, 'wago', { ...VALID_MANIFEST, name: 'wago' });
+      writePlugin(root, 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28', { ...VALID_MANIFEST, name: 'wago' });
+      writeFileSync(join(root, '.npm-plugin-state.json'), '[]');
+
+      expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual(['wago']);
+    });
+
+    it('discovers a tracked npm installation', () => {
+      const folder = 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28';
+      writePlugin(root, folder, { ...VALID_MANIFEST, name: 'wago' });
+      writeFileSync(join(root, '.npm-plugin-state.json'), JSON.stringify([{ installPath: folder }]));
+
+      expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual([folder]);
+    });
+
+    it('keeps npm directories visible when the install state file is unreadable', () => {
+      const folder = 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28';
+      writePlugin(root, folder, { ...VALID_MANIFEST, name: 'wago' });
+      writeFileSync(join(root, '.npm-plugin-state.json'), '{corrupt');
+
+      expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual([folder]);
+    });
+
+    it('rejects a ZIP upload whose name falls in the reserved npm directory namespace', async () => {
+      const zip = zipFileUpload({ 'plugin.json': JSON.stringify({ ...VALID_MANIFEST, name: 'npm-tools' }) });
+
+      await expect(new PluginService().uploadPlugin(zip)).rejects.toThrow('visible single path segment');
+    });
+
     it('returns an empty array when the plugin folder does not exist', () => {
       PluginService.configure({ PLUGIN_DIR: join(root, 'does-not-exist'), RESTART_BY_EXIT: true });
       expect(PluginService.getPlugins()).toEqual([]);
     });
 
-    it('discovers a manifest and assigns an id and prefixed backend directory', () => {
+    it('discovers a manifest and assigns a stable id and prefixed backend directory', () => {
       writePlugin(root, 'my-plugin', {
         name: 'my-plugin',
         version: '1.0.0',
@@ -91,6 +123,20 @@ describe('PluginService', () => {
       expect(plugins[0].pluginDirectory).toBe('my-plugin');
       expect(plugins[0].id).toEqual(expect.any(String));
       expect(plugins[0].main.backend.directory).toBe(join('my-plugin', 'dist'));
+    });
+
+    it('keeps a plugin id stable across discovery scans', () => {
+      writePlugin(root, 'stable-plugin', {
+        name: 'stable-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      const first = PluginService.getPlugins()[0].id;
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.getPlugins()[0].id).toBe(first);
     });
 
     it('reports per-plugin backend load status (loaded / error / unknown)', () => {
@@ -118,6 +164,141 @@ describe('PluginService', () => {
       expect(byName['plugin-bad'].error).toBe("Cannot find module '@nestjs/common'");
     });
 
+    it('persists a quarantined plugin error across a new process discovery', () => {
+      writePlugin(root, 'crashing-plugin', {
+        name: 'crashing-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+
+      PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({
+        status: 'error',
+        error: 'onModuleInit failed',
+      });
+    });
+
+    it('keeps a failed plugin quarantined in memory when persistence fails', () => {
+      writePlugin(root, 'crashing-plugin', {
+        name: 'crashing-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      jest
+        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .mockImplementation(() => {
+          throw new Error('read-only plugin directory');
+        });
+
+      expect(() => PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'))).not.toThrow();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it('removes quarantine state when a plugin is replaced', () => {
+      writePlugin(root, 'repaired-plugin', {
+        name: 'repaired-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+
+      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
+    });
+
+    it('preserves quarantine state when clearing it cannot be persisted', () => {
+      writePlugin(root, 'repaired-plugin', {
+        name: 'repaired-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+      jest
+        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .mockImplementation(() => {
+          throw new Error('read-only plugin directory');
+        });
+
+      expect(() => PluginService.clearPluginQuarantine(plugin.pluginDirectory)).toThrow('read-only plugin directory');
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it('persists the startup error before quarantining plugins from an incomplete startup', () => {
+      writePlugin(root, 'previously-active', {
+        name: 'previously-active',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      PluginService.beginBootGuard();
+      const error = new Error('Plugin onModuleInit failed');
+      error.stack = `${error.stack}\n    at ${join(root, 'previously-active', 'dist', 'index.js')}:1:1`;
+      PluginService.recordBootFailure(error);
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      const [plugin] = PluginService.getPlugins();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0].error).toBe('Plugin onModuleInit failed');
+    });
+
+    it('quarantines guarded plugins after an abrupt startup failure', () => {
+      writePlugin(root, 'unrelated-plugin', {
+        name: 'unrelated-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      PluginService.beginBootGuard();
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      const [plugin] = PluginService.getPlugins();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it.each(['SIGINT', 'SIGTERM'] as const)('does not quarantine plugins when startup is stopped by %s', (signal) => {
+      writePlugin(root, 'installed-plugin', {
+        name: 'installed-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      jest.spyOn(process, 'kill').mockImplementation(() => true);
+      const existing = new Set(process.listeners(signal));
+      PluginService.beginBootGuard();
+      const handler = process.listeners(signal).find((listener) => !existing.has(listener));
+      expect(handler).toBeDefined();
+      handler?.();
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
+    });
+
+    it('creates a configured plugin directory before writing boot guard state', () => {
+      const missingRoot = join(root, 'does-not-exist');
+      PluginService.configure({ PLUGIN_DIR: missingRoot, RESTART_BY_EXIT: true });
+
+      expect(() => PluginService.beginBootGuard()).not.toThrow();
+      expect(existsSync(join(missingRoot, '.plugin-boot-guard.json'))).toBe(true);
+    });
+
     it('caches discovery between calls and re-scans after configure', () => {
       writePlugin(root, 'plugin-a', {
         name: 'plugin-a',
@@ -135,6 +316,28 @@ describe('PluginService', () => {
 
     it('skips folders without a manifest', () => {
       mkdirSync(join(root, 'not-a-plugin'), { recursive: true });
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+
+    it('excludes internal npm backup storage from discovery', () => {
+      writePlugin(root, '.npm-backups', {
+        name: 'stale-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+
+    it('excludes hidden replacement backups from discovery', () => {
+      writePlugin(root, '.uploaded-plugin-backup', {
+        name: 'uploaded-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
       expect(PluginService.getPlugins()).toEqual([]);
     });
 
@@ -197,18 +400,136 @@ describe('PluginService', () => {
       expect(restartSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('clears stale quarantine state for an uploaded replacement', async () => {
+      writePlugin(root, 'uploaded-plugin', VALID_MANIFEST);
+      const [previous] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(previous, new Error('prior crash'));
+      rmSync(join(root, 'uploaded-plugin'), { recursive: true, force: true });
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      await new PluginService().uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
+    });
+
+    // Finder ("Compress" on an unpacked folder) and most GUI zip tools wrap the
+    // contents in a single top-level folder. Before, that surfaced as a raw
+    // ENOENT on <temp>/plugin.json.
+    it('unpacks a plugin whose contents sit in a single wrapper folder', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({
+        'plugin-example/plugin.json': JSON.stringify(VALID_MANIFEST),
+        'plugin-example/dist/index.js': 'module.exports = {};',
+        '__MACOSX/._plugin.json': 'junk',
+      });
+
+      const manifest = await service.uploadPlugin(file);
+
+      expect(manifest.name).toBe('uploaded-plugin');
+      expect(existsSync(join(root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
+      expect(existsSync(join(root, 'uploaded-plugin', 'dist', 'index.js'))).toBe(true);
+      expect(existsSync(join(root, 'temp'))).toBe(true);
+      expect(readdirSync(join(root, 'temp'))).toEqual([]);
+    });
+
+    it('rejects a zip without a plugin.json instead of throwing ENOENT', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'dist/index.js': 'module.exports = {};' });
+
+      await expect(service.uploadPlugin(file)).rejects.toThrow(/plugin\.json/);
+    });
+
+    it('rejects a file that cannot be extracted', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('not a zip at all') });
+
+      await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('cleans up the temp folder when the upload is rejected', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) });
+
+      await expect(service.uploadPlugin(file)).rejects.toBeDefined();
+      expect(readdirSync(join(root, 'temp'))).toEqual([]);
+    });
+
     it('rejects a manifest that fails schema validation', async () => {
       const service = new PluginService();
       const file = zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) });
       await expect(service.uploadPlugin(file)).rejects.toBeDefined();
     });
 
-    it('rejects when a plugin with the same name already exists', async () => {
+    it('replaces an uploaded plugin with the same name', async () => {
       const service = new PluginService();
-      await service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
+      await service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(VALID_MANIFEST),
+          'dist/index.js': 'module.exports = "old";',
+        }),
+      );
 
-      const again = zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) });
-      await expect(service.uploadPlugin(again)).rejects.toThrow(/already exists/);
+      const updatedManifest = { ...VALID_MANIFEST, version: '1.2.4' };
+      const manifest = await service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(updatedManifest),
+          'dist/index.js': 'module.exports = "new";',
+        }),
+      );
+
+      expect(manifest.version).toBe('1.2.4');
+      expect(readFileSync(join(root, 'uploaded-plugin', 'dist', 'index.js'), 'utf8')).toBe('module.exports = "new";');
+      expect(readdirSync(root).filter((entry) => entry.startsWith('.uploaded-plugin-'))).toEqual([]);
+    });
+
+    it.each(['../outside-plugin', 'nested/plugin', '..\\outside-plugin'])(
+      'rejects a plugin name that escapes its directory: %s',
+      async (name) => {
+        const service = new PluginService();
+        const manifest = { ...VALID_MANIFEST, name };
+
+        await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
+          'Plugin name must be a visible single path segment',
+        );
+        expect(existsSync(join(root, 'outside-plugin'))).toBe(false);
+      },
+    );
+
+    it('rejects a dot-prefixed plugin name that discovery would skip', async () => {
+      const service = new PluginService();
+      const manifest = { ...VALID_MANIFEST, name: '.hidden-plugin' };
+
+      await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
+        'Plugin name must be a visible single path segment',
+      );
+      expect(existsSync(join(root, '.hidden-plugin'))).toBe(false);
+    });
+
+    it('serializes plugin updates with the same name', async () => {
+      const withPluginUploadLock = Reflect.get(PluginService, 'withPluginUploadLock') as <T>(
+        name: string,
+        action: () => Promise<T>,
+      ) => Promise<T>;
+      let releaseFirst!: () => void;
+      const order: string[] = [];
+      const first = withPluginUploadLock('uploaded-plugin', async () => {
+        order.push('first-start');
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        });
+        order.push('first-end');
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const second = withPluginUploadLock('uploaded-plugin', async () => {
+        order.push('second');
+      });
+
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(order).toEqual(['first-start']);
+      releaseFirst();
+      await Promise.all([first, second]);
+      expect(order).toEqual(['first-start', 'first-end', 'second']);
     });
   });
 
@@ -226,11 +547,13 @@ describe('PluginService', () => {
         attraccessVersion: { min: '1.0.0' },
       });
       const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
       const service = new PluginService();
 
       await service.deletePlugin(plugin.id);
 
       expect(existsSync(join(root, 'delete-me'))).toBe(false);
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
       flushScheduledRestart();
       expect(restartSpy).toHaveBeenCalledTimes(1);
     });
@@ -249,7 +572,11 @@ describe('PluginService', () => {
       restartSpy.mockRestore();
       PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: false });
       expect(() => (new PluginService() as unknown as { restartApp: () => void }).restartApp()).toThrow('process.exit');
-      expect(mockSpawn).toHaveBeenCalledWith(process.argv[0], process.argv.slice(1), expect.objectContaining({ detached: true }));
+      expect(mockSpawn).toHaveBeenCalledWith(
+        process.argv[0],
+        process.argv.slice(1),
+        expect.objectContaining({ detached: true }),
+      );
       expect(exitSpy).toHaveBeenCalled();
     });
   });

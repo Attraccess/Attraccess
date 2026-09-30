@@ -1,4 +1,4 @@
-import { HTMLAttributes, useCallback, useRef, useState } from 'react';
+import { HTMLAttributes, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { History } from 'lucide-react';
@@ -17,6 +17,11 @@ import de from './translations/resourceUsageHistory.de';
 import historyTableEn from './components/HistoryTable/utils/translations/en.json';
 import historyTableDe from './components/HistoryTable/utils/translations/de.json';
 import { FlatSection } from '../../../components/flatSection';
+import {
+  attributedOperatingDurationForUsage,
+  useCanViewOperatingDuration,
+  useOperatingDuration,
+} from '../operatingDuration';
 
 type ResourceUsageHistoryProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
@@ -27,7 +32,8 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
   const { t } = useTranslations({ en, de });
   const { t: tHistoryTable } = useTranslations({ en: historyTableEn, de: historyTableDe });
   const { hasPermission } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
+  const canViewOperatingDuration = useCanViewOperatingDuration(resourceId);
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
@@ -37,6 +43,18 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
   const [projectOverrides, setProjectOverrides] = useState<Record<number, number | null>>({});
   const [updatingSessionIds, setUpdatingSessionIds] = useState<Record<number, boolean>>({});
   const previousProjectAssignmentsRef = useRef<Record<number, number | null>>({});
+  const selectedSessionRange = useMemo(
+    () =>
+      selectedSession?.endTime
+        ? { start: new Date(selectedSession.startTime), end: new Date(selectedSession.endTime) }
+        : undefined,
+    [selectedSession],
+  );
+  const { data: selectedOperatingDuration } = useOperatingDuration(
+    resourceId,
+    canViewOperatingDuration && selectedSession !== null,
+    selectedSessionRange,
+  );
 
   const projectPlaceholder = tHistoryTable('rows.machine.project.unassigned');
   const projectLabel = tHistoryTable('headers.machine.project');
@@ -132,7 +150,7 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
     [resourceId, resolveProjectId, updateSessionProject],
   );
 
-  const showAllUsersToggle = canManageResources ? (
+  const showAllUsersToggle = canUpdateResources ? (
     <ShowAllUsersToggle showAllUsers={showAllUsers} setShowAllUsers={setShowAllUsers} />
   ) : undefined;
 
@@ -140,12 +158,13 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
     <HistoryTable
       resourceId={resourceId}
       showAllUsers={showAllUsers}
-      canManageResources={canManageResources}
+      canUpdateResources={canUpdateResources}
       onSessionClick={handleSessionClick}
       projectPlaceholder={projectPlaceholder}
       resolveProjectId={resolveProjectId}
       updatingSessionIds={updatingSessionIds}
       onProjectChange={handleProjectChange}
+      canViewOperatingDuration={canViewOperatingDuration}
     />
   );
 
@@ -159,6 +178,11 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
       resolveProjectId={resolveProjectId}
       updatingSessionIds={updatingSessionIds}
       onProjectChange={handleProjectChange}
+      operatingDurationMs={
+        selectedSession && canViewOperatingDuration
+          ? attributedOperatingDurationForUsage(selectedOperatingDuration, selectedSession.id)
+          : undefined
+      }
     />
   );
 

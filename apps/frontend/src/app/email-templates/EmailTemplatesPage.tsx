@@ -13,7 +13,7 @@ import {
 import { Edit3, Mail } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/pageHeader'; // Assuming PageHeader exists
+import { PageHeader } from '../../components/pageHeader';
 import { EmptyState } from '../../components/emptyState';
 
 import en from './en.json';
@@ -23,13 +23,16 @@ import { useCallback, useMemo } from 'react';
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  // The Email settings section — these editors are sub-routes of it and navigate to its siblings.
+  const basePath = '/settings/email';
+
   const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
 
   const openEditor = useCallback(
     (type: string) => {
-      navigate(`/email-templates/${type}`);
+      navigate(`${basePath}/templates/${type}`);
     },
-    [navigate],
+    [navigate, basePath],
   );
 
   const tableItems = useMemo(() => {
@@ -47,7 +50,12 @@ export function EmailTemplatesPage() {
 
   return (
     <>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Mail className="w-6 h-6" />} />
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={<Mail className="w-6 h-6" />}
+        backTo={basePath}
+      />
 
       <Table>
         <TableScrollContainer>

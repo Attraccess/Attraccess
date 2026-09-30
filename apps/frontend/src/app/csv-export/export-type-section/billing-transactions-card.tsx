@@ -34,7 +34,7 @@ export function BillingTransactionsCard(props: Props) {
       Icon={CreditCardIcon}
       title={t('exports.billingTransactions.title')}
       description={t('exports.billingTransactions.description')}
-      rowCount={data?.length}
+      rowCount={data?.total}
       rowCountStatus={hasRange ? status : 'idle'}
       estimatedLabel={({ count }) => t('exports.card.estimatedRows', { count })}
       loadingLabel={t('exports.card.estimatedRowsLoading')}

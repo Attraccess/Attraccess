@@ -4,9 +4,21 @@ import { Strategy } from 'passport-custom';
 import { Request } from 'express';
 import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
+import { RbacService } from '../rbac/rbac.service';
+import { ApiTokenService } from '../auth/api-token/api-token.service';
+import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
+
+// ponytail: Set serializes as {} over JSON; this subclass emits an array so plugins/responses are safe
+class SerializablePermissionSet extends Set<string> {
+  toJSON() {
+    return [...this];
+  }
+}
 
 @Injectable()
 export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
@@ -15,16 +27,46 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   constructor(
     private readonly sessionService: SessionService,
     private readonly twoFactorService: TwoFactorService,
+    private readonly rbacService: RbacService,
+    private readonly apiTokenService: ApiTokenService,
+    private readonly authAuditLogger: AuthAuditLogger,
   ) {
     super();
   }
 
   async validate(req: Request): Promise<User> {
-    const token = this.extractTokenFromRequest(req);
+    const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
       this.logger.debug('No session token found in request');
       throw new UnauthorizedException('No session token provided');
+    }
+
+    if (fromAuthorizationHeader) {
+      const tokenPrincipal = await this.apiTokenService.authenticate(token);
+      if (tokenPrincipal) {
+        const authenticatedUser = tokenPrincipal.user as AuthenticatedUser;
+        // Tokens must reflect owner permission removals immediately, including after a role change on another replica.
+        const ownerPermissions = await this.rbacService.getEffectivePermissions(tokenPrincipal.user.id, true);
+        if (!ownerPermissions.has('users.api-tokens.manage')) {
+          throw new UnauthorizedException('API token permission revoked');
+        }
+        authenticatedUser.effectivePermissions = new SerializablePermissionSet(
+          tokenPrincipal.apiToken.permissionKeys.filter((permission) => ownerPermissions.has(permission)),
+        );
+        authenticatedUser.authenticationMethod = 'api-token';
+        authenticatedUser.apiTokenId = tokenPrincipal.apiToken.id;
+        this.authAuditLogger.log({
+          type: 'api_token',
+          outcome: 'success',
+          ip: resolveIp(req),
+          userId: authenticatedUser.id,
+          username: authenticatedUser.username,
+          authenticationMethod: 'api-token',
+          apiTokenId: tokenPrincipal.apiToken.id,
+        });
+        return tokenPrincipal.user;
+      }
     }
 
     const user = await this.sessionService.validateSession(token);
@@ -33,6 +75,12 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       this.logger.debug(`Invalid or expired session token: ${token.substring(0, 8)}...`);
       throw new UnauthorizedException('Invalid or expired session');
     }
+
+    // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
+    (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
+      await this.rbacService.getEffectivePermissions(user.id),
+    );
+    (user as AuthenticatedUser).authenticationMethod = 'session';
 
     if (!this.isTwoFactorSetupAllowedPath(req)) {
       const status = await this.twoFactorService.getStatus(user);
@@ -51,23 +99,23 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
    * @param req Express request object
    * @returns Session token or null if not found
    */
-  private extractTokenFromRequest(req: Request): string | null {
+  private extractTokenFromRequest(req: Request): { token: string | null; fromAuthorizationHeader: boolean } {
     // Priority 1: Authorization header with Bearer token
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7).trim();
       if (token) {
-        return token;
+        return { token, fromAuthorizationHeader: true };
       }
     }
 
     // Priority 2: Session cookie
     const sessionCookie = req.cookies?.['auth-session'];
     if (sessionCookie) {
-      return sessionCookie;
+      return { token: sessionCookie, fromAuthorizationHeader: false };
     }
 
-    return null;
+    return { token: null, fromAuthorizationHeader: false };
   }
 
   private isTwoFactorSetupAllowedPath(req: Request): boolean {

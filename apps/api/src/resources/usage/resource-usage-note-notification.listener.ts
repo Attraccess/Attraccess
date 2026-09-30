@@ -8,6 +8,12 @@ import { Resource, ResourceIntroducer, User } from '@attraccess/database-entitie
 import { ResourceUsageNoteAddedEvent } from './events/resource-usage.events';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './resource-usage-note-notification.en.json';
+import * as de from './resource-usage-note-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceUsageNoteNotificationListener {
@@ -21,6 +27,7 @@ export class ResourceUsageNoteNotificationListener {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @OnEvent(ResourceUsageNoteAddedEvent.EVENT_NAME)
@@ -40,18 +47,25 @@ export class ResourceUsageNoteNotificationListener {
         return;
       }
 
-      const authorName = event.author.username ?? 'A user';
+      const authorUsername = event.author.username;
       await this.notifications.dispatch({
         category: NotificationCategory.RESOURCE_USAGE_NOTES,
         recipients,
         actorId: event.author.id,
-        title: `Usage note added for ${resource.name}`,
-        body: `${authorName}: ${event.note}`,
+        title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
+        body: (recipient) => {
+          const authorName = authorUsername ?? t(recipient.locale, 'fallbackUser');
+          return t(recipient.locale, 'body', { authorName, note: event.note });
+        },
         url: `/resources/${resource.id}/usage`,
         sendEmail: (recipient) =>
           this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_USAGE_NOTES, {
             resource: { id: resource.id, name: resource.name },
-            note: { content: event.note, phase: event.phase, authorName },
+            note: {
+              content: event.note,
+              phase: event.phase,
+              authorName: authorUsername ?? t(recipient.locale, 'fallbackUser'),
+            },
           }),
       });
     } catch (error) {
@@ -66,10 +80,8 @@ export class ResourceUsageNoteNotificationListener {
   private async collectRecipients(resource: Resource, authorId: number): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.canManageResources = :value', { value: true })
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

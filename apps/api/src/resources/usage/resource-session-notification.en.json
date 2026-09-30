@@ -1,0 +1,8 @@
+{
+  "takeoverTitle": "{resourceName} was taken over",
+  "takeoverBody": "{userName} took over your active resource session.",
+  "sessionEndedTitle": "{resourceName} session ended",
+  "sessionEndedBody": "{endedBy} ended your active resource session.",
+  "fallbackUser": "Another user",
+  "fallbackSystem": "The system"
+}

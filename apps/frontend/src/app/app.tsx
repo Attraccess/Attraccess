@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
@@ -6,9 +6,9 @@ import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
-import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
-import { OpenAPI, SystemPermissions } from '@attraccess/react-query-client';
+import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { hasRequiredPermissions } from './routes/routeAccess';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -20,22 +20,23 @@ import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AccessDenied } from './unauthorized/accessDenied';
-import { getBaseUrl } from '../api';
+import { configureApiClient } from '../api';
 import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
+import { KioskGuard } from './kiosk/KioskGuard';
+import { useLocaleSync } from '../hooks/useLocaleSync';
+import { NotFound } from './not-found';
+import { ThemeToggle } from '../components/themeToggle';
 
-function useRoutesWithAuthElements(routes: RouteConfig[]) {
-  const { user } = useAuth();
+// Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
+export function useRoutesWithAuthElements(routes: RouteConfig[]) {
+  const { user, hasPermission } = useAuth();
 
   const routesWithAuthElements = useMemo(() => {
     return routes.map((route) => {
       if (!route.authRequired) {
-        return route;
-      }
-
-      if (route.authRequired === true && user) {
         return route;
       }
 
@@ -46,15 +47,12 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
         };
       }
 
-      const requiredPermissions = (
-        Array.isArray(route.authRequired) ? route.authRequired : [route.authRequired]
-      ) as (keyof SystemPermissions)[];
+      // `true` = any logged-in user, which the check above just established.
+      if (route.authRequired === true) {
+        return route;
+      }
 
-      const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => user.systemPermissions[permission] === true,
-      );
-
-      if (!userHasAllRequiredPermissions) {
+      if (!hasRequiredPermissions(route.authRequired, hasPermission)) {
         return {
           ...route,
           element: <AccessDenied />,
@@ -63,7 +61,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       return route;
     });
-  }, [routes, user]);
+  }, [routes, user, hasPermission]);
 
   return useMemo(
     () =>
@@ -93,7 +91,7 @@ function useIsTouchDevice() {
 }
 
 function AppLayout(props: PropsWithChildren) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, needsTwoFactorSetup } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -107,9 +105,14 @@ function AppLayout(props: PropsWithChildren) {
     <RouterProvider navigate={navigate}>
       <I18nProvider locale={language}>
         <ToastProvider>
+          {(!isAuthenticated || needsTwoFactorSetup) && (
+            <div className="fixed top-4 right-4 z-30">
+              <ThemeToggle />
+            </div>
+          )}
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
-              <Layout noLayout={!isAuthenticated}>{props.children}</Layout>
+              {props.children}
               {isAuthenticated && <SupervisorApprovalListener />}
             </AttraccessUserActionsBridge>
           </ReactFlowProvider>
@@ -145,61 +148,69 @@ function AppLayout(props: PropsWithChildren) {
   );
 }
 
-function AppContent() {
+// Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
+export function AppRoutes() {
   const { isAuthenticated } = useAuth();
   const allRoutes = useAllRoutes();
-  const routesWithAuthElements = useRoutesWithAuthElements(allRoutes);
+
+  const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
+  const layoutRoutes = useMemo(() => allRoutes.filter((r) => !r.noLayout), [allRoutes]);
+
+  const bareRouteElements = useRoutesWithAuthElements(bareRoutes);
+  const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
 
   return (
+    <Routes>
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route
+        path="/accept-invitation"
+        element={
+          <UnauthorizedLayout>
+            <AcceptInvitation />
+          </UnauthorizedLayout>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <UnauthorizedLayout>
+            <ResetPassword />
+          </UnauthorizedLayout>
+        }
+      />
+
+      {bareRouteElements}
+
+      <Route
+        element={
+          <Layout>
+            <Outlet />
+          </Layout>
+        }
+      >
+        {layoutRouteElements}
+        {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
+            layout route never rendered and the document came up blank (ATT-869). */}
+        <Route path="*" element={<NotFound isAuthenticated={isAuthenticated} />} />
+      </Route>
+    </Routes>
+  );
+}
+
+function AppContent() {
+  return (
     <TwoFactorGate>
-      <Routes>
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route
-          path="/accept-invitation"
-          element={
-            <UnauthorizedLayout>
-              <AcceptInvitation />
-            </UnauthorizedLayout>
-          }
-        />
-        <Route
-          path="/reset-password"
-          element={
-            <UnauthorizedLayout>
-              <ResetPassword />
-            </UnauthorizedLayout>
-          }
-        />
-
-        {routesWithAuthElements}
-
-        {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
-      </Routes>
+      <KioskGuard />
+      <AppRoutes />
     </TwoFactorGate>
   );
 }
 
 export function App() {
   const { isInitialized } = useAuth();
-  const { setTheme } = useTheme();
+  useLocaleSync();
 
-  useEffect(() => {
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    setTheme(systemTheme);
-
-    let metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (!metaTheme) {
-      metaTheme = document.createElement('meta');
-      metaTheme.setAttribute('name', 'theme-color');
-    }
-
-    const darkBackground = 'rgb(0,0,0)';
-    const lightBackground = 'rgb(255,255,255)';
-
-    metaTheme.setAttribute('content', systemTheme === 'dark' ? darkBackground : lightBackground);
-  }, [setTheme]);
-
-  OpenAPI.BASE = getBaseUrl();
+  configureApiClient();
 
   return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
 }

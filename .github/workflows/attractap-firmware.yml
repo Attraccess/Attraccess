@@ -1,0 +1,39 @@
+name: Attractap Firmware
+
+on:
+  pull_request:
+    paths:
+      - 'apps/attractap/firmware/**'
+      - '.github/workflows/attractap-firmware.yml'
+  push:
+    branches:
+      - 'claude/attractap-**'
+    paths:
+      - 'apps/attractap/firmware/**'
+      - '.github/workflows/attractap-firmware.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/build-attractap-firmware
+
+      - name: Test SupervisionFlow and LVGL rendering
+        run: |
+          cmake -S apps/attractap/firmware/tests/supervision -B /tmp/attractap-supervision-flow-tests
+          cmake --build /tmp/attractap-supervision-flow-tests
+          ctest --test-dir /tmp/attractap-supervision-flow-tests --output-on-failure
+          cmake -S apps/attractap/firmware/tests/display-theme -B /tmp/attractap-display-theme-tests
+          cmake --build /tmp/attractap-display-theme-tests --parallel 2
+          ctest --test-dir /tmp/attractap-display-theme-tests --output-on-failure
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: attractap-firmware
+          path: apps/attractap/firmware/firmware_output/
+          retention-days: 14

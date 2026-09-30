@@ -27,6 +27,10 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     events,
     dataSource,
     logger: new Logger('test-plugin'),
+    mqtt: {
+      subscribe: () => Promise.resolve({ unsubscribe: () => undefined }),
+      publish: () => Promise.resolve(),
+    },
     getRepository: (entity) => ({ entity } as never),
     get: (token) => ({ token } as never),
     onEvent: () => ({ off: () => undefined }),
@@ -42,6 +46,13 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
         password: 'secret',
         clientId: null,
       }),
+    flows: {
+      trigger: jest.fn(async () => undefined),
+    },
+    secrets: {
+      encrypt: (value) => `encrypted:${value}`,
+      decrypt: (value) => value.replace('encrypted:', ''),
+    },
   };
 }
 
@@ -230,6 +241,37 @@ describe('PluginSandboxService', () => {
         PluginPermission.RESOLVE_HOST_PROVIDERS,
       ]);
       expect(() => ctx.getMqttServerConfig(1)).toThrow(/ACCESS_MQTT_SERVERS/);
+    });
+
+    it('gates mqtt subscriptions and publishing behind ACCESS_MQTT_SERVERS', async () => {
+      const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => denied.mqtt.subscribe(1, 'sensors/+', () => undefined)).toThrow(PluginPermissionError);
+      expect(() => denied.mqtt.publish(1, 'sensors/kitchen', 'on')).toThrow(PluginPermissionError);
+
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.ACCESS_MQTT_SERVERS]);
+      await expect(granted.mqtt.subscribe(1, 'sensors/+', () => undefined)).resolves.toEqual({
+        unsubscribe: expect.any(Function),
+      });
+      await expect(granted.mqtt.publish(1, 'sensors/kitchen', 'on')).resolves.toBeUndefined();
+    });
+
+    it('gates flows.trigger() behind TRIGGER_FLOWS', async () => {
+      const base = buildBaseContext(events);
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.flows.trigger('plugin.test.trigger', () => true, {})).toThrow(PluginPermissionError);
+      expect(() => denied.flows.trigger('plugin.test.trigger', () => true, {})).toThrow(/TRIGGER_FLOWS/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.TRIGGER_FLOWS]);
+      await granted.flows.trigger('plugin.test.trigger', () => true, {});
+      expect(base.flows.trigger).toHaveBeenCalledWith('plugin.test.trigger', expect.any(Function), {});
+    });
+
+    it('gates host-managed secret encryption behind MANAGE_SECRETS', () => {
+      const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => denied.secrets.encrypt('secret')).toThrow(/MANAGE_SECRETS/);
+
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.MANAGE_SECRETS]);
+      expect(granted.secrets.decrypt(granted.secrets.encrypt('secret'))).toBe('secret');
     });
   });
 });

@@ -14,13 +14,14 @@ export function generateRowCells(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
-  canManageResources: boolean,
+  canUpdateResources: boolean,
   projectCellRenderer?: (session: ResourceUsage) => ReactElement,
+  operatingDuration?: { canView: boolean; durationMs: number | undefined },
 ): TableRowProps<ResourceUsage>['children'] {
   const cells: ReactElement<TableCellProps>[] = [];
 
-  // Only show user cell if we're showing all users (requires canManageResources)
-  if (canManageResources && showAllUsers) {
+  // Only show user cell if we're showing all users (requires canUpdateResources)
+  if (canUpdateResources && showAllUsers) {
     cells.push(
       <TableCell key={`user-${session.id}`}>
         <AttraccessUser user={session.user} />
@@ -48,11 +49,20 @@ export function generateRowCells(
               </Chip>
             }
           />
-          {hasNotes && (
-            <MessageSquareText className="w-4 h-4" role="img" aria-label={t('rows.machine.hasNotes')} />
-          )}
+          {hasNotes && <MessageSquareText className="w-4 h-4" role="img" aria-label={t('rows.machine.hasNotes')} />}
         </div>
       </TableCell>,
+      ...(operatingDuration?.canView
+        ? [
+            <TableCell key={`operating-duration-${session.id}`} className="hidden xl:table-cell whitespace-nowrap">
+              {operatingDuration.durationMs === undefined ? (
+                '—'
+              ) : (
+                <DurationDisplay minutes={operatingDuration.durationMs / 60_000} />
+              )}
+            </TableCell>,
+          ]
+        : []),
       <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">
         {projectCellRenderer ? projectCellRenderer(session) : session.project?.name}
       </TableCell>,

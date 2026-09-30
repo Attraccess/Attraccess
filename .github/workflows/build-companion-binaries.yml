@@ -1,0 +1,103 @@
+name: Build Companion Binaries
+
+# Reusable workflow — called by docker-nightly-latest, release, pull-requests,
+# balena-manual, and companion. Builds all three platform binaries in parallel
+# and uploads them as artifacts named companion-{platform}-<run_id>.
+# Callers must pass `secrets: inherit` so signing secrets are available.
+
+on:
+  workflow_call:
+
+env:
+  # Nx remote cache. github.event_name and github.ref here are the caller's, so
+  # PR and manual-dispatch callers read only; push-to-main and release callers
+  # write. The ref check has to be push-specific — a release event's ref is the
+  # tag — and it is what stops a future push-triggered caller on some other
+  # branch from inheriting a write credential.
+  #
+  # The three jobs below run the same nx command on three different OSes and
+  # share one cache, so every cached target reached from here must either be
+  # platform-independent or carry a platform input. companion:build is the one
+  # that is not — electron-builder emits host-only artifacts — so it declares a
+  # runtime input in apps/companion/project.json. Check that before adding a
+  # target here, or two of the three runners will restore the wrong binaries.
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release') && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
+
+jobs:
+  build-companion-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Install Linux packaging dependencies
+        run: sudo apt-get install -y fakeroot rpm
+      - name: Build Linux companion (x64 + arm64)
+        run: pnpm nx run companion:build
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-linux-${{ github.run_id }}
+          path: |
+            apps/companion/dist/companion_linux_x86_64.AppImage
+            apps/companion/dist/companion_linux_arm64.AppImage
+          if-no-files-found: error
+
+  build-companion-macos:
+    runs-on: macos-latest
+    env:
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Set up macOS code signing
+        if: ${{ env.HAS_APPLE_CERT == 'true' }}
+        uses: ./.github/actions/macos-codesign-setup
+        with:
+          certificate: ${{ secrets.APPLE_CERTIFICATE }}
+          certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      - name: Build macOS companion (universal)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm nx run companion:build
+      - name: Clean up keychain
+        if: ${{ env.HAS_APPLE_CERT == 'true' && always() }}
+        run: '[ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true'
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-macos-${{ github.run_id }}
+          path: apps/companion/dist/companion_mac_universal.dmg
+          if-no-files-found: error
+
+  build-companion-windows:
+    runs-on: windows-latest
+    env:
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Set up Windows code signing
+        if: ${{ env.HAS_WINDOWS_CERT == 'true' }}
+        uses: ./.github/actions/windows-codesign-setup
+        with:
+          cert-base64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          cert-password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      - name: Build Windows companion (x64)
+        shell: bash
+        run: pnpm nx run companion:build
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-windows-${{ github.run_id }}
+          path: apps/companion/dist/companion_win_x64.exe
+          if-no-files-found: error

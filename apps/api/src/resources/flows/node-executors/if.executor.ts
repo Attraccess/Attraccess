@@ -28,17 +28,18 @@ export class IfExecutor implements NodeExecutor {
       case '!=':
         result = String(comparisonValue) !== String(sourceValue);
         break;
+      // Operand order matches how the node reads in the editor: path <operator> comparisonValue
       case '>':
-        result = Number(comparisonValue) > Number(sourceValue);
+        result = Number(sourceValue) > Number(comparisonValue);
         break;
       case '<':
-        result = Number(comparisonValue) < Number(sourceValue);
+        result = Number(sourceValue) < Number(comparisonValue);
         break;
       case '>=':
-        result = Number(comparisonValue) >= Number(sourceValue);
+        result = Number(sourceValue) >= Number(comparisonValue);
         break;
       case '<=':
-        result = Number(comparisonValue) <= Number(sourceValue);
+        result = Number(sourceValue) <= Number(comparisonValue);
         break;
       default: {
         const exhaustiveCheck: never = comparisonOperator;

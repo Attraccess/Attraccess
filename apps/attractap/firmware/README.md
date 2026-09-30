@@ -1,95 +1,144 @@
 # Attractap Firmware
 
-This directory contains the firmware for the Attractap device, an ESP32-C3 based RFID/NFC reader.
+Firmware for the Attractap NFC readers (ESP32-S3), built on **ESP-IDF v6.0.2** (`idf.py` + CMake — no Arduino, no PlatformIO).
 
-## Web Installation
+## Variants
 
-You can install the firmware directly from your web browser using [ESP Web Tools](https://esphome.github.io/esp-web-tools/), which allows for a seamless installation experience without requiring command-line tools.
+One firmware per hardware flavor, defined by a file in `variants/`:
 
-### Requirements
+| Variant | Board | Hardware |
+| --- | --- | --- |
+| `attractap-touch` | ESP32-S3 DevKitC (V3 hardware) | ST7701 480x480 RGB panel, GT911 touch, TCA9554 IO expander, PN532 NFC, WiFi |
+| `attractap-touch-v2` | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64 |
+| `attractap-touch-ethernet` | Adafruit Qualia S3 RGB666 | TL040WVS03 panel via XCA9554 expander, FocalTech touch, W5500 ethernet |
+| `attractap-lite-ethernet` | Adafruit Qualia S3 | headless, WS2812 24-LED ring, W5500 ethernet |
+| `attractap-touch-demo` | V3 display hardware | Offline demo API and demo settings |
+| `attractap-touch-v2-demo` | V4 display hardware | Offline demo API, demo settings and power button |
 
-- Chrome or Edge browser on desktop (Web Serial is not supported on mobile or Firefox)
-- ESP32-C3 based Attractap device
-- USB connection to your computer
+Each variant file sets the compile definitions (pins, feature flags, firmware
+name) and the source subtrees excluded for that hardware. The firmware version
+lives in `version.txt` — bump it whenever firmware source changes (CI enforces
+this).
 
-### Quick Installation
+## Building
 
-1. Connect your Attractap device to your computer via USB
-2. Visit our [firmware installation page](https://OWNER_NAME.github.io/Attraccess/) (replace OWNER_NAME with your GitHub username)
-3. Click the "Install" button and follow the on-screen instructions
-4. If prompted, select the correct serial port for your device
-5. Wait for the installation to complete
+Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh`. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
 
-### Manual Installation
+NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
-If the web installer doesn't work for you, you can download the firmware binary from the GitHub Pages site and flash it manually:
-
-```bash
-# Install esptool
-pip install esptool
-
-# Flash the firmware
-esptool.py --chip esp32c3 --port /dev/ttyUSB0 --baud 921600 write_flash 0x0 merged-firmware.bin
-```
-
-Replace `/dev/ttyUSB0` with the correct port for your device:
-
-- On Windows, this will be a COM port (e.g., COM3)
-- On macOS, this will be something like `/dev/tty.usbserial-X`
-- On Linux, it's typically `/dev/ttyUSB0` or `/dev/ttyACM0`
-
-## Development Setup
-
-1. Install [PlatformIO](https://platformio.org/)
-2. Clone this repository
-3. Open the `apps/attractap/firmware` directory in PlatformIO
-4. Build and upload the firmware
-
-## Development
-
-### Project Structure
-
-- `src/`: Contains the source code for the firmware
-- `include/`: Header files
-- `lib/`: Libraries
-- `platformio.ini`: PlatformIO configuration file
-
-### Building
-
-To build the firmware, run:
+Build the active `attractap-touch` and `attractap-touch-v2` variants (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
 
 ```bash
-pio run -e attractap
+python3 build_firmwares.py
 ```
 
-### Uploading During Development
+This generates the CA-certificate headers (`src/certs/`), builds each variant
+into `build/<variant>/`, and writes `firmware_output/` containing per variant:
 
-To upload the firmware to a connected device, run:
+- `<name>_<variant>.bin` — merged image for the web serial flasher (flash at offset `0x0`)
+- `<name>_<variant>_ota.bin` — app-only image for OTA updates via the server
+- `<name>_<variant>.elf` — unstripped ELF for server-side coredump symbolication
+- `firmwares.json` — manifest consumed by the Attraccess API/frontend
+
+Build a single variant during development:
 
 ```bash
-pio run -e attractap -t upload
+idf.py -B build/attractap-touch -DATTRACTAP_VARIANT=attractap-touch build
+idf.py -B build/attractap-touch flash monitor
 ```
 
-## Continuous Integration
+Debug build (replaces the old `attractap-touch-debug` PlatformIO env):
 
-This project uses GitHub Actions for continuous integration:
+```bash
+idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
+       -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
+```
 
-1. When changes are pushed to the `main` branch that affect files in the `apps/attractap/firmware` directory, a build is triggered
-2. The firmware is built using PlatformIO, creating a merged binary for ESP Web Tools
-3. The files are automatically deployed to GitHub Pages with a web installer interface
-4. The firmware can be installed using any browser that supports Web Serial API
+Note: `tools/build_individual_ca_certs.py` needs network access on the first
+run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
+`idf.py` when building without `build_firmwares.py`.
 
-### How ESP Web Tools Integration Works
+## Display Theme
 
-The GitHub Actions workflow:
+All display variants use the web frontend's dark palette: deep blue-green
+backgrounds (`#162124`), raised surfaces (`#1E2C2F`), water-blue accents
+(`#82C4CE`), light text, small corners and restrained borders. Shared styles live
+in `src/display/theme.hpp` and `theme.cpp`, including pressed, disabled, focused
+and keyboard states. Green, amber and red retain their status/safety meanings.
+This is the firmware's fixed dark theme; the web application's saved dark-mode
+preference does not configure a reader. Lite's LED status colors are unchanged.
 
-1. Builds the firmware using PlatformIO
-2. Creates a merged binary file compatible with ESP Web Tools
-3. Generates a manifest.json file with absolute URLs to the firmware
-4. Deploys these files to GitHub Pages
-5. Creates a web interface with the ESP Web Tools install button
+The logos preserve the approved full-color mascot, with light vector lettering
+for dark backgrounds. From the repository root,
+run `node scripts/generate-brand-assets.mjs` to regenerate the 133 x 40 and
+400 x 120 `*.rgb565a8` assets alongside the web artwork, or add `--check` to
+verify them without writing files. They contain a little-endian RGB565 color
+plane followed by an A8 alpha plane. ESP-IDF embeds these binary assets only
+for display variants; the small image-descriptor headers are handwritten.
+The lockscreen, resource list and no-resources screens use a bottom-left square
+crop of `apps/frontend/public/login-wallpaper-RAL5020.png`, preserving the raccoon
+and the rings. The same brand generator produces a 480 x 480 PNG preview at
+`apps/frontend/public/login-wallpaper-RAL5020-480.png` and the firmware asset.
+`lockscreen.rgb565` is a 460,800-byte little-endian RGB565
+asset shared by those screens, embedded once with four-byte alignment through
+`logos.S.in`. No generated C++ pixel arrays are needed.
 
-The manifest.json file contains the necessary information for ESP Web Tools to install the firmware, including the URL to the firmware binary and the chip family (ESP32-C3).
+## Host Tests
+
+From the repository root, run `pnpm nx run attractap-firmware:test`. It runs
+SupervisionFlow logic tests and the [real LVGL host-rendering harness](tests/display-theme/README.md).
+The latter checks theme states, both logo assets, selected production screens
+and deterministic 480 x 480 rendering. The dedicated firmware CI runs both.
+
+Host renders are not photographs or tests of a physical panel. Confirm actual
+device colors, touch/keyboard interactions and heap headroom on the target
+hardware before deployment.
+
+## Unattended Hardware Tests
+
+The [firmware test guide](test/README.md) documents the C++ serial tests and
+ESP32 hardware-in-the-loop suite, dedicated GitHub runner setup, coverage
+boundaries, JUnit artifacts, and unverified hardware acceptance steps. Run the
+real-device suite with `pnpm nx run attractap-firmware:test-hil`; it requires
+dedicated hardware and never requires physical NFC card presentation.
+
+## Flashing
+
+- **Web flasher (initial install):** the Attraccess frontend flashes the merged
+  `.bin` over Web Serial (Chrome/Edge). The device console runs on the ESP32-S3
+  USB-Serial-JTAG port.
+- **CLI:** `python -m esptool --chip esp32s3 write_flash 0x0 firmware_output/<name>_<variant>.bin`
+- **OTA:** upload `firmware_output` via the Attraccess server; updates stream to
+  the readers over the websocket.
+
+## Latin-1 Font Smoke Test
+
+CMake generates uncompressed Montserrat fonts in each build directory for sizes
+10, 14, 16, 18, 20, 24, 26, 28, 32, and 36. The original configured sizes remain
+unchanged. Firmware, desktop, and host rendering tests share
+`tools/latin1_fonts.cmake`. Builds require Node.js/npm (`npx`) and curl; the first
+build downloads the pinned LVGL 9.3.0 font source (SHA-256 verified) and
+`lv_font_conv@1.5.3`. Subsequent builds reuse their generated files. Do not commit
+the generated C files. For standalone generation, run
+`tools/generate_latin1_fonts.sh` (outputs to the ignored `.cache/latin1-fonts/`).
+
+On a touch device, verify `ÄÖÜ äöü ß | München, Größe, für` in resource names and
+descriptions, form labels/descriptions/placeholders, select options, text editors
+and value previews, project names, popup messages, introducer lists, health
+reasons, and flow-button labels. Also verify a signed-in username at 10px and an
+enrollment, reset, or supervision username at 36px. Check card statuses at 32px,
+supervision statuses and reset titles at 28px, empty-resource messages at 26px,
+and the PIN title at 32px. Compare ASCII text, hierarchy, wrapping, and clipping
+with the previous firmware. Confirm no missing-glyph boxes, preserved multiline
+layout, and that selecting an option such as `Size™` still submits its original
+value while displaying `SizeTM`. Host rendering checks do not replace this
+on-device smoke test.
+
+## Serial provisioning console
+
+The firmware speaks a line protocol on the USB console (115200 8N1):
+`CMND <topic> <json>` in, `RESP <topic> <json>` out — used by the frontend's
+hardware setup flow. Log lines have the format `[Module] LEVEL: message`.
 
 ## Attractap Lite LED Animations
 
@@ -113,7 +162,3 @@ The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a use
 | `triggerSuccess()` | Green | Auth succeeded |
 | `triggerError()` | Red flash | Auth failed |
 | `triggerIndicate()` | Yellow flash | Card held too long |
-
-## License
-
-[Specify your license here]

@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
   Button,
   Card,
   Chip,
@@ -18,7 +14,6 @@ import {
 } from '@heroui/react';
 import { ActivityIcon, ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
@@ -26,6 +21,7 @@ import {
   Attractap,
   useAttractapServiceGetFirmwares,
   useAttractapServiceGetReaders,
+  useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
@@ -42,6 +38,8 @@ export function AttractapList() {
     de,
     en,
   });
+
+  const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const { data: firmwares } = useAttractapServiceGetFirmwares();
 
@@ -113,6 +111,10 @@ export function AttractapList() {
     [firmwares],
   );
 
+  if (license && !license.modules.includes('attractap')) {
+    return null;
+  }
+
   return (
     <>
       <AttractapHardwareSetup
@@ -125,7 +127,6 @@ export function AttractapList() {
             {(onOpenSerialConsole) => (
               <PageHeader
                 title={t('page.title')}
-                backTo="/attractap"
                 actions={
                   [
                     {

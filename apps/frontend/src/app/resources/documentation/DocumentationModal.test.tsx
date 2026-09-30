@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocumentationModal } from './DocumentationModal';
 import { TestWrapper } from '../../../test-utils/wrappers';
@@ -31,8 +30,10 @@ vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: () => false }),
 }));
 
+// ponytail: fireEvent instead of userEvent — userEvent waits for HeroUI modal
+// animations that never resolve in happy-dom, causing 20s timeouts.
 const openModal = async () => {
-  render(
+  const { container } = render(
     <DocumentationModal resourceId={1}>
       {(onOpen) => (
         <button type="button" data-cy="open" onClick={onOpen}>
@@ -42,9 +43,8 @@ const openModal = async () => {
     </DocumentationModal>,
     { wrapper: TestWrapper }
   );
-  const user = userEvent.setup();
-  await user.click(document.querySelector('[data-cy="open"]') as HTMLButtonElement);
-  return user;
+  fireEvent.click(container.querySelector('[data-cy="open"]') as HTMLButtonElement);
+  await screen.findByRole('dialog');
 };
 
 beforeEach(() => {
@@ -82,9 +82,9 @@ describe('DocumentationModal', () => {
   });
 
   it('drops the forced width when switching to fullscreen', async () => {
-    const user = await openModal();
+    await openModal();
 
-    await user.click(
+    fireEvent.click(
       document.querySelector('[data-cy="documentation-modal-fullscreen-button"]') as HTMLButtonElement
     );
 

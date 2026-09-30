@@ -17,6 +17,7 @@ import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { MessageSquareWarningIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import {
+  useLicenseServiceGetLicenseInformation,
   useResourceMaintenancesServiceCanManageMaintenance,
   useResourceMaintenancesServiceCreateMaintenanceRequest,
   useResourceMaintenancesServiceListMaintenanceRequestsKey,
@@ -38,6 +39,7 @@ export function RequestMaintenanceButton(props: Props) {
   const [reason, setReason] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
+  const { data: license } = useLicenseServiceGetLicenseInformation();
   const { data: permissions } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
 
   const onSuccess = useCallback(() => {
@@ -69,7 +71,7 @@ export function RequestMaintenanceButton(props: Props) {
     [setOpen, reset],
   );
 
-  if (permissions?.canManage) {
+  if (!license?.modules.includes('maintenance') || permissions?.canManage) {
     return null;
   }
 

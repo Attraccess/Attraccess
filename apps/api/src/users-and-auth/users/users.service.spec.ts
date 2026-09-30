@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
-import { DataSource, Repository, UpdateResult } from 'typeorm';
+import { AuthenticationDetail, ResourceUsage, Role, Session, User } from '@attraccess/database-entities';
+import { DataSource, EntityManager, QueryFailedError, Repository, UpdateResult } from 'typeorm';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
@@ -10,18 +10,34 @@ import { EmailService } from '../../email/email.service';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { RbacService } from '../rbac/rbac.service';
 
 const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
   usersTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  usersLocaleSyncsTotal: { inc: jest.fn() },
+  usersPerLocale: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+};
+
+const mockRbacService = {
+  assignRoleByKey: jest.fn().mockResolvedValue(undefined),
+  assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
+  getEffectivePermissions: jest.fn().mockResolvedValue(new Set()),
+  isLastAdministrator: jest.fn().mockResolvedValue(false),
 };
 
 describe('UsersService', () => {
   let service: UsersService;
   let userRepository: jest.Mocked<Repository<User>>;
-  let emailService: { sendUsernameChangedEmail: jest.Mock };
+  let dataSource: jest.Mocked<DataSource>;
+  let emailService: { sendUsernameChangedEmail: jest.Mock; sendVerificationEmail: jest.Mock };
 
   beforeEach(async () => {
+    mockRbacService.assignRoleByKey.mockClear();
+    mockRbacService.assignDefaultRoles.mockClear();
+    mockRbacService.isLastAdministrator.mockClear();
+    mockRbacService.isLastAdministrator.mockResolvedValue(false);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
@@ -35,12 +51,20 @@ describe('UsersService', () => {
           provide: EmailService,
           useValue: {
             sendUsernameChangedEmail: jest.fn(),
+            sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
           provide: DataSource,
           useValue: {
-            transaction: jest.fn(),
+            // Call the callback with a mock EntityManager that delegates save() to
+            // userRepository.save so per-test mocks on the repository still apply.
+            transaction: jest.fn().mockImplementation(async (cb: (em: unknown) => Promise<unknown>) => {
+              const em = {
+                save: jest.fn().mockImplementation((entity: unknown) => userRepository.save(entity as User)),
+              };
+              return cb(em);
+            }),
           },
         },
         {
@@ -57,6 +81,7 @@ describe('UsersService', () => {
             save: jest.fn(),
             update: jest.fn(),
             findAndCount: jest.fn(),
+            createQueryBuilder: jest.fn(),
             count: jest.fn(),
           },
         },
@@ -82,12 +107,20 @@ describe('UsersService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
+        {
+          provide: RbacService,
+          useValue: mockRbacService,
+        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
-    emailService = module.get(EmailService) as unknown as { sendUsernameChangedEmail: jest.Mock };
+    dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
+    emailService = module.get(EmailService) as unknown as {
+      sendUsernameChangedEmail: jest.Mock;
+      sendVerificationEmail: jest.Mock;
+    };
   });
 
   it('should be defined', () => {
@@ -128,50 +161,43 @@ describe('UsersService', () => {
     });
   });
 
+  describe('rollbackFailedRegistration', () => {
+    it('hard-deletes the unregistered user without updating user metrics', async () => {
+      const manager = { delete: jest.fn().mockResolvedValue(undefined) };
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager as EntityManager));
+
+      await service.rollbackFailedRegistration(14);
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(manager.delete).toHaveBeenCalledWith(User, 14);
+      expect(mockMetricsService.usersTotal.dec).not.toHaveBeenCalled();
+      expect(mockMetricsService.usersPerLocale.dec).not.toHaveBeenCalled();
+    });
+  });
+
   describe('createOne', () => {
-    it('the first created user should have all permissions', async () => {
+    it('the first created user should be assigned the administrator role via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => {
-        return {
-          id: 1,
-          ...data,
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            ...(data.systemPermissions || {}),
-          },
-        } as User;
-      });
+      jest.spyOn(userRepository, 'save').mockImplementation(
+        async (data) =>
+          ({
+            id: 1,
+            username: 'test',
+            email: 'test@example.com',
+            externalIdentifier: null,
+            ...data,
+          }) as User,
+      );
       jest.spyOn(userRepository, 'count').mockResolvedValue(0);
 
-      const result = await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
-      expect(result).toEqual({
-        id: 1,
-        username: 'test',
-        email: 'test@example.com',
-        externalIdentifier: null,
-        systemPermissions: {
-          canManageResources: true,
-          canManageSystemConfiguration: true,
-          canManageUsers: true,
-          canManageBilling: true,
-        },
-      });
+      await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', expect.anything());
     });
 
-    it('the following created user should not have any permissions', async () => {
+    it('a subsequent user should be assigned default roles via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(userRepository, 'save').mockImplementation(async (data) => {
-        return {
-          id: 1,
-          ...data,
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            ...(data.systemPermissions || {}),
-          },
-        } as User;
+        return { id: 1, ...data } as User;
       });
       jest.spyOn(userRepository, 'count').mockResolvedValue(1);
 
@@ -181,11 +207,10 @@ describe('UsersService', () => {
         username: 'test',
         email: 'test@example.com',
         externalIdentifier: null,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-        },
+        isEmailVerified: false,
       });
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, expect.anything());
+      expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
     });
 
     it('should throw if email already exists', async () => {
@@ -274,35 +299,6 @@ describe('UsersService', () => {
 
       await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
-
-    it('should persist system permission updates', async () => {
-      const user = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: true,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-      } as User;
-      const permissionsUpdate = {
-        canManageResources: true,
-        canManageSystemConfiguration: true,
-        canManageUsers: false,
-        canManageBilling: false,
-      };
-      jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
-
-      await service.updateOne(1, { systemPermissions: permissionsUpdate });
-
-      expect(userRepository.update).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          systemPermissions: permissionsUpdate,
-        }),
-      );
-    });
   });
 
   describe('findMany', () => {
@@ -312,12 +308,6 @@ describe('UsersService', () => {
           id: 1,
           username: 'user1',
           email: 'user1@example.com',
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            canManageBilling: false,
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
           isEmailVerified: false,
@@ -352,17 +342,12 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
         {
           id: 2,
           username: 'user2',
           email: 'user2@example.com',
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            canManageBilling: false,
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
           isEmailVerified: false,
@@ -397,6 +382,7 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
       ];
 
@@ -409,6 +395,243 @@ describe('UsersService', () => {
       expect(result.page).toEqual(1);
       expect(result.limit).toEqual(10);
       expect(userRepository.findAndCount).toHaveBeenCalled();
+    });
+
+    it('should order users by username ascending', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10 });
+
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
+    });
+
+    it('should filter users by role assignment', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10, roleId: 42 });
+
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
+      );
+    });
+
+    it('should retain the role assignment filter when searching', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10, roleId: 42, search: 'alice' });
+
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.arrayContaining([expect.objectContaining({ userRoles: { roleId: 42 } })]),
+        }),
+      );
+    });
+
+    it('should require every selected role when roleMatch is all', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const roleFilter = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        having: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT role user IDs)'),
+      };
+      query.subQuery.mockReturnValue(roleFilter);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, roleIds: [2, 2, 4], roleMatch: 'all' });
+
+      expect(roleFilter.having).toHaveBeenCalledWith('COUNT(DISTINCT userRole.roleId) = :roleCount');
+      expect(query.andWhere).toHaveBeenCalledWith('user.id IN (SELECT role user IDs)', {
+        roleIds: [2, 4],
+        roleCount: 2,
+      });
+    });
+
+    it('should exclude users assigned any selected role', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const excludedRoles = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT excluded role user IDs)'),
+      };
+      query.subQuery.mockReturnValue(excludedRoles);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, excludeRoleIds: [2, 2, 4] });
+
+      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded role user IDs)', {
+        excludeRoleIds: [2, 4],
+      });
+    });
+
+    it('should combine selected SSO providers with no SSO users for an any match', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        setParameters: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const noSsoProvider = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
+      };
+      const ssoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
+      };
+      query.subQuery.mockReturnValueOnce(noSsoProvider).mockReturnValueOnce(ssoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, ssoProviderIds: [7], ssoProviderNone: true });
+
+      expect(query.andWhere).toHaveBeenCalledWith(expect.anything());
+      expect(query.setParameters).toHaveBeenCalledWith({
+        ssoType: 'sso',
+        ssoProviderIds: [7],
+        ssoProviderCount: 1,
+      });
+    });
+
+    it('should deduplicate SSO providers before applying an all match', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        setParameters: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const ssoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        having: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
+      };
+      query.subQuery
+        .mockReturnValueOnce({
+          select: jest.fn().mockReturnThis(),
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
+        })
+        .mockReturnValueOnce(ssoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, ssoProviderIds: [7, 7], ssoProviderMatch: 'all' });
+
+      expect(ssoProviders.having).toHaveBeenCalledWith('COUNT(DISTINCT ssoDetail.providerId) = :ssoProviderCount');
+      expect(query.setParameters).toHaveBeenCalledWith({
+        ssoType: 'sso',
+        ssoProviderIds: [7],
+        ssoProviderCount: 1,
+      });
+    });
+
+    it('should exclude users linked to any selected SSO provider', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const excludedSsoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT excluded SSO providers)'),
+      };
+      query.subQuery.mockReturnValue(excludedSsoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, excludeSsoProviderIds: [7, 7] });
+
+      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded SSO providers)', {
+        excludedSsoType: 'sso',
+        excludeSsoProviderIds: [7],
+      });
+    });
+
+    it('should require users with an SSO provider', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const ssoProviderExists = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT any SSO provider)'),
+      };
+      query.subQuery.mockReturnValue(ssoProviderExists);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, hasSsoProvider: true });
+
+      expect(query.andWhere).toHaveBeenCalledWith('EXISTS (SELECT any SSO provider)', {
+        anySsoType: 'sso',
+      });
+    });
+
+    it('should filter by email verification status', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, emailVerified: true });
+
+      expect(query.andWhere).toHaveBeenCalledWith('user.isEmailVerified = :emailVerified', { emailVerified: true });
     });
 
     it('should throw error for invalid pagination options', async () => {
@@ -427,11 +650,7 @@ describe('UsersService', () => {
         id: 1,
         username: 'olduser',
         email: 'user@example.com',
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-        },
+
         createdAt: new Date(),
         updatedAt: new Date(),
         isEmailVerified: false,
@@ -498,13 +717,8 @@ describe('UsersService', () => {
       const target = baseUser({ id: 20, username: 'target', lastUsernameChangeAt: null });
       const admin = baseUser({
         id: 1,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: true,
-          canManageBilling: false,
-        },
-      });
+        effectivePermissions: new Set(['users.update']),
+      } as never);
       const updated = { ...target, username: 'new_admin_set', lastUsernameChangeAt: null } as User;
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(target).mockResolvedValueOnce(updated);
       const updateSpy = jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
@@ -534,6 +748,290 @@ describe('UsersService', () => {
       jest.spyOn(service, 'isSSOUser').mockResolvedValueOnce(true);
 
       await expect(service.changeUsername(5, 'newuser', me)).rejects.toThrow(SSOUsernameChangeForbiddenException);
+    });
+  });
+
+  describe('createOne – locale', () => {
+    beforeEach(() => {
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
+      jest.spyOn(userRepository, 'count').mockResolvedValue(1);
+      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({ id: 99, ...data }) as User);
+    });
+
+    it('sets locale when provided', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'de' });
+      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }));
+      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
+    });
+
+    it('stores the full BCP 47 locale tag without lowercasing or truncating', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'ZH-Hant-TW' });
+      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ZH-Hant-TW' }));
+    });
+
+    it('leaves locale at column default when not provided', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null });
+      const saved = (userRepository.save as jest.Mock).mock.calls[0][0] as Partial<User>;
+      expect(saved.locale).toBeUndefined();
+    });
+  });
+
+  describe('updateLocale', () => {
+    it('saves cleaned locale, updates gauge, and returns user', async () => {
+      const existing = { id: 1, locale: 'en' } as User;
+      const updated = { id: 1, locale: 'de' } as User;
+      jest.spyOn(userRepository, 'update').mockResolvedValue({} as UpdateResult);
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
+
+      const result = await service.updateLocale(1, 'de-DE');
+      expect(userRepository.update).toHaveBeenCalledWith(1, { locale: 'de-DE' });
+      expect(mockMetricsService.usersLocaleSyncsTotal.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
+      expect(mockMetricsService.usersPerLocale.dec).toHaveBeenCalledWith({ locale: 'en' });
+      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
+      expect(result).toEqual(updated);
+    });
+
+    it('throws BadRequestException for empty locale', async () => {
+      await expect(service.updateLocale(1, '   ')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('confirmSelfDeletion', () => {
+    const futureDate = new Date(Date.now() + 86_400_000);
+
+    it('throws ForbiddenException when user is the last administrator', async () => {
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: 1,
+        email: 'admin@example.com',
+        deletedAt: null,
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as unknown as User);
+      mockRbacService.isLastAdministrator.mockResolvedValue(true);
+
+      await expect(service.confirmSelfDeletion('admin@example.com', 'tok')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('treats a repeated confirmation as success after the email has been reused', async () => {
+      const reusedEmailUser = {
+        id: 2,
+        deletedAt: null,
+        deleteAccountToken: 'hashed:different-token',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(reusedEmailUser).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).resolves.toBeUndefined();
+
+      expect(userRepository.findOne).toHaveBeenNthCalledWith(2, {
+        where: expect.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deletedAt: expect.anything(),
+        }),
+        withDeleted: true,
+      });
+    });
+
+    it('rejects an expired confirmation token for a deleted account', async () => {
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: new Date(Date.now() - 1_000),
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).rejects.toThrow(
+        'DeleteAccountTokenExpiredException',
+      );
+    });
+
+    it('retains confirmation token evidence while confirming an account deletion', async () => {
+      const user = {
+        id: 1,
+        locale: 'en',
+        deletedAt: null,
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+        deleteAccountRequestedAt: new Date(),
+      } as User;
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(user),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
+        softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      const usageRepo = { findOne: jest.fn().mockResolvedValue(null) };
+      const authRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const sessionRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const manager = {
+        getRepository: jest.fn((entity) => {
+          if (entity === User) return userRepo;
+          if (entity === ResourceUsage) return usageRepo;
+          if (entity === AuthenticationDetail) return authRepo;
+          return sessionRepo;
+        }),
+      } as unknown as EntityManager;
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager));
+
+      userRepository.findOne.mockResolvedValue(user);
+
+      await service.confirmSelfDeletion('deleted@example.com', 'tok');
+
+      expect(userRepo.update).toHaveBeenCalledWith(
+        1,
+        expect.not.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deleteAccountTokenExpiresAt: expect.anything(),
+          deleteAccountRequestedAt: expect.anything(),
+        }),
+      );
+    });
+  });
+  describe('email changes', () => {
+    const actor = Object.assign(new User(), { id: 1, email: 'old@example.com' });
+    beforeEach(() => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(actor).mockResolvedValue(null);
+    });
+    it('changes and reverifies an email inside the transaction', async () => {
+      const updated = Object.assign(new User(), { id: 1, email: 'new@example.com' });
+      jest
+        .mocked(service.findOne)
+        .mockReset()
+        .mockResolvedValueOnce(actor)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(updated);
+      const manager = new EntityManager(dataSource);
+      jest.spyOn(manager, 'getRepository').mockReturnValue(userRepository);
+      dataSource.transaction.mockImplementation(async (workOrIsolation, work) => {
+        const callback = typeof workOrIsolation === 'function' ? workOrIsolation : work;
+        if (!callback) throw new Error('Missing transaction callback');
+        return callback(manager);
+      });
+      expect(await service.changeEmail(1, ' new@example.com ', actor)).toBe(updated);
+      expect(userRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          email: 'new@example.com',
+          isEmailVerified: false,
+          emailVerificationToken: expect.any(String),
+          emailVerificationTokenExpiresAt: expect.any(Date),
+        }),
+      );
+      expect(service.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
+    });
+    it('leaves an unchanged email verified without a transaction', async () => {
+      expect(await service.changeEmail(1, ' old@example.com ', actor)).toBe(actor);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+    it.each(['', 'invalid'])('rejects invalid email %p before reading users', async (email) => {
+      await expect(service.changeEmail(1, email, actor)).rejects.toThrow(BadRequestException);
+      expect(service.findOne).not.toHaveBeenCalled();
+    });
+    it('rejects editing another user without permission', async () => {
+      await expect(service.changeEmail(2, 'new@example.com', actor)).rejects.toThrow(ForbiddenException);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+    it.each(['23505', 'SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT_UNIQUE', 'ER_DUP_ENTRY', 1062])(
+      'translates a concurrent unique constraint failure (%p)',
+      async (code) => {
+        dataSource.transaction.mockRejectedValue(
+          new QueryFailedError('UPDATE users', [], Object.assign(new Error('duplicate'), { code })),
+        );
+        await expect(service.changeEmail(1, 'new@example.com', actor)).rejects.toThrow('Email already exists');
+      },
+    );
+    it.each([
+      [
+        new QueryFailedError('UPDATE users', [], new Error('UNIQUE constraint failed: user.email')),
+        'Email already exists',
+      ],
+      [new QueryFailedError('UPDATE users', [], new Error('database unavailable')), 'database unavailable'],
+      [new Error('mail delivery failed'), 'mail delivery failed'],
+    ])('preserves unrelated failures and recognizes email uniqueness by message', async (error, message) => {
+      dataSource.transaction.mockRejectedValue(error);
+      await expect(service.changeEmail(1, 'new@example.com', actor)).rejects.toThrow(message);
+    });
+  });
+
+  describe('bulk user role assignment', () => {
+    function managerForImport(totalExisting = 0, rolePermissions = ['resources.view']) {
+      const roleRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValue({ rolePermissions: rolePermissions.map((permissionKey) => ({ permissionKey })) }),
+      };
+      const repo = {
+        count: jest.fn().mockResolvedValue(totalExisting),
+        create: jest.fn(() => new User()),
+        save: jest.fn(async (users: User[]) => users.map((user, index) => Object.assign(user, { id: index + 1 }))),
+      };
+      const manager = {
+        getRepository: jest.fn((entity) => (entity === Role ? roleRepo : repo)),
+      } as unknown as EntityManager;
+      return { manager, repo, roleRepo };
+    }
+    it('bootstraps one administrator and assigns defaults to remaining normalized users', async () => {
+      const { manager } = managerForImport();
+      const users = await service.createMany(
+        [
+          { username: ' FIRST ', email: ' first@example.com ', locale: ' de ' },
+          { username: 'second', email: 'second@example.com', locale: ' ' },
+        ],
+        { manager, grantAllPermissionsToFirst: true },
+      );
+      expect(users).toEqual([
+        expect.objectContaining({
+          username: 'first',
+          email: 'first@example.com',
+          locale: 'de',
+          externalIdentifier: null,
+        }),
+        expect.objectContaining({ username: 'second', locale: 'en' }),
+      ]);
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', manager);
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledTimes(1);
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(2, manager);
+    });
+    it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
+      const { manager } = managerForImport(3);
+      mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
+      await service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'viewer' }], {
+        manager,
+        grantAllPermissionsToFirst: true,
+        actorId: 9,
+      });
+      expect(mockRbacService.getEffectivePermissions).toHaveBeenCalledWith(9);
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, manager);
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'viewer', manager);
+      expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(1, 'administrator', manager);
+    });
+    it('refuses an import role above the actor privilege ceiling', async () => {
+      const { manager } = managerForImport(1, ['users.update']);
+      mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
+      await expect(
+        service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'admin' }], {
+          manager,
+          actorId: 9,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
+    });
+    it('rejects an unknown role and an empty email', async () => {
+      const { manager, roleRepo } = managerForImport();
+      roleRepo.findOne.mockResolvedValue(null);
+      await expect(
+        service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'missing' }], { manager }),
+      ).rejects.toThrow("Role with key 'missing' not found");
+      await expect(service.createMany([{ username: 'member', email: ' ' }], { manager })).rejects.toThrow(
+        'Email is required',
+      );
     });
   });
 });

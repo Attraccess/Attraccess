@@ -1,0 +1,13 @@
+{
+  "noDeviceId": "No device ID specified.",
+  "loadError": "Failed to load resources for this device.",
+  "empty": {
+    "title": "No resources linked",
+    "description": "This companion device is not yet wired to any resource flow. Ask your administrator to add a Lock PC or Unlock PC node in a resource flow and select this device."
+  },
+  "title": "Select a resource",
+  "status": {
+    "inUse": "In use",
+    "available": "Available"
+  }
+}

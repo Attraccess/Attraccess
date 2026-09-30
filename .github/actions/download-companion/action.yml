@@ -1,0 +1,29 @@
+name: 'Download Companion Binaries'
+description: >
+  Download companion app binaries that were built earlier in this workflow run
+  (by build-companion-binaries.yml) into apps/companion/dist/ so the Docker or
+  Balena build context includes them for copy-companion-into-assets.js.
+
+runs:
+  using: composite
+  steps:
+    - name: Download Linux companion binaries
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: companion-linux-${{ github.run_id }}
+        path: apps/companion/dist
+
+    - name: Download macOS companion binary
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: companion-macos-${{ github.run_id }}
+        path: apps/companion/dist
+
+    - name: Download Windows companion binary
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: companion-windows-${{ github.run_id }}
+        path: apps/companion/dist

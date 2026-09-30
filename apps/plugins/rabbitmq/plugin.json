@@ -8,7 +8,8 @@
     },
     "frontend": {
       "directory": "frontend",
-      "entryPoint": "remoteEntry.js"
+      "entryPoint": "remoteEntry.js",
+      "styles": "style.css"
     }
   },
   "attraccessVersion": {

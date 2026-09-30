@@ -19,13 +19,15 @@ describe('AdminPasswordPolicyController', () => {
   const auditContext = {
     actorId: 1,
     actorUsername: 'root',
+    authenticationMethod: 'session' as const,
+    apiTokenId: null,
     ip: '127.0.0.1',
     userAgent: 'jest',
     requestId: 'req-1',
   };
 
   const adminReq = {
-    user: { id: 1, username: 'root', systemPermissions: { canManageSystemConfiguration: true } },
+    user: { id: 1, username: 'root' },
     ip: '127.0.0.1',
     headers: { 'user-agent': 'jest', 'x-request-id': 'req-1' },
   } as never;

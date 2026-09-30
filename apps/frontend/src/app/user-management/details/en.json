@@ -4,10 +4,13 @@
     "externalIdentifier": "External ID: {{identifier}}"
   },
   "profile": {
-    "title": "Profile",
-    "usernameTitle": "Username",
-    "emailTitle": "Email",
-    "passwordTitle": "Password"
+    "title": "Profile"
+  },
+  "security": {
+    "title": "Security"
+  },
+  "permissions": {
+    "title": "Roles & Permissions"
   },
   "sso": {
     "title": "SSO",
@@ -17,6 +20,12 @@
     "linked": "{{count}} linked",
     "provider": "Provider",
     "userId": "SSO user ID"
+  },
+  "effectivePermissions": {
+    "title": "Effective Permissions",
+    "empty": "No permissions assigned.",
+    "loading": "Loading permissions…",
+    "uncategorized": "Other"
   },
   "delete": {
     "title": "Delete user",

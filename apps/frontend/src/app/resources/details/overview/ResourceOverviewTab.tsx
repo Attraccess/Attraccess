@@ -7,6 +7,9 @@ import { ResourceBillingInfo } from '../resourceBillingInfo';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { RecentSessionsCard } from './RecentSessionsCard';
 import { ResourceDocsPreviewCard } from './ResourceDocsPreviewCard';
+import { PluginSlot } from '../../../plugins/PluginSlot';
+import { RESOURCE_OVERVIEW_SLOT, ResourceSlotContext } from '@attraccess/plugins-frontend-sdk';
+import { OperatingDurationCard } from './OperatingDurationCard';
 
 const CARD_CLASS = 'break-inside-avoid mb-6';
 
@@ -30,12 +33,13 @@ export function ResourceOverviewTab() {
       />
       <ResourceBillingInfo
         className={CARD_CLASS}
-        variant="flat"
         resourceId={resourceId}
         onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
       />
       <ResourceDocsPreviewCard className={CARD_CLASS} resourceId={resourceId} />
       <RecentSessionsCard className={CARD_CLASS} resourceId={resourceId} />
+      <OperatingDurationCard className={CARD_CLASS} resourceId={resourceId} />
+      <PluginSlot<ResourceSlotContext> slotId={RESOURCE_OVERVIEW_SLOT} context={{ resourceId }} />
     </div>
   );
 }

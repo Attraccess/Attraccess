@@ -4,25 +4,25 @@
 SemaphoreHandle_t State::state_mutex = nullptr;
 esp_ip4_addr_t State::wifi_ip = {};
 bool State::wifi_connected = false;
-String State::wifi_ssid;
+std::string State::wifi_ssid;
 esp_ip4_addr_t State::ethernet_ip = {};
 bool State::ethernet_connected = false;
-String State::websocket_hostname;
+std::string State::websocket_hostname;
 uint16_t State::websocket_port = 0;
 bool State::websocket_use_ssl = false;
 bool State::websocket_connected = false;
 State::WebsocketPhase State::websocket_phase = State::WS_INIT;
-String State::websocket_cert_name;
+std::string State::websocket_cert_name;
 int State::websocket_cert_index = 0;
 int State::websocket_cert_count = 0;
 int State::websocket_remembered_retry_count = 0;
 int State::websocket_next_attempt_seconds = 0;
 bool State::api_authenticated = false;
-String State::api_device_name;
+std::string State::api_device_name;
 
 // ----- State method implementations -----
 
-void State::setWifiState(bool connected, esp_ip4_addr_t ip, String ssid) {
+void State::setWifiState(bool connected, esp_ip4_addr_t ip, std::string ssid) {
     wifi_connected = connected;
     wifi_ip = ip;
     wifi_ssid = ssid;
@@ -34,14 +34,14 @@ void State::setEthernetState(bool connected, esp_ip4_addr_t ip) {
 State::NetworkState State::getNetworkState() {
     return {wifi_connected, wifi_ip, wifi_ssid, ethernet_connected, ethernet_ip};
 }
-void State::setWebsocketState(bool connected, String hostname, uint16_t port, bool useSSL) {
+void State::setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL) {
     websocket_connected = connected;
     websocket_hostname = hostname;
     websocket_port = port;
     websocket_use_ssl = useSSL;
 }
 void State::setWebsocketPhase(WebsocketPhase phase) { websocket_phase = phase; }
-void State::setWebsocketCertProgress(String certName, int certIndex, int certCount, int rememberedRetryCount) {
+void State::setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount, bool) {
     websocket_cert_name = certName;
     websocket_cert_index = certIndex;
     websocket_cert_count = certCount;
@@ -51,9 +51,9 @@ void State::setWebsocketNextAttemptSeconds(int seconds) { websocket_next_attempt
 State::WebsocketState State::getWebsocketState() {
     return {websocket_connected, websocket_hostname, websocket_port, websocket_use_ssl,
             websocket_phase, websocket_cert_name, websocket_cert_index, websocket_cert_count,
-            websocket_remembered_retry_count, websocket_next_attempt_seconds};
+            websocket_remembered_retry_count, false, websocket_next_attempt_seconds};
 }
-void State::setApiState(bool authenticated, String deviceName) {
+void State::setApiState(bool authenticated, std::string deviceName) {
     api_authenticated = authenticated;
     api_device_name = deviceName;
 }

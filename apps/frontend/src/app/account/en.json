@@ -1,5 +1,29 @@
 {
   "title": "Account",
+  "subtitle": "Find the setting you need and open it to make changes.",
+  "search": "Find a setting…",
+  "noResults": "No matching settings",
+  "groups": {
+    "identity": "Identity",
+    "access": "Sign-in and access",
+    "preferences": "Preferences",
+    "advanced": "Advanced"
+  },
+  "topics": {
+    "profile": { "title": "Personal details", "description": "Email address and username" },
+    "password": { "title": "Password", "description": "Change your sign-in password" },
+    "twoFactor": { "title": "Two-factor authentication", "description": "Add an authenticator app" },
+    "passkeys": { "title": "Passkeys", "description": "Manage passwordless sign-in" },
+    "notifications": { "title": "Notifications", "description": "Choose what reaches you and where" },
+    "tokens": { "title": "API tokens", "description": "Manage access for integrations" },
+    "delete": { "title": "Delete account", "description": "Request permanent account removal" }
+  },
+  "searchTerms": {
+    "email": "email",
+    "username": "username",
+    "authenticator": "authenticator 2FA",
+    "push": "push"
+  },
   "sections": {
     "profile": "Profile",
     "security": "Security",

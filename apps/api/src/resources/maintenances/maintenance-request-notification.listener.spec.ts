@@ -2,26 +2,26 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
 import { MaintenanceRequestNotificationListener } from './maintenance-request-notification.listener';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 describe('MaintenanceRequestNotificationListener', () => {
   let listener: MaintenanceRequestNotificationListener;
   let requestRepository: { findOne: jest.Mock };
   let resourceRepository: { findOne: jest.Mock };
-  let userRepository: { createQueryBuilder: jest.Mock };
+  let userRepository: { findBy: jest.Mock };
   let introducerRepository: { find: jest.Mock };
   let dispatch: { dispatch: jest.Mock };
+  let rbacService: { getUserIdsWithPermission: jest.Mock };
 
   beforeEach(async () => {
     requestRepository = { findOne: jest.fn() };
     resourceRepository = { findOne: jest.fn() };
+    rbacService = { getUserIdsWithPermission: jest.fn().mockResolvedValue([2]) };
     userRepository = {
-      createQueryBuilder: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 2, email: 'admin@example.com' } as User]),
-      }),
+      findBy: jest.fn().mockResolvedValue([{ id: 2, email: 'admin@example.com' } as User]),
     };
     introducerRepository = { find: jest.fn().mockResolvedValue([]) };
     dispatch = { dispatch: jest.fn().mockResolvedValue(undefined) };
@@ -34,6 +34,7 @@ describe('MaintenanceRequestNotificationListener', () => {
         { provide: getRepositoryToken(ResourceMaintenanceRequest), useValue: requestRepository },
         { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: NotificationDispatchService, useValue: dispatch },
+        { provide: RbacService, useValue: rbacService },
       ],
     }).compile();
 
@@ -48,16 +49,21 @@ describe('MaintenanceRequestNotificationListener', () => {
     } as ResourceMaintenanceRequest);
     resourceRepository.findOne.mockResolvedValue({ id: 4, name: 'Laser cutter', groups: [] } as unknown as Resource);
 
-    await listener.handleRequestCreated(new MaintenanceRequestCreatedEvent(4, 9));
+    await listener.handleRequestCreated(new ResourceMaintenanceRequestCreatedEvent(4, 9));
 
     expect(dispatch.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         category: NotificationCategory.MAINTENANCE_REQUESTS,
         recipients: [expect.objectContaining({ id: 2 })],
-        title: 'Maintenance requested for Laser cutter',
-        body: 'alice requested maintenance: Broken lens',
+        title: expect.any(Function),
+        body: expect.any(Function),
         url: '/resources/4/maintenance',
       }),
     );
+
+    const req = dispatch.dispatch.mock.calls[0][0];
+    const enUser = { locale: 'en' } as User;
+    expect(req.title(enUser)).toBe('Maintenance requested for Laser cutter');
+    expect(req.body(enUser)).toBe('alice requested maintenance: Broken lens');
   });
 });

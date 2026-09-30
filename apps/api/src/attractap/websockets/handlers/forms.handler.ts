@@ -13,6 +13,7 @@ import {
   ResourceUsageFormGetFieldsPayload,
   ResourceUsageFormFieldsPayload,
   ResourceUsageFormSubmitPagePayload,
+  ResourceUsageFormCancelPayload,
   ResourceUsageFormPageResultPayload,
 } from '../websocket.types';
 
@@ -47,14 +48,21 @@ export class AttractapFormsHandler {
     }
   }
 
+  public handleResourceUsageFormCancel(socket: AuthenticatedWebSocket, data: AttractapEvent['data']): void {
+    const { resourceId, action } = data.payload as ResourceUsageFormCancelPayload;
+    this.clearFormDraft(socket, resourceId, action);
+  }
+
   public async ensureFormsSatisfied({
     socket,
     resourceId,
     action,
+    requestId,
   }: {
     socket: AuthenticatedWebSocket;
     resourceId: number;
     action: ResourceFormAction;
+    requestId?: number;
   }): Promise<FormSubmissionRequestDto[] | null> {
     const forms = await this.resourceFormsService.getFormsForAction(resourceId, action);
     if (!forms.length) {
@@ -90,6 +98,7 @@ export class AttractapFormsHandler {
     }
 
     const payload: ResourceUsageFormRequestPayload = {
+      ...(Number.isSafeInteger(requestId) && requestId > 0 ? { requestId } : {}),
       resourceId,
       resourceName,
       action,

@@ -6,16 +6,13 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../components/toastProvider';
 import {
   ArrowLeft,
-  FolderIcon,
   Gauge,
   History as HistoryIcon,
-  ListChecks,
-  PenSquareIcon,
+  Settings2Icon,
   QrCodeIcon,
   ShapesIcon,
   Trash,
   Users,
-  WorkflowIcon,
   WrenchIcon,
 } from 'lucide-react';
 import { memo, ReactNode, useMemo, useRef } from 'react';
@@ -29,7 +26,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader, PageAction } from '../../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
-import { ResourceEditModal } from '../../editModal/resourceEditModal';
 import { ResourceQrCode } from '../qrcode';
 import { useQrCodeAction } from '../useQrCodeAction';
 import { filenameToUrl } from '../../../../api';
@@ -43,10 +39,7 @@ const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   overview: <Gauge className="w-4 h-4" />,
   history: <HistoryIcon className="w-4 h-4" />,
   people: <Users className="w-4 h-4" />,
-  groups: <FolderIcon className="w-4 h-4" />,
   maintenance: <WrenchIcon className="w-4 h-4" />,
-  flows: <WorkflowIcon className="w-4 h-4" />,
-  forms: <ListChecks className="w-4 h-4" />,
 };
 
 function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
@@ -72,7 +65,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   const { t } = useTranslations({ en, de });
 
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
 
   const {
     data: resource,
@@ -82,7 +75,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   const deleteResource = useResourcesServiceDeleteOneResource();
 
-  const editOpenRef = useRef<() => void>(() => undefined);
   const qrOpenRef = useRef<() => void>(() => undefined);
 
   const { tabs } = useResourceTabs(resourceId);
@@ -140,16 +132,16 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       key: 'qr',
       label: t('actions.qrCode'),
       icon: <QrCodeIcon className="w-4 h-4" />,
-      isHidden: !canManageResources,
+      isHidden: !canUpdateResources,
       onPress: () => qrOpenRef.current(),
       dataCy: 'qr-code-button',
     },
     {
       key: 'edit',
       label: t('actions.edit'),
-      icon: <PenSquareIcon className="w-4 h-4" />,
-      isHidden: !canManageResources,
-      onPress: () => editOpenRef.current(),
+      icon: <Settings2Icon className="w-4 h-4" />,
+      isHidden: !canUpdateResources,
+      onPress: () => navigate(`/resources/${resourceId}/settings`),
       dataCy: 'edit-resource-button',
     },
     {
@@ -157,7 +149,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       label: t('actions.delete'),
       icon: <Trash className="w-4 h-4" />,
       variant: 'destructive',
-      isHidden: !canManageResources,
+      isHidden: !canUpdateResources,
       onPress: open,
       dataCy: 'delete-resource-button',
     },
@@ -203,23 +195,26 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
             onSelectionChange={(key) => navigateToTab(key as ResourceTabKey)}
             data-cy="resource-tabs"
           >
-            <TabList>
-              {tabs.map((tab) => (
-                <Tab key={tab.key} id={tab.key}>
-                  <span className="flex items-center gap-2">
-                    {TAB_ICONS[tab.key]}
-                    {t(tab.translationKey)}
-                  </span>
-                </Tab>
-              ))}
-            </TabList>
+            <Tabs.ListContainer>
+              <TabList>
+                {tabs.map((tab) => (
+                  <Tab key={tab.key} id={tab.key}>
+                    <Tabs.Indicator />
+                    <span className="flex items-center gap-2">
+                      {TAB_ICONS[tab.key]}
+                      {t(tab.translationKey)}
+                    </span>
+                  </Tab>
+                ))}
+              </TabList>
+            </Tabs.ListContainer>
           </Tabs>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
 
-      {canManageResources && (
+      {canUpdateResources && (
         <>
           <DeleteConfirmationModal
             isOpen={isOpen}
@@ -228,12 +223,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
             itemName={resource.name}
             data-cy="delete-confirmation-modal"
           />
-          <ResourceEditModal resourceId={resourceId} closeOnSuccess>
-            {(onOpen) => {
-              editOpenRef.current = onOpen;
-              return null;
-            }}
-          </ResourceEditModal>
           <ResourceQrCode
             resourceId={resourceId}
             renderTrigger={(onOpen) => {

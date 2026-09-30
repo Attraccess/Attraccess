@@ -22,6 +22,13 @@ export class LiveNotificationsService {
     return this.transactionSubjects.get(userId);
   }
 
+  public deleteSubjectIfUnobserved(userId: number): void {
+    const subject = this.transactionSubjects.get(userId);
+    if (subject && !subject.observed) {
+      this.transactionSubjects.delete(userId);
+    }
+  }
+
   public async notifyTransactionUpdate(transactionOrId: BillingTransaction | number): Promise<void> {
     const transactionId = typeof transactionOrId === 'number' ? transactionOrId : transactionOrId.id;
 

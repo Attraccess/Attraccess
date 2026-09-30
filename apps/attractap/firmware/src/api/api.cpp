@@ -2,10 +2,14 @@
 // FEATURE: api-core
 
 #include "api.hpp"
+#include <functional>
 #include "../utils.hpp"
+#include "platform.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <cstring>
 #include <memory>
+#include <string>
 
 constexpr size_t API::MAX_PROJECTS_PER_PAGE;
 
@@ -25,25 +29,27 @@ void API::updateSateInfo()
 
 void API::setup()
 {
-    this->websocket.setup();
-    this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
+    this->transport.setup();
+    this->transport.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
-    this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
+#ifdef ESP_PLATFORM
+    this->transport.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });
+#endif
 }
 void API::setFirmwareUpdateProgressCallback(std::function<void(int)> callback)
 {
     this->firmwareUpdateProgressCallback = callback;
 }
 
-void API::setFirmwareUpdateMetaCallback(std::function<void(String availableVersion)> callback)
+void API::setFirmwareUpdateMetaCallback(std::function<void(std::string availableVersion)> callback)
 {
     this->firmwareUpdateMetaCallback = callback;
 }
 
 void API::loop()
 {
-    this->websocket.loop();
+    this->transport.loop();
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable
@@ -62,7 +68,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     auto err = deserializeJson(inboundDoc, buf, len);
     if (err)
     {
-        logger.error((String("JSON parse error: ") + err.c_str()).c_str());
+        logger.error((std::string("JSON parse error: ") + err.c_str()).c_str());
         return;
     }
 
@@ -75,7 +81,20 @@ void API::processIncomingMessage(const char *buf, size_t len)
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {
-        logger.error((String("Missing event type, payload: ") + String(buf, len)).c_str());
+        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
+        return;
+    }
+
+    const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
+        strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
+        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
+    const bool isActionFormRequest = strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0;
+    const uint32_t requestId = inboundDoc["data"]["payload"]["requestId"] | 0u;
+    // A cancelled/timed-out request must not complete a later action, even on
+    // the same resource. Untagged replies remain compatible with older APIs.
+    if ((isActionResponse || isActionFormRequest) && !isCurrentResourceAction(requestId)) {
+        this->sendAck(eventType);
         return;
     }
 
@@ -94,6 +113,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
     // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
     bool isSupervisionEvent = strcmp(eventType, "SUPERVISION_REQUEST") == 0 ||
+                              strcmp(eventType, "SUPERVISION_START") == 0 ||
                               strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
                               strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
 
@@ -102,11 +122,16 @@ void API::processIncomingMessage(const char *buf, size_t len)
         inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
-        if (payload["error"].is<String>())
+        if (payload["error"].is<const char *>())
         {
-            String err = payload["error"].as<String>();
+            std::string err = payload["error"].as<std::string>();
             if (err.length() > 0)
             {
+                if (isActionResponse && this->actionResultCallback) {
+                    this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
+                    this->sendAck(eventType);
+                    return;
+                }
                 // Special-case insufficient balance: propagate sumUpEnabled flag if present
                 if (err == "INSUFFICIENT_BALANCE")
                 {
@@ -160,6 +185,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     {
         this->onSupervisionRequestResult(inboundDoc["data"].as<JsonObject>());
     }
+    else if (strcmp(eventType, "SUPERVISION_START") == 0)
+    {
+        this->onSupervisionStart(inboundDoc["data"].as<JsonObject>());
+    }
     else if (strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0)
     {
         this->onSupervisorCardAuthenticationData(inboundDoc["data"].as<JsonObject>());
@@ -206,11 +235,17 @@ void API::processIncomingMessage(const char *buf, size_t len)
         }
         if (this->actionResultCallback)
         {
-            this->actionResultCallback(eventType, success);
+            this->actionResultCallback({eventType, success, requestId, {}, false});
         }
     }
     else if (strcmp(eventType, "READER_FIRMWARE_UPDATE_REQUIRED") == 0)
     {
+#ifdef ATTRACTAP_HOST
+        // The simulator deliberately cannot alter firmware, flash, or boot state.
+        logger.error("Firmware updates are unsupported by the desktop simulator");
+        if (this->errorCallback)
+            this->errorCallback("Firmware update", "Firmware updates are not available in the desktop simulator.");
+#else
         // Initialize OTA from metadata and request first chunk
         JsonObject fw = inboundDoc["data"]["payload"]["available"].as<JsonObject>();
         if (fw.isNull())
@@ -219,6 +254,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
             return;
         }
         this->firmware.begin(fw);
+#endif
     }
     else if (strcmp(eventType, "PROJECTS_OF_USER") == 0)
     {
@@ -242,7 +278,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     }
     else
     {
-        logger.error((String("Unknown event type: ") + eventType).c_str());
+        logger.error((std::string("Unknown event type: ") + eventType).c_str());
     }
 }
 
@@ -251,7 +287,7 @@ void API::setErrorCallback(std::function<void(const char *title, const char *mes
     this->errorCallback = callback;
 }
 
-void API::setActionResultCallback(std::function<void(const char *type, bool success)> callback)
+void API::setActionResultCallback(std::function<void(const ActionResult &)> callback)
 {
     this->actionResultCallback = callback;
 }
@@ -263,7 +299,7 @@ void API::setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> 
 
 void API::sendAck(const char *type)
 {
-    this->sendMessage(("ACK_" + String(type)).c_str());
+    this->sendMessage(("ACK_" + std::string(type)).c_str());
 }
 
 void API::sendMessage(const char *type)
@@ -273,7 +309,7 @@ void API::sendMessage(const char *type)
     this->sendMessage(type, payload);
 }
 
-void API::sendMessage(const char *type, JsonObject payload)
+bool API::sendMessage(const char *type, JsonObject payload)
 {
     JsonDocument event;
     event["event"] = "EVENT";
@@ -294,27 +330,26 @@ void API::sendMessage(const char *type, JsonObject payload)
         if (n == 0)
         {
             this->logger.error("Failed to serialize event to buffer (small)");
-            return;
+            return false;
         }
-        this->logger.info((String("sending message to websocket: ") + String(json)).c_str());
-        this->websocket.sendMessage(json, n);
-        return;
+        this->logger.info((std::string("Sending reader event: ") + type).c_str());
+        return this->transport.sendMessage(json, n);
     }
 
     std::unique_ptr<char[]> json(new (std::nothrow) char[requiredBytes]);
     if (!json)
     {
         this->logger.error("Failed to allocate buffer for outgoing event");
-        return;
+        return false;
     }
     size_t n = serializeJson(event, json.get(), requiredBytes);
     if (n == 0)
     {
         this->logger.error("Failed to serialize event to dynamically allocated buffer");
-        return;
+        return false;
     }
-    this->logger.info((String("sending message to websocket: ") + String(json.get())).c_str());
-    this->websocket.sendMessage(json.get(), n);
+    this->logger.info((std::string("Sending reader event: ") + type).c_str());
+    return this->transport.sendMessage(json.get(), n);
 }
 
 void API::sendHeartbeat()
@@ -340,19 +375,24 @@ void API::sendHeartbeat()
         this->logger.error("Failed to serialize heartbeat");
         return;
     }
-    this->logger.info((String("pushing heartbeat to websocket queue: ") + String(json)).c_str());
-    this->websocket.sendMessage(json, n);
+    this->logger.info("Sending reader heartbeat");
+    this->transport.sendHeartbeat(json, n);
 
     this->heartbeat_sent_at = millis();
 }
 
 void API::disableConnectionAttempts()
 {
-    this->websocket.disableConnectionAttempts();
+    this->transport.disableConnectionAttempts();
     this->loopIsEnabled = false;
 }
 
 void API::enableConnectionAttempts()
 {
-    this->websocket.enableConnectionAttempts();
+    this->transport.enableConnectionAttempts();
+}
+
+void API::resetCertificateTrust()
+{
+    this->transport.resetCertificateTrust();
 }

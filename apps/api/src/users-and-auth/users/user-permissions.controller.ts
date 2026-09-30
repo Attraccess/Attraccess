@@ -1,104 +1,110 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Optional,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { SystemPermissions, User } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+import { UserRole } from '@attraccess/database-entities';
+import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
-import { UpdateUserPermissionsDto } from './dtos/updateUserPermissions.dto';
-import { BulkUpdateUserPermissionsDto } from './dtos/bulkUpdateUserPermissions.dto';
-import { GetUsersWithPermissionQueryDto } from './dtos/getUsersWithPermissionQuery.dto';
-import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+import { RbacService } from '../rbac/rbac.service';
+import { AssignRoleDto } from '../rbac/dtos/assign-role.dto';
 import { UserPermissionsService } from './user-permissions.service';
+import { UsersService } from './users.service';
+import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Users')
 @Controller('users')
 @UseInterceptors(AuthRateLimitInterceptor)
 export class UserPermissionsController {
-  constructor(private readonly permissionsService: UserPermissionsService) {}
+  constructor(
+    private readonly rbacService: RbacService,
+    private readonly permissionsService: UserPermissionsService,
+    private readonly usersService: UsersService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
+  ) {}
 
-  @Patch(':id/permissions')
-  @Auth('canManageUsers')
-  @ApiOperation({ summary: "Update a user's system permissions", operationId: 'updatePermissions' })
-  @ApiResponse({
-    status: 200,
-    description: 'The user permissions have been successfully updated.',
-    type: User,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input data.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'User not found.',
-  })
-  async updatePermissions(
+  @Get(':id/roles')
+  @Auth('users.roles.manage')
+  @ApiOperation({ summary: "Get a user's role assignments", operationId: 'getUserRoleAssignments' })
+  @ApiResponse({ status: 200, type: [UserRole] })
+  getUserRoles(@Param('id', ParseIntPipe) id: number): Promise<UserRole[]> {
+    return this.rbacService.getUserRoles(id);
+  }
+
+  @Post(':id/roles')
+  @Auth('users.roles.manage')
+  @ApiOperation({ summary: 'Assign a role to a user', operationId: 'assignRoleToUser' })
+  @ApiResponse({ status: 201, type: UserRole })
+  async assignRole(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateUserPermissionsDto,
+    @Body() body: AssignRoleDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<User> {
-    return this.permissionsService.updatePermissions(id, body, request.user);
+  ): Promise<UserRole> {
+    const actor = request.user as AuthenticatedUser;
+    if (actor.id === id) {
+      throw new ForbiddenException('You cannot modify your own roles');
+    }
+    const result = await this.rbacService.assignRole(id, body.roleId, actor.effectivePermissions ?? new Set());
+    const user = await this.usersService.findOne({ id });
+    if (user) this.permissionsService.notifyPermissionsChanged(user, actor.id);
+    await this.record('user_role_assigned', id, body.roleId, request);
+    return result;
   }
 
-  @Post('permissions')
-  @Auth('canManageUsers')
-  @ApiOperation({ summary: 'Bulk update user permissions', operationId: 'bulkUpdatePermissions' })
-  @ApiResponse({
-    status: 200,
-    description: 'The user permissions have been successfully updated.',
-    type: [User],
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input data.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
-  })
-  async bulkUpdatePermissions(
-    @Body() body: BulkUpdateUserPermissionsDto,
+  @Delete(':id/roles/:roleId')
+  @Auth('users.roles.manage')
+  @ApiOperation({ summary: 'Revoke a role from a user', operationId: 'revokeRoleFromUser' })
+  @ApiResponse({ status: 200, description: 'Role revoked' })
+  async revokeRole(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('roleId', ParseIntPipe) roleId: number,
     @Req() request: AuthenticatedRequest,
-  ): Promise<User[]> {
-    return this.permissionsService.bulkUpdatePermissions(body, request.user);
+  ): Promise<void> {
+    const actor = request.user as AuthenticatedUser;
+    if (actor.id === id) {
+      throw new ForbiddenException('You cannot modify your own roles');
+    }
+    await this.rbacService.revokeRole(id, roleId, actor.effectivePermissions ?? new Set());
+    const user = await this.usersService.findOne({ id });
+    if (!user) throw new UserNotFoundException(id);
+    this.permissionsService.notifyPermissionsChanged(user, actor.id);
+    await this.record('user_role_removed', id, roleId, request);
   }
 
-  @Get(':id/permissions')
-  @Auth('canManageUsers')
-  @ApiOperation({ summary: "Get a user's system permissions", operationId: 'getPermissions' })
-  @ApiResponse({
-    status: 200,
-    description: "The user's permissions.",
-    type: SystemPermissions,
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'User not found.',
-  })
-  async getPermissions(@Param('id', ParseIntPipe) id: number): Promise<SystemPermissions> {
-    return this.permissionsService.getPermissions(id);
-  }
-
-  @Get('with-permission')
-  @Auth('canManageUsers')
-  @ApiOperation({ summary: 'Get users with a specific permission', operationId: 'getAllWithPermission' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of users with the specified permission.',
-    type: PaginatedUsersResponseDto,
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
-  })
-  async getAllWithPermission(@Query() query: GetUsersWithPermissionQueryDto): Promise<PaginatedUsersResponseDto> {
-    return this.permissionsService.getAllWithPermission(query);
+  private record(
+    action: 'user_role_assigned' | 'user_role_removed',
+    userId: number,
+    roleId: number,
+    request: AuthenticatedRequest,
+  ): Promise<void> {
+    if (!this.identityAudit) return Promise.resolve();
+    return this.rbacService
+      .getRoleKey(roleId)
+      .then(async (roleKey) => {
+        if (!roleKey) return;
+        await this.identityAudit.record({
+          action,
+          operationId: randomUUID(),
+          outcome: 'succeeded',
+          actorId: request.user.id,
+          authenticationMethod: request.user.authenticationMethod ?? 'session',
+          apiTokenId: request.user.apiTokenId,
+          subjectId: userId,
+          details: { role: roleKey },
+          request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+        });
+      })
+      .catch(() => undefined);
   }
 }

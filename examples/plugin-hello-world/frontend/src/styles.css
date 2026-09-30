@@ -1,0 +1,21 @@
+/* Plugin Tailwind entry. Emits ONLY the utility classes used by this plugin's
+   sources, all under the `hw:` prefix (e.g. `hw:flex`, `hw:md:p-6`).
+
+   The prefix is what makes plugin CSS safe: the host document already contains
+   a complete Tailwind build, and two unscoped utility sheets in one document
+   break each other's variant overrides (unlayered plugin rules beat the host's
+   layered ones — e.g. a plugin `.fixed` would defeat the host sidebar's
+   `md:relative`). DOM-scoping is no alternative because HeroUI drawers/modals
+   portal to <body>, outside any wrapper. Prefixed class names travel with the
+   markup, so they work everywhere and can never collide with host classes.
+
+   Theme tokens are emitted as `--hw-*` variables, so they don't clash either.
+   The HeroUI token map is `@theme inline` and referenced, so utilities like
+   `hw:bg-surface` compile straight to the host-defined CSS variables. */
+@import 'tailwindcss/theme.css' prefix(hw);
+@import '@heroui/styles/themes/shared/theme.css' theme(reference);
+@import 'tailwindcss/utilities.css' source(none);
+@source './';
+
+/* Must match the host's dark-mode variant (apps/frontend/src/styles.css). */
+@custom-variant dark (&:where(.dark, .dark *));

@@ -2,6 +2,8 @@
 // FEATURE: api-auth
 
 #include "api.hpp"
+#include <functional>
+#include <string>
 
 void API::onRegistrationData(JsonObject data)
 {
@@ -10,14 +12,14 @@ void API::onRegistrationData(JsonObject data)
     if (data["payload"].is<JsonObject>())
     {
         auto payload = data["payload"].as<JsonObject>();
-        if (payload["id"].is<uint32_t>() && payload["token"].is<String>())
+        if (payload["id"].is<uint32_t>() && payload["token"].is<const char *>())
         {
             uint32_t readerId = payload["id"].as<uint32_t>();
-            String apiKey = payload["token"].as<String>();
+            std::string apiKey = payload["token"].as<std::string>();
 
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
 
-            this->logger.infof("Reader registered with ID: %d and token: %s", readerId, apiKey.c_str());
+            this->logger.infof("Reader registered with ID: %d", readerId);
 
             this->sendAuthenticationRequest();
         }
@@ -26,13 +28,13 @@ void API::onRegistrationData(JsonObject data)
 
 void API::onUnauthorized(JsonObject data)
 {
-    String message = "Unknown error";
+    std::string message = "Unknown error";
     if (data["payload"].is<JsonObject>())
     {
         JsonObject payload = data["payload"].as<JsonObject>();
-        if (payload["message"].is<String>() && !payload["message"].isNull())
+        if (payload["message"].is<const char *>() && !payload["message"].isNull())
         {
-            message = payload["message"].as<String>();
+            message = payload["message"].as<std::string>();
         }
     }
 
@@ -69,8 +71,8 @@ void API::sendAuthenticationRequest()
         this->logger.error("Failed to serialize authenticate event to buffer");
         return;
     }
-    this->logger.info((String("sending authentication request to websocket: ") + String(json)).c_str());
-    this->websocket.sendMessage(json, n);
+    this->logger.info("Sending reader authentication request");
+    this->transport.sendMessage(json, n);
 }
 
 void API::sendFirmwareInfo()
@@ -109,14 +111,16 @@ void API::sendFirmwareInfo()
         this->logger.error("Failed to serialize firmware info");
         return;
     }
-    this->websocket.sendMessage(json, n);
+    this->transport.sendMessage(json, n);
 }
 
 void API::onReaderAuthenticated(JsonObject data)
 {
     logger.info("READER_AUTHENTICATED");
+    resourceListMessageCounter = resourceListRevision = 0;
+    cancelResourceAction();
 
-    String deviceName = data["payload"]["name"].as<String>();
+    std::string deviceName = data["payload"]["name"].as<std::string>();
 
     State::setApiState(true, deviceName);
 
@@ -131,7 +135,7 @@ void API::onReaderAuthenticated(JsonObject data)
     this->sendPendingCrashReport();
 }
 
-void API::onDeviceName(std::function<void(String)> callback)
+void API::onDeviceName(std::function<void(std::string)> callback)
 {
     this->deviceNameCallback = callback;
 }

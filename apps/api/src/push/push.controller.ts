@@ -26,7 +26,7 @@ export class PushController {
   }
 
   @Get('vapid-keys')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({
     summary: 'Get the current VAPID configuration (admin)',
     operationId: 'pushGetVapidConfig',
@@ -41,7 +41,7 @@ export class PushController {
   }
 
   @Put('vapid-keys')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({
     summary:
       'Replace the VAPID key pair (admin). Omit the body keys to auto-generate a fresh pair. ' +

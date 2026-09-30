@@ -6,12 +6,14 @@ import { ResourceHealthController } from './resource-health.controller';
 import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
 import { ResourceHealthNotificationListener } from './resource-health-notification.listener';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResourceHealthState, Resource, ResourceIntroducer, User]),
     ResourceMaintenanceModule,
     NotificationsModule,
+    RbacModule,
   ],
   controllers: [ResourceHealthController],
   providers: [ResourceHealthService, ResourceHealthNotificationListener],

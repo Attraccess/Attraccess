@@ -38,18 +38,18 @@ Bevor Sie die meisten Ressourcen nutzen können, benötigen Sie eine Sicherheits
 
 ## Beaufsichtigte Sitzung starten
 
-Manche Ressourcen erlauben oder erfordern beaufsichtigte Nutzung. In einer beaufsichtigten Sitzung starten Sie die Ressource, während eine qualifizierte Aufsicht anwesend ist. Eine Aufsicht kann Einweiser, Wartender oder Ressourcenverwalter für diese Ressource sein.
+Manche Ressourcen erlauben oder erfordern beaufsichtigte Nutzung. In einer beaufsichtigten Sitzung starten Sie die Ressource, während eine qualifizierte Aufsicht anwesend ist. Nur ein Einweiser für diese Ressource kann die Aufsicht übernehmen.
 
 Sie benötigen möglicherweise eine beaufsichtigte Sitzung, wenn:
 
 - Sie noch nicht eingewiesen sind, die Ressource aber beaufsichtigte Nutzung erlaubt
 - die Ressource für jede Sitzung Beaufsichtigung erfordert
-- ein Einweiser oder Wartender Ihr Training oder Ihre ersten Nutzungsversuche beaufsichtigen möchte
+- ein Einweiser Ihr Training oder Ihre ersten Nutzungsversuche beaufsichtigen möchte
 
 So starten Sie eine beaufsichtigte Sitzung:
 
 1. Öffnen Sie die Ressourcen-Detailseite
-2. Wählen Sie die beaufsichtigte Startoption oder halten Sie Ihre NFC-Karte an einen Leser, der eine Beaufsichtigung anfordert
+2. Wählen Sie die beaufsichtigte Startoption. An einem Attractap-Touchleser melden Sie sich mit Ihrer Karte an und tippen neben der Ressource auf **Aufsicht**.
 3. Bitten Sie die Aufsicht, die Sitzung zu bestätigen, wenn Attraccess dazu auffordert
 4. Füllen Sie gegebenenfalls erforderliche Formularinformationen aus
 5. Starten Sie die Sitzung, sobald die Beaufsichtigung bestätigt wurde
@@ -63,7 +63,7 @@ Nachdem Sie genügend beaufsichtigte Sitzungen abgeschlossen haben, kann Attracc
 Sobald Sie für eine Ressource eingewiesen sind, können Sie eine Nutzungssitzung starten:
 
 1. Öffnen Sie die Ressourcen-Detailseite
-2. Klicken Sie auf **Nutzung starten** (oder halten Sie Ihre NFC-Karte an den Leser, falls vorhanden)
+2. Klicken Sie auf **Nutzung starten**. An einem Attractap-Touchleser melden Sie sich mit Ihrer Karte an und tippen anschließend in der Liste neben der Ressource auf **Start**.
 3. Wenn der Ressource ein **Formular** zugeordnet ist, füllen Sie die erforderlichen Informationen aus
 4. Die Sitzung ist jetzt aktiv
 
@@ -73,9 +73,9 @@ Sobald Sie für eine Ressource eingewiesen sind, können Sie eine Nutzungssitzun
 
 Wenn Sie die Ressource nicht mehr benötigen:
 
-1. Öffnen Sie die Ressourcen-Detailseite (oder halten Sie Ihre NFC-Karte erneut an den Leser)
-2. Klicken Sie auf **Nutzung beenden**
-3. Die Sitzung wird in Ihrem Nutzungsverlauf gespeichert
+1. Öffnen Sie die Ressourcen-Detailseite. An einem Attractap-Touchleser melden Sie sich bei Bedarf erneut mit Ihrer Karte an.
+2. Klicken Sie in der App auf **Nutzung beenden** oder tippen Sie am Leser neben der Ressource auf **Stop**.
+3. Füllen Sie gegebenenfalls das erforderliche Formular aus und warten Sie auf das Ende der Nutzung. Die Sitzung wird in Ihrem Nutzungsverlauf gespeichert.
 
 > [!WARNING]
 > Beenden Sie Ihre Nutzungssitzung immer, wenn Sie fertig sind. Eine offene Sitzung kann andere Benutzer daran hindern, die Ressource zu starten.
@@ -98,6 +98,7 @@ Um Ihre vergangenen Nutzungssitzungen einzusehen:
 
 ## Siehe auch
 
+- [Leser benutzen](attractap/using-the-reader.md) – Mit der Karte anmelden und Maschinen oder Türen nutzen
 - [Überblick](end-user/overview.md) – Überblick der Endbenutzer-Anleitung
 - [Anmeldung](end-user/login.md) – So melden Sie sich an
 - [Ressourcen-Überblick](resources/overview.md) – Was sind Ressourcen? (Admin-Perspektive)

@@ -113,6 +113,9 @@ export function SummaryCard(props: Props) {
           // Fallback to the known id even if the original transaction object isn't loaded
           originalId: originalTransaction?.id ?? transaction.refundOfId,
         };
+      } else if (transaction.correctionOfId) {
+        type = 'correction';
+        details = { originalId: transaction.correctionOfId };
       } else if (transaction.resourceUsageId) {
         type = 'resourceUsage';
         details = { resourceUsage: transaction.resourceUsage };

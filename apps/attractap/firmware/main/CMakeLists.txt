@@ -1,0 +1,76 @@
+# NOTE: ESP-IDF includes this file twice. The first time is the early
+# requirements-expansion pass, which runs in an isolated scope where the
+# top-level project variables (ATTRACTAP_*) do not exist and where
+# idf_component_register() returns immediately after recording REQUIRES.
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    if(NOT DEFINED ATTRACTAP_DEFINES)
+        message(FATAL_ERROR "ATTRACTAP_DEFINES not set — build via the top-level project so a variant file is loaded")
+    endif()
+
+    file(GLOB_RECURSE ATTRACTAP_SRCS
+         "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
+         "${CMAKE_CURRENT_LIST_DIR}/../src/*.c")
+
+    if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
+        include("${CMAKE_CURRENT_LIST_DIR}/../tools/latin1_fonts.cmake")
+        attractap_latin1_fonts(ATTRACTAP_LATIN1_FONTS)
+        list(APPEND ATTRACTAP_SRCS ${ATTRACTAP_LATIN1_FONTS})
+    endif()
+
+    if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
+        list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "${ATTRACTAP_EXCLUDE_REGEX}")
+    endif()
+endif()
+
+idf_component_register(
+    SRCS ${ATTRACTAP_SRCS}
+    INCLUDE_DIRS ../src ../include
+    REQUIRES
+        driver
+        esp_driver_gpio
+        esp_driver_i2c
+        esp_driver_spi
+        esp_driver_usb_serial_jtag
+        esp_event
+        esp_netif
+        esp_wifi
+        esp_eth
+        esp_timer
+        esp_hw_support
+        esp_system
+        esp_partition
+        app_update
+        esp_app_format
+        espcoredump
+        nvs_flash
+        mbedtls
+        esp_rom
+        lwip
+        vfs
+)
+
+target_compile_definitions(${COMPONENT_LIB} PUBLIC
+    ${ATTRACTAP_DEFINES}
+    FIRMWARE_VERSION="${ATTRACTAP_VERSION}"
+    LOG_LEVEL=${ATTRACTAP_LOG_LEVEL}
+)
+if(ATTRACTAP_HIL)
+    target_sources(${COMPONENT_LIB} PRIVATE ../test/device/api_driver.cpp)
+endif()
+
+# LVGL's canonical selector idiom `LV_PART_MAIN | LV_STATE_DEFAULT` ORs two
+# distinct enum types. GCC 14 (IDF v6) promotes this to
+# -Wdeprecated-enum-enum-conversion in C++ only (LVGL core is C, so it is
+# unaffected). Suppress for the app like IDF does for the sibling warning
+# (-Wno-enum-conversion in tools/cmake/build.cmake:193).
+target_compile_options(${COMPONENT_LIB} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>")
+
+if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
+    # Generic binary embedding does not align the start symbol. LVGL's RGB565
+    # pixel reads require aligned data, so use the same explicit wrapper as host tests.
+    get_filename_component(ATTRACTAP_IMAGE_DIR "${CMAKE_CURRENT_LIST_DIR}/../src/display/images" ABSOLUTE)
+    configure_file("${ATTRACTAP_IMAGE_DIR}/logos.S.in" "${CMAKE_CURRENT_BINARY_DIR}/logos.S" @ONLY)
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
+        OBJECT_DEPENDS "${ATTRACTAP_IMAGE_DIR}/logo_133x40.rgb565a8;${ATTRACTAP_IMAGE_DIR}/logo_400x120.rgb565a8;${ATTRACTAP_IMAGE_DIR}/lockscreen.rgb565")
+    target_sources(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/logos.S")
+endif()

@@ -2,14 +2,30 @@
 // FEATURE: application-state
 
 #include "application.hpp"
+#include "platform.hpp"
 
 void Application::processState() {
 #ifdef HAS_WS2812_LED
   this->updateLedState();
 #endif
 
+#ifdef DEMO_MODE
+  // In demo mode, handle a pending card scan for the settings screen.
+  if (this->demoPendingScanReady) {
+    this->demoPendingScanReady = false;
+    this->nfc.disableCardDetection();
+    Display::demoSettingsScreen.onCardScanned(this->demoScanUid);
+    this->demoScanUid.clear();
+    return;
+  }
+  // In demo mode the settings screen is always accessible and connection
+  // config / PIN prompts are suppressed.
+  if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED) {
+    return;
+  }
+#else
   AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
-  bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() &&
+  bool connectionIsConfigured = !attraccessApiConfig.hostname.empty() &&
                                 attraccessApiConfig.hostname != "" &&
                                 attraccessApiConfig.port > 0;
 
@@ -33,6 +49,7 @@ void Application::processState() {
     {
         return;
     }
+#endif // DEMO_MODE
 
 #ifdef HAS_LVGL_DISPLAY
   if (!this->bootDone &&
@@ -45,6 +62,7 @@ void Application::processState() {
     return;
   }
 
+#ifndef DEMO_MODE
   bool pinIsSet = Settings::getDeviceConfig().passCode != "0000";
   if (!pinIsSet) {
     if (this->state == APPLICATION_STATE_PIN_NOT_SET) {
@@ -57,7 +75,8 @@ void Application::processState() {
     Display::transitionToScreen(&Display::setPinScreen);
     return;
   }
-#endif
+#endif // !DEMO_MODE
+#endif // HAS_LVGL_DISPLAY
 
   State::ApiState apiState = State::getApiState();
   State::NetworkState networkState = State::getNetworkState();
@@ -84,19 +103,7 @@ void Application::processState() {
       this->externalState = EXTERNAL_STATE_NONE;
       this->resetPhase = RESET_PHASE_NONE;
     }
-    // Drop any in-progress supervision flow: the server-side request is gone after a disconnect, so
-    // a stale screen/phase would otherwise hang until timeout.
-    if (this->state == APPLICATION_STATE_SUPERVISION ||
-        this->supervisionPhase != SUPERVISION_PHASE_NONE) {
-      this->supervisionPhase = SUPERVISION_PHASE_NONE;
-      this->supervisionCardDetected = false;
-      this->supervisionKeyReady = false;
-      this->supervisionResolvedByWeb = false;
-      this->supervisionFailed = false;
-      this->supervisionCardRejected = false;
-      this->supervisionCancelRequested = false;
-      this->autoStartAfterSupervision = false;
-    }
+    this->supervision.onDisconnect();
 #endif
         if (this->state == APPLICATION_STATE_INIT)
         {
@@ -150,11 +157,44 @@ void Application::processState() {
     return;
   }
 
+  // The server can arm supervision without anyone tapping first (ATT-816): the requester picked this
+  // reader in the web UI. Enrollment and reset return before this point, so the flag may sit unread
+  // for as long as one of those runs — check it against the server's TTL rather than assuming the
+  // request is still live, and tell the server when we cannot serve it.
+  if (this->supervision.takePendingWebStart(
+          millis(), this->state == APPLICATION_STATE_SUPERVISION ||
+                         this->cardAuthenticationPending || this->unlocked ||
+                         this->state == APPLICATION_STATE_AUTHENTICATE_CARD)) {
+    this->state = APPLICATION_STATE_SUPERVISION;
+    this->externalState = EXTERNAL_STATE_NONE;
+    return;
+  }
+
   // Two-card supervision is a sticky, self-contained sub-flow like enrollment/reset — it owns the
-  // screen until success, cancel or timeout. beginSupervision() is entered from the card-auth path
-  // (processCardAuthenticationData) rather than via externalState.
+  // screen until success, cancel or timeout.
   if (this->state == APPLICATION_STATE_SUPERVISION) {
-    this->processSupervision();
+    SupervisionFlow::Outcome outcome = this->supervision.tick(millis());
+    if (outcome != SupervisionFlow::Outcome::None) {
+      this->externalState = EXTERNAL_STATE_NONE;
+      this->state = APPLICATION_STATE_INIT;
+      const bool hadLogin = this->unlocked;
+      this->unlocked = hadLogin || outcome == SupervisionFlow::Outcome::Unlock ||
+                       outcome == SupervisionFlow::Outcome::UnlockAndStartSession;
+      if (outcome == SupervisionFlow::Outcome::UnlockAndStartSession) {
+        this->pendingUiStartedAt = millis();
+        this->showReaderActionProgress("Nutzung wird gestartet");
+        if (this->actionInProgressCount == 0) this->beginActionPause();
+        this->pendingActionType = PENDING_ACTION_START_SESSION;
+        this->pendingActionResourceId = this->selectedResourceId;
+        this->pendingActionProjectId = this->selectedProjectId;
+        this->pendingActionIsTakeover = false;
+        this->hasPendingFormRequest = false;
+        this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
+      } else if (hadLogin) {
+        this->finishReaderAction(outcome == SupervisionFlow::Outcome::Unlock);
+      }
+
+    }
     return;
   }
 #endif
@@ -173,6 +213,28 @@ void Application::processState() {
     }
   }
 #endif
+
+#ifdef HAS_LVGL_DISPLAY
+  // This must run before the AUTHENTICATE_CARD early return (card lifted while
+  // waiting for its key). Otherwise that wait would never expire.
+  if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
+    this->finishCardAuthentication(false);
+    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte NFC-Karte erneut auflegen.");
+  }
+#endif
+
+  // A late or duplicate card-auth response (double-tap on the lockscreen sends
+  // two requests; the websocket task sets the trigger asynchronously) must not
+  // hijack the state machine while the user is already unlocked. Otherwise
+  // state flips to AUTHENTICATE_CARD with the resource-details screen still
+  // shown and the early-return below wedges the UI: buttons are guarded on
+  // state == UNLOCKED and the logout timeout is never evaluated (ATT-718).
+  if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD &&
+      this->unlocked) {
+    this->logger.debug(
+        "Dropping card-auth trigger while unlocked (stale/duplicate response)");
+    this->externalState = EXTERNAL_STATE_NONE;
+  }
 
   if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD) {
     if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
@@ -232,150 +294,74 @@ void Application::processState() {
   }
 
 #ifdef HAS_LVGL_DISPLAY
-  if (this->resourceCount == 0) {
-    if (this->state == APPLICATION_STATE_NO_RESOURCES) {
-      return;
-    }
-
-    this->logger.debug("Resource count is 0, showing no resources screen");
-    this->state = APPLICATION_STATE_NO_RESOURCES;
-
-    Display::transitionToScreen(&Display::noResourcesScreen);
-    return;
+  uint32_t now = millis();
+  if (!this->pendingUiAction.empty() && !this->hasPendingFormRequest &&
+      now - this->pendingUiStartedAt > 60000) {
+    this->finishReaderAction(false);
+    this->handleFormsCancel();
+    Display::showErrorPopup("Aktion nicht bestätigt", "Der Ressourcenstatus wird neu geladen. Bitte vor einem erneuten Versuch prüfen.");
   }
-
-  if (this->resourceCount == 1 && !this->resourceIsSelected) {
-    this->logger.debug(
-        "Resource count is 1 and resource is not selected, selecting resource");
-    this->selectResource(resourceList.items[0]);
-    return;
+  // Finishing an action starts a new refresh timer; do not subtract its newer
+  // timestamp from the earlier sample and wrap the unsigned elapsed duration.
+  now = millis();
+  if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
+    this->logoutReader();
+    Display::showErrorPopup("Status nicht verfügbar", "Bitte erneut anmelden, um den aktuellen Ressourcenstatus zu laden.");
   }
-
-  if (this->resourceCount > 0 && !this->resourceIsSelected) {
-    if (this->resourceListUpdated) {
-// Update UI with the list
-#ifdef HAS_LVGL_DISPLAY
-      Display::resourceListScreen.setResourceList(this->resourceList);
-#endif
-      this->resourceListUpdated = false;
-    }
-
-    if (this->state == APPLICATION_STATE_RESOURCE_LIST) {
-      return;
-    }
-
-    this->logger.debug("Resource count is greater than 0 and resource is not "
-                       "selected, showing resource list");
-    this->state = APPLICATION_STATE_RESOURCE_LIST;
-#ifdef HAS_LVGL_DISPLAY
-    Display::transitionToScreen(&Display::resourceListScreen);
-#endif
-    return;
+  if (this->unlocked) {
+    uint32_t effectivePause = this->accumulatedPauseMs;
+    if (this->actionInProgressCount > 0) effectivePause += now - this->pauseStartMs;
+    uint32_t elapsed = now - this->timeOfUnlockedMs;
+    elapsed = elapsed > effectivePause ? elapsed - effectivePause : 0;
+    if (elapsed > this->UNLOCKED_TIMEOUT_MS) this->logoutReader();
   }
-
   if (this->selectedResourceChanged) {
-    for (uint16_t i = 0; i < this->resourceList.count; ++i) {
-      if (this->resourceList.items[i].id == this->selectedResourceId) {
-        API::ResourceBrief resource = this->resourceList.items[i];
-
-        Display::lockscreen.setResourceName(resource.name);
-        Display::lockscreen.setUsageInfo(resource.hasActiveUsage,
-                                         resource.activeUser,
-                                         resource.isUnderMaintenance);
-
-        // Directly pass the native struct to the screen so it can avoid String
-        // conversions
-        Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
-
-        break;
-      }
-    }
+    this->updateSelectedResourceDetails();
     this->selectedResourceChanged = false;
   }
-
-  uint32_t now = millis();
+  if (this->projectsOfUserResponseUpdated && this->unlocked) {
+    Display::resourceDetailsScreen.setProjects(this->projectsOfUserResponse);
+    Display::resourceDetailsScreen.setSelectedProject(this->selectedProjectId, this->selectedProjectName.c_str());
+    this->projectsOfUserResponseUpdated = false;
+  }
+  if (this->resourceListUpdated) {
+    Display::resourceListScreen.setResourceList(this->resourceList);
+    this->resourceListUpdated = false;
+  }
+  if (this->resourceCount == 0) {
+    if (this->state != APPLICATION_STATE_NO_RESOURCES) {
+      this->logoutReader();
+      this->state = APPLICATION_STATE_NO_RESOURCES;
+      Display::transitionToScreen(&Display::noResourcesScreen);
+    }
+    return;
+  }
+  if (!this->resourceIsSelected) {
+    Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
+    const auto target = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;
+    if (this->state != target) {
+      this->state = target;
+      Display::transitionToScreen(&Display::resourceListScreen);
+      if (!this->unlocked && !this->cardAuthenticationPending) this->nfc.enableCardDetection();
+    }
+    return;
+  }
   if (!this->unlocked) {
     if (this->state == APPLICATION_STATE_LOCKED) {
-
-      if (now - this->timeOfResourceSelectionMs >
-          this->RESOURCE_SELECTION_TIMEOUT_MS) {
-        this->logger.debug(
-            "Resource selection timeout reached, showing resource list");
+      if (!this->cardAuthenticationPending && now - this->timeOfResourceSelectionMs > this->RESOURCE_SELECTION_TIMEOUT_MS) {
         this->resourceIsSelected = false;
+        this->selectedResourceId = 0;
       }
       return;
     }
-
-    this->logger.debug("Card is not detected, showing lockscreen");
     this->state = APPLICATION_STATE_LOCKED;
-#ifdef HAS_LVGL_DISPLAY
-    Display::transitionToScreen(&Display::lockscreen, [this]() {
-      this->logger.debug(
-          "Lockscreen transition complete, enabling card detection");
-      this->nfc.enableCardDetection();
-    });
-#else
-    this->nfc.enableCardDetection();
-#endif
+    Display::transitionToScreen(&Display::lockscreen, [this] { this->nfc.enableCardDetection(); });
     return;
   }
-
-  if (this->state == APPLICATION_STATE_UNLOCKED) {
-    // Auto-start the session right after a supervisor approved by tapping their card at the reader
-    // (ATT-493). The web-approval channel starts the session server-side instead, so this only fires
-    // for the on-reader card path.
-    if (this->autoStartAfterSupervision) {
-      this->autoStartAfterSupervision = false;
-      Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
-      this->beginActionPause();
-      this->pendingActionType = PENDING_ACTION_START_SESSION;
-      this->pendingActionResourceId = this->selectedResourceId;
-      this->pendingActionProjectId = this->selectedProjectId;
-      this->hasPendingFormRequest = false;
-      this->api.startResourceUsageSession(this->selectedResourceId,
-                                          this->selectedProjectId);
-    }
-
-    // Subtract any accumulated pause time while actions were in-progress.
-    // accumulatedPauseMs only gets the elapsed delta added once an action
-    // finishes (endActionPause). While an action is still running -- most
-    // notably while the user fills out a resource usage form -- include the
-    // in-progress pause here too, so the logout timeout stays frozen for the
-    // whole duration instead of expiring mid-form.
-    uint32_t effectivePause = this->accumulatedPauseMs;
-    if (this->actionInProgressCount > 0) {
-      effectivePause +=
-          (now >= this->pauseStartMs) ? (now - this->pauseStartMs) : 0;
-    }
-    uint32_t effectiveElapsed = now - this->timeOfUnlockedMs;
-    if (effectiveElapsed > effectivePause) {
-      effectiveElapsed -= effectivePause;
-    } else {
-      effectiveElapsed = 0;
-    }
-    if (effectiveElapsed > this->UNLOCKED_TIMEOUT_MS) {
-      this->logger.debug("Unlocked timeout reached, locking");
-      this->unlocked = false;
-      this->resourceIsSelected = this->resourceCount == 1;
-    }
-
-    if (this->projectsOfUserResponseUpdated) {
-#ifdef HAS_LVGL_DISPLAY
-      Display::resourceDetailsScreen.setProjects(this->projectsOfUserResponse);
-      Display::resourceDetailsScreen.setSelectedProject(
-          this->selectedProjectId, this->selectedProjectName.c_str());
-#endif
-      this->projectsOfUserResponseUpdated = false;
-    }
-
-    return;
+  if (this->state != APPLICATION_STATE_UNLOCKED) {
+    this->state = APPLICATION_STATE_UNLOCKED;
+    Display::transitionToScreen(&Display::resourceDetailsScreen);
   }
-
-  this->logger.debug("Resource is unlocked, showing resource details screen");
-  this->state = APPLICATION_STATE_UNLOCKED;
-  this->restartSessionTimeout();
-
-  Display::transitionToScreen(&Display::resourceDetailsScreen);
 #else
 
   // Process unlocked card actions for non-display mode
@@ -495,7 +481,7 @@ void Application::processEnrollment() {
     this->enrollErrorPending = false;
     this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-    Display::enrollmentScreen.setStatusMessage(String(this->enrollErrorMessage));
+    Display::enrollmentScreen.setStatusMessage(this->enrollErrorMessage);
     this->enrollPhase = ENROLL_PHASE_ERROR;
     this->enrollPhaseChangedMs = now;
     return;
@@ -550,9 +536,9 @@ void Application::processEnrollment() {
 
   case ENROLL_PHASE_WRITING: {
     bool ok = this->nfc.changeKey(
-        this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
-        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes,
-        NFC::CARD_KEY_VERSION_ENROLLED);
+        this->apiEnrollNewCardData.keyNo, this->nfc.getFactoryKey(),
+        this->nfc.getFactoryKey(), this->apiEnrollNewCardData.keyBytes,
+        INfc::CARD_KEY_VERSION_ENROLLED);
     this->api.sendEnrollNewCard(ok);
     if (ok) {
       this->beeper.successBeep();
@@ -668,10 +654,10 @@ void Application::processReset() {
     // Authenticate as the (still factory) application master key, then change
     // the stored slot from the card's current key back to the factory key.
     bool ok = this->nfc.changeKey(this->apiResetNfcCardData.keyNo,
-                                  this->nfc.FACTORY_KEY,
+                                  this->nfc.getFactoryKey(),
                                   this->apiResetNfcCardData.keyBytes,
-                                  this->nfc.FACTORY_KEY,
-                                  NFC::CARD_KEY_VERSION_FREE);
+                                  this->nfc.getFactoryKey(),
+                                  INfc::CARD_KEY_VERSION_FREE);
     this->api.sendResetNfcCard(ok);
     if (ok) {
       this->beeper.successBeep();
@@ -681,7 +667,7 @@ void Application::processReset() {
       this->beeper.errorBeep();
       Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
       Display::resetScreen.setStatusMessage(
-          "Karte konnte nicht\nzurueckgesetzt werden");
+          "Karte konnte nicht\nzurückgesetzt werden");
       this->resetPhase = RESET_PHASE_ERROR;
     }
     this->resetPhaseChangedMs = now;

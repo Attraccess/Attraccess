@@ -3,6 +3,8 @@
   "compilerOptions": {
     "outDir": "../../dist/api-client",
     "declaration": true,
+    "module": "node16",
+    "moduleResolution": "node16",
     "types": ["node", "vite/client"]
   },
   "include": ["src/**/*.ts"],

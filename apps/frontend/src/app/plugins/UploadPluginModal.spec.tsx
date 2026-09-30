@@ -32,12 +32,9 @@ vi.mock('../../components/toastProvider', () => ({
   }),
 }));
 
-const fileInput = () =>
-  document.querySelector('[data-cy="upload-plugin-modal-file-input"]') as HTMLInputElement;
-const uploadButton = () =>
-  document.querySelector('[data-cy="upload-plugin-modal-upload-button"]') as HTMLButtonElement;
-const cancelButton = () =>
-  document.querySelector('[data-cy="upload-plugin-modal-cancel-button"]') as HTMLButtonElement;
+const fileInput = () => document.querySelector('[data-cy="upload-plugin-modal-file-input"]') as HTMLInputElement;
+const uploadButton = () => document.querySelector('[data-cy="upload-plugin-modal-upload-button"]') as HTMLButtonElement;
+const cancelButton = () => document.querySelector('[data-cy="upload-plugin-modal-cancel-button"]') as HTMLButtonElement;
 
 beforeEach(() => {
   hoisted.uploadMutateMock.mockReset();
@@ -59,8 +56,8 @@ describe('UploadPluginModal', () => {
   it('renders the title, description, file input and action buttons when open', () => {
     render(<UploadPluginModal isOpen onClose={vi.fn()} />);
 
-    expect(screen.getByText('Upload Plugin')).toBeInTheDocument();
-    expect(screen.getByText(/Upload a plugin as a ZIP file/)).toBeInTheDocument();
+    expect(screen.getByText('Upload or Update Plugin')).toBeInTheDocument();
+    expect(screen.getByText(/If a plugin with the same name is already installed/)).toBeInTheDocument();
     expect(fileInput()).toBeInTheDocument();
     expect(uploadButton()).toBeInTheDocument();
     expect(cancelButton()).toBeInTheDocument();
@@ -132,7 +129,7 @@ describe('UploadPluginModal', () => {
     render(<UploadPluginModal isOpen onClose={vi.fn()} />);
 
     const file = new File(['content'], 'bad.txt', { type: 'text/plain' });
-    await user.upload(fileInput(), file, { applyAccept: false });
+    fireEvent.change(fileInput(), { target: { files: [file] } });
     await user.click(uploadButton());
 
     expect(hoisted.uploadMutateMock).not.toHaveBeenCalled();

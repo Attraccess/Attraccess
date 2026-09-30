@@ -20,6 +20,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../metrics/metrics.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { Observable } from 'rxjs';
+import { LicenseService } from '../license/license.service';
+import { AuditService } from '../audit/audit.service';
 
 const mockMetricsService = {
   billingTransactionsTotal: { inc: jest.fn() },
@@ -54,6 +56,10 @@ describe('BillingModule', () => {
         providers: [
           BillingService,
           { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
+          {
+            provide: AuditService,
+            useValue: { recordBillingTransaction: jest.fn(), recordBillingTransactionAfterCommit: jest.fn() },
+          },
           { provide: EventEmitter2, useValue: { emit: jest.fn() } },
           { provide: SumUpService, useValue: {} },
           { provide: EmailService, useValue: { sendResourceUsageBillingSummaryEmail: jest.fn() } },
@@ -90,6 +96,10 @@ describe('BillingModule', () => {
           {
             provide: SseInstrumentation,
             useValue: { wrap: <T,>(_s: string, source: Observable<T>) => source },
+          },
+          {
+            provide: LicenseService,
+            useValue: { verifyLicense: jest.fn().mockResolvedValue({ valid: true, modules: [] }) },
           },
         ],
       }).compile();

@@ -4,10 +4,13 @@
     "externalIdentifier": "Externe ID: {{identifier}}"
   },
   "profile": {
-    "title": "Profil",
-    "usernameTitle": "Benutzername",
-    "emailTitle": "E-Mail",
-    "passwordTitle": "Passwort"
+    "title": "Profil"
+  },
+  "security": {
+    "title": "Sicherheit"
+  },
+  "permissions": {
+    "title": "Rollen & Berechtigungen"
   },
   "sso": {
     "title": "SSO",
@@ -17,6 +20,12 @@
     "linked": "{{count}} verknüpft",
     "provider": "Anbieter",
     "userId": "SSO-Benutzer-ID"
+  },
+  "effectivePermissions": {
+    "title": "Effektive Berechtigungen",
+    "empty": "Keine Berechtigungen zugewiesen.",
+    "loading": "Berechtigungen werden geladen…",
+    "uncategorized": "Sonstige"
   },
   "delete": {
     "title": "Benutzer löschen",

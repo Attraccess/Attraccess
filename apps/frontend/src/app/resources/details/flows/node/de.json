@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Konfiguration",
+    "loading": "Zusammenfassung wird geladen…",
+    "unavailable": "Vorschau nicht verfügbar"
+  },
   "editor": {
     "buttons": {
       "save": "Speichern",
@@ -33,31 +38,66 @@
       "resource": {
         "usage": {
           "started": {
-            "title": "Resource wurde gestartet",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestartet wird.",
+            "title": "Nutzung gestartet",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung startet.",
             "outputs": {
               "output": "Ausgabe"
             }
           },
           "stopped": {
-            "title": "Resource wurde gestoppt",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestoppt wird.",
+            "title": "Nutzung beendet",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung endet.",
             "outputs": {
               "output": "Ausgabe"
             }
           },
           "takeover": {
-            "title": "Ressource wurde übernommen",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird.",
+            "title": "Nutzung übernommen",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird.",
             "outputs": {
               "output": "Ausgabe"
             }
           }
         },
+        "metering": {
+          "start": {
+            "title": "Messung starten",
+            "description": "Läuft, wenn eine abgerechnete Sitzung beginnt. Setzen Sie den Zähler zurück oder lesen Sie ihn hier aus und verbinden Sie dann „Messung bereit“.",
+            "outputs": { "output": "Ausgabe" },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Zeitlimit (Sekunden)",
+                "helpText": "Maximale Wartezeit auf „Messung bereit“. Eine Sitzung, deren Zähler nicht startet, startet nicht."
+              }
+            }
+          },
+          "collect": {
+            "title": "Messwert abfragen",
+            "description": "Läuft zum Auslesen des Zählers: regelmäßig für den Live-Wert und einmal beim Sitzungsende für die Abrechnung. Verbinden Sie „Energie melden“.",
+            "outputs": { "output": "Ausgabe" },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Zeitlimit (Sekunden)",
+                "helpText": "Maximale Wartezeit auf „Energie melden“."
+              },
+              "interimIntervalMinutes": {
+                "label": "Zwischenintervall (Minuten)",
+                "helpText": "Wie oft der Zählerstand der laufenden Sitzung aktualisiert wird. Live-Werte werden angezeigt, aber nie abgerechnet. 0 deaktiviert sie."
+              },
+              "finalAttempts": {
+                "label": "Versuche für den Endwert",
+                "helpText": "Versuche, beim Sitzungsende einen frischen Endstand zu erhalten, bevor die Energieabrechnung ausstehend bleibt."
+              },
+              "finalRetryDelaySeconds": {
+                "label": "Pause zwischen Endwert-Versuchen (Sekunden)"
+              }
+            }
+          }
+        },
         "activity": {
           "no-activity": {
-            "title": "Ressource ist inaktiv",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource inaktiv ist für eine bestimmte Zeit.",
+            "title": "Inaktivitäts-Timeout erreicht",
+            "description": "Wird ausgelöst, nachdem für die konfigurierte Dauer keine Aktivität für die Ressource aufgezeichnet wurde.",
             "outputs": {
               "output": "Ausgabe"
             },
@@ -121,6 +161,85 @@
               "serverId": {
                 "label": "Server"
               }
+            }
+          }
+        }
+      },
+      "companion": {
+        "idle": {
+          "title": "Companion: Gerät inaktiv",
+          "description": "Wird ausgelöst, wenn das Gerät eines Companion-Geräts für die konfigurierte Zeit inaktiv war.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "active": {
+          "title": "Companion: Gerät aktiv",
+          "description": "Wird ausgelöst, wenn das Gerät eines Companion-Geräts wieder aktiv wird.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "foreground_app_changed": {
+          "title": "Companion: Vordergrund-App geändert",
+          "description": "Wird ausgelöst, wenn sich die fokussierte Anwendung auf einem Companion-Gerät ändert. Payload enthält appName, bundleId (nur macOS) und pid.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "usb_device_connected": {
+          "title": "Companion: USB-Gerät verbunden",
+          "description": "Wird ausgelöst, wenn ein USB-Gerät mit einem Companion-Gerät verbunden wird. Payload enthält vendorId, productId, manufacturer, product und serialNumber.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            },
+            "vendorId": {
+              "label": "Hersteller-ID Filter (optional, dezimal)"
+            },
+            "productId": {
+              "label": "Produkt-ID Filter (optional, dezimal)"
+            }
+          }
+        },
+        "usb_device_disconnected": {
+          "title": "Companion: USB-Gerät getrennt",
+          "description": "Wird ausgelöst, wenn ein USB-Gerät von einem Companion-Gerät getrennt wird. Payload enthält vendorId und productId.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            },
+            "vendorId": {
+              "label": "Hersteller-ID Filter (optional, dezimal)"
+            },
+            "productId": {
+              "label": "Produkt-ID Filter (optional, dezimal)"
             }
           }
         }
@@ -195,7 +314,7 @@
           "title": "Auf MQTT-Nachricht warten",
           "description": "Wartet auf die nächste MQTT-Nachricht, die dem Themen-Filter entspricht; übergibt {topic, payload}.",
           "inputs": { "input": "Eingabe" },
-          "outputs": { "output": "Ausgabe" },
+          "outputs": { "output": "Ausgabe", "failure": "Fehler" },
           "preview": {
             "topic": "Thema",
             "timeoutSeconds": "Timeout (s)"
@@ -210,6 +329,15 @@
                 "0": "0 - Höchstens einmal (Fire-and-Forget)",
                 "1": "1 - Mindestens einmal (Bestätigung)",
                 "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+              }
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
               }
             }
           }
@@ -298,7 +426,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "assignments": "Setzt"
@@ -315,7 +444,7 @@
                 },
                 "value": {
                   "label": "Wert-Vorlage",
-                  "helpText": "Handlebars-Vorlage. Nutzlast referenzieren mit \\{{path.to.field}}, vorhandene Variablen mit \\{{variables.KEY}}. Reiner Text ohne \\{{ }} wird unverändert übernommen.",
+                  "helpText": "Handlebars-Vorlage. Nutzlast referenzieren mit \\{{path.to.field}}, vorhandene Variablen mit \\{{variables.KEY}}. Mit \\{{json payload}} werden Objekte oder Arrays als JSON serialisiert. Reiner Text ohne \\{{ }} wird unverändert übernommen.",
                   "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
                   "docsLabel": "Handlebars-Syntax-Referenz"
                 },
@@ -380,7 +509,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "method": "Methode",
@@ -409,6 +539,27 @@
             },
             "body": {
               "label": "Body"
+            },
+            "timeoutSeconds": {
+              "label": "Antwort-Timeout (Sekunden)",
+              "helpText": "Maximale Wartezeit auf die Controller-Antwort. Leer lassen, um ohne knotenspezifisches Timeout zu warten."
+            },
+            "completionBehavior": {
+              "label": "Abschluss",
+              "helpText": "Nur senden fährt fort, nachdem die HTTP-Anfrage gestartet wurde. Auf Antwort warten wartet auf die Controller-Antwort.",
+              "enum": {
+                "dispatch": "Nur senden",
+                "acknowledged": "Auf Antwort warten"
+              }
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
+              }
             }
           }
         }
@@ -421,7 +572,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "topic": "Thema"
@@ -444,19 +596,75 @@
                 "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
               }
             },
-            "retain": { "label": "Nachricht behalten (retain)" }
+            "retain": { "label": "Nachricht behalten (retain)" },
+            "completionBehavior": {
+              "label": "Abschluss",
+              "helpText": "Nur senden fährt fort, nachdem MQTT den Publish-Aufruf akzeptiert hat. Bestätigt wartet auf den MQTT-Publish-Callback.",
+              "enum": {
+                "dispatch": "Nur senden",
+                "acknowledged": "Auf Bestätigung warten"
+              }
+            },
+            "acknowledgementTimeoutSeconds": {
+              "label": "Bestätigungs-Timeout (Sekunden)",
+              "helpText": "Maximale Wartezeit auf die MQTT-Publish-Bestätigung. Leer lassen, um die Standardvorgabe der Integration zu verwenden."
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
+              }
+            }
+          }
+        }
+      },
+      "companion": {
+        "lock-pc": {
+          "title": "PC sperren",
+          "description": "Sperrt den Bildschirm eines registrierten Companion-Geräts.",
+          "inputs": { "input": "Eingabe" },
+          "outputs": { "output": "Ausgabe" },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "unlock-pc": {
+          "title": "PC entsperren",
+          "description": "Entsperrt den Bildschirm eines registrierten Companion-Geräts.",
+          "inputs": { "input": "Eingabe" },
+          "outputs": { "output": "Ausgabe" },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
           }
         }
       },
       "resource": {
         "usage": {
           "end-session": {
-            "title": "Nutzung beenden",
-            "description": "Beendet die aktive Nutzungssitzung. Optional mit Notizen (Template oder statisch).",
+            "title": "Aktive Sitzung beenden",
+            "description": "Beendet die aktuelle Nutzungssitzung, optional mit einer Notiz.",
             "inputs": { "input": "Eingabe" },
-            "outputs": { "output": "Ausgabe" },
+            "outputs": { "output": "Ausgabe", "failure": "Fehler" },
             "config": {
-              "notes": { "label": "Notizen (Templates erlaubt)" }
+              "notes": { "label": "Notizen (Templates erlaubt)" },
+              "failureBehavior": {
+                "label": "Bei Fehler",
+                "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+                "enum": {
+                  "fail-flow": "Flow abbrechen",
+                  "failure-output": "Über Fehlerausgang fortsetzen",
+                  "log-and-continue": "Protokollieren und fortsetzen"
+                }
+              }
             },
             "preview": {
               "notes": "Notizen"
@@ -494,10 +702,74 @@
             }
           }
         },
+        "metering": {
+          "ready": {
+            "title": "Messung bereit",
+            "description": "Bestätigt, dass der Zähler initialisiert ist. Sitzungen starten erst, wenn dieser Knoten erreicht wird.",
+            "inputs": { "input": "Eingabe" },
+            "config": {
+              "baselineValue": {
+                "label": "Baseline-Wert",
+                "helpText": "Nur für Zähler, die sich nicht zurücksetzen lassen: der aktuelle Gesamtstand (Templates erlaubt). Der Verbrauch wird ab diesem Wert gezählt. Leer lassen, wenn der Zähler zurückgesetzt wurde."
+              },
+              "baselineUnit": {
+                "label": "Baseline-Einheit",
+                "helpText": "Energieeinheit des Zählerstands, z. B. kWh oder Wh."
+              },
+              "source": {
+                "label": "Quelle",
+                "helpText": "Optionale Bezeichnung des physischen Zählers (Templates erlaubt)."
+              }
+            },
+            "preview": {
+              "baselineValue": "Ausgangsstand",
+              "source": "Zähler"
+            }
+          },
+          "report": {
+            "title": "Energie melden",
+            "description": "Meldet die seit „Messung starten“ verbrauchte Gesamtenergie. Keine Leistung, kein Inkrement.",
+            "inputs": { "input": "Eingabe" },
+            "config": {
+              "value": {
+                "label": "Wert",
+                "helpText": "Templates erlaubt, z. B. {{reading.total}}. Muss Energie sein (Wh, kWh, ...), nie ein Leistungswert."
+              },
+              "unit": {
+                "label": "Einheit",
+                "helpText": "Wh, kWh, MWh, mWh, J, kJ oder MJ (Templates erlaubt). Leistungseinheiten wie W oder kW werden abgelehnt."
+              },
+              "observedAt": {
+                "label": "Gemessen am",
+                "helpText": "Optionale ISO-Zeit der Messung. Werte von vor dem Sitzungsende werden als veraltet abgelehnt. Standard: jetzt."
+              },
+              "source": {
+                "label": "Quelle",
+                "helpText": "Optionale Bezeichnung des physischen Zählers (Templates erlaubt)."
+              }
+            },
+            "preview": {
+              "value": "Wert",
+              "unit": "Einheit"
+            }
+          }
+        },
         "activity": {
+          "operating": {
+            "title": "Betriebsbeginn aufzeichnen",
+            "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb aufgenommen hat.",
+            "inputs": { "input": "Eingang" },
+            "outputs": { "output": "Ausgang" }
+          },
+          "idle": {
+            "title": "Betriebsende aufzeichnen",
+            "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb beendet hat.",
+            "inputs": { "input": "Eingang" },
+            "outputs": { "output": "Ausgang" }
+          },
           "track-activity": {
-            "title": "Ressource war aktiv",
-            "description": "Nutze um Attraccess anzuzeigen, dass die Ressource aktiv war.",
+            "title": "Aktivität aufzeichnen",
+            "description": "Zeichnet Aktivität für diese Ressource zum aktuellen Serverzeitpunkt auf.",
             "inputs": {
               "input": "Eingabe"
             },
@@ -508,7 +780,7 @@
         },
         "health": {
           "heartbeat": {
-            "title": "Lebenszeichen",
+            "title": "Gesundheits-Lebenszeichen senden",
             "description": "Markiert die Ressource als gesund, wenn dieser Knoten ausgelöst wird. Erfolgt innerhalb des Timeouts kein neues Lebenszeichen, wird die Ressource automatisch als ungesund markiert.",
             "inputs": { "input": "Eingabe" },
             "outputs": { "output": "Ausgabe" },

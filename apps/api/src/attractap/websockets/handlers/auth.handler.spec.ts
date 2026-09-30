@@ -14,12 +14,15 @@ describe('AttractapAuthHandler', () => {
   let mockSocket: {
     id: string;
     readerId: number | null;
+    readerName: string | null;
     state: Record<string, unknown>;
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
   let mockAttractapService: { createNewReader: jest.Mock; findReaderById: jest.Mock };
   let mockResourceListService: { sendResourceListToSocket: jest.Mock };
+  let mockMetricsService: { attractapReaderConnected: { set: jest.Mock } };
+  let mockAudit: { recordAttractap: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -35,6 +38,7 @@ describe('AttractapAuthHandler', () => {
     mockSocket = {
       id: 'socket-1',
       readerId: null,
+      readerName: null,
       state: {},
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
@@ -49,8 +53,15 @@ describe('AttractapAuthHandler', () => {
       sendResourceListToSocket: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockMetricsService = {
+      attractapReaderConnected: { set: jest.fn() },
+    };
+    mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceListService = mockResourceListService;
+    (handler as any).metricsService = mockMetricsService;
+    (handler as any).audit = mockAudit;
   });
 
   describe('handleReaderRegister', () => {
@@ -64,6 +75,10 @@ describe('AttractapAuthHandler', () => {
       await handler.handleReaderRegister(mockSocket as any, data);
 
       expect(mockAttractapService.createNewReader).toHaveBeenCalledWith('fw-1.2.3');
+      expect(mockAudit.recordAttractap).toHaveBeenCalledWith({
+        action: 'reader.registered', actorId: null, authenticationMethod: null, subjectId: 99,
+        details: { source: 'reader-websocket' },
+      });
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -91,6 +106,17 @@ describe('AttractapAuthHandler', () => {
             payload: { id: 7, token: 'another-token' },
           }),
         }),
+      );
+    });
+
+    it('sends the registration response when audit persistence rejects', async () => {
+      mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 7 }, token: 'another-token' });
+      mockAudit.recordAttractap.mockRejectedValueOnce(new Error('audit unavailable'));
+
+      await expect(handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data'])).resolves.toBeUndefined();
+
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ payload: { id: 7, token: 'another-token' } }) }),
       );
     });
   });
@@ -152,6 +178,11 @@ describe('AttractapAuthHandler', () => {
 
       expect(mockVerifyToken).toHaveBeenCalledWith('client-token', 'hashed');
       expect(mockSocket.readerId).toBe(42);
+      expect(mockSocket.readerName).toBe('Reader A');
+      expect(mockMetricsService.attractapReaderConnected.set).toHaveBeenCalledWith(
+        { reader_id: '42', reader_name: 'Reader A' },
+        1,
+      );
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

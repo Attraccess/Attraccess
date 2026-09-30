@@ -11,7 +11,7 @@ describe('HttpSendRequestExecutor', () => {
   let ctx: NodeExecutionContext;
 
   const makeNode = (data: object): ResourceFlowNode =>
-    ({ id: 'n1', type: 'OUTPUT_HTTP_SEND_REQUEST', resourceId: 1, data } as unknown as ResourceFlowNode);
+    ({ id: 'n1', type: 'OUTPUT_HTTP_SEND_REQUEST', resourceId: 1, data }) as unknown as ResourceFlowNode;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -114,5 +114,74 @@ describe('HttpSendRequestExecutor', () => {
     const node = makeNode({ url: 'https://example.com', method: 'GET' });
 
     await expect(executor.execute(node, {}, ctx)).rejects.toThrow('network down');
+  });
+
+  it('uses the configured response timeout', async () => {
+    (axios.request as jest.Mock).mockResolvedValue({ data: {} });
+
+    await executor.execute(makeNode({ url: 'https://example.com', method: 'GET', timeoutSeconds: 12 }), {}, ctx);
+
+    expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ timeout: 12000 }));
+  });
+
+  it('continues with the input after dispatch without waiting for a response', async () => {
+    let resolveRequest: (value: { data: unknown }) => void = () => undefined;
+    (axios.request as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+    const input = { requestId: 'abc' };
+
+    await expect(
+      executor.execute(
+        makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }),
+        input,
+        ctx,
+      ),
+    ).resolves.toEqual({ payload: input });
+
+    resolveRequest({ data: { ignored: true } });
+  });
+
+  it('uses a finite timeout for dispatch requests without a configured timeout', async () => {
+    (axios.request as jest.Mock).mockResolvedValue({ data: {} });
+
+    await executor.execute(
+      makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }),
+      {},
+      ctx,
+    );
+
+    expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ timeout: 30_000 }));
+  });
+
+  it('logs asynchronous dispatch failures without failing the continued flow', async () => {
+    const error = new Error('network down');
+    (axios.request as jest.Mock).mockRejectedValue(error);
+    const logger = jest.spyOn(Logger.prototype, 'error');
+
+    await expect(
+      executor.execute(
+        makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }),
+        {},
+        ctx,
+      ),
+    ).resolves.toEqual({ payload: {} });
+    await Promise.resolve();
+
+    expect(logger).toHaveBeenCalledWith('HTTP request dispatch failed: https://example.com', error);
+  });
+
+  it('classifies controller responses separately from transport failures', () => {
+    expect(executor.getFailureKind({ response: { status: 500 } })).toBe('controller-rejection');
+    expect(executor.getFailureKind(new Error('network down'))).toBe('transport-dispatch');
+  });
+
+  it.each(['ECONNABORTED', 'ETIMEDOUT'])('classifies Axios %s response timeouts separately', (code) => {
+    const error = Object.assign(new Error('timeout'), { code });
+    (axios.isAxiosError as jest.Mock).mockReturnValue(true);
+
+    expect(executor.getFailureKind(error)).toBe('acknowledgement-timeout');
   });
 });

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsage } from '@attraccess/database-entities';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
@@ -63,8 +64,14 @@ export class SupervisionController {
     operationId: 'supervisionLive',
   })
   streamRequests(@Req() req: AuthenticatedRequest): Observable<{ data: SupervisionLiveEventDto }> {
-    const subject = this.supervisionLive.getSupervisorSubject(req.user.id);
-    return this.sse.wrap('supervision', subject.asObservable());
+    const { id: userId } = req.user;
+    const subject = this.supervisionLive.getSupervisorSubject(userId);
+    return this.sse.wrap(
+      'supervision',
+      subject.asObservable().pipe(
+        finalize(() => this.supervisionLive.deleteSubjectIfUnobserved(userId)),
+      ),
+    );
   }
 
   @Post('supervision/requests/:requestId/approve')
@@ -81,7 +88,12 @@ export class SupervisionController {
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.supervisionService.approve(requestId, req.user);
+    return this.supervisionService.approve(
+      requestId,
+      req.user,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 
   @Post('supervision/requests/:requestId/reject')
@@ -98,6 +110,11 @@ export class SupervisionController {
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
   ): SupervisionDecisionResponseDto {
-    return this.supervisionService.reject(requestId, req.user);
+    return this.supervisionService.reject(
+      requestId,
+      req.user,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 }

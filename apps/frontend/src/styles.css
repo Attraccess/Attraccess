@@ -1,4 +1,5 @@
-@import "@heroui/styles";
+@import '@heroui/styles';
+@import '../../../libs/ui/src/tokens.css';
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -37,13 +38,21 @@ body,
 }
 
 /* Expressive form validation errors: larger, bolder, with leading warning glyph */
-.field-error[data-visible="true"] {
+.field-error[data-visible='true'] {
   @apply text-sm font-medium flex items-start gap-1;
 }
 
-.field-error[data-visible="true"]::before {
-  content: "⚠";
+.field-error[data-visible='true']::before {
+  content: '⚠';
   @apply text-base leading-none;
 }
 
-/* You can add global styles to this file, and also import other style files */
+/* Keep labels, helper copy, and prefixed input text clear of field boundaries. */
+.textfield,
+.select {
+  @apply gap-2;
+}
+
+.input-group:has([data-slot='input-group-prefix']) .input-group__input {
+  @apply ps-3;
+}

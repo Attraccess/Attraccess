@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
 import { IsResourceIntroducer } from './isIntroducer.decorator';
@@ -32,9 +33,12 @@ export class ResourceIntroductionsController {
   async grant(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number,
-    @Body() data: UpdateResourceIntroductionDto
+    @Body() data: UpdateResourceIntroductionDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.grant(resourceId, userId, data);
+    return await this.resourceIntroductionsService.grant(resourceId, userId, data, {
+      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+    });
   }
 
   @Delete('/:userId/revoke')
@@ -51,9 +55,12 @@ export class ResourceIntroductionsController {
   async revoke(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number,
-    @Body() data: UpdateResourceIntroductionDto
+    @Body() data: UpdateResourceIntroductionDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.revoke(resourceId, userId, data);
+    return await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
+      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+    });
   }
 
   @Get('/:userId/history')

@@ -1,8 +1,12 @@
 import { DynamicModule, LoggerService, Type } from '@nestjs/common';
+import type { PluginFlowNodeDefinition } from './plugin-flow-node';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 import type { PluginEntityClass } from './entity';
+import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
+import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
+import type { PluginAuditContext, PluginAuditDomainDeclaration } from './plugin-audit';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -38,7 +42,14 @@ export interface MqttServerConnectionConfig {
   readonly name: string;
   readonly host: string;
   readonly port: number;
+  /** Management API port on the same host (1-65535). Null/omitted uses the provider default. */
+  readonly managementPort?: number | null;
   readonly useTls: boolean;
+  /** PEM trust anchors for private PKI. Omitted by older hosts. */
+  readonly caCert?: string | null;
+  /** Integrations requiring authenticated TLS must reject this setting. */
+  readonly tlsInsecure?: boolean;
+  readonly tlsServername?: string | null;
   readonly username: string | null;
   /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
   readonly password: string | null;
@@ -55,12 +66,64 @@ export interface MqttServerHostProvider {
   getServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
 }
 
+/** A message delivered to a plugin's MQTT subscription. */
+export interface PluginMqttMessage {
+  readonly serverId: number;
+  readonly topic: string;
+  readonly payload: Buffer;
+}
+
+/** Handle returned from an MQTT subscription. */
+export interface PluginMqttSubscription {
+  unsubscribe(): void;
+}
+
+export interface PluginMqttClient {
+  /**
+   * Subscribe through the host's shared MQTT connection. MQTT wildcards `+`
+   * and `#` are supported. Resolves after the broker acknowledges the
+   * subscription. Handlers run serially; each subscription buffers up to 100
+   * messages and drops new messages while full. The returned handle detaches
+   * the handler.
+   */
+  subscribe(
+    serverId: number,
+    topicFilter: string,
+    handler: (message: PluginMqttMessage) => void | Promise<void>,
+  ): Promise<PluginMqttSubscription>;
+
+  /** Publish through the host's shared MQTT connection. */
+  publish(
+    serverId: number,
+    topic: string,
+    payload: string | Buffer,
+    options?: { qos?: 0 | 1 | 2; retain?: boolean },
+  ): Promise<void>;
+}
+
+/** Host flow functionality available to plugins with the TRIGGER_FLOWS permission. */
+export interface PluginFlowsContext {
+  /**
+   * Starts a flow from every persisted trigger node of nodeType whose saved
+   * configuration matches the supplied external event.
+   */
+  trigger(nodeType: string, matches: (config: Record<string, unknown>, nodeId: string) => boolean, payload: object): Promise<void>;
+}
+
+/** Host-managed encryption for secret material owned by this plugin. */
+export interface PluginSecretsContext {
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}
+
 /**
  * Curated facade handed to a backend plugin at load time. It is the single,
  * versioned seam between plugin code and the host application. Adding a field is
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
+  /** Optional for compatibility with hosts predating generic plugin audit support. */
+  readonly audit?: PluginAuditContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 
@@ -72,6 +135,9 @@ export interface PluginContext {
 
   /** Scoped logger, prefixed with the plugin name. */
   readonly logger: LoggerService;
+
+  /** Shared MQTT connection access. Requires ACCESS_MQTT_SERVERS. */
+  readonly mqtt: PluginMqttClient;
 
   /** Typed repository accessor over the shared DataSource. */
   getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T>;
@@ -100,9 +166,18 @@ export interface PluginContext {
    * (decrypted) credentials. Requires the ACCESS_MQTT_SERVERS permission.
    * Returns null when no server with the given id exists. The host performs all
    * credential decryption; the plugin only ever receives the mapped config — it
-   * stays broker-agnostic (no RabbitMQ awareness).
+   * stays broker-agnostic (no broker-vendor awareness).
    */
   getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
+
+  /** Discover and use the host-selected broker credential provider. Requires ACCESS_MQTT_SERVERS. */
+  getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider;
+
+  /** Start matching flows from a plugin-declared trigger node. Requires TRIGGER_FLOWS. */
+  readonly flows: PluginFlowsContext;
+
+  /** Encrypt and decrypt this plugin's secret material. Requires MANAGE_SECRETS. */
+  readonly secrets: PluginSecretsContext;
 }
 
 /**
@@ -121,4 +196,26 @@ export interface PluginBackendModule {
    * the DATABASE_ACCESS permission. See `docs/en/plugins/database-migrations.md`.
    */
   entities?: PluginEntityClass[];
+
+  /**
+   * Optional custom flow node types this plugin contributes. The host registers
+   * them into the flow engine so they appear in the frontend node catalog and
+   * can be executed like built-in node types. No extra permission is required.
+   *
+   * Type naming convention: "plugin.<pluginName>.<nodeName>".
+   */
+  flowNodes?: PluginFlowNodeDefinition[] | ((context: PluginContext) => PluginFlowNodeDefinition[]);
+
+  /**
+   * Optional audit domains this plugin contributes. The host registers the
+   * declarations at load time and enforces them on every event the plugin
+   * records through {@link PluginContext.audit}: only declared actions, subject
+   * types and detail fields are accepted, and events are stored under the
+   * declared domain. Domains must not collide with host domains or with other
+   * plugins. No extra permission is required.
+   */
+  auditDomains?: PluginAuditDomainDeclaration[] | ((context: PluginContext) => PluginAuditDomainDeclaration[]);
+
+  /** Optional broker credential provider offered to other integrations by this plugin. */
+  credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;
 }

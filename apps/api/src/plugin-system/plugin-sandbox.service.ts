@@ -3,7 +3,10 @@ import { Resource, Setting, User } from '@attraccess/database-entities';
 import {
   isPluginPermission,
   MqttServerConnectionConfig,
+  MqttCredentialProvisioningHostProvider,
   PluginContext,
+  PluginFlowsContext,
+  PluginSecretsContext,
   PluginPermission,
   PluginPermissionError,
   SystemEvent,
@@ -71,6 +74,18 @@ function permissionForEntity<T extends ObjectLiteral>(base: PluginContext, entit
 export class PluginSandboxService {
   private static readonly logger = new Logger(PluginSandboxService.name);
 
+  /** Also called when a repository retained during bootstrap is first resolved. */
+  public static assertRepositoryPermission(
+    base: PluginContext,
+    declared: PluginPermission[],
+    entity: EntityTarget<ObjectLiteral>,
+  ): void {
+    const permission = permissionForEntity(base, entity);
+    if (!declared.includes(permission)) {
+      throw new PluginPermissionError(base.manifest.name, `getRepository(${entityLabel(entity)})`, permission);
+    }
+  }
+
   /**
    * Validates the permissions declared in a manifest. Returns the parsed set or
    * throws guidance on the first unknown value.
@@ -120,15 +135,25 @@ export class PluginSandboxService {
 
     return {
       manifest: base.manifest,
+      audit: base.audit,
       logger: base.logger,
+      mqtt: {
+        subscribe(serverId, topicFilter, handler) {
+          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.subscribe(${serverId}, ${topicFilter})`);
+          return base.mqtt.subscribe(serverId, topicFilter, handler);
+        },
+        publish(serverId, topic, payload, options) {
+          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.publish(${serverId}, ${topic})`);
+          return base.mqtt.publish(serverId, topic, payload, options);
+        },
+      },
       events: guardedEvents,
       get dataSource() {
         require(PluginPermission.DATABASE_ACCESS, 'dataSource');
         return base.dataSource;
       },
       getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>) {
-        const permission = permissionForEntity(base, entity);
-        require(permission, `getRepository(${entityLabel(entity)})`);
+        PluginSandboxService.assertRepositoryPermission(base, declared, entity);
         return base.getRepository(entity);
       },
       get<T>(token: Type<T> | string | symbol): T {
@@ -146,6 +171,18 @@ export class PluginSandboxService {
       getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
         require(PluginPermission.ACCESS_MQTT_SERVERS, `getMqttServerConfig(${serverId})`);
         return base.getMqttServerConfig(serverId);
+      },
+      getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider {
+        require(PluginPermission.ACCESS_MQTT_SERVERS, 'getMqttCredentialProvisioning()');
+        return base.getMqttCredentialProvisioning();
+      },
+      get flows(): PluginFlowsContext {
+        require(PluginPermission.TRIGGER_FLOWS, 'flows.trigger()');
+        return base.flows;
+      },
+      get secrets(): PluginSecretsContext {
+        require(PluginPermission.MANAGE_SECRETS, 'secrets');
+        return base.secrets;
       },
     };
   }

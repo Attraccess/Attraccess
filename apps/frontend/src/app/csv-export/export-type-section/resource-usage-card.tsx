@@ -34,7 +34,7 @@ export function ResourceUsageCard(props: Props) {
       Icon={DatabaseIcon}
       title={t('exports.resourceUsageHours.title')}
       description={t('exports.resourceUsageHours.description')}
-      rowCount={data?.length}
+      rowCount={data?.total}
       rowCountStatus={hasRange ? status : 'idle'}
       estimatedLabel={({ count }) => t('exports.card.estimatedRows', { count })}
       loadingLabel={t('exports.card.estimatedRowsLoading')}

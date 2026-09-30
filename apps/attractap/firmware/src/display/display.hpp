@@ -1,6 +1,9 @@
 #pragma once
 
-#include <Arduino.h>
+#include <functional>
+
+#include <string>
+
 #include <vector>
 #include <lvgl.h>
 #include "lv_conf.h"
@@ -19,6 +22,9 @@
 #include "screens/reset/resetScreen.hpp"
 #include "screens/supervision/supervisionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#ifdef DEMO_MODE
+#include "screens/demoSettings/demoSettingsScreen.hpp"
+#endif
 #include "driver/display_driver.hpp"
 
 #ifdef HAS_IO_EXPANDER
@@ -28,7 +34,9 @@ class IOExpander;
 class Display
 {
 public:
-#ifdef HAS_IO_EXPANDER
+#ifdef ATTRACTAP_HOST
+    static void setup(IDisplayDriver &driver);
+#elif defined(HAS_IO_EXPANDER)
     static void setup(IOExpander *ioExpander = nullptr);
 #else
     static void setup();
@@ -50,16 +58,19 @@ public:
     static ResetScreen resetScreen;
     static SupervisionScreen supervisionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+#ifdef DEMO_MODE
+    static DemoSettingsScreen demoSettingsScreen;
+#endif
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
-    static void setDeviceName(String deviceName);
+    static void setDeviceName(std::string deviceName);
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
 
     // Global error popup helpers
-    static void showErrorPopup(const String &title, const String &message);
+    static void showErrorPopup(const std::string &title, const std::string &message);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
 
@@ -67,6 +78,7 @@ public:
     // "Open Settings" and "Reboot" actions. The settings action is wired by the
     // application; reboot is handled internally (esp_restart after a confirm).
     static void setOnOpenSettingsCallback(std::function<void()> callback);
+    static void setDrawerAvailableCallback(std::function<bool()> callback);
 
     /**
      * Thread-safe lv_async_call: takes lv_lock() around the timer-list
@@ -82,9 +94,16 @@ private:
     // shares the main application loop with blocking work.
     static void renderTask(void *parameter);
     static std::function<void(int16_t, int16_t)> touchCallback;
-    static const int TRANSITION_DURATION = 500;
-    // static const int TRANSITION_DURATION = 50;
-    static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_FADE_IN;
+    // Instant transition: every fade frame is a full-screen software render
+    // (70-90ms each at 480x480), so even a 50ms fade stalls the UI for
+    // ~3 frames. Direct load removes the animation entirely — the screen
+    // swap itself is free; only the single first frame renders
+    // (PERFORMANCE_ANALYSIS.md A-3, measured on hardware).
+    static const int TRANSITION_DURATION = 0;
+    static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_NONE;
+
+    // The router owns the complete transition transaction. Starting another
+    // transition before this one advances cancels its completion callback.
     static uint32_t transitionStartTime;
     static bool transitionComplete;
     static std::function<void()> onTransitionComplete;
@@ -99,13 +118,20 @@ private:
     static void increase_reboot(void *arg);
     static uint8_t reboot_count;
 
+    static void advanceScreenRouter();
+
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);
     static uint32_t tick_cb();
 
     static void initDeviceOverlay();
+    static void updateNetworkQualityOverlay();
     static lv_obj_t *deviceNameLabel;
-    static String deviceNameInitValue;
+    static std::string deviceNameInitValue;
+    static lv_obj_t *networkQualityContainer;
+    static lv_obj_t *networkQualityLabel;
+    static State::NetworkQuality networkQualityOverlayValue;
+    static bool networkQualityOverlayInitialized;
 
     static lv_obj_t *activePopup;
     static lv_timer_t *popupAutoCloseTimer;
@@ -115,14 +141,18 @@ private:
     static void openDrawer();
     static void closeDrawer();
     static void showRebootConfirm();
+    static bool isDrawerAvailable();
+    static void updateDrawerAvailability();
     // Fed every touch sample from touchpad_read to detect the top-edge pull-down
     // gesture without intercepting touches destined for the active screen.
     static void handleGestureSample(int16_t x, int16_t y, bool pressed);
 
     static lv_obj_t *drawerBackdrop;
     static lv_obj_t *drawerPanel;
+    static lv_obj_t *rebootConfirmOverlay;
     static bool drawerOpen;
     static std::function<void()> onOpenSettingsCallback;
+    static std::function<bool()> drawerAvailableCallback;
     static bool gestureCandidate;
     static bool gesturePrevPressed;
     static int16_t gestureStartY;

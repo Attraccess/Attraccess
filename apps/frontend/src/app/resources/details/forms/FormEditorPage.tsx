@@ -22,6 +22,22 @@ import { DeleteConfirmationModal } from '../../../../components/deleteConfirmati
 import { FormFieldEditor } from './components/FormFieldEditor';
 import { FormPreview } from './components/FormPreview';
 import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
+import {
   EditableForm,
   EditableFormField,
   createDefaultFieldOptions,
@@ -38,6 +54,80 @@ const EMPTY_FORM: EditableForm = {
   isRequiredOnResourceUsageEnd: false,
   fields: [],
 };
+
+interface SortableFieldProps {
+  field: EditableFormField;
+  index: number;
+  onChange: (field: EditableFormField) => void;
+  onRemove: () => void;
+  t: (key: string, vars?: Record<string, unknown>) => string;
+  labelInputRef?: React.RefObject<HTMLInputElement | null>;
+}
+
+function SortableField({ field, index, onChange, onRemove, t, labelInputRef }: SortableFieldProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: field._id ?? `field-${field.id}`,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  const key = `field-${field.id ?? field._id}`;
+  const typeLabel = t(`fields.types.${field.type}`);
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <AccordionItem key={key} id={key} aria-label={`${t('fields.label')} #${index + 1}`}>
+        <AccordionHeading>
+          {/* No onPress here: the Accordion already toggles via onExpandedChange, and a
+              second handler would toggle straight back, making clicks a no-op. */}
+          <AccordionTrigger>
+            <div className="flex items-center gap-2 flex-1">
+              <button
+                type="button"
+                className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-default-100 touch-none"
+                {...attributes}
+                {...listeners}
+                // The trigger's press handling works off pointer events that bubble up from
+                // this nested button — without stopPropagation, grabbing the grip also
+                // toggles the panel.
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  listeners?.onPointerDown?.(e);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={t('editor.reorderField')}
+              >
+                <GripVertical className="w-4 h-4 text-default-400" />
+              </button>
+              <div className="flex flex-col text-start flex-1">
+                <span className="text-sm font-semibold text-default-700">
+                  <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
+                </span>
+                <span className="text-xs text-default-400">{typeLabel}</span>
+              </div>
+            </div>
+            <AccordionIndicator />
+          </AccordionTrigger>
+        </AccordionHeading>
+        <AccordionPanel>
+          <AccordionBody>
+            <FormFieldEditor
+              field={field}
+              onChange={onChange}
+              onRemove={onRemove}
+              t={t}
+              labelInputRef={labelInputRef}
+            />
+          </AccordionBody>
+        </AccordionPanel>
+      </AccordionItem>
+    </div>
+  );
+}
 
 export function FormEditorPage() {
   const { id, formId } = useParams<{ id: string; formId: string }>();
@@ -157,6 +247,37 @@ export function FormEditorPage() {
       return { ...prev, fields: nextFields };
     });
   };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setForm((prev) => {
+      const oldIndex = prev.fields.findIndex(
+        (f) => (f._id ?? `field-${f.id}`) === active.id,
+      );
+      const newIndex = prev.fields.findIndex(
+        (f) => (f._id ?? `field-${f.id}`) === over.id,
+      );
+      if (oldIndex === -1 || newIndex === -1) return prev;
+
+      const newFields = arrayMove(prev.fields, oldIndex, newIndex);
+      return { ...prev, fields: newFields };
+    });
+  }, []);
+
+  const fieldSortableIds = useMemo(
+    () => form.fields.map((f) => f._id ?? `field-${f.id}`),
+    [form.fields],
+  );
 
   const hasUnsavedChanges = useMemo(() => {
     if (isCreateMode && form.fields.length === 0 && form.name === '') {
@@ -291,41 +412,34 @@ export function FormEditorPage() {
                 <p className="text-sm text-default-400">{t('editor.emptyFieldsDescription')}</p>
               </div>
             ) : (
-              <Accordion
-                variant="surface"
-                expandedKeys={expandedFieldKeys}
-                onExpandedChange={setExpandedFieldKeys}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
               >
-                {form.fields.map((field, index) => {
-                  const key = `field-${field.id ?? field._id}`;
-                  const typeLabel = t(`fields.types.${field.type}`);
-
-                  return (
-                    <AccordionItem key={key} id={key} aria-label={`${t('fields.label')} #${index + 1}`}>
-                      <AccordionHeading>
-                        <AccordionTrigger>
-                          <div className="flex flex-col text-start flex-1">
-                            <span className="text-sm font-semibold text-default-700">
-                              <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
-                            </span>
-                            <span className="text-xs text-default-400">{typeLabel}</span>
-                          </div>
-                          <AccordionIndicator />
-                        </AccordionTrigger>
-                      </AccordionHeading>
-                      <AccordionPanel><AccordionBody>
-                        <FormFieldEditor
-                          field={field}
-                          onChange={(value) => updateField(index, value)}
-                          onRemove={() => removeField(index)}
-                          t={t}
-                          labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
-                        />
-                      </AccordionBody></AccordionPanel>
-                    </AccordionItem>
-                  );
-                })}
-              </Accordion>
+                <SortableContext
+                  items={fieldSortableIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <Accordion
+                    variant="surface"
+                    expandedKeys={expandedFieldKeys}
+                    onExpandedChange={setExpandedFieldKeys}
+                  >
+                    {form.fields.map((field, index) => (
+                      <SortableField
+                        key={field._id ?? `field-${field.id}`}
+                        field={field}
+                        index={index}
+                        onChange={(value) => updateField(index, value)}
+                        onRemove={() => removeField(index)}
+                        t={t}
+                        labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
+                      />
+                    ))}
+                  </Accordion>
+                </SortableContext>
+              </DndContext>
             )}
           </section>
 
@@ -372,13 +486,14 @@ function buildRequestBody(form: EditableForm) {
     isRequiredOnResourceUsageStart: form.isRequiredOnResourceUsageStart,
     isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
     isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
-    fields: form.fields.map((field) => ({
+    fields: form.fields.map((field, index) => ({
       id: field.id,
       name: field.name,
       type: field.type,
       isRequired: field.isRequired,
       description: field.description?.trim() || undefined,
       options: serializeFieldOptions(field.type, field.options) ?? undefined,
+      position: index,
     })),
   };
 }
@@ -389,13 +504,14 @@ function sanitizeFormPayload(form: EditableForm) {
     isRequiredOnResourceUsageStart: form.isRequiredOnResourceUsageStart,
     isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
     isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
-    fields: form.fields.map((field) => ({
+    fields: form.fields.map((field, index) => ({
       id: field.id ?? null,
       name: field.name,
       type: field.type,
       isRequired: field.isRequired,
       description: field.description?.trim() || '',
       options: serializeFieldOptions(field.type, field.options),
+      position: index,
     })),
   };
 }

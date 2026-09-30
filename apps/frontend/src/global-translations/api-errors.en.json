@@ -15,9 +15,33 @@
     "title": "Resource unhealthy",
     "description": "The resource is currently reporting an unhealthy state and cannot be used until it recovers."
   },
+  "METER_NOT_CONFIGURED": {
+    "title": "Energy meter not set up",
+    "description": "Energy billing is enabled for this resource, but its flow does not define a complete meter. Ask an administrator to add the metering start and collection nodes."
+  },
+  "METER_INITIALIZATION_FAILED": {
+    "title": "Energy meter did not start",
+    "description": "The session was not started because the energy meter could not be initialized: {{error}}"
+  },
+  "METER_SETTLEMENT_FAILED": {
+    "title": "Energy still unavailable",
+    "description": "{{error}}"
+  },
+  "METER_SESSION_NOT_FOUND": {
+    "title": "Session not found",
+    "description": "This energy charge no longer exists."
+  },
+  "METER_SESSION_NOT_PENDING": {
+    "title": "Nothing left to settle",
+    "description": "This energy charge has already been settled or waived."
+  },
   "INSUFFICIENT_BALANCE": {
     "title": "Insufficient balance",
     "description": "The balance is not sufficient for this action."
+  },
+  "INVALID_CSV": {
+    "title": "Invalid CSV file",
+    "description": "The CSV file could not be processed. Check its format and try again."
   },
   "Invalid API key": {
     "title": "Invalid API key",

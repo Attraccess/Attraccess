@@ -1,12 +1,5 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Get, Optional, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
@@ -22,6 +15,8 @@ import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SignupDomainService } from './signup-domain.service';
 import { UserRegistrationService } from './user-registration.service';
 import { UserPasswordService } from './user-password.service';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -31,10 +26,11 @@ export class UsersRegistrationController {
     private readonly signupDomainService: SignupDomainService,
     private readonly registrationService: UserRegistrationService,
     private readonly passwordService: UserPasswordService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @Get('local-signup-domain-whitelist')
-  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @Auth('system.settings.manage', 'users.create')
   @ApiOperation({ summary: 'Get the local signup domain whitelist', operationId: 'getLocalSignupDomainWhitelist' })
   @ApiResponse({
     status: 200,
@@ -46,7 +42,7 @@ export class UsersRegistrationController {
   }
 
   @Post('local-signup-domain-whitelist')
-  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @Auth('system.settings.manage', 'users.create')
   @ApiOperation({ summary: 'Set the local signup domain whitelist', operationId: 'setLocalSignupDomainWhitelist' })
   @ApiResponse({
     status: 200,
@@ -76,8 +72,23 @@ export class UsersRegistrationController {
     status: 403,
     description: 'First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).',
   })
-  async createOne(@Body() body: CreateUserDto): Promise<User> {
-    return this.registrationService.createOne(body);
+  @ApiResponse({
+    status: 503,
+    description: 'The account could not be created because the verification email could not be sent.',
+  })
+  async createOne(@Body() body: CreateUserDto, @Req() req: Request): Promise<User> {
+    const acceptLanguage = req.headers['accept-language'];
+    const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || 'en';
+    const user = await this.registrationService.createOne(body, locale);
+    await this.identityAudit?.record({
+      action: 'user_created',
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      subjectId: user.id,
+      details: {},
+      request: { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
+    });
+    return user;
   }
 
   @Get('local-signup-enabled')

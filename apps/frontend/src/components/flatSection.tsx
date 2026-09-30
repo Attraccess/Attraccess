@@ -12,8 +12,8 @@ interface FlatSectionProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
 export function FlatSection({ icon, title, actions, children, className, ...rest }: FlatSectionProps) {
   return (
     <section className={cn('w-full', className)} {...rest}>
-      <header className="flex items-center justify-between gap-2 flex-wrap border-b border-divider pb-2 mb-3">
-        <div className="flex items-center gap-2 text-foreground-700">
+      <header className="flex items-center justify-between gap-2 flex-wrap border-b border-separator pb-2 mb-3">
+        <div className="flex items-center gap-2 text-accent">
           {icon}
           <h3 className="text-xs font-semibold uppercase tracking-wider">{title}</h3>
         </div>

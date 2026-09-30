@@ -10,8 +10,11 @@ import { PluginProvider } from './app/plugins/plugin-provider';
 import { PWAInstall } from './components/pwaInstall';
 import { registerSW } from 'virtual:pwa-register';
 import { detectAndSetLanguage } from '@attraccess/plugins-frontend-ui';
+import { trackVisualViewportHeight } from './viewport-height';
+import { Providers } from '@attraccess/ui';
 
 detectAndSetLanguage();
+trackVisualViewportHeight();
 
 const oneMinute = 60 * 1000;
 const serviceWorkerUpdateIntervalMs = 15 * oneMinute;
@@ -35,14 +38,16 @@ const updateSW = registerSW({
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
 root.render(
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <PluginProvider>
-        <StrictMode>
-          <PWAInstall />
-          <App />
-        </StrictMode>
-      </PluginProvider>
-    </BrowserRouter>
-  </QueryClientProvider>,
+  <Providers>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <PluginProvider>
+          <StrictMode>
+            <PWAInstall />
+            <App />
+          </StrictMode>
+        </PluginProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </Providers>,
 );

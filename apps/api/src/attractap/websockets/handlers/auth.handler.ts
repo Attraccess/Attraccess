@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../attractap.service';
 import { verifyToken } from '../websocket.utils';
 import { ResourceListService } from './resource-list.service';
+import { MetricsService } from '../../../metrics/metrics.service';
+import { AuditService } from '../../../audit/audit.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 @Injectable()
@@ -14,9 +16,19 @@ export class AttractapAuthHandler {
   @Inject(ResourceListService)
   private resourceListService: ResourceListService;
 
+  @Inject(MetricsService)
+  private metricsService: MetricsService;
+
+  @Inject(AuditService)
+  private audit: AuditService;
+
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     this.logger.debug('Received REGISTER event');
     const response = await this.attractapService.createNewReader(data.payload.firmware);
+    await this.audit.recordAttractap({
+      action: 'reader.registered', actorId: null, authenticationMethod: null, subjectId: response.reader.id,
+      details: { source: 'reader-websocket' },
+    }).catch(() => undefined);
 
     this.logger.debug(
       `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`,
@@ -52,6 +64,11 @@ export class AttractapAuthHandler {
     }
 
     socket.readerId = reader.id;
+    socket.readerName = reader.name;
+    this.metricsService.attractapReaderConnected.set(
+      { reader_id: String(reader.id), reader_name: reader.name },
+      1,
+    );
 
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
       name: reader.name,

@@ -39,7 +39,7 @@ function writeMigrationPlugin(root: string, folder: string, name: string): void 
       },
       attraccessVersion: { min: '1.0.0' },
       permissions: [],
-    })
+    }),
   );
 }
 
@@ -47,7 +47,9 @@ async function tableExists(dbFile: string, table: string): Promise<boolean> {
   const probe = new DataSource({ type: 'sqlite', database: dbFile });
   await probe.initialize();
   try {
-    const rows: unknown[] = await probe.query(`SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, [table]);
+    const rows: unknown[] = await probe.query(`SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, [
+      table,
+    ]);
     return rows.length > 0;
   } finally {
     await probe.destroy();
@@ -74,6 +76,42 @@ describe('PluginMigrationService', () => {
   afterEach(() => {
     PluginMigrationService.configureForTesting(null);
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('allows replacement only when the target retains every applied migration', async () => {
+    await PluginMigrationService.assertReplacementMigrationHistory(manifest, root);
+    await PluginMigrationService.runUpMigrations(manifest);
+    await PluginMigrationService.assertReplacementMigrationHistory(manifest, root);
+    const withoutMigrations = { ...manifest, main: { ...manifest.main, migrations: undefined } };
+    await expect(PluginMigrationService.assertReplacementMigrationHistory(withoutMigrations, root)).rejects.toThrow(
+      'does not contain applied migrations',
+    );
+    const replacement = join(root, 'replacement');
+    mkdirSync(join(replacement, manifest.main.migrations.directory), { recursive: true });
+    writeFileSync(
+      join(replacement, manifest.main.migrations.directory, manifest.main.migrations.entryPoint),
+      'module.exports = { Other1700000000001: class Other1700000000001 {} };',
+    );
+    await expect(PluginMigrationService.assertReplacementMigrationHistory(manifest, replacement)).rejects.toThrow(
+      'CreateWidget1700000000000',
+    );
+    expect(await tableExists(dbFile, 'plugin_widget')).toBe(true);
+  });
+
+  it('runs boot migrations while quarantining only the failing plugin', async () => {
+    writeMigrationPlugin(root, 'broken', 'broken');
+    writeFileSync(
+      join(root, 'broken/mig/index.js'),
+      'module.exports = { Broken1700000000001: class Broken1700000000001 { async up() { throw new Error("migration rejected"); } async down() {} } };',
+    );
+    PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+    await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
+    expect(await tableExists(dbFile, 'plugin_widget')).toBe(true);
+    const broken = PluginService.getPlugins().find((plugin) => plugin.name === 'broken');
+    expect(PluginService.isPluginQuarantined(broken)).toBe(true);
+    expect(PluginService.isPluginQuarantined(manifest)).toBe(false);
+    await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
+    expect(await tableExists(dbFile, 'plugin_widget')).toBe(true);
   });
 
   it('discovers the migrations entry on the manifest', () => {
@@ -122,7 +160,7 @@ describe('PluginMigrationService', () => {
         },
         attraccessVersion: { min: '1.0.0' },
         permissions: [],
-      })
+      }),
     );
     // Re-discover so the cached manifest is dropped.
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });

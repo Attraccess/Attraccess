@@ -1,0 +1,5 @@
+{
+  "title": "Maintenance requested for {resourceName}",
+  "body": "{requestedBy} requested maintenance: {reason}",
+  "fallbackUser": "A user"
+}

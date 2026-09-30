@@ -1,7 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
-// Add enum for email template types
 export enum EmailTemplateType {
   VERIFY_EMAIL = 'verify-email',
   USER_INVITATION = 'user-invitation',
@@ -29,10 +28,7 @@ export class EmailTemplate {
     enum: EmailTemplateType,
     enumName: 'EmailTemplateType',
   })
-  @PrimaryColumn({
-    type: 'varchar',
-    length: 255,
-  })
+  @PrimaryColumn({ type: 'varchar', length: 255 })
   type!: EmailTemplateType;
 
   @ApiProperty({ description: 'Email subject line', example: 'Verify Your Email Address' })

@@ -7,7 +7,7 @@ import {
   ResourceFlowVariableScope,
   ResourceFlowVariableValueType,
 } from '@attraccess/database-entities';
-import { FlowVariableChangedEvent } from './events/flow-variable-changed.event';
+import { ResourceFlowVariableChangedEvent } from './events/flow-variable-changed.event';
 
 function classifyValueType(value: unknown): ResourceFlowVariableValueType {
   if (value === null) return 'null';
@@ -99,8 +99,8 @@ export class ResourceFlowVariablesService {
     });
 
     this.eventEmitter.emit(
-      FlowVariableChangedEvent.EVENT_NAME,
-      new FlowVariableChangedEvent(scope, ownerId, key, previousValue, value, row.updatedAt ?? new Date(), sourceResourceId),
+      ResourceFlowVariableChangedEvent.EVENT_NAME,
+      new ResourceFlowVariableChangedEvent(scope, ownerId, key, previousValue, value, row.updatedAt ?? new Date(), sourceResourceId),
     );
   }
 

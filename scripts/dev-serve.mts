@@ -3,7 +3,8 @@
 
 import { spawn } from 'node:child_process';
 import { writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { findFreePort, isPortFree } from './lib/find-free-port.mts';
 
 type Target = 'api' | 'frontend' | 'both';
@@ -34,7 +35,7 @@ function removePortsFile(): void {
   rmSync(PORTS_FILE, { force: true });
 }
 
-function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArgs: string[] } {
+export function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArgs: string[] } {
   let only: Target = 'both';
   let tui = false;
   const passthroughArgs: string[] = [];
@@ -69,7 +70,7 @@ function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArg
   return { only, tui, passthroughArgs };
 }
 
-async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
+export async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
   const explicit = process.env[envName];
   if (explicit !== undefined && explicit !== '') {
     const port = Number(explicit);
@@ -95,7 +96,7 @@ function banner(r: Resolved): string {
   return lines.join('\n');
 }
 
-async function main() {
+export async function main() {
   const { only, tui, passthroughArgs } = parseArgs(process.argv);
   const resolved: Resolved = {};
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
@@ -149,7 +150,9 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error(`[dev-serve] ${err.message}`);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((err) => {
+    console.error(`[dev-serve] ${err.message}`);
+    process.exit(1);
+  });
+}

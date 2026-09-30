@@ -22,11 +22,40 @@ module.exports = [
   ...baseConfig,
   ...nx.configs['flat/react'],
   {
+    // Vendored, Emscripten-generated output (see tools/vendor-openscad.mjs).
+    // Downloaded verbatim and not authored here, so it is neither linted nor
+    // typechecked. Ignoring the directory rather than one filename, since the
+    // build's output filenames are upstream's to choose.
+    ignores: ['public/openscad/**'],
+  },
+  {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     ignores: ['**/*.json'],
     rules: {
       'no-console': ['error', { allow: ['warn', 'error', 'info', 'debug', 'trace'] }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='fetch']",
+          message:
+            'Use a generated React Query hook instead of fetch(). If a direct request is necessary, disable this rule for that statement and explain why.',
+        },
+        {
+          selector: "CallExpression[callee.property.name='fetch']",
+          message:
+            'Use a generated React Query hook instead of fetch(). If a direct request is necessary, disable this rule for that statement and explain why.',
+        },
+      ],
       ...reactCompilerRulesAsWarn,
+    },
+  },
+  {
+    // Web worker entry points run outside a window: `self` is the legitimate global
+    // (there is no `window`), not the confusing-browser-global that this rule guards
+    // against in ordinary app code.
+    files: ['**/*.worker.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
     },
   },
 ];

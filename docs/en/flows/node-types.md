@@ -70,6 +70,27 @@ Triggers after a period of inactivity on the resource. Useful for safety automat
 | **Timeout** | Duration of inactivity before triggering |
 | **Unit** | Seconds, Minutes, or Hours |
 
+### Metering Start
+
+Triggers when a billed usage session begins (or is taken over) so the energy meter can be prepared. The branch must end in **Metering Ready**; otherwise the session does not start. Part of the **Billing** group.
+
+| Setting | Description |
+|---------|-------------|
+| **Timeout (seconds)** | How long to wait for **Metering Ready** (default 30) |
+
+### Metering Collection
+
+Triggers for interim energy readings while a session runs and for the final reading when it ends. The branch must end in **Report Energy**. Part of the **Billing** group.
+
+| Setting | Description |
+|---------|-------------|
+| **Timeout (seconds)** | How long to wait for **Report Energy** (default 30) |
+| **Interim interval (minutes)** | Time between interim readings, shown live and never billed (default 1, `0` disables) |
+| **Final attempts** | Tries to get a fresh final reading (default 3) |
+| **Final retry delay (seconds)** | Pause between final attempts (default 5) |
+
+See [Energy Metering](flows/energy-metering.md).
+
 ---
 
 ## Processing Nodes
@@ -184,9 +205,40 @@ Records an activity event on the resource. Resets the inactivity timer for **No 
 
 No additional settings.
 
+### Machine Operating State
+
+Operating-state actions record whether a machine is physically operating or idle. Feed them from an observed signal interpreted by your flow; sending a command or starting a usage session does not itself prove operation.
+
+Repeated assignments of the same state do nothing. An operating interval stays open across session boundaries and server restarts until a flow assigns idle. Accepted changes keep their server timestamp and the originating flow node/run. If the server clock moves behind the last accepted transition, the assignment fails instead of writing an invalid interval.
+
+An accepted operating observation remains recorded even if a later node fails. A failed usage start or takeover still aborts its session change and billing changes. If the server stops during a pending usage change, that attempt is canceled on restart; its physical commands are not replayed. Actual recorded operation remains available for reporting and maintenance.
+
+### Metering Ready
+
+Confirms that the energy meter is prepared. Only valid in a branch started by **Metering Start**. Part of the **Billing** group. All settings are optional templates.
+
+| Setting | Description |
+|---------|-------------|
+| **Baseline value** / **Baseline unit** | Only for lifetime counters that cannot be reset: the current counter reading; later totals are counted from it |
+| **Source** | Label of the physical meter |
+
+### Report Energy
+
+Reports the **total** energy consumed since the metering start. Only valid in a branch started by **Metering Collection**. Part of the **Billing** group. All settings are templates.
+
+| Setting | Description |
+|---------|-------------|
+| **Value** | Total energy since the metering start (not an increment, not power) |
+| **Unit** | An energy unit such as `Wh`, `kWh`, `MWh`, `J`, `kJ` or `MJ`; power units (`W`, `kW`) are rejected |
+| **Observed at** | Optional ISO time of the reading |
+| **Source** | Optional label of the physical meter |
+
+See [Energy Metering](flows/energy-metering.md).
+
 ## See Also
 
 - [Flow Editor](flows/flow-editor.md) -- How to place and connect nodes
 - [Flows Overview](flows/overview.md) -- What flows are and how they work
-- [MQTT & IoT](mqtt/overview.md) -- Setting up MQTT
+- [MQTT & IoT](devices/mqtt/overview.md) -- Setting up MQTT
+- [Energy Metering](flows/energy-metering.md) -- Bill electricity per kWh
 - [Billing](billing/overview.md) -- Billing system details

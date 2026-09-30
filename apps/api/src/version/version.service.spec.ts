@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import axios from 'axios';
+import { User, Resource, Project, ResourceUsage, Session } from '@attraccess/database-entities';
 import { GithubReleaseApiResponse, VersionService } from './version.service';
+import { IsNull } from 'typeorm';
 
 jest.mock('axios');
 
@@ -20,19 +23,33 @@ function buildRelease(overrides: Partial<GithubReleaseApiResponse> = {}): Github
   };
 }
 
+function makeRepo(countValue = 0) {
+  return { count: jest.fn().mockResolvedValue(countValue) };
+}
+
 describe('VersionService', () => {
   let service: VersionService;
   let configService: { get: jest.Mock };
   let httpGet: jest.Mock;
+  let usageRepository: ReturnType<typeof makeRepo>;
 
   beforeEach(async () => {
     httpGet = jest.fn();
     axiosMock.create.mockReturnValue({ get: httpGet } as unknown as ReturnType<typeof axios.create>);
 
     configService = { get: jest.fn().mockReturnValue({ VERSION: '0.0.16' }) };
+    usageRepository = makeRepo(2);
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [VersionService, { provide: ConfigService, useValue: configService }],
+      providers: [
+        VersionService,
+        { provide: ConfigService, useValue: configService },
+        { provide: getRepositoryToken(User), useValue: makeRepo(5) },
+        { provide: getRepositoryToken(Resource), useValue: makeRepo(10) },
+        { provide: getRepositoryToken(Project), useValue: makeRepo(3) },
+        { provide: getRepositoryToken(ResourceUsage), useValue: usageRepository },
+        { provide: getRepositoryToken(Session), useValue: makeRepo(7) },
+      ],
     }).compile();
 
     service = module.get<VersionService>(VersionService);
@@ -43,28 +60,50 @@ describe('VersionService', () => {
   });
 
   describe('getCurrentVersion', () => {
-    it('returns the version from app config', () => {
-      expect(service.getCurrentVersion()).toEqual({ version: '0.0.16' });
+    it('returns the version and commitHash from app config', () => {
+      expect(service.getCurrentVersion()).toEqual({ version: '0.0.16', commitHash: null });
+    });
+
+    it('returns commitHash when COMMIT_SHA is set', () => {
+      configService.get.mockReturnValue({ VERSION: '0.0.16', COMMIT_SHA: 'abc123def456' });
+      expect(service.getCurrentVersion()).toEqual({ version: '0.0.16', commitHash: 'abc123def456' });
     });
 
     it('normalizes a "v"-prefixed version', () => {
       configService.get.mockReturnValue({ VERSION: 'v1.2.3' });
-      expect(service.getCurrentVersion()).toEqual({ version: '1.2.3' });
+      expect(service.getCurrentVersion()).toEqual({ version: '1.2.3', commitHash: null });
     });
 
     it('falls back to 0.0.0-dev when config is missing', () => {
       configService.get.mockReturnValue(undefined);
-      expect(service.getCurrentVersion()).toEqual({ version: '0.0.0-dev' });
+      expect(service.getCurrentVersion()).toEqual({ version: '0.0.0-dev', commitHash: null });
     });
 
     it('keeps the raw value when the configured version is not semver-shaped', () => {
       configService.get.mockReturnValue({ VERSION: 'canary' });
-      expect(service.getCurrentVersion()).toEqual({ version: 'canary' });
+      expect(service.getCurrentVersion()).toEqual({ version: 'canary', commitHash: null });
     });
 
     it('normalizes the 0.0.0-dev placeholder into a comparable semver', () => {
       configService.get.mockReturnValue({ VERSION: '0.0.0-dev' });
-      expect(service.getCurrentVersion()).toEqual({ version: '0.0.0-dev' });
+      expect(service.getCurrentVersion()).toEqual({ version: '0.0.0-dev', commitHash: null });
+    });
+  });
+
+  describe('getSystemInfo', () => {
+    it('returns uptime, node version, and DB counts', async () => {
+      const result = await service.getSystemInfo();
+
+      expect(result.uptimeSeconds).toBeGreaterThanOrEqual(0);
+      expect(result.nodeVersion).toMatch(/^v\d+/);
+      expect(result.usersTotal).toBe(5);
+      expect(result.resourcesTotal).toBe(10);
+      expect(result.projectsTotal).toBe(3);
+      expect(result.activeResourceUsageSessions).toBe(2);
+      expect(usageRepository.count).toHaveBeenCalledWith({
+        where: { endTime: IsNull(), lifecyclePending: false },
+      });
+      expect(result.activeAuthSessions).toBe(7);
     });
   });
 

@@ -1,0 +1,5 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": { "types": ["jest", "node"], "jsx": "react-jsx" },
+  "include": ["backend/**/*.ts"]
+}

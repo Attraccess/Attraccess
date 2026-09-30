@@ -96,4 +96,19 @@ describe('PageHeaderActions', () => {
     expect(captured.variant).toBe('outline');
     expect(captured.size).toBe('sm');
   });
+
+  it('uses the brand variant for primary actions without promoting secondary actions', () => {
+    renderActions([
+      { key: 'create', label: 'Create', variant: 'primary', onPress: vi.fn() },
+      { key: 'export', label: 'Export', variant: 'secondary', onPress: vi.fn() },
+    ]);
+    expect(screen.getByRole('button', { name: 'Create' })).toHaveClass('button--primary');
+    expect(screen.getByRole('button', { name: 'Export' })).toHaveClass('button--outline');
+  });
+
+  it('passes the primary variant to custom triggers', () => {
+    const renderTrigger = vi.fn((props) => <button type="button">{props.children}</button>);
+    renderActions([{ key: 'create', label: 'Create', variant: 'primary', renderTrigger }]);
+    expect(renderTrigger).toHaveBeenCalledWith(expect.objectContaining({ variant: 'primary', size: 'sm' }));
+  });
 });

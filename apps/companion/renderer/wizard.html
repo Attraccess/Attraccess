@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'" />
+  <title>Attraccess Companion Setup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; align-items: center; justify-content: center; height: 100vh; padding: 24px; }
+    .card { background: #1e293b; border-radius: 12px; padding: 32px; width: 100%; max-width: 420px; }
+    h1 { font-size: 1.25rem; font-weight: 700; margin-bottom: 4px; }
+    p { color: #94a3b8; font-size: 0.875rem; margin-bottom: 20px; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 0.875rem; outline: none; }
+    input:focus { border-color: #6366f1; }
+    button { width: 100%; margin-top: 16px; padding: 10px; background: #6366f1; color: white; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin-top: 12px; font-size: 0.8rem; color: #94a3b8; text-align: center; min-height: 1.2em; }
+    .status.ok { color: #34d399; }
+    .status.err { color: #f87171; }
+    .step { display: none; }
+    .step.active { display: block; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <!-- Step 1: Server URL -->
+  <div class="step active" id="step-url">
+    <h1>Attraccess Companion</h1>
+    <p>Enter the URL of your Attraccess server to get started.</p>
+    <label for="serverUrl">Server URL</label>
+    <input id="serverUrl" type="url" placeholder="https://attraccess.example.com" />
+    <button id="btnConnect">Connect</button>
+    <div class="status" id="statusUrl"></div>
+  </div>
+
+  <!-- Step 2: Registering -->
+  <div class="step" id="step-register">
+    <h1>Registering…</h1>
+    <p>The app is opening a connection and registering this device. Please wait.</p>
+    <div class="status" id="statusRegister">Connecting to server…</div>
+  </div>
+
+  <!-- Step 3: Done -->
+  <div class="step" id="step-done">
+    <h1>Setup complete!</h1>
+    <p>This device has been registered. Please name it in the Attraccess admin panel.</p>
+    <div class="status ok" id="statusDone"></div>
+  </div>
+</div>
+
+<script>
+  const api = window.companion;
+  let serverUrl = '';
+
+  function show(stepId) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    document.getElementById(stepId).classList.add('active');
+  }
+
+  api.onInit(({ firstRun, serverUrl: savedUrl }) => {
+    if (!firstRun && savedUrl) {
+      document.getElementById('serverUrl').value = savedUrl;
+    }
+  });
+
+  api.onWsStatus((status) => {
+    if (status === 'connected') {
+      document.getElementById('statusRegister').textContent = 'Connected — awaiting registration…';
+    } else {
+      document.getElementById('statusRegister').textContent = 'Reconnecting…';
+    }
+  });
+
+  api.onRegistered(({ id }) => {
+    document.getElementById('statusDone').textContent = `Device ID: ${id}`;
+    show('step-done');
+  });
+
+  api.onAuthenticated(() => {
+    // wizard auto-closes from main process after a brief delay
+  });
+
+  document.getElementById('btnConnect').addEventListener('click', async () => {
+    const input = document.getElementById('serverUrl');
+    serverUrl = input.value.trim().replace(/\/$/, '');
+    const status = document.getElementById('statusUrl');
+
+    if (!serverUrl) {
+      status.textContent = 'Please enter a server URL.';
+      status.className = 'status err';
+      return;
+    }
+
+    document.getElementById('btnConnect').disabled = true;
+    status.textContent = 'Checking connectivity…';
+    status.className = 'status';
+
+    const ok = await api.checkHealth(serverUrl);
+    if (!ok) {
+      status.textContent = 'Could not reach server. Check the URL and try again.';
+      status.className = 'status err';
+      document.getElementById('btnConnect').disabled = false;
+      return;
+    }
+
+    status.textContent = '';
+    show('step-register');
+    await api.register(serverUrl);
+  });
+</script>
+</body>
+</html>

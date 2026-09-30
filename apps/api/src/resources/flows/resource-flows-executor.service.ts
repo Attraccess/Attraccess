@@ -5,17 +5,14 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, EntityManager, EntityTarget } from 'typeorm';
+import { Repository, EntityManager, EntityTarget, MoreThan } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceFlowNodeType,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   Resource,
   ResourceUsageAction,
   ResourceUsage,
@@ -26,14 +23,17 @@ import {
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
+  CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
+  getExternalEffectFailureBehavior,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
-import { ConfigService } from '@nestjs/config';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { FlowConfigType } from './flow.config';
-import { Subject } from 'rxjs';
+import { ResourceFlowLogType } from './dto/flow-log.dto';
+import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { randomBytes } from 'crypto';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import Handlebars from 'handlebars';
@@ -44,9 +44,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
+import { getPluginFlowNode, getPluginFlowNodeOwner } from '../../plugin-system/plugin-flow-node-registry';
 import {
   ActivityTrackExecutor,
   BillingSetAdditionalItemsExecutor,
+  CompanionLockPcExecutor,
+  CompanionUnlockPcExecutor,
   EndUsageSessionExecutor,
   ErrorExecutor,
   GetVariablesExecutor,
@@ -56,6 +59,10 @@ import {
   IfExecutor,
   MqttSendMessageExecutor,
   MqttWaitForMessageExecutor,
+  OperatingTransitionExecutor,
+  MeteringReadyExecutor,
+  MeteringReportExecutor,
+  MeteringRunContext,
   NodeExecutionContext,
   NodeExecutor,
   NodeProcessingResult,
@@ -67,6 +74,16 @@ import {
   heartbeatKey,
   topicMatches,
 } from './node-executors';
+import { ResourceOperatingIntervalService } from '../operating-intervals/resource-operating-interval.service';
+import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import { CompanionUsbDeviceDto } from '../../companion/companion.types';
+import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
+
+interface FlowExecutionOptions {
+  lifecycleAttemptId?: string;
+  lifecycleCandidateCancellation?: boolean;
+  metering?: MeteringRunContext;
+}
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -76,8 +93,6 @@ Handlebars.registerHelper('json', (value: unknown) => {
     return 'null';
   }
 });
-
-export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
 
 interface UsageEventData {
   resource: {
@@ -112,15 +127,13 @@ interface FlowResourceContext {
 }
 
 @Injectable()
-export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestroy {
+export class ResourceFlowsExecutorService implements OnModuleInit {
   private readonly logger = new Logger(ResourceFlowsExecutorService.name);
-  private readonly logTTLDays: number;
-  private keepAliveInterval: NodeJS.Timeout;
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
   private readonly heartbeatLastSeen: Map<string, Date> = new Map();
-
-  public readonly resourceFlowLogSubjects: Map<Resource['id'], Subject<ResourceFlowLogEvent>> = new Map();
+  /** Preserve event lookup order without serializing the flow runs they launch. */
+  private pluginFlowLookupQueue: Promise<void> = Promise.resolve();
 
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
@@ -136,11 +149,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly flowNodeRepository: Repository<ResourceFlowNode>,
     @InjectRepository(ResourceFlowEdge)
     private readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
-    @InjectRepository(ResourceFlowLog)
-    private readonly flowLogRepository: Repository<ResourceFlowLog>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
-    private readonly configService: ConfigService,
+    private readonly flowLogs: FlowLogRecorderService,
     private readonly mqttClientService: MqttClientService,
     @Inject(forwardRef(() => ResourceUsageService))
     private readonly resourceUsageService: ResourceUsageService,
@@ -151,10 +162,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly variablesService: ResourceFlowVariablesService,
     private readonly cronTimer: CronTimer,
     private readonly flowTimer: FlowTimer,
+    private readonly companionGatewayService: CompanionGatewayService,
+    private readonly operatingIntervals: ResourceOperatingIntervalService,
   ) {
-    const flowConfig = this.configService.get<FlowConfigType>('flow');
-    this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
-
     this.nodeExecutors = this.buildNodeExecutorRegistry();
   }
 
@@ -191,6 +201,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(this.mqttClientService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(this.resourceUsageService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(this.resourceActivity),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING]: new OperatingTransitionExecutor(
+        this.operatingIntervals,
+        'operating',
+      ),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: new OperatingTransitionExecutor(
+        this.operatingIntervals,
+        'idle',
+      ),
 
       [ResourceFlowNodeType.PROCESSING_WAIT]: new WaitExecutor(),
       [ResourceFlowNodeType.PROCESSING_IF]: new IfExecutor(),
@@ -202,26 +220,24 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       [ResourceFlowNodeType.PROCESSING_ERROR]: new ErrorExecutor(),
       [ResourceFlowNodeType.PROCESSING_SET_VARIABLES]: new SetVariablesExecutor(this.variablesService),
       [ResourceFlowNodeType.PROCESSING_GET_VARIABLES]: new GetVariablesExecutor(this.variablesService),
+
+      [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: new CompanionLockPcExecutor(this.companionGatewayService),
+      [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: new CompanionUnlockPcExecutor(this.companionGatewayService),
+      [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED]: passthrough,
+
+      [ResourceFlowNodeType.INPUT_METERING_START]: passthrough,
+      [ResourceFlowNodeType.INPUT_METERING_COLLECT]: passthrough,
+      [ResourceFlowNodeType.OUTPUT_METERING_READY]: new MeteringReadyExecutor(),
+      [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: new MeteringReportExecutor(),
     };
   }
 
   async onModuleInit() {
-    // Send keep-alive messages every 30 seconds to prevent connection timeouts
-    this.keepAliveInterval = setInterval(() => {
-      this.resourceFlowLogSubjects.forEach((subject) => {
-        subject.next({ data: { keepalive: true } });
-      });
-    }, 10000);
-
     await this.subscribeToMqttTopics();
-  }
-
-  onModuleDestroy() {
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-    }
-
-    this.resourceFlowLogSubjects.forEach((subject) => subject.complete());
   }
 
   private async subscribeToMqttTopics() {
@@ -258,29 +274,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       await this.mqttClientService.subscribe(serverId, topic, qos).catch((error) => {
         this.logger.error(`Failed to subscribe to topic ${topic} for server ID ${serverId}`, error.stack);
       });
-    }
-  }
-
-  private async createFlowLog(
-    data: Omit<ResourceFlowLog, 'id' | 'createdAt' | 'resource'>,
-    transactionManager?: EntityManager,
-  ): Promise<ResourceFlowLog> {
-    const logEntry = this.flowLogRepository.create(data);
-
-    const repository = this.getRepository(ResourceFlowLog, this.flowLogRepository, transactionManager);
-
-    try {
-      const log = await repository.save(logEntry);
-      if (!this.resourceFlowLogSubjects.has(log.resourceId)) {
-        this.resourceFlowLogSubjects.set(log.resourceId, new Subject<ResourceFlowLogEvent>());
-      }
-      const subject = this.resourceFlowLogSubjects.get(log.resourceId);
-      subject.next({ data: log });
-      this.logger.debug(`Created flow log entry: ${log.id} for node: ${log.nodeId} (${log.type})`);
-      return log;
-    } catch (error) {
-      this.logger.error(`Failed to create flow log entry for node: ${logEntry.nodeId}`, error.stack);
-      throw error;
     }
   }
 
@@ -360,31 +353,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return result;
   }
 
-  @Cron('0 2 * * *') // Daily at 2 AM
-  async cleanupOldFlowLogs() {
-    await this.cronTimer.time('flow_daily_cleanup', async () => {
-      try {
-        const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
-
-        this.logger.log(
-          `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
-        );
-
-        const result = await this.flowLogRepository.delete({
-          createdAt: LessThan(cutoffDate),
-        });
-
-        const deletedCount = result.affected || 0;
-        this.logger.log(`Successfully cleaned up ${deletedCount} old flow log entries`);
-      } catch (error) {
-        this.logger.error('Failed to cleanup old flow logs', error.stack);
-        throw error;
-      }
-    });
-  }
-
-  @OnEvent(ResourceUsageEvent.EVENT_NAME)
-  async handleResourceUsageEvent(event: ResourceUsageEvent) {
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  async handleResourceSessionStartedEvent(event: ResourceSessionStartedEvent) {
     try {
       const { usage } = event;
 
@@ -504,6 +474,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     triggerNodeType: ResourceFlowNodeType,
     initialData: object = {},
     transactionManager?: EntityManager,
+    options: FlowExecutionOptions = {},
   ): Promise<object[]> {
     const repository = this.getRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
 
@@ -522,8 +493,80 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     // TODO: propagate errors so when calling runFlow you can react to them and they dont get ignored
-    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager);
+    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager, new Map(), options);
     return results.map((r) => r.payload);
+  }
+
+  /**
+   * Starts every plugin trigger node whose saved configuration matches an
+   * external plugin event. Each node is started independently so its run logs
+   * remain attributed to that node's resource.
+   */
+  public async triggerPluginFlows(
+    pluginName: string,
+    nodeType: string,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
+    payload: object,
+  ): Promise<void> {
+    const definition = getPluginFlowNode(nodeType);
+    if (
+      !nodeType.startsWith(`plugin.${pluginName}.`) ||
+      !definition?.isInput ||
+      getPluginFlowNodeOwner(nodeType) !== pluginName
+    ) {
+      throw new Error(`Plugin flow node type "${nodeType}" is not a registered trigger node.`);
+    }
+
+    const pageSize = 100;
+    const concurrency = 10;
+    let lastId: string | undefined;
+    for (;;) {
+      const nodes = await this.queuedPluginFlowLookup(() =>
+        this.flowNodeRepository.find({
+          where: {
+            type: nodeType as ResourceFlowNodeType,
+            ...(lastId ? { id: MoreThan(lastId) } : {}),
+          },
+          order: { id: 'ASC' },
+          take: pageSize,
+        }),
+      );
+
+      if (nodes.length === 0) return;
+      lastId = nodes[nodes.length - 1].id;
+
+      for (let offset = 0; offset < nodes.length; offset += concurrency) {
+        await Promise.allSettled(
+          nodes.slice(offset, offset + concurrency).map(async (node) => {
+            let isMatch: boolean;
+            try {
+              isMatch = matches(node.data as Record<string, unknown>, node.id);
+            } catch (error) {
+              this.logger.error(
+                `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
+                error instanceof Error ? error.stack : undefined,
+              );
+              return;
+            }
+
+            if (isMatch) {
+              await this.startFlow(node, { payload });
+            }
+          }),
+        );
+      }
+
+      if (nodes.length < pageSize) return;
+    }
+  }
+
+  private queuedPluginFlowLookup(lookup: () => Promise<ResourceFlowNode[]>): Promise<ResourceFlowNode[]> {
+    const queued = this.pluginFlowLookupQueue.then(lookup, lookup);
+    this.pluginFlowLookupQueue = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
   }
 
   public async startFlow(
@@ -531,6 +574,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     data: NodeProcessingResult,
     transactionManager?: EntityManager,
     resourceContextCache: Map<number, FlowResourceContext> = new Map(),
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     const nodes = Array.isArray(node) ? node : [node];
 
@@ -541,7 +585,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         .toString('base64url')
         .slice(0, 3)}-${randomBytes(3).toString('base64url').slice(0, 3)}`;
 
-      await this.createFlowLog({
+      this.flowLogs.record({
         flowRunId,
         nodeId: null,
         resourceId: nodes[0].resourceId,
@@ -550,29 +594,46 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
       let leafResults: NodeProcessingResult[] = [];
       try {
-        const results = await Promise.all(
+        leafResults = await this.settleFlowBranches(
           nodes.map((node) => {
-            return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache);
+            return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache, options);
           }),
         );
-        leafResults = results.flat();
         this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
       } catch (error) {
         this.logger.error(`Failed to process flow nodes`, error.stack);
         throw error;
       } finally {
-        await this.createFlowLog(
-          {
-            flowRunId,
-            nodeId: null,
-            resourceId: nodes[0].resourceId,
-            type: ResourceFlowLogType.FLOW_COMPLETED,
-          },
-          transactionManager,
-        );
+        this.flowLogs.record({
+          flowRunId,
+          nodeId: null,
+          resourceId: nodes[0].resourceId,
+          type: ResourceFlowLogType.FLOW_COMPLETED,
+        });
       }
       return leafResults;
     });
+  }
+
+  private async settleFlowBranches(branches: Promise<NodeProcessingResult[]>[]): Promise<NodeProcessingResult[]> {
+    // A failed branch cannot release a lifecycle reservation while sibling effects are still running.
+    // Wait for work already started, then preserve lifecycle-fatal failures over ordinary node errors.
+    let failure: { error: unknown } | undefined;
+    const results = await Promise.allSettled(
+      branches.map((branch) =>
+        branch.catch((error) => {
+          if (
+            !failure ||
+            (error instanceof ExternalEffectFailureError && !(failure.error instanceof ExternalEffectFailureError))
+          ) {
+            failure = { error };
+          }
+          throw error;
+        }),
+      ),
+    );
+    if (failure) throw failure.error;
+    return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
   }
 
   /**
@@ -580,8 +641,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
    * template helpers backed by the service-owned WeakMap so executors stay free
    * of Handlebars/variable plumbing.
    */
-  private buildExecutionContext(transactionManager?: EntityManager): NodeExecutionContext {
+  private buildExecutionContext(
+    flowRunId: string,
+    transactionManager?: EntityManager,
+    options: FlowExecutionOptions = {},
+  ): NodeExecutionContext {
     return {
+      flowRunId,
+      lifecycleAttemptId: options.lifecycleAttemptId,
+      lifecycleCandidateCancellation: options.lifecycleCandidateCancellation,
+      metering: options.metering,
       transactionManager,
       compileTemplate: (template, data) => this.compileTemplate(template, data),
       getTemplateVariables: (data) => this.templateVariables.get(data),
@@ -590,12 +659,32 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   private async dispatchNode(
+    flowRunId: string,
     node: ResourceFlowNode,
     input: object,
     transactionManager?: EntityManager,
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult> {
-    const executor = this.nodeExecutors[node.type];
-    return executor.execute(node, input, this.buildExecutionContext(transactionManager));
+    // Core node types are looked up in the exhaustive record.
+    const executor = this.nodeExecutors[node.type as ResourceFlowNodeType];
+    if (executor) {
+      return executor.execute(node, input, this.buildExecutionContext(flowRunId, transactionManager, options));
+    }
+
+    // Plugin-contributed node types fall through to the plugin registry.
+    const pluginNode = getPluginFlowNode(node.type);
+    if (pluginNode) {
+      if (pluginNode.isInput) {
+        return { payload: input, outputHandle: 'output' };
+      }
+      return pluginNode.execute(
+        { id: node.id, type: node.type, data: node.data as Record<string, unknown> },
+        input,
+        this.buildExecutionContext(flowRunId, transactionManager, options),
+      );
+    }
+
+    throw new Error(`No executor found for flow node type: ${node.type}`);
   }
 
   private async processNode(
@@ -604,12 +693,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     resultOfPreviousNode: NodeProcessingResult,
     transactionManager?: EntityManager,
     resourceContextCache?: Map<number, FlowResourceContext>,
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Processing flow node - ID: ${node.id}, Type: ${node.type}, Resource ID: ${node.resourceId}`);
 
     const startTime = Date.now();
 
     let responseOfNode: NodeProcessingResult = { payload: {} };
+    let dispatchStarted = false;
 
     try {
       // Log the start of node processing
@@ -620,19 +711,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         resourceContextCache,
       )) as object;
 
-      await this.createFlowLog(
-        {
-          flowRunId,
-          nodeId: node.id,
-          resourceId: node.resourceId,
-          type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
-          payload: JSON.stringify({ input }),
-        },
-        transactionManager,
-      );
+      this.flowLogs.record({
+        flowRunId,
+        nodeId: node.id,
+        resourceId: node.resourceId,
+        type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
+        payload: () => ({ input }),
+      });
 
+      dispatchStarted = true;
       responseOfNode = await this.flowTimer.timeNode(node.type, () =>
-        this.dispatchNode(node, input, transactionManager),
+        this.dispatchNode(flowRunId, node, input, transactionManager, options),
       );
 
       const processingTime = Date.now() - startTime;
@@ -645,38 +734,78 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         resourceContextCache,
       )) as object;
 
-      await this.createFlowLog(
-        {
-          flowRunId,
-          nodeId: node.id,
-          resourceId: node.resourceId,
-          type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
-          payload: JSON.stringify({ output: responseOfNode.payload }),
-        },
-        transactionManager,
-      );
+      this.flowLogs.record({
+        flowRunId,
+        nodeId: node.id,
+        resourceId: node.resourceId,
+        type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
+        payload: () => ({ output: responseOfNode.payload }),
+      });
     } catch (error) {
       const processingTime = Date.now() - startTime;
+      const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
+      const failureKind = dispatchStarted
+        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
+        : 'node-failure';
+      const errorMessage = this.errorReason(error);
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
 
-      await this.createFlowLog(
-        {
-          flowRunId,
-          nodeId: node.id,
-          resourceId: node.resourceId,
-          type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-          payload: JSON.stringify({ error }),
-        },
-        transactionManager,
-      );
+      this.flowLogs.record({
+        flowRunId,
+        nodeId: node.id,
+        resourceId: node.resourceId,
+        type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
+        payload: () => ({ error: errorMessage, failureKind, failureBehavior: failureBehavior ?? 'fail-flow' }),
+      });
 
-      throw error;
+      if (!failureBehavior || failureBehavior === 'fail-flow') {
+        throw failureBehavior === 'fail-flow'
+          ? new ExternalEffectFailureError(errorMessage, error, failureKind)
+          : error;
+      }
+
+      const payload =
+        failureBehavior === 'failure-output'
+          ? { ...resultOfPreviousNode.payload, flowError: { kind: failureKind, message: errorMessage } }
+          : resultOfPreviousNode.payload;
+      responseOfNode = {
+        payload,
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
+      };
     }
 
-    return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager, resourceContextCache);
+    return await this.executeNextNodes(
+      flowRunId,
+      node,
+      responseOfNode,
+      transactionManager,
+      resourceContextCache,
+      options,
+    );
+  }
+
+  private errorReason(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message || error.name;
+    }
+
+    if (typeof error === 'string') {
+      return error || 'Unknown error';
+    }
+
+    if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
+      return error.message || 'Unknown error';
+    }
+
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized && serialized !== '{}' ? serialized : 'Unknown error';
+    } catch {
+      return String(error);
+    }
   }
 
   private async executeNextNodes(
@@ -685,6 +814,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     resultOfPreviousNode: NodeProcessingResult,
     transactionManager?: EntityManager,
     resourceContextCache?: Map<number, FlowResourceContext>,
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
@@ -721,11 +851,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         return [] as NodeProcessingResult[];
       }
 
-      return this.processNode(flowRunId, targetNode, resultOfPreviousNode, transactionManager, resourceContextCache);
+      return this.processNode(
+        flowRunId,
+        targetNode,
+        resultOfPreviousNode,
+        transactionManager,
+        resourceContextCache,
+        options,
+      );
     });
 
-    const results = await Promise.all(edgePromises);
-    return results.flat();
+    return this.settleFlowBranches(edgePromises);
   }
 
   public trackResourceActivity(resourceId: number) {
@@ -858,6 +994,92 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     const dataWithVariables = variables ? { ...data, variables } : data;
     const compiledTemplate = Handlebars.compile(template);
     return compiledTemplate(dataWithVariables);
+  }
+
+  @OnEvent('companion.idle')
+  async handleCompanionIdle(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_IDLE,
+      event.payload,
+      CompanionIdleActiveNodeDataSchema,
+    );
+  }
+
+  @OnEvent('companion.active')
+  async handleCompanionActive(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_ACTIVE,
+      event.payload,
+      CompanionIdleActiveNodeDataSchema,
+    );
+  }
+
+  @OnEvent('companion.foreground_app')
+  async handleCompanionForegroundApp(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED,
+      event.payload,
+      CompanionForegroundAppNodeDataSchema,
+    );
+  }
+
+  @OnEvent('companion.usb_connected')
+  async handleCompanionUsbConnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
+    await this.triggerUsbDeviceEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED,
+      event.payload,
+    );
+  }
+
+  @OnEvent('companion.usb_disconnected')
+  async handleCompanionUsbDisconnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
+    await this.triggerUsbDeviceEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED,
+      event.payload,
+    );
+  }
+
+  private async triggerCompanionEvent(
+    deviceId: number,
+    type: ResourceFlowNodeType,
+    payload: object,
+    schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } },
+  ): Promise<void> {
+    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const matching = allNodes.filter((node) => {
+      const parsed = schema.safeParse(node.data ?? {});
+      return parsed.success && parsed.data?.deviceId === deviceId;
+    });
+    if (matching.length === 0) return;
+    await this.startFlow(matching, { payload });
+  }
+
+  private async triggerUsbDeviceEvent(
+    deviceId: number,
+    type: ResourceFlowNodeType,
+    payload: CompanionUsbDeviceDto,
+  ): Promise<void> {
+    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const matching = allNodes.filter((node) => {
+      const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});
+      if (!parsed.success || parsed.data.deviceId !== deviceId) return false;
+      const { vendorId, productId } = parsed.data;
+      const hasVendorFilter = vendorId !== undefined;
+      const hasProductFilter = productId !== undefined;
+      if (hasVendorFilter && hasProductFilter) {
+        return vendorId === payload.vendorId && productId === payload.productId;
+      }
+      if (hasVendorFilter) return vendorId === payload.vendorId;
+      if (hasProductFilter) return productId === payload.productId;
+      return true;
+    });
+    if (matching.length === 0) return;
+    await this.startFlow(matching, { payload });
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {

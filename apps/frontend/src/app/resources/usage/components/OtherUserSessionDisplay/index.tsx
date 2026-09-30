@@ -56,10 +56,10 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const canManageResources = hasPermission('canManageResources');
-  const canStartSession = canManageResources || access?.canControl || permissions?.isIntroducer;
+  const canUpdateResources = hasPermission('resources.update');
+  const canStartSession = canUpdateResources || access?.canControl || permissions?.isIntroducer;
   const canTakeover = resource?.allowTakeOver && canStartSession;
-  const canStopOtherUserSession = permissions?.isIntroducer || canManageResources;
+  const canStopOtherUserSession = permissions?.isIntroducer || canUpdateResources;
 
   const startSession = useResourcesServiceResourceUsageStartSession({
     onSuccess: () => {
@@ -257,7 +257,9 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 {t('takeover.button')}
               </Button>
               <Dropdown>
-                <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger-soft' })}>
+                <DropdownTrigger
+                  className={`${buttonVariants({ isIconOnly: true, variant: 'danger-soft' })} inline-flex items-center justify-center`}
+                >
                   <ChevronDownIcon />
                 </DropdownTrigger>
                 <DropdownPopover>
@@ -287,7 +289,9 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 {t('stopOtherUserSession.button')}
               </Button>
               <Dropdown>
-                <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
+                <DropdownTrigger
+                  className={`${buttonVariants({ isIconOnly: true, variant: 'danger' })} inline-flex items-center justify-center`}
+                >
                   <ChevronDownIcon />
                 </DropdownTrigger>
                 <DropdownPopover>

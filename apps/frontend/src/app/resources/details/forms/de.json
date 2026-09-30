@@ -32,6 +32,7 @@
     "resourceUsageEnd": "Vor Beenden erforderlich",
     "fieldsTitle": "Felder",
     "addField": "Feld hinzufügen",
+    "reorderField": "Feld verschieben",
     "emptyFieldsTitle": "Keine Felder",
     "emptyFieldsDescription": "Füge mindestens ein Feld hinzu, damit Mitglieder etwas ausfüllen können.",
     "save": "Formular speichern",

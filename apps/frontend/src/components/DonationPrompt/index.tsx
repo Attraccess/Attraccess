@@ -6,7 +6,10 @@ import { HeartHandshake, Share2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import en from './en.json';
 import de from './de.json';
-import { useLicenseServiceGetLicenseInformation, User } from '@attraccess/react-query-client';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useLocation } from 'react-router-dom';
+import { USEFUL_ACTION_EVENT } from './usefulAction';
+import { type SystemPermission } from '@attraccess/shared';
 
 const SNOOZE_KEY = 'donationPrompt:snoozedUntil';
 
@@ -31,16 +34,39 @@ function setSnoozedForOneMonth() {
   }
 }
 
-function userHasAnyManagePermission(user: User | null): boolean {
-  if (!user) return false;
-  return Object.values(user.systemPermissions).some((enabled) => enabled === true);
-}
-
 export function DonationPrompt() {
   const { t } = useTranslations({ en, de });
-  const { user } = useAuth();
+  const { hasPermission, user, isAuthenticated, needsTwoFactorSetup } = useAuth();
+  const { pathname } = useLocation();
+  const usefulActionKey = user ? `donationPrompt:usefulAction:${user.id}` : null;
 
-  const isEligible = useMemo(() => userHasAnyManagePermission(user), [user]);
+  useEffect(() => {
+    if (!usefulActionKey) return;
+    const record = () => {
+      try {
+        localStorage.setItem(usefulActionKey, 'true');
+      } catch {
+        // Optional prompts must not interrupt resource creation or usage.
+      }
+    };
+    window.addEventListener(USEFUL_ACTION_EVENT, record);
+    return () => window.removeEventListener(USEFUL_ACTION_EVENT, record);
+  }, [usefulActionKey]);
+
+  // Show donation prompt to users with any elevated role (i.e., any permission beyond the default resources.read)
+  const isEligible = useMemo(
+    () =>
+      (
+        [
+          'resources.update',
+          'system.settings.manage',
+          'users.update',
+          'billing.manage',
+          'users.roles.manage',
+        ] as SystemPermission[]
+      ).some((p) => hasPermission(p)),
+    [hasPermission],
+  );
   const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const [isVisible, setIsVisible] = useState(false);
@@ -51,8 +77,23 @@ export function DonationPrompt() {
   }, []);
 
   useEffect(() => {
-    if (!mounted || !isEligible) {
+    if (
+      !mounted ||
+      !isEligible ||
+      !isAuthenticated ||
+      needsTwoFactorSetup ||
+      !usefulActionKey ||
+      !['/', '/resources'].includes(pathname)
+    ) {
       setIsVisible(false);
+      return;
+    }
+    try {
+      if (localStorage.getItem(usefulActionKey) !== 'true') {
+        setIsVisible(false);
+        return;
+      }
+    } catch {
       return;
     }
     const until = getSnoozedUntil();
@@ -63,7 +104,7 @@ export function DonationPrompt() {
     // small delay to allow slide-in transition
     const id = setTimeout(() => setIsVisible(true), 300);
     return () => clearTimeout(id);
-  }, [mounted, isEligible]);
+  }, [mounted, isEligible, isAuthenticated, needsTwoFactorSetup, usefulActionKey, pathname]);
 
   const onHideForMonth = useCallback(() => {
     setSnoozedForOneMonth();
@@ -95,7 +136,9 @@ export function DonationPrompt() {
   return (
     <StandardDrawer
       isOpen={isVisible}
-      onOpenChange={(open) => setIsVisible(open)}
+      onOpenChange={(open) => {
+        if (!open) onHideForMonth();
+      }}
       backdropProps={{ variant: 'blur', isDismissable: false }}
       contentProps={{ placement: 'bottom' }}
     >

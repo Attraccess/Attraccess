@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany,
   DeleteDateColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
@@ -20,39 +21,11 @@ import { Project } from './project';
 import { ProjectMember } from './project-member.entity';
 import { ProjectInvitation } from './project-invitation.entity';
 import { FormSubmission } from './form';
+import { UserRole } from './user-role.entity';
+import { ApiToken } from './api-token.entity';
 
-export class SystemPermissions {
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage resources',
-    example: false,
-  })
-  canManageResources!: boolean;
 
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage system configuration',
-    example: false,
-  })
-  canManageSystemConfiguration!: boolean;
-
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage users',
-    example: false,
-  })
-  canManageUsers!: boolean;
-
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage billing',
-    example: false,
-  })
-  canManageBilling!: boolean;
-}
-
-export type SystemPermission = keyof SystemPermissions;
-
+@Index('IDX_user_deleteAccountToken', ['deleteAccountToken'])
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
@@ -76,12 +49,22 @@ export class User {
   @Exclude()
   email!: string;
 
+  @Column({ type: 'varchar', length: 35, default: 'en' })
+  @ApiProperty({
+    description: "The user's preferred locale (BCP 47 language tag)",
+    example: 'en',
+  })
+  locale!: string;
+
   @Column({ default: false, type: 'boolean' })
   @ApiProperty({
     description: 'Whether the user has verified their email address',
     example: true,
   })
   isEmailVerified!: boolean;
+
+  @Column({ default: false, type: 'boolean' })
+  isDisabled!: boolean;
 
   @Column({ type: 'text', nullable: true })
   @Exclude()
@@ -98,17 +81,6 @@ export class User {
   @Column({ type: 'datetime', nullable: true })
   @Exclude()
   passwordResetTokenExpiresAt!: Date | null;
-
-  @Column(() => SystemPermissions, { prefix: '' })
-  @ApiProperty({
-    description: 'System-wide permissions for the user',
-    example: {
-      canManageResources: true,
-      canManageSystemConfiguration: false,
-      canManageUsers: false,
-    },
-  })
-  systemPermissions!: SystemPermissions;
 
   @CreateDateColumn()
   @ApiProperty({
@@ -250,4 +222,11 @@ export class User {
     onDelete: 'CASCADE',
   })
   formSubmissions!: FormSubmission[];
+
+  @OneToMany(() => UserRole, (ur) => ur.user, { onDelete: 'CASCADE' })
+  @ApiProperty({ type: [UserRole], description: 'Role assignments for this user', required: false })
+  userRoles!: UserRole[];
+
+  @OneToMany(() => ApiToken, (apiToken) => apiToken.user, { onDelete: 'CASCADE' })
+  apiTokens!: ApiToken[];
 }

@@ -3,5 +3,10 @@
     "title": "Keine Ressourcen gefunden",
     "description": "Passe deine Suche oder die Filter-Optionen an, um Ressourcen zu finden",
     "clear": "Filter und Suche zurücksetzen"
+  },
+  "firstResource": {
+    "title": "Noch keine Ressourcen",
+    "description": "Füge deine erste Maschine oder Tür hinzu, um Zugang und Nutzung zu verwalten.",
+    "noPermission": "Bitte einen Administrator, eine Maschine oder Tür für deine Werkstatt hinzuzufügen."
   }
 }

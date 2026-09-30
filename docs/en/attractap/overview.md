@@ -47,6 +47,7 @@ See [Hardware](attractap/hardware.md) for detailed specifications of each varian
 
 ## See Also
 
+- [Using the Reader](attractap/using-the-reader.md) – Sign in with your card and use machines or doors
 - [Hardware](attractap/hardware.md) -- Hardware variants and components
 - [Setup](attractap/setup.md) -- Register and configure readers
 - [NFC Cards](attractap/nfc-cards.md) -- Manage user NFC cards

@@ -2,6 +2,7 @@
 // FEATURE: Cross-task state synchronization for network and API status
 
 #include "state.hpp"
+#include <string>
 
 struct StateLock
 {
@@ -28,21 +29,35 @@ SemaphoreHandle_t State::state_mutex = xSemaphoreCreateRecursiveMutex();
 
 esp_ip4_addr_t State::wifi_ip = {};
 bool State::wifi_connected = false;
-String State::wifi_ssid = "";
+std::string State::wifi_ssid = "";
 esp_ip4_addr_t State::ethernet_ip = {};
 bool State::ethernet_connected = false;
-String State::websocket_hostname = "";
+std::string State::websocket_hostname = "";
+State::NetworkQuality State::network_quality = State::NETWORK_QUALITY_OFFLINE;
+uint32_t State::network_quality_last_inbound_age_ms = 0;
+uint8_t State::network_quality_reconnects_last_minute = 0;
+uint8_t State::network_quality_tx_queue_depth = 0;
+uint8_t State::network_quality_tx_queue_full_events_last_minute = 0;
+uint8_t State::network_quality_send_failures_last_minute = 0;
+uint8_t State::network_quality_liveness_timeouts_last_minute = 0;
+uint32_t State::network_quality_last_pong_rtt_ms = 0;
+uint32_t State::network_quality_average_pong_rtt_ms = 0;
+int32_t State::network_quality_pong_rtt_trend_ms = 0;
+uint8_t State::network_quality_pong_timeouts_last_minute = 0;
+uint8_t State::network_quality_pong_probe_loss_percent_last_minute = 0;
+uint8_t State::network_quality_missed_heartbeats_last_minute = 0;
 uint16_t State::websocket_port = 0;
 bool State::websocket_use_ssl = false;
 bool State::websocket_connected = false;
 State::WebsocketPhase State::websocket_phase = State::WS_INIT;
-String State::websocket_cert_name = "";
+std::string State::websocket_cert_name = "";
 int State::websocket_cert_index = 0;
 int State::websocket_cert_count = 0;
 int State::websocket_remembered_retry_count = 0;
+bool State::websocket_cert_locked = false;
 int State::websocket_next_attempt_seconds = 0;
 bool State::api_authenticated = false;
-String State::api_device_name = "";
+std::string State::api_device_name = "";
 
 void State::setEthernetState(bool connected, esp_ip4_addr_t ip)
 {
@@ -51,7 +66,7 @@ void State::setEthernetState(bool connected, esp_ip4_addr_t ip)
     ethernet_connected = connected;
 }
 
-void State::setWifiState(bool connected, esp_ip4_addr_t ip, String ssid)
+void State::setWifiState(bool connected, esp_ip4_addr_t ip, std::string ssid)
 {
     StateLock lock(state_mutex);
     wifi_connected = connected;
@@ -73,7 +88,58 @@ State::NetworkState State::getNetworkState()
     return state;
 }
 
-void State::setWebsocketState(bool connected, String hostname, uint16_t port, bool useSSL)
+void State::setNetworkQualityState(NetworkQuality quality,
+                                   uint32_t lastInboundAgeMs,
+                                   uint8_t reconnectsLastMinute,
+                                   uint8_t txQueueDepth,
+                                   uint8_t txQueueFullEventsLastMinute,
+                                   uint8_t sendFailuresLastMinute,
+                                   uint8_t livenessTimeoutsLastMinute,
+                                   uint32_t lastPongRttMs,
+                                   uint32_t averagePongRttMs,
+                                   int32_t pongRttTrendMs,
+                                   uint8_t pongTimeoutsLastMinute,
+                                   uint8_t pongProbeLossPercentLastMinute,
+                                   uint8_t missedHeartbeatsLastMinute)
+{
+    StateLock lock(state_mutex);
+    network_quality = quality;
+    network_quality_last_inbound_age_ms = lastInboundAgeMs;
+    network_quality_reconnects_last_minute = reconnectsLastMinute;
+    network_quality_tx_queue_depth = txQueueDepth;
+    network_quality_tx_queue_full_events_last_minute = txQueueFullEventsLastMinute;
+    network_quality_send_failures_last_minute = sendFailuresLastMinute;
+    network_quality_liveness_timeouts_last_minute = livenessTimeoutsLastMinute;
+    network_quality_last_pong_rtt_ms = lastPongRttMs;
+    network_quality_average_pong_rtt_ms = averagePongRttMs;
+    network_quality_pong_rtt_trend_ms = pongRttTrendMs;
+    network_quality_pong_timeouts_last_minute = pongTimeoutsLastMinute;
+    network_quality_pong_probe_loss_percent_last_minute = pongProbeLossPercentLastMinute;
+    network_quality_missed_heartbeats_last_minute = missedHeartbeatsLastMinute;
+}
+
+State::NetworkQualityState State::getNetworkQualityState()
+{
+    StateLock lock(state_mutex);
+    NetworkQualityState state;
+    state.quality = network_quality;
+    state.lastInboundAgeMs = network_quality_last_inbound_age_ms;
+    state.reconnectsLastMinute = network_quality_reconnects_last_minute;
+    state.txQueueDepth = network_quality_tx_queue_depth;
+    state.txQueueFullEventsLastMinute = network_quality_tx_queue_full_events_last_minute;
+    state.sendFailuresLastMinute = network_quality_send_failures_last_minute;
+    state.livenessTimeoutsLastMinute = network_quality_liveness_timeouts_last_minute;
+    state.lastPongRttMs = network_quality_last_pong_rtt_ms;
+    state.averagePongRttMs = network_quality_average_pong_rtt_ms;
+    state.pongRttTrendMs = network_quality_pong_rtt_trend_ms;
+    state.pongTimeoutsLastMinute = network_quality_pong_timeouts_last_minute;
+    state.pongProbeLossPercentLastMinute = network_quality_pong_probe_loss_percent_last_minute;
+    state.missedHeartbeatsLastMinute = network_quality_missed_heartbeats_last_minute;
+
+    return state;
+}
+
+void State::setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL)
 {
     StateLock lock(state_mutex);
     websocket_connected = connected;
@@ -88,13 +154,14 @@ void State::setWebsocketPhase(WebsocketPhase phase)
     websocket_phase = phase;
 }
 
-void State::setWebsocketCertProgress(String certName, int certIndex, int certCount, int rememberedRetryCount)
+void State::setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount, bool certLocked)
 {
     StateLock lock(state_mutex);
     websocket_cert_name = certName;
     websocket_cert_index = certIndex;
     websocket_cert_count = certCount;
     websocket_remembered_retry_count = rememberedRetryCount;
+    websocket_cert_locked = certLocked;
 }
 
 void State::setWebsocketNextAttemptSeconds(int seconds)
@@ -116,12 +183,13 @@ State::WebsocketState State::getWebsocketState()
     state.certIndex = websocket_cert_index;
     state.certCount = websocket_cert_count;
     state.rememberedRetryCount = websocket_remembered_retry_count;
+    state.certLocked = websocket_cert_locked;
     state.secondsUntilNextAttempt = websocket_next_attempt_seconds;
 
     return state;
 }
 
-void State::setApiState(bool authenticated, String deviceName)
+void State::setApiState(bool authenticated, std::string deviceName)
 {
     StateLock lock(state_mutex);
     api_authenticated = authenticated;

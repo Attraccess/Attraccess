@@ -3,7 +3,7 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/attractap/firmware",
   "projectType": "application",
-  "tags": [],
+  "tags": ["scope:hardware"],
   "targets": {
     "build": {
       "executor": "nx:run-commands",
@@ -13,24 +13,52 @@
       },
       "outputs": ["{projectRoot}/firmware_output"],
       "inputs": [
-        "{projectRoot}/platformio.ini",
+        "{projectRoot}/CMakeLists.txt",
+        "{projectRoot}/main/**/*",
+        "{projectRoot}/variants/**/*",
+        "{projectRoot}/sdkconfig.defaults",
+        "{projectRoot}/version.txt",
+        "{projectRoot}/partitions.csv",
+        "{projectRoot}/include/**/*",
         "{projectRoot}/build_firmwares.py",
-        "{projectRoot}/src/**/*",
-        "{projectRoot}/.pio/**/*"
+        "{projectRoot}/src/**/*"
       ],
       "cache": true
     },
-    "test-unit": {
+    "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pio test -e native",
+        "commands": [
+          "cmake -E make_directory apps/attractap/firmware/test-results",
+          "cmake -S apps/attractap/firmware/test -B apps/attractap/firmware/test/build",
+          "cmake --build apps/attractap/firmware/test/build",
+          "ctest --test-dir apps/attractap/firmware/test/build --output-on-failure --output-junit \"$PWD/apps/attractap/firmware/test-results/serial.xml\"",
+          "cmake -S apps/attractap/firmware/tests/supervision -B apps/attractap/firmware/tests/supervision/build",
+          "cmake --build apps/attractap/firmware/tests/supervision/build",
+          "ctest --test-dir apps/attractap/firmware/tests/supervision/build --output-on-failure --output-junit \"$PWD/apps/attractap/firmware/test-results/supervision.xml\"",
+          "cmake -S apps/attractap/firmware/tests/display-theme -B apps/attractap/firmware/tests/display-theme/build",
+          "cmake --build apps/attractap/firmware/tests/display-theme/build --parallel 2",
+          "ctest --test-dir apps/attractap/firmware/tests/display-theme/build --output-on-failure --output-junit \"$PWD/apps/attractap/firmware/test-results/display-theme.xml\""
+        ],
+        "parallel": false,
+        "cwd": "."
+      },
+      "cache": false
+    },
+    "test-hil": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash test/run-hil.sh",
         "cwd": "apps/attractap/firmware"
       },
-      "inputs": [
-        "{projectRoot}/test/**/*",
-        "{projectRoot}/src/**/*",
-        "{projectRoot}/platformio.ini"
-      ],
+      "cache": false
+    },
+    "flash": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/attractap/firmware && python3 flash_firmware.py",
+        "cwd": "."
+      },
       "cache": false
     }
   }

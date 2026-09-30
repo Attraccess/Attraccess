@@ -1,20 +1,20 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Optional, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { TwoFactorService } from './two-factor.service';
-import {
-  TwoFactorCodeDto,
-  TwoFactorPolicyDto,
-  TwoFactorSetupResponseDto,
-  TwoFactorStatusDto,
-} from './two-factor.dto';
+import { TwoFactorCodeDto, TwoFactorPolicyDto, TwoFactorSetupResponseDto, TwoFactorStatusDto } from './two-factor.dto';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Two-Factor Authentication')
 @Controller('/auth/two-factor')
 export class TwoFactorController {
-  constructor(private readonly twoFactorService: TwoFactorService) {}
+  constructor(
+    private readonly twoFactorService: TwoFactorService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
+  ) {}
 
-  @Auth()
+  @SessionAuth()
   @Get()
   @ApiOperation({ summary: 'Get 2FA status for the current user', operationId: 'getTwoFactorStatus' })
   @ApiResponse({
@@ -26,7 +26,7 @@ export class TwoFactorController {
     return this.twoFactorService.getStatus(request.user);
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('setup')
   @ApiOperation({ summary: 'Start 2FA setup for the current user', operationId: 'setupTwoFactor' })
   @ApiResponse({
@@ -35,10 +35,12 @@ export class TwoFactorController {
     type: TwoFactorSetupResponseDto,
   })
   async setup(@Req() request: AuthenticatedRequest): Promise<TwoFactorSetupResponseDto> {
-    return this.twoFactorService.createSetup(request.user);
+    const result = await this.twoFactorService.createSetup(request.user);
+    await this.record('two_factor_setup_started', request);
+    return result;
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('verify')
   @ApiOperation({ summary: 'Verify and enable 2FA for the current user', operationId: 'verifyTwoFactor' })
   @ApiResponse({
@@ -48,10 +50,11 @@ export class TwoFactorController {
   })
   async verify(@Req() request: AuthenticatedRequest, @Body() body: TwoFactorCodeDto): Promise<TwoFactorStatusDto> {
     await this.twoFactorService.enable(request.user, body.code);
+    await this.record('two_factor_enabled', request);
     return this.twoFactorService.getStatus(request.user);
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('disable')
   @ApiOperation({ summary: 'Disable 2FA for the current user', operationId: 'disableTwoFactor' })
   @ApiResponse({
@@ -60,9 +63,10 @@ export class TwoFactorController {
   })
   async disable(@Req() request: AuthenticatedRequest, @Body() body: TwoFactorCodeDto): Promise<void> {
     await this.twoFactorService.disable(request.user, body.code);
+    await this.record('two_factor_disabled', request);
   }
 
-  @Auth('canManageUsers')
+  @SessionAuth('users.update')
   @Get('policy')
   @ApiOperation({ summary: 'Get the configured 2FA policy', operationId: 'getTwoFactorPolicy' })
   @ApiResponse({
@@ -75,7 +79,7 @@ export class TwoFactorController {
     return { policy };
   }
 
-  @Auth('canManageUsers')
+  @SessionAuth('users.update')
   @Post('policy')
   @ApiOperation({ summary: 'Set the configured 2FA policy', operationId: 'setTwoFactorPolicy' })
   @ApiResponse({
@@ -86,5 +90,22 @@ export class TwoFactorController {
   async setPolicy(@Body() body: TwoFactorPolicyDto): Promise<TwoFactorPolicyDto> {
     await this.twoFactorService.setPolicy(body.policy);
     return { policy: body.policy };
+  }
+
+  private record(
+    action: 'two_factor_setup_started' | 'two_factor_enabled' | 'two_factor_disabled',
+    request: AuthenticatedRequest,
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
+      action,
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+      subjectId: request.user.id,
+      details: {},
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    })).then(() => undefined);
   }
 }

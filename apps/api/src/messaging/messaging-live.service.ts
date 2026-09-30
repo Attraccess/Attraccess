@@ -55,6 +55,10 @@ export class MessagingLiveService {
       this.connectionCounts.set(userId, next);
     } else {
       this.connectionCounts.delete(userId);
+      const subject = this.messageSubjects.get(userId);
+      if (subject && !subject.observed) {
+        this.messageSubjects.delete(userId);
+      }
     }
   }
 

@@ -21,14 +21,14 @@ export function ProjectCard(props: Props) {
       </Card.Content>
       <Card.Footer className="flex-col items-start justify-start gap-2">
         <div className="flex w-full items-center justify-between gap-2">
-          <b className="text-ellipsis overflow-hidden line-clamp-1">{project.name}</b>
+          <b className="text-ellipsis overflow-hidden line-clamp-1 font-semibold text-foreground">{project.name}</b>
           {project.archivedAt && (
             <Chip variant="soft" color="warning">
               {archivedLabel ?? 'Archived'}
             </Chip>
           )}
         </div>
-        <p className="text-small leading-5 text-default-500 text-ellipsis overflow-hidden line-clamp-2 min-h-[2.5rem]">
+        <p className="text-small leading-5 text-muted text-ellipsis overflow-hidden line-clamp-2 min-h-[2.5rem]">
           {project.description}
         </p>
       </Card.Footer>

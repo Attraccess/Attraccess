@@ -127,13 +127,8 @@ export function RabbitmqUserFormModal({
               <ModalHeading>{isEdit ? `Edit user "${user.name}"` : 'Create RabbitMQ user'}</ModalHeading>
             </ModalHeader>
             <Form onSubmit={handleSubmit}>
-              <ModalBody className="flex flex-col gap-4 w-full">
-                <TextField
-                  value={username}
-                  onChange={setUsername}
-                  className="w-full"
-                  isDisabled={isEdit}
-                >
+              <ModalBody className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
+                <TextField value={username} onChange={setUsername} className="rmq:w-full" isDisabled={isEdit}>
                   <Label>Username</Label>
                   <Input
                     name="rabbitmq-username"
@@ -143,7 +138,7 @@ export function RabbitmqUserFormModal({
                   />
                 </TextField>
 
-                <TextField value={password} onChange={setPassword} className="w-full">
+                <TextField value={password} onChange={setPassword} className="rmq:w-full">
                   <Label>{isEdit ? 'New password (leave blank to keep current)' : 'Password'}</Label>
                   <Input
                     name="rabbitmq-password"
@@ -153,7 +148,7 @@ export function RabbitmqUserFormModal({
                   />
                 </TextField>
 
-                <TextField value={tags} onChange={setTags} className="w-full">
+                <TextField value={tags} onChange={setTags} className="rmq:w-full">
                   <Label>Tags (comma-separated, e.g. management, administrator)</Label>
                   <Input
                     name="rabbitmq-tags"
@@ -164,7 +159,7 @@ export function RabbitmqUserFormModal({
                 </TextField>
 
                 {!isEdit && (
-                  <div className="flex flex-col gap-3 rounded-lg border border-default-200 dark:border-default-100 p-3">
+                  <div className="rmq:flex rmq:flex-col rmq:gap-3 rmq:rounded-lg rmq:border rmq:border-default-200 rmq:dark:border-default-100 rmq:p-3">
                     <Checkbox
                       isSelected={grantMqttDefaults}
                       onChange={setGrantMqttDefaults}
@@ -172,13 +167,13 @@ export function RabbitmqUserFormModal({
                     >
                       Grant default MQTT permissions
                     </Checkbox>
-                    <p className="text-xs text-default-500">
+                    <p className="rmq:text-xs rmq:text-default-500">
                       Allows the user to publish and subscribe over MQTT: configure{' '}
                       <code>{DEFAULT_MQTT_PERMISSIONS.configure}</code>, write/read{' '}
                       <code>{DEFAULT_MQTT_PERMISSIONS.write}</code>.
                     </p>
                     {grantMqttDefaults && (
-                      <TextField value={vhost} onChange={setVhost} className="w-full">
+                      <TextField value={vhost} onChange={setVhost} className="rmq:w-full">
                         <Label>Vhost{vhosts.length > 0 ? ` (available: ${vhosts.join(', ')})` : ''}</Label>
                         <Input
                           name="rabbitmq-vhost"
@@ -203,12 +198,7 @@ export function RabbitmqUserFormModal({
                 <Button variant="secondary" onPress={onClose} data-cy="rabbitmq-user-form-cancel-button">
                   Cancel
                 </Button>
-                <Button
-                  variant="primary"
-                  type="submit"
-                  isPending={saving}
-                  data-cy="rabbitmq-user-form-save-button"
-                >
+                <Button variant="primary" type="submit" isPending={saving} data-cy="rabbitmq-user-form-save-button">
                   {isEdit ? 'Save changes' : 'Create user'}
                 </Button>
               </ModalFooter>

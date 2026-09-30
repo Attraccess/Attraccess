@@ -5,7 +5,6 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
-  PasswordPolicyAudit,
   PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
@@ -20,6 +19,7 @@ import { TokenHashService } from '../../encryption/token-hash.service';
 import { PasswordPolicyService } from './password-policy.service';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { RbacService } from '../rbac/rbac.service';
 import { PasswordPolicyViolationException } from './password-policy.errors';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
@@ -48,6 +48,7 @@ describe('Register flow + password policy (integration)', () => {
   let service: UserRegistrationService;
   let createOne: jest.Mock;
   let addAuthenticationDetails: jest.Mock;
+  let hashPassword: jest.Mock;
   let generateEmailVerificationToken: jest.Mock;
   let sendVerificationEmail: jest.Mock;
   let hibpCheck: jest.Mock;
@@ -56,6 +57,7 @@ describe('Register flow + password policy (integration)', () => {
   beforeEach(async () => {
     createOne = jest.fn(async ({ username, email }) => ({ id: 1, username, email }));
     addAuthenticationDetails = jest.fn(async () => ({ id: 'auth-1' }));
+    hashPassword = jest.fn(async (password) => `hashed-${password}`);
     generateEmailVerificationToken = jest.fn(async () => 'token');
     sendVerificationEmail = jest.fn(async () => undefined);
     hibpCheck = jest.fn(async () => ({ pwned: false, count: 0, available: true }));
@@ -81,7 +83,6 @@ describe('Register flow + password policy (integration)', () => {
         { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn((row) => row), save: jest.fn() } },
         { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
         { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn(), remove: jest.fn() } },
-        { provide: getRepositoryToken(PasswordPolicyAudit), useValue: { create: jest.fn((row) => row), save: jest.fn(async (row) => row) } },
         { provide: DataSource, useValue: { transaction: jest.fn(async (cb: never) => (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({ getRepository: () => ({ findOne: jest.fn(), find: jest.fn(async () => []), save: jest.fn(), create: jest.fn(), remove: jest.fn() }) })) } },
         { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
@@ -92,6 +93,8 @@ describe('Register flow + password policy (integration)', () => {
             findOne: jest.fn(),
             deleteOne: jest.fn(),
             updateOne: jest.fn(),
+            withTransaction: jest.fn(async (handler) => handler({})),
+            recordCreatedUser: jest.fn(),
             countUsers: jest.fn(async () => 0),
             cleanupUsername: (v: string) => v,
             validateUsernameOrThrow: jest.fn(),
@@ -101,13 +104,14 @@ describe('Register flow + password policy (integration)', () => {
           provide: AuthService,
           useValue: {
             addAuthenticationDetails,
+            hashPassword,
             generateEmailVerificationToken,
             removeAuthenticationDetails: jest.fn(),
           },
         },
         {
           provide: EmailService,
-          useValue: { sendVerificationEmail },
+          useValue: { assertSmtpConfigured: jest.fn(), sendVerificationEmail },
         },
         {
           provide: SSOService,
@@ -131,6 +135,7 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
       ],
     }).compile();
     service = module.get(UserRegistrationService);
@@ -181,7 +186,6 @@ describe('Register flow + password policy (integration)', () => {
         { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn(), save: jest.fn() } },
         { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
         { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn(), remove: jest.fn() } },
-        { provide: getRepositoryToken(PasswordPolicyAudit), useValue: { create: jest.fn((row) => row), save: jest.fn(async (row) => row) } },
         { provide: DataSource, useValue: { transaction: jest.fn(async (cb: never) => (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({ getRepository: () => ({ findOne: jest.fn(), find: jest.fn(async () => []), save: jest.fn(), create: jest.fn(), remove: jest.fn() }) })) } },
         { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
@@ -212,6 +216,7 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
       ],
     }).compile();
     const ctrl = moduleRef.get(UserRegistrationService);

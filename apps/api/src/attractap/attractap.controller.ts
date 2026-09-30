@@ -27,10 +27,13 @@ import { EnrollNfcCardResponseDto } from './dtos/enroll-nfc-card-response.dto';
 import { ResetNfcCardResponseDto } from './dtos/reset-nfc-card-response.dto';
 import { UpdateReaderDto } from './dtos/update-reader.dto';
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+import { RequiresLicense } from '../license/require-license.decorator';
+import { LicenseModuleType } from '../license/license.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
 @UseInterceptors(ClassSerializerInterceptor)
+@RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class AttractapController {
   private readonly logger = new Logger(AttractapController.name);
 
@@ -59,6 +62,8 @@ export class AttractapController {
     await this.attractapGateway.startEnrollOfNewNfcCard({
       readerId: enrollData.readerId,
       userId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
     });
 
     return {
@@ -83,6 +88,8 @@ export class AttractapController {
       readerId: resetData.readerId,
       cardId: resetData.cardId,
       userId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
     });
 
     return {
@@ -91,7 +98,7 @@ export class AttractapController {
   }
 
   @Patch(':readerId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Update reader name and connected resources', operationId: 'updateReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to update', example: 1 })
   @ApiBody({ type: UpdateReaderDto })
@@ -130,7 +137,10 @@ export class AttractapController {
     type: [Attractap],
   })
   async getReaders(): Promise<Attractap[]> {
-    return await this.attractapService.getAllReaders();
+    // `resources` is a plain ManyToMany with no eager loading, so without this the relation is
+    // absent from the response entirely. Callers that group readers by resource — the supervised
+    // start popup (ATT-816) — silently see every reader as unattached.
+    return await this.attractapService.getAllReaders({ relations: ['resources'] });
   }
 
   @Get(':readerId')
@@ -148,7 +158,7 @@ export class AttractapController {
   }
 
   @Get(':readerId/crash-reports')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Get crash reports for a reader', operationId: 'getReaderCrashReports' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader', example: 1 })
   @ApiResponse({
@@ -161,7 +171,7 @@ export class AttractapController {
   }
 
   @Get(':readerId/crash-reports/:reportId/coredump')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({
     summary: 'Download the coredump blob of a crash report',
     operationId: 'getReaderCrashReportCoredump',
@@ -188,11 +198,18 @@ export class AttractapController {
   }
 
   @Delete(':readerId')
-  @Auth('canManageResources')
+  @Auth('resources.delete')
   @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
   @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
-  async deleteReader(@Param('readerId', ParseIntPipe) readerId: number): Promise<void> {
-    await this.attractapService.deleteReader(readerId);
+  async deleteReader(@Param('readerId', ParseIntPipe) readerId: number, @Req() req: AuthenticatedRequest): Promise<void> {
+    const deleted = await this.attractapService.deleteReader(readerId);
+    if (deleted) {
+      await this.attractapService.recordReaderDeregistration(readerId, {
+        userId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod ?? 'session',
+        ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+      });
+    }
   }
 }

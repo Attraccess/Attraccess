@@ -5,6 +5,7 @@
 // MQTT slot contributions to decide what to render. The result shape is
 // restated here (the backend and frontend are separate bundles with no shared
 // module), mirroring backend/rabbitmq-detection.types.ts.
+import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface RabbitmqDetectionResult {
@@ -19,18 +20,14 @@ export interface RabbitmqDetectionResult {
   error: string | null;
 }
 
-// Host mounts plugin controllers under `/api`; cookies carry the session.
-function detectionEndpoint(mqttServerId: number, refresh: boolean): string {
-  const base = `/api/rabbitmq/detection/${mqttServerId}`;
-  return refresh ? `${base}?refresh=true` : base;
-}
+// Host mounts plugin controllers under `/api`; the SDK client supplies the
+// origin, session cookie and JSON/error handling.
+const api = createPluginApiClient('/api/rabbitmq/detection');
 
-async function fetchDetection(mqttServerId: number, refresh: boolean): Promise<RabbitmqDetectionResult> {
-  const res = await fetch(detectionEndpoint(mqttServerId, refresh), { credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
-  return (await res.json()) as RabbitmqDetectionResult;
+function fetchDetection(mqttServerId: number, refresh: boolean): Promise<RabbitmqDetectionResult> {
+  return api.request<RabbitmqDetectionResult>(`/${mqttServerId}`, {
+    query: { refresh: refresh ? 'true' : undefined },
+  });
 }
 
 export interface UseDetectionState {

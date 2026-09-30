@@ -2,15 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { VersionController } from './version.controller';
 import { VersionService } from './version.service';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { SystemInfoDto } from './dto/system-info.dto';
 
 describe('VersionController', () => {
   let controller: VersionController;
-  let service: jest.Mocked<Pick<VersionService, 'getCurrentVersion' | 'getUpdateStatus'>>;
+  let service: jest.Mocked<Pick<VersionService, 'getCurrentVersion' | 'getUpdateStatus' | 'getSystemInfo'>>;
 
   beforeEach(async () => {
     service = {
       getCurrentVersion: jest.fn(),
       getUpdateStatus: jest.fn(),
+      getSystemInfo: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -25,10 +27,29 @@ describe('VersionController', () => {
 
   describe('GET /version', () => {
     it('delegates to VersionService.getCurrentVersion', () => {
-      service.getCurrentVersion.mockReturnValue({ version: '0.0.16' });
+      service.getCurrentVersion.mockReturnValue({ version: '0.0.16', commitHash: null });
 
-      expect(controller.getCurrentVersion()).toEqual({ version: '0.0.16' });
+      expect(controller.getCurrentVersion()).toEqual({ version: '0.0.16', commitHash: null });
       expect(service.getCurrentVersion).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('GET /version/system-info', () => {
+    const sampleInfo: SystemInfoDto = {
+      uptimeSeconds: 3600,
+      nodeVersion: 'v22.0.0',
+      usersTotal: 5,
+      resourcesTotal: 10,
+      projectsTotal: 3,
+      activeAuthSessions: 7,
+      activeResourceUsageSessions: 2,
+    };
+
+    it('delegates to VersionService.getSystemInfo', async () => {
+      service.getSystemInfo.mockResolvedValue(sampleInfo);
+
+      await expect(controller.getSystemInfo()).resolves.toEqual(sampleInfo);
+      expect(service.getSystemInfo).toHaveBeenCalledTimes(1);
     });
   });
 

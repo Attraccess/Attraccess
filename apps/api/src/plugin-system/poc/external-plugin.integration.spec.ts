@@ -83,6 +83,10 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
     events,
     dataSource,
     logger: new Logger('poc-backend-plugin'),
+    mqtt: {
+      subscribe: () => ({ unsubscribe: () => undefined }),
+      publish: () => Promise.resolve(),
+    },
     getRepository: <T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> => dataSource.getRepository(entity),
     get: <T>(token: import('@nestjs/common').Type<T> | string | symbol): T => {
       if (!moduleRefHolder.ref) throw new Error('host ModuleRef not ready');
@@ -95,6 +99,16 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
       pluginEvents.emit(event, payload);
     },
     getMqttServerConfig: () => Promise.resolve(null),
+    getMqttCredentialProvisioning: () => ({
+      availableProviders: async () => [],
+      provision: async () => ({}),
+      revoke: async () => undefined,
+    }),
+    flows: { trigger: async () => undefined },
+    secrets: {
+      encrypt: (value) => `encrypted:${value}`,
+      decrypt: (value) => value.replace('encrypted:', ''),
+    },
   };
 
   const plugin = loadDefaultExport(artifactPath);

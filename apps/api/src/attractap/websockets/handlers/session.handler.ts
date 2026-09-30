@@ -42,9 +42,10 @@ export class AttractapSessionHandler {
   private supervisionService: SupervisionService;
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId, projectId } = data.payload as {
+    const { resourceId, projectId, forceTakeOver } = data.payload as {
       resourceId: number;
       projectId?: number;
+      forceTakeOver?: boolean;
     };
 
     if (
@@ -52,15 +53,18 @@ export class AttractapSessionHandler {
         socket,
         resourceId,
         AttractapEventType.START_RESOURCE_USAGE_SESSION,
+        data.payload?.requestId,
       ))
     ) {
       return;
     }
 
+    const formAction = forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
     const formSubmissions = await this.formsHandler.ensureFormsSatisfied({
       socket,
       resourceId,
-      action: ResourceFormAction.START,
+      action: formAction,
+      requestId: data.payload?.requestId,
     });
     if (formSubmissions === null) {
       return;
@@ -68,9 +72,7 @@ export class AttractapSessionHandler {
 
     const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
     if (!user) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' }),
-      );
+      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;
     }
 
@@ -78,43 +80,42 @@ export class AttractapSessionHandler {
     // the session to that supervisor. The requester stays as `user` (lastAuthenticatedUserId).
     const flow = socket.state.supervisionFlow;
     const supervisorUserId =
-      flow && flow.resourceId === resourceId ? flow.approvedSupervisorUserId ?? undefined : undefined;
+      flow && flow.resourceId === resourceId ? (flow.approvedSupervisorUserId ?? undefined) : undefined;
 
     try {
       await this.resourceUsageService.startSession(
         resourceId,
         user,
-        { projectId, formSubmissions },
-        supervisorUserId ? { supervisorUserId } : {},
+        { projectId, formSubmissions, forceTakeOver },
+        {
+          ...(supervisorUserId ? { supervisorUserId } : {}),
+          auditOrigin: { actorId: user.id, authenticationMethod: null },
+        },
       );
-      this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.START);
+      this.formsHandler.clearFormDraft(socket, resourceId, formAction);
       // The card channel won — settle the still-open web request so any supervisor popups close.
       if (flow?.requestId) {
         this.supervisionService.settleByCard(flow.requestId);
       }
       socket.state.supervisionFlow = null;
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true }));
+      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true });
     } catch (error) {
       if (error instanceof ResourceInUseError) {
-        setTimeout(async () => {
-          await this.resourceListService.sendResourceListToSocket(socket, { resourceId });
-        }, 1000);
+        // Resolve the pending action before refreshing an occupied row.
+        await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message });
+        await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
         return;
       }
       if (error instanceof InsufficientBalanceError || error?.message === 'INSUFFICIENT_BALANCE') {
         const sumUpEnabled = await this.sumUpService.getIsEnabled();
-        await socket.sendMessage(
-          new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, {
-            error: 'INSUFFICIENT_BALANCE',
-            sumUpEnabled,
-          }),
-        );
+        await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
+          error: 'INSUFFICIENT_BALANCE',
+          sumUpEnabled,
+        });
         return;
       }
       this.logger.error(`Failed to start resource usage session: ${error.message}`);
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message }),
-      );
+      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message });
     }
   }
 
@@ -127,7 +128,8 @@ export class AttractapSessionHandler {
       !(await this.resourceActionGuard.validateResourceAction(
         socket,
         resourceId,
-        AttractapEventType.START_RESOURCE_USAGE_SESSION,
+        AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
+        data.payload?.requestId,
       ))
     ) {
       return;
@@ -137,6 +139,7 @@ export class AttractapSessionHandler {
       socket,
       resourceId,
       action: ResourceFormAction.END,
+      requestId: data.payload?.requestId,
     });
     if (formSubmissions === null) {
       return;
@@ -144,21 +147,24 @@ export class AttractapSessionHandler {
 
     const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
     if (!user) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' }),
-      );
+      await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;
     }
 
     try {
-      await this.resourceUsageService.endSession(resourceId, user, { formSubmissions });
+      await this.resourceUsageService.endSession(
+        resourceId,
+        user,
+        { formSubmissions },
+        {
+          auditOrigin: { actorId: user.id, authenticationMethod: null },
+        },
+      );
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true }));
+      await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true });
     } catch (error) {
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message }),
-      );
+      await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });
     }
   }
 
@@ -169,7 +175,8 @@ export class AttractapSessionHandler {
       !(await this.resourceActionGuard.validateResourceAction(
         socket,
         resourceId,
-        AttractapEventType.START_RESOURCE_USAGE_SESSION,
+        AttractapEventType.LOCK_DOOR,
+        data.payload?.requestId,
       ))
     ) {
       return;
@@ -177,19 +184,17 @@ export class AttractapSessionHandler {
 
     const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
     if (!user) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' }),
-      );
+      await this.reply(socket, data, AttractapEventType.LOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
     }
 
     try {
       await this.resourceUsageService.lockDoor(resourceId, user);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.LOCK_DOOR, { success: true }));
+      await this.reply(socket, data, AttractapEventType.LOCK_DOOR, { success: true });
     } catch (error) {
       const errorMessage = this.extractUserFacingError(error);
       this.logger.error(`Failed to lock door: ${errorMessage}`);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.LOCK_DOOR, { error: errorMessage }));
+      await this.reply(socket, data, AttractapEventType.LOCK_DOOR, { error: errorMessage });
     }
   }
 
@@ -200,7 +205,8 @@ export class AttractapSessionHandler {
       !(await this.resourceActionGuard.validateResourceAction(
         socket,
         resourceId,
-        AttractapEventType.START_RESOURCE_USAGE_SESSION,
+        AttractapEventType.UNLOCK_DOOR,
+        data.payload?.requestId,
       ))
     ) {
       return;
@@ -208,19 +214,17 @@ export class AttractapSessionHandler {
 
     const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
     if (!user) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' }),
-      );
+      await this.reply(socket, data, AttractapEventType.UNLOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
     }
 
     try {
       await this.resourceUsageService.unlockDoor(resourceId, user);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLOCK_DOOR, { success: true }));
+      await this.reply(socket, data, AttractapEventType.UNLOCK_DOOR, { success: true });
     } catch (error) {
       const errorMessage = this.extractUserFacingError(error);
       this.logger.error(`Failed to unlock door: ${errorMessage}`);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLOCK_DOOR, { error: errorMessage }));
+      await this.reply(socket, data, AttractapEventType.UNLOCK_DOOR, { error: errorMessage });
     }
   }
 
@@ -231,7 +235,8 @@ export class AttractapSessionHandler {
       !(await this.resourceActionGuard.validateResourceAction(
         socket,
         resourceId,
-        AttractapEventType.START_RESOURCE_USAGE_SESSION,
+        AttractapEventType.UNLATCH_DOOR,
+        data.payload?.requestId,
       ))
     ) {
       return;
@@ -239,36 +244,56 @@ export class AttractapSessionHandler {
 
     const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
     if (!user) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' }),
-      );
+      await this.reply(socket, data, AttractapEventType.UNLATCH_DOOR, { error: 'USER_NOT_FOUND' });
       return;
     }
 
     try {
       await this.resourceUsageService.unlatchDoor(resourceId, user);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLATCH_DOOR, { success: true }));
+      await this.reply(socket, data, AttractapEventType.UNLATCH_DOOR, { success: true });
     } catch (error) {
       const errorMessage = this.extractUserFacingError(error);
       this.logger.error(`Failed to unlatch door: ${errorMessage}`);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLATCH_DOOR, { error: errorMessage }));
+      await this.reply(socket, data, AttractapEventType.UNLATCH_DOOR, { error: errorMessage });
     }
   }
 
   public async handleTriggerFlowButton(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId, buttonId } = data.payload as { resourceId: number; buttonId: string };
 
-    if (!(await this.resourceActionGuard.validateResourceAction(socket, resourceId, AttractapEventType.TRIGGER_FLOW_BUTTON))) {
+    if (
+      !(await this.resourceActionGuard.validateResourceAction(
+        socket,
+        resourceId,
+        AttractapEventType.TRIGGER_FLOW_BUTTON,
+        data.payload?.requestId,
+      ))
+    ) {
       return;
     }
 
     try {
       await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, socket.state.lastAuthenticatedUserId);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.TRIGGER_FLOW_BUTTON, { success: true }));
+      await this.reply(socket, data, AttractapEventType.TRIGGER_FLOW_BUTTON, { success: true });
     } catch (error) {
       this.logger.error(`Failed to trigger flow button: ${error.message}`);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.TRIGGER_FLOW_BUTTON, { error: error.message }));
+      await this.reply(socket, data, AttractapEventType.TRIGGER_FLOW_BUTTON, { error: error.message });
     }
+  }
+
+  private reply(
+    socket: AuthenticatedWebSocket,
+    request: AttractapEvent['data'],
+    type: AttractapEventType,
+    payload: Record<string, unknown>,
+  ) {
+    const requestId = request.payload?.requestId;
+    return socket.sendMessage(
+      new AttractapEvent(type, {
+        ...payload,
+        ...(Number.isSafeInteger(requestId) && requestId > 0 ? { requestId } : {}),
+      }),
+    );
   }
 
   private extractUserFacingError(error: unknown): string {

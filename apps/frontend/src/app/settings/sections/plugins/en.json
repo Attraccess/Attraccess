@@ -1,0 +1,204 @@
+{
+  "title": "Plugins",
+  "description": "Plugins installed on this instance, and what each of them loaded.",
+  "disabledWarning": {
+    "title": "Plugins are disabled",
+    "description": "Plugins are disabled by the DISABLE_PLUGINS setting and will not load until the application is restarted with it disabled."
+  },
+  "installPlugin": "Install plugin",
+  "uploadButton": "Upload ZIP file",
+  "docsButton": "Documentation",
+  "manageVersion": "Manage version",
+  "classification": {
+    "official": {
+      "label": "Official",
+      "tooltip": "Maintained or approved by Attraccess. This label does not mean the plugin is sandboxed or guaranteed safe."
+    },
+    "community": {
+      "label": "Community",
+      "tooltip": "Not on Attraccess's approved package-source allowlist. Review the source and requested permissions before installing."
+    }
+  },
+  "marketplace": {
+    "title": "Plugin marketplace",
+    "description": "Find compatible plugins from configured package registries.",
+    "official": "Official plugins",
+    "community": "Community plugins",
+    "registry": "Registry",
+    "allRegistries": "All registries",
+    "open": "Browse marketplace",
+    "search": "Search plugins",
+    "searchPlaceholder": "Search plugins or enter an exact package name",
+    "loading": "Searching plugins...",
+    "back": "Back",
+    "about": "About this plugin",
+    "links": "Package links",
+    "versionLabel": "Version",
+    "publisherLabel": "Publisher",
+    "hostCompatibilityLabel": "Host compatibility",
+    "sdkCompatibilityLabel": "SDK compatibility",
+    "sdkCompatibilityValue": "Backend {{backend}}, frontend {{frontend}}",
+    "licenseLabel": "License",
+    "sourceLabel": "Source",
+    "permissionsLabel": "Requested permissions",
+    "safetyWarning": "Review the source and requested permissions before installing.",
+    "details": "Details",
+    "installed": "Installed",
+    "update": "Update plugin",
+    "updateDescription": "Review compatible published versions and update this installed marketplace plugin.",
+    "install": "Install",
+    "noResults": "No packages found. Incompatible packages remain visible with the reason they cannot be installed.",
+    "loadError": "Could not load the marketplace.",
+    "lookupError": "Could not find that package in the selected registry.",
+    "registryManagement": "Manage registries",
+    "registryName": "Registry name",
+    "registryUrl": "Registry URL",
+    "registryToken": "Access token (write-only)",
+    "addRegistry": "Add registry",
+    "testRegistry": "Test",
+    "removeRegistry": "Remove",
+    "tokenConfigured": "Token configured",
+    "noToken": "No token",
+    "registryAdded": "Registry added.",
+    "registryLoadError": "Could not load configured registries.",
+    "registrySaveError": "Could not add the registry.",
+    "registryTestSuccess": "Registry connection succeeded.",
+    "registryTestError": "Could not connect to the registry.",
+    "registryRemoveError": "Could not remove the registry.",
+    "detailTitle": "{{pluginName}} details",
+    "source": "Source: {{registry}}",
+    "version": "Version: {{version}}",
+    "publisher": "Publisher: {{publisher}}",
+    "hostCompatibility": "Host compatibility: {{range}}",
+    "sdkCompatibility": "SDK compatibility: backend {{backend}}, frontend {{frontend}}",
+    "license": "License: {{license}}",
+    "repository": "Repository",
+    "homepage": "Homepage",
+    "integrity": "Integrity: {{integrity}}",
+    "provenance": "Provenance: {{provenance}}",
+    "deprecated": "This package is deprecated.",
+    "permissions": "Requested permissions: {{permissions}}",
+    "installTitle": "Install {{pluginName}}?",
+    "installDescription": "Review the package source and requested permissions before installing.",
+    "installApproval": "I acknowledge this source and its requested permissions.",
+    "restartWarning": "Installing this plugin requires an application restart to activate it.",
+    "cancel": "Cancel",
+    "confirmInstall": "Install plugin",
+    "installSuccess": "Plugin installed. The app will restart in a few seconds to activate it.",
+    "installError": "The plugin was not installed.",
+    "installPermissionHelp": "Sign in with a role that can manage plugins, then try again.",
+    "installRouteHelp": "Reload Attraccess to pick up the latest client. If this persists, check that the frontend and API are running the same version.",
+    "installCompatibilityHelp": "Choose a plugin version compatible with this Attraccess version.",
+    "installVersionHelp": "Refresh the marketplace and choose an available version.",
+    "installServerHelp": "Check the API server logs for the install error, then retry.",
+    "installRetryHelp": "Check the registry connection and try again."
+  },
+  "columns": {
+    "name": "Name",
+    "version": "Version",
+    "directory": "Directory",
+    "permissions": "Permissions",
+    "source": "Source",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "loaded": "Loaded",
+    "error": "Failed to load",
+    "unknown": "Frontend only",
+    "errorTooltip": "View the server load error",
+    "viewError": "View load error for {{pluginName}}",
+    "errorTitle": "{{pluginName}} failed to load",
+    "errorDescription": "The server reported this error during startup:",
+    "close": "Close",
+    "retry": "Retry and restart",
+    "retrySuccess": "The plugin will be retried when the app restarts.",
+    "retryError": "Could not retry the plugin."
+  },
+  "noPermissions": "None requested",
+  "updatePolicy": {
+    "title": "Automatic updates",
+    "description": "Check installed packages from their original registry. Automatic updates never apply major releases, permission additions, prereleases, or deprecated packages.",
+    "enabled": "Check for updates",
+    "enabledHint": "Disabled checks leave installed packages unchanged.",
+    "mode": "Default update policy",
+    "modeHint": "A plugin can use a stricter override.",
+    "prerelease": "Allow prereleases",
+    "prereleaseHint": "Prereleases are never automatically applied.",
+    "checkNow": "Check all now",
+    "checked": "Plugin update checks completed",
+    "checkError": "Could not check plugin updates",
+    "saved": "Update policy saved",
+    "saveError": "Could not save update policy",
+    "available": "Update available",
+    "availableTitle": "Plugin updates are available",
+    "availableDescription": "{{count}} installed marketplace plugin can be updated. Review the available version before applying it.",
+    "reviewUpdates": "Review updates",
+    "modes": { "off": "Off", "patch": "Patch only", "minor": "Patch and minor", "follow": "Follow package policy" }
+  },
+  "deleteTooltip": "Remove plugin",
+  "aside": {
+    "title": "Writing a plugin",
+    "description": "Plugins extend the API and the frontend from a single bundle. The developer guide covers the manifest, the permission model and local development."
+  },
+  "deleteConfirmation": {
+    "title": "Remove plugin?",
+    "message": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Plugin data and secrets are retained for recovery.",
+    "cancel": "Cancel",
+    "delete": "Remove"
+  },
+  "error": {
+    "versions": {
+      "title": "Could not load versions",
+      "description": "The installed package was not changed. Please try again."
+    },
+    "replace": {
+      "title": "Could not replace the plugin",
+      "description": "The current version is still active. Please try again."
+    },
+    "delete": {
+      "title": "Could not remove the plugin",
+      "description": "The plugin is still installed. Please try again."
+    }
+  },
+  "success": {
+    "replace": {
+      "title": "Plugin version replaced",
+      "description": "The app will restart in a few seconds to activate the selected version."
+    },
+    "delete": {
+      "title": "Plugin removed",
+      "description": "The app will reload in a few seconds to drop the plugin's code."
+    }
+  },
+  "versionManagement": {
+    "title": "Manage {{pluginName}} version",
+    "current": "Current version: {{version}}",
+    "loading": "Loading available versions...",
+    "selected": "Selected version: {{version}}",
+    "spec": "Requested version or channel",
+    "autoUpdate": "Plugin automatic update policy",
+    "savePolicy": "Save version policy",
+    "policySaved": "Plugin version policy saved",
+    "policyError": "Could not save plugin version policy",
+    "overrides": {
+      "inherit": "Inherit global policy",
+      "off": "Off",
+      "patch": "Patch only",
+      "minor": "Patch and minor",
+      "follow": "Follow package policy"
+    },
+    "published": "Published: {{date}}",
+    "permissionApproval": "I approve these new permissions: {{permissions}}",
+    "permissionRemovals": "Removed permissions: {{permissions}}",
+    "majorApproval": "I approve this major version update and its restart/downtime.",
+    "deprecated": "Deprecated by publisher: {{notice}}",
+    "integrity": "Integrity: {{integrity}}",
+    "repository": "Release repository",
+    "downgradeWarning": "Downgrading can affect plugin data and requires an application restart.",
+    "cancel": "Cancel",
+    "update": "Update",
+    "downgrade": "Downgrade",
+    "direction": { "current": "Current", "newer": "Newer", "older": "Older" }
+  }
+}

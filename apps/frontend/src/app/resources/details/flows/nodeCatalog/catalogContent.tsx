@@ -4,12 +4,11 @@ import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { CatalogDomainHeader } from './catalogDomainHeader';
 import { CatalogRow } from './catalogRow';
 import { CatalogGroup } from './useNodeCatalog';
-import { Domain } from './domains';
 
 interface Props {
   groups: CatalogGroup[];
-  isDomainExpanded: (domain: Domain) => boolean;
-  setDomainExpanded: (domain: Domain, next: boolean) => void;
+  isDomainExpanded: (domain: string) => boolean;
+  setDomainExpanded: (domain: string, next: boolean) => void;
   onSelect: (nodeType: string) => void;
   tCatalog: TFunction;
   tNodeTranslations: TFunction;

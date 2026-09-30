@@ -70,6 +70,27 @@ Löst nach einer Inaktivitätsperiode an der Ressource aus. Nützlich für Siche
 | **Timeout** | Dauer der Inaktivität vor dem Auslösen |
 | **Einheit** | Sekunden, Minuten oder Stunden |
 
+### Messung starten
+
+Löst aus, wenn eine abgerechnete Nutzungssitzung beginnt (oder übernommen wird), damit der Energiezähler vorbereitet werden kann. Der Zweig muss in **Messung bereit** enden, sonst startet die Sitzung nicht. Gehört zur Gruppe **Billing**.
+
+| Einstellung | Beschreibung |
+|-------------|-------------|
+| **Zeitlimit (Sekunden)** | Wartezeit auf **Messung bereit** (Standard 30) |
+
+### Messwert abfragen
+
+Löst für Zwischenwerte während einer laufenden Sitzung und für den Endwert beim Sitzungsende aus. Der Zweig muss in **Energie melden** enden. Gehört zur Gruppe **Billing**.
+
+| Einstellung | Beschreibung |
+|-------------|-------------|
+| **Zeitlimit (Sekunden)** | Wartezeit auf **Energie melden** (Standard 30) |
+| **Zwischenintervall (Minuten)** | Abstand der Zwischenwerte, live angezeigt und nie abgerechnet (Standard 1, `0` deaktiviert) |
+| **Versuche für den Endwert** | Versuche für einen frischen Endwert (Standard 3) |
+| **Pause zwischen Endwert-Versuchen (Sekunden)** | Pause zwischen den Versuchen (Standard 5) |
+
+Siehe [Energiemessung](flows/energy-metering.md).
+
 ---
 
 ## Verarbeitungs-Knoten
@@ -184,9 +205,40 @@ Zeichnet ein Aktivitätsereignis an der Ressource auf. Setzt den Inaktivitäts-T
 
 Keine zusätzlichen Einstellungen.
 
+### Maschinenbetriebszustand
+
+Aktionen zum Betriebszustand erfassen, ob eine Maschine tatsächlich arbeitet oder stillsteht. Verwenden Sie dafür ein beobachtetes Signal, das Ihr Flow auswertet. Ein gesendeter Befehl oder der Start einer Nutzungssitzung ist allein kein Nachweis für Maschinenbetrieb.
+
+Wiederholte Zuweisungen desselben Zustands ändern nichts. Ein Betriebsintervall bleibt über Sitzungsgrenzen und Serverneustarts hinweg offen, bis ein Flow den Ruhezustand zuweist. Akzeptierte Änderungen speichern den Serverzeitpunkt sowie den auslösenden Flow-Knoten und Flow-Durchlauf. Liegt die Serverzeit vor der letzten akzeptierten Änderung, schlägt die Zuweisung fehl, statt ein ungültiges Intervall zu schreiben.
+
+Eine akzeptierte Betriebsbeobachtung bleibt gespeichert, auch wenn ein späterer Knoten fehlschlägt. Ein fehlgeschlagener Nutzungsstart oder eine fehlgeschlagene Übernahme bricht die zugehörigen Sitzungs- und Abrechnungsänderungen weiterhin ab. Stoppt der Server während einer ausstehenden Nutzungsänderung, wird dieser Versuch beim Neustart verworfen; seine physischen Befehle werden nicht erneut ausgeführt. Aufgezeichneter Maschinenbetrieb bleibt für Auswertungen und Wartung erhalten.
+
+### Messung bereit
+
+Bestätigt, dass der Energiezähler vorbereitet ist. Nur in einem Zweig gültig, der von **Messung starten** ausgelöst wurde. Gehört zur Gruppe **Billing**. Alle Einstellungen sind optionale Vorlagen.
+
+| Einstellung | Beschreibung |
+|-------------|-------------|
+| **Baseline-Wert** / **Baseline-Einheit** | Nur für Lifetime-Zähler, die sich nicht zurücksetzen lassen: der aktuelle Zählerstand; spätere Summen werden ab diesem Wert gezählt |
+| **Quelle** | Bezeichnung des physischen Zählers |
+
+### Energie melden
+
+Meldet die **Gesamtenergie** seit dem Messstart. Nur in einem Zweig gültig, der von **Messwert abfragen** ausgelöst wurde. Gehört zur Gruppe **Billing**. Alle Einstellungen sind Vorlagen.
+
+| Einstellung | Beschreibung |
+|-------------|-------------|
+| **Wert** | Gesamtenergie seit dem Messstart (kein Zuwachs, keine Leistung) |
+| **Einheit** | Eine Energieeinheit wie `Wh`, `kWh`, `MWh`, `J`, `kJ` oder `MJ`; Leistungseinheiten (`W`, `kW`) werden abgelehnt |
+| **Gemessen am** | Optionale ISO-Zeit der Erfassung |
+| **Quelle** | Optionale Bezeichnung des physischen Zählers |
+
+Siehe [Energiemessung](flows/energy-metering.md).
+
 ## Siehe auch
 
 - [Flow-Editor](flows/flow-editor.md) -- Knoten platzieren und verbinden
 - [Flows-Überblick](flows/overview.md) -- Was Flows sind und wie sie funktionieren
 - [MQTT & IoT](mqtt/overview.md) -- MQTT einrichten
+- [Energiemessung](flows/energy-metering.md) -- Strom pro kWh abrechnen
 - [Abrechnung](billing/overview.md) -- Details zum Abrechnungssystem

@@ -12,12 +12,16 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { ResourceMaintenanceSchedule } from '@attraccess/database-entities';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Req } from '@nestjs/common';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
 import { MaintenanceScheduleService } from './maintenance-schedule.service';
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
+import { LicenseModuleType } from '../../license/license.service';
+import { RequiresLicense } from '../../license/require-license.decorator';
 
+@RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenance Schedules')
 @Controller('resources/:resourceId/maintenance-schedules')
 @Auth()
@@ -74,8 +78,15 @@ export class MaintenanceScheduleController {
   async createSchedule(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: CreateMaintenanceScheduleDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceSchedule> {
-    return this.scheduleService.create(resourceId, dto);
+    return this.scheduleService.create(
+      resourceId,
+      dto,
+      req.user.id,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 
   @Put(':scheduleId')
@@ -96,8 +107,16 @@ export class MaintenanceScheduleController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('scheduleId', ParseIntPipe) scheduleId: number,
     @Body() dto: UpdateMaintenanceScheduleDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceSchedule> {
-    return this.scheduleService.update(resourceId, scheduleId, dto);
+    return this.scheduleService.update(
+      resourceId,
+      scheduleId,
+      dto,
+      req.user.id,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 
   @Delete(':scheduleId')
@@ -117,7 +136,14 @@ export class MaintenanceScheduleController {
   async deleteSchedule(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('scheduleId', ParseIntPipe) scheduleId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    await this.scheduleService.delete(resourceId, scheduleId);
+    await this.scheduleService.delete(
+      resourceId,
+      scheduleId,
+      req.user.id,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 }

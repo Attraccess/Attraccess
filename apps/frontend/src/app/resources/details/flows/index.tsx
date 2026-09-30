@@ -1,8 +1,18 @@
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  ReactFlow,
+  Node,
+  Panel,
+  Edge,
+  useReactFlow,
+  SelectionMode,
+} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ButtonGroup } from '@heroui/react';
+import { ButtonGroup, Spinner } from '@heroui/react';
 import {
   ApiError,
   ResourceFlowEdgeDto,
@@ -13,9 +23,9 @@ import {
   useResourceFlowsServiceSaveResourceFlow,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '@heroui/react';
+import { useAppTheme } from '@attraccess/ui';
 import { usePtrStore } from '../../../../stores/ptr.store';
-import Dagre from '@dagrejs/dagre';
+import { getLayoutedElements } from './flowLayout';
 import { Button } from '../../../../components/button';
 import {
   BoxSelectIcon,
@@ -37,6 +47,7 @@ import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
 import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
+import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
 import de from './de.json';
 import en from './en.json';
 import nodesDeTranslations from './node/de.json';
@@ -44,35 +55,6 @@ import nodesEnTranslations from './node/en.json';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
-
-function getLayoutedElements(nodes: Node[], edges: Edge[]) {
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB' });
-
-  edges.forEach((edge) => g.setEdge(edge.source, edge.target));
-  nodes.forEach((node) =>
-    g.setNode(node.id, {
-      ...node,
-      width: node.measured?.width ?? 0,
-      height: node.measured?.height ?? 0,
-    }),
-  );
-
-  Dagre.layout(g);
-
-  return {
-    nodes: nodes.map((node) => {
-      const position = g.node(node.id);
-      // We are shifting the dagre node position (anchor=center center) to the top left
-      // so it matches the React Flow node anchor point (top left).
-      const x = position.x - (node.measured?.width ?? 0) / 2;
-      const y = position.y - (node.measured?.height ?? 0) / 2;
-
-      return { ...node, position: { x, y } };
-    }),
-    edges,
-  };
-}
 
 // Efficient comparison functions to replace expensive JSON.stringify operations
 function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNodeDto | Node): boolean {
@@ -93,7 +75,7 @@ const jsConfetti = new JSConfetti();
 
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useAppTheme();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -118,13 +100,14 @@ function FlowsPageInner() {
     };
   }, [setPullToRefreshIsEnabled]);
 
-  const { data: originalFlowData } = useResourceFlowsServiceGetResourceFlow(
-    { resourceId: Number(resourceId) },
-    undefined,
-    {
-      enabled: !!resourceId,
-    },
-  );
+  const {
+    data: originalFlowData,
+    isFetching: isFlowFetching,
+    isError: isFlowError,
+  } = useResourceFlowsServiceGetResourceFlow({ resourceId: Number(resourceId) }, undefined, {
+    enabled: !!resourceId,
+  });
+  const isFlowLoading = !originalFlowData && isFlowFetching;
 
   const toast = useToastMessage();
 
@@ -148,7 +131,7 @@ function FlowsPageInner() {
     },
   });
 
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition, getInternalNode } = useReactFlow();
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   const nodeCatalogRef = useRef<NodeCatalogHandle>(null);
   const {
@@ -163,6 +146,7 @@ function FlowsPageInner() {
     addLiveLogReceiver,
     removeLiveLogReceiver,
     flowNodeTypes,
+    setValidationErrors,
     copySelectedNodes,
     cutSelectedNodes,
     pasteNodes,
@@ -181,8 +165,12 @@ function FlowsPageInner() {
     if (originalFlowData) {
       setNodes(originalFlowData.nodes);
       setEdges(originalFlowData.edges);
+      setValidationErrors(
+        (originalFlowData as unknown as { validationErrors?: Array<{ nodeId: string; message: string }> })
+          .validationErrors ?? [],
+      );
     }
-  }, [originalFlowData, setNodes, setEdges]);
+  }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
 
   const nodesHaveChanged = useMemo(() => {
     const originalNodes = originalFlowData?.nodes ?? [];
@@ -239,11 +227,19 @@ function FlowsPageInner() {
   }, [nodes, edges, saveFlow, resourceId]);
 
   const layout = useCallback(() => {
-    const layouted = getLayoutedElements(nodes, edges);
+    const sourceHandles = new Map(
+      nodes.map((node) => [
+        node.id,
+        [...(getInternalNode(node.id)?.internals.handleBounds?.source ?? [])]
+          .sort((a, b) => a.x - b.x)
+          .flatMap((handle) => (handle.id == null ? [] : [handle.id])),
+      ]),
+    );
+    const layouted = getLayoutedElements(nodes, edges, sourceHandles);
     setNodes([...layouted.nodes]);
     setEdges([...layouted.edges]);
     fitView();
-  }, [nodes, edges, fitView, setNodes, setEdges]);
+  }, [nodes, edges, fitView, setNodes, setEdges, getInternalNode]);
 
   const addStartNode = useCallback(
     (nodeType: string) => {
@@ -311,9 +307,7 @@ function FlowsPageInner() {
     }
     return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   }, []);
-  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() =>
-    isCoarsePointer ? 'pan' : 'select',
-  );
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() => (isCoarsePointer ? 'pan' : 'select'));
   // @xyflow/react's mouse-button array in panOnDrag doesn't apply to touch, so for select mode on touch we must disable pan entirely.
   const panOnDrag = interactionMode === 'pan' ? true : isCoarsePointer ? false : [1, 2];
   const selectionOnDrag = interactionMode === 'select';
@@ -400,7 +394,7 @@ function FlowsPageInner() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+      <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-border">
         <NodeCatalogPanel
           ref={nodeCatalogRef}
           resourceId={Number(resourceId)}
@@ -408,12 +402,20 @@ function FlowsPageInner() {
           tNodeTranslations={tNodeTranslations}
         />
         <div
-          className="flex-1 h-full"
+          className="flex-1 h-full relative"
           onMouseMove={(e) => {
             mousePosRef.current = { x: e.clientX, y: e.clientY };
           }}
         >
           <ReactFlow
+            className="[--xy-background-color:var(--background)] [--xy-background-pattern-color:var(--border)]
+              [--xy-edge-stroke:var(--muted)] [--xy-edge-stroke-selected:var(--accent)]
+              [--xy-connectionline-stroke:var(--accent)]
+              [--xy-handle-background-color:var(--foreground)] [--xy-handle-border-color:var(--surface)]
+              [--xy-controls-button-background-color:var(--surface)] [--xy-controls-button-background-color-hover:var(--surface-secondary)]
+              [--xy-controls-button-color:var(--foreground)] [--xy-controls-button-color-hover:var(--foreground)]
+              [--xy-controls-button-border-color:var(--border)] [--xy-controls-box-shadow:var(--surface-shadow)]
+              [--xy-selection-background-color:var(--accent-soft)] [--xy-selection-border:1px_dotted_var(--accent)]"
             nodes={nodes}
             edges={edgesWithCorrectType}
             onNodesChange={onNodesChange}
@@ -426,13 +428,19 @@ function FlowsPageInner() {
             selectionMode={SelectionMode.Partial}
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
-            colorMode={theme === 'dark' ? 'dark' : 'light'}
+            colorMode={resolvedTheme}
             fitView
+            // ponytail: fixed floor, derive it from the graph bounding box if 0.02 ever bites.
+            // React Flow's default minZoom of 0.5 clamps fitView on flows taller than the pane,
+            // which then centres on the bounding box and parks the viewport in a gap between
+            // nodes - the canvas looks empty even though every node is rendered.
+            minZoom={0.02}
             defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
             nodeTypes={flowNodeTypes}
             edgeTypes={edgeTypes}
           >
             <Controls />
+            <FlowNodeQuerySelection key={resourceId} nodes={nodes} setNodes={setNodes} />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
@@ -461,19 +469,24 @@ function FlowsPageInner() {
                 isPending={isSaving}
                 onPress={save}
                 isDisabled={!flowHasChanged}
-                variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'ghost'}
+                variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'secondary'}
               >
                 <SaveIcon />
               </Button>
-              <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')}>
+              <Button
+                isIconOnly
+                onPress={handleImportClick}
+                aria-label={t('actions.import')}
+                isDisabled={isFlowLoading}
+              >
                 <UploadIcon />
               </Button>
-              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')}>
+              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>
                 <DownloadIcon />
               </Button>
               <LogViewer resourceId={Number(resourceId)}>
                 {(open) => (
-                  <Button isIconOnly onPress={open}>
+                  <Button isIconOnly onPress={open} aria-label={t('actions.logs')}>
                     <LogsIcon />
                   </Button>
                 )}
@@ -487,7 +500,7 @@ function FlowsPageInner() {
                 )}
               </VariablesModal>
 
-              <Button isIconOnly onPress={layout}>
+              <Button isIconOnly onPress={layout} isDisabled={isFlowLoading}>
                 <LayoutGridIcon />
               </Button>
               <Button
@@ -496,11 +509,27 @@ function FlowsPageInner() {
                 onPress={() => nodeCatalogRef.current?.open()}
                 aria-label={t('actions.addNode')}
                 className="md:hidden"
+                isDisabled={isFlowLoading}
               >
                 <PlusIcon />
               </Button>
             </Panel>
           </ReactFlow>
+          {(isFlowLoading || (isFlowError && !originalFlowData)) && (
+            <div
+              className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm"
+              role={isFlowError ? 'alert' : 'status'}
+              aria-live="polite"
+              aria-label={isFlowError ? t('loadError') : t('loading')}
+              aria-busy={isFlowLoading}
+            >
+              {isFlowError ? (
+                <p className="text-danger text-sm text-center px-4">{t('loadError')}</p>
+              ) : (
+                <Spinner size="lg" />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

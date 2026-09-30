@@ -1,11 +1,20 @@
 {
   "logout": "Logout",
+  "collapseSidebar": "Collapse sidebar",
+  "expandSidebar": "Expand sidebar",
   "language": "Language",
   "languages": {
     "en": "English",
     "de": "Deutsch"
   },
   "account": "Account",
+  "design": "Design ({{variant}})",
+  "designVariants": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "userMenu": "User menu",
   "groups": {
     "##default##": {
       "items": {
@@ -13,24 +22,23 @@
         "projects": "Projects",
         "messages": "Messages",
         "billing": "Billing",
+        "csvExport": "CSV Export",
         "attractap": "NFC-Cards",
-        "userManagement": "User Management"
+        "users": "Users",
+        "settings": "Settings"
       }
     },
-    "system": {
-      "label": "System",
+    "devices": {
+      "label": "Devices",
       "items": {
-        "plugins": "Plugins",
-        "emailTemplates": "Email Templates",
+        "attractapReaders": "Attractap Readers",
         "mqttServers": "MQTT Servers",
-        "csvExport": "CSV Export",
-        "balena": "Balena",
-        "settings": "Settings"
+        "companion": "Companion App",
+        "balena": "Balena"
       }
     }
   },
   "endItems": {
-    "docs": "Documentation",
     "dependencies": "Dependencies",
     "changelog": "Changelog",
     "groups": {
@@ -39,6 +47,13 @@
         "items": {
           "reportBug": "Report a Bug",
           "requestFeature": "Request a Feature"
+        }
+      },
+      "docsAndTools": {
+        "label": "Docs & Tools",
+        "items": {
+          "docs": "Documentation",
+          "printables": "3D Models"
         }
       }
     }

@@ -1,5 +1,29 @@
 {
   "title": "Konto",
+  "subtitle": "Finde die gewünschte Einstellung und öffne sie zum Bearbeiten.",
+  "search": "Einstellung suchen…",
+  "noResults": "Keine passenden Einstellungen",
+  "groups": {
+    "identity": "Identität",
+    "access": "Anmeldung und Zugriff",
+    "preferences": "Einstellungen",
+    "advanced": "Erweitert"
+  },
+  "topics": {
+    "profile": { "title": "Persönliche Daten", "description": "E-Mail-Adresse und Benutzername" },
+    "password": { "title": "Passwort", "description": "Anmeldepasswort ändern" },
+    "twoFactor": { "title": "Zwei-Faktor-Authentifizierung", "description": "Authenticator-App hinzufügen" },
+    "passkeys": { "title": "Passkeys", "description": "Passwortlose Anmeldung verwalten" },
+    "notifications": { "title": "Benachrichtigungen", "description": "Auswählen, was dich wo erreicht" },
+    "tokens": { "title": "API-Tokens", "description": "Zugriff für Integrationen verwalten" },
+    "delete": { "title": "Konto löschen", "description": "Dauerhafte Kontolöschung anfordern" }
+  },
+  "searchTerms": {
+    "email": "E-Mail",
+    "username": "Benutzername",
+    "authenticator": "Authenticator 2FA",
+    "push": "Push"
+  },
   "sections": {
     "profile": "Profil",
     "security": "Sicherheit",

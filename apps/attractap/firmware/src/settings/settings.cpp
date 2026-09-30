@@ -1,13 +1,20 @@
 #include "settings.hpp"
+#include <string>
 
-Preferences Settings::preferences;
+#ifdef ATTRACTAP_HOST
+#include <random>
+#else
+#include "esp_random.h"
+#endif
+
+KVStore Settings::preferences;
 Logger Settings::logger("Settings");
 
 DeviceConfig Settings::_deviceConfig;
 NetworkConfig Settings::_networkConfig;
 AttraccessApiConfig Settings::_attraccessApiConfig;
 AttraccessAuthConfig Settings::_attraccessAuthConfig;
-String Settings::_hostname;
+std::string Settings::_hostname;
 
 void Settings::setup()
 {
@@ -42,7 +49,7 @@ DeviceConfig Settings::getDeviceConfig()
     return _deviceConfig;
 }
 
-void Settings::setDevicePin(String passCode)
+void Settings::setDevicePin(const std::string &passCode)
 {
     logger.info("Setting device pin...");
     _deviceConfig.passCode = passCode;
@@ -82,7 +89,7 @@ NetworkConfig Settings::getNetworkConfig()
     return _networkConfig;
 }
 
-void Settings::saveNetworkConfig(String ssid, String password)
+void Settings::saveNetworkConfig(const std::string &ssid, const std::string &password)
 {
     logger.info("Saving network config...");
     preferences.begin("settings", false);
@@ -101,7 +108,7 @@ AttraccessApiConfig Settings::getAttraccessApiConfig()
     return _attraccessApiConfig;
 }
 
-void Settings::saveAttraccessApiConfig(String hostname, uint16_t port, bool useSSL)
+void Settings::saveAttraccessApiConfig(const std::string &hostname, uint16_t port, bool useSSL)
 {
     logger.info("Saving attraccess api config...");
     preferences.begin("settings", false);
@@ -123,7 +130,7 @@ AttraccessAuthConfig Settings::getAttraccessAuthConfig()
     return _attraccessAuthConfig;
 }
 
-void Settings::saveAttraccessAuthConfig(String apiKey, uint32_t readerId)
+void Settings::saveAttraccessAuthConfig(const std::string &apiKey, uint32_t readerId)
 {
     logger.info("Saving attraccess auth config...");
     preferences.begin("settings", false);
@@ -151,12 +158,17 @@ void Settings::clearAttraccessAuthConfig()
     preferences.end();
 }
 
-String Settings::getHostname()
+std::string Settings::getHostname()
 {
-    if (_hostname.isEmpty())
+    if (_hostname.empty())
     {
-        String randomSuffix = String(random(1000, 9999));
-        _hostname = String(FIRMWARE_FRIENDLY_NAME) + "-" + String(FIRMWARE_VARIANT_FRIENDLY_NAME) + "-" + randomSuffix;
+        // Same range as Arduino random(1000, 9999): 1000..9998
+        #ifdef ATTRACTAP_HOST
+        std::string randomSuffix = "desktop";
+        #else
+        std::string randomSuffix = std::to_string(1000 + (esp_random() % 8999));
+        #endif
+        _hostname = std::string(FIRMWARE_FRIENDLY_NAME) + "-" + FIRMWARE_VARIANT_FRIENDLY_NAME + "-" + randomSuffix;
         preferences.begin("settings", false);
         preferences.putString("hostname", _hostname);
         preferences.end();

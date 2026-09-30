@@ -1,6 +1,46 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalendarDate, getLocalTimeZone } from '@internationalized/date';
-import { rangeToDateBounds } from './compute-range';
+import { computeRange, daysBetween, rangeToDateBounds, type Preset } from './compute-range';
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2024-03-15T12:00:00Z'));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+it.each<[Preset, string, string]>([
+  ['today', '2024-03-15', '2024-03-15'],
+  ['yesterday', '2024-03-14', '2024-03-14'],
+  ['last7d', '2024-03-09', '2024-03-15'],
+  ['last30d', '2024-02-15', '2024-03-15'],
+  ['thisMonth', '2024-03-01', '2024-03-15'],
+  ['lastMonth', '2024-02-01', '2024-02-29'],
+  ['thisYear', '2024-01-01', '2024-03-15'],
+])('computes inclusive %s bounds across leap-year dates', (preset, start, end) => {
+  const range = computeRange(preset);
+  expect(range?.start.toString()).toBe(start);
+  expect(range?.end.toString()).toBe(end);
+});
+it('handles the previous year and custom ranges', () => {
+  vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
+  expect(computeRange('lastMonth')?.start.toString()).toBe('2023-12-01');
+  expect(computeRange('lastMonth')?.end.toString()).toBe('2023-12-31');
+  expect(computeRange('custom')).toBeNull();
+});
+it('counts inclusive days and applies the entire final day to export bounds', () => {
+  const range = { start: new CalendarDate(2024, 3, 10), end: new CalendarDate(2024, 3, 15) };
+  expect(daysBetween(range)).toBe(6);
+  expect(daysBetween(null)).toBeNull();
+  expect(rangeToDateBounds(range, new Date(0))).toEqual({
+    start: new Date(2024, 2, 10),
+    end: new Date(2024, 2, 15, 23, 59, 59, 999),
+  });
+});
+it('does not mutate the fallback date when there is no selected range', () => {
+  const fallback = new Date('2024-03-15T12:34:00Z');
+  expect(rangeToDateBounds(null, fallback)).toEqual({ start: fallback, end: new Date(2024, 2, 15, 23, 59, 59, 999) });
+  expect(fallback.toISOString()).toBe('2024-03-15T12:34:00.000Z');
+});
 
 describe('rangeToDateBounds', () => {
   it('uses end-of-day for the end bound so usages on the end day are included', () => {

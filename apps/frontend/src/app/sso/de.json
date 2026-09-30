@@ -1,7 +1,0 @@
-{
-  "title": "SSO-Anbieter",
-  "subtitle": "Verwalten Sie Single Sign-On-Anbieter für die Systemauthentifizierung",
-  "actions": {
-    "addNew": "Neuen Anbieter hinzufügen"
-  }
-}

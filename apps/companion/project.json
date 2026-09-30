@@ -1,0 +1,99 @@
+{
+  "name": "companion",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/companion/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:core", "scope:companion"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion-ws-client:generate"],
+      "options": {
+        "cwd": "apps/companion",
+        "parallel": true,
+        "commands": ["vite dev --config renderer/vite.config.ts --port 5273 --strictPort", "node tools/dev.mjs"]
+      }
+    },
+    "build-renderer": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/renderer/dist"],
+      "options": {
+        "cwd": "apps/companion/renderer",
+        "command": "vite build --config vite.config.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["companion-ws-client:build", "build-renderer"],
+      "// inputs": "electron-builder with no target flag builds for the host only, so this target's outputs are platform-specific while its file inputs are identical on every runner. The runtime input keeps the three CI runners (linux/mac/windows) on separate hashes \u2014 without it they share one entry in the remote cache and two of the three restore the wrong platform's dist/.",
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "runtime": "node -p \"process.platform + '-' + process.arch\""
+        }
+      ],
+      "outputs": ["{projectRoot}/out", "{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/companion",
+        "commands": [
+          "esbuild src/main.ts --bundle --platform=node --external:electron --external:usb --outfile=out/main.js --format=cjs --alias:@attraccess/companion-ws-client=../../libs/companion-ws-client/src/index.ts",
+          "esbuild src/preload.ts --bundle --platform=node --external:electron --outfile=out/preload.js --format=cjs",
+          "electron-builder --config electron-builder.config.cjs"
+        ],
+        "parallel": false,
+        "env": {
+          "CI": "true"
+        }
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion-ws-client:generate"],
+      "options": {
+        "cwd": "apps/companion",
+        "commands": ["tsc -p tsconfig.app.json --noEmit", "tsc -p tsconfig.renderer.json --noEmit"],
+        "parallel": false
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/companion"],
+      "options": {
+        "jestConfig": "apps/companion/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["apps/companion/**/*.ts", "apps/companion/**/*.tsx"]
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/companion"
+      }
+    },
+    "test-renderer": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "command": "vitest run --config apps/companion/renderer/vitest.config.mts"
+      }
+    }
+  }
+}

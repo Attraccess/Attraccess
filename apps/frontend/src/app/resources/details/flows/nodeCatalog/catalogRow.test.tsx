@@ -14,7 +14,7 @@ const tStub: TFunction = ((key: string) => {
 }) as unknown as TFunction;
 
 const node: CatalogNode = {
-  schema: { type: ResourceFlowNodeType.INPUT_BUTTON, inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
+  schema: { type: ResourceFlowNodeType.INPUT_BUTTON, inputs: [], outputs: ['out'], isInput: true, isOutput: false, supportedByResource: true, configSchema: {} },
   direction: 'down',
 };
 
@@ -23,6 +23,23 @@ describe('CatalogRow', () => {
     render(<CatalogRow node={node} tNodeTranslations={tStub} onSelect={vi.fn()} />);
     expect(screen.getByText('Button')).toBeInTheDocument();
     expect(screen.getByText('User-triggered start')).toBeInTheDocument();
+  });
+
+  it('renders a plugin-provided name and description without i18n', () => {
+    const pluginNode: CatalogNode = {
+      ...node,
+      schema: {
+        ...node.schema,
+        type: 'plugin.example.action',
+        label: 'Control device',
+        description: 'Select a capability to control.',
+      },
+    };
+
+    render(<CatalogRow node={pluginNode} tNodeTranslations={tStub} onSelect={vi.fn()} />);
+
+    expect(screen.getByText('Control device')).toBeInTheDocument();
+    expect(screen.getByText('Select a capability to control.')).toBeInTheDocument();
   });
 
   it('calls onSelect with node type on click', async () => {

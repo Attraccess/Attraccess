@@ -1,11 +1,20 @@
 {
   "logout": "Abmelden",
+  "collapseSidebar": "Seitenleiste minimieren",
+  "expandSidebar": "Seitenleiste ausklappen",
   "language": "Sprache",
   "languages": {
     "en": "Englisch",
     "de": "Deutsch"
   },
   "account": "Konto",
+  "design": "Darstellung ({{variant}})",
+  "designVariants": {
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System"
+  },
+  "userMenu": "Benutzermenü",
   "groups": {
     "##default##": {
       "items": {
@@ -13,24 +22,23 @@
         "projects": "Projekte",
         "messages": "Nachrichten",
         "billing": "Zahlungen",
+        "csvExport": "CSV-Export",
         "attractap": "NFC-Karten",
-        "userManagement": "Benutzerverwaltung"
+        "users": "Benutzer",
+        "settings": "Einstellungen"
       }
     },
-    "system": {
-      "label": "System",
+    "devices": {
+      "label": "Geräte",
       "items": {
-        "plugins": "Plugins",
-        "emailTemplates": "E-Mail-Vorlagen",
+        "attractapReaders": "Attractap-Lesegeräte",
         "mqttServers": "MQTT-Server",
-        "csvExport": "CSV-Export",
-        "balena": "Balena",
-        "settings": "Einstellungen"
+        "companion": "Companion-App",
+        "balena": "Balena"
       }
     }
   },
   "endItems": {
-    "docs": "Dokumentation",
     "dependencies": "Abhängigkeiten",
     "changelog": "Änderungsprotokoll",
     "groups": {
@@ -39,6 +47,13 @@
         "items": {
           "reportBug": "Fehler melden",
           "requestFeature": "Funktion vorschlagen"
+        }
+      },
+      "docsAndTools": {
+        "label": "Doku & Werkzeuge",
+        "items": {
+          "docs": "Dokumentation",
+          "printables": "3D-Modelle"
         }
       }
     }

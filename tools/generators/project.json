@@ -3,10 +3,18 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "tools/generators/src",
   "projectType": "library",
-  "tags": [],
+  "tags": ["type:tool", "scope:core"],
+  "implicitDependencies": [
+    "frontend",
+    "companion",
+    "ui",
+    "plugins-frontend-ui",
+    "plugins-frontend-sdk"
+  ],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
+      "dependsOn": [],
       "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/tools/generators",
@@ -35,6 +43,12 @@
             "output": "."
           }
         ]
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs tools/generators"
       }
     }
   }

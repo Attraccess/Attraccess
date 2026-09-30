@@ -170,7 +170,7 @@ export class ResourceFormsService {
   ): Promise<{ totalFieldCount: number; fields: FormFieldResponseDto[] }> {
     await this.ensureResourceExists(resourceId);
     const form = await this.getFormOrThrow(resourceId, formId);
-    const fields = (form.fields ?? []).sort((a, b) => a.id - b.id);
+    const fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
     const safeOffset = Math.max(0, offset);
     const safeLimit = Math.max(1, limit);
     const window = fields.slice(safeOffset, safeOffset + safeLimit).map((field) => this.mapFieldResponse(field));
@@ -210,6 +210,17 @@ export class ResourceFormsService {
     resourceUsageId: number;
     manager: EntityManager;
   }): Promise<FormSubmission[]> {
+    const submissions = await this.prepareRequiredSubmissions(options);
+    const repository = options.manager.getRepository(FormSubmission);
+    const saved: FormSubmission[] = [];
+    for (const submission of submissions) saved.push(await repository.save(submission));
+    return saved;
+  }
+
+  /** Validate and snapshot answers before external lifecycle effects, without publishing submissions. */
+  async prepareRequiredSubmissions(
+    options: Parameters<ResourceFormsService['saveRequiredSubmissions']>[0],
+  ): Promise<FormSubmission[]> {
     const forms = await this.getFormsByAction(options.resourceId, options.action, options.manager);
 
     if (!forms.length) {
@@ -220,8 +231,6 @@ export class ResourceFormsService {
       }
       return [];
     }
-
-    const submissionRepo = options.manager.getRepository(FormSubmission);
 
     const submissionEntities: FormSubmission[] = [];
 
@@ -240,7 +249,7 @@ export class ResourceFormsService {
 
       const data = this.buildSubmissionData(form, submission);
 
-      const submissionEntity = await submissionRepo.save({
+      const submissionEntity = Object.assign(new FormSubmission(), {
         formId: form.id,
         form,
         resourceUsageId: options.resourceUsageId,
@@ -290,7 +299,7 @@ export class ResourceFormsService {
       order: { createdAt: 'ASC' },
     });
     return forms.map((form) => {
-      form.fields = (form.fields ?? []).sort((a, b) => a.id - b.id);
+      form.fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
       return form;
     });
   }
@@ -315,6 +324,7 @@ export class ResourceFormsService {
       isRequired: field.isRequired,
       description: field.description ?? null,
       options: parseFieldOptions(field.type, field.options),
+      position: field.position,
     };
   }
 
@@ -368,6 +378,7 @@ export class ResourceFormsService {
     fieldDto.isRequired = field.isRequired;
     fieldDto.description = field.description;
     fieldDto.options = field.options;
+    fieldDto.position = field.position;
     return fieldDto;
   }
 
@@ -381,7 +392,9 @@ export class ResourceFormsService {
     response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
     response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
     response.resourceId = form.resourceId;
-    response.fields = (form.fields ?? []).map((field) => this.mapFieldResponse(field));
+    response.fields = (form.fields ?? [])
+      .sort((a, b) => a.position - b.position)
+      .map((field) => this.mapFieldResponse(field));
 
     return response;
   }

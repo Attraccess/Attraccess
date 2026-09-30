@@ -52,7 +52,7 @@ interface PutUserBody {
 export class RabbitmqUsersService {
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
-    @Inject(RabbitmqManagementClient) private readonly client: RabbitmqManagementClient
+    @Inject(RabbitmqManagementClient) private readonly client: RabbitmqManagementClient,
   ) {}
 
   // Lists all users with their per-vhost permissions, plus the vhost list for
@@ -132,7 +132,7 @@ export class RabbitmqUsersService {
       // (and the broker connection) out.
       throw new HttpException(
         'Refusing to delete the user the MQTT server connection is configured with.',
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -154,14 +154,14 @@ export class RabbitmqUsersService {
     await this.client.request(
       config,
       'DELETE',
-      `/permissions/${encodeURIComponent(vhost)}/${encodeURIComponent(username)}`
+      `/permissions/${encodeURIComponent(vhost)}/${encodeURIComponent(username)}`,
     );
   }
 
   private async putPermission(
     config: MqttServerConnectionConfig,
     username: string,
-    permission: RabbitmqPermission | SetRabbitmqPermissionDto
+    permission: RabbitmqPermission | SetRabbitmqPermissionDto,
   ): Promise<void> {
     await this.client.request(
       config,
@@ -171,7 +171,7 @@ export class RabbitmqUsersService {
         configure: permission.configure ?? '',
         write: permission.write ?? '',
         read: permission.read ?? '',
-      }
+      },
     );
   }
 
@@ -202,7 +202,10 @@ export class RabbitmqUsersService {
       return tags.filter((tag) => tag.length > 0);
     }
     if (typeof tags === 'string' && tags.length > 0) {
-      return tags.split(',').map((tag) => tag.trim()).filter((tag) => tag.length > 0);
+      return tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0);
     }
     return [];
   }

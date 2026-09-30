@@ -8,6 +8,7 @@ import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
 import { ProjectAccessService } from './project-access.service';
 import { Currency } from '../billing/dto/set-configuration.dto';
+import { computeNextPage } from '../types/response';
 
 type UsageSummaryRaw = {
   totalSessions: string | null;
@@ -75,6 +76,7 @@ export class ProjectUsageService {
       .leftJoinAndSelect('usage.resource', 'resource')
       .leftJoinAndSelect('usage.project', 'project')
       .where('usage.projectId = :projectId', { projectId })
+      .andWhere('usage.lifecyclePending = FALSE')
       .orderBy('usage.startTime', 'DESC');
 
     this.applyDateFilters(qb, 'usage', query.startDate, query.endDate);
@@ -84,7 +86,7 @@ export class ProjectUsageService {
       .take(query.limit)
       .getManyAndCount();
 
-    const nextPage = query.page * query.limit < total ? query.page + 1 : undefined;
+    const nextPage = computeNextPage(query.page, query.limit, total);
 
     return {
       data,

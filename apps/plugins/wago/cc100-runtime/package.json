@@ -1,0 +1,9 @@
+{
+  "name": "@attraccess/wago-cc100-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Data-driven WAGO CC100 runtime for Attraccess.",
+  "dependencies": {
+    "mqtt": "^5.15.2"
+  }
+}

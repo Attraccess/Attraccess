@@ -1,5 +1,11 @@
 name: 'Setup Workspace'
-description: 'Install Node.js, pnpm, dependencies, Python, and PlatformIO. Must be called after actions/checkout.'
+description: 'Install Node.js, pnpm, and dependencies. Optionally install the ESP-IDF firmware toolchain. Must be called after actions/checkout.'
+
+inputs:
+  esp-idf:
+    description: 'Install the ESP-IDF toolchain (needed for jobs that build the Attractap firmware)'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -8,7 +14,7 @@ runs:
       uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version-file: '.nvmrc'
         cache: 'pnpm'
@@ -19,12 +25,20 @@ runs:
       shell: bash
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      if: inputs.esp-idf == 'true'
+      uses: actions/setup-python@v7
       with:
-        python-version: '3.x'
+        # Pinned: the IDF virtualenv is named after the interpreter
+        # (idf6.0_py3.13_env), so `3.x` drifting to 3.14 no longer matches the
+        # cached env and breaks the firmware build.
+        python-version: '3.13'
 
-    - name: Install PlatformIO and ESP tools
+    - name: Install ESP tools
+      if: inputs.esp-idf == 'true'
       run: |
         python -m pip install --upgrade pip
-        pip install platformio esptool
+        pip install esptool
       shell: bash
+
+    - uses: ./.github/actions/esp-idf-toolchain
+      if: inputs.esp-idf == 'true'

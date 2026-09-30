@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attraccess Config</title>
   <style>
+    :root { color-scheme: light; --accent: #256D7B; --accent-hover: #1c5560; --foreground: #202b30; --muted: #536369; --border: #d6dede; --surface: #f4f6f6; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 1rem; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; color: var(--foreground); border-top: 6px solid var(--accent); padding: 1rem; }
     h1 { font-size: 1.5rem; margin-bottom: 1rem; }
-    h2 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #555; }
+    h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
     .container { max-width: 800px; margin: 0 auto; }
-    .card { background: #fff; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
     .status-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
     .status-bar.running { background: #e8f5e9; color: #2e7d32; }
     .status-bar.stopped { background: #ffebee; color: #c62828; }
@@ -18,44 +19,48 @@
     .status-bar.running .status-dot { background: #4caf50; }
     .status-bar.stopped .status-dot { background: #f44336; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
-    th { color: #888; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
-    .actions { display: flex; gap: 0.25rem; }
-    button { cursor: pointer; border: none; border-radius: 4px; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
-    .btn-primary { background: #1976d2; color: #fff; }
-    .btn-primary:hover { background: #1565c0; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    button { cursor: pointer; border: 1px solid transparent; border-radius: 4px; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: 600; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
     .btn-danger { background: #d32f2f; color: #fff; }
     .btn-danger:hover { background: #c62828; }
-    .btn-secondary { background: #e0e0e0; color: #333; }
-    .btn-secondary:hover { background: #bdbdbd; }
-    input[type="text"] { border: 1px solid #ccc; border-radius: 4px; padding: 0.4rem 0.6rem; font-size: 0.9rem; width: 100%; }
+    .btn-secondary { background: var(--surface); border-color: var(--border); color: var(--foreground); }
+    .btn-secondary:hover { background: #e6ecec; }
+    input[type="text"], input[type="password"] { background: #fff; color: var(--foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; font-size: 0.9rem; width: 100%; }
+    input::placeholder { color: var(--muted); }
+    input[type="checkbox"] { accent-color: var(--accent); }
     .add-form { display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; padding-top: 0.2rem; }
     .add-form .field { flex: 1; min-width: 150px; }
-    .add-form label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 0.2rem; }
+    .add-form label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.2rem; }
     .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    .settings-grid label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 0.2rem; }
+    .settings-grid label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.2rem; }
     .settings-grid.full { grid-template-columns: 1fr; }
     .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
     .checkbox-row input { width: auto; }
-    .edit-input { border: 1px solid #1976d2; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 100%; }
-    .empty-state { text-align: center; color: #999; padding: 2rem; }
-    .desc { font-size: 0.8rem; color: #888; margin-bottom: 0.75rem; line-height: 1.4; }
-    .field-hint { font-size: 0.75rem; color: #aaa; margin-top: 0.15rem; }
-    .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid #e0e0e0; }
-    .tab { padding: 0.6rem 1.2rem; cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #888; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; background: none; border-radius: 0; }
-    .tab:hover { color: #555; }
-    .tab.active { color: #1976d2; border-bottom-color: #1976d2; }
+    .edit-input { background: #fff; color: var(--foreground); border: 1px solid var(--accent); border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 100%; }
+    .empty-state { text-align: center; color: var(--muted); padding: 2rem; }
+    .desc { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; line-height: 1.4; }
+    .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+    .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border); }
+    .tab { padding: 0.6rem 1.2rem; cursor: pointer; font-size: 0.95rem; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; background: none; border-radius: 0; }
+    .tab:hover { color: var(--foreground); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .config-preview { background: #263238; color: #e0e0e0; border-radius: 6px; padding: 0.75rem 1rem; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.8rem; white-space: pre; overflow-x: auto; line-height: 1.5; margin-top: 0.5rem; }
+    .config-preview { background: var(--surface); color: var(--foreground); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.8rem; white-space: pre; overflow-x: auto; line-height: 1.5; margin-top: 0.5rem; }
     .api-key-field { position: relative; }
     .api-key-field input { padding-right: 3rem; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; }
-    .masked-key { font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; color: #888; }
+    .masked-key { font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; color: var(--muted); }
     .success-msg { background: #e8f5e9; color: #2e7d32; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.75rem; }
     @media (max-width: 600px) {
       .add-form { flex-direction: column; }
+      .add-form .field { width: 100%; min-width: 0; }
       .settings-grid { grid-template-columns: 1fr; }
-      table { font-size: 0.85rem; }
+      table { display: block; overflow-x: auto; font-size: 0.85rem; }
     }
   </style>
 </head>
@@ -122,7 +127,7 @@
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="dns-logQueries" data-testid="input-log-queries">
-          <label for="dns-logQueries" style="font-size: 0.9rem; color: #333;">Enable query logging</label>
+          <label for="dns-logQueries" style="font-size: 0.9rem;">Enable query logging</label>
         </div>
         <div style="margin-top: 0.75rem;">
           <button class="btn-primary" onclick="saveDnsSettings()" data-testid="btn-save-dns-settings">Save Settings</button>

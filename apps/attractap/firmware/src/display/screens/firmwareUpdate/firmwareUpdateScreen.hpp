@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
 #include "../../../api/api.hpp"
@@ -14,10 +14,10 @@ public:
     void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override { return screen; }
-    String getName() override { return "FirmwareUpdate"; }
+    std::string getName() override { return "FirmwareUpdate"; }
     void destroy() override;
 
-    void setAvailableVersion(String version);
+    void setAvailableVersion(std::string version);
     void setProgress(int percent);
 
 private:
@@ -26,6 +26,6 @@ private:
     lv_obj_t *title = nullptr;
     lv_obj_t *versionsLabel = nullptr;
     lv_obj_t *progressBar = nullptr;
-    String availableVersionCache;
+    std::string availableVersionCache;
     int progressPercent = 0;
 };

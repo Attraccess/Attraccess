@@ -31,7 +31,7 @@ interface FlowContextType {
   onNodesChange: OnNodesChange<Node>;
   onEdgesChange: OnEdgesChange<Edge>;
   onConnect: (params: Edge | Connection) => void;
-  updateNodeData: (nodeId: string, data: object) => void;
+  updateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
   addNode: (node: Node) => void;
   removeNode: (nodeId: string) => void;
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -47,6 +47,8 @@ interface FlowContextType {
   copySelectedNodes: () => Promise<void>;
   cutSelectedNodes: () => Promise<void>;
   pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;
+  validationErrors: Record<string, string>;
+  setValidationErrors: (errors: Array<{ nodeId: string; message: string }>) => void;
 }
 
 const FlowContext = createContext<FlowContextType | undefined>(undefined);
@@ -59,6 +61,7 @@ interface FlowProviderProps {
 export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
@@ -79,9 +82,9 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   );
 
   const updateNodeData = useCallback(
-    (nodeId: string, data: object) => {
+    (nodeId: string, data: Record<string, unknown>) => {
       setNodes((nodes) =>
-        nodes.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node)),
+        nodes.map((node) => (node.id === nodeId ? { ...node, data } : node)),
       );
     },
     [setNodes],
@@ -100,6 +103,15 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     },
     [setNodes],
   );
+
+  const setValidationErrors = useCallback((errors: Array<{ nodeId: string; message: string }>) => {
+    setValidationErrorsState(
+      errors.reduce<Record<string, string>>((messages, error) => ({
+        ...messages,
+        [error.nodeId]: messages[error.nodeId] ? `${messages[error.nodeId]} ${error.message}` : error.message,
+      }), {}),
+    );
+  }, []);
 
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);
 
@@ -140,12 +152,13 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
           tNodeExists={tNodeExists}
           schema={nodeSchema}
           node={props}
+          validationError={validationErrors[props.id]}
         />
       );
     });
 
     return types;
-  }, [nodeSchemas, tNodeTranslations, tNodeExists]);
+  }, [nodeSchemas, tNodeTranslations, tNodeExists, validationErrors]);
 
   const copySelectedNodes = useCallback(async () => {
     const clipboardData = buildClipboardData(nodes, edges);
@@ -202,6 +215,8 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,
+      validationErrors,
+      setValidationErrors,
     }),
     [
       nodes,
@@ -225,6 +240,8 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,
+      validationErrors,
+      setValidationErrors,
     ],
   );
 

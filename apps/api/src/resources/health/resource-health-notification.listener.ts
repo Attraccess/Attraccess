@@ -8,6 +8,12 @@ import { Resource, ResourceHealthStatus, ResourceIntroducer, User } from '@attra
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './resource-health-notification.en.json';
+import * as de from './resource-health-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceHealthNotificationListener {
@@ -21,6 +27,7 @@ export class ResourceHealthNotificationListener {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
@@ -48,8 +55,15 @@ export class ResourceHealthNotificationListener {
       await this.notifications.dispatch({
         category: NotificationCategory.RESOURCE_HEALTH,
         recipients,
-        title: becameUnhealthy ? `Resource degraded: ${resource.name}` : `Resource recovered: ${resource.name}`,
-        body: event.reason ?? `${resource.name} changed from ${event.previousStatus ?? 'unknown'} to ${event.status}`,
+        title: (recipient) =>
+          t(recipient.locale, becameUnhealthy ? 'titleDegraded' : 'titleRecovered', { resourceName: resource.name }),
+        body: (recipient) =>
+          event.reason ??
+          t(recipient.locale, 'bodyStatusChanged', {
+            resourceName: resource.name,
+            previousStatus: event.previousStatus ?? t(recipient.locale, 'statusUnknown'),
+            status: event.status,
+          }),
         url: `/resources/${resource.id}`,
         severity: becameUnhealthy ? 'warning' : 'info',
         sendEmail: (recipient) =>
@@ -74,10 +88,8 @@ export class ResourceHealthNotificationListener {
   private async collectRecipients(resource: Resource): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.canManageResources = :value', { value: true })
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

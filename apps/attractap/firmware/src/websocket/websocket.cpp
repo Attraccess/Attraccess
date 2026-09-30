@@ -1,7 +1,12 @@
 #include "websocket.hpp"
+#include <functional>
+#include "platform.hpp"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
-#include <Preferences.h>
+#include "settings/kvstore.hpp"
+#include <cstdlib>
+#include <cstring>
+#include <string>
 
 // Deliberate-reboot reason handed to the crash reporter across the SW reset (see
 // api_diag.cpp). Lives in the same NVS namespace as the boot diagnostics record
@@ -19,6 +24,14 @@ void Websocket::setup()
     if (!connect_lifecycle_mutex)
     {
         connect_lifecycle_mutex = xSemaphoreCreateMutex();
+    }
+    if (!network_quality_mutex)
+    {
+        network_quality_mutex = xSemaphoreCreateMutex();
+        if (!network_quality_mutex)
+        {
+            logger.error("Websocket setup: network quality mutex allocation failed; quality event tracking disabled");
+        }
     }
     if (!tx_queue)
     {
@@ -85,18 +98,22 @@ void Websocket::loop()
 
     if (!connectionAttemptsEnabled)
     {
+        this->connectWatchdogStartMs = 0;
         return;
     }
 
     this->updateInfoFromAppState();
     this->publishConnectionStatus();
+    this->publishNetworkQuality();
 
     if (!network_is_connected)
     {
+        this->connectWatchdogStartMs = 0;
         return;
     }
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
+    this->checkConnectWatchdog(apiConfig);
     bool apiConfigChanged = _lastApiConfig.hostname != apiConfig.hostname || _lastApiConfig.port != apiConfig.port || _lastApiConfig.useSSL != apiConfig.useSSL;
     if (apiConfigChanged)
     {
@@ -112,9 +129,11 @@ void Websocket::loop()
     case CONNECTING:
         break;
     case CONNECTED:
+        sendPongProbe(nowMs);
         if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
         {
             logger.error("No inbound frames within liveness timeout, forcing reconnect");
+            recordNetworkQualityEvent(this->livenessTimeoutEventTimes, this->livenessTimeoutEventNextIndex);
             setState(INIT);
         }
         break;
@@ -141,14 +160,15 @@ void Websocket::publishConnectionStatus()
     if (apiConfig.useSSL)
     {
         State::setWebsocketCertProgress(
-            String(this->_certManager.getCurrentCertName()),
+            std::string(this->_certManager.getCurrentCertName()),
             this->_certManager.getCurrentCertIndex(),
             this->_certManager.getCertCount(),
-            this->_certManager.getRememberedFailureCount());
+            this->_certManager.getRememberedFailureCount(),
+            this->_certManager.isLocked());
     }
     else
     {
-        State::setWebsocketCertProgress("", 0, 0, 0);
+        State::setWebsocketCertProgress("", 0, 0, 0, false);
     }
 
     // Seconds until the next reconnect attempt (0 while connected or due now).
@@ -162,6 +182,220 @@ void Websocket::publishConnectionStatus()
         }
     }
     State::setWebsocketNextAttemptSeconds(secondsUntilNext);
+}
+
+void Websocket::sendPongProbe(uint32_t nowMs)
+{
+    if (!this->network_quality_mutex || nowMs - this->lastPongProbeTime < this->PONG_PROBE_INTERVAL_MS)
+    {
+        return;
+    }
+
+    lockWsClient();
+    if (!ws_client)
+    {
+        unlockWsClient();
+        return;
+    }
+
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+    if (this->pendingPongProbeTime != 0 && nowMs - this->pendingPongProbeTime < this->PONG_PROBE_TIMEOUT_MS)
+    {
+        xSemaphoreGive(this->network_quality_mutex);
+        unlockWsClient();
+        return;
+    }
+    if (this->pendingPongProbeTime != 0)
+    {
+        // The application PING is independent from esp_websocket's keepalive, so
+        // account for its timeout here rather than relying on a client error event.
+        this->pongTimeoutEventTimes[this->pongTimeoutEventNextIndex] = nowMs;
+        this->pongTimeoutEventNextIndex = (uint8_t)((this->pongTimeoutEventNextIndex + 1) % QUALITY_EVENT_SLOTS);
+        this->pendingPongProbeTime = 0;
+    }
+
+    uint32_t token = this->pendingPongProbeToken + 1;
+    uint8_t payload[sizeof(token)];
+    memcpy(payload, &token, sizeof(token));
+
+    // Hold the quality lock until the send completes so a prompt PONG cannot be
+    // processed before its matching PING timestamp and token are published.
+    uint32_t sentAtMs = millis();
+    int ret = esp_websocket_client_send_with_opcode(ws_client, WS_TRANSPORT_OPCODES_PING, payload, sizeof(payload), 0);
+    this->lastPongProbeTime = sentAtMs;
+    bool probeSendFailed = ret != static_cast<int>(sizeof(payload));
+    if (ret == static_cast<int>(sizeof(payload)))
+    {
+        this->pendingPongProbeTime = sentAtMs;
+        this->pendingPongProbeToken = token;
+        this->pongProbeSentEventTimes[this->pongProbeSentEventNextIndex] = sentAtMs;
+        this->pongProbeSentEventNextIndex = (uint8_t)((this->pongProbeSentEventNextIndex + 1) % PONG_PROBE_EVENT_SLOTS);
+    }
+    xSemaphoreGive(this->network_quality_mutex);
+    unlockWsClient();
+
+    if (probeSendFailed)
+    {
+        recordNetworkQualityEvent(this->sendFailureEventTimes, this->sendFailureEventNextIndex);
+    }
+}
+
+void Websocket::clearPendingPongProbe()
+{
+    if (!this->network_quality_mutex)
+    {
+        return;
+    }
+
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+    this->pendingPongProbeTime = 0;
+    xSemaphoreGive(this->network_quality_mutex);
+}
+
+void Websocket::publishNetworkQuality()
+{
+    uint32_t nowMs = millis();
+    uint32_t inboundAgeMs = (this->lastInboundFrameTime == 0) ? 0 : nowMs - this->lastInboundFrameTime;
+    uint8_t txDepth = this->tx_queue ? (uint8_t)uxQueueMessagesWaiting(this->tx_queue) : 0;
+    uint8_t reconnects = 0;
+    uint8_t queueFull = 0;
+    uint8_t sendFailures = 0;
+    uint8_t livenessTimeouts = 0;
+    uint8_t pongTimeouts = 0;
+    uint8_t pongProbesSent = 0;
+    uint8_t pongProbeResponses = 0;
+    bool pongProbePending = false;
+    uint8_t missedHeartbeats = 0;
+    uint32_t lastPongRttMs = 0;
+    uint32_t averagePongRttMs = 0;
+    int32_t pongRttTrendMs = 0;
+    if (this->network_quality_mutex)
+    {
+        xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+        reconnects = countRecentNetworkQualityEvents(this->reconnectEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        pongTimeouts = countRecentNetworkQualityEvents(this->pongTimeoutEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        pongProbesSent = countRecentNetworkQualityEvents(this->pongProbeSentEventTimes, PONG_PROBE_EVENT_SLOTS, nowMs);
+        pongProbeResponses = countRecentNetworkQualityEvents(this->pongProbeResponseEventTimes, PONG_PROBE_EVENT_SLOTS, nowMs);
+        pongProbePending = this->pendingPongProbeTime != 0;
+        missedHeartbeats = countRecentNetworkQualityEvents(this->missedHeartbeatEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        lastPongRttMs = this->lastPongRttMs;
+        averagePongRttMs = averageRecentPongRtt(nowMs);
+        pongRttTrendMs = recentPongRttTrend(nowMs);
+        xSemaphoreGive(this->network_quality_mutex);
+    }
+
+    uint8_t completedPongProbes = pongProbesSent - (pongProbePending && pongProbesSent > 0 ? 1 : 0);
+    uint8_t pongProbeLossPercent = completedPongProbes == 0 || pongProbeResponses >= completedPongProbes
+                                       ? 0
+                                       : (uint8_t)(((completedPongProbes - pongProbeResponses) * 100) / completedPongProbes);
+    State::NetworkQuality quality = State::NETWORK_QUALITY_GOOD;
+    if (!this->network_is_connected || this->_state != CONNECTED)
+    {
+        quality = State::NETWORK_QUALITY_OFFLINE;
+    }
+    else if ((this->lastInboundFrameTime != 0 && inboundAgeMs >= this->INBOUND_DEGRADED_AFTER_MS) ||
+             reconnects >= 2 ||
+             queueFull > 0 ||
+              sendFailures > 0 ||
+              livenessTimeouts > 0 ||
+              pongTimeouts > 0 ||
+               (completedPongProbes >= 3 && pongProbeLossPercent >= this->PONG_PROBE_LOSS_DEGRADED_PERCENT) ||
+               missedHeartbeats > 0 ||
+              averagePongRttMs >= this->PONG_RTT_DEGRADED_AFTER_MS ||
+              txDepth >= (TX_QUEUE_DEPTH / 2))
+    {
+        quality = State::NETWORK_QUALITY_DEGRADED;
+    }
+
+    State::setNetworkQualityState(quality, inboundAgeMs, reconnects, txDepth, queueFull, sendFailures, livenessTimeouts,
+                                  lastPongRttMs, averagePongRttMs, pongRttTrendMs, pongTimeouts, pongProbeLossPercent,
+                                  missedHeartbeats);
+}
+
+void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
+{
+    if (!this->network_quality_mutex)
+    {
+        return;
+    }
+
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+    events[nextIndex] = millis();
+    nextIndex = (uint8_t)((nextIndex + 1) % QUALITY_EVENT_SLOTS);
+    xSemaphoreGive(this->network_quality_mutex);
+}
+
+void Websocket::recordPongRtt(uint32_t rttMs, uint32_t nowMs)
+{
+    if (!this->network_quality_mutex)
+    {
+        return;
+    }
+
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+    this->lastPongRttMs = rttMs;
+    this->pongRttSamples[this->pongRttSampleNextIndex] = rttMs;
+    this->pongRttSampleTimes[this->pongRttSampleNextIndex] = nowMs;
+    this->pongRttSampleNextIndex = (uint8_t)((this->pongRttSampleNextIndex + 1) % QUALITY_EVENT_SLOTS);
+    xSemaphoreGive(this->network_quality_mutex);
+}
+
+uint8_t Websocket::countRecentNetworkQualityEvents(const uint32_t *events, size_t eventSlots, uint32_t nowMs) const
+{
+    uint8_t count = 0;
+    for (size_t i = 0; i < eventSlots; i++)
+    {
+        if (events[i] != 0 && nowMs - events[i] <= this->QUALITY_EVENT_WINDOW_MS)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+uint32_t Websocket::averageRecentPongRtt(uint32_t nowMs) const
+{
+    uint32_t total = 0;
+    uint8_t count = 0;
+    for (size_t i = 0; i < QUALITY_EVENT_SLOTS; i++)
+    {
+        if (this->pongRttSampleTimes[i] != 0 && nowMs - this->pongRttSampleTimes[i] <= this->QUALITY_EVENT_WINDOW_MS)
+        {
+            total += this->pongRttSamples[i];
+            count++;
+        }
+    }
+    return count == 0 ? 0 : total / count;
+}
+
+int32_t Websocket::recentPongRttTrend(uint32_t nowMs) const
+{
+    size_t oldestIndex = QUALITY_EVENT_SLOTS;
+    size_t newestIndex = QUALITY_EVENT_SLOTS;
+    for (size_t i = 0; i < QUALITY_EVENT_SLOTS; i++)
+    {
+        if (this->pongRttSampleTimes[i] == 0 || nowMs - this->pongRttSampleTimes[i] > this->QUALITY_EVENT_WINDOW_MS)
+        {
+            continue;
+        }
+        if (oldestIndex == QUALITY_EVENT_SLOTS || this->pongRttSampleTimes[i] < this->pongRttSampleTimes[oldestIndex])
+        {
+            oldestIndex = i;
+        }
+        if (newestIndex == QUALITY_EVENT_SLOTS || this->pongRttSampleTimes[i] > this->pongRttSampleTimes[newestIndex])
+        {
+            newestIndex = i;
+        }
+    }
+
+    if (oldestIndex == QUALITY_EVENT_SLOTS || oldestIndex == newestIndex)
+    {
+        return 0;
+    }
+    return static_cast<int32_t>(this->pongRttSamples[newestIndex]) - static_cast<int32_t>(this->pongRttSamples[oldestIndex]);
 }
 
 void Websocket::connectWebSocket()
@@ -203,10 +437,10 @@ void Websocket::connectWebSocketLocked()
     }
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
-    String serverHostname = apiConfig.hostname;
+    std::string serverHostname = apiConfig.hostname;
     uint16_t serverPort = apiConfig.port;
 
-    if (serverHostname.isEmpty() || serverPort == 0)
+    if (serverHostname.empty() || serverPort == 0)
     {
         logger.error("connectWebSocket: serverHostname or serverPort is empty");
         setState(INIT);
@@ -219,6 +453,9 @@ void Websocket::connectWebSocketLocked()
     if (apiConfig.useSSL)
     {
         logger.info("connectWebSocket: using SSL");
+        // A changed API address invalidates the locked certificate decision:
+        // the lock only proves anything about the server it was made against.
+        this->_certManager.ensureLockMatchesServer(serverHostname + ":" + std::to_string(serverPort));
         if (!this->_certManager.getCertificate(&certPem))
         {
             logger.error("Failed to get certificate");
@@ -256,7 +493,7 @@ void Websocket::connectWebSocketLocked()
             this->consecutiveConnectFailures = 0;
             return;
         }
-        logger.error((String("Failed to restart WebSocket client: ") + esp_err_to_name(restartRet)).c_str());
+        logger.error((std::string("Failed to restart WebSocket client: ") + esp_err_to_name(restartRet)).c_str());
     }
 
     lockWsClient();
@@ -268,8 +505,8 @@ void Websocket::connectWebSocketLocked()
         esp_websocket_client_destroy(oldClient);
     }
 
-    String protocol = (apiConfig.useSSL) ? "wss" : "ws";
-    String wsUrl = protocol + "://" + serverHostname + ":" + String(serverPort) + "/api/attractap/websocket";
+    std::string protocol = (apiConfig.useSSL) ? "wss" : "ws";
+    std::string wsUrl = protocol + "://" + serverHostname + ":" + std::to_string(serverPort) + "/api/attractap/websocket";
     logger.info(("Connecting to WebSocket: " + wsUrl).c_str());
 
     esp_websocket_client_config_t websocket_cfg = {};
@@ -277,7 +514,10 @@ void Websocket::connectWebSocketLocked()
     websocket_cfg.port = serverPort;
 
     // Configure buffer sizes to prevent ENOBUFS errors
-    websocket_cfg.task_stack = 9830;  // Increase task stack size for stability
+    // WebSocket event callbacks parse API payloads and invoke application
+    // callbacks on this task. The 9.8 KB stack overflowed on the initial
+    // resource-list payload after adding network-quality reporting.
+    websocket_cfg.task_stack = 16384;
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
     // Below the LVGL render task (prio 4): TLS work must not preempt UI refresh
     // (default was 5, unpinned) - ATT-554 item 7.
@@ -286,6 +526,10 @@ void Websocket::connectWebSocketLocked()
     websocket_cfg.ping_interval_sec = 5;
     websocket_cfg.pingpong_timeout_sec = PINGPONG_TIMEOUT_SEC;
     websocket_cfg.disable_pingpong_discon = false;
+    // Bound unreachable-host retries: without network_timeout_ms the client
+    // waits the full TCP connect timeout per attempt, which multiplies across
+    // the cert sweep (PERFORMANCE_ANALYSIS.md quick win Q2).
+    websocket_cfg.network_timeout_ms = 10000;
 
     websocket_cfg.disable_auto_reconnect = true;
 
@@ -317,7 +561,7 @@ void Websocket::connectWebSocketLocked()
     if (ret != ESP_OK)
     {
         esp_websocket_client_destroy(newClient);
-        handleConnectFailure((String("esp_websocket_client_start: ") + esp_err_to_name(ret)).c_str());
+        handleConnectFailure((std::string("esp_websocket_client_start: ") + esp_err_to_name(ret)).c_str());
         return;
     }
 
@@ -353,7 +597,7 @@ void Websocket::handleConnectFailure(const char *reason)
         // Record why we are rebooting so the next boot's crash report carries the
         // real cause instead of a bare "SW" reset reason. The API layer reads and
         // clears this key once the report is acknowledged (see api_diag.cpp).
-        Preferences prefs;
+        KVStore prefs;
         if (prefs.begin(BOOT_DIAG_NAMESPACE, false))
         {
             prefs.putString(BOOT_DIAG_REBOOT_REASON_KEY, "WEBSOCKET_RECONNECT_HEAP_EXHAUSTION");
@@ -363,6 +607,60 @@ void Websocket::handleConnectFailure(const char *reason)
         delay(200);
         esp_restart();
     }
+}
+
+// Last line of defense against any connect-loop the device cannot escape on its
+// own (wedged TLS stack, exhausted socket state, ...): if network and server
+// config are present but no connection could be established for a whole
+// watchdog period, reboot into a clean slate. An advancing certificate sweep
+// re-arms the watchdog: the sweep position is RAM-only and a full sweep takes
+// longer than one watchdog period, so rebooting mid-sweep would restart it at
+// index 0 forever and certs late in the list would never be reached. Only a
+// locked certificate (index frozen) or a truly stuck attempt lets it fire.
+void Websocket::checkConnectWatchdog(const AttraccessApiConfig &apiConfig)
+{
+    bool waitingForConnection = _state != CONNECTED && !apiConfig.hostname.empty() && apiConfig.port != 0;
+    if (!waitingForConnection)
+    {
+        this->connectWatchdogStartMs = 0;
+        return;
+    }
+
+    uint32_t now = millis();
+    int certIndex = this->_certManager.getCurrentCertIndex();
+    bool sweepAdvanced = certIndex != this->connectWatchdogCertIndex;
+    this->connectWatchdogCertIndex = certIndex;
+
+    if (this->connectWatchdogStartMs == 0 || sweepAdvanced)
+    {
+        this->connectWatchdogStartMs = now ? now : 1;
+        return;
+    }
+
+    if (now - this->connectWatchdogStartMs < CONNECT_WATCHDOG_TIMEOUT_MS)
+    {
+        return;
+    }
+
+    this->logger.errorf("No connection for %u ms despite network and config; rebooting to recover",
+                        (unsigned)CONNECT_WATCHDOG_TIMEOUT_MS);
+
+    // Same mechanism as handleConnectFailure: leave the reboot cause for the
+    // next boot's crash report (read and cleared by api_diag.cpp).
+    KVStore prefs;
+    if (prefs.begin(BOOT_DIAG_NAMESPACE, false))
+    {
+        prefs.putString(BOOT_DIAG_REBOOT_REASON_KEY, "WEBSOCKET_CONNECT_TIMEOUT");
+        prefs.end();
+    }
+
+    delay(200);
+    esp_restart();
+}
+
+void Websocket::resetCertificateTrust()
+{
+    this->_certManager.reset();
 }
 
 bool Websocket::shouldReconnect()
@@ -401,15 +699,17 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
 
-    this->lastInboundFrameTime = millis();
-
     switch (event_id)
     {
     case WEBSOCKET_EVENT_CONNECTED:
         logger.info("WebSocket connected");
+        this->lastInboundFrameTime = millis();
         this->consecutiveConnectFailures = 0;
+        // Only an SSL connect proves anything about the certificate; locking on a
+        // plain connect would pin index 0 and skip the sweep after a switch to SSL.
+        if (apiConfig.useSSL)
         {
-            this->_certManager.markSuccess();
+            this->_certManager.markSuccess(apiConfig.hostname + ":" + std::to_string(apiConfig.port));
         }
         resetReconnectBackoff();
         setState(CONNECTED);
@@ -417,12 +717,20 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_CLOSED:
         logger.info("WebSocket closed");
+        if (this->_state == CONNECTED || this->_state == CONNECTING)
+        {
+            recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        }
         setState(INIT);
         break;
 
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
         logger.info("WebSocket disconnected");
+        if (this->_state == CONNECTED || this->_state == CONNECTING)
+        {
+            recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        }
         if (apiConfig.useSSL && !this->_certManager.markFailure())
         {
             // Still iterating the certificate list: retry fast so a working cert near
@@ -441,6 +749,28 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     }
 
     case WEBSOCKET_EVENT_DATA:
+    {
+        uint32_t nowMs = millis();
+        if (data->op_code == WS_TRANSPORT_OPCODES_PONG && this->network_quality_mutex)
+        {
+            xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+            if (this->pendingPongProbeTime != 0 &&
+                data->data_len == static_cast<int>(sizeof(this->pendingPongProbeToken)) &&
+                memcmp(data->data_ptr, &this->pendingPongProbeToken, sizeof(this->pendingPongProbeToken)) == 0)
+            {
+                uint32_t rttMs = nowMs - this->pendingPongProbeTime;
+                this->pendingPongProbeTime = 0;
+                this->pongProbeResponseEventTimes[this->pongProbeResponseEventNextIndex] = nowMs;
+                this->pongProbeResponseEventNextIndex = (uint8_t)((this->pongProbeResponseEventNextIndex + 1) % PONG_PROBE_EVENT_SLOTS);
+                xSemaphoreGive(this->network_quality_mutex);
+                recordPongRtt(rttMs, nowMs);
+            }
+            else
+            {
+                xSemaphoreGive(this->network_quality_mutex);
+            }
+        }
+        this->lastInboundFrameTime = nowMs;
         if (data->op_code == 0x01)
         { // Text frame
             if (this->messageCallbackRaw)
@@ -450,7 +780,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         }
         else if (data->op_code == 0x02)
         { // Binary frame
-            logger.debug(("Received binary data: " + String(data->data_len) + " bytes").c_str());
+            logger.debug(("Received binary data: " + std::to_string(data->data_len) + " bytes").c_str());
 
             if (this->binaryDataCallback)
             {
@@ -458,51 +788,81 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
             }
         }
         break;
+    }
 
     case WEBSOCKET_EVENT_ERROR:
         logger.error("WebSocket error");
+        if (data && data->error_handle.error_type == WEBSOCKET_ERROR_TYPE_PONG_TIMEOUT)
+        {
+            recordNetworkQualityEvent(this->pongTimeoutEventTimes, this->pongTimeoutEventNextIndex);
+        }
+        if (this->_state == CONNECTED || this->_state == CONNECTING)
+        {
+            recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        }
         setState(INIT);
         break;
 
     default:
-        logger.error(("Unknown event: " + String(event_id)).c_str());
+        // esp_websocket_client >=1.5.0 emits benign lifecycle events we don't act on
+        // (BEFORE_CONNECT=5, BEGIN=6, FINISH=7). They are not errors, so keep them at
+        // debug to avoid crying wolf in production (ERROR-only) log builds.
+        logger.debugf("Unhandled websocket event: %d", (int)event_id);
         break;
     }
 }
 
-void Websocket::sendMessage(const String &message)
+void Websocket::forceReconnect(const char *reason)
+{
+    logger.errorf("Forcing websocket reconnect: %s", reason);
+    setState(INIT); // loop() initiates a fresh connection from INIT
+}
+
+bool Websocket::sendMessage(const std::string &message)
 {
     this->logger.debug(("sendMessage: " + message).c_str());
-    enqueueMessage(message.c_str(), message.length());
+    return enqueueMessage(message.c_str(), message.length());
 }
 
-void Websocket::sendMessage(const char *message, size_t length)
+bool Websocket::sendMessage(const char *message, size_t length)
 {
-    enqueueMessage(message, length);
+    return enqueueMessage(message, length);
 }
 
-void Websocket::enqueueMessage(const char *data, size_t length)
+bool Websocket::sendHeartbeat(const char *message, size_t length)
+{
+    return enqueueMessage(message, length, true);
+}
+
+bool Websocket::enqueueMessage(const char *data, size_t length, bool isHeartbeat)
 {
     if (!tx_queue)
     {
         logger.error("enqueueMessage: tx_queue not initialized");
-        return;
+        return false;
     }
 
     char *copy = (char *)malloc(length);
     if (!copy)
     {
         logger.error("enqueueMessage: allocation failed");
-        return;
+        return false;
     }
     memcpy(copy, data, length);
 
-    TxMessage msg{copy, length};
+    TxMessage msg{copy, length, isHeartbeat};
     if (xQueueSend(tx_queue, &msg, 0) != pdTRUE)
     {
         logger.error("enqueueMessage: tx queue full, dropping message");
+        recordNetworkQualityEvent(this->txQueueFullEventTimes, this->txQueueFullEventNextIndex);
+        if (isHeartbeat)
+        {
+            recordNetworkQualityEvent(this->missedHeartbeatEventTimes, this->missedHeartbeatEventNextIndex);
+        }
         free(copy);
+        return false;
     }
+    return true;
 }
 
 void Websocket::txTaskEntry(void *arg)
@@ -525,6 +885,10 @@ void Websocket::txTaskLoop()
         {
             unlockWsClient();
             logger.error("ws tx: ws_client not initialized, dropping message");
+            if (msg.isHeartbeat)
+            {
+                recordNetworkQualityEvent(this->missedHeartbeatEventTimes, this->missedHeartbeatEventNextIndex);
+            }
             free(msg.data);
             continue;
         }
@@ -534,6 +898,11 @@ void Websocket::txTaskLoop()
         if (ret == -1)
         {
             logger.error("ws tx: send failed");
+            recordNetworkQualityEvent(this->sendFailureEventTimes, this->sendFailureEventNextIndex);
+            if (msg.isHeartbeat)
+            {
+                recordNetworkQualityEvent(this->missedHeartbeatEventTimes, this->missedHeartbeatEventNextIndex);
+            }
         }
         free(msg.data);
     }
@@ -554,6 +923,11 @@ void Websocket::drainTxQueue()
 
 void Websocket::setState(ConnectionState state)
 {
+    if (this->_state == CONNECTED && state != CONNECTED)
+    {
+        // A PONG from the old socket must not time out after a new socket connects.
+        clearPendingPongProbe();
+    }
     _state = state;
 
     State::WebsocketPhase phase = State::WS_INIT;

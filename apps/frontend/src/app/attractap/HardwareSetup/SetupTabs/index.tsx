@@ -85,20 +85,26 @@ export function SetupTabs({ openDeviceSettings }: Props) {
         className="w-full"
         data-cy="attractap-setup-tabs"
       >
-        <TabList>
-          <Tab id="firmware" data-cy="attractap-setup-firmware-tab">
-            {t('tabs.firmware')}
-          </Tab>
-          <Tab id="network" data-cy="attractap-setup-network-tab">
-            {t('tabs.network')}
-          </Tab>
-          <Tab id="server" data-cy="attractap-setup-server-tab">
-            {t('tabs.server')}
-          </Tab>
-          <Tab id="security" data-cy="attractap-setup-security-tab">
-            {t('tabs.security')}
-          </Tab>
-        </TabList>
+        <Tabs.ListContainer>
+          <TabList>
+            <Tab id="firmware" data-cy="attractap-setup-firmware-tab">
+              <Tabs.Indicator />
+              {t('tabs.firmware')}
+            </Tab>
+            <Tab id="network" data-cy="attractap-setup-network-tab">
+              <Tabs.Indicator />
+              {t('tabs.network')}
+            </Tab>
+            <Tab id="server" data-cy="attractap-setup-server-tab">
+              <Tabs.Indicator />
+              {t('tabs.server')}
+            </Tab>
+            <Tab id="security" data-cy="attractap-setup-security-tab">
+              <Tabs.Indicator />
+              {t('tabs.security')}
+            </Tab>
+          </TabList>
+        </Tabs.ListContainer>
 
         <TabPanel id="firmware" className="pt-4">
           <FirmwareTab onFlashed={() => setSelectedTab('network')} />

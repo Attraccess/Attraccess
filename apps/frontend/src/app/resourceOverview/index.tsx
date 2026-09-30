@@ -1,13 +1,16 @@
+import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   useResourcesServiceResourceGroupsGetMany,
-  useResourcesServiceGetAllResources,
+  ResourcesService,
+  UseResourcesServiceGetAllResourcesKeyFn,
 } from '@attraccess/react-query-client';
 import { Toolbar } from './toolbar/toolbar';
 import { ResourceGroupCard } from './resourceGroupCard';
 import { useCallback, useMemo, useState } from 'react';
-import { useDebounce } from '../../hooks/useDebounce';
+import { useDebounce } from '@attraccess/plugins-frontend-ui';
 import { NoResourcesFound } from './noResourcesFound';
 import { ActiveUsageSessionsBanner } from './activeUsageSessionsBanner';
+import { CreateResourceDrawer } from './createResourceDrawer';
 
 enum PersistedFilterProps {
   onlyInUseByMe = 'onlyInUseByMe',
@@ -27,17 +30,18 @@ function getValueFromLocalStorage(filter: PersistedFilterProps, defaultValue: bo
 }
 
 export function ResourceOverview() {
+  const [createOpen, setCreateOpen] = useState(false);
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
   const [searchValue, setSearchValue] = useState('');
   const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false)
+    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
   );
   const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true)
+    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
   );
   const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true)
+    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
   );
 
   const debouncedSearchValue = useDebounce(searchValue, 250);
@@ -46,7 +50,7 @@ export function ResourceOverview() {
     setFilterByOnlyInUseByMeState(value);
     localStorage.setItem(
       getLocalStorageFilterKey(PersistedFilterProps.onlyInUseByMe),
-      value === true ? 'true' : 'false'
+      value === true ? 'true' : 'false',
     );
   }, []);
 
@@ -54,7 +58,7 @@ export function ResourceOverview() {
     setFilterByOnlyWithPermissionsState(value);
     localStorage.setItem(
       getLocalStorageFilterKey(PersistedFilterProps.onlyWithPermissions),
-      value === true ? 'true' : 'false'
+      value === true ? 'true' : 'false',
     );
   }, []);
 
@@ -62,7 +66,7 @@ export function ResourceOverview() {
     setFilterByHideEmptyResourceGroupsState(value);
     localStorage.setItem(
       getLocalStorageFilterKey(PersistedFilterProps.hideEmptyResourceGroups),
-      value === true ? 'true' : 'false'
+      value === true ? 'true' : 'false',
     );
   }, []);
 
@@ -74,18 +78,42 @@ export function ResourceOverview() {
     return ids;
   }, [groups]);
 
-  // Check if there are any resources matching the current filters across all groups
-  const { data: allResources, isLoading: isLoadingAllResources } = useResourcesServiceGetAllResources({
-    search: debouncedSearchValue?.trim() || undefined,
-    onlyInUseByMe: filterByOnlyInUseByMe,
-    onlyWithPermissions: filterByOnlyWithPermissions,
-    page: 1,
-    limit: 1, // We only need to check if any resources exist
+  // Match the cards' visible group scope; a global resource query can include
+  // resources belonging only to hidden groups that this user cannot see.
+  const matchingResources = useQueries({
+    queries: groupIds.map((groupId) => {
+      const params = {
+        groupId: groupId === 'none' ? -1 : groupId,
+        search: debouncedSearchValue?.trim() || undefined,
+        onlyInUseByMe: filterByOnlyInUseByMe,
+        onlyWithPermissions: filterByOnlyWithPermissions,
+        page: 1,
+        // Share the first-page query with ResourceGroupCard instead of fetching twice.
+        limit: 10,
+      };
+      return {
+        queryKey: UseResourcesServiceGetAllResourcesKeyFn(params),
+        queryFn: () => ResourcesService.getAllResources(params),
+        enabled: groups !== undefined,
+      };
+    }),
   });
+  const noMatchingResources = groups !== undefined && matchingResources.every((query) => query.data?.data.length === 0);
+
+  // One server-side visibility check replaces per-group unfiltered probes.
+  // Keep it under the resource-list prefix so resource mutations invalidate it.
+  const { data: unfilteredResources } = useQuery({
+    queryKey: UseResourcesServiceGetAllResourcesKeyFn({}, ['visible-existence', groupIds]),
+    queryFn: () => ResourcesService.resourceGroupsResourcesExist(),
+    enabled: noMatchingResources,
+  });
+  const hasResources = unfilteredResources?.hasResources ?? false;
+  const showEmptyState = noMatchingResources && unfilteredResources !== undefined;
 
   return (
     <div>
       <Toolbar
+        onOpenCreate={() => setCreateOpen(true)}
         search={searchValue}
         onSearchChanged={setSearchValue}
         onlyInUseByMe={filterByOnlyInUseByMe}
@@ -94,18 +122,21 @@ export function ResourceOverview() {
         onOnlyWithPermissionsChanged={setFilterByOnlyWithPermissions}
         hideEmptyResourceGroups={filterByHideEmptyResourceGroups}
         onHideEmptyResourceGroupsChanged={setFilterByHideEmptyResourceGroups}
-        highlightSearch={allResources?.data.length === 0}
-        highlightFilter={allResources?.data.length === 0}
+        highlightSearch={showEmptyState && hasResources}
+        highlightFilter={showEmptyState && hasResources}
       />
 
       <ActiveUsageSessionsBanner onShowMySessions={() => setFilterByOnlyInUseByMe(true)} />
 
       <div className="flex flex-row flex-wrap gap-4">
-        {!isLoadingAllResources && allResources?.data.length === 0 && (
+        {showEmptyState && (
           <NoResourcesFound
+            onOpenCreate={() => setCreateOpen(true)}
+            hasResources={hasResources}
             onClearFilterAndSearch={() => {
               setFilterByOnlyInUseByMe(false);
               setFilterByOnlyWithPermissions(false);
+              setFilterByHideEmptyResourceGroups(false);
               setSearchValue('');
             }}
           />
@@ -121,10 +152,11 @@ export function ResourceOverview() {
               onlyWithPermissions: filterByOnlyWithPermissions,
             }}
             hideIfEmpty={filterByHideEmptyResourceGroups}
-            className="flex flex-1 min-w-[100%] md:min-w-[500px]"
+            className="flex flex-1 min-w-0 basis-full xl:basis-[calc(50%-1rem)]"
           />
         ))}
       </div>
+      <CreateResourceDrawer isOpen={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

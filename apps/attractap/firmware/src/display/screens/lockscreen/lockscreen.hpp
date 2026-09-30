@@ -1,11 +1,12 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
 #include <lvgl.h>
-#include "../../images/lockscreen_background_image.hpp"
 #include "../../images/logo_40h.hpp"
 #include "../IScreen.hpp"
 #include "../../../api/api.hpp"
+#include "display/shared/actionOverlay.hpp"
+#include <functional>
 
 class Lockscreen : public IScreen
 {
@@ -14,13 +15,24 @@ public:
     void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
+    void setBackCallback(std::function<void()> callback) { backCallback = std::move(callback); }
+    void showActionProgress() { authenticating = true; overlay.show(screen, "Karte wird geprüft", resourceName); }
+    void hideActionProgress() { authenticating = false; overlay.hide(); }
+
+    /* The lockscreen is re-entered on every card removal / session end, so
+     * keeping its LVGL tree alive avoids the destroy+rebuild cost per
+     * transition (PERFORMANCE_ANALYSIS.md M4: hot screens persistent). */
+    bool shouldAutoUnload() const override { return false; }
 
     void setResourceName(const char *resourceName);
     void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance);
 
 private:
+    ActionOverlay overlay;
+    bool authenticating = false;
+    std::function<void()> backCallback;
     lv_obj_t *screen = nullptr;
 
     lv_obj_t *resourceNameLabel = nullptr;

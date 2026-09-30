@@ -33,11 +33,9 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
     data: resourceIntroductions,
     error: resourceIntroductionsError,
     isLoading: isResourceIntroductionsLoading,
-  } = useAccessControlServiceResourceIntroductionsGetMany(
-    { resourceId: target.id },
-    undefined,
-    { enabled: isResource },
-  );
+  } = useAccessControlServiceResourceIntroductionsGetMany({ resourceId: target.id }, undefined, {
+    enabled: isResource,
+  });
 
   const {
     data: groupIntroducers,
@@ -49,11 +47,7 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
     data: groupIntroductions,
     error: groupIntroductionsError,
     isLoading: isGroupIntroductionsLoading,
-  } = useAccessControlServiceResourceGroupIntroductionsGetMany(
-    { groupId: target.id },
-    undefined,
-    { enabled: isGroup },
-  );
+  } = useAccessControlServiceResourceGroupIntroductionsGetMany({ groupId: target.id }, undefined, { enabled: isGroup });
 
   const introducers = isResource ? resourceIntroducers : groupIntroducers;
   const introductions = isResource ? resourceIntroductions : groupIntroductions;
@@ -69,12 +63,21 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
 
     (introducers ?? []).forEach((introducer) => {
       if (!introducer.user) return;
+      const existing = byUserId.get(introducer.user.id);
+      if (existing) {
+        existing.introducers.push(introducer);
+        existing.isIntroducer ||= introducer.type === ResourceIntroducerType.INTRODUCER;
+        existing.isMaintainer ||= introducer.type === ResourceIntroducerType.MAINTAINER;
+        if (new Date(introducer.grantedAt).getTime() > new Date(existing.activityAt).getTime()) {
+          existing.activityAt = introducer.grantedAt;
+        }
+        return;
+      }
       byUserId.set(introducer.user.id, {
         user: introducer.user,
         isIntroducer: introducer.type === ResourceIntroducerType.INTRODUCER,
         isMaintainer: introducer.type === ResourceIntroducerType.MAINTAINER,
-        introducerType: introducer.type,
-        introducer,
+        introducers: [introducer],
         introduction: null,
         hasValidIntroduction: false,
         introductionLastEventAt: null,
@@ -109,8 +112,7 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
           user,
           isIntroducer: false,
           isMaintainer: false,
-          introducerType: null,
-          introducer: null,
+          introducers: [],
           introduction,
           hasValidIntroduction: isValid,
           introductionLastEventAt: lastEventAt,

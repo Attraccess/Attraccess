@@ -1,6 +1,15 @@
 {
   "label": "Benutzer",
-  "placeholder": "Nach Benutzername oder E-Mail suchen",
-  "noUsersFound": "Keine Benutzer gefunden",
-  "typeToSearch": "Tippen Sie, um nach Benutzern zu suchen"
+  "chooseUser": "Benutzer auswählen",
+  "modalTitle": "Benutzer auswählen",
+  "searchPlaceholder": "Nach Benutzername oder E-Mail suchen",
+  "usersListLabel": "Benutzer",
+  "clear": "Auswahl entfernen",
+  "resultCount": {
+    "one": "{{count}} Benutzer angezeigt",
+    "many": "{{count}} Benutzer angezeigt"
+  },
+  "empty": "Keine Benutzer gefunden",
+  "loadError": "Benutzer konnten nicht geladen werden.",
+  "retry": "Erneut versuchen"
 }

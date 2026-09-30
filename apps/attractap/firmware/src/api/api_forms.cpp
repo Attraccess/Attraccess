@@ -2,6 +2,10 @@
 // FEATURE: api-forms
 
 #include "api.hpp"
+#include <functional>
+#include <cstdio>
+#include <cstring>
+#include <string>
 
 void API::setResourceFormsRequestCallback(std::function<void(const ResourceUsageFormRequest &)> callback)
 {
@@ -42,6 +46,15 @@ void API::submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action
     this->sendMessage("RESOURCE_USAGE_FORM_SUBMIT_PAGE", payload);
 }
 
+void API::cancelForm(uint32_t resourceId, ResourceUsageFormActionType action)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    payload["action"] = API::formActionToString(action);
+    this->sendMessage("RESOURCE_USAGE_FORM_CANCEL", payload);
+}
+
 void API::onResourceUsageFormRequest(JsonObject data)
 {
     if (!this->resourceFormsRequestCallback)
@@ -58,6 +71,7 @@ void API::onResourceUsageFormRequest(JsonObject data)
     }
 
     ResourceUsageFormRequest &request = this->resourceFormsRequestScratch;
+    request.requestId = payload["requestId"] | 0u;
     request.resourceId = payload["resourceId"].is<uint32_t>() ? payload["resourceId"].as<uint32_t>() : 0;
     request.resourceName = "";
     if (payload["resourceName"].is<const char *>())
@@ -162,7 +176,10 @@ void API::onResourceUsageFormFields(JsonObject data)
                 }
                 else if (valueVariant.is<double>())
                 {
-                    field.value = String(valueVariant.as<double>());
+                    // Match Arduino String(double): 2 decimal places
+                    char numBuf[32];
+                    snprintf(numBuf, sizeof(numBuf), "%.2f", valueVariant.as<double>());
+                    field.value = numBuf;
                 }
                 else
                 {
@@ -301,8 +318,8 @@ void API::parseFormFieldOptions(ResourceUsageFormField &field, JsonVariantConst 
                 {
                     continue;
                 }
-                String value = raw;
-                value.trim();
+                std::string value = raw;
+                trimString(value);
                 if (value.length() == 0)
                 {
                     continue;

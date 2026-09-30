@@ -1,27 +1,32 @@
-import { Controller, Get, Put, Param, Body, ParseIntPipe, Query, Sse, Logger, Post, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Put, Param, Body, ParseIntPipe, Sse, Logger, Post, Req, Delete } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
 import { ResourceFlowsService } from './resource-flows.service';
 import {
   ResourceFlowSaveDto,
   ResourceFlowResponseDto,
-  ResourceFlowLogsQueryDto,
   ResourceFlowLogsResponseDto,
+  FlowLogRecordingDto,
+  StartFlowLogRecordingDto,
+  ResolveResourceFlowNodeSchemaDto,
 } from './dto';
-import { ResourceFlowLogEvent, ResourceFlowsExecutorService } from './resource-flows-executor.service';
-import { Observable, Subject } from 'rxjs';
+import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
+import { FlowLogRecorderService, ResourceFlowLogEvent } from './flow-log-recorder.service';
+import { Observable } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 
 @ApiTags('Resource Flows')
 @Controller('resources/:resourceId/flow')
-@Auth('canManageResources')
+@Auth('resources.update')
 export class ResourceFlowsController {
   private readonly logger = new Logger(ResourceFlowsController.name);
 
   constructor(
     private readonly resourceFlowsService: ResourceFlowsService,
     private readonly resourceFlowsExecutorService: ResourceFlowsExecutorService,
+    private readonly flowLogs: FlowLogRecorderService,
     private readonly sse: SseInstrumentation,
   ) {}
 
@@ -41,6 +46,36 @@ export class ResourceFlowsController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
   ): Promise<ResourceFlowNodeSchemaDto[]> {
     return await this.resourceFlowsService.getNodeSchemas(resourceId);
+  }
+
+  @Post('node-schemas/:nodeType')
+  @ApiOperation({
+    summary: 'Resolve a plugin flow-node schema',
+    description: 'Build a plugin flow-node configuration schema from the current configuration.',
+    operationId: 'resolveNodeSchema',
+  })
+  @ApiResponse({ status: 201, description: 'Node schema resolved successfully', type: ResourceFlowNodeSchemaDto })
+  public async resolveNodeSchema(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('nodeType') nodeType: string,
+    @Body() body: ResolveResourceFlowNodeSchemaDto,
+  ): Promise<ResourceFlowNodeSchemaDto> {
+    return await this.resourceFlowsService.resolveNodeSchema(resourceId, nodeType, body.config);
+  }
+
+  @Post('node-previews/:nodeType')
+  @ApiOperation({
+    summary: 'Resolve a plugin flow-node preview',
+    description: 'Resolve a canvas summary without editor-only schema lookups.',
+    operationId: 'resolveNodePreview',
+  })
+  @ApiResponse({ status: 201, description: 'Node preview resolved successfully', type: ResourceFlowNodeSchemaDto })
+  public async resolveNodePreview(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('nodeType') nodeType: string,
+    @Body() body: ResolveResourceFlowNodeSchemaDto,
+  ): Promise<ResourceFlowNodeSchemaDto> {
+    return await this.resourceFlowsService.resolveNodeSchema(resourceId, nodeType, body.config, 'preview');
   }
 
   @Get()
@@ -136,7 +171,7 @@ export class ResourceFlowsController {
   @ApiOperation({
     summary: 'Get resource flow logs',
     description:
-      'Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.',
+      'Retrieve the flow logs collected by the currently running recording, oldest first. Flow logs are never persisted: they are only collected while a recording is active and are discarded when it stops or expires.',
     operationId: 'getResourceFlowLogs',
   })
   @ApiParam({
@@ -151,48 +186,72 @@ export class ResourceFlowsController {
     type: ResourceFlowLogsResponseDto,
   })
   @ApiResponse({
-    status: 404,
-    description: 'Resource not found',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'Resource not found' },
-        statusCode: { type: 'number', example: 404 },
-      },
-    },
-  })
-  @ApiResponse({
     status: 403,
     description: 'Insufficient permissions to manage resources',
   })
-  async getResourceFlowLogs(
+  getResourceFlowLogs(@Param('resourceId', ParseIntPipe) resourceId: number): ResourceFlowLogsResponseDto {
+    return this.flowLogs.getLogs(resourceId);
+  }
+
+  @Get('logs/recording')
+  @ApiOperation({
+    summary: 'Get flow log recording status',
+    description:
+      'Retrieve only whether a recording is currently active and when it started and expires. Cheap enough to poll: unlike the logs endpoint it never returns the collected entries.',
+    operationId: 'getFlowLogRecordingStatus',
+  })
+  @ApiParam({ name: 'resourceId', type: 'integer', example: 1 })
+  @ApiResponse({ status: 200, description: 'Recording status retrieved successfully', type: FlowLogRecordingDto })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions to manage resources' })
+  getFlowLogRecordingStatus(@Param('resourceId', ParseIntPipe) resourceId: number): FlowLogRecordingDto {
+    return this.flowLogs.getStatus(resourceId);
+  }
+
+  @Post('logs/recording')
+  @ApiOperation({
+    summary: 'Start recording flow logs',
+    description:
+      'Start collecting flow logs for this resource for the given duration (default 15 minutes, maximum 24 hours). Recording stops automatically when the duration elapses and all collected logs are discarded.',
+    operationId: 'startFlowLogRecording',
+  })
+  @ApiParam({ name: 'resourceId', type: 'integer', example: 1 })
+  @ApiBody({ type: StartFlowLogRecordingDto })
+  @ApiResponse({ status: 201, description: 'Recording started', type: FlowLogRecordingDto })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions to manage resources' })
+  startFlowLogRecording(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Query() query: ResourceFlowLogsQueryDto,
-  ): Promise<ResourceFlowLogsResponseDto> {
-    return await this.resourceFlowsService.getResourceFlowLogs(resourceId, query.page, query.limit);
+    @Body() body: StartFlowLogRecordingDto,
+  ): FlowLogRecordingDto {
+    return this.flowLogs.start(resourceId, body.durationMinutes);
+  }
+
+  @Delete('logs/recording')
+  @ApiOperation({
+    summary: 'Stop recording flow logs',
+    description: 'Stop the running recording and discard every log collected by it.',
+    operationId: 'stopFlowLogRecording',
+  })
+  @ApiParam({ name: 'resourceId', type: 'integer', example: 1 })
+  @ApiResponse({ status: 200, description: 'Recording stopped', type: FlowLogRecordingDto })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions to manage resources' })
+  stopFlowLogRecording(@Param('resourceId', ParseIntPipe) resourceId: number): FlowLogRecordingDto {
+    return this.flowLogs.stop(resourceId);
   }
 
   @Sse('logs/live')
   async streamEvents(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<Observable<ResourceFlowLogEvent>> {
     this.logger.log(`Client connected to SSE for resource ${resourceId}`);
 
-    // Create a subject for this resource if it doesn't exist
-    if (!this.resourceFlowsExecutorService.resourceFlowLogSubjects.has(resourceId)) {
-      this.resourceFlowsExecutorService.resourceFlowLogSubjects.set(resourceId, new Subject<ResourceFlowLogEvent>());
-    }
+    const subject = this.flowLogs.subjectFor(resourceId);
 
-    // Get the subject for this resource
-    const subject = this.resourceFlowsExecutorService.resourceFlowLogSubjects.get(resourceId);
-
-    // Send initial state immediately
-    setTimeout(async () => {
-      subject.next({
-        data: { keepalive: true },
-      });
+    setTimeout(() => {
+      subject.next({ data: { keepalive: true } });
     }, 100);
 
-    // Create an observable from the subject
-    return this.sse.wrap('resource_flows', subject.asObservable());
+    return this.sse.wrap(
+      'resource_flows',
+      subject.asObservable().pipe(finalize(() => this.flowLogs.releaseSubject(resourceId))),
+    );
   }
 
   @Post('/buttons/:buttonId/press')
