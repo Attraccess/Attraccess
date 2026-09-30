@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CRAP_SCORE_LIMIT, enforceScores, isSource, ownedFiles, validateFunctionCompleteness, workspace } from './run.mjs';
+import { CRAP_SCORE_LIMIT, enforceScores, isSource, ownedFiles, sourceStatementCount, validateFunctionCompleteness, workspace } from './run.mjs';
 
 const exec = (command, args, options = {}) => execFileSync(command, args, { cwd: workspace, ...options });
 
@@ -136,6 +136,12 @@ function validateProjectReport(project, root, currentSources) {
   if (summary.violations !== violations || summary.max !== max)
     throw new Error(`Inconsistent CRAP summary for ${project}: expected ${violations} violation(s), max ${max}`);
   validateFunctionCompleteness(project, expected, normalizedReport, Object.fromEntries(coverageEntries));
+  for (const [file, data] of coverageEntries) {
+    const expectedStatements = sourceStatementCount(file);
+    const actualStatements = Object.keys(data.statementMap).length;
+    if (actualStatements < expectedStatements)
+      throw new Error(`Incomplete statement coverage for ${project}: ${path.relative(root, file)} contains ${expectedStatements} source statements but coverage has ${actualStatements}`);
+  }
   enforceScores(project, normalizedReport);
 }
 

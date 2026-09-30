@@ -316,6 +316,17 @@ export function sourceFunctionCount(file) {
   return Object.keys(functions.fnMap).length;
 }
 
+export function sourceStatementCount(file) {
+  const source = readFileSync(file, 'utf8');
+  const instrumenter = createInstrumenter({
+    parserPlugins: ['typescript', 'decorators-legacy', ...(/\.[jt]sx$/.test(file) ? ['jsx'] : [])],
+  });
+  instrumenter.instrumentSync(source, file);
+  const statements = instrumenter.lastFileCoverage();
+  deduplicateStatements(statements);
+  return Object.keys(statements.statementMap).length;
+}
+
 export function validateFunctionCompleteness(project, files, report, coverage) {
   for (const file of files) {
     const findEntry = (map) => Object.entries(map).find(([name]) => {

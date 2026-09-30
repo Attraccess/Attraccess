@@ -8,10 +8,11 @@ const names = (args) =>
     .filter(Boolean);
 const unstaged = names(['diff', '--name-only', '-z']);
 const generatedCache = (file) =>
-  /^(?:\.nx-cache|\.nx-workspace-data|\.electron-cache|\.npm-cache)(?:\/|$)/.test(file);
+  /^(?:coverage\/crap|\.nx-cache|\.nx-workspace-data|\.electron-cache|\.npm-cache)(?:\/|$)/.test(file);
 const affectsCrap = (file) =>
   !generatedCache(file) &&
   (/\.[cm]?[jt]sx?$/.test(file) ||
+    /\.(?:json|ya?ml|csv|xml|toml|properties)$/i.test(file) ||
     /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|project\.json|tsconfig(?:\.[^/]+)?\.json|(?:jest\.preset|(?:jest|vitest|vite)\.config|babel\.config)\.[cm]?[jt]sx?|test-setup\.[cm]?[jt]sx?)$/.test(
       file,
     ) ||

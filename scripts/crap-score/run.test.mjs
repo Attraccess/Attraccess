@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { getCrapReport } from 'crap-score';
-import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run, enforceScores, sourceFunctionCount, workspace } from './run.mjs';
+import { completeCoverage, isSource, summarizeScores, ownedFiles, nodeCoverage, run, enforceScores, sourceFunctionCount, sourceStatementCount, workspace } from './run.mjs';
 import { affectedSelection, isSharedChange, projectSourceManifest, selectProjects, validateSupportedTargets, verifyReports } from './affected.mjs';
 
 test('source selection includes apps and scripts but excludes tests and generated clients', () => {
@@ -118,7 +118,7 @@ test('project report validation distinguishes complete zero-function reports fro
   try {
     mkdirSync(path.join(output, 'html'), { recursive: true });
     mkdirSync(path.dirname(source), { recursive: true });
-    writeFileSync(source, 'export const value = 1;\n');
+    writeFileSync(source, '');
     writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
     writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify({ [source]: coverageEntry() }));
     writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
@@ -152,6 +152,28 @@ test('empty analysis is rejected when source contains a function', () => {
     writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: {} }));
     writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 0, violations: 0, max: 0 }));
     assert.throws(() => verifyReports(['demo'], directory), /contains 1 source functions but analysis has 0 and coverage has 0/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('restored reports reject omitted statement locations even when function maps are complete', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'crap-empty-statements-'));
+  const output = path.join(directory, 'coverage/crap/demo');
+  const source = path.join(directory, 'demo/source.ts');
+  try {
+    mkdirSync(path.join(output, 'html'), { recursive: true });
+    mkdirSync(path.dirname(source), { recursive: true });
+    writeFileSync(source, 'export function work() { return 1; }\n');
+    writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
+    const coverage = { [source]: { path: source, statementMap: {}, s: {}, fnMap: { one: { name: 'work' } }, f: { one: 0 }, branchMap: {}, b: {} } };
+    writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify(coverage));
+    writeFileSync(path.join(output, 'crap-report.json'), JSON.stringify({ [source]: { work: {
+      functionDescriptor: 'work', start: { line: 1 }, complexity: 8, statements: { crap: 8, coverage: 1 },
+    } } }));
+    writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ project: 'demo', limit: 30, files: 1, sourceFiles: [source], functions: 1, violations: 0, max: 8 }));
+    assert.ok(sourceStatementCount(source) > 0);
+    assert.throws(() => verifyReports(['demo'], directory), /Incomplete statement coverage.*coverage has 0/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -314,14 +336,7 @@ test('restored project reports are checked against the current inclusive limit',
     mkdirSync(path.dirname(source), { recursive: true });
     writeFileSync(source, 'export function example() { return 1; }\n');
     writeFileSync(path.join(output, 'html/index.html'), '<html></html>');
-    const coverage = {
-      [source]: {
-        path: source,
-        statementMap: {}, s: {},
-        fnMap: { one: { name: 'example', decl: {}, loc: {} } }, f: { one: 0 },
-        branchMap: {}, b: {},
-      },
-    };
+    const coverage = completeCoverage([source], []);
     writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify(coverage));
     const fn = (crap) => ({
       functionDescriptor: 'example',
@@ -403,6 +418,20 @@ test('commit validation accepts staged source, rejects partial edits and ignores
     assert.equal(readFileSync(path.join(dir, 'patches/crap-score.patch'), 'utf8'), patchWorktreeBefore);
 
     git('checkout', '--', 'patches/crap-score.patch', 'source.ts');
+    mkdirSync(path.join(dir, 'apps/frontend/src/resources'), { recursive: true });
+    writeFileSync(path.join(dir, 'apps/frontend/src/resources/translations.test.ts'), 'export const translation = "ok";\n');
+    writeFileSync(path.join(dir, 'apps/frontend/src/resources/de.json'), '{"value":"staged"}\n');
+    git('add', 'apps/frontend/src/resources/translations.test.ts', 'apps/frontend/src/resources/de.json');
+    writeFileSync(path.join(dir, 'apps/frontend/src/resources/de.json'), '{"value":"worktree only"}\n');
+    const dataIndexBefore = execFileSync('git', ['show', ':apps/frontend/src/resources/de.json'], { cwd: dir, encoding: 'utf8', env });
+    const dataWorktreeBefore = readFileSync(path.join(dir, 'apps/frontend/src/resources/de.json'), 'utf8');
+    const dataStatus = check();
+    assert.equal(dataStatus.status, 1);
+    assert.match(dataStatus.stderr, /Unstaged relevant paths: apps\/frontend\/src\/resources\/de\.json/);
+    assert.equal(execFileSync('git', ['show', ':apps/frontend/src/resources/de.json'], { cwd: dir, encoding: 'utf8', env }), dataIndexBefore);
+    assert.equal(readFileSync(path.join(dir, 'apps/frontend/src/resources/de.json'), 'utf8'), dataWorktreeBefore);
+
+    git('checkout', '--', 'patches/crap-score.patch', 'source.ts', 'apps/frontend/src/resources/translations.test.ts', 'apps/frontend/src/resources/de.json');
     mkdirSync(path.join(dir, '.nx-cache/hash/project/src'), { recursive: true });
     writeFileSync(path.join(dir, '.nx-cache/hash/project/src/generated.ts'), 'export const cached = true;\n');
     assert.equal(check().status, 0, 'generated Nx cache data is not a proposed source change');
