@@ -62,7 +62,11 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
+      ],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",

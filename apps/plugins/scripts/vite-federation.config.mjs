@@ -11,6 +11,7 @@ import federation from '@originjs/vite-plugin-federation';
 import tailwindcssImport from '@tailwindcss/vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Vite bundles this config to CJS, which wraps the ESM default export.
 const tailwindcss = tailwindcssImport.default ?? tailwindcssImport;
@@ -25,7 +26,16 @@ export const HOST_SHARED = {
   'lucide-react': { singleton: true, requiredVersion: '*', import: false, generate: false },
   '@tanstack/react-query': { singleton: true, requiredVersion: '*', import: false, generate: false },
   // Includes the core language store: a remote must never create its own copy.
-  '@attraccess/plugins-frontend-ui': { singleton: true, requiredVersion: '*', import: false, generate: false },
+  '@attraccess/plugins-frontend-ui': {
+    singleton: true,
+    requiredVersion: '*',
+    import: false,
+    generate: false,
+    // The federation bundler eagerly resolves shared chunks even with generate:false.
+    // Use an inert build-only entry; runtime imports still use the host's full UI
+    // module under this shared key, and import:false forbids a local fallback.
+    packagePath: fileURLToPath(new URL('./host-shared-placeholder.mjs', import.meta.url)),
+  },
 };
 
 /**
