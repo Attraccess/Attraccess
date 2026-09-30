@@ -4,17 +4,35 @@ import { describe, expect, it } from 'vitest';
 import { DIGITAL_TERMINALS } from '../../backend/configuration-digital';
 import { validateEditorSnapshot } from '../../backend/configuration-editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
-import { addDevice, busConnection, removeDevice, saveDevice, terminalChannel, updateBus, updateTerminal, type PanelConfiguration } from '../src/front-panel/model';
+import {
+  addDevice,
+  busConnection,
+  removeDevice,
+  saveDevice,
+  terminalChannel,
+  updateBus,
+  updateTerminal,
+  type PanelConfiguration,
+} from '../src/front-panel/model';
 
-const empty = (): PanelConfiguration => ({ snapshot: { version: 1, physicalPoints: [], logicalChannels: [] }, metadata: { names: {}, presets: [] } });
+const empty = (): PanelConfiguration => ({
+  snapshot: { version: 1, physicalPoints: [], logicalChannels: [] },
+  metadata: { names: {}, presets: [] },
+});
+
+function required<T>(value: T | null | undefined): T {
+  if (value == null) throw new Error('Missing test fixture value');
+  return value;
+}
 
 describe('front panel configuration', () => {
   it('uses each fixed terminal and preserves the channel identity when renaming', () => {
     let configuration = empty();
-    for (const terminal of DIGITAL_TERMINALS) configuration = updateTerminal(configuration, terminal, terminal.label, {});
+    for (const terminal of DIGITAL_TERMINALS)
+      configuration = updateTerminal(configuration, terminal, terminal.label, {});
     expect(configuration.snapshot.logicalChannels).toHaveLength(12);
     expect(validateEditorSnapshot(configuration.snapshot)).toEqual([]);
-    const before = terminalChannel(configuration.snapshot, DIGITAL_TERMINALS[0])!;
+    const before = required(terminalChannel(configuration.snapshot, DIGITAL_TERMINALS[0]));
     configuration = updateTerminal(configuration, DIGITAL_TERMINALS[0], 'Laser power', {});
     expect(terminalChannel(configuration.snapshot, DIGITAL_TERMINALS[0])?.id).toBe(before.id);
     expect(terminalChannel(configuration.snapshot, DIGITAL_TERMINALS[0])?.physicalPointId).toBe(before.physicalPointId);
@@ -22,7 +40,10 @@ describe('front panel configuration', () => {
   });
 
   it('removes an unnamed terminal and clears pulse settings when changing to switched behavior', () => {
-    let configuration = updateTerminal(empty(), DIGITAL_TERMINALS[0], 'Door', { capabilities: ['output', 'pulse'], pulse: { durationMs: 3000 } });
+    let configuration = updateTerminal(empty(), DIGITAL_TERMINALS[0], 'Door', {
+      capabilities: ['output', 'pulse'],
+      pulse: { durationMs: 3000 },
+    });
     configuration = updateTerminal(configuration, DIGITAL_TERMINALS[0], 'Door', { capabilities: ['output'] });
     expect(configuration.snapshot.logicalChannels[0].pulse).toBeUndefined();
     configuration = updateTerminal(configuration, DIGITAL_TERMINALS[0], '  ', {});
@@ -40,15 +61,31 @@ describe('front panel configuration', () => {
     expect(configuration.snapshot.logicalChannels).toHaveLength(profile.measurements.length * 2);
     expect(validateEditorSnapshot(configuration.snapshot)).toEqual([]);
     const bus = busConnection(configuration.snapshot);
-    configuration = updateBus(configuration, { ...bus, transport: 'rtu', path: '/dev/serial', baudRate: 19200, parity: 'odd', stopBits: 2 });
-    expect(configuration.snapshot.modbus?.connections[0]).toMatchObject({ baudRate: 19200, parity: 'odd', stopBits: 2 });
+    configuration = updateBus(configuration, {
+      ...bus,
+      transport: 'rtu',
+      path: '/dev/serial',
+      baudRate: 19200,
+      parity: 'odd',
+      stopBits: 2,
+    });
+    expect(configuration.snapshot.modbus?.connections[0]).toMatchObject({
+      baudRate: 19200,
+      parity: 'odd',
+      stopBits: 2,
+    });
   });
 
   it('customizes a profile without modifying the built-in map and preserves existing signal identities', () => {
     const { configuration, id } = addDevice(empty(), 'Meter');
     const before = configuration.snapshot.logicalChannels.map((channel) => channel.id);
     const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'custom-meter');
-    const next = saveDevice(configuration, { ...configuration.snapshot.modbus!.devices[0], pollIntervalMs: 2500 }, busConnection(configuration.snapshot), profile);
+    const next = saveDevice(
+      configuration,
+      { ...required(configuration.snapshot.modbus).devices[0], pollIntervalMs: 2500 },
+      busConnection(configuration.snapshot),
+      profile,
+    );
     expect(next.snapshot.logicalChannels.map((channel) => channel.id)).toEqual(before);
     expect(next.snapshot.modbus?.devices.find((device) => device.id === id)?.pollIntervalMs).toBe(2500);
     expect(next.snapshot.modbus?.profiles[0]).toEqual(profile);
@@ -58,8 +95,34 @@ describe('front panel configuration', () => {
 
   it('adds switch bindings, prunes removed registers and removes all bindings of a removed device', () => {
     const { configuration, id } = addDevice(empty(), 'Relay');
-    const profile = { id: 'relay', name: 'Relay', version: 1, measurements: [], actions: [{ id: 'switch', name: 'Relay 1', functionCode: 5 as const, address: 0, addressBase: 0 as const, dataType: 'uint16' as const, byteOrder: 'big' as const, wordOrder: 'big' as const, scale: 1, offset: 0, onValue: 1, offValue: 0 }] };
-    const next = saveDevice(configuration, configuration.snapshot.modbus!.devices[0], busConnection(configuration.snapshot), profile);
+    const profile = {
+      id: 'relay',
+      name: 'Relay',
+      version: 1,
+      measurements: [],
+      actions: [
+        {
+          id: 'switch',
+          name: 'Relay 1',
+          functionCode: 5 as const,
+          address: 0,
+          addressBase: 0 as const,
+          dataType: 'uint16' as const,
+          byteOrder: 'big' as const,
+          wordOrder: 'big' as const,
+          scale: 1,
+          offset: 0,
+          onValue: 1,
+          offValue: 0,
+        },
+      ],
+    };
+    const next = saveDevice(
+      configuration,
+      required(configuration.snapshot.modbus).devices[0],
+      busConnection(configuration.snapshot),
+      profile,
+    );
     expect(next.snapshot.logicalChannels).toHaveLength(1);
     expect(next.snapshot.logicalChannels[0].capabilities).toEqual(['output']);
     expect(validateEditorSnapshot(next.snapshot)).toEqual([]);

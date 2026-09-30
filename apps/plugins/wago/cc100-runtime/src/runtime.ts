@@ -356,9 +356,15 @@ export class WagoRuntime {
           const resume = this.options.device.suspend?.();
           try {
             await this.queueStateUpdate(async () => {
-              await this.options.store.save({ ...this.state, accepted });
+              const manualOutputChannelIds = (this.state.manualOutputChannelIds ?? []).filter((id) =>
+                accepted.snapshot.logicalChannels.some(
+                  (channel) => channel.id === id && channel.capabilities.includes('output'),
+                ),
+              );
+              await this.options.store.save({ ...this.state, accepted, manualOutputChannelIds });
               installRouting();
               this.state.accepted = accepted;
+              this.state.manualOutputChannelIds = manualOutputChannelIds;
             });
           } finally {
             resume?.();
@@ -397,7 +403,10 @@ export class WagoRuntime {
       !['set', 'pulse', 'release'].includes(command.action)
     )
       return;
-    if ((command.source !== undefined && command.source !== 'manual') || (command.action === 'release' && command.source !== 'manual'))
+    if (
+      (command.source !== undefined && command.source !== 'manual') ||
+      (command.action === 'release' && command.source !== 'manual')
+    )
       return this.acknowledge(command.id, 'rejected', 'invalid command source', 'invalid_command');
     if (command.action === 'set' && typeof command.value !== 'boolean')
       return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value', 'invalid_command');
@@ -460,7 +469,9 @@ export class WagoRuntime {
           return { error: 'command has expired', code: 'expired' };
         }
         if (command.action === 'release') {
-          this.state.manualOutputChannelIds = (this.state.manualOutputChannelIds ?? []).filter((id) => id !== currentChannel.id);
+          this.state.manualOutputChannelIds = (this.state.manualOutputChannelIds ?? []).filter(
+            (id) => id !== currentChannel.id,
+          );
           await this.saveState();
           this.requestStatePublication();
           return undefined;
@@ -504,10 +515,12 @@ export class WagoRuntime {
         )
           return this.releaseFailedWrite(command.id, currentChannel.id);
         if (command.source === 'manual' || this.state.manualOutputChannelIds?.includes(currentChannel.id)) {
-          this.state.manualOutputChannelIds = [...new Set([
-            ...(this.state.manualOutputChannelIds ?? []).filter((id) => id !== currentChannel.id),
-            ...(command.source === 'manual' ? [currentChannel.id] : []),
-          ])];
+          this.state.manualOutputChannelIds = [
+            ...new Set([
+              ...(this.state.manualOutputChannelIds ?? []).filter((id) => id !== currentChannel.id),
+              ...(command.source === 'manual' ? [currentChannel.id] : []),
+            ]),
+          ];
           await this.saveState();
           this.requestStatePublication();
         }
@@ -651,8 +664,15 @@ export class WagoRuntime {
     return this.statePublication;
   }
 
+  private readonly modbusOutputSamples = new Map<
+    string,
+    { revision: number; value: boolean; commanded: boolean | undefined }
+  >();
+
   private async readAndPublishState(force: boolean): Promise<void> {
     const accepted = this.state.accepted;
+    for (const [id, sample] of this.modbusOutputSamples)
+      if (sample.revision !== accepted?.revision) this.modbusOutputSamples.delete(id);
     const inputs: Record<string, boolean> = Object.create(null);
     const outputs: Record<string, boolean> = Object.create(null);
     const commandedOutputs: Record<string, boolean> = Object.create(null);
@@ -675,11 +695,29 @@ export class WagoRuntime {
           commandedOutputs[channel.id] = this.state.outputs[channel.id];
         const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
         if (!point) continue;
-        if (point.modbus && (!output || !this.options.device.readOutput)) continue;
+        if (point.modbus) {
+          if (!output || !this.options.device.readOutput) continue;
+          // Preview reads belong to the polling loop: offline devices must never
+          // block configuration acceptance, safety writes or command acknowledgements.
+          if (force) {
+            const sample = this.modbusOutputSamples.get(channel.id);
+            if (sample?.revision === accepted.revision && sample.commanded === this.state.outputs[channel.id])
+              outputs[channel.id] = sample.value;
+            continue;
+          }
+        }
         try {
-          const value = point.modbus ? await this.options.device.readOutput!(point) : await this.options.device.read(point);
+          const value = point.modbus
+            ? await this.options.device.readOutput?.(point)
+            : await this.options.device.read(point);
           if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
           (output ? outputs : inputs)[channel.id] = !output && channel.invert ? !value : value;
+          if (point.modbus)
+            this.modbusOutputSamples.set(channel.id, {
+              revision: accepted.revision,
+              value,
+              commanded: this.state.outputs[channel.id],
+            });
         } catch (error) {
           errors.push({
             path: channel.id,
@@ -698,7 +736,11 @@ export class WagoRuntime {
       inputs,
       outputs,
       commandedOutputs,
-      manualOutputChannelIds: (this.state.manualOutputChannelIds ?? []).filter((id) => accepted?.snapshot.logicalChannels.some((channel) => channel.id === id && channel.capabilities.includes('output'))),
+      manualOutputChannelIds: (this.state.manualOutputChannelIds ?? []).filter((id) =>
+        accepted?.snapshot.logicalChannels.some(
+          (channel) => channel.id === id && channel.capabilities.includes('output'),
+        ),
+      ),
       readiness: {
         configurationAccepted: Boolean(accepted),
         hardwareAvailable: !errors.some((error) => error.code !== 'modbus_read_failed'),

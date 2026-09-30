@@ -139,7 +139,11 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     }
     const capabilities = Array.isArray(channel?.capabilities) ? channel.capabilities : [];
     if (channel.invert !== undefined && (typeof channel.invert !== 'boolean' || !capabilities.includes('input')))
-      errors.push({ path: `${path}.invert`, code: 'invalid_invert', message: 'invert requires a boolean and an input channel' });
+      errors.push({
+        path: `${path}.invert`,
+        code: 'invalid_invert',
+        message: 'invert requires a boolean and an input channel',
+      });
     if (!capabilities.length) {
       errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
     }

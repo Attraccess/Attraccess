@@ -80,12 +80,10 @@ export class WagoCommandHandler {
     const controllers =
       previewOnly && !controllerId
         ? []
-        : await this.dependencies
-            .controllers()
-            .find({
-              where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId } : {}) },
-              order: { name: 'ASC' },
-            });
+        : await this.dependencies.controllers().find({
+            where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId } : {}) },
+            order: { name: 'ASC' },
+          });
     const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
     const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
     const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
@@ -381,7 +379,10 @@ export class WagoCommandHandler {
     return nodes.map((node) => `resource ${node.resourceId} / node ${node.id}`);
   }
 
-  private parse(config: WagoCommandConfig, manual = false):
+  private parse(
+    config: WagoCommandConfig,
+    manual = false,
+  ):
     | {
         value: {
           controllerId: number;
@@ -398,7 +399,10 @@ export class WagoCommandHandler {
     const controllerId = positiveInteger(config.controllerId);
     const expectedConfigurationRevision = positiveInteger(config.expectedConfigurationRevision);
     const channelId = typeof config.channelId === 'string' && config.channelId.trim() ? config.channelId : undefined;
-    const action = config.action === 'set' || config.action === 'pulse' || (manual && config.action === 'release') ? config.action : undefined;
+    const action =
+      config.action === 'set' || config.action === 'pulse' || (manual && config.action === 'release')
+        ? config.action
+        : undefined;
     const completionBehavior = config.completionBehavior === 'dispatch' ? 'dispatch' : 'acknowledged';
     const parsedTimeout = positiveInteger(config.acknowledgementTimeoutSeconds);
     const acknowledgementTimeoutSeconds = parsedTimeout ?? DEFAULT_COMMAND_TIMEOUT_SECONDS;

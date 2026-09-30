@@ -342,7 +342,11 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
     });
   });
   config.devices.forEach((d, i) => {
-    keys(d, ['id', 'name', 'connectionId', 'unitId', 'profileId', 'profileVersion', 'pollIntervalMs'], `modbus.devices[${i}]`);
+    keys(
+      d,
+      ['id', 'name', 'connectionId', 'unitId', 'profileId', 'profileVersion', 'pollIntervalMs'],
+      `modbus.devices[${i}]`,
+    );
     if (d.pollIntervalMs !== undefined && !integer(d.pollIntervalMs, 100, 3600000))
       fail(`modbus.devices[${i}].pollIntervalMs`, 'device polling interval must be 100..3600000 ms');
     if (

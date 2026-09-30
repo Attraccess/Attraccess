@@ -77,7 +77,11 @@ export default class WagoPlugin implements AttraccessFrontendPlugin {
         authRequired: 'resources.update',
         element: <ConfigurationPage />,
       },
-      { path: '/wago/controllers/:controllerId/configuration/history', authRequired: 'resources.update', element: <HistoryPage /> },
+      {
+        path: '/wago/controllers/:controllerId/configuration/history',
+        authRequired: 'resources.update',
+        element: <HistoryPage />,
+      },
     ];
   }
 

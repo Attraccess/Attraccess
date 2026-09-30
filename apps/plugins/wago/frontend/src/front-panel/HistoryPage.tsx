@@ -23,9 +23,30 @@ function ControllerHistory({ controllerId }: { controllerId: number }) {
   const draft = useDraftQuery(controllerId);
   const [busy, setBusy] = useState(false);
   const [generation, setGeneration] = useState(0);
-  return <main className="wg:mx-auto wg:flex wg:w-full wg:max-w-[1440px] wg:flex-col wg:gap-5 wg:p-4 wg:md:p-6">
-    <Button variant="ghost" isDisabled={busy} onPress={() => navigate(`/wago/controllers/${controllerId}/configuration`)}><ArrowLeft className="wg:size-4" />{t('panel.title')}</Button>
-    <h1 className="wg:text-3xl wg:font-semibold">{t('panel.history')}</h1>
-    <ConfigurationRevisions view="history" controllerId={controllerId} metadata={readMetadata(draft.data?.presetProvenance ?? null)} disabled={!draft.isSuccess} hasSavedDraft={Boolean(draft.data)} generation={generation} onBusyChange={setBusy} onRollback={async () => { await draft.refetch(); setGeneration((value) => value + 1); }} />
-  </main>;
+  return (
+    <main className="wg:mx-auto wg:flex wg:w-full wg:max-w-[1440px] wg:flex-col wg:gap-5 wg:p-4 wg:md:p-6">
+      <Button
+        variant="ghost"
+        isDisabled={busy}
+        onPress={() => navigate(`/wago/controllers/${controllerId}/configuration`)}
+      >
+        <ArrowLeft className="wg:size-4" />
+        {t('panel.title')}
+      </Button>
+      <h1 className="wg:text-3xl wg:font-semibold">{t('panel.history')}</h1>
+      <ConfigurationRevisions
+        view="history"
+        controllerId={controllerId}
+        metadata={readMetadata(draft.data?.presetProvenance ?? null)}
+        disabled={!draft.isSuccess}
+        hasSavedDraft={Boolean(draft.data)}
+        generation={generation}
+        onBusyChange={setBusy}
+        onRollback={async () => {
+          await draft.refetch();
+          setGeneration((value) => value + 1);
+        }}
+      />
+    </main>
+  );
 }

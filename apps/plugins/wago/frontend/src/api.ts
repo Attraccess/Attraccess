@@ -224,7 +224,10 @@ export interface ManualCommand {
   acknowledgementTimeoutSeconds: number;
 }
 export const manualCommand = (id: number, command: ManualCommand) =>
-  api.request<{ result: 'acknowledged' | 'rejected' | 'timeout' | 'transport_failure' }>(`/controllers/${id}/commands`, { method: 'POST', body: JSON.stringify(command) });
+  api.request<{ result: 'acknowledged' | 'rejected' | 'timeout' | 'transport_failure' }>(
+    `/controllers/${id}/commands`,
+    { method: 'POST', body: JSON.stringify(command) },
+  );
 
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);

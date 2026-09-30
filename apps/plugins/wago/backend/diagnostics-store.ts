@@ -82,8 +82,14 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 function validStatePayload(data: Record<string, unknown>, kind: string, canonical: boolean): boolean {
-  if (kind === 'state' && data.manualOutputChannelIds !== undefined &&
-      (!Array.isArray(data.manualOutputChannelIds) || data.manualOutputChannelIds.length > MAX_CHANNELS || !data.manualOutputChannelIds.every(identifier))) return false;
+  if (
+    kind === 'state' &&
+    data.manualOutputChannelIds !== undefined &&
+    (!Array.isArray(data.manualOutputChannelIds) ||
+      data.manualOutputChannelIds.length > MAX_CHANNELS ||
+      !data.manualOutputChannelIds.every(identifier))
+  )
+    return false;
   if (
     canonical &&
     kind === 'state' &&
@@ -360,7 +366,8 @@ export class WagoDiagnosticsStore {
     state.contentHash = contentHash;
     state.hardwareAvailable = hardwareAvailable;
     state.stateSourceAt = canonical ? (data.timestamp as string) : undefined;
-    state.manualOutputChannelIds = canonical && Array.isArray(data.manualOutputChannelIds) ? data.manualOutputChannelIds as string[] : undefined;
+    state.manualOutputChannelIds =
+      canonical && Array.isArray(data.manualOutputChannelIds) ? (data.manualOutputChannelIds as string[]) : undefined;
     if (data.outputs && typeof data.outputs === 'object' && !Array.isArray(data.outputs)) {
       for (const [channelId, value] of Object.entries(data.outputs).slice(0, MAX_CHANNELS)) {
         if (identifier(channelId) && typeof value === 'boolean')
