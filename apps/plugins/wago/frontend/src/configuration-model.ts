@@ -1,5 +1,6 @@
 import { randomUUID } from './configuration-id';
-import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
+import { BUILTIN_MODBUS_PROFILES, findProfile } from '../../modbus/model';
+import type { ModbusConfiguration, ModbusProfile } from '../../modbus/model';
 import type { ConfigurationDiff, ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { availableDigitalTerminals, digitalTerminalLabel } from '../../backend/configuration-digital';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -7,6 +8,7 @@ import englishFields from './fields.en.json';
 import englishChannels from './channels.en.json';
 import englishModbus from './modbus.en.json';
 import englishPresets from './presets.en.json';
+import { modbusDisplayName } from './modbus-labels';
 
 export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
 export type PhysicalPoint = WagoConfigurationSnapshot['physicalPoints'][number];
@@ -81,11 +83,41 @@ export function pointLabel(point: PhysicalPoint, names: Record<string, string>, 
       : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
 }
 
-export function readableValue(value: unknown, names: Record<string, string>, t?: TFunction, field = ''): string {
+type ValueContext = {
+  modbus?: ModbusConfiguration;
+  profile?: ModbusProfile;
+  translateName: (name: string) => string;
+  metadataNames: Record<string, string>;
+};
+
+function profileForDevice(modbus: ModbusConfiguration | undefined, deviceId: string) {
+  const device = modbus?.devices.find((item) => item.id === deviceId);
+  return modbus && device ? findProfile(modbus, device) : undefined;
+}
+
+export function readableValue(
+  value: unknown,
+  names: Record<string, string>,
+  t?: TFunction,
+  field = '',
+  context?: ValueContext,
+): string {
   if (value === undefined || value === null) return t ? t('fields.notConfigured') : 'Not configured';
   if (Array.isArray(value))
-    return value.map((item) => readableValue(item, names, t, field)).join(', ') || (t ? t('fields.none') : 'None');
+    return (
+      value.map((item) => readableValue(item, names, t, field, context)).join(', ') || (t ? t('fields.none') : 'None')
+    );
   if (typeof value === 'object') {
+    if (
+      context &&
+      'hardwareProfile' in value &&
+      'modbus' in value &&
+      value.modbus &&
+      typeof value.modbus === 'object' &&
+      'deviceId' in value.modbus &&
+      typeof value.modbus.deviceId === 'string'
+    )
+      context = { ...context, profile: profileForDevice(context.modbus, value.modbus.deviceId) };
     if (
       'hardwareProfile' in value &&
       value.hardwareProfile === '751-9301' &&
@@ -98,11 +130,17 @@ export function readableValue(value: unknown, names: Record<string, string>, t?:
     return Object.entries(value)
       .map(
         ([key, item]) =>
-          `${fieldLabel(key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t, key)}`,
+          `${fieldLabel(field ? `${field}.${key}` : key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t, key, context)}`,
       )
       .join('; ');
   }
   if (typeof value === 'string') {
+    if (context && (field === 'measurementId' || field === 'actionId')) {
+      if (context.metadataNames[value]) return context.metadataNames[value];
+      const entries = field === 'measurementId' ? context.profile?.measurements : context.profile?.actions;
+      const entry = entries?.find((item) => item.id === value);
+      return entry && context.profile ? modbusDisplayName(context.profile, entry.name, context.translateName) : value;
+    }
     if (names[value]) return names[value];
     // Only localize application-defined choices, never identifiers or user text.
     if (field === 'profile' && Object.hasOwn(englishPresets.items, value)) {
@@ -131,17 +169,30 @@ export function readableChangeValue(
   snapshot: WagoConfigurationSnapshot | null,
   names: Record<string, string>,
   t?: TFunction,
+  options?: Pick<ValueContext, 'translateName' | 'metadataNames'>,
 ) {
   if (/\.(name|host|path)$/.test(path) && typeof value === 'string') return value;
   const point = path.match(/^(?:\$\.)?physicalPoints\[(\d+)\]\.channel$/);
   if (point && typeof value === 'number' && snapshot?.physicalPoints[Number(point[1])]?.hardwareProfile === '751-9301')
     return `CC100 ${digitalTerminalLabel(value)}`;
+  const context: ValueContext = {
+    modbus: snapshot?.modbus,
+    translateName: options?.translateName ?? ((name) => name),
+    metadataNames: options?.metadataNames ?? names,
+  };
+  const pointPath = path.match(/^(?:\$\.)?physicalPoints\[(?:(\d+)|id:([^\]]*))\]/);
+  const physicalPoint =
+    pointPath &&
+    (pointPath[1] !== undefined
+      ? snapshot?.physicalPoints[Number(pointPath[1])]
+      : snapshot?.physicalPoints.find((item) => item.id === decodeURIComponent(pointPath[2])));
+  if (physicalPoint?.modbus) context.profile = profileForDevice(context.modbus, physicalPoint.modbus.deviceId);
   const field =
     path
       .split('.')
       .at(-1)
       ?.replace(/\[\d+\]$/, '') ?? '';
-  return readableValue(value, names, t, field);
+  return readableValue(value, names, t, field, context);
 }
 
 function words(value: string) {
@@ -260,6 +311,7 @@ export function configurationNames(
   snapshot: WagoConfigurationSnapshot | null,
   names: Record<string, string>,
   t?: TFunction,
+  translateName: (name: string) => string = (name) => name,
 ) {
   const modbus = snapshot?.modbus;
   if (!modbus) return names;
@@ -270,9 +322,9 @@ export function configurationNames(
         t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`,
       ]),
       ...modbus.devices.map((d) => [d.id, d.name]),
-      ...[...BUILTIN_MODBUS_PROFILES, ...modbus.profiles].flatMap((p) => [
-        [p.id, p.name],
-        ...[...p.measurements, ...p.actions].map((entry) => [entry.id, entry.name]),
+      ...[...BUILTIN_MODBUS_PROFILES, ...modbus.profiles].map((p) => [
+        p.id,
+        modbusDisplayName(p, p.name, translateName),
       ]),
     ]),
     ...names,

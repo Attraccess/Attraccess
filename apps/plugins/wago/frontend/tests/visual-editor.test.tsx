@@ -200,11 +200,14 @@ async function external(user: ReturnType<typeof userEvent.setup>, name: string) 
 describe('visual configuration workflow', () => {
   it('switches diagnostic status values with the host language while preserving source identifiers', async () => {
     const diagnostics = diagnosticsFixture();
+    diagnostics.capabilities = ['input', 'measurement', 'vendor.capability-v2'];
+    diagnostics.hardwareReadinessReason =
+      'Reported hardware availability is shown when supplied; it does not prove physical I/O readiness. Applied configuration and cached output state are not physical proof.';
     diagnostics.channels = [
       {
         id: 'sensor.v1',
         profile: 'generic-digital-output',
-        capabilities: ['output'],
+        capabilities: ['output', 'pulse', 'vendor.channel-v2'],
         disconnectPolicy: { mode: 'hold' },
         safeState: 'off (runtime default)',
         samples: [
@@ -219,6 +222,19 @@ describe('visual configuration workflow', () => {
             current: false,
             availabilityReason: 'vendor.diagnostic-v2',
           },
+          {
+            kind: 'measurement',
+            value: 12.4,
+            unit: 'volt',
+            measurementKind: 'live',
+            sourceAt: null,
+            sourceFreshness: 'fresh',
+            receivedAt: '2026-09-06T18:00:00.000Z',
+            streamId: 'boot.v1',
+            sequence: 2,
+            current: false,
+            availabilityReason: 'configuration-mismatch',
+          },
         ],
         current: false,
         fault: null,
@@ -229,16 +245,25 @@ describe('visual configuration workflow', () => {
     mount();
     await section(userEvent.setup(), 'Diagnostics');
     expect(await screen.findByText(/Permanent heartbeat:.*\(fresh\)/)).toBeInTheDocument();
+    expect(screen.getByText('Capabilities: input, measurement, vendor.capability-v2')).toBeInTheDocument();
+    expect(screen.getByText(/Latest output:/)).toBeInTheDocument();
+    expect(screen.getByText(/Latest measurement: 12.4 volt live/)).toBeInTheDocument();
     expect(screen.getByText('Safe state: off (runtime default). Disconnect: hold.')).toBeInTheDocument();
     act(() => useTranslationState.getState().setLanguage('de'));
     expect(screen.getByText(/Dauerhaftes Lebenszeichen:.*\(Aktuell\)/)).toBeInTheDocument();
     expect(screen.getByText(/Quellzeit:.*\(Veraltet\)/)).toBeInTheDocument();
+    expect(screen.getByText('Funktionen: Eingang, Messwert, vendor.capability-v2')).toBeInTheDocument();
+    expect(screen.getByText(/Funktionen: Ausgang, Impuls, vendor.channel-v2/)).toBeInTheDocument();
+    expect(screen.getByText(/Letzter Wert für Ausgang:/)).toBeInTheDocument();
+    expect(screen.getByText(/Letzter Wert für Messwert: 12.4 Volt Aktuell/)).toBeInTheDocument();
+    expect(screen.getByText(/nicht aktuell: Konfigurationsabweichung/)).toBeInTheDocument();
+    expect(screen.getByText(/Gemeldete Hardware-Verfügbarkeit/)).toBeInTheDocument();
     expect(
       screen.getByText('Sicherer Zustand: Aus (Standard der Laufzeitumgebung). Bei Verbindungsabbruch: Halten.'),
     ).toBeInTheDocument();
     expect(screen.getByText('sensor.v1')).toBeInTheDocument();
     expect(screen.getByText(/vendor\.diagnostic-v2/)).toBeInTheDocument();
-    expect(screen.getByText(/boot\.v1/)).toBeInTheDocument();
+    expect(screen.getAllByText(/boot\.v1/)).toHaveLength(2);
     expect(state.diagnostics).toHaveBeenCalledTimes(1);
   });
 

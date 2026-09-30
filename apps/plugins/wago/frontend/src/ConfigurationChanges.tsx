@@ -20,13 +20,16 @@ export function ConfigurationErrors({
   names: Record<string, string>;
 }) {
   const { t, tBackendMessage } = useWagoTranslations();
-  names = configurationNames(snapshot, names, t);
+  names = configurationNames(snapshot, names, t, tBackendMessage);
   return (
     <ul>
       {errors.map((error, index) => (
         <li key={error.path + error.code + index}>
           {changeLabel({ path: error.path, previous: undefined, current: undefined }, snapshot, snapshot, names, t)}:{' '}
-          {Object.entries(names).reduce((message, [id, name]) => message.replaceAll(id, name), tBackendMessage(error.message))}
+          {Object.entries(names).reduce(
+            (message, [id, name]) => message.replaceAll(id, name),
+            tBackendMessage(error.message),
+          )}
         </li>
       ))}
     </ul>
@@ -48,8 +51,9 @@ export function ConfigurationChanges({
   selected?: string[];
   onSelect?: (path: string, selected: boolean) => void;
 }) {
-  const { t } = useWagoTranslations();
-  names = configurationNames(after, configurationNames(before, names, t), t);
+  const { t, tBackendMessage } = useWagoTranslations();
+  const valueOptions = { translateName: tBackendMessage, metadataNames: names };
+  names = configurationNames(after, configurationNames(before, names, t, tBackendMessage), t, tBackendMessage);
   const displayed = onSelect ? changes : readableStructuralChanges(changes, before, after);
   if (!displayed.length) return <p>{t('configuration.empty')}</p>;
   return (
@@ -69,10 +73,11 @@ export function ConfigurationChanges({
             <p className="wg:font-medium">{changeLabel(change, before, after, names, t)}</p>
           )}
           <p className="wg:text-sm">
-            {t('configuration.before')} {readableChangeValue(change.path, change.previous, before, names, t)}
+            {t('configuration.before')}{' '}
+            {readableChangeValue(change.path, change.previous, before, names, t, valueOptions)}
           </p>
           <p className="wg:text-sm">
-            {t('configuration.after')} {readableChangeValue(change.path, change.current, after, names, t)}
+            {t('configuration.after')} {readableChangeValue(change.path, change.current, after, names, t, valueOptions)}
           </p>
         </li>
       ))}

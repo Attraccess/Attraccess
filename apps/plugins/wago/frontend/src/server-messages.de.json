@@ -101,5 +101,19 @@
   "dispatch-failed": "Versand fehlgeschlagen",
   "timeout": "Zeitüberschreitung",
   "off (runtime default)": "Aus (Standard der Laufzeitumgebung)",
-  "not applicable": "Nicht zutreffend"
+  "not applicable": "Nicht zutreffend",
+  "untrusted": "Nicht vertrauenswürdig",
+  "incompatible-runtime": "Inkompatible Laufzeitumgebung",
+  "stream-tracking-exhausted": "Grenze der Datenstromverfolgung erreicht",
+  "disconnected-or-unknown": "Getrennt oder unbekannt",
+  "hardware-unavailable": "Hardware nicht verfügbar",
+  "configuration-mismatch": "Konfigurationsabweichung",
+  "recent-fault": "Aktueller Fehler",
+  "state-source-unavailable-or-stale": "Quellzustand nicht verfügbar oder veraltet",
+  "old-or-legacy-stream": "Alter Datenstrom oder Altversion",
+  "source-missing": "Quellzeit fehlt",
+  "source-invalid": "Ungültige Quellzeit",
+  "source-future": "Quellzeit liegt in der Zukunft",
+  "source-stale": "Quellmesswert veraltet",
+  "Reported hardware availability is shown when supplied; it does not prove physical I/O readiness. Applied configuration and cached output state are not physical proof.": "Gemeldete Hardware-Verfügbarkeit wird angezeigt, sofern vorhanden; sie belegt keine physische E/A-Bereitschaft. Eine angewendete Konfiguration und gespeicherte Ausgangszustände sind kein physischer Nachweis."
 }

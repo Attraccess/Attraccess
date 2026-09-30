@@ -67,7 +67,8 @@ export function WagoStatus({
           </p>
         )}
         <p>
-          {t('diagnostics.hardware', { status: tBackendMessage(d.hardwareReadiness) })} {d.hardwareReadinessReason}
+          {t('diagnostics.hardware', { status: tBackendMessage(d.hardwareReadiness) })}{' '}
+          {tBackendMessage(d.hardwareReadinessReason)}
         </p>
         {d.stateHardwareAvailable === false && <p role="alert">{t('diagnostics.hardwareUnavailable')}</p>}
         {c.validationCodes.length > 0 && <p>{t('diagnostics.draftErrors', { codes: c.validationCodes.join(', ') })}</p>}
@@ -102,7 +103,7 @@ export function WagoStatus({
           {t('diagnostics.versions', { runtime: d.runtimeVersion, protocol: d.protocolVersion })}
           {d.incompatible ? t('diagnostics.incompatible') : ''}
         </p>
-        <p>{t('diagnostics.capabilities', { capabilities: d.capabilities.join(', ') })}</p>
+        <p>{t('diagnostics.capabilities', { capabilities: d.capabilities.map(tBackendMessage).join(', ') })}</p>
         {d.faults.map((fault) => (
           <p role="alert" key={fault.channelId}>
             {t('diagnostics.fault', {
@@ -142,7 +143,7 @@ export function ControllerDiagnostics(props: { controllerId: number; onConfigure
 }
 
 function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: number; onConfigure?: () => void }) {
-  const { t, language, tBackendMessage } = useWagoTranslations();
+  const { t, tExists, language, tBackendMessage } = useWagoTranslations();
   const query = useWagoDiagnostics(controllerId);
   const now = useDiagnosticsClock();
   const pollingStale = !!query.data && !pollFresh(query.dataUpdatedAt, now);
@@ -176,7 +177,10 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
               <Card.Header>
                 <Card.Title>{channel.id}</Card.Title>
                 <Card.Description>
-                  {t('diagnostics.preset', { preset: channel.profile, capabilities: channel.capabilities.join(', ') })}
+                  {t('diagnostics.preset', {
+                    preset: channel.profile,
+                    capabilities: channel.capabilities.map(tBackendMessage).join(', '),
+                  })}
                 </Card.Description>
               </Card.Header>
               <Card.Content>
@@ -184,11 +188,14 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                 {channel.samples.map((sample) => (
                   <div key={`${sample.kind}:${sample.measurementKind ?? ''}`}>
                     <p>
-                      {t('diagnostics.latest', { kind: sample.kind })} {String(sample.value)} {sample.unit ?? ''}{' '}
-                      {sample.measurementKind ?? ''} ·{' '}
+                      {t('diagnostics.latest', { kind: tBackendMessage(sample.kind) })} {String(sample.value)}{' '}
+                      {sample.unit && tExists(`modbus.options.${sample.unit}`)
+                        ? t(`modbus.options.${sample.unit}`)
+                        : (sample.unit ?? '')}{' '}
+                      {tBackendMessage(sample.measurementKind)} ·{' '}
                       {sample.current
                         ? t('diagnostics.current')
-                        : t('diagnostics.notCurrent', { reason: sample.availabilityReason })}
+                        : t('diagnostics.notCurrent', { reason: tBackendMessage(sample.availabilityReason) })}
                     </p>
                     <p>
                       {t('diagnostics.sampleTime', {

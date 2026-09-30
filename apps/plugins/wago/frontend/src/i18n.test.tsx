@@ -17,6 +17,7 @@ import rabbitmqEn from '../../../rabbitmq/frontend/src/en.json';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import rabbitmqDe from '../../../rabbitmq/frontend/src/de.json';
 import { ChannelWorkspace } from './ChannelWorkspace';
+import { ConfigurationChanges } from './ConfigurationChanges';
 import {
   emptyConfiguration,
   emptyMetadata,
@@ -26,9 +27,9 @@ import {
 } from './configuration-model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import { modbusDisplayName } from './modbus-labels';
-import type { ModbusConnection, RegisterFormat } from '../../modbus/model';
+import type { ModbusConnection, ModbusProfile, RegisterFormat } from '../../modbus/model';
 import type { Freshness, WagoDiagnostics } from '../../diagnostics-types';
-import type { CommissioningVerification } from './api';
+import type { CommissioningVerification, WagoConfigurationSnapshot } from './api';
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', { setItem: vi.fn() });
@@ -116,6 +117,120 @@ it('translates every diagnostic freshness, acknowledgement and commissioning rea
     expect(result.current.tBackendMessage(status)).toBe(status);
     act(() => useTranslationState.getState().setLanguage('de'));
     expect(result.current.tBackendMessage(status)).toBe(german);
+    act(() => useTranslationState.getState().setLanguage('en'));
+  }
+});
+
+it('localizes built-in Modbus review names while preserving custom names and metadata overrides', () => {
+  const builtin = BUILTIN_MODBUS_PROFILES[1];
+  const custom = duplicateProfile(builtin, 'custom-meter');
+  custom.name = builtin.name;
+  const snapshotFor = (profile: ModbusProfile): WagoConfigurationSnapshot => ({
+    ...emptyConfiguration,
+    physicalPoints: [
+      {
+        id: 'meter-point',
+        hardwareProfile: 'modbus',
+        channel: 0,
+        modbus: { deviceId: 'active-power', measurementId: profile.measurements[0].id },
+      },
+    ],
+    modbus: {
+      connections: [
+        {
+          id: 'bus',
+          transport: 'tcp',
+          host: '192.0.2.1',
+          port: 502,
+          timeoutMs: 1000,
+          reconnectMs: 1000,
+          queueLimit: 8,
+        },
+      ],
+      devices: [
+        {
+          id: 'active-power',
+          name: 'Meter.v1',
+          connectionId: 'bus',
+          unitId: 1,
+          profileId: profile.id,
+          profileVersion: 1,
+        },
+      ],
+      profiles: [custom],
+    },
+  });
+  const before = snapshotFor(builtin);
+  const after = snapshotFor(custom);
+  const changes = [
+    { path: '$.modbus.devices[0].profileId', previous: builtin.id, current: custom.id },
+    {
+      path: '$.physicalPoints[0].modbus.measurementId',
+      previous: builtin.measurements[0].id,
+      current: custom.measurements[0].id,
+    },
+  ];
+  const { rerender } = render(<ConfigurationChanges changes={changes} before={before} after={after} names={{}} />);
+  expect(screen.getByText(`Before: ${builtin.name}`)).toBeTruthy();
+  expect(screen.getByText(`After: ${custom.name}`)).toBeTruthy();
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(screen.getByText('Vorher: WAGO 879-3000 — NICHT QUALIFIZIERT / Zuordnung nicht verifiziert')).toBeTruthy();
+  expect(screen.getByText('Vorher: Wirkleistung')).toBeTruthy();
+  expect(screen.getByText(`Nachher: ${custom.name}`)).toBeTruthy();
+  expect(screen.getByText('Nachher: Active power')).toBeTruthy();
+  rerender(
+    <ConfigurationChanges
+      changes={[{ path: '$', previous: null, current: before }]}
+      before={null}
+      after={before}
+      names={{}}
+    />,
+  );
+  expect(screen.getByText(/^Nachher:/).textContent).toContain('Wirkleistung');
+  expect(screen.getByText(/^Nachher:/).textContent).toContain('Meter.v1');
+  rerender(
+    <ConfigurationChanges
+      changes={[{ path: '$', previous: null, current: after }]}
+      before={null}
+      after={after}
+      names={{}}
+    />,
+  );
+  expect(screen.getByText(/^Nachher:/).textContent).toContain('Active power');
+  expect(screen.getByText(/^Nachher:/).textContent).not.toContain('Wirkleistung');
+  rerender(
+    <ConfigurationChanges
+      changes={changes}
+      before={before}
+      after={after}
+      names={{ [builtin.id]: 'My meter.v1', [builtin.measurements[0].id]: 'My power.v2' }}
+    />,
+  );
+  expect(screen.getByText('Vorher: My meter.v1')).toBeTruthy();
+  expect(screen.getByText('Vorher: My power.v2')).toBeTruthy();
+});
+
+it('translates the backend-owned reasons that diagnostic samples are not current', () => {
+  const reasons = {
+    untrusted: 'Nicht vertrauenswürdig',
+    'incompatible-runtime': 'Inkompatible Laufzeitumgebung',
+    'stream-tracking-exhausted': 'Grenze der Datenstromverfolgung erreicht',
+    'disconnected-or-unknown': 'Getrennt oder unbekannt',
+    'hardware-unavailable': 'Hardware nicht verfügbar',
+    'configuration-mismatch': 'Konfigurationsabweichung',
+    'recent-fault': 'Aktueller Fehler',
+    'state-source-unavailable-or-stale': 'Quellzustand nicht verfügbar oder veraltet',
+    'old-or-legacy-stream': 'Alter Datenstrom oder Altversion',
+    'source-missing': 'Quellzeit fehlt',
+    'source-invalid': 'Ungültige Quellzeit',
+    'source-future': 'Quellzeit liegt in der Zukunft',
+    'source-stale': 'Quellmesswert veraltet',
+  };
+  const { result } = renderHook(() => useWagoTranslations());
+  for (const [reason, german] of Object.entries(reasons)) {
+    expect(result.current.tBackendMessage(reason)).toBe(reason);
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(result.current.tBackendMessage(reason)).toBe(german);
     act(() => useTranslationState.getState().setLanguage('en'));
   }
 });
