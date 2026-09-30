@@ -93,3 +93,13 @@ it('withdraws cached success when verification polling fails', async () => {
   expect(await screen.findByText('Verification status unavailable')).toBeTruthy();
   expect(screen.queryByText(/Enrollment complete/)).toBeNull();
 });
+
+it('can transition between empty and populated collections without changing hook order', () => {
+  const props = { sessions: [], onResume: vi.fn(), onConfigure: vi.fn(), onClaim: vi.fn(), onRemove: vi.fn() };
+  const { rerender } = render(<ControllersTable {...props} controllers={[]} />);
+  expect(screen.getByText('No controllers or commissioning sessions yet.')).toBeTruthy();
+  rerender(<ControllersTable {...props} controllers={[controller]} />);
+  expect(screen.getByText('Fixture')).toBeTruthy();
+  rerender(<ControllersTable {...props} controllers={[]} />);
+  expect(screen.getByText('No controllers or commissioning sessions yet.')).toBeTruthy();
+});

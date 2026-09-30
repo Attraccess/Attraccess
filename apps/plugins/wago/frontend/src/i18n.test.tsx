@@ -17,7 +17,7 @@ import rabbitmqEn from '../../../rabbitmq/frontend/src/en.json';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import rabbitmqDe from '../../../rabbitmq/frontend/src/de.json';
 import { ChannelWorkspace } from './ChannelWorkspace';
-import { emptyConfiguration, emptyMetadata } from './configuration-model';
+import { emptyConfiguration, emptyMetadata, readableChangeValue } from './configuration-model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import { modbusDisplayName } from './modbus-labels';
 
@@ -52,17 +52,29 @@ it('translates retained backend messages, statuses and builtin names while prese
   const { result } = renderHook(() => useWagoTranslations());
   act(() => useTranslationState.getState().setLanguage('de'));
   expect(result.current.tBackendMessage('Confirm controller identity')).toBe('Identität der Steuerung bestätigen');
-  expect(result.current.tBackendMessage('Uploading runtime bundle: 42%.')).toBe('Laufzeitpaket wird hochgeladen: 42 %.');
-  expect(result.current.tBackendMessage('unique non-empty ID required')).toBe('Eindeutige, nicht leere ID erforderlich');
+  expect(result.current.tBackendMessage('Uploading runtime bundle: 42%.')).toBe(
+    'Laufzeitpaket wird hochgeladen: 42 %.',
+  );
+  expect(result.current.tBackendMessage('unique non-empty ID required')).toBe(
+    'Eindeutige, nicht leere ID erforderlich',
+  );
   expect(result.current.tBackendMessage('key_enrolled')).toBe('Schlüssel registriert');
-  expect(result.current.tBackendMessage('logical channel input-42 does not exist in this snapshot')).toBe('Logischer Kanal input-42 ist in dieser Konfigurationsaufnahme nicht vorhanden');
-  expect(result.current.tBackendMessage('Channel removed. Existing flow references may fail.')).toBe('Kanal entfernt. Vorhandene Ablaufreferenzen können fehlschlagen.');
+  expect(result.current.tBackendMessage('logical channel input-42 does not exist in this snapshot')).toBe(
+    'Logischer Kanal input-42 ist in dieser Konfigurationsaufnahme nicht vorhanden',
+  );
+  expect(result.current.tBackendMessage('Channel removed. Existing flow references may fail.')).toBe(
+    'Kanal entfernt. Vorhandene Ablaufreferenzen können fehlschlagen.',
+  );
   expect(result.current.tBackendMessage('Unknown diagnostic: device-42')).toBe('Unknown diagnostic: device-42');
   expect(result.current.tBackendMessage(undefined)).toBe('');
   const builtin = BUILTIN_MODBUS_PROFILES[0];
   expect(modbusDisplayName(builtin, 'Active power', result.current.tBackendMessage)).toBe('Wirkleistung');
-  expect(modbusDisplayName(duplicateProfile(builtin, 'custom'), 'Active power', result.current.tBackendMessage)).toBe('Active power');
-  expect(result.current.t('remove.question', { name: 'R&D <Workshop>' })).toBe('R&D <Workshop> aus Attraccess entfernen?');
+  expect(modbusDisplayName(duplicateProfile(builtin, 'custom'), 'Active power', result.current.tBackendMessage)).toBe(
+    'Active power',
+  );
+  expect(result.current.t('remove.question', { name: 'R&D <Workshop>' })).toBe(
+    'R&D <Workshop> aus Attraccess entfernen?',
+  );
   act(() => useTranslationState.getState().setLanguage('en'));
   expect(result.current.tBackendMessage('Confirm controller identity')).toBe('Confirm controller identity');
 });
@@ -97,6 +109,19 @@ function leaves(record: Record<string, unknown>, prefix = ''): Record<string, st
     }),
   );
 }
+
+it('translates configuration choices by field without translating user names or identifiers', () => {
+  const { result } = renderHook(() => useWagoTranslations());
+  const renderValue = (path: string, value: unknown) =>
+    readableChangeValue(path, value, emptyConfiguration, {}, result.current.t);
+  expect(renderValue('$.logicalChannels[0].disconnectPolicy.mode', 'immediate')).toBe('Immediate off');
+  act(() => useTranslationState.setState({ language: 'de' }));
+  expect(renderValue('$.logicalChannels[0].disconnectPolicy.mode', 'immediate')).toBe('Sofort aus');
+  expect(renderValue('$.logicalChannels[0].guard.when', 'on')).toBe('Ein');
+  expect(renderValue('$.logicalChannels[0].capabilities', ['input', 'feedback'])).toBe('Eingang, Rückmeldung');
+  expect(renderValue('$.logicalChannels[0].name', 'on')).toBe('on');
+  expect(renderValue('$.logicalChannels[0].id', 'immediate')).toBe('immediate');
+});
 
 it.each([
   ['WAGO', wagoTranslations.en, wagoTranslations.de],

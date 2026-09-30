@@ -1,4 +1,23 @@
 {
+  "values": {
+    "immediate": "Sofort aus",
+    "hold": "Letzten Zustand halten",
+    "watchdog": "Überwachung",
+    "on": "Ein",
+    "off": "Aus",
+    "match": "Wie Ausgang",
+    "inverse": "Entgegengesetzt zum Ausgang",
+    "input": "Eingang",
+    "output": "Ausgang",
+    "pulse": "Impuls",
+    "guard": "Freigabe",
+    "feedback": "Rückmeldung",
+    "measurement": "Messung",
+    "live": "Aktuell",
+    "counter": "Zähler",
+    "watt": "Watt",
+    "watt-hour": "Wattstunde"
+  },
   "physicalPointId": "Physische Klemme",
   "channel": "Physische Klemme",
   "profile": "Einrichtungsvorlage",

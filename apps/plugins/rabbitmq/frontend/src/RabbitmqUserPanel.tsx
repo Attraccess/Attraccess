@@ -56,7 +56,7 @@ function PermissionChips({ user }: { user: RabbitmqUser }) {
 }
 
 export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
-  const { t, tMessage } = useRabbitmqTranslations();
+  const { t, tMessage, language } = useRabbitmqTranslations();
   const { result } = useDetection(mqttServerId);
 
   const [data, setData] = useState<RabbitmqUserList | null>(null);
@@ -197,7 +197,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                   <TableColumn>{t('users.access')}</TableColumn>
                   <TableColumn>{t('users.actions')}</TableColumn>
                 </TableHeader>
-                <TableBody items={data.users}>
+                <TableBody items={data.users} dependencies={[language]}>
                   {(user) => (
                     <TableRow key={user.name} id={user.name}>
                       <TableCell className="rmq:whitespace-nowrap rmq:font-medium">{user.name}</TableCell>

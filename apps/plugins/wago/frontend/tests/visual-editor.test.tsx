@@ -9,6 +9,7 @@ import type { WagoConfigurationSnapshot } from '../src/api';
 import { validateEditorSnapshot } from '../../backend/configuration-editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import type { WagoDiagnostics } from '../src/diagnostics';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
 const state = vi.hoisted(() => ({
   snapshot: {
@@ -171,6 +172,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  useTranslationState.setState({ language: 'en' });
   client.clear();
   vi.unstubAllGlobals();
 });
@@ -291,7 +293,7 @@ describe('visual configuration workflow', () => {
     expect(screen.getByText('After: Pump A')).toBeInTheDocument();
   });
 
-  it.each(['success', 'delivery failure', 'refresh failure'] as const)(
+  it.each(['success', 'delivery failure', 'refresh failure', 'unsupported refresh'] as const)(
     'reconciles rollback after %s and sends the previewed draft identity',
     async (outcome) => {
       const revision = {
@@ -313,6 +315,8 @@ describe('visual configuration workflow', () => {
       });
       state.rollback.mockImplementation(async () => {
         if (outcome === 'refresh failure') state.getDraft.mockRejectedValue(new Error('refresh unavailable'));
+        else if (outcome === 'unsupported refresh')
+          state.getDraft.mockResolvedValue({ controllerId: 1, snapshot: '{"version":2}', updatedAt: '2026-09-05' });
         else
           state.getDraft.mockResolvedValue({
             controllerId: 1,
@@ -345,11 +349,22 @@ describe('visual configuration workflow', () => {
       await waitFor(() =>
         expect(state.rollback).toHaveBeenCalledWith(1, 1, false, 'historical', 'historical', 'snapshot-and-metadata'),
       );
-      if (outcome === 'refresh failure') {
-        expect(await screen.findByText(/Could not reconcile the saved draft after rollback/)).toBeInTheDocument();
+      if (outcome === 'refresh failure' || outcome === 'unsupported refresh') {
+        expect(
+          await screen.findByText(
+            outcome === 'unsupported refresh'
+              ? /unsupported configuration structure/
+              : /Could not reconcile the saved draft after rollback/,
+          ),
+        ).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
         expect(screen.queryByRole('textbox', { name: 'Channel name' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'WAGO controllers' })).toBeEnabled();
+        if (outcome === 'unsupported refresh') {
+          act(() => useTranslationState.setState({ language: 'de' }));
+          expect(screen.getByText(/nicht unterstützt/)).toBeInTheDocument();
+          expect(screen.queryByText(/unsupported/)).not.toBeInTheDocument();
+        }
       } else {
         await section(user, 'Channels');
         await waitFor(() =>

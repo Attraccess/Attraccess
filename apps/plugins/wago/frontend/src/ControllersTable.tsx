@@ -79,7 +79,7 @@ export function ControllersTable({
               <TableColumn className="wg:hidden wg:lg:table-cell">{t('controllers.heartbeat')}</TableColumn>
               <TableColumn className="wg:text-end">{t('controllers.actions')}</TableColumn>
             </TableHeader>
-            <TableBody items={rows} renderEmptyState={EmptyControllers}>
+            <TableBody items={rows} renderEmptyState={() => <EmptyControllers />}>
               {(row) =>
                 row.kind === 'session' ? (
                   <CommissioningRow row={row} onResume={onResume} />

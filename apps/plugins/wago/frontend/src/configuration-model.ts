@@ -3,6 +3,7 @@ import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
 import type { ConfigurationDiff, ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { availableDigitalTerminals, digitalTerminalLabel } from '../../backend/configuration-digital';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import englishFields from './fields.en.json';
 
 export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
 export type PhysicalPoint = WagoConfigurationSnapshot['physicalPoints'][number];
@@ -77,10 +78,10 @@ export function pointLabel(point: PhysicalPoint, names: Record<string, string>, 
       : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
 }
 
-export function readableValue(value: unknown, names: Record<string, string>, t?: TFunction): string {
+export function readableValue(value: unknown, names: Record<string, string>, t?: TFunction, field = ''): string {
   if (value === undefined || value === null) return t ? t('fields.notConfigured') : 'Not configured';
   if (Array.isArray(value))
-    return value.map((item) => readableValue(item, names, t)).join(', ') || (t ? t('fields.none') : 'None');
+    return value.map((item) => readableValue(item, names, t, field)).join(', ') || (t ? t('fields.none') : 'None');
   if (typeof value === 'object') {
     if (
       'hardwareProfile' in value &&
@@ -94,11 +95,19 @@ export function readableValue(value: unknown, names: Record<string, string>, t?:
     return Object.entries(value)
       .map(
         ([key, item]) =>
-          `${fieldLabel(key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t)}`,
+          `${fieldLabel(key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t, key)}`,
       )
       .join('; ');
   }
-  if (typeof value === 'string') return names[value] ?? words(value);
+  if (typeof value === 'string') {
+    if (names[value]) return names[value];
+    // Only localize application-defined choices, never identifiers or user text.
+    if (['mode', 'capabilities', 'when', 'expected', 'kind', 'unit'].includes(field)) {
+      const fallback = englishFields.values[value as keyof typeof englishFields.values];
+      if (fallback && t) return t(`fields.values.${value}`);
+    }
+    return words(value);
+  }
   return String(value);
 }
 
@@ -113,7 +122,12 @@ export function readableChangeValue(
   const point = path.match(/^(?:\$\.)?physicalPoints\[(\d+)\]\.channel$/);
   if (point && typeof value === 'number' && snapshot?.physicalPoints[Number(point[1])]?.hardwareProfile === '751-9301')
     return `CC100 ${digitalTerminalLabel(value)}`;
-  return readableValue(value, names, t);
+  const field =
+    path
+      .split('.')
+      .at(-1)
+      ?.replace(/\[\d+\]$/, '') ?? '';
+  return readableValue(value, names, t, field);
 }
 
 function words(value: string) {
@@ -123,42 +137,10 @@ function words(value: string) {
     .replaceAll('.', ' · ');
 }
 
-const fieldLabels: Record<string, string> = {
-  physicalPointId: 'Physical terminal',
-  channel: 'Physical terminal',
-  profile: 'Setup preset',
-  capabilities: 'Capabilities',
-  disconnectPolicy: 'On disconnect',
-  mode: 'Mode',
-  timeoutMs: 'Timeout (ms)',
-  durationMs: 'Duration (ms)',
-  channelId: 'Channel',
-  presetId: 'Preset',
-  pulse: 'Pulse',
-  guard: 'Guard',
-  feedback: 'Feedback',
-  measurement: 'Measurement',
-  range: 'Expected range',
-  minimum: 'Minimum',
-  maximum: 'Maximum',
-  when: 'When',
-  expected: 'Expected state',
-  unit: 'Unit',
-  scale: 'Scale',
-  offset: 'Offset',
-  kind: 'Measurement kind',
-  'disconnectPolicy.mode': 'On disconnect',
-  'disconnectPolicy.timeoutMs': 'Watchdog timeout',
-  'pulse.durationMs': 'Pulse duration',
-  'guard.channelId': 'Guard input',
-  'guard.when': 'Guard condition',
-  'feedback.channelId': 'Feedback input',
-  'feedback.expected': 'Expected feedback',
-  'feedback.timeoutMs': 'Feedback timeout',
-};
-
 function fieldLabel(field: string, t?: TFunction) {
-  return fieldLabels[field] && (t ? t(`fields.${field.replaceAll('.', '_')}`) : fieldLabels[field]);
+  const key = field.replaceAll('.', '_');
+  const fallback = englishFields[key as keyof typeof englishFields];
+  return typeof fallback === 'string' ? (t ? t(`fields.${key}`) : fallback) : undefined;
 }
 
 /** Read-only reviews match structural edits by identity, not shifting array positions. */

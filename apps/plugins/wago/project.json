@@ -137,7 +137,8 @@
       ],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css"
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
       }
     },
     "publish": {

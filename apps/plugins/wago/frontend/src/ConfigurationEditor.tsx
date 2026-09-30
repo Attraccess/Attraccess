@@ -367,8 +367,12 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                         value.version !== 1 ||
                         !Array.isArray(value.physicalPoints) ||
                         !Array.isArray(value.logicalChannels)
-                      )
-                        throw new Error(t('editor.unsupported'));
+                      ) {
+                        setInitialized(false);
+                        setNotice('');
+                        setError({ key: 'editor.unsupported' });
+                        return;
+                      }
                       loadedDraft.current = draftIdentity(refreshed.data);
                       setDraftConflict(false);
                       setSnapshot(value);
@@ -377,12 +381,19 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                       setGeneration((value) => value + 1);
                       setNotice({ key: 'editor.rollbackReloaded' });
                       setError(
-                        failure ? (failure instanceof Error ? failure.message : { key: 'editor.rollbackFailed' }) : null,
+                        failure
+                          ? failure instanceof Error
+                            ? failure.message
+                            : { key: 'editor.rollbackFailed' }
+                          : null,
                       );
                     } catch (error) {
                       setInitialized(false);
                       setNotice('');
-                      setError({ key: 'editor.reconcileError', data: { error: error instanceof Error ? error.message : '' } });
+                      setError({
+                        key: 'editor.reconcileError',
+                        data: { error: error instanceof Error ? error.message : '' },
+                      });
                     } finally {
                       setRevisionBusy(false);
                     }
