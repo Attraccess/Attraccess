@@ -2,7 +2,7 @@ import { Button, Card, Chip, Input, Label, TextField } from '@heroui/react';
 import { ArrowDownToLine, ArrowUpFromLine, LayoutGrid, List, Plus, Radio } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
-import { addDigitalChannel, type Channel } from './configuration-model';
+import { addDigitalChannel, presetDisplayName, type Channel } from './configuration-model';
 import {
   availableDigitalTerminals,
   DIGITAL_TERMINALS,
@@ -549,7 +549,7 @@ export function ChannelWorkspace({
                   }
                 />
               ) : (
-                <p>{t('channels.dedicatedEditor', { profile: selected.profile.replaceAll('-', ' ') })}</p>
+                <p>{t('channels.dedicatedEditor', { profile: presetDisplayName(selected.profile, t) })}</p>
               )}
             </div>
           </section>
