@@ -22,6 +22,8 @@ import presetsDe from './presets.de.json';
 import fieldsEn from './fields.en.json';
 import fieldsDe from './fields.de.json';
 import serverMessagesDe from './server-messages.de.json';
+import panelEn from './panel.en.json';
+import panelDe from './panel.de.json';
 
 // Legacy API message IDs are English strings. Translate known IDs without
 // changing persisted diagnostics or the wire contract. Unknown text stays literal.
@@ -56,6 +58,7 @@ export const wagoTranslations = {
     security: securityEn,
     presets: presetsEn,
     fields: fieldsEn,
+    panel: panelEn,
   },
   de: {
     ...serverMessagesDe,
@@ -70,6 +73,7 @@ export const wagoTranslations = {
     security: securityDe,
     presets: presetsDe,
     fields: fieldsDe,
+    panel: panelDe,
   },
 };
 

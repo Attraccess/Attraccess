@@ -35,6 +35,7 @@ export const CAPABILITIES = [
   'fault',
   'acknowledgement',
   'credential-rotation-v1',
+  'front-panel-v1',
 ];
 
 export class WagoRuntime {
@@ -379,7 +380,8 @@ export class WagoRuntime {
       id: string;
       expiresAt?: unknown;
       channelId: string;
-      action: 'set' | 'pulse';
+      action: 'set' | 'pulse' | 'release';
+      source?: 'manual';
       value?: boolean;
       expectedConfigurationRevision?: unknown;
     };
@@ -392,9 +394,11 @@ export class WagoRuntime {
       typeof command?.id !== 'string' ||
       !command.id ||
       !command.channelId ||
-      !['set', 'pulse'].includes(command.action)
+      !['set', 'pulse', 'release'].includes(command.action)
     )
       return;
+    if ((command.source !== undefined && command.source !== 'manual') || (command.action === 'release' && command.source !== 'manual'))
+      return this.acknowledge(command.id, 'rejected', 'invalid command source', 'invalid_command');
     if (command.action === 'set' && typeof command.value !== 'boolean')
       return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value', 'invalid_command');
     const expiresAt = command.expiresAt;
@@ -427,7 +431,7 @@ export class WagoRuntime {
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
       if (!channel || !channel.capabilities.includes('output'))
         return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
-      if (!supportsOutputAction(channel, command.action))
+      if (command.action !== 'release' && !supportsOutputAction(channel, command.action))
         return this.acknowledge(
           command.id,
           'rejected',
@@ -454,6 +458,12 @@ export class WagoRuntime {
         if (Date.parse(expiresAt) <= Date.now()) {
           await this.releaseCommand(command.id);
           return { error: 'command has expired', code: 'expired' };
+        }
+        if (command.action === 'release') {
+          this.state.manualOutputChannelIds = (this.state.manualOutputChannelIds ?? []).filter((id) => id !== currentChannel.id);
+          await this.saveState();
+          this.requestStatePublication();
+          return undefined;
         }
         if (!supportsOutputAction(currentChannel, command.action)) {
           await this.releaseCommand(command.id);
@@ -493,6 +503,14 @@ export class WagoRuntime {
           ))
         )
           return this.releaseFailedWrite(command.id, currentChannel.id);
+        if (command.source === 'manual' || this.state.manualOutputChannelIds?.includes(currentChannel.id)) {
+          this.state.manualOutputChannelIds = [...new Set([
+            ...(this.state.manualOutputChannelIds ?? []).filter((id) => id !== currentChannel.id),
+            ...(command.source === 'manual' ? [currentChannel.id] : []),
+          ])];
+          await this.saveState();
+          this.requestStatePublication();
+        }
         return undefined;
       });
       // Release the physical channel/configuration barrier before waiting on MQTT.
@@ -656,15 +674,16 @@ export class WagoRuntime {
         if (output && typeof this.state.outputs[channel.id] === 'boolean')
           commandedOutputs[channel.id] = this.state.outputs[channel.id];
         const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-        if (!point || point.modbus) continue;
+        if (!point) continue;
+        if (point.modbus && (!output || !this.options.device.readOutput)) continue;
         try {
-          const value = await this.options.device.read(point);
+          const value = point.modbus ? await this.options.device.readOutput!(point) : await this.options.device.read(point);
           if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
-          (output ? outputs : inputs)[channel.id] = value;
+          (output ? outputs : inputs)[channel.id] = !output && channel.invert ? !value : value;
         } catch (error) {
           errors.push({
             path: channel.id,
-            code: 'digital_read_failed',
+            code: point.modbus ? 'modbus_read_failed' : 'digital_read_failed',
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -679,9 +698,10 @@ export class WagoRuntime {
       inputs,
       outputs,
       commandedOutputs,
+      manualOutputChannelIds: (this.state.manualOutputChannelIds ?? []).filter((id) => accepted?.snapshot.logicalChannels.some((channel) => channel.id === id && channel.capabilities.includes('output'))),
       readiness: {
         configurationAccepted: Boolean(accepted),
-        hardwareAvailable: !errors.length,
+        hardwareAvailable: !errors.some((error) => error.code !== 'modbus_read_failed'),
         ready: Boolean(accepted) && !errors.length && this.connected,
         errors,
       },
@@ -690,7 +710,7 @@ export class WagoRuntime {
     const signature = JSON.stringify(payload);
     if (!force && signature === this.lastPublishedState) return;
     for (const error of errors) {
-      if (error.code === 'digital_read_failed')
+      if (error.code === 'digital_read_failed' || error.code === 'modbus_read_failed')
         void this.publishFault(error.path, { code: error.code, message: error.message }).catch(() => undefined);
     }
     await this.publishOperational('state', payload, { retain: true }, () => accepted === this.state.accepted);

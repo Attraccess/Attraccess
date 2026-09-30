@@ -202,7 +202,7 @@ describe('Modbus protocol fixtures (no hardware)', () => {
       return rtuFrame(r[0], r.subarray(1, 6));
     });
     await expect(transport.request(0, readPdu(3, format))).rejects.toThrow('unit');
-    await expect(transport.request(1, Buffer.from([1, 0, 0, 0, 1]))).rejects.toThrow('function');
+    await expect(transport.request(1, Buffer.from([2, 0, 0, 0, 1]))).rejects.toThrow('function');
     await expect(transport.request(1, Buffer.from([3, 0, 0, 0, 0]))).rejects.toThrow('quantity');
     expect(calls).toBe(0);
     const request = writePdu(5, { ...format, dataType: 'uint16' }, 1);

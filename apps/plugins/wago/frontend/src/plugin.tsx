@@ -9,6 +9,7 @@ import type {
 import type { PluginStore } from 'react-pluggable';
 import { ControllersPage } from './ControllersPage';
 import { ConfigurationPage } from './ConfigurationPage';
+import { HistoryPage } from './front-panel/HistoryPage';
 import {
   RESOURCE_OVERVIEW_SLOT,
   type PluginSlotContribution,
@@ -76,6 +77,7 @@ export default class WagoPlugin implements AttraccessFrontendPlugin {
         authRequired: 'resources.update',
         element: <ConfigurationPage />,
       },
+      { path: '/wago/controllers/:controllerId/configuration/history', authRequired: 'resources.update', element: <HistoryPage /> },
     ];
   }
 
