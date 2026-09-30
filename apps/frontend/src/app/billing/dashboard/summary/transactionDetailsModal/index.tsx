@@ -37,6 +37,19 @@ interface Props {
   onClose?: () => unknown;
 }
 
+// energyMicroWh is transported as a string because it can exceed Number.MAX_SAFE_INTEGER.
+// Do the microWh->kWh division with BigInt so the integer part stays exact; only the final
+// display value is coerced to Number.
+// ponytail: Number() below still caps precision beyond ~9 quadrillion kWh (2^53) — no real
+// energy meter gets there, upgrade to a decimal/bignumber formatter if that ever changes.
+function microWhToKwh(microWh: string): number {
+  const value = BigInt(microWh);
+  const perKwh = BigInt(1_000_000_000);
+  const whole = value / perKwh;
+  const fraction = (value % perKwh).toString().padStart(9, '0');
+  return Number(`${whole}.${fraction}`);
+}
+
 export function TransactionDetailsModal(props: Props) {
   const { children, transactionId, isOpen: isOpenProp, onClose: onCloseProp } = props;
 
@@ -211,7 +224,7 @@ export function TransactionDetailsModal(props: Props) {
                                 <TableCell className="max-w-[28ch] truncate">
                                   {item.name === 'ENERGY' && item.energyMicroWh != null
                                     ? t('items.energyDescription', {
-                                        kwh: formatNumber(Number(item.energyMicroWh) / 1e9),
+                                        kwh: formatNumber(microWhToKwh(item.energyMicroWh)),
                                         rate: formatNumber(
                                           dbCurrencyToUserCurrency(
                                             item.energyCreditsPerKwh ?? 0,
@@ -223,7 +236,7 @@ export function TransactionDetailsModal(props: Props) {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   {item.name === 'ENERGY' && item.energyMicroWh != null
-                                    ? formatNumber(Number(item.energyMicroWh) / 1e9)
+                                    ? formatNumber(microWhToKwh(item.energyMicroWh))
                                     : item.quantity}
                                 </TableCell>
                                 <TableCell className="text-right">

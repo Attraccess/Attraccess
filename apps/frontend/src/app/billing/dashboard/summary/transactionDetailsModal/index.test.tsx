@@ -98,6 +98,30 @@ it('describes an energy item from its kWh and captured rate instead of a stored 
   expect(screen.getByText('1.50')).toBeTruthy();
   expect(screen.getByText('0.30')).toBeTruthy();
 });
+it('keeps kWh precision for energy readings beyond Number.MAX_SAFE_INTEGER', async () => {
+  state.transaction = {
+    id: 7,
+    resourceUsageId: 8,
+    resourceUsage: { id: 8 },
+    status: 'completed',
+    amount: -45,
+    items: [
+      {
+        id: 1,
+        name: 'ENERGY',
+        description: null,
+        quantity: 1,
+        unitPrice: 45,
+        // 24-digit microWh: Number(str)/1e9 rounds this to ...00.02 kWh; the BigInt-based
+        // split keeps the exact ...00.00 kWh (ATT-1103 Sourcery finding).
+        energyMicroWh: '100000000000000000000009',
+        energyCreditsPerKwh: 30,
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={7} isOpen />);
+  expect(await screen.findByText('100000000000000.00')).toBeTruthy();
+});
 it.each([
   ['refund', { refundOfId: 4, amount: 100, status: 'pending' }, 'type.refund'],
   ['correction', { correctionOfId: 4, initiatorId: 2, amount: -45, status: 'completed' }, 'type.correction'],
