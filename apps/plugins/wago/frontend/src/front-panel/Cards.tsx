@@ -54,9 +54,11 @@ export function OutputControl({ live, channel, label }: { live: LiveControls; ch
       isDisabled={disabled || !sample}
       onChange={(value) => channel && live.command(channel, value)}
     >
-      <Switch.Control>
-        <Switch.Thumb />
-      </Switch.Control>
+      <Switch.Content aria-label={t('panel.switchOutput', { name: label })}>
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+      </Switch.Content>
     </Switch>
   );
 }
@@ -78,7 +80,7 @@ export function OnboardCard({
   const bus = busConnection(configuration.snapshot);
   return (
     <Card className="wg:min-w-0">
-      <Card.Header className="wg:flex wg:flex-wrap wg:items-start wg:justify-between wg:gap-3">
+      <Card.Header className="wg:flex wg:flex-row wg:flex-wrap wg:items-start wg:justify-between wg:gap-3">
         <div>
           <Card.Title>{t('panel.onboard')}</Card.Title>
           <Card.Description>{t('panel.terminalHint')}</Card.Description>
@@ -114,7 +116,7 @@ export function OnboardCard({
                     isDisabled={disabled}
                     onPress={() => editTerminal(terminal)}
                   >
-                    <Settings2 className="wg:size-4" />
+                    <Settings2 className="wg:absolute wg:top-3 wg:right-3 wg:size-4" />
                   </Button>
                   <div className="wg:pointer-events-none wg:flex wg:items-center wg:justify-between wg:gap-2 wg:pr-7">
                     <span className="wg:text-xs wg:font-semibold">{terminal.label}</span>

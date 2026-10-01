@@ -21,6 +21,7 @@ export default defineConfig({
       'apps/plugins/wago/frontend/tests/*.test.tsx',
       'apps/plugins/wago/frontend/src/ModbusConfigurationForm.spec.tsx',
       'apps/plugins/wago/frontend/src/CommissioningModal.test.tsx',
+      'apps/plugins/wago/frontend/src/CommissioningPreflight.test.tsx',
       'apps/plugins/wago/frontend/src/ControllersTable.test.tsx',
       'apps/plugins/wago/frontend/src/useCommissioningVerification.test.tsx',
       'apps/plugins/wago/frontend/src/i18n.test.tsx',

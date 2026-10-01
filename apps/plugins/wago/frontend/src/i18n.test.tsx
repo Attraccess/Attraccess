@@ -135,23 +135,36 @@ it('localizes Modbus add buttons without saving translated signal names', async 
 it('localizes preset metadata objects and leaves while preserving unknown preset IDs and names', () => {
   const presetId = 'generic-digital-output';
   const changes = [
-    { path: '$.presets[0]', previous: null, current: { presetId, channelId: 'channel' } },
+    {
+      path: '$.presets[0]',
+      previous: null,
+      current: { presetId, channelId: 'channel', guardChannelId: 'guard', feedbackChannelId: 'feedback' },
+    },
     { path: '$.presets[0].presetId', previous: 'vendor.preset-v2', current: presetId },
+    { path: '$.presets[0].guardChannelId', previous: 'unknown-guard', current: 'guard' },
+    { path: '$.presets[0].feedbackChannelId', previous: null, current: 'feedback' },
     { path: '$.names.channel', previous: null, current: presetId },
   ];
   render(
     <ConfigurationMetadataChanges
       changes={changes}
-      names={{ channel: 'Workshop', [presetId]: 'Unrelated ID alias' }}
+      names={{ channel: 'Workshop', guard: 'R&D <Guard>', feedback: 'Door feedback', [presetId]: 'Unrelated ID alias' }}
     />,
   );
   expect(screen.getByText(`After: ${englishPresets.items[presetId].name}`)).toBeTruthy();
+  expect(screen.getByText(/After: Preset:/).textContent).toContain('Guard input: R&D <Guard>');
+  expect(screen.getByText(/After: Preset:/).textContent).toContain('Feedback input: Door feedback');
   act(() => useTranslationState.getState().setLanguage('de'));
   expect(screen.getByText(`Nachher: ${germanPresets.items[presetId].name}`)).toBeTruthy();
   expect(screen.getByText('Vorher: vendor.preset-v2')).toBeTruthy();
   expect(screen.getByText(`Nachher: ${presetId}`)).toBeTruthy();
   expect(screen.getByText(/Nachher: Vorlage:/).textContent).toContain(germanPresets.items[presetId].name);
   expect(screen.getByText(/Nachher: Vorlage:/).textContent).toContain('Workshop');
+  expect(screen.getByText(/Nachher: Vorlage:/).textContent).toContain('Freigabeeingang: R&D <Guard>');
+  expect(screen.getByText(/Nachher: Vorlage:/).textContent).toContain('Rückmeldeeingang: Door feedback');
+  expect(screen.getByText('Nachher: R&D <Guard>')).toBeTruthy();
+  expect(screen.getByText('Nachher: Door feedback')).toBeTruthy();
+  expect(screen.getByText('Vorher: unknown-guard')).toBeTruthy();
 });
 
 it('preserves literal validation text and resolves only exact references in recognized messages', () => {

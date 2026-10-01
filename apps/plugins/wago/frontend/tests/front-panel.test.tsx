@@ -112,6 +112,41 @@ function required<T>(value: T | null | undefined): T {
 }
 
 describe('front panel', () => {
+  it('exposes an interactive output switch and sends a manual command when clicked', async () => {
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    const control = await screen.findByRole('switch', { name: 'Switch DO1 Laser power' });
+    await waitFor(() => expect(control.getAttribute('aria-disabled')).not.toBe('true'));
+    fireEvent.click(control);
+    await waitFor(() =>
+      expect(api.manual).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ channelId: 'output', action: 'set', value: true, expectedConfigurationRevision: 7 }),
+      ),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('exposes an interactive input inversion switch in the terminal settings', async () => {
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure DI1' }));
+    const control = await screen.findByRole('switch', { name: 'Invert input' });
+    fireEvent.click(control);
+    expect(control).toHaveProperty('checked', true);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Door contact' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    await waitFor(() =>
+      expect(api.save).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          logicalChannels: expect.arrayContaining([expect.objectContaining({ invert: true })]),
+        }),
+        expect.anything(),
+        draft,
+      ),
+    );
+  });
+
   it('shows every terminal and switches languages through the host store', async () => {
     render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
     await screen.findByText('CC100 onboard I/O');
@@ -121,6 +156,15 @@ describe('front panel', () => {
     expect(screen.getByText('Integrierte CC100-Ein- und Ausgänge')).toBeTruthy();
     expect(screen.getByText('Laser power')).toBeTruthy();
     expect(api.save).not.toHaveBeenCalled();
+  });
+
+  it('translates the shared bus baud rate while its drawer is open', async () => {
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: 'RS-485 port · 9600 E1' }));
+    expect(await screen.findByText('Baud rate')).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText('Baudrate')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('!!!');
   });
 
   it('cancels a new device without changing the working configuration', async () => {
