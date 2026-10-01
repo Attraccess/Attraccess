@@ -177,7 +177,7 @@ export function readableValue(
       const index = context.modbus?.connections.findIndex((connection) => connection.id === value) ?? -1;
       return index < 0 ? value : t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`;
     }
-    if (['physicalPointId', 'channelId', 'channelIds'].includes(field))
+    if (['physicalPointId', 'channelId', 'channelIds', 'guardChannelId', 'feedbackChannelId'].includes(field))
       return (context?.metadataNames ?? names)[value] ?? value;
     const choiceCatalog = ['unit', 'kind', 'parity', 'byteOrder', 'wordOrder'].includes(field)
       ? { prefix: 'modbus.options', values: englishModbus.options }
