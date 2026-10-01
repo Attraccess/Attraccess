@@ -40,6 +40,7 @@ describe('front panel runtime', () => {
   let runtime: WagoRuntime;
   let device: MemoryDeviceAdapter;
   let persisted: RuntimeState;
+  let store: StateStore;
   let state: Record<string, unknown>;
   let statePublications: number;
   let acknowledgements: Array<Record<string, unknown>>;
@@ -48,7 +49,7 @@ describe('front panel runtime', () => {
     statePublications = 0;
     acknowledgements = [];
     device = new MemoryDeviceAdapter();
-    const store: StateStore = {
+    store = {
       load: async () => persisted,
       save: async (value) => {
         persisted = structuredClone(value);
@@ -92,15 +93,27 @@ describe('front panel runtime', () => {
   });
 
   it('persists manual ownership and lets a subsequent flow command take over', async () => {
+    const commits: RuntimeState[] = [];
+    jest.spyOn(store, 'save').mockImplementation(async (value) => {
+      persisted = structuredClone(value);
+      commits.push(persisted);
+    });
     await runtime.receiveCommand(command({ source: 'manual' }));
     await runtime.publishHeartbeat();
     expect(persisted.manualOutputChannelIds).toEqual(['output']);
     expect(state.manualOutputChannelIds).toEqual(['output']);
+    expect(commits.filter((value) => value.outputs.output)).not.toEqual([]);
+    for (const value of commits.filter((value) => value.outputs.output))
+      expect(value.manualOutputChannelIds).toEqual(['output']);
+    commits.length = 0;
     await runtime.receiveCommand(command({ value: false }));
     await runtime.publishHeartbeat();
     expect(persisted.manualOutputChannelIds).toEqual([]);
     expect(state.manualOutputChannelIds).toEqual([]);
     expect(state.outputs).toEqual({ output: false });
+    expect(commits.filter((value) => value.outputs.output === false)).not.toEqual([]);
+    for (const value of commits.filter((value) => value.outputs.output === false))
+      expect(value.manualOutputChannelIds).toEqual([]);
   });
 
   it('releases ownership without writing hardware and rejects release against a stale revision', async () => {
@@ -114,6 +127,80 @@ describe('front panel runtime', () => {
     expect(writes).not.toHaveBeenCalled();
     expect(state.outputs).toEqual({ output: true });
     expect(state.manualOutputChannelIds).toEqual([]);
+  });
+
+  it('keeps output and manual ownership together when durable output persistence fails', async () => {
+    const previousOutputs = structuredClone(persisted.outputs);
+    const attempted: RuntimeState[] = [];
+    jest.spyOn(store, 'save').mockImplementation(async (value) => {
+      const next = structuredClone(value);
+      if (next.outputs.output) {
+        attempted.push(next);
+        throw new Error('disk unavailable');
+      }
+      persisted = next;
+    });
+    await expect(runtime.receiveCommand(command({ source: 'manual' }))).rejects.toThrow(
+      'failed to persist channel state',
+    );
+    expect(attempted).not.toEqual([]);
+    for (const value of attempted) expect(value.manualOutputChannelIds).toEqual(['output']);
+    expect(persisted.outputs).toEqual(previousOutputs);
+    expect(acknowledgements).not.toContainEqual(expect.objectContaining({ status: 'accepted' }));
+  });
+
+  it('preserves manual ownership when a flow hardware write fails', async () => {
+    await runtime.receiveCommand(command({ source: 'manual' }));
+    jest.spyOn(device, 'write').mockRejectedValueOnce(new Error('relay unavailable'));
+    await runtime.receiveCommand(command({ value: false }));
+    expect(acknowledgements.at(-1)).toMatchObject({ status: 'rejected' });
+    expect(persisted.outputs).toEqual({ output: true });
+    expect(persisted.manualOutputChannelIds).toEqual(['output']);
+  });
+
+  it('commits pulse ownership with output state and preserves it during automatic shutoff', async () => {
+    jest.useFakeTimers();
+    try {
+      const pulseSnapshot: Snapshot = {
+        ...snapshot,
+        logicalChannels: [
+          { ...snapshot.logicalChannels[0], capabilities: ['output', 'pulse'], pulse: { durationMs: 1000 } },
+          snapshot.logicalChannels[1],
+        ],
+      };
+      await runtime.receiveDesired(
+        Buffer.from(
+          JSON.stringify({
+            protocolVersion: 1,
+            revision: 2,
+            contentHash: hash(pulseSnapshot),
+            snapshot: pulseSnapshot,
+          }),
+        ),
+      );
+      const commits: RuntimeState[] = [];
+      jest.spyOn(store, 'save').mockImplementation(async (value) => {
+        persisted = structuredClone(value);
+        commits.push(persisted);
+      });
+      await runtime.receiveCommand(command({ source: 'manual', action: 'pulse', expectedConfigurationRevision: 2 }));
+      expect(acknowledgements.at(-1)).toMatchObject({ status: 'accepted' });
+      expect(commits.filter((value) => value.outputs.output)).not.toEqual([]);
+      for (const value of commits.filter((value) => value.outputs.output))
+        expect(value.manualOutputChannelIds).toEqual(['output']);
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(persisted.outputs).toEqual({ output: false });
+      expect(persisted.manualOutputChannelIds).toEqual(['output']);
+      commits.length = 0;
+      await runtime.receiveCommand(command({ action: 'pulse', expectedConfigurationRevision: 2 }));
+      expect(commits.filter((value) => value.outputs.output)).not.toEqual([]);
+      for (const value of commits.filter((value) => value.outputs.output))
+        expect(value.manualOutputChannelIds).toEqual([]);
+      await jest.advanceTimersByTimeAsync(1000);
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
   });
 
   it('isolates switch acquisition and retains failed readback across heartbeats', async () => {

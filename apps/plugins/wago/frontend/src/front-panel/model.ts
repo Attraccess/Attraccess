@@ -184,7 +184,26 @@ export function saveDevice(
         const point = snapshot.physicalPoints.find(
           (point) => point.modbus?.deviceId === affectedDevice.id && point.modbus[kind] === register.id,
         );
-        if (point) continue;
+        if (point) {
+          const previousDevice = previous.devices.find((item) => item.id === affectedDevice.id);
+          const previousProfile = previousDevice && findProfile(previous, previousDevice);
+          const previousRegister =
+            kind === 'measurementId'
+              ? previousProfile?.measurements.find((item) => item.id === register.id)
+              : previousProfile?.actions.find((item) => item.id === register.id);
+          const channel = snapshot.logicalChannels.find((item) => item.physicalPointId === point.id);
+          // Refresh generated labels, including the provisional name of a newly added device.
+          // Explicit operator labels remain user data and must survive device/profile edits.
+          if (
+            channel &&
+            previousDevice &&
+            previousRegister &&
+            names[channel.id] === `${previousDevice.name} · ${previousRegister.name}`.slice(0, 120)
+          ) {
+            names[channel.id] = `${affectedDevice.name} · ${register.name}`.slice(0, 120);
+          }
+          continue;
+        }
         const added = addModbusChannel(snapshot, { deviceId: affectedDevice.id, [kind]: register.id });
         snapshot = added.snapshot;
         names[added.channel.id] = `${affectedDevice.name} · ${register.name}`.slice(0, 120);
