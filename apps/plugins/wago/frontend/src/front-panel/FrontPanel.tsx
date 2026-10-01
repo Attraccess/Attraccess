@@ -88,7 +88,7 @@ export function FrontPanel({
         </Alert>
       )}
       {panel.ready && panel.dirty && (
-        <Alert status="warning">
+        <Alert status="warning" className="wg:flex-col wg:items-stretch wg:sm:flex-row wg:sm:items-start">
           <Alert.Content>
             <Alert.Title>{t('panel.unapplied')}</Alert.Title>
             <Alert.Description>{t('panel.unappliedHint')}</Alert.Description>
@@ -132,7 +132,7 @@ export function FrontPanel({
         </Alert>
       )}
       {manualCount > 0 && (
-        <Alert status="warning">
+        <Alert status="warning" className="wg:flex-col wg:items-stretch wg:sm:flex-row wg:sm:items-start">
           <Alert.Content>
             <Alert.Title>{t('panel.manualActive', { count: manualCount })}</Alert.Title>
             <Alert.Description>{t('panel.manualHint')}</Alert.Description>
