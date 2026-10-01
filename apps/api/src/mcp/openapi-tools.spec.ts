@@ -1,0 +1,302 @@
+import { excludeOpenApiOperations, generateMcpTools, OpenApiDocument, operationShape } from './openapi-tools';
+import { Controller, Get, Module } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { Test } from '@nestjs/testing';
+
+@Controller('plugin-nested')
+class NestedPluginController {
+  @Get()
+  nestedRoute() { return {}; }
+}
+
+@Module({ controllers: [NestedPluginController] })
+class NestedPluginFeatureModule {}
+
+@Module({ imports: [NestedPluginFeatureModule] })
+class PluginRootModule {}
+
+@Controller('host-root')
+class HostRootController {
+  @Get()
+  rootRoute() { return {}; }
+}
+
+@Module({ controllers: [HostRootController], imports: [PluginRootModule] })
+class HostRootModule {}
+
+describe('generateMcpTools', () => {
+  it('discovers plugin controllers in imported modules for exclusion from host MCP tools', async () => {
+    const app = await Test.createTestingModule({ imports: [PluginRootModule] }).compile();
+    const nestApp = app.createNestApplication();
+    try {
+      await nestApp.init();
+      const shallowPluginDocument = SwaggerModule.createDocument(nestApp, new DocumentBuilder().build(), {
+        include: [PluginRootModule],
+      }) as unknown as OpenApiDocument;
+      expect(shallowPluginDocument.paths?.['/plugin-nested']).toBeUndefined();
+
+      const pluginDocument = SwaggerModule.createDocument(nestApp, new DocumentBuilder().build(), {
+        include: [PluginRootModule],
+        deepScanRoutes: true,
+      }) as unknown as OpenApiDocument;
+      expect(pluginDocument.paths?.['/plugin-nested']).toBeDefined();
+
+      const pluginRoutes = new Set(
+        Object.entries(pluginDocument.paths ?? {}).flatMap(([path, item]) =>
+          Object.entries(item).flatMap(([method, operation]) =>
+            operation && typeof operation === 'object' && 'operationId' in operation && typeof operation.operationId === 'string'
+              ? [`${method.toLowerCase()} ${path}`]
+              : [],
+          ),
+        ),
+      );
+      const hostDocument = excludeOpenApiOperations(pluginDocument, pluginRoutes);
+      expect(hostDocument.paths?.['/plugin-nested']).toBeUndefined();
+    } finally {
+      await nestApp.close();
+    }
+  });
+
+  it('excludes identified plugin operations while retaining unreviewed host operations for coverage validation', () => {
+    const mixed: OpenApiDocument = { paths: {
+      '/host': { get: { operationId: 'newHostOperation' } },
+      '/plugin': { get: { operationId: 'pluginOperation' } },
+    } };
+    const hostDocument = excludeOpenApiOperations(mixed, new Set(['get /plugin']));
+    expect(hostDocument.paths?.['/host']?.get).toEqual({ operationId: 'newHostOperation' });
+    expect(hostDocument.paths?.['/plugin']).toBeUndefined();
+    expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation newHostOperation');
+  });
+
+  it('retains a host route when it shares an operationId with an excluded plugin route', () => {
+    const mixed: OpenApiDocument = { paths: {
+      '/host': { get: { operationId: 'sharedOperation' } },
+      '/plugin': { get: { operationId: 'sharedOperation' } },
+    } };
+    const hostDocument = excludeOpenApiOperations(mixed, new Set(['get /plugin']));
+    expect(hostDocument.paths?.['/host']?.get).toEqual({ operationId: 'sharedOperation' });
+    expect(hostDocument.paths?.['/plugin']).toBeUndefined();
+    expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation sharedOperation');
+  });
+
+  it('retains host routes imported into a plugin module for manifest coverage validation', () => {
+    const mixed: OpenApiDocument = { paths: {
+      '/settings': { get: { operationId: 'newHostSettingsOperation' } },
+      '/plugin': { get: { operationId: 'pluginOperation' } },
+    } };
+    const hostDocument = excludeOpenApiOperations(mixed, new Set(['get /settings', 'get /plugin']), new Set(['get /settings']));
+    expect(hostDocument.paths?.['/settings']?.get).toEqual({ operationId: 'newHostSettingsOperation' });
+    expect(hostDocument.paths?.['/plugin']).toBeUndefined();
+    expect(() => generateMcpTools(hostDocument, {})).toThrow('Unreviewed OpenAPI operation newHostSettingsOperation');
+  });
+
+  it('finds direct root-module host routes without scanning its plugin imports', async () => {
+    const app = await Test.createTestingModule({ imports: [HostRootModule] }).compile();
+    const nestApp = app.createNestApplication();
+    try {
+      await nestApp.init();
+      const config = new DocumentBuilder().build();
+      const rootDocument = SwaggerModule.createDocument(nestApp, config, { include: [HostRootModule] }) as unknown as OpenApiDocument;
+      expect(rootDocument.paths?.['/host-root']).toBeDefined();
+
+      const mixedDocument: OpenApiDocument = { paths: {
+        ...rootDocument.paths,
+        '/plugin-nested': { get: { operationId: 'nestedRoute' } },
+      } };
+      const filtered = excludeOpenApiOperations(
+        mixedDocument,
+        new Set(['get /plugin-nested']),
+        new Set(['get /host-root']),
+      );
+      expect(filtered.paths?.['/host-root']).toBeDefined();
+      expect(filtered.paths?.['/plugin-nested']).toBeUndefined();
+      expect(() => generateMcpTools(filtered, {})).toThrow('Unreviewed OpenAPI operation HostRootController_rootRoute');
+    } finally {
+      await nestApp.close();
+    }
+  });
+
+  const document: OpenApiDocument = {
+    paths: {
+      '/resources/{id}': {
+        get: {
+          operationId: 'getResource',
+          summary: 'Get a resource',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+            { name: 'expand', in: 'query', schema: { type: 'boolean' } },
+          ],
+          responses: { '200': { content: { 'application/json': {} } } },
+        },
+        patch: {
+          operationId: 'updateResource',
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateResource' } } },
+          },
+          responses: { '200': { content: { 'application/json': {} } } },
+        },
+      },
+    },
+    components: {
+      schemas: {
+        UpdateResource: {
+          type: 'object',
+          required: ['name'],
+          properties: { name: { type: 'string' }, description: { type: 'string', nullable: true } },
+        },
+      },
+    },
+  };
+  const manifest = (doc: OpenApiDocument = document, overrides: Record<string, { decision: 'allow' | 'deny'; reason: string }> = {}) => {
+    const result: Record<string, { decision: 'allow' | 'deny'; reason: string; shape: string }> = {};
+    for (const [path, item] of Object.entries(doc.paths ?? {})) for (const [method, operation] of Object.entries(item)) {
+      if (!operation || typeof operation !== 'object' || !('operationId' in operation)) continue;
+      const id = operation.operationId as string;
+      const choice = overrides[id] ?? { decision: 'deny' as const, reason: 'Reviewed fixture operation.' };
+      result[id] = {
+        ...choice,
+        shape: operationShape(method, path, operation, item.parameters ?? [], doc.components?.schemas ?? {}),
+      };
+    }
+    return result;
+  };
+
+  it('uses operation IDs and combines path, query, and body inputs', () => {
+    const tools = generateMcpTools(document, manifest(document, {
+      getResource: { decision: 'allow', reason: 'Read-only resource lookup.' },
+      updateResource: { decision: 'allow', reason: 'Resource updates use normal REST authorization.' },
+    }));
+    expect(tools.map(({ name }) => name)).toEqual(['getResource', 'updateResource']);
+    expect(tools[0].inputSchema.required).toEqual(['id']);
+    expect(tools[0].inputSchema.properties).toEqual({ id: { type: 'integer' }, expand: { type: 'boolean' } });
+    expect(tools[1].inputSchema.required).toEqual(['name']);
+    expect(tools[1].inputSchema.properties.name).toEqual({ type: 'string' });
+  });
+
+  it('requires manifest coverage and rejects duplicate operation IDs', () => {
+    expect(() => generateMcpTools(document, { getResource: { ...manifest().getResource, decision: 'deny', reason: 'Reviewed.' } })).toThrow(
+      'Unreviewed OpenAPI operation updateResource',
+    );
+    const duplicate = structuredClone(document);
+    duplicate.paths = { ...duplicate.paths, '/other': { get: { operationId: 'getResource' } } };
+    expect(() => generateMcpTools(duplicate, {})).toThrow('Duplicate operationId getResource');
+  });
+
+  it('requires reasons and rejects incompatible allow decisions', () => {
+    expect(() => generateMcpTools(document, manifest(document, {
+      getResource: { decision: 'deny', reason: '' },
+      updateResource: { decision: 'deny', reason: 'Reviewed.' },
+    }))).toThrow('has no review reason');
+    const incompatible = structuredClone(document);
+    incompatible.paths = { ...incompatible.paths, '/firmware/download': { get: { operationId: 'downloadFirmware' } } };
+    expect(() => generateMcpTools(incompatible, manifest(incompatible, {
+      getResource: { decision: 'deny', reason: 'Reviewed.' },
+      updateResource: { decision: 'deny', reason: 'Reviewed.' },
+      downloadFirmware: { decision: 'allow', reason: 'Reviewed.' },
+    }))).toThrow('Incompatible endpoint');
+  });
+
+  it('ignores OpenAPI extensions and supports structured JSON media types', () => {
+    const extended = structuredClone(document);
+    const resourcePath = extended.paths?.['/resources/{id}'];
+    if (!resourcePath) throw new Error('Test fixture is missing its resource path');
+    resourcePath['x-display-name'] = 'Resource';
+    resourcePath.patch = {
+      operationId: 'updateResource',
+      requestBody: {
+        required: true,
+        content: { 'application/vnd.attraccess+json': { schema: { $ref: '#/components/schemas/UpdateResource' } } },
+      },
+      responses: { '200': { content: { 'application/vnd.attraccess+json': {} } } },
+    };
+
+    expect(generateMcpTools(extended, manifest(extended, {
+      getResource: { decision: 'allow', reason: 'Read-only resource lookup.' },
+      updateResource: { decision: 'allow', reason: 'Resource updates use normal REST authorization.' },
+    }))).toHaveLength(2);
+  });
+
+  it('preserves map additionalProperties and validates operation shape, all success media, streaming and methods', () => {
+    const mapDoc: OpenApiDocument = { paths: { '/maps': { post: { operationId: 'setMap', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', additionalProperties: { type: 'string' } } } } }, responses: { '200': { content: { 'application/json': {} } } } } } } };
+    const mapManifest = manifest(mapDoc, { setMap: { decision: 'allow', reason: 'Reviewed map input.' } });
+    expect(generateMcpTools(mapDoc, mapManifest)[0].inputSchema.properties.body).toMatchObject({ additionalProperties: { type: 'string' } });
+    const changed = structuredClone(mapDoc);
+    const changedOperation = changed.paths?.['/maps']?.post;
+    if (!changedOperation || typeof changedOperation !== 'object') throw new Error('Test fixture is missing its operation');
+    changedOperation.summary = 'Changed contract';
+    expect(() => generateMcpTools(changed, mapManifest)).toThrow('shape drift');
+    const unsafe = structuredClone(mapDoc);
+    const unsafeOperation = unsafe.paths?.['/maps']?.post;
+    if (!unsafeOperation || typeof unsafeOperation !== 'object') throw new Error('Test fixture is missing its operation');
+    unsafeOperation.responses = { ...unsafeOperation.responses, '201': { content: { 'text/event-stream': {} } } };
+    expect(() => generateMcpTools(unsafe, manifest(unsafe, { setMap: { decision: 'allow', reason: 'Reviewed.' } }))).toThrow('Unsupported response media type');
+    const stream = structuredClone(mapDoc);
+    const streamOperation = stream.paths?.['/maps']?.post;
+    if (!streamOperation || typeof streamOperation !== 'object') throw new Error('Test fixture is missing its operation');
+    streamOperation['x-mcp-streaming'] = true;
+    expect(() => generateMcpTools(stream, manifest(stream, { setMap: { decision: 'allow', reason: 'Reviewed.' } }))).toThrow('Incompatible endpoint');
+    const unsupported: OpenApiDocument = { paths: { '/maps': { options: { operationId: 'optionsMaps' } } } };
+    expect(() => generateMcpTools(unsupported, {})).toThrow('Unsupported OpenAPI operation OPTIONS');
+  });
+
+  it('resolves and rejects incompatible additionalProperties schemas', () => {
+    const doc: OpenApiDocument = {
+      paths: { '/maps': { post: { operationId: 'setMap', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', additionalProperties: { $ref: '#/components/schemas/MapValue' } } } } }, responses: { '200': {} } } } },
+      components: { schemas: { MapValue: { type: 'array', items: { type: 'string', format: 'binary' } } } },
+    };
+    const reviewed = manifest(doc, { setMap: { decision: 'allow', reason: 'Reviewed map schema.' } });
+    expect(() => generateMcpTools(doc, reviewed)).toThrow('Binary schemas are not tool-compatible');
+    const valid = structuredClone(doc);
+    const schemas = valid.components?.schemas;
+    if (!schemas) throw new Error('Test fixture is missing schemas');
+    schemas.MapValue = { type: 'string' };
+    const validManifest = manifest(valid, { setMap: { decision: 'allow', reason: 'Reviewed map schema.' } });
+    expect(generateMcpTools(valid, validManifest)[0].inputSchema.properties.body).toMatchObject({ additionalProperties: { type: 'string' } });
+  });
+
+  it('rejects streaming operation IDs even when the path and response do not declare streaming', () => {
+    const doc: OpenApiDocument = {
+      paths: {
+        '/notifications': {
+          get: {
+            operationId: 'notificationsLive',
+            responses: { '200': {} },
+          },
+        },
+      },
+    };
+    expect(() => generateMcpTools(doc, manifest(doc, {
+      notificationsLive: { decision: 'allow', reason: 'A bad review must not make streaming tool safe.' },
+    }))).toThrow('Incompatible endpoint');
+  });
+
+  it.each([
+    ['getLogo', '/logo.png'],
+    ['getFrontendPluginFile', '/plugins/{name}/frontend/{file}'],
+  ])('rejects known binary or streamed operation %s even if its manifest says allow', (operationId, path) => {
+    const doc: OpenApiDocument = {
+      paths: {
+        [path]: {
+          get: {
+            operationId,
+            responses: { '200': { content: { 'application/json': { schema: { type: 'string' } } } } },
+          },
+        },
+      },
+    };
+    const reviewed = manifest(doc, { [operationId]: { decision: 'allow', reason: 'Deliberately unsafe regression fixture.' } });
+    expect(() => generateMcpTools(doc, reviewed)).toThrow(`Incompatible endpoint GET ${path} cannot be allowed (${operationId})`);
+  });
+
+  it('lets operation parameters override shared parameters at matching name and location', () => {
+    const doc: OpenApiDocument = { paths: { '/things/{id}': { parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], get: { operationId: 'getThing', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': { content: { 'application/json': {} } } } } } } };
+    expect(generateMcpTools(doc, manifest(doc, { getThing: { decision: 'allow', reason: 'Reviewed.' } }))[0].inputSchema.properties.id).toEqual({ type: 'integer' });
+
+    const changedSharedParameter = structuredClone(doc);
+    const shared = changedSharedParameter.paths?.['/things/{id}']?.parameters;
+    if (!Array.isArray(shared)) throw new Error('Test fixture is missing its shared path parameter');
+    shared[0] = { name: 'id', in: 'path', required: true, schema: { type: 'number' } };
+    expect(() => generateMcpTools(changedSharedParameter, manifest(doc, { getThing: { decision: 'allow', reason: 'Reviewed.' } }))).toThrow('shape drift');
+  });
+});

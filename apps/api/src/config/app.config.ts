@@ -48,6 +48,7 @@ export const AppEnvSchema = z
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
     ATTRACCESS_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
+    MCP_OAUTH_CLIENTS: z.string().optional(),
     VERSION: z.string().default(resolveAppVersion()),
     COMMIT_SHA: z.string().optional(),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),

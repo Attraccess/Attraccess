@@ -29,6 +29,7 @@ describe('SessionService', () => {
       validateSession: jest.fn().mockResolvedValue(null),
       rotateSession: jest.fn().mockResolvedValue(false),
       revokeSession: jest.fn().mockResolvedValue(false),
+      consumeSession: jest.fn().mockResolvedValue(false),
       revokeAllUserSessions: jest.fn().mockResolvedValue(0),
       cleanupExpired: jest.fn().mockResolvedValue(null),
       getUserSessions: jest.fn().mockResolvedValue([]),
@@ -65,6 +66,7 @@ describe('SessionService', () => {
     store.validateSession.mockResolvedValue(null);
     store.rotateSession.mockResolvedValue(false);
     store.revokeSession.mockResolvedValue(false);
+    store.consumeSession.mockResolvedValue(false);
     store.revokeAllUserSessions.mockResolvedValue(0);
     store.cleanupExpired.mockResolvedValue(null);
     store.getUserSessions.mockResolvedValue([]);
@@ -116,6 +118,16 @@ describe('SessionService', () => {
       const [, , , expiresAt] = store.createSession.mock.calls[0];
       const maxExpiry = Date.now() + 168 * 3600 * 1000;
       expect((expiresAt as Date).getTime()).toBeLessThanOrEqual(maxExpiry + 1000);
+    });
+  });
+
+  describe('consumeSession', () => {
+    it('decrements the active-session metric only when an active session is consumed', async () => {
+      store.consumeSession.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      expect(await service.consumeSession('one-time')).toBe(true);
+      expect(await service.consumeSession('already-consumed')).toBe(false);
+      expect(store.consumeSession).toHaveBeenCalledWith('one-time');
+      expect(metrics.authActiveSessions.dec).toHaveBeenCalledTimes(1);
     });
   });
 

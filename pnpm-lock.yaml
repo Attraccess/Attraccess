@@ -253,6 +253,9 @@ importers:
       express:
         specifier: 4.22.2
         version: 4.22.2
+      express-rate-limit:
+        specifier: 7.5.1
+        version: 7.5.1(express@4.22.2)
       express-session:
         specifier: ^1.19.0
         version: 1.19.0
@@ -11279,6 +11282,12 @@ packages:
 
   express-rate-limit@5.5.1:
     resolution: {integrity: sha512-MTjE2eIbHv5DyfuFz4zLYWxpqVhEhkTiwFGuB74Q9CSou2WHO52nlE5y3Zlg6SIsiYUIPj6ifFxnkPz6O3sIUg==}
+
+  express-rate-limit@7.5.1:
+    resolution: {integrity: sha512-7iN8iPMDzOMHPUYllBEsQdWVB6fPDMPqwjBaFrgr4Jgr/+okjvzAy+UHlYYL/Vs0OsOrMkwS6PJDkFlJwoxUnw==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      express: '>= 4.11'
 
   express-session@1.19.0:
     resolution: {integrity: sha512-0csaMkGq+vaiZTmSMMGkfdCOabYv192VbytFypcvI0MANrp+4i/7yEkJ0sbAEhycQjntaKGzYfjfXQyVb7BHMA==}
@@ -32791,6 +32800,10 @@ snapshots:
   expr-eval-fork@3.0.3: {}
 
   express-rate-limit@5.5.1: {}
+
+  express-rate-limit@7.5.1(express@4.22.2):
+    dependencies:
+      express: 4.22.2
 
   express-session@1.19.0:
     dependencies:

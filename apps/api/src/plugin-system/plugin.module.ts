@@ -47,6 +47,7 @@ import { createPluginAuditContext } from './plugin-audit-context';
 @Module({})
 export class PluginModule {
   private static pluginManifests: LoadedPluginManifest[];
+  private static loadedPluginModuleTypes: Type<unknown>[] = [];
   private static logger = new Logger(PluginModule.name);
   private static DISABLE_PLUGINS_FLAG = false; // Default to false
 
@@ -72,7 +73,13 @@ export class PluginModule {
 
   public static configure(config: { DISABLE_PLUGINS: boolean }): void {
     PluginModule.DISABLE_PLUGINS_FLAG = config.DISABLE_PLUGINS;
+    if (config.DISABLE_PLUGINS) PluginModule.loadedPluginModuleTypes = [];
     PluginModule.logger.log(`PluginModule configured. DisablePlugins: ${PluginModule.DISABLE_PLUGINS_FLAG}`);
+  }
+
+  /** Module classes contributed by installed plugins, excluding host-owned plugin services. */
+  public static getLoadedPluginModuleTypes(): Type<unknown>[] {
+    return [...PluginModule.loadedPluginModuleTypes];
   }
 
   public static arePluginsDisabled(): boolean {
@@ -81,6 +88,7 @@ export class PluginModule {
 
   public static forRoot(): DynamicModule {
     if (PluginModule.DISABLE_PLUGINS_FLAG) {
+      PluginModule.loadedPluginModuleTypes = [];
       PluginModule.logger.log('Plugins are disabled');
 
       return {
@@ -115,6 +123,8 @@ export class PluginModule {
         }
       })
       .filter((module) => module !== null);
+
+    PluginModule.loadedPluginModuleTypes = pluginModules.map((module) => module.module);
 
     return {
       module: PluginModule,

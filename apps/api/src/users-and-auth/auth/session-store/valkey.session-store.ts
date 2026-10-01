@@ -89,6 +89,28 @@ export class ValkeySessionStore implements SessionStore {
     return wasActive;
   }
 
+  async consumeSession(token: string): Promise<boolean> {
+    const hashedToken = this.tokenHashService.hashToken(token);
+    const script = `
+      local userId = redis.call('HGET', KEYS[1], 'userId')
+      local ttl = redis.call('TTL', KEYS[1])
+      if not userId or ttl <= 0 then
+        if userId then redis.call('DEL', KEYS[1]); redis.call('SREM', 'user_sessions:' .. userId, ARGV[1]); end
+        return 0
+      end
+      redis.call('DEL', KEYS[1])
+      redis.call('SREM', 'user_sessions:' .. userId, ARGV[1])
+      return 1
+    `;
+    const result = await this.client.eval(
+      script,
+      1,
+      `${SESSION_PREFIX}${hashedToken}`,
+      hashedToken,
+    );
+    return Number(result) === 1;
+  }
+
   async revokeAllUserSessions(userId: number): Promise<number> {
     const userKey = `${USER_SESSIONS_PREFIX}${userId}`;
     const hashedTokens = await this.client.smembers(userKey);

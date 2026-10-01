@@ -14,9 +14,17 @@ const token = '1234567890abcdef1234567890abcdef';
 const key = generateManagementKey();
 const keyEntry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${key.publicKey}`;
 let root: string, home: string, bin: string;
+const hostPath = process.env.PATH ?? '/usr/bin:/bin';
 let watchdogPid: number | undefined;
+// These fixtures execute several portable shell pipelines per assertion. Under
+// the plugin project's parallel test load, a Jest default timeout can expire
+// before the isolated subprocess chain gets CPU time.
+jest.setTimeout(60_000);
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
-const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` });
+const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${hostPath}` });
+// The shell fixtures spawn many small utilities. Leave headroom for loaded CI
+// runners instead of killing a healthy transaction at the old 10s cap.
+const shellTimeout = 30_000;
 const command = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
   managementKeyCommand(action, selectedToken, seconds, key.publicKey)
     .replaceAll('/proc/uptime', join(root, 'uptime'))
@@ -24,7 +32,7 @@ const command = (action: ManagementShellAction, seconds = 180, selectedToken = t
 const run = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
   exec('/bin/sh', ['-c', command(action, seconds, selectedToken)], {
     env: env(),
-    timeout: 10000,
+    timeout: shellTimeout,
     maxBuffer: 16384,
   });
 
@@ -54,6 +62,7 @@ elif name=='flock':
    fcntl.flock(int(sys.argv[-1]),fcntl.LOCK_EX|fcntl.LOCK_NB)
    break
   except BlockingIOError:
+   open(os.path.join(os.environ['HOME'],'flock-waiting'),'a').close()
    if time.monotonic()>=end:
     with open(os.path.join(os.environ['HOME'],'flock-timeouts'),'a') as log: log.write('timeout\\n')
     sys.exit(1)
@@ -101,7 +110,7 @@ describe('executable isolated management shell fixtures', () => {
     expect(await readFile(path(`.attraccess-management-recovered-${token}`, 'previous'), 'utf8')).toBe(
       '# existing key\n',
     );
-  }, 10000);
+  }, 60_000);
 
   it('removes a newly created authorized_keys file on rollback', async () => {
     await run('prepare');
@@ -118,7 +127,7 @@ describe('executable isolated management shell fixtures', () => {
     await expect(run('rollback')).rejects.toBeDefined();
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# administrator replacement\n');
     expect(await readFile(path('.attraccess-management-transaction', 'previous'), 'utf8')).toBe('# existing key\n');
-  });
+  }, 60_000);
 
   it('a foreign transaction and unsafe permissions or symlinks cannot overwrite keys', async () => {
     await prepared();
@@ -158,25 +167,32 @@ describe('executable isolated management shell fixtures', () => {
     }
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await expect(run('commit')).rejects.toBeDefined();
-  }, 30000);
+  }, 60_000);
 
   it('retries watchdog lock contention beyond the first five-second wait', async () => {
     await prepared();
     await run('install');
     const holder = exec(
       '/bin/sh',
-      ['-c', 'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; sleep 7'],
-      { env: env(), timeout: 10000 },
+      [
+        '-c',
+        'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; while [ ! -e "$HOME/flock-timeouts" ]; do sleep 0.02; done; sleep 1.5',
+      ],
+      { env: env(), timeout: shellTimeout },
     );
     await waitFor(async () => (await readdir(home)).includes('locked'));
     const watchdog = run('watchdog');
-    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 6500);
+    // Hold the lock until the watchdog itself records a timed-out attempt. This
+    // synchronizes contention on the actual flock call instead of assuming the
+    // watchdog starts within a fixed window after the holder.
+    await waitFor(async () => (await readdir(home)).includes('flock-waiting'), 30000);
+    await waitFor(async () => (await readdir(home)).includes('flock-timeouts'), 30000);
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
     await holder;
     await watchdog;
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await expect(run('install')).rejects.toBeDefined();
-  }, 15000);
+  }, 90_000);
 
   it('reserves append space and rolls back an installed image of exactly 65536 bytes', async () => {
     const previous = '#'.repeat(65536 - Buffer.byteLength(keyEntry) - 2);
@@ -260,7 +276,7 @@ describe('executable isolated management shell fixtures', () => {
     await expect(run('commit')).rejects.toBeDefined();
     await run('rollback');
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
-  }, 10000);
+  }, 60_000);
 
   it('kills an in-flight install at its remote deadline and leaves it recoverable', async () => {
     await prepared();

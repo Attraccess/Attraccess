@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-custom';
 import { Request } from 'express';
@@ -10,6 +10,9 @@ import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { ConfigService } from '@nestjs/config';
+import { AppConfigType } from '../../config/app.config';
+import { verifyMcpDelegation } from '../../mcp/mcp-delegation';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 
@@ -30,6 +33,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     private readonly rbacService: RbacService,
     private readonly apiTokenService: ApiTokenService,
     private readonly authAuditLogger: AuthAuditLogger,
+    @Optional() private readonly configService?: ConfigService,
   ) {
     super();
   }
@@ -77,9 +81,20 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     }
 
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
-    (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
-      await this.rbacService.getEffectivePermissions(user.id),
-    );
+    const delegationHeader = req.headers['x-mcp-delegation'];
+    const currentPermissions = await this.rbacService.getEffectivePermissions(user.id, delegationHeader !== undefined);
+    if (delegationHeader !== undefined) {
+      const delegation = verifyMcpDelegation(
+        this.configService?.get<AppConfigType>('app')?.AUTH_SESSION_SECRET ?? '',
+        Array.isArray(delegationHeader) ? delegationHeader[0] ?? '' : delegationHeader,
+      );
+      if (!delegation || delegation.userId !== user.id) throw new UnauthorizedException('Invalid MCP permission delegation');
+      (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
+        delegation.permissions.filter((permission) => currentPermissions.has(permission)),
+      );
+    } else {
+      (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(currentPermissions);
+    }
     (user as AuthenticatedUser).authenticationMethod = 'session';
 
     if (!this.isTwoFactorSetupAllowedPath(req)) {

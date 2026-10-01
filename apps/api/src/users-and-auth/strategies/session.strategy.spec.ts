@@ -10,6 +10,8 @@ import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { ConfigService } from '@nestjs/config';
+import { signMcpDelegation } from '../../mcp/mcp-delegation';
 
 describe('SessionStrategy', () => {
   let strategy: SessionStrategy;
@@ -55,6 +57,10 @@ describe('SessionStrategy', () => {
           provide: AuthAuditLogger,
           useValue: { log: jest.fn() },
         },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue({ AUTH_SESSION_SECRET: 'test-mcp-delegation-secret' }) },
+        },
       ],
     }).compile();
 
@@ -71,6 +77,28 @@ describe('SessionStrategy', () => {
   });
 
   describe('validate', () => {
+    it('limits an OAuth delegated session to the signed permissions intersected with current RBAC', async () => {
+      const mockRequest = {
+        headers: {
+          authorization: 'Bearer delegated-session-token',
+          'x-mcp-delegation': signMcpDelegation('test-mcp-delegation-secret', {
+            userId: mockUser.id,
+            permissions: ['resources.read', 'resources.update'],
+            expiresAt: Date.now() + 30_000,
+          }),
+        },
+        cookies: {},
+        path: '/api/resources',
+      } as Request;
+      sessionService.validateSession.mockResolvedValue(mockUser);
+      rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read']));
+
+      const principal = (await strategy.validate(mockRequest)) as AuthenticatedUser;
+
+      expect([...(principal.effectivePermissions ?? [])]).toEqual(['resources.read']);
+      expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(mockUser.id, true);
+    });
+
     it('restricts API token permissions to the owner current permissions', async () => {
       const mockRequest = {
         headers: { authorization: 'Bearer api-token' },

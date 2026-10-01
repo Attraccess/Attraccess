@@ -21,6 +21,7 @@ import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
 import { SettingsService } from './settings/settings.service';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
+import { excludeOpenApiOperations } from './mcp/openapi-tools';
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -284,6 +285,86 @@ export async function bootstrap() {
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
+
+  const { SessionStrategy } = await import('./users-and-auth/strategies/session.strategy');
+  const { registerMcpHttpEndpoints } = await import('./mcp/mcp-http');
+  const { registerMcpOAuthEndpoints } = await import('./mcp/mcp-oauth');
+  const { SessionService } = await import('./users-and-auth/auth/session.service');
+  const { RbacService } = await import('./users-and-auth/rbac/rbac.service');
+  const sessionStrategy = app.get(SessionStrategy, { strict: false });
+  const sessionService = app.get(SessionService, { strict: false });
+  const rbacService = app.get(RbacService, { strict: false });
+  const mcpPath = `/${globalPrefix ? `${globalPrefix}/` : ''}mcp`;
+  const publicBaseUrl = appUrl ?? `http://localhost:${appConfig.PORT}`;
+  const mcpResourceUrl = new URL(mcpPath, publicBaseUrl).toString();
+  const publicUrl = new URL(mcpResourceUrl);
+  const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(publicUrl.hostname);
+  if (publicUrl.protocol !== 'https:' && !isLoopback) throw new Error('MCP OAuth requires HTTPS for public ATTRACCESS_URL');
+  const authenticateMcp = registerMcpOAuthEndpoints(app, {
+    resourceUrl: mcpResourceUrl,
+    secret: appConfig.AUTH_SESSION_SECRET,
+    clientsJson: appConfig.MCP_OAUTH_CLIENTS,
+    prefix: mcpPath,
+    sessions: sessionService,
+    rbac: rbacService,
+    sessionStrategy,
+  });
+  registerMcpHttpEndpoints(app, {
+    document: (() => {
+      const document = documentFactory() as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      const pluginModuleTypes = PluginModule.getLoadedPluginModuleTypes();
+      if (pluginModuleTypes.length === 0) return document;
+      // Plugin controllers may live in imported feature modules, not only on the
+      // plugin root module. Scan the complete plugin module graph so every plugin
+      // operation is excluded from MCP, including endpoints deferred by this feature.
+      const pluginDocument = SwaggerModule.createDocument(app, config, {
+        include: pluginModuleTypes,
+        deepScanRoutes: true,
+      }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      // Plugin module graphs can import host modules (for example SettingsModule).
+      // Build host coverage independently of the reviewed manifest so those routes
+      // remain visible to generateMcpTools even when they are new and unreviewed.
+      const hostModuleTypes = ((Reflect.getMetadata('imports', AppModule) as unknown[] | undefined) ?? [])
+        .map((entry) => entry && typeof entry === 'object' && 'module' in entry ? (entry as { module: unknown }).module : entry)
+        .filter((moduleType) => moduleType !== PluginModule);
+      const hostDocument = SwaggerModule.createDocument(app, config, {
+        include: hostModuleTypes as never[],
+        deepScanRoutes: true,
+      }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      // AppController is declared on AppModule itself rather than one of its
+      // imports. Scan the root module shallowly so those host operations count
+      // toward manifest coverage without pulling the plugin graph back in.
+      const rootDocument = SwaggerModule.createDocument(app, config, {
+        include: [AppModule],
+      }) as unknown as import('./mcp/openapi-tools').OpenApiDocument;
+      const hostOperations = new Set<string>();
+      for (const source of [hostDocument, rootDocument]) {
+        for (const [path, pathItem] of Object.entries(source.paths ?? {})) {
+          for (const [method, operation] of Object.entries(pathItem)) {
+            if (operation && typeof operation === 'object') hostOperations.add(`${method.toLowerCase()} ${path}`);
+          }
+        }
+      }
+      const pluginOperations = new Set<string>();
+      for (const [path, pathItem] of Object.entries(pluginDocument.paths ?? {})) {
+        for (const [method, operation] of Object.entries(pathItem)) {
+          if (operation && typeof operation === 'object' && typeof (operation as { operationId?: unknown }).operationId === 'string') {
+            pluginOperations.add(`${method.toLowerCase()} ${path}`);
+          }
+        }
+      }
+      return excludeOpenApiOperations(document, pluginOperations, hostOperations);
+    })(),
+    resourceUrl: mcpResourceUrl,
+    port: appConfig.PORT,
+    // The public URL may terminate TLS at a reverse proxy while this local
+    // Nest listener remains plain HTTP. Delegation must follow the listener.
+    secure: Boolean(httpsOptions),
+    tlsCa: httpsOptions?.cert as Buffer | undefined,
+    globalPrefix,
+    delegationSecret: appConfig.AUTH_SESSION_SECRET,
+    authenticate: authenticateMcp,
+  });
 
   const port = appConfig.PORT;
   // Listening and related logging will be handled by startListening function
