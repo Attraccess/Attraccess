@@ -8,7 +8,13 @@ import { useWagoTranslations } from './i18n';
 
 const api = createPluginApiClient('/api/wago/commissioning/sessions');
 export function CommissioningPlatformPreflight({ session }: { session: CommissioningSession }) {
-  const { t, tBackendMessage } = useWagoTranslations();
+  const { t, tBackendMessage, language } = useWagoTranslations();
+  const formatUtc = (value: string) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleString(language, { timeZone: 'UTC', timeZoneName: 'short' });
+  };
   const client = useQueryClient();
   const [updated, setUpdated] = useState<CommissioningSession | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,9 +82,9 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           <dt>{t('security.clockResult')}</dt>
           <dd>{tBackendMessage(report.clock.result)}</dd>
           <dt>{t('security.utcReference')}</dt>
-          <dd>{report.clock.hostUtc}</dd>
+          <dd>{formatUtc(report.clock.hostUtc)}</dd>
           <dt>{t('security.controllerUtc')}</dt>
-          <dd>{report.clock.controllerUtc}</dd>
+          <dd>{formatUtc(report.clock.controllerUtc)}</dd>
           <dt>{t('security.clockObservation')}</dt>
           <dd>
             {t('security.observation', {
@@ -135,11 +141,9 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
       )}
       {report?.provision === 'unsupported-lifecycle-dependencies' && <p>{t('security.lifecycle')}</p>}
       {current.dockerProvisionState && (
-        <p role="status">
-          {t('security.savedPreparation', { state: tBackendMessage(current.dockerProvisionState) })}
-        </p>
+        <p role="status">{t('security.savedPreparation', { state: tBackendMessage(current.dockerProvisionState) })}</p>
       )}
-      {current.failureReason && <p role="alert">{current.failureReason}</p>}
+      {current.failureReason && <p role="alert">{tBackendMessage(current.failureReason)}</p>}
       <form ref={form} onSubmit={(event) => event.preventDefault()}>
         <p>
           {t('commissioningUI.sshLogin', {

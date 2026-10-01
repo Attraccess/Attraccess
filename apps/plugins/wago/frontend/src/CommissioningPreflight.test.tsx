@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CommissioningPlatformPreflight } from './CommissioningPlatformPreflight';
 import type { CommissioningSession } from './api';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
 const session: CommissioningSession = {
   id: 7,
@@ -47,6 +48,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  useTranslationState.setState({ language: 'en' });
   client.clear();
   vi.unstubAllGlobals();
 });
@@ -131,6 +133,46 @@ it.each(['codesys-active', 'codesys-boot-enabled', 'output-container-conflict'])
     expect(screen.getByText('500 seconds')).toBeTruthy();
     expect(screen.getByText('Fixture requires attention')).toBeTruthy();
     expect(screen.getByText(/could not verify the Docker lifecycle dependencies/)).toBeTruthy();
+    expect(requests).toHaveLength(0);
+  },
+);
+
+it.each(['Free space on the CC100, then retry installation.', 'unknown failure <controller>'])(
+  'switches saved failure feedback and UTC clock formatting without inspecting again: %s',
+  (failureReason) => {
+    const hostUtc = '2026-09-22T10:00:00Z';
+    mountPreflight({
+      ...session,
+      failureReason,
+      platformReport: JSON.stringify({
+        clock: {
+          hostUtc,
+          controllerUtc: 'unavailable',
+          result: 'synchronized',
+          observation: 'before-action',
+          uncertaintySeconds: 2,
+          skewSeconds: 0,
+          tool: 'supported',
+          action: 'none',
+        },
+      }),
+    });
+    expect(
+      screen.getByText(new Date(hostUtc).toLocaleString('en', { timeZone: 'UTC', timeZoneName: 'short' })),
+    ).toBeTruthy();
+    expect(screen.getByText(failureReason)).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(
+      screen.getByText(new Date(hostUtc).toLocaleString('de', { timeZone: 'UTC', timeZoneName: 'short' })),
+    ).toBeTruthy();
+    expect(screen.getByText('unavailable')).toBeTruthy();
+    expect(
+      screen.getByText(
+        failureReason.startsWith('Free space')
+          ? 'Gib Speicherplatz auf dem CC100 frei und versuche die Installation erneut.'
+          : failureReason,
+      ),
+    ).toBeTruthy();
     expect(requests).toHaveLength(0);
   },
 );
