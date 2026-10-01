@@ -152,7 +152,7 @@ export function OnboardCard({
                   isDisabled={disabled}
                   aria-label={t('panel.configure', { name: `${terminal.label} ${name}` })}
                   onPress={() => editTerminal(terminal)}
-                  className={`wg:h-auto wg:min-h-12 wg:justify-start wg:gap-2 wg:rounded-lg wg:bg-surface-secondary wg:px-3 wg:py-3 ${name ? '' : 'wg:opacity-55'}`}
+                  className={`wg:h-auto wg:min-h-12 wg:w-full wg:min-w-0 wg:justify-start wg:gap-2 wg:rounded-lg wg:bg-surface-secondary wg:px-3 wg:py-3 wg:whitespace-normal ${name ? '' : 'wg:opacity-55'}`}
                 >
                   <span
                     aria-label={t(sample ? (sample.value ? 'panel.on' : 'panel.off') : 'panel.unknown')}
@@ -216,13 +216,13 @@ export function DeviceCard({
   return (
     <Card className="wg:min-w-0">
       <Card.Header className="wg:flex wg:flex-row wg:items-start wg:justify-between wg:gap-2">
-        <div className="wg:min-w-0">
+        <div className="wg:min-w-0 wg:flex-1">
           <Card.Title className="wg:flex wg:items-center wg:gap-2">
             <span
               aria-label={t(online ? 'panel.online' : 'panel.offline')}
               className={`wg:size-2.5 wg:shrink-0 wg:rounded-full ${online ? 'wg:bg-success' : fault ? 'wg:bg-danger' : 'wg:bg-muted'}`}
             />
-            <span className="wg:break-words">{device.name}</span>
+            <span className="wg:min-w-0 wg:break-words">{device.name}</span>
           </Card.Title>
           <Card.Description className="wg:mt-1 wg:break-words">
             {profile ? (builtin ? tBackendMessage(profile.name) : profile.name) : t('panel.unknownProfile')} ·{' '}
@@ -235,6 +235,7 @@ export function DeviceCard({
           variant="ghost"
           size="sm"
           isIconOnly
+          className="wg:shrink-0"
           isDisabled={disabled}
           aria-label={t('panel.configure', { name: device.name })}
           onPress={onEdit}
@@ -289,7 +290,7 @@ export function DeviceCard({
             registerChannel(live.applied.snapshot, device.id, register.id, 'actionId');
           return (
             <div key={register.id} className="wg:flex wg:items-center wg:justify-between wg:gap-3">
-              <span className="wg:text-sm">{register.name}</span>
+              <span className="wg:min-w-0 wg:break-words wg:text-sm">{register.name}</span>
               <OutputControl live={live} channel={channel || undefined} label={`${device.name} ${register.name}`} />
             </div>
           );
