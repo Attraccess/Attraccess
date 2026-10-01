@@ -162,6 +162,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
       // register scale/offset, with exactly what a command would write.
       const on = action.functionCode === 5 ? action.onValue : decodeRaw(encode(action.onValue, action), action);
       const off = action.functionCode === 5 ? action.offValue : decodeRaw(encode(action.offValue, action), action);
+      if (on === off) throw new Error('switch register has indistinguishable on/off values');
       if (raw !== on && raw !== off) throw new Error('switch register has an unknown state');
       const value = raw === on;
       this.outputSamples.set(point.id, { result: { value }, expiresAt });

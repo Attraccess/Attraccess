@@ -373,6 +373,20 @@ describe('Modbus switch readback', () => {
     await expect(router.readOutput(point)).rejects.toThrow('No response');
     expect(request).toHaveBeenCalledTimes(1);
   });
+  it('fails closed when distinct switch values collapse to the same float32 representation', async () => {
+    const register = {
+      ...action,
+      functionCode: 16 as const,
+      dataType: 'float32' as const,
+      scale: 1,
+      offset: 0,
+      onValue: 0.1,
+      offValue: 0.1000000001,
+    };
+    const request = jest.fn(async () => encode(register.offValue, register));
+    const router = routerFor(register, request);
+    await expect(router.readOutput(point)).rejects.toThrow('indistinguishable on/off values');
+  });
   it.each(['big', 'little'] as const)(
     'recognizes encoded float32 switch values with %s word order',
     async (wordOrder) => {
