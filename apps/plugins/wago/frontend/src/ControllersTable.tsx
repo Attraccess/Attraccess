@@ -102,6 +102,7 @@ export function ControllersTable({
                     onConfigure={onConfigure}
                     onRemove={onRemove}
                     onResume={onResume}
+                    onRecover={(session) => setRuntimeUpdateTarget({ session })}
                     onShowRuntimeUpdate={(controller) => setRuntimeUpdateTarget({ controller })}
                   />
                 )
@@ -122,6 +123,7 @@ function ControllerRow({
   onRemove,
   onResume,
   onShowRuntimeUpdate,
+  onRecover,
 }: {
   row: Extract<TableRowData, { kind: 'controller' }>;
   onClaim: (controllerId: number) => void;
@@ -129,6 +131,7 @@ function ControllerRow({
   onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
   onShowRuntimeUpdate: (controller: WagoController) => void;
+  onRecover: (session: CommissioningSession) => void;
 }) {
   const { controller, session } = row;
   return (
@@ -173,6 +176,11 @@ function ControllerRow({
                 Runtime updates
               </Button>
             </>
+          )}
+          {session?.managedAccessAvailable && controller.trustState !== 'claimed' && (
+            <Button size="sm" variant="secondary" onPress={() => onRecover(session)}>
+              Managed SSH recovery
+            </Button>
           )}
           <Button size="sm" variant="danger" onPress={() => onRemove(controller)}>
             Remove
@@ -357,6 +365,12 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
         <Button variant="secondary" isPending={pending} onPress={() => void action('retry')}>
           Retry managed access
         </Button>
+      )}
+      {status.rolloutEnabled === false && (
+        <p role="status">
+          Managed enrolment and automatic updates are disabled pending FW31 qualification. Administrator recovery
+          remains available.
+        </p>
       )}
       <p className="wg:text-sm wg:text-muted">Physical FW31 qualification: unverified.</p>
       <Accordion>

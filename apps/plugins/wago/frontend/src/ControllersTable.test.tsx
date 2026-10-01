@@ -184,3 +184,23 @@ it('withdraws cached success when verification polling fails', async () => {
   expect(await screen.findByText('Verification status unavailable')).toBeTruthy();
   expect(screen.queryByText(/Enrollment complete/)).toBeNull();
 });
+
+it('keeps session recovery reachable when merged into an untrusted controller row', async () => {
+  getSessionStatus.mockResolvedValue({ management: 'recovery_required', sessionId: 7, update: null });
+  render(
+    <QueryClientProvider client={client}>
+      <ControllersTable
+        controllers={[{ ...controller, trustState: 'untrusted' }]}
+        sessions={[{ ...session, managedAccessAvailable: true }]}
+        onResume={vi.fn()}
+        onConfigure={vi.fn()}
+        onClaim={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Managed SSH recovery' }));
+  expect(await screen.findByText('Managed SSH needs attention')).toBeTruthy();
+  expect(getSessionStatus).toHaveBeenCalledWith(7);
+  expect(getUpdateStatus).not.toHaveBeenCalled();
+});

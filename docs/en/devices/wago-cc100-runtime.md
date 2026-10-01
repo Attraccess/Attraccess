@@ -413,3 +413,7 @@ Record evidence against [ATT-984](https://linear.app/attraccess/issue/ATT-984/va
 - [WAGO CC100 Docker lifecycle](https://github.com/WAGO/cc100-firmware-sdk/blob/main/ptxproj/projectroot/etc/config-tools/config_docker_home)
 - [WAGO direct onboard I/O access](https://github.com/WAGO/cc100-howtos/blob/main/HowTo_Access_Onboard_IO/README.md)
 - [WAGO CC100 serial interface feature detection](https://github.com/WAGO/cc100-firmware-sdk/blob/main/ptxproj/projectroot/etc/init.d/serial_features)
+
+### Qualification gate
+
+Managed enrolment, managed-access retry and automatic reconciliation are disabled by default. Commissioning delivery fails before remote preparation while disabled. The deployment environment must explicitly set `WAGO_MANAGED_RUNTIME_ENABLED=true` to enable them; keep it unset until FW31 recovery, SSH rejection, watchdog/reboot and repeated-update acceptance pass on an isolated bench controller. Existing encrypted recovery disclosure and bootstrap-restoration actions remain available when the rollout is disabled. Status includes `rolloutEnabled` so operators can distinguish a paused rollout from a pending update. Runtime heartbeats coalesce fleet reconciliation into at most one new scan per 30 seconds.

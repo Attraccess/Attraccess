@@ -674,6 +674,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     input: DeliveryInput = {},
     principal: CommissioningPrincipal | null = null,
   ): Promise<CommissioningSessionResponse> {
+    this.managedRuntime?.assertEnabled();
     return auditCommissioning(
       this.context,
       principal,

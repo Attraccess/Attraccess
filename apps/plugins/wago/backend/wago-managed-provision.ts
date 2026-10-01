@@ -12,7 +12,7 @@ function isolated(source: string, testRoot: string): string {
     .replaceAll('PATH=/usr/sbin:/usr/bin:/sbin:/bin', `PATH=${quote(testRoot + '/bin')}`)
     .replaceAll("root=''", `root=${quote(testRoot)}`)
     .replace(/\/(?:etc|home|usr\/(?:sbin|bin)|var\/run)(?=\/|\b)/g, (path, offset: number, whole: string) =>
-      whole.slice(0, offset).endsWith('$root') ? path : testRoot + path,
+      whole.slice(0, offset).endsWith('$root') || whole.slice(offset).startsWith(testRoot) ? path : testRoot + path,
     );
 }
 export const MANAGEMENT_USERNAME = 'attraccess';
@@ -35,8 +35,8 @@ restore_access() {
   cp "$base/dropbear.previous" /etc/init.d/dropbear.next
   chmod 0755 /etc/init.d/dropbear.next
   sync; mv /etc/init.d/dropbear.next /etc/init.d/dropbear; sync
-  rm -f "$base/cutover"
   /etc/init.d/dropbear restart 7>&-
+  rm -f "$base/cutover"; sync
 }
 if test "\${1:-}" = boot; then
   # Give the server a bounded opportunity to prove hardened access after reboot.
@@ -44,6 +44,9 @@ if test "\${1:-}" = boot; then
   if test -f "$base/cutover" && test ! -f "$base/committed"; then
     nohup "$base/watchdog" </dev/null >/dev/null 2>&1 &
   fi
+elif test "\${1:-}" = restore; then
+  exec 7>"$base/access.lock"; flock -w 30 7
+  restore_access
 elif test "\${1:-}" = runtime-boot; then
   tx=/var/lib/attraccess-wago-update-transaction
   if test -d "$tx" && test ! -L "$tx" && test "$(stat -c '%u:%g:%a' "$tx")" = 0:0:700; then
@@ -269,11 +272,11 @@ umask 077
 base=/etc/attraccess-wago-management
 exec 7>"$base/access.lock"; flock -w 30 7
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
-if test -f "$base/dropbear.previous"; then
-  touch "$base/cutover"
+if test -f "$base/cutover"; then
+  test -f "$base/dropbear.previous" && test ! -L "$base/dropbear.previous" || exit 1
   rm -f "$base/committed"
   sync
-  nohup "$base/watchdog" boot 7>&- </dev/null >/dev/null 2>&1 &
+  nohup sh -c 'sleep 2; exec "$1" restore' sh "$base/watchdog" 7>&- </dev/null >/dev/null 2>&1 &
 fi
 printf 'OK\\n'
 `,

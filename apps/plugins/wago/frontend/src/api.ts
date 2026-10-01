@@ -218,6 +218,7 @@ export const removeCommissioningSession = (id: number) =>
 export const removeController = (id: number) => api.request<void>(`/controllers/${id}`, { method: 'DELETE' });
 
 export interface RuntimeUpdateStatus {
+  rolloutEnabled: boolean;
   sessionId: number | null;
   management: 'pending' | 'verified' | 'managed' | 'recovery_required' | 'retiring' | 'retired' | 'reenrol_required';
   keyFingerprint: string | null;

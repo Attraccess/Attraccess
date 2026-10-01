@@ -67,6 +67,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   private timer?: ReturnType<typeof setInterval>;
   private destroyed = false;
   private scanning = false;
+  private nextScanAt = 0;
+  private readonly enabled = process.env.WAGO_MANAGED_RUNTIME_ENABLED === 'true';
   private rootProbe?: RootProbe;
   private retirementProbe?: RootProbe;
   private readonly connections = new Set<AbortController>();
@@ -117,6 +119,11 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     this.wake();
   }
 
+  assertEnabled(): void {
+    if (!this.enabled)
+      throw new ConflictException('Managed CC100 enrolment and updates are disabled pending FW31 qualification');
+  }
+
   registerRootProbe(probe: RootProbe): void {
     this.rootProbe = probe;
   }
@@ -142,6 +149,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     execute: (script: string) => Promise<string>,
     signal: AbortSignal,
   ): Promise<void> {
+    this.assertEnabled();
     const desired = await this.desired();
     let access = await this.loadSession(session.id);
     if (
@@ -250,6 +258,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       keyFingerprint: access?.keyFingerprint ?? null,
       update: row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null,
       physicalQualification: 'unverified' as const,
+      rolloutEnabled: this.enabled,
     };
   }
 
@@ -317,7 +326,16 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       if (!(await this.retirementProbe(access.host, access.fingerprint, password))) {
         await this.connection(access, `access-restore ${access.token}`, operation.signal);
         await new Promise((resolve) => setTimeout(resolve, 3000));
-        if (!(await this.rootProbe(access.host, access.fingerprint, password)))
+        const deadline = Date.now() + 30_000;
+        let restored = false;
+        while (!operation.signal.aborted && Date.now() < deadline) {
+          if (await this.rootProbe(access.host, access.fingerprint, password)) {
+            restored = true;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        if (!restored)
           throw new ConflictException('Bootstrap SSH restoration is unverified; retry administrator recovery');
         await this.operations.assertOwned(access.fingerprint, owner);
         await this.connection(access, `access-retire ${access.token}`, operation.signal).catch(() => undefined);
@@ -341,6 +359,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   async retryAccess(sessionId: number): Promise<void> {
+    this.assertEnabled();
     const access = await this.loadSession(sessionId);
     if (!access || ['retiring', 'retired'].includes(access.state))
       throw new ConflictException('Managed access cannot be retried');
@@ -464,7 +483,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   private wake() {
-    if (this.destroyed || this.scanning || !this.coordinator) return;
+    if (!this.enabled || this.destroyed || this.scanning || !this.coordinator || Date.now() < this.nextScanAt) return;
+    this.nextScanAt = Date.now() + 30_000;
     this.scanning = true;
     void this.scan()
       .catch(() => this.context.logger.warn('Managed CC100 reconciliation requires attention.'))
