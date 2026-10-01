@@ -139,6 +139,7 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
+      "inputs": ["default", "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"],
       "options": {
         "command": "vitest run --config apps/plugins/rabbitmq/frontend/vitest.config.ts"
       }

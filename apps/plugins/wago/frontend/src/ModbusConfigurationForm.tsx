@@ -380,7 +380,7 @@ export function ModbusProfileForm({
                 {
                   ...emptyFormat,
                   id: randomUUID(),
-                  name: t('modbus.defaultMeasurement'),
+                  name: 'Measurement',
                   functionCode: 3,
                   unit: 'watt',
                   kind: 'live',
@@ -462,7 +462,7 @@ export function ModbusProfileForm({
                 {
                   ...emptyFormat,
                   id: randomUUID(),
-                  name: t('modbus.defaultAction'),
+                  name: 'Switch',
                   functionCode: 5,
                   onValue: 1,
                   offValue: 0,
@@ -498,7 +498,10 @@ export function ModbusConfigurationForm({
   const profiles = [...BUILTIN_MODBUS_PROFILES, ...value.profiles];
   const items =
     section === 'profiles'
-      ? profiles.map((p) => ({ id: `${p.id}@${p.version}`, name: `${modbusDisplayName(p, p.name, tBackendMessage)} v${p.version}` }))
+      ? profiles.map((p) => ({
+          id: `${p.id}@${p.version}`,
+          name: `${modbusDisplayName(p, p.name, tBackendMessage)} v${p.version}`,
+        }))
       : section === 'devices'
         ? value.devices
         : value.connections.map((c, i) => ({
@@ -782,7 +785,11 @@ export function ModbusConfigurationForm({
                 <Select.Popover>
                   <ListBox>
                     {profiles.map((p) => (
-                      <ListBox.Item key={`${p.id}@${p.version}`} id={`${p.id}@${p.version}`} textValue={modbusDisplayName(p, p.name, tBackendMessage)}>
+                      <ListBox.Item
+                        key={`${p.id}@${p.version}`}
+                        id={`${p.id}@${p.version}`}
+                        textValue={modbusDisplayName(p, p.name, tBackendMessage)}
+                      >
                         {modbusDisplayName(p, p.name, tBackendMessage)} v{p.version}
                         <ListBox.ItemIndicator />
                       </ListBox.Item>
@@ -813,7 +820,7 @@ export function ModbusConfigurationForm({
                 ...value.devices,
                 {
                   id: randomUUID(),
-                  name: t('modbus.device'),
+                  name: 'Modbus device',
                   connectionId: value.connections[0]?.id ?? '',
                   unitId: 1,
                   profileId: profiles[0].id,
@@ -882,7 +889,7 @@ export function ModbusConfigurationForm({
               ...value,
               profiles: [
                 ...value.profiles,
-                { id: randomUUID(), name: t('modbus.customProfile'), version: 1, measurements: [], actions: [] },
+                { id: randomUUID(), name: 'Custom profile', version: 1, measurements: [], actions: [] },
               ],
             })
           }

@@ -19,17 +19,14 @@ export function ConfigurationErrors({
   snapshot: WagoConfigurationSnapshot;
   names: Record<string, string>;
 }) {
-  const { t, tBackendMessage } = useWagoTranslations();
-  names = configurationNames(snapshot, names, t, tBackendMessage);
+  const { t, tBackendMessage, tValidationMessage } = useWagoTranslations();
+  const labels = configurationNames(snapshot, names, t, tBackendMessage);
   return (
     <ul>
       {errors.map((error, index) => (
         <li key={error.path + error.code + index}>
-          {changeLabel({ path: error.path, previous: undefined, current: undefined }, snapshot, snapshot, names, t)}:{' '}
-          {Object.entries(names).reduce(
-            (message, [id, name]) => message.replaceAll(id, name),
-            tBackendMessage(error.message),
-          )}
+          {changeLabel({ path: error.path, previous: undefined, current: undefined }, snapshot, snapshot, labels, t)}:{' '}
+          {tValidationMessage(error.message, names)}
         </li>
       ))}
     </ul>
@@ -116,7 +113,12 @@ export function ConfigurationMetadataChanges({
 
 function readableMetadataValue(path: string, value: unknown, names: Record<string, string>, t: TFunction) {
   if (path.startsWith('$.names.') && typeof value === 'string') return value;
-  return readableValue(value, names, t);
+  const field =
+    path
+      .split('.')
+      .at(-1)
+      ?.replace(/\[\d+\]$/, '') ?? '';
+  return readableValue(value, names, t, field);
 }
 
 function metadataChangeLabel(path: string, names: Record<string, string>, t: TFunction) {

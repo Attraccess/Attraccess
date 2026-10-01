@@ -117,6 +117,19 @@ export function readableValue(
   if (typeof value === 'object') {
     if (
       context &&
+      'profileId' in value &&
+      typeof value.profileId === 'string' &&
+      'profileVersion' in value &&
+      typeof value.profileVersion === 'number'
+    )
+      context = {
+        ...context,
+        profile: [...BUILTIN_MODBUS_PROFILES, ...(context.modbus?.profiles ?? [])].find(
+          (profile) => profile.id === value.profileId && profile.version === value.profileVersion,
+        ),
+      };
+    if (
+      context &&
       'hardwareProfile' in value &&
       'modbus' in value &&
       value.modbus &&
@@ -142,15 +155,30 @@ export function readableValue(
       .join('; ');
   }
   if (typeof value === 'string') {
+    if (field === 'id') return value;
     if (context && (field === 'measurementId' || field === 'actionId')) {
       if (context.metadataNames[value]) return context.metadataNames[value];
       const entries = field === 'measurementId' ? context.profile?.measurements : context.profile?.actions;
       const entry = entries?.find((item) => item.id === value);
       return entry && context.profile ? modbusDisplayName(context.profile, entry.name, context.translateName) : value;
     }
-    if (names[value]) return names[value];
     // Only localize application-defined choices, never identifiers or user text.
-    if (field === 'profile') return presetDisplayName(value, t);
+    if (field === 'profile' || field === 'presetId') return presetDisplayName(value, t);
+    if (context && ['connectionId', 'deviceId', 'profileId'].includes(field)) {
+      if (context.metadataNames[value]) return context.metadataNames[value];
+      if (field === 'deviceId') return context.modbus?.devices.find((device) => device.id === value)?.name ?? value;
+      if (field === 'profileId') {
+        const profile =
+          context.profile?.id === value
+            ? context.profile
+            : [...BUILTIN_MODBUS_PROFILES, ...(context.modbus?.profiles ?? [])].find((item) => item.id === value);
+        return profile ? modbusDisplayName(profile, profile.name, context.translateName) : value;
+      }
+      const index = context.modbus?.connections.findIndex((connection) => connection.id === value) ?? -1;
+      return index < 0 ? value : t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`;
+    }
+    if (['physicalPointId', 'channelId', 'channelIds'].includes(field))
+      return (context?.metadataNames ?? names)[value] ?? value;
     const choiceCatalog = ['unit', 'kind', 'parity', 'byteOrder', 'wordOrder'].includes(field)
       ? { prefix: 'modbus.options', values: englishModbus.options }
       : field === 'mode' || field === 'expected'
@@ -191,6 +219,9 @@ export function readableChangeValue(
       ? snapshot?.physicalPoints[Number(pointPath[1])]
       : snapshot?.physicalPoints.find((item) => item.id === decodeURIComponent(pointPath[2])));
   if (physicalPoint?.modbus) context.profile = profileForDevice(context.modbus, physicalPoint.modbus.deviceId);
+  const devicePath = path.match(/^(?:\$\.)?modbus\.devices\[(\d+)\]/);
+  const device = devicePath && context.modbus?.devices[Number(devicePath[1])];
+  if (device) context.profile = profileForDevice(context.modbus, device.id);
   const field =
     path
       .split('.')

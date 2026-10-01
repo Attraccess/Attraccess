@@ -2,6 +2,7 @@ import { Button, Card } from '@heroui/react';
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { useWagoDiagnostics, type WagoDiagnostics } from './diagnostics';
 import { useWagoTranslations } from './i18n';
+import { presetDisplayName } from './configuration-model';
 
 function useDiagnosticsClock() {
   const [now, setNow] = useState(Date.now);
@@ -178,7 +179,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                 <Card.Title>{channel.id}</Card.Title>
                 <Card.Description>
                   {t('diagnostics.preset', {
-                    preset: channel.profile,
+                    preset: presetDisplayName(channel.profile, t),
                     capabilities: channel.capabilities.map(tBackendMessage).join(', '),
                   })}
                 </Card.Description>

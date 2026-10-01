@@ -29,17 +29,43 @@ const serverMessagesEn = Object.fromEntries(Object.keys(serverMessagesDe).map((m
 
 // Recognize only templates emitted by our legacy API. Captured identifiers and
 // values remain data; the surrounding message follows the core language.
-const serverMessagePatterns = [
-  { pattern: /^Uploading runtime bundle: (\d+(?:\.\d+)?)%\.$/, key: 'Uploading runtime bundle: {{percent}}%.', parameters: ['percent'] },
+const serverMessagePatterns: {
+  pattern: RegExp;
+  key: string;
+  parameters: string[];
+  referenceParameter?: string;
+}[] = [
+  {
+    pattern: /^Uploading runtime bundle: (\d+(?:\.\d+)?)%\.$/,
+    key: 'Uploading runtime bundle: {{percent}}%.',
+    parameters: ['percent'],
+  },
   { pattern: /^version must be (\d+)$/, key: 'version must be {{version}}', parameters: ['version'] },
   { pattern: /^duplicate id (.+)$/, key: 'duplicate id {{id}}', parameters: ['id'] },
   { pattern: /^must be one of: (.+)$/, key: 'must be one of: {{values}}', parameters: ['values'] },
   { pattern: /^duplicate capability (.+)$/, key: 'duplicate capability {{capability}}', parameters: ['capability'] },
   { pattern: /^(.+) must be an (array|object)$/, key: '{{path}} must be an {{type}}', parameters: ['path', 'type'] },
-  { pattern: /^(logical channel|physical point) (.*) does not exist in this snapshot$/, key: '{{type}} {{id}} does not exist in this snapshot', parameters: ['type', 'id'] },
-  { pattern: /^(D[IO]\d+) requires an (input|output) channel$/, key: '{{terminal}} requires an {{direction}} channel', parameters: ['terminal', 'direction'] },
-  { pattern: /^configure (pulse|guard|feedback|measurement) settings for this capability$/, key: 'configure {{capability}} settings for this capability', parameters: ['capability'] },
-  { pattern: /^(.+); controller (.+); application (.+); skew (.+)s; action (.+)\.$/, key: '{{result}}; controller {{controller}}; application {{application}}; skew {{skew}}s; action {{action}}.', parameters: ['result', 'controller', 'application', 'skew', 'action'] },
+  {
+    pattern: /^(logical channel|physical point) (.*) does not exist in this snapshot$/,
+    key: '{{type}} {{id}} does not exist in this snapshot',
+    parameters: ['type', 'id'],
+    referenceParameter: 'id',
+  },
+  {
+    pattern: /^(D[IO]\d+) requires an (input|output) channel$/,
+    key: '{{terminal}} requires an {{direction}} channel',
+    parameters: ['terminal', 'direction'],
+  },
+  {
+    pattern: /^configure (pulse|guard|feedback|measurement) settings for this capability$/,
+    key: 'configure {{capability}} settings for this capability',
+    parameters: ['capability'],
+  },
+  {
+    pattern: /^(.+); controller (.+); application (.+); skew (.+)s; action (.+)\.$/,
+    key: '{{result}}; controller {{controller}}; application {{application}}; skew {{skew}}s; action {{action}}.',
+    parameters: ['result', 'controller', 'application', 'skew', 'action'],
+  },
 ];
 
 export const wagoTranslations = {
@@ -75,19 +101,32 @@ export const wagoTranslations = {
 
 export const useWagoTranslations = () => {
   const translations = useTranslations(wagoTranslations, { escapeValues: false });
-  const tBackendMessage = (message: string | null | undefined) => {
+  const translateBackendMessage = (message: string | null | undefined, referenceNames?: Record<string, string>) => {
     if (!message) return '';
-    for (const { pattern, key, parameters } of serverMessagePatterns) {
+    for (const { pattern, key, parameters, referenceParameter } of serverMessagePatterns) {
       const match = message.match(pattern);
       if (!match) continue;
-      const data = Object.fromEntries(parameters.map((parameter, index) => {
-        const value = match[index + 1];
-        const label = ['type', 'direction', 'capability', 'result', 'action'].includes(parameter);
-        return [parameter, label && translations.tExists(value) ? translations.t(value) : value];
-      }));
+      const data = Object.fromEntries(
+        parameters.map((parameter, index) => {
+          const value = match[index + 1];
+          const label = ['type', 'direction', 'capability', 'result', 'action'].includes(parameter);
+          return [
+            parameter,
+            parameter === referenceParameter && referenceNames?.[value]
+              ? referenceNames[value]
+              : label && translations.tExists(value)
+                ? translations.t(value)
+                : value,
+          ];
+        }),
+      );
       return translations.t(key, data);
     }
     return translations.tExists(message) ? translations.t(message) : message;
   };
-  return { ...translations, tBackendMessage };
+  return {
+    ...translations,
+    tBackendMessage: (message: string | null | undefined) => translateBackendMessage(message),
+    tValidationMessage: translateBackendMessage,
+  };
 };

@@ -246,6 +246,9 @@ describe('visual configuration workflow', () => {
     await section(userEvent.setup(), 'Diagnostics');
     expect(await screen.findByText(/Permanent heartbeat:.*\(fresh\)/)).toBeInTheDocument();
     expect(screen.getByText('Capabilities: input, measurement, vendor.capability-v2')).toBeInTheDocument();
+    expect(
+      screen.getByText('Setup preset: Generic digital output · Capabilities: output, pulse, vendor.channel-v2'),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Latest output:/)).toBeInTheDocument();
     expect(screen.getByText(/Latest measurement: 12.4 volt live/)).toBeInTheDocument();
     expect(screen.getByText('Safe state: off (runtime default). Disconnect: hold.')).toBeInTheDocument();
@@ -254,6 +257,11 @@ describe('visual configuration workflow', () => {
     expect(screen.getByText(/Quellzeit:.*\(Veraltet\)/)).toBeInTheDocument();
     expect(screen.getByText('Funktionen: Eingang, Messwert, vendor.capability-v2')).toBeInTheDocument();
     expect(screen.getByText(/Funktionen: Ausgang, Impuls, vendor.channel-v2/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Einrichtungsvorlage: Allgemeiner digitaler Ausgang · Funktionen: Ausgang, Impuls, vendor.channel-v2',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Letzter Wert für Ausgang:/)).toBeInTheDocument();
     expect(screen.getByText(/Letzter Wert für Messwert: 12.4 Volt Aktuell/)).toBeInTheDocument();
     expect(screen.getByText(/nicht aktuell: Konfigurationsabweichung/)).toBeInTheDocument();
