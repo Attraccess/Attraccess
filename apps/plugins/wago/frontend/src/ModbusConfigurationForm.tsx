@@ -380,7 +380,7 @@ export function ModbusProfileForm({
                 {
                   ...emptyFormat,
                   id: randomUUID(),
-                  name: 'Measurement',
+                  name: t('modbus.defaultMeasurement'),
                   functionCode: 3,
                   unit: 'watt',
                   kind: 'live',
@@ -462,7 +462,7 @@ export function ModbusProfileForm({
                 {
                   ...emptyFormat,
                   id: randomUUID(),
-                  name: 'Switch',
+                  name: t('modbus.defaultAction'),
                   functionCode: 5,
                   onValue: 1,
                   offValue: 0,

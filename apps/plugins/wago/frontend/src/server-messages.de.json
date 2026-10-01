@@ -1,4 +1,6 @@
 {
+  "Pulsed behavior requires output and pulse capabilities and a positive integer durationMs.": "Für Impulse sind die Fähigkeiten Ausgang und Impuls sowie eine positive ganzzahlige Impulsdauer in Millisekunden erforderlich.",
+  "invert requires a boolean and an input channel": "Die Invertierung benötigt einen booleschen Wert und einen Eingangskanal",
   "Channel behavior or physical assignment changed. Existing flow commands may behave differently.": "Kanalverhalten oder physische Zuordnung geändert. Vorhandene Ablaufbefehle können sich anders verhalten.",
   "Channel removed. Existing flow references may fail.": "Kanal entfernt. Vorhandene Ablaufreferenzen können fehlschlagen.",
   "An input used by this channel as a guard or feedback changed.": "Ein von diesem Kanal als Freigabebedingung oder Rückmeldung verwendeter Eingang wurde geändert.",

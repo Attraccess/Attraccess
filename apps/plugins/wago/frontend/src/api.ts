@@ -216,6 +216,19 @@ export const removeCommissioningSession = (id: number) =>
   api.request<void>(`/commissioning/sessions/${id}`, { method: 'DELETE' });
 export const removeController = (id: number) => api.request<void>(`/controllers/${id}`, { method: 'DELETE' });
 
+export interface ManualCommand {
+  channelId: string;
+  action: 'set' | 'pulse' | 'release';
+  value?: boolean;
+  expectedConfigurationRevision: number;
+  acknowledgementTimeoutSeconds: number;
+}
+export const manualCommand = (id: number, command: ManualCommand) =>
+  api.request<{ result: 'acknowledged' | 'rejected' | 'timeout' | 'transport_failure' }>(
+    `/controllers/${id}/commands`,
+    { method: 'POST', body: command },
+  );
+
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);
 export const getConfigurationBaseline = (id: number) =>

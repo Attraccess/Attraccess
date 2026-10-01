@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { ConfigurationEditor } from './ConfigurationEditor';
+import { FrontPanel } from './front-panel/FrontPanel';
 import { useWagoTranslations } from './i18n';
 
 export function ConfigurationPage() {
@@ -9,11 +9,11 @@ export function ConfigurationPage() {
   const id = Number(controllerId);
   if (!Number.isSafeInteger(id) || id < 1) return <p role="alert">{t('configuration.invalidController')}</p>;
   return (
-    <ConfigurationEditor
+    <FrontPanel
+      key={id}
       controllerId={id}
-      onOpenChange={(open) => {
-        if (!open) navigate('/wago');
-      }}
+      onClose={() => navigate('/wago')}
+      onHistory={() => navigate(`/wago/controllers/${id}/configuration/history`)}
     />
   );
 }

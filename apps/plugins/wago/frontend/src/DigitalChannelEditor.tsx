@@ -54,12 +54,14 @@ export function NumericField({
   value,
   onChange,
   min,
+  max,
   integer = true,
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
+  max?: number;
   integer?: boolean;
 }) {
   return (
@@ -68,6 +70,7 @@ export function NumericField({
       <Input
         type="number"
         min={min}
+        max={max}
         step={integer ? 1 : 'any'}
         value={Number.isFinite(value) ? String(value) : ''}
         onChange={(event) => onChange(event.target.value === '' ? NaN : Number(event.target.value))}

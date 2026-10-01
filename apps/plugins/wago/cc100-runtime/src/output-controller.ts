@@ -135,6 +135,7 @@ export class OutputController {
     onCommitted?: () => void,
     admit?: () => void,
     pulseDuration?: number,
+    ownership?: 'manual' | 'flow',
   ): Promise<boolean> {
     const configurationGeneration = this.configurationGeneration;
     const point = this.options.getSnapshot()?.physicalPoints.find((item) => item.id === channel.physicalPointId);
@@ -148,6 +149,7 @@ export class OutputController {
       configurationGeneration,
       admit,
       pulseDuration,
+      ownership,
     );
   }
 
@@ -160,6 +162,7 @@ export class OutputController {
     configurationGeneration = this.configurationGeneration,
     admit?: () => void,
     pulseDuration?: number,
+    ownership?: 'manual' | 'flow',
   ): Promise<boolean> {
     this.uncertainWrites.delete(channel.id);
     const state = this.options.getState();
@@ -196,6 +199,13 @@ export class OutputController {
     }
     onWritten?.();
     this.options.getState().outputs = { ...this.options.getState().outputs, [channel.id]: value };
+    // Output value and its command owner must share the same durable commit.
+    // Safety shutoffs omit ownership so they do not pretend a flow took over.
+    if (ownership !== undefined)
+      state.manualOutputChannelIds = [
+        ...(state.manualOutputChannelIds ?? []).filter((id) => id !== channel.id),
+        ...(ownership === 'manual' ? [channel.id] : []),
+      ];
     // Feedback follows confirmed hardware state. Disk persistence may stall while a
     // pulse shuts off; the old ON check must not survive that physical transition.
     if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);
@@ -231,7 +241,8 @@ export class OutputController {
     const guardPoint = snapshot?.physicalPoints.find((item) => item.id === guardChannel?.physicalPointId);
     if (!guardPoint) return false;
     try {
-      return Boolean(await this.options.device.read(guardPoint)) === (channel.guard.when === 'on');
+      const value = Boolean(await this.options.device.read(guardPoint));
+      return (guardChannel?.invert ? !value : value) === (channel.guard.when === 'on');
     } catch {
       return false;
     }
@@ -379,7 +390,8 @@ export class OutputController {
       ?.physicalPoints.find((item) => item.id === feedbackChannel?.physicalPointId);
     if (!channel.feedback || !point) return;
     try {
-      const actual = Boolean(await this.options.device.read(point));
+      const readValue = Boolean(await this.options.device.read(point));
+      const actual = feedbackChannel?.invert ? !readValue : readValue;
       const expected = channel.feedback.expected === 'match' ? value : !value;
       if (actual !== expected && this.isCurrentFeedback(channel.id, generation, configurationGeneration))
         await this.options.publishFault(channel.id, {
