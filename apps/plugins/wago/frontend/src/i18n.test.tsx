@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useWagoTranslations, wagoTranslations } from './i18n';
+import { pulseBehaviorError } from '../../channel-behavior';
 // Integration test: verify the independent plugin catalogs against the same host language store.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { useShellyTranslations } from '../../../shelly/frontend/src/i18n';
@@ -641,6 +642,16 @@ it.each([
   expect(result.current.tExists(failure)).toBe(true);
   expect(result.current.tBackendMessage(failure)).not.toBe(failure);
   expect(result.current.tBackendMessage('unknown failure <controller>')).toBe('unknown failure <controller>');
+});
+
+it('translates the actual shared pulse validation message through the host language store', () => {
+  const message = pulseBehaviorError(['output', 'pulse'], { durationMs: 0 });
+  const { result } = renderHook(() => useWagoTranslations());
+  expect(result.current.tValidationMessage(message)).toBe(message);
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(result.current.tValidationMessage(message)).toBe(
+    'Für Impulse sind die Fähigkeiten Ausgang und Impuls sowie eine positive ganzzahlige Impulsdauer in Millisekunden erforderlich.',
+  );
 });
 
 it('translates runtime failures and protocol compatibility while preserving their identifiers and measurements', () => {

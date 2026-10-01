@@ -76,7 +76,7 @@ export function OnboardCard({
   editTerminal: (terminal: Terminal) => void;
   editBus: () => void;
 }) {
-  const { t } = useWagoTranslations();
+  const { t, language } = useWagoTranslations();
   const bus = busConnection(configuration.snapshot);
   return (
     <Card className="wg:min-w-0">
@@ -129,7 +129,11 @@ export function OnboardCard({
                   <p className="wg:pointer-events-none wg:break-words wg:font-medium">{name || t('panel.unused')}</p>
                   <p className="wg:pointer-events-none wg:mt-auto wg:text-xs wg:text-muted">
                     {outputBehavior(applied || channel || { capabilities: [] }) === 'pulsed'
-                      ? t('panel.pulseSummary', { seconds: ((applied || channel)?.pulse?.durationMs ?? 0) / 1000 })
+                      ? t('panel.pulseSummary', {
+                          seconds: new Intl.NumberFormat(language).format(
+                            ((applied || channel)?.pulse?.durationMs ?? 0) / 1000,
+                          ),
+                        })
                       : t('panel.switched')}{' '}
                     · {t(manual ? 'panel.manual' : 'panel.flow')}
                   </p>
