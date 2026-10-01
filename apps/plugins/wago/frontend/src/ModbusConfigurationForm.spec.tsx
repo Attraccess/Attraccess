@@ -14,7 +14,7 @@ afterEach(() => {
   useTranslationState.setState({ language: 'en' });
 });
 
-it('creates language-independent default names from a German form and preserves later user edits', async () => {
+it('creates localized signal defaults from a German form and preserves later user edits', async () => {
   useTranslationState.setState({ language: 'de' });
   let latest: ModbusConfiguration = { connections: [], devices: [], profiles: [] };
   function Editor() {
@@ -39,9 +39,9 @@ it('creates language-independent default names from a German form and preserves 
     .find((button) => !button.hasAttribute('disabled'));
   if (!actionButton) throw new Error('Missing editable custom profile');
   await user.click(actionButton);
-  expect(latest.profiles[0].measurements[0].name).toBe('Measurement');
-  expect(latest.profiles[0].actions[0].name).toBe('Switch');
-  const name = screen.getByDisplayValue('Measurement');
+  expect(latest.profiles[0].measurements[0].name).toBe(germanModbus.defaultMeasurement);
+  expect(latest.profiles[0].actions[0].name).toBe(germanModbus.defaultAction);
+  const name = screen.getByDisplayValue(germanModbus.defaultMeasurement);
   await user.clear(name);
   await user.type(name, 'My reading');
   const saved = JSON.stringify(latest);
