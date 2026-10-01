@@ -121,7 +121,7 @@ function ControllerRow({
   onResume: (session: CommissioningSession) => void;
   onShowRuntimeUpdate: (controller: WagoController) => void;
 }) {
-  const { t, language } = useWagoTranslations();
+  const { t, language, tBackendMessage } = useWagoTranslations();
   const { controller, session } = row;
   return (
     <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-primary/5' : undefined}>
@@ -143,7 +143,7 @@ function ControllerRow({
           {controller.protocolVersion} / {controller.runtimeVersion}
         </div>
         {controller.compatibilityError && (
-          <p className="wg:mt-1 wg:text-xs wg:text-danger">{controller.compatibilityError}</p>
+          <p className="wg:mt-1 wg:text-xs wg:text-danger">{tBackendMessage(controller.compatibilityError)}</p>
         )}
       </TableCell>
       <TableCell className="wg:hidden wg:lg:table-cell">
@@ -283,7 +283,7 @@ function CommissioningRow({
 }
 
 function CommissioningStatus({ session }: { session: CommissioningSession }) {
-  const { t } = useWagoTranslations();
+  const { t, tBackendMessage } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   const label = verification.enrollmentComplete
     ? verification.runtimeVerified
@@ -295,7 +295,7 @@ function CommissioningStatus({ session }: { session: CommissioningSession }) {
   return (
     <span className="wg:mt-1 wg:text-xs wg:text-primary">
       {label}
-      {session.failureReason ? `: ${session.failureReason}` : ''}
+      {session.failureReason ? `: ${tBackendMessage(session.failureReason)}` : ''}
     </span>
   );
 }

@@ -46,6 +46,27 @@ const serverMessagePatterns: {
   { pattern: /^duplicate id (.+)$/, key: 'duplicate id {{id}}', parameters: ['id'] },
   { pattern: /^must be one of: (.+)$/, key: 'must be one of: {{values}}', parameters: ['values'] },
   { pattern: /^duplicate capability (.+)$/, key: 'duplicate capability {{capability}}', parameters: ['capability'] },
+  {
+    pattern: /^Protocol version "(.+)" is invalid; install a CC100 runtime using protocol (\d+)\.x\.$/,
+    key: 'Protocol version "{{version}}" is invalid; install a CC100 runtime using protocol {{major}}.x.',
+    parameters: ['version', 'major'],
+  },
+  {
+    pattern: /^Protocol (.+) is incompatible; this plugin supports protocol (\d+)\.x\.$/,
+    key: 'Protocol {{version}} is incompatible; this plugin supports protocol {{major}}.x.',
+    parameters: ['version', 'major'],
+  },
+  {
+    pattern: /^Controller is missing required capabilities: (.+)\. Update the CC100 runtime\.$/,
+    key: 'Controller is missing required capabilities: {{capabilities}}. Update the CC100 runtime.',
+    parameters: ['capabilities'],
+  },
+  {
+    pattern:
+      /^Runtime delivery failed: (remote-exit|local-timeout|operation-aborted), SSH exit (unknown|\d+), (\d+)s elapsed\. (.+)\. Use reviewed recovery before retrying\.$/,
+    key: 'Runtime delivery failed: {{termination}}, SSH exit {{code}}, {{seconds}}s elapsed. {{reason}}. Use reviewed recovery before retrying.',
+    parameters: ['termination', 'code', 'seconds', 'reason'],
+  },
   { pattern: /^(.+) must be an (array|object)$/, key: '{{path}} must be an {{type}}', parameters: ['path', 'type'] },
   {
     pattern: /^(logical channel|physical point) (.*) does not exist in this snapshot$/,
@@ -113,7 +134,9 @@ export const useWagoTranslations = () => {
       const data = Object.fromEntries(
         parameters.map((parameter, index) => {
           const value = match[index + 1];
-          const label = ['type', 'direction', 'capability', 'result', 'action'].includes(parameter);
+          const label = ['type', 'direction', 'capability', 'result', 'action', 'termination', 'reason'].includes(
+            parameter,
+          );
           return [
             parameter,
             parameter === referenceParameter && referenceNames?.[value]

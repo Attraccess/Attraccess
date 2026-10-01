@@ -137,7 +137,7 @@ it.each(['codesys-active', 'codesys-boot-enabled', 'output-container-conflict'])
   },
 );
 
-it.each(['Free space on the CC100, then retry installation.', 'unknown failure <controller>'])(
+it.each(['Commissioning was interrupted.', 'unknown failure <controller>'])(
   'switches saved failure feedback and UTC clock formatting without inspecting again: %s',
   (failureReason) => {
     const hostUtc = '2026-09-22T10:00:00Z';
@@ -165,12 +165,10 @@ it.each(['Free space on the CC100, then retry installation.', 'unknown failure <
     expect(
       screen.getByText(new Date(hostUtc).toLocaleString('de', { timeZone: 'UTC', timeZoneName: 'short' })),
     ).toBeTruthy();
-    expect(screen.getByText('unavailable')).toBeTruthy();
+    expect(screen.getByText('Nicht verfügbar')).toBeTruthy();
     expect(
       screen.getByText(
-        failureReason.startsWith('Free space')
-          ? 'Gib Speicherplatz auf dem CC100 frei und versuche die Installation erneut.'
-          : failureReason,
+        failureReason === 'Commissioning was interrupted.' ? 'Die Inbetriebnahme wurde unterbrochen.' : failureReason,
       ),
     ).toBeTruthy();
     expect(requests).toHaveLength(0);
