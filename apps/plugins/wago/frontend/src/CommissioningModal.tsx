@@ -1087,7 +1087,7 @@ function DeliveryStep({
 }
 
 function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
-  const { t } = useWagoTranslations();
+  const { t, tBackendMessage } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   const complete =
     verification.enrollmentComplete ||
@@ -1113,7 +1113,7 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Description>{session.failureReason}</Alert.Description>
+            <Alert.Description>{tBackendMessage(session.failureReason)}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}
@@ -1247,7 +1247,7 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>{t('commissioningUI.deliveryError')}</Alert.Title>
-            <Alert.Description>{session.failureReason}</Alert.Description>
+            <Alert.Description>{tBackendMessage(session.failureReason)}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}

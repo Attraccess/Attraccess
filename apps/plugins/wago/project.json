@@ -55,6 +55,7 @@
       "cache": true,
       "inputs": [
         "{projectRoot}/frontend/**/*",
+        "{projectRoot}/backend/**/*",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/channel-behavior.ts",
         "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*",
