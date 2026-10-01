@@ -135,6 +135,7 @@ export class OutputController {
     onCommitted?: () => void,
     admit?: () => void,
     pulseDuration?: number,
+    ownership?: 'manual' | 'flow',
   ): Promise<boolean> {
     const configurationGeneration = this.configurationGeneration;
     const point = this.options.getSnapshot()?.physicalPoints.find((item) => item.id === channel.physicalPointId);
@@ -148,6 +149,7 @@ export class OutputController {
       configurationGeneration,
       admit,
       pulseDuration,
+      ownership,
     );
   }
 
@@ -160,6 +162,7 @@ export class OutputController {
     configurationGeneration = this.configurationGeneration,
     admit?: () => void,
     pulseDuration?: number,
+    ownership?: 'manual' | 'flow',
   ): Promise<boolean> {
     this.uncertainWrites.delete(channel.id);
     const state = this.options.getState();
@@ -196,6 +199,13 @@ export class OutputController {
     }
     onWritten?.();
     this.options.getState().outputs = { ...this.options.getState().outputs, [channel.id]: value };
+    // Output value and its command owner must share the same durable commit.
+    // Safety shutoffs omit ownership so they do not pretend a flow took over.
+    if (ownership !== undefined)
+      state.manualOutputChannelIds = [
+        ...(state.manualOutputChannelIds ?? []).filter((id) => id !== channel.id),
+        ...(ownership === 'manual' ? [channel.id] : []),
+      ];
     // Feedback follows confirmed hardware state. Disk persistence may stall while a
     // pulse shuts off; the old ON check must not survive that physical transition.
     if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);

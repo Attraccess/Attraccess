@@ -502,6 +502,7 @@ export class WagoRuntime {
               undefined,
               admit,
               currentDuration,
+              command.source === 'manual' ? 'manual' : 'flow',
             ))
           )
             return this.releaseFailedWrite(command.id, currentChannel.id);
@@ -512,19 +513,11 @@ export class WagoRuntime {
             undefined,
             () => this.outputs.clearPulse(currentChannel.id),
             admit,
+            undefined,
+            command.source === 'manual' ? 'manual' : 'flow',
           ))
         )
           return this.releaseFailedWrite(command.id, currentChannel.id);
-        if (command.source === 'manual' || this.state.manualOutputChannelIds?.includes(currentChannel.id)) {
-          this.state.manualOutputChannelIds = [
-            ...new Set([
-              ...(this.state.manualOutputChannelIds ?? []).filter((id) => id !== currentChannel.id),
-              ...(command.source === 'manual' ? [currentChannel.id] : []),
-            ]),
-          ];
-          await this.saveState();
-          this.requestStatePublication();
-        }
         return undefined;
       });
       // Release the physical channel/configuration barrier before waiting on MQTT.

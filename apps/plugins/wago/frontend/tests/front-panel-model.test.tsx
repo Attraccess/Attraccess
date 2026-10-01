@@ -26,6 +26,36 @@ function required<T>(value: T | null | undefined): T {
 }
 
 describe('front panel configuration', () => {
+  it('refreshes provisional device labels while preserving customized and unrelated channel names', () => {
+    let configuration = addDevice(empty(), 'Existing meter').configuration;
+    const existingNames = { ...configuration.metadata.names };
+    const added = addDevice(configuration, 'New Modbus device');
+    configuration = added.configuration;
+    const device = required(configuration.snapshot.modbus).devices.find((item) => item.id === added.id);
+    const profile = BUILTIN_MODBUS_PROFILES[0];
+    const points = configuration.snapshot.physicalPoints.filter((point) => point.modbus?.deviceId === added.id);
+    const customized = required(
+      configuration.snapshot.logicalChannels.find((channel) => channel.physicalPointId === points[0].id),
+    );
+    configuration.metadata.names[customized.id] = 'Operator custom label';
+    const next = saveDevice(
+      configuration,
+      { ...required(device), name: 'Workshop meter' },
+      busConnection(configuration.snapshot),
+      profile,
+    );
+    expect(next.snapshot.logicalChannels).toEqual(configuration.snapshot.logicalChannels);
+    for (const point of points) {
+      const channel = required(next.snapshot.logicalChannels.find((item) => item.physicalPointId === point.id));
+      const register = required(profile.measurements.find((item) => item.id === point.modbus?.measurementId));
+      expect(next.metadata.names[channel.id]).toBe(
+        channel.id === customized.id ? 'Operator custom label' : `Workshop meter · ${register.name}`.slice(0, 120),
+      );
+    }
+    for (const [id, name] of Object.entries(existingNames)) expect(next.metadata.names[id]).toBe(name);
+    expect(validateEditorSnapshot(next.snapshot)).toEqual([]);
+  });
+
   it('preserves measurement calibration on both edited and unrelated devices', () => {
     let configuration = addDevice(empty(), 'First meter').configuration;
     configuration = addDevice(configuration, 'Second meter').configuration;
