@@ -7,7 +7,7 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
         message(FATAL_ERROR "ATTRACTAP_DEFINES not set — build via the top-level project so a variant file is loaded")
     endif()
 
-    file(GLOB_RECURSE ATTRACTAP_SRCS
+    file(GLOB_RECURSE ATTRACTAP_SRCS CONFIGURE_DEPENDS
          "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
          "${CMAKE_CURRENT_LIST_DIR}/../src/*.c")
 
