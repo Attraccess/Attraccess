@@ -1,8 +1,8 @@
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
-import { useTranslationState } from '@attraccess/plugins-frontend-ui';
+import { act, render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ControllersTable } from './ControllersTable';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import type { CommissioningSession, CommissioningVerification, WagoController } from './api';
 
 const getVerification = vi.hoisted(() => vi.fn());
@@ -53,6 +53,7 @@ beforeEach(() => {
 afterEach(() => {
   useTranslationState.setState({ language: 'en' });
   cleanup();
+  useTranslationState.setState({ language: 'en' });
   client.clear();
   vi.clearAllMocks();
 });
@@ -267,4 +268,19 @@ it('can transition between empty and populated collections without changing hook
   expect(screen.getByText('Fixture')).toBeTruthy();
   rerender(<ControllersTable {...props} controllers={[]} />);
   expect(screen.getByText('No controllers or commissioning sessions yet.')).toBeTruthy();
+});
+
+it('translates recognized saved failures on mounted controller rows while retaining unknown text', async () => {
+  const reason = 'Commissioning was interrupted.';
+  session.failureReason = reason;
+  try {
+    mount();
+    await screen.findByText(`Enrollment complete · runtime verified: ${reason}`);
+    const count = getVerification.mock.calls.length;
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText(/Die Inbetriebnahme wurde unterbrochen/)).toBeTruthy();
+    expect(getVerification.mock.calls.length).toBe(count);
+  } finally {
+    session.failureReason = null;
+  }
 });

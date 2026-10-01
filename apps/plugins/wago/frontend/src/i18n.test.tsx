@@ -613,3 +613,58 @@ it.each([
     expect(german[key].match(/\{\{[^}]+\}\}/g)?.sort() ?? [], key).toEqual(value.match(/\{\{[^}]+\}\}/g)?.sort() ?? []);
   }
 });
+
+it.each([
+  'Not enough free storage on the CC100 for this runtime. Free space and retry.',
+  'The CC100 is busy with a runtime operation. Retry installation shortly; no preparation was started.',
+  'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.',
+  'Controller preparation failed. Check the runtime release, staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.',
+  'Controller preparation cleanup remains unverified. Clean up any runtime transaction first, then retry preparation cleanup. The recovery token is retained; previous workloads are not restored.',
+  'Delivery failed. Controller recovery may be required; check access and runtime prerequisites.',
+  'Automatic MQTT credential provisioning is unavailable for this server. Check its MQTT settings.',
+  'Unsupported CC100 model or firmware baseline.',
+  'Delivery failed; bootstrap credential revocation requires attention.',
+  'Installation cleanup or credential revocation failed; finish the retained recovery before retrying delivery.',
+  'Automatic claim failed.',
+  'Commissioning verifier is unavailable; credential revocation requires attention.',
+  'Controller preparation was interrupted. Clean up the retained attempt before retrying.',
+  'Commissioning was interrupted.',
+  'Controller preparation failed. Check staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.',
+  'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.',
+  'Controller UTC inspection or synchronization failed. Enrollment is blocked; retry with fresh install consent and SSH credentials. Check the application UTC clock and supported FW31 clock tool. Clock changes are not rolled back by cleanup.',
+  'Enrollment or runtime delivery failed. Clean up the retained installation before retrying; previous workloads will not be restored.',
+  'Application UTC changed or controller clock verification expired before enrollment. No new enrollment credential was issued; retry with fresh install consent.',
+])('switches the persisted commissioning failure: %s', (failure) => {
+  const { result } = renderHook(() => useWagoTranslations());
+  expect(result.current.tBackendMessage(failure)).toBe(failure);
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(result.current.tExists(failure)).toBe(true);
+  expect(result.current.tBackendMessage(failure)).not.toBe(failure);
+  expect(result.current.tBackendMessage('unknown failure <controller>')).toBe('unknown failure <controller>');
+});
+
+it('translates runtime failures and protocol compatibility while preserving their identifiers and measurements', () => {
+  const { result } = renderHook(() => useWagoTranslations());
+  const runtime =
+    'Runtime delivery failed: local-timeout, SSH exit unknown, 301s elapsed. Runtime supervisor launch unverified: readiness. Use reviewed recovery before retrying.';
+  expect(result.current.tBackendMessage(runtime)).toBe(runtime);
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(result.current.tBackendMessage(runtime)).toBe(
+    'Laufzeitbereitstellung fehlgeschlagen: Lokales Zeitlimit überschritten, SSH-Exitcode unknown, 301 s vergangen. Start der Laufzeitüberwachung nicht verifiziert: Bereitschaft. Verwende vor dem erneuten Versuch die geprüfte Wiederherstellung.',
+  );
+  expect(
+    result.current.tBackendMessage(
+      'Protocol version "vendor.v2" is invalid; install a CC100 runtime using protocol 1.x.',
+    ),
+  ).toBe('Protokollversion „vendor.v2“ ist ungültig; installiere eine CC100-Laufzeitumgebung mit Protokoll 1.x.');
+  expect(result.current.tBackendMessage('Protocol 2.3 is incompatible; this plugin supports protocol 1.x.')).toBe(
+    'Protokoll 2.3 ist inkompatibel; dieses Plugin unterstützt Protokoll 1.x.',
+  );
+  expect(
+    result.current.tBackendMessage(
+      'Controller is missing required capabilities: digital-output.v1, diagnostics.v2. Update the CC100 runtime.',
+    ),
+  ).toBe(
+    'Der Steuerung fehlen erforderliche Fähigkeiten: digital-output.v1, diagnostics.v2. Aktualisiere die CC100-Laufzeitumgebung.',
+  );
+});

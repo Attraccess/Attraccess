@@ -12,7 +12,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
   const formatUtc = (value: string) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime())
-      ? value
+      ? tBackendMessage(value)
       : date.toLocaleString(language, { timeZone: 'UTC', timeZoneName: 'short' });
   };
   const client = useQueryClient();

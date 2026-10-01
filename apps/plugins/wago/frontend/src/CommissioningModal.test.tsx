@@ -617,15 +617,13 @@ it('lets the operator keep enrollment after opening cancellation without sending
 it.each(['delivery_failed', 'claim_interrupted'] as const)(
   'switches saved commissioning failures without new requests: %s',
   async (state) => {
-    activeSession = { ...session, state, failureReason: 'Free space on the CC100, then retry installation.' };
+    activeSession = { ...session, state, failureReason: 'Commissioning was interrupted.' };
     mount();
     await screen.findAllByText(activeSession.failureReason!);
     await waitFor(() => expect(requests.some(({ url }) => url.endsWith('/settings'))).toBe(true));
     const count = requests.length;
     act(() => useTranslationState.getState().setLanguage('de'));
-    expect(
-      screen.getAllByText('Gib Speicherplatz auf dem CC100 frei und versuche die Installation erneut.').length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Die Inbetriebnahme wurde unterbrochen.').length).toBeGreaterThan(0);
     expect(requests).toHaveLength(count);
   },
 );
