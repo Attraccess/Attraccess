@@ -111,6 +111,7 @@ const active = new Set<RuntimeUpdatePhase>([
 ]);
 const OPERATION_MS = 25 * 60_000;
 const LEASE_MS = 30 * 60_000;
+const CURRENT_RECHECK_MS = 5 * 60_000;
 
 /** Durable reconciliation core. Only desired Docker config identity drives upgrades;
  * build IDs, registry tags and recompressed tar digests never cause a restart.
@@ -320,6 +321,7 @@ export class WagoRuntimeUpdateCoordinator {
         }
         record.phase = 'current';
         record.attempt = 0;
+        record.retryAt = this.now() + CURRENT_RECHECK_MS;
         await persist(record);
         return 'settled';
       }
@@ -359,6 +361,7 @@ export class WagoRuntimeUpdateCoordinator {
         await this.host.accept(controllerId, record.token, operation.signal);
         record.phase = 'current';
         record.attempt = 0;
+        record.retryAt = this.now() + CURRENT_RECHECK_MS;
         await persist(record);
         // This last cleanup cannot turn a durably accepted rollout into a failed
         // rollout. If interrupted, the next owner retries acknowledgement only.

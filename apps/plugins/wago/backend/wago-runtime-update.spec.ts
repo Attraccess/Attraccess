@@ -95,6 +95,62 @@ describe('durable managed runtime reconciliation', () => {
   });
   afterEach(() => coordinator.stop());
 
+  it.each([false, true])(
+    'defers settled current SSH work durably (already-current=%s) but checks a new build immediately',
+    async (alreadyCurrent) => {
+      if (alreadyCurrent)
+        host.inspect.mockResolvedValue({
+          imageId: desired.imageId,
+          managed: true,
+          claimed: true,
+          compatible: true,
+          online: true,
+        });
+      host.prepare = jest.fn<
+        ReturnType<NonNullable<ManagedRuntimeUpdateHost['prepare']>>,
+        Parameters<NonNullable<ManagedRuntimeUpdateHost['prepare']>>
+      >(async () => undefined);
+      await coordinator.reconcile(1);
+      expect(rows.get(1)).toMatchObject({ phase: 'current', retryAt: now + 5 * 60_000 });
+      host.inspect.mockClear();
+      host.prepare.mockClear();
+      host.verify.mockClear();
+      now += 30_000;
+      coordinator.stop();
+      coordinator = new WagoRuntimeUpdateCoordinator(
+        store,
+        async () => desired,
+        host,
+        audit,
+        () => now,
+      );
+      expect(await coordinator.reconcile(1)).toBe('deferred');
+      expect(host.inspect).not.toHaveBeenCalled();
+      expect(host.prepare).not.toHaveBeenCalled();
+      expect(host.verify).not.toHaveBeenCalled();
+      desired = release('c');
+      expect(await coordinator.reconcile(1)).toBe('settled');
+      expect(host.inspect).toHaveBeenCalledTimes(1);
+      expect(rows.get(1)).toMatchObject({ phase: 'current', desiredImageId: desired.imageId });
+    },
+  );
+
+  it('rechecks current runtime health when its bounded steady-state deadline expires', async () => {
+    await coordinator.reconcile(1);
+    host.inspect.mockClear();
+    now = rows.get(1)!.retryAt;
+    host.inspect.mockResolvedValue({
+      imageId: desired.imageId,
+      managed: true,
+      claimed: true,
+      compatible: true,
+      online: false,
+    });
+    expect(await coordinator.reconcile(1)).toBe('settled');
+    expect(host.inspect).toHaveBeenCalledTimes(1);
+    expect(rows.get(1)).toMatchObject({ phase: 'blocked', failure: 'offline', retryAt: now + 30_000 });
+  });
+
   it('administrator retry advances backoff without discarding the rollback token', async () => {
     host.activate.mockRejectedValueOnce(new RuntimeUpdateError('load'));
     host.recover.mockRejectedValueOnce(new RuntimeUpdateError('recovery'));

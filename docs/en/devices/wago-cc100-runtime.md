@@ -71,6 +71,11 @@ registrations are not migrated or silently adopted: remove and re-enrol them.
 The **Runtime updates** dialog shows managed-access state, desired image,
 durable update phase, failure and retry time. Startup, permanent runtime heartbeats
 and a 30-second retry sweep drive reconciliation, with at most two updates active.
+Settled current controllers are rechecked over SSH at most once every five minutes;
+a changed build image bypasses this deadline, and retained transaction cleanup
+continues on its independent retry schedule. Peripheral Modbus read failures stay
+visible as channel faults without blocking controller/runtime readiness; onboard
+hardware and configuration failures still block commissioning and updates.
 Database leases keyed by the pinned device identity serialize updates with
 commissioning, management transitions, removal and credential operations.
 

@@ -821,7 +821,9 @@ export class WagoRuntime {
       readiness: {
         configurationAccepted: Boolean(accepted),
         hardwareAvailable: !errors.some((error) => error.code !== 'modbus_read_failed'),
-        ready: Boolean(accepted) && !errors.length && this.connected,
+        // A peripheral bus fault remains a channel diagnostic, not a failure
+        // of the controller/runtime proof used for commissioning and updates.
+        ready: Boolean(accepted) && !errors.some((error) => error.code !== 'modbus_read_failed') && this.connected,
         errors,
       },
     };

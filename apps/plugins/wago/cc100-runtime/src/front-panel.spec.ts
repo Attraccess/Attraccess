@@ -200,6 +200,7 @@ describe('front panel runtime', () => {
       await runtime.publishHeartbeat();
       expect(state.outputs).toEqual({});
       expect(state.readiness).toMatchObject({ errors: [expect.objectContaining({ code: 'modbus_read_failed' })] });
+      expect(state.readiness).toMatchObject({ configurationAccepted: true, hardwareAvailable: true, ready: true });
       await runtime.publishHeartbeat();
       expect(state.outputs).toEqual({});
       expect(state.readiness).toMatchObject({ errors: [expect.objectContaining({ code: 'modbus_read_failed' })] });
@@ -223,6 +224,12 @@ describe('front panel runtime', () => {
       await pending;
       await runtime.publishHeartbeat();
       expect(state.outputs).toEqual({ output: true });
+      expect(state.readiness).toMatchObject({
+        configurationAccepted: true,
+        hardwareAvailable: true,
+        ready: true,
+        errors: [],
+      });
       clock.mockReturnValue(now + 27004);
       await runtime.publishHeartbeat();
       expect(state.outputs).toEqual({});
