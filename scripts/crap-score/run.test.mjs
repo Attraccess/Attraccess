@@ -209,13 +209,12 @@ test('unresolvable source mappings fail visibly instead of dropping functions', 
   assert.throws(() => repairFunctionLocations({ 0: fn }, {}), /Ambiguous source mapping/);
 });
 
-test('WAGO includes both frontend configurations and host-composed acceptance suites', async () => {
+test('WAGO includes the complete serial frontend suite once and host-composed acceptance suites', async () => {
   const { suites } = await import('./run.mjs');
   const configs = suites('apps/plugins/wago').map((suite) => suite.args[1]);
   assert.deepEqual(configs, [
     'apps/plugins/wago/jest.config.ts',
     'apps/plugins/wago/frontend/vitest.config.mts',
-    'apps/plugins/wago/frontend/vitest.config.ts',
     'apps/plugins/wago/scripts/jest.audit-hooks.config.cjs',
     'apps/plugins/wago/scripts/jest.commissioning.config.cjs',
   ]);
