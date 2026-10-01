@@ -109,6 +109,8 @@ jobs:
 
       - uses: ./.github/actions/build-attractap-firmware
 
+      - uses: ./.github/actions/build-cc100-runtime
+
       - uses: ./.github/actions/download-companion
 
       - name: Get short SHA

@@ -13,7 +13,7 @@
     "actions": "Actions",
     "claim": "Claim",
     "configure": "Configure",
-    "updateRuntime": "Update runtime",
+    "updateRuntime": "Runtime updates",
     "progress": "View progress",
     "resume": "Resume",
     "empty": "No controllers or commissioning sessions yet.",

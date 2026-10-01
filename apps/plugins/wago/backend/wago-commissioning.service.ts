@@ -3,7 +3,7 @@ import { parseWagoCodesysClassification, wagoCodesysClassificationShell } from '
 import { commissionClock } from './wago-commissioning-clock';
 import type { WagoCommissioningPreflightReport } from '../shared/commissioning';
 import { CC100_DIGITAL_PROFILE_ID, type Cc100HardwareProfile } from '../shared/hardware-profile';
-import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
+import { MANAGEMENT_INSPECTION_COMMAND, parseManagementInspection } from './wago-management-inspection';
 import { ManagementPeerVersion } from './wago-management-peer-version';
 import {
   ConflictException,
@@ -27,13 +27,16 @@ import { commissioningVerification } from './wago-commissioning-verification';
 import { WagoController } from './wago-controller.entity';
 import { assertCommissioningBroker } from './wago-commissioning-preflight';
 import { auditCommissioning, commissioningPrincipal, CommissioningPrincipal } from './wago-commissioning-audit';
-import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
+import { WagoRuntimeArtifactsService, WagoRuntimeArtifactCatalog } from './wago-runtime-artifacts';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import type { CommissioningOperationGuard } from './wago-operation-guard';
 import { createWagoManagementService } from './wago-management-store';
 import { ManagementError, WagoManagementService } from './wago-management';
 import type { ManagementTarget, ManagementMode, ManagementException } from './wago-management.types';
 import { restoreManagementKey } from './wago-management-key';
+import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
+import { WagoDeviceOperations } from './wago-device-operations';
+import { WagoDeviceOperation } from './wago-managed-access.entity';
 import {
   wagoHardwareDeploymentReportScript,
   parseWagoHardwareDeploymentReport,
@@ -92,14 +95,22 @@ export class WagoControllerLockError extends Error {
     super('The CC100 is busy with a runtime operation. Retry installation shortly; no preparation was started.');
   }
 }
+class RuntimeReleaseChangedError extends ConflictException {
+  constructor() {
+    super(
+      'The runtime release changed during delivery. Recover any retained installation and retry with the current release.',
+    );
+  }
+}
 type CommissioningSessionResponse = Omit<
   WagoCommissioningSession,
   'pairingCode' | 'deliveryToken' | 'initiatingPrincipal' | 'dockerProvisionToken'
-> & { runtimeRecoveryAvailable?: boolean };
+> & { runtimeRecoveryAvailable?: boolean; managedAccessAvailable?: boolean };
 const VERIFIER_PREFIX = 'encrypted:v1:';
 type DeliveryInput = { temporarySsh?: TemporarySshCredential; confirmInstall?: boolean };
 type RuntimeDeliveryBundle = Awaited<ReturnType<typeof verifyRuntimeBundle>> & {
   image?: string;
+  imageId?: string;
   hardwareProfile?: Cc100HardwareProfile;
 };
 
@@ -115,13 +126,42 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
     @Inject(WagoService) private readonly wago: WagoService,
-    @Optional() @Inject(WagoRuntimeArtifactsService) private readonly artifacts?: WagoRuntimeArtifactsService,
+    @Optional() @Inject(WagoRuntimeArtifactsService) private readonly artifacts?: WagoRuntimeArtifactCatalog,
     @Optional() @Inject(WagoCommissioningReadiness) private readonly readiness?: WagoCommissioningReadiness,
+    @Optional() @Inject(WagoManagedRuntimeService) private readonly managedRuntime?: WagoManagedRuntimeService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
     this.sessions = this.context.getRepository(WagoCommissioningSession);
+    this.managedRuntime?.registerRootProbe(async (host, fingerprint, password) => {
+      try {
+        return (
+          (await this.run(host, fingerprint, { username: 'root', password }, 'id -u', undefined, {
+            timeoutMs: 15000,
+            maxOutputBytes: 1024,
+          })) === '0\n'
+        );
+      } catch {
+        return false;
+      }
+    });
+    this.managedRuntime?.registerRetirementProbe(async (host, fingerprint, password) => {
+      try {
+        return (
+          (await this.run(
+            host,
+            fingerprint,
+            { username: 'root', password },
+            'set -eu; test "$(id -u)" = 0; test ! -e /home/attraccess/.ssh/authorized_keys; test ! -L /home/attraccess/.ssh/authorized_keys; test ! -e /etc/attraccess-wago-management/key.pending; test ! -e /etc/attraccess-wago-management/cutover; test ! -e /etc/attraccess-wago-management/committed; printf "0\\n"',
+            undefined,
+            { timeoutMs: 15000, maxOutputBytes: 1024 },
+          )) === '0\n'
+        );
+      } catch {
+        return false;
+      }
+    });
     this.management = createWagoManagementService(this.context, {
       execute: (target, credential, command, limits) =>
         this.run(target.host, target.hostKeyFingerprint, credential, command, undefined, limits),
@@ -249,7 +289,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const take = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 50;
     const skip = Number.isSafeInteger(offset) ? Math.max(offset, 0) : 0;
     const sessions = await this.sessions.find({ order: { updatedAt: 'DESC' }, take, skip });
-    return sessions.map((session) => this.toResponse(session));
+    return Promise.all(sessions.map((session) => this.toResponse(session)));
   }
 
   async verification(id: number) {
@@ -634,6 +674,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     input: DeliveryInput = {},
     principal: CommissioningPrincipal | null = null,
   ): Promise<CommissioningSessionResponse> {
+    this.managedRuntime?.assertEnabled();
     return auditCommissioning(
       this.context,
       principal,
@@ -722,6 +763,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       );
       safeFailure =
         'Controller preparation failed. Check staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.';
+      await this.assertCurrentRuntimeBundle(bundle);
       await this.prepareController(session, credential, bundle.bytes, bundle.hardwareProfile);
       safeFailure =
         'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.';
@@ -789,6 +831,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       if (JSON.stringify(currentBroker) !== JSON.stringify(broker)) throw new Error('Broker changed during delivery');
       enrollmentExpiresAt = enrollment.expiresAt;
       const environment = [
+        ...(bundle.imageId ? [`WAGO_RUNTIME_IMAGE_ID=${bundle.imageId}`] : []),
         `WAGO_HARDWARE_ID=${session.hardwareId}`,
         `WAGO_MQTT_URL=${broker.useTls ? 'mqtts' : 'mqtt'}://${broker.host}:${broker.port}`,
         `WAGO_MQTT_USERNAME=${enrollment.username}`,
@@ -834,6 +877,34 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         await this.transferWrites.get(session.id);
       }
 
+      // A release change while SSH was transferring/loading must remain visible;
+      // never advance the obsolete installation to automatic enrollment/claim.
+      await this.assertCurrentRuntimeBundle(bundle);
+
+      if (this.managedRuntime) {
+        safeFailure =
+          'Managed SSH provisioning failed. Use the audited recovery action for the generated root credential before retrying cleanup.';
+        await this.updateProgress(
+          session,
+          90,
+          'Provisioning managed SSH',
+          'Rotating root recovery and provisioning encrypted key-only management access for automatic updates.',
+        );
+        const guard = this.operationContext.getStore();
+        if (!guard) throw new Error('Controller operation ownership unavailable');
+        const managementPeer = parseManagementInspection(
+          await this.run(session.targetHost, session.hostKeyFingerprint, credential, MANAGEMENT_INSPECTION_COMMAND),
+        );
+        if (managementPeer.ssh !== 'dropbear' || managementPeer.dropbearVersion !== '2025.88')
+          throw new Error('Managed SSH requires the FW31 Dropbear 2025.88 peer');
+        await this.managedRuntime.enrol(
+          session,
+          (script) => this.sudoRunScript(session.targetHost, session.hostKeyFingerprint, credential, script),
+          guard.signal,
+        );
+        await this.assertCurrentRuntimeBundle(bundle);
+      }
+
       session.state = 'awaiting_discovery';
       session.enrollmentExpiresAt = enrollmentExpiresAt;
       session.failureReason = null;
@@ -845,6 +916,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     } catch (error) {
       if (
         error instanceof WagoRuntimeUploadError ||
+        error instanceof RuntimeReleaseChangedError ||
         error instanceof WagoStorageCapacityError ||
         error instanceof WagoControllerLockError
       )
@@ -898,8 +970,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
 
   private async assertCurrentRuntimeBundle(bundle: { digest: string; image?: string }): Promise<void> {
     if (!bundle.image || !this.artifacts) return;
-    if ((await this.artifacts.current())?.digest !== bundle.digest)
-      throw new ConflictException('The runtime release changed during delivery. Retry with the current release.');
+    if ((await this.artifacts.current())?.digest !== bundle.digest) throw new RuntimeReleaseChangedError();
   }
 
   async recover(
@@ -1013,7 +1084,23 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       },
     };
     try {
-      return await this.operationContext.run(guard, operation);
+      let deviceOperations: WagoDeviceOperations | undefined;
+      const owner = randomBytes(16).toString('hex');
+      if (this.managedRuntime) {
+        deviceOperations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation));
+        if (!(await deviceOperations.acquire(key, owner, Date.now(), deadline + 60_000)))
+          throw new ConflictException('Another controller operation is active. Retry after it finishes.');
+      }
+      const originalAssert = guard.assertOwned;
+      guard.assertOwned = async () => {
+        await originalAssert();
+        await deviceOperations?.assertOwned(key, owner);
+      };
+      try {
+        return await this.operationContext.run(guard, operation);
+      } finally {
+        await deviceOperations?.release(key, owner);
+      }
     } finally {
       finished = true;
       controller.abort();
@@ -1045,6 +1132,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           throw new ConflictException('Clean up the retained runtime installation before deleting this session.');
         if (session.dockerProvisionToken)
           throw new ConflictException('Clean up the retained controller preparation before deleting this session.');
+        if (await this.managedRuntime?.hasAccess(id))
+          throw new ConflictException(
+            'Retain this session for audited managed SSH recovery. Re-enrolment creates a fresh management identity.',
+          );
         if (session.managementControllerId) {
           const security = await this.management.status(session.managementControllerId);
           if (security && (security.recoveryRequired || ['key_enrolled', 'hardened'].includes(security.state)))
@@ -1119,7 +1210,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       if (!guard) throw new ConflictException('Controller operation ownership is unavailable.');
       const assertOwned = guard.assertOwned;
       await assertOwned();
+      await this.managedRuntime?.assertRemovable(id);
       const hardwareId = await remove(assertOwned);
+      await this.managedRuntime?.retire(id);
       for (const candidate of await this.sessions.find({ where: { hardwareId } })) {
         await this.withDeliveryLock(candidate.id, async () => {
           const session = await this.sessions.findOneBy({ id: candidate.id });
@@ -1130,7 +1223,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             if (!security || (!security.recoveryRequired && !['key_enrolled', 'hardened'].includes(security.state)))
               session.managementControllerId = null;
           }
-          if (session.deliveryToken || session.dockerProvisionToken || session.managementControllerId) {
+          if (
+            session.deliveryToken ||
+            session.dockerProvisionToken ||
+            session.managementControllerId ||
+            (await this.managedRuntime?.hasAccess(session.id))
+          ) {
             session.state = 'revoked';
             session.pairingCode = null;
             session.progressStep = 'Controller registration removed';
@@ -1203,6 +1301,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             /* Legacy sessions never invent an initiating actor. */
           }
           await this.operationContext.getStore()?.assertOwned();
+          await this.managedRuntime?.bind(current.id, controller.id);
           await auditCommissioning(this.context, principal, controller.id, 'claim', () =>
             this.wago.claim(
               controller.id,
@@ -1612,7 +1711,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     }
   }
 
-  private toResponse(session: WagoCommissioningSession): CommissioningSessionResponse {
+  private async toResponse(session: WagoCommissioningSession): Promise<CommissioningSessionResponse> {
     const {
       pairingCode: _pairingCode,
       deliveryToken: _deliveryToken,
@@ -1624,7 +1723,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     void _deliveryToken;
     void _principal;
     void _dockerToken;
-    return { ...response, ...(_deliveryToken ? { runtimeRecoveryAvailable: true } : {}) };
+    return {
+      ...response,
+      ...(_deliveryToken ? { runtimeRecoveryAvailable: true } : {}),
+      ...((await this.managedRuntime?.hasAccess(session.id)) ? { managedAccessAvailable: true } : {}),
+    };
   }
 
   private async withDeliveryLock<T>(id: number, operation: () => Promise<T>): Promise<T> {

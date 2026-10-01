@@ -1,3 +1,5 @@
+import managedRuntimeEn from './managed-runtime.en.json';
+import managedRuntimeDe from './managed-runtime.de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -95,6 +97,7 @@ export const wagoTranslations = {
   en: {
     ...serverMessagesEn,
     ...en,
+    runtimeManagement: managedRuntimeEn,
     commissioningUI: commissioningEn,
     editor: editorEn,
     revisions: revisionsEn,
@@ -110,6 +113,7 @@ export const wagoTranslations = {
   de: {
     ...serverMessagesDe,
     ...de,
+    runtimeManagement: managedRuntimeDe,
     commissioningUI: commissioningDe,
     editor: editorDe,
     revisions: revisionsDe,

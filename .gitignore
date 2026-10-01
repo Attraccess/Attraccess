@@ -70,3 +70,5 @@ output/
 libs/companion-ws-client/src/lib/
 apps/plugins/*/package.zip
 apps/attractap/firmware/__pycache__/
+# Generated build-owned CC100 Docker assets (never commit bundles or keys).
+apps/plugins/wago/runtime-assets/
