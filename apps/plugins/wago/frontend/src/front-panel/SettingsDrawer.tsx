@@ -36,7 +36,7 @@ export function SettingsDrawer({
       <Drawer.Content placement="right">
         <Drawer.Dialog
           aria-label={title}
-          className="wg:w-full wg:sm:max-w-xl wg:bg-surface-secondary"
+          className="wg:w-full wg:max-w-full wg:sm:max-w-xl wg:bg-surface-secondary"
           style={{ '--field-border': 'var(--border-secondary)', '--border-width-field': '1px' } as React.CSSProperties}
         >
           <Form
@@ -115,10 +115,12 @@ export function TerminalSettings({
       <p className="wg:text-sm wg:text-muted">{t('panel.emptyName')}</p>
       {terminal.direction === 'input' ? (
         <Switch isSelected={invert} onChange={setInvert}>
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-          <Label>{t('panel.invert')}</Label>
+          <Switch.Content>
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+            <Label>{t('panel.invert')}</Label>
+          </Switch.Content>
         </Switch>
       ) : (
         <>
@@ -182,7 +184,7 @@ export function BusSettings({
     >
       <p className="wg:text-sm wg:text-muted">{t('panel.sharedBus')}</p>
       <Choice
-        label={t('modbus.baudRate')}
+        label={t('modbus.baud')}
         value={String(bus.baudRate)}
         onChange={(value) => setBus({ ...bus, baudRate: Number(value) })}
         options={[1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].map((value) => ({
