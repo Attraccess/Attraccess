@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@heroui/react';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
+import { useWagoTranslations } from './i18n';
 
 export interface RuntimeArtifactInfo {
   digest: string;
@@ -33,6 +34,7 @@ export function RuntimeArtifactImport({
   onSelectionChange,
   disabled = false,
 }: RuntimeArtifactImportProps) {
+  const { t } = useWagoTranslations();
   const [current, setCurrent] = useState<RuntimeArtifactInfo | null>(null);
   useEffect(() => {
     onSelectionChange?.(current);
@@ -76,7 +78,7 @@ export function RuntimeArtifactImport({
       .catch(() => {
         if (abort.signal.aborted) return;
         setLoadFailed(true);
-        setError('Runtime releases could not be loaded. Check your connection and retry.');
+        setError('artifacts.loadError');
       })
       .finally(() => {
         if (!abort.signal.aborted) setLoading(false);
@@ -86,15 +88,15 @@ export function RuntimeArtifactImport({
   async function importRelease() {
     if (!files.bundle || !files.checksum || disabled || loading || loadFailed || uploadAbort.current) return;
     if (files.bundle.size > maxBytes || files.checksum.size > 4096) {
-      setError('The runtime tar must be at most 512 MiB and checksum 4 KiB.');
+      setError('artifacts.sizeError');
       return;
     }
     setBusy(true);
     setError('');
-    setStatus('Uploading and checking the runtime release…');
+    setStatus('artifacts.uploading');
     const abort = new AbortController();
     uploadAbort.current = abort;
-    let failureMessage = 'Import could not be completed. Check your connection and retry with the selected files.';
+    let failureMessage = 'artifacts.importError';
     try {
       const body = new FormData();
       body.append('bundle', files.bundle);
@@ -104,10 +106,10 @@ export function RuntimeArtifactImport({
       if (!response.ok) {
         failureMessage =
           response.status === 403
-            ? 'Administrator access is required.'
+            ? 'artifacts.adminRequired'
             : response.status === 409
-              ? 'Another upload is in progress. Try again shortly.'
-              : 'Import failed. Check that the runtime tar and checksum belong together and try again.';
+              ? 'artifacts.uploadBusy'
+              : 'artifacts.invalid';
         throw new Error('Import rejected');
       }
       const artifact: RuntimeArtifactInfo = await response.json();
@@ -116,7 +118,7 @@ export function RuntimeArtifactImport({
       setArtifacts((previous) => [artifact, ...previous.filter((entry) => entry.digest !== artifact.digest)]);
       setFiles({});
       form.current?.reset();
-      setStatus('Release verified and selected for future commissioning. Existing deliveries retain their release.');
+      setStatus('artifacts.success');
       onImported?.(artifact);
     } catch {
       if (abort.signal.aborted) return;
@@ -130,10 +132,10 @@ export function RuntimeArtifactImport({
     }
   }
   return (
-    <section className="wg:space-y-3" aria-label="CC100 runtime release">
+    <section className="wg:space-y-3" aria-label={t('artifacts.title')}>
       <header>
-        <h3>CC100 runtime release</h3>
-        <p>Download the WAGO runtime bundle, extract its archive, then select the runtime tar and checksum files.</p>
+        <h3>{t('artifacts.title')}</h3>
+        <p>{t('artifacts.description')}</p>
       </header>
       <div className="wg:space-y-3">
         <p>
@@ -142,25 +144,29 @@ export function RuntimeArtifactImport({
             target="_blank"
             rel="noreferrer"
           >
-            Official runtime build artifacts
+            {t('artifacts.official')}
           </a>
-          . Your software distributor can also provide these files. Check the source before importing.
+          . {t('artifacts.sourceHint')}
         </p>
         {loading ? (
-          <p>Loading releases…</p>
+          <p>{t('artifacts.loading')}</p>
         ) : loadFailed ? (
-          <p>Runtime releases are unavailable.</p>
+          <p>{t('artifacts.unavailable')}</p>
         ) : current ? (
           <p className="wg:break-words">
-            Selected: {current.manifest.runtimeVersion} · WAGO {current.manifest.hardware.model} · firmware{' '}
-            {current.manifest.hardware.firmwareBaseline} · {Math.ceil(current.bytes / 1024 / 1024)} MiB
+            {t('artifacts.selected', {
+              version: current.manifest.runtimeVersion,
+              model: current.manifest.hardware.model,
+              firmware: current.manifest.hardware.firmwareBaseline,
+              size: Math.ceil(current.bytes / 1024 / 1024),
+            })}
           </p>
         ) : (
-          <p>Import a release before commissioning a controller.</p>
+          <p>{t('artifacts.required')}</p>
         )}
         {current && (
           <details className="wg:min-w-0 wg:max-w-full">
-            <summary>Release details</summary>
+            <summary>{t('artifacts.details')}</summary>
             <p className="wg:break-all">{current.image}</p>
             <p className="wg:break-all">SHA-256: {current.digest}</p>
           </details>
@@ -173,15 +179,15 @@ export function RuntimeArtifactImport({
           }}
         >
           <fieldset disabled={disabled || busy || loading || loadFailed} className="wg:flex wg:flex-col wg:gap-3">
-            <legend>Runtime release files</legend>
+            <legend>{t('artifacts.files')}</legend>
             {(
               [
-                ['bundle', 'Runtime bundle (.tar)', '.tar'],
-                ['checksum', 'Checksum (.sha256)', '.sha256'],
+                ['bundle', 'artifacts.bundle', '.tar'],
+                ['checksum', 'artifacts.checksum', '.sha256'],
               ] as const
             ).map(([field, label, accept]) => (
               <label key={field}>
-                {label}
+                {t(label)}
                 <input
                   type="file"
                   accept={accept}
@@ -194,14 +200,14 @@ export function RuntimeArtifactImport({
               type="submit"
               isDisabled={disabled || busy || loading || loadFailed || !files.bundle || !files.checksum}
             >
-              {busy ? 'Verifying release…' : 'Import and select release'}
+              {t(busy ? 'artifacts.verifying' : 'artifacts.import')}
             </Button>
           </fieldset>
         </form>
         <p role="status" aria-live="polite">
-          {status}
+          {status && t(status)}
         </p>
-        {error && <p role="alert">{error}</p>}
+        {error && <p role="alert">{t(error)}</p>}
         {loadFailed && (
           <Button
             variant="secondary"
@@ -212,17 +218,17 @@ export function RuntimeArtifactImport({
               setLoadAttempt((attempt) => attempt + 1);
             }}
           >
-            Retry loading releases
+            {t('artifacts.retry')}
           </Button>
         )}
         {artifacts.length > 1 && (
           <details>
-            <summary>Retained releases ({artifacts.length})</summary>
+            <summary>{t('artifacts.retained', { count: artifacts.length })}</summary>
             <ul>
               {artifacts.map((artifact) => (
                 <li key={artifact.digest}>
                   {artifact.manifest.runtimeVersion} · {artifact.digest.slice(0, 12)}
-                  {artifact.digest === current?.digest ? ' · selected' : ''}
+                  {artifact.digest === current?.digest ? t('artifacts.selectedSuffix') : ''}
                 </li>
               ))}
             </ul>

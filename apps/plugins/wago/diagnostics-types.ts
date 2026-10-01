@@ -31,6 +31,7 @@ export interface WagoDiagnostics {
   stateConnected: boolean | null;
   stateHardwareAvailable: boolean | null;
   stateSourceAt: string | null;
+  manualOutputChannelIds?: string[];
   sequenceExplanation: string;
   configuration: {
     draftUpdatedAt: string | null;

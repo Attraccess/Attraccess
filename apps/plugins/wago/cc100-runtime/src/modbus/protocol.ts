@@ -11,7 +11,7 @@ export class ModbusException extends Error {
   }
 }
 export function validateRequest(unit: number, pdu: Buffer): void {
-  if (!Number.isInteger(unit) || unit < 1 || unit > 247 || ![3, 4, 5, 6, 16].includes(pdu[0]))
+  if (!Number.isInteger(unit) || unit < 1 || unit > 247 || ![1, 3, 4, 5, 6, 16].includes(pdu[0]))
     throw new Error('unsupported unit/function');
   if (pdu.length < 5) throw new Error('truncated Modbus request');
   const address = pdu.readUInt16BE(1);
@@ -21,7 +21,7 @@ export function validateRequest(unit: number, pdu: Buffer): void {
       throw new Error('invalid FC16 quantity/byte count');
   } else {
     if (pdu.length !== 5) throw new Error('invalid Modbus request length');
-    if ([3, 4].includes(pdu[0]) && (value < 1 || value > 125 || address + value > 65536))
+    if ([1, 3, 4].includes(pdu[0]) && (value < 1 || value > (pdu[0] === 1 ? 2000 : 125) || address + value > 65536))
       throw new Error('invalid read quantity');
     if (pdu[0] === 5 && value !== 0 && value !== 0xff00) throw new Error('invalid coil value');
   }
@@ -42,8 +42,8 @@ export function rtuFrame(unit: number, pdu: Buffer): Buffer {
 export function validateResponse(request: Buffer, response: Buffer): Buffer {
   if (response[0] === (request[0] | 0x80) && response.length === 2) throw new ModbusException(request[0], response[1]);
   if (response[0] !== request[0]) throw new Error('Modbus function mismatch');
-  if ([3, 4].includes(request[0])) {
-    const bytes = request.readUInt16BE(3) * 2;
+  if ([1, 3, 4].includes(request[0])) {
+    const bytes = request[0] === 1 ? Math.ceil(request.readUInt16BE(3) / 8) : request.readUInt16BE(3) * 2;
     if (response[1] !== bytes || response.length !== bytes + 2) throw new Error('Modbus register byte count mismatch');
     return response.subarray(2);
   }
@@ -51,11 +51,11 @@ export function validateResponse(request: Buffer, response: Buffer): Buffer {
     throw new Error('Modbus write echo mismatch');
   return response;
 }
-export function readPdu(functionCode: 3 | 4, format: RegisterFormat): Buffer {
+export function readPdu(functionCode: 1 | 3 | 4, format: RegisterFormat): Buffer {
   const pdu = Buffer.alloc(5);
   pdu[0] = functionCode;
   pdu.writeUInt16BE(wireAddress(format), 1);
-  pdu.writeUInt16BE(registerCount(format), 3);
+  pdu.writeUInt16BE(functionCode === 1 ? 1 : registerCount(format), 3);
   return pdu;
 }
 function reorder(bytes: Buffer, format: RegisterFormat): Buffer {

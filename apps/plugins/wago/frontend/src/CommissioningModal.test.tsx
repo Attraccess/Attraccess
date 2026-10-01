@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import type { CommissioningSession, CommissioningVerification } from './api';
 import { CommissioningModal } from './CommissioningModal';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
 vi.mock('./drawer', () => ({
   StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: ReactNode }) =>
@@ -85,6 +86,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  useTranslationState.setState({ language: 'en' });
   client.clear();
   vi.unstubAllGlobals();
 });
@@ -118,6 +120,31 @@ it('shows verified enrollment separately from unfinished configuration and manag
   expect(screen.getByText('Management hardening: unverified')).toBeTruthy();
 });
 
+it.each([false, true])(
+  'switches verification and completed-summary statuses with the host language (complete: %s)',
+  async (complete) => {
+    activeSession.state = 'awaiting_verification';
+    activeSession.updatedAt = '2026-09-06T18:00:00.000Z';
+    verificationControllerId = 2;
+    verificationOverrides = {
+      permanentConnection: true,
+      enrollmentRevoked: true,
+      configurationApplied: complete,
+      managementHardening: 'supported',
+      hardwareReadiness: 'ready',
+    };
+    mount();
+    await screen.findByText(complete ? 'supported' : 'Management hardening: supported');
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(
+      screen.getByText(complete ? 'Unterstützt' : 'Absicherung des Verwaltungszugriffs: Unterstützt'),
+    ).toBeTruthy();
+    if (!complete) expect(screen.getByText('Hardware-Prüfung der Laufzeitumgebung: Bereit')).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('en'));
+    expect(screen.getByText(complete ? 'supported' : 'Management hardening: supported')).toBeTruthy();
+  },
+);
+
 it.each(['permanentConnection', 'enrollmentRevoked'] as const)(
   'keeps enrollment pending when %s has not been verified',
   async (missing) => {
@@ -147,6 +174,26 @@ function fillRecoveryCredentials() {
 }
 
 describe('FW31 software support boundary', () => {
+  it.each([
+    ['starting', 'Wird gestartet'],
+    ['started', 'Gestartet'],
+    ['recovering', 'Wird wiederhergestellt'],
+    ['restored', 'Wiederhergestellt'],
+    ['recovery_required', 'Wiederherstellung erforderlich'],
+    ['vendor.preparation-v2', 'vendor.preparation-v2'],
+  ])('switches the saved preparation status without another request (%s)', async (state, german) => {
+    activeSession.dockerProvisionState = state;
+    mount();
+    await screen.findByText((text) => text.startsWith(`Saved controller preparation: ${state}.`));
+    const requestCount = requests.length;
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText((text) => text.startsWith(`Gespeicherte Steuerungsvorbereitung: ${german}.`))).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('en'));
+    expect(screen.getByText((text) => text.startsWith(`Saved controller preparation: ${state}.`))).toBeTruthy();
+    expect(requests).toHaveLength(requestCount);
+    expect(requests.some(({ url }) => url.endsWith('/deliver') || url.endsWith('/inspect'))).toBe(false);
+  });
+
   it('shows saved UTC skew, action and result without claiming live synchronization', () => {
     activeSession.platformReport = JSON.stringify({
       clock: {
@@ -166,6 +213,10 @@ describe('FW31 software support boundary', () => {
     expect(screen.getByText('synchronized')).toBeTruthy();
     expect(screen.getByText('-134972158 seconds')).toBeTruthy();
     expect(screen.getByText('supported / synchronize')).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText('Unterstützt / Synchronisieren')).toBeTruthy();
+    expect(screen.getByText(/^Nach der Aktion; Unsicherheit 1 Sekunden\./)).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('en'));
     expect(
       screen.getByRole('checkbox', {
         name: /synchronization of controller system and hardware clocks to application UTC/,

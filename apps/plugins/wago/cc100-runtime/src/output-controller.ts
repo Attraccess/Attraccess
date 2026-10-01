@@ -231,7 +231,8 @@ export class OutputController {
     const guardPoint = snapshot?.physicalPoints.find((item) => item.id === guardChannel?.physicalPointId);
     if (!guardPoint) return false;
     try {
-      return Boolean(await this.options.device.read(guardPoint)) === (channel.guard.when === 'on');
+      const value = Boolean(await this.options.device.read(guardPoint));
+      return (guardChannel?.invert ? !value : value) === (channel.guard.when === 'on');
     } catch {
       return false;
     }
@@ -379,7 +380,8 @@ export class OutputController {
       ?.physicalPoints.find((item) => item.id === feedbackChannel?.physicalPointId);
     if (!channel.feedback || !point) return;
     try {
-      const actual = Boolean(await this.options.device.read(point));
+      const readValue = Boolean(await this.options.device.read(point));
+      const actual = feedbackChannel?.invert ? !readValue : readValue;
       const expected = channel.feedback.expected === 'match' ? value : !value;
       if (actual !== expected && this.isCurrentFeedback(channel.id, generation, configurationGeneration))
         await this.options.publishFault(channel.id, {

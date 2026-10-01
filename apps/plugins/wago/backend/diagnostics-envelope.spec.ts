@@ -163,6 +163,25 @@ describe('canonical diagnostic consumer', () => {
     expect(send('state', { connected: true, revision: 2, outputs: { relay: true } })).toBe(false);
     expect(store.read(1).outputs).toEqual({});
   });
+  it.each([
+    ['relay', 'modbus_read_failed'],
+    ['door', 'digital_read_failed'],
+  ])('retains %s read faults across omitted samples until a successful reading', (channelId, code) => {
+    expect(state()).toBe(true);
+    expect(send('faults', { channelId, code, ...envelope(1) })).toBe(true);
+
+    for (let sequence = 2; sequence <= 4; sequence++) {
+      now++;
+      expect(state(sequence, 1, { inputs: {}, outputs: {} })).toBe(true);
+      expect(store.read(1).inputs).toEqual({});
+      expect(store.read(1).outputs).toEqual({});
+      expect(store.read(1).faults[channelId]).toMatchObject({ code });
+    }
+
+    now++;
+    expect(state(5)).toBe(true);
+    expect(store.read(1).faults[channelId]).toBeUndefined();
+  });
   it('fails closed when retired stream tracking is full and bounds category tracking', () => {
     for (let index = 1; index <= 17; index++) {
       now++;

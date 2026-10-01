@@ -117,7 +117,7 @@ const controllerActions: PluginAuditActionPolicy[] = [
     details: {
       channelId,
       commandId: { type: 'string', pattern: uuidPattern },
-      operation: { type: 'string', oneOf: ['set', 'pulse'] },
+      operation: { type: 'string', oneOf: ['set', 'pulse', 'release'] },
       result: { type: 'string', oneOf: ['dispatched', 'acknowledged', 'rejected', 'timeout', 'transport_failure'] },
     },
   },

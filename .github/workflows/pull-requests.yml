@@ -176,6 +176,11 @@ jobs:
         with:
           esp-idf: 'false'
 
+      - name: Test plugin build and package tooling
+        run: |
+          pnpm exec vitest run --config apps/plugins/scripts/vitest.config.mts
+          node --test apps/plugins/scripts/*.test.mjs
+
       # Only affected plugins are linted, tested, and npm-packed. The `*,!tag:type:plugin`
       # exclude keeps the affected set restricted to plugin apps, so a PR that
       # touches no plugin (or shared global) runs nothing here.

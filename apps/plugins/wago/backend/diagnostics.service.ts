@@ -320,6 +320,14 @@ export class WagoDiagnosticsService {
       incompatible: !!controller.compatibilityError,
       ...runtimeStreamSummary(runtime),
       configuration: configurationSummary(draft, latest, applied, runtime, revisionMismatch),
+      manualOutputChannelIds:
+        connected && !revisionMismatch && freshness(runtime.stateSourceAt) === 'fresh'
+          ? (runtime.manualOutputChannelIds ?? []).filter((id) =>
+              appliedSnapshot?.logicalChannels.some(
+                (channel) => channel.id === id && channel.capabilities.includes('output'),
+              ),
+            )
+          : [],
       hardwareReadiness: 'unknown' as const,
       hardwareReadinessReason:
         'Reported hardware availability is shown when supplied; it does not prove physical I/O readiness. Applied configuration and cached output state are not physical proof.',

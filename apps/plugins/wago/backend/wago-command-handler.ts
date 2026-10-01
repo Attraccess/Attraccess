@@ -80,12 +80,10 @@ export class WagoCommandHandler {
     const controllers =
       previewOnly && !controllerId
         ? []
-        : await this.dependencies
-            .controllers()
-            .find({
-              where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId } : {}) },
-              order: { name: 'ASC' },
-            });
+        : await this.dependencies.controllers().find({
+            where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId } : {}) },
+            order: { name: 'ASC' },
+          });
     const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
     const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
     const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
@@ -214,8 +212,8 @@ export class WagoCommandHandler {
     };
   }
 
-  async validate(config: Record<string, unknown>, validationContext = new Map<string, unknown>()) {
-    const parsed = this.parse(config);
+  async validate(config: Record<string, unknown>, validationContext = new Map<string, unknown>(), manual = false) {
+    const parsed = this.parse(config, manual);
     if ('errors' in parsed) return parsed.errors;
     const { controllerId, channelId, action, expectedConfigurationRevision } = parsed.value;
     const controller = await this.cached(validationContext, `wago-controller:${controllerId}`, () =>
@@ -239,7 +237,7 @@ export class WagoCommandHandler {
     if (!channel) return [{ field: 'channelId', message: 'The selected Logical Channel no longer exists.' }];
     if (!channel.capabilities.includes('output'))
       return [{ field: 'channelId', message: 'The selected Logical Channel no longer supports output commands.' }];
-    if (!supportsOutputAction(channel, action))
+    if (action !== 'release' && !supportsOutputAction(channel, action))
       return [
         {
           field: 'action',
@@ -254,11 +252,11 @@ export class WagoCommandHandler {
     return [];
   }
 
-  async execute(config: Record<string, unknown>, commandId = randomUUID()): Promise<void> {
-    const errors = await this.validate(config);
+  async execute(config: Record<string, unknown>, commandId = randomUUID(), source?: 'manual'): Promise<void> {
+    const errors = await this.validate(config, new Map(), source === 'manual');
     if (errors.length)
       throw new WagoCommandError(errors.map((error) => error.message).join(' '), 'controller-rejection');
-    const parsed = this.parse(config);
+    const parsed = this.parse(config, source === 'manual');
     if ('errors' in parsed)
       throw new WagoCommandError(parsed.errors.map((error) => error.message).join(' '), 'controller-rejection');
     const {
@@ -282,6 +280,7 @@ export class WagoCommandHandler {
       channelId,
       action,
       ...(action === 'set' ? { value } : {}),
+      ...(source ? { source } : {}),
       expectedConfigurationRevision,
     });
     const acknowledgement =
@@ -380,12 +379,15 @@ export class WagoCommandHandler {
     return nodes.map((node) => `resource ${node.resourceId} / node ${node.id}`);
   }
 
-  private parse(config: WagoCommandConfig):
+  private parse(
+    config: WagoCommandConfig,
+    manual = false,
+  ):
     | {
         value: {
           controllerId: number;
           channelId: string;
-          action: 'set' | 'pulse';
+          action: 'set' | 'pulse' | 'release';
           value?: boolean;
           expectedConfigurationRevision: number;
           completionBehavior: 'dispatch' | 'acknowledged';
@@ -397,7 +399,10 @@ export class WagoCommandHandler {
     const controllerId = positiveInteger(config.controllerId);
     const expectedConfigurationRevision = positiveInteger(config.expectedConfigurationRevision);
     const channelId = typeof config.channelId === 'string' && config.channelId.trim() ? config.channelId : undefined;
-    const action = config.action === 'set' || config.action === 'pulse' ? config.action : undefined;
+    const action =
+      config.action === 'set' || config.action === 'pulse' || (manual && config.action === 'release')
+        ? config.action
+        : undefined;
     const completionBehavior = config.completionBehavior === 'dispatch' ? 'dispatch' : 'acknowledged';
     const parsedTimeout = positiveInteger(config.acknowledgementTimeoutSeconds);
     const acknowledgementTimeoutSeconds = parsedTimeout ?? DEFAULT_COMMAND_TIMEOUT_SECONDS;

@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
   resolve: {
     alias: {
+      '@attraccess/plugins-frontend-ui': fileURLToPath(
+        new URL('../../../../libs/plugins-frontend-ui/src/lib/i18n.ts', import.meta.url),
+      ),
       '@attraccess/plugins-frontend-sdk': fileURLToPath(
         new URL('../../../../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),
       ),
@@ -20,6 +23,7 @@ export default defineConfig({
       'apps/plugins/wago/frontend/src/CommissioningModal.test.tsx',
       'apps/plugins/wago/frontend/src/ControllersTable.test.tsx',
       'apps/plugins/wago/frontend/src/useCommissioningVerification.test.tsx',
+      'apps/plugins/wago/frontend/src/i18n.test.tsx',
     ],
     // The visual editor and Modbus form tests both render into jsdom's global document.
     // Running files concurrently allows user-event interactions in one file to target

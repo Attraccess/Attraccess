@@ -42,6 +42,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
   private active = new Set<string>();
   private generation = 0;
   private suspended = false;
+  private outputSamples = new Map<string, { result: { value: boolean } | { error: unknown }; expiresAt: number }>();
   constructor(
     private readonly onboard: DeviceAdapter,
     private readonly factory: (c: ModbusConnection) => ModbusTransport = (c) => new QueuedModbusTransport(c),
@@ -102,6 +103,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
       this.generation++;
       this.config = config;
       this.transports = next;
+      this.outputSamples.clear();
       // Names, polling intervals and profile/revision versions are not physical source identity.
       for (const key of this.counters.keys()) if (!sources.has(key)) this.counters.delete(key);
       for (const key of this.due.keys()) if (!key.startsWith('onboard:') && !sources.has(key)) this.due.delete(key);
@@ -135,6 +137,39 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     if (!measurement) throw new Error('point has no named measurement');
     return this.acquire(this.measurementSource(point), measurement, transport, device.unitId);
   }
+  async readOutput(point: Point): Promise<boolean> {
+    if (!point.modbus) return Boolean(await this.onboard.read(point));
+    if (this.suspended) throw new Error('Modbus configuration persistence in progress');
+    const { binding, device, profile, transport } = this.resolve(point);
+    const action = profile.actions.find((action) => action.id === binding.actionId);
+    if (!action) throw new Error('point has no named action');
+    const cached = this.outputSamples.get(point.id);
+    if (cached && cached.expiresAt > Date.now()) {
+      if ('error' in cached.result) throw cached.result.error;
+      return cached.result.value;
+    }
+    const generation = this.generation;
+    const expiresAt = Date.now() + (device.pollIntervalMs ?? 5000);
+    try {
+      const bytes = await transport.request(
+        device.unitId,
+        readPdu(action.functionCode === 5 ? 1 : 3, action),
+        () => generation === this.generation,
+      );
+      if (generation !== this.generation) throw new Error('Modbus configuration changed during acquisition');
+      const raw = action.functionCode === 5 ? Number(Boolean(bytes[0] & 1)) : decodeRaw(bytes, action);
+      const physical = action.functionCode === 5 ? raw : raw * action.scale + action.offset;
+      if (physical !== action.onValue && physical !== action.offValue)
+        throw new Error('switch register has an unknown state');
+      const value = physical === action.onValue;
+      this.outputSamples.set(point.id, { result: { value }, expiresAt });
+      return value;
+    } catch (error) {
+      if (generation === this.generation) this.outputSamples.set(point.id, { result: { error }, expiresAt });
+      throw error;
+    }
+  }
+
   measurementSource(point: Point): string {
     if (!point.modbus) return `onboard:${point.id}`;
     const { device, profile, binding, connection } = this.resolve(point);
@@ -178,12 +213,12 @@ export class ModbusDeviceRouter implements DeviceAdapter {
       this.due.set(key, now + 5000);
       return true;
     }
-    const { binding, profile } = this.resolve(point);
+    const { binding, profile, device } = this.resolve(point);
     const m = profile.measurements.find((entry) => entry.id === binding.measurementId);
     if (!m) return false;
     const key = this.measurementSource(point);
     if (this.active.has(key) || now < (this.due.get(key) ?? 0)) return false;
-    this.due.set(key, now + m.pollIntervalMs);
+    this.due.set(key, now + (device.pollIntervalMs ?? m.pollIntervalMs));
     return true;
   }
   writeMayHaveBeenTransmitted(error: unknown): boolean {
@@ -194,6 +229,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     );
   }
   async write(point: Point, value: boolean, admit?: WriteAdmission): Promise<void> {
+    this.outputSamples.delete(point.id);
     admit?.();
     if (this.suspended) throw new Error('Modbus configuration persistence in progress');
     if (!point.modbus) {
@@ -215,6 +251,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
         { expiresAt: admit?.expiresAt },
       ),
     );
+    this.outputSamples.delete(point.id);
   }
 }
 

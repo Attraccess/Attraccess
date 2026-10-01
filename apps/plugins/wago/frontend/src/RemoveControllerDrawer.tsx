@@ -2,6 +2,7 @@ import { Alert, Button, DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/r
 import type { WagoController } from './api';
 import { StandardDrawer } from './drawer';
 import { useRemoveControllerMutation } from './queries';
+import { useWagoTranslations } from './i18n';
 
 export function RemoveControllerDrawer({
   controller,
@@ -10,22 +11,47 @@ export function RemoveControllerDrawer({
   controller: WagoController | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useWagoTranslations();
   const removeMutation = useRemoveControllerMutation();
   const close = () => onOpenChange(false);
 
   return (
-    <StandardDrawer ariaLabel="Remove controller" isOpen={controller !== null} onOpenChange={onOpenChange}>
-      <DrawerHeader><h2 className="wg:text-xl wg:font-semibold">Remove controller</h2></DrawerHeader>
+    <StandardDrawer ariaLabel={t('remove.title')} isOpen={controller !== null} onOpenChange={onOpenChange}>
+      <DrawerHeader>
+        <h2 className="wg:text-xl wg:font-semibold">{t('remove.title')}</h2>
+      </DrawerHeader>
       <DrawerBody>
         <div className="wg:space-y-4">
-          <p>Remove <strong>{controller?.name ?? controller?.hardwareId}</strong> from Attraccess?</p>
-          <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>This revokes MQTT access and removes the controller registration and configuration. Commissioning records with unfinished installation cleanup or management access recovery are retained. The runtime remains installed on the CC100. Removing a registration does not restore preexisting applications or data, or re-enable CODESYS. An active operation blocks removal.</Alert.Description></Alert.Content></Alert>
-          {removeMutation.isError && <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Description>{removeMutation.error instanceof Error ? removeMutation.error.message : 'Could not remove the controller.'}</Alert.Description></Alert.Content></Alert>}
+          <p>{t('remove.question', { name: controller?.name ?? controller?.hardwareId })}</p>
+          <Alert status="warning">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>{t('remove.description')}</Alert.Description>
+            </Alert.Content>
+          </Alert>
+          {removeMutation.isError && (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>
+                  {removeMutation.error instanceof Error ? removeMutation.error.message : t('remove.error')}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
         </div>
       </DrawerBody>
       <DrawerFooter>
-        <Button variant="secondary" onPress={close}>Keep controller</Button>
-        <Button variant="danger" isPending={removeMutation.isPending} onPress={() => controller && removeMutation.mutate(controller.id, { onSuccess: close })}>Remove controller</Button>
+        <Button variant="secondary" onPress={close}>
+          {t('remove.keep')}
+        </Button>
+        <Button
+          variant="danger"
+          isPending={removeMutation.isPending}
+          onPress={() => controller && removeMutation.mutate(controller.id, { onSuccess: close })}
+        >
+          {t('remove.title')}
+        </Button>
       </DrawerFooter>
     </StandardDrawer>
   );

@@ -132,6 +132,20 @@ describe('WAGO command form', () => {
     expect(await handler.validate({ ...config, channelId: 'door-lock', action: 'pulse' })).toEqual([]);
   });
 
+  it('allows release only for manual commands on an applied output', async () => {
+    const config = { controllerId: 1, expectedConfigurationRevision: 3, action: 'release', channelId: 'door-lock' };
+    expect(await handler.validate(config)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'action' })]),
+    );
+    expect(await handler.validate(config, new Map(), true)).toEqual([]);
+    expect(await handler.validate({ ...config, channelId: 'door-contact' }, new Map(), true)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'channelId' })]),
+    );
+    expect(await handler.validate({ ...config, expectedConfigurationRevision: 2 }, new Map(), true)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'expectedConfigurationRevision' })]),
+    );
+  });
+
   it('keeps an unapplied controller incomplete with actionable help', async () => {
     appliedRevision.mockResolvedValue(null);
     const schema = await handler.schema({ controllerId: 1 }, 2);

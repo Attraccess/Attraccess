@@ -62,7 +62,11 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
+      ],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
@@ -113,7 +117,8 @@
       ],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
+        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
       }
     },
     "publish": {
@@ -134,6 +139,7 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
+      "inputs": ["default", "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"],
       "options": {
         "command": "vitest run --config apps/plugins/rabbitmq/frontend/vitest.config.ts"
       }

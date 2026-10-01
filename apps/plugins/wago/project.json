@@ -53,7 +53,14 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/channel-behavior.ts"],
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/channel-behavior.ts",
+        "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*",
+        "{workspaceRoot}/apps/plugins/shelly/frontend/src/{i18n.ts,en.json,de.json}",
+        "{workspaceRoot}/apps/plugins/rabbitmq/frontend/src/{i18n.ts,en.json,de.json}"
+      ],
       "options": {
         "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
       }
@@ -85,7 +92,8 @@
         "{projectRoot}/frontend/**/*",
         "{projectRoot}/shared/**/*",
         "{projectRoot}/modbus/**/*",
-        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
       ],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": {
@@ -137,7 +145,8 @@
       ],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css"
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
       }
     },
     "publish": {

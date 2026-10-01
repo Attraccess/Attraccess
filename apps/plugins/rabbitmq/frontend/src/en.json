@@ -1,0 +1,68 @@
+{
+  "page": {
+    "description": "RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT server detail view."
+  },
+  "status": {
+    "detected": "detected",
+    "refresh": "Refresh RabbitMQ status",
+    "reachable": "Management API reachable",
+    "auth": "Authentication",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "failed": "Failed",
+    "managementVersion": "Management API version",
+    "version": "RabbitMQ version",
+    "api": "Management API"
+  },
+  "users": {
+    "title": "RabbitMQ users",
+    "reload": "Reload RabbitMQ users",
+    "add": "Add user",
+    "username": "Username",
+    "tags": "Tags",
+    "access": "Vhost access",
+    "actions": "Actions",
+    "none": "none",
+    "edit": "Edit user {{name}}",
+    "permissions": "Edit permissions of {{name}}",
+    "delete": "Delete user {{name}}",
+    "deleteTitle": "Delete user",
+    "deleteDescription": "Delete the RabbitMQ user {{name}}? Connected clients using this account will be disconnected and its permissions removed.",
+    "loadError": "Loading users failed.",
+    "deleteError": "Deleting the user failed."
+  },
+  "form": {
+    "editTitle": "Edit user \"{{name}}\"",
+    "createTitle": "Create RabbitMQ user",
+    "usernamePlaceholder": "e.g. shop-floor-sensor",
+    "newPassword": "New password (leave blank to keep current)",
+    "password": "Password",
+    "tags": "Tags (comma-separated, e.g. management, administrator)",
+    "grant": "Grant default MQTT permissions",
+    "defaults": "Allows the user to publish and subscribe over MQTT: configure {{configure}}, write/read {{write}}.",
+    "vhost": "Vhost",
+    "available": " (available: {{vhosts}})",
+    "save": "Save changes",
+    "create": "Create user",
+    "usernameRequired": "Username is required.",
+    "passwordRequired": "Password is required when creating a user.",
+    "saveError": "Saving the user failed."
+  },
+  "permissions": {
+    "title": "Permissions of \"{{name}}\"",
+    "remove": "Remove permissions on {{vhost}}",
+    "configure": "Configure",
+    "write": "Write",
+    "read": "Read",
+    "defaults": "Use MQTT defaults",
+    "empty": "This user has no permissions on any vhost — it cannot connect yet.",
+    "addVhost": "Add vhost",
+    "add": "Add",
+    "saveError": "Saving permissions failed.",
+    "removeError": "Removing permissions failed.",
+    "duplicate": "Permissions for vhost \"{{vhost}}\" are already listed.",
+    "summary": "configure: {{configure}}\nwrite: {{write}}\nread: {{read}}"
+  },
+  "common": { "cancel": "Cancel", "close": "Close", "save": "Save", "delete": "Delete" }
+}

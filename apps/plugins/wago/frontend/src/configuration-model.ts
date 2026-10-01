@@ -1,7 +1,14 @@
 import { randomUUID } from './configuration-id';
-import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
+import { BUILTIN_MODBUS_PROFILES, findProfile } from '../../modbus/model';
+import type { ModbusConfiguration, ModbusProfile } from '../../modbus/model';
 import type { ConfigurationDiff, ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { availableDigitalTerminals, digitalTerminalLabel } from '../../backend/configuration-digital';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import englishFields from './fields.en.json';
+import englishChannels from './channels.en.json';
+import englishModbus from './modbus.en.json';
+import englishPresets from './presets.en.json';
+import { modbusDisplayName } from './modbus-labels';
 
 export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
 export type PhysicalPoint = WagoConfigurationSnapshot['physicalPoints'][number];
@@ -68,16 +75,69 @@ export function addDigitalChannel(
   };
 }
 
-export function pointLabel(point: PhysicalPoint, names: Record<string, string>) {
+export function pointLabel(point: PhysicalPoint, names: Record<string, string>, t?: TFunction) {
   return point.hardwareProfile === '751-9301'
     ? `${names[point.id] ?? 'CC100'} · ${digitalTerminalLabel(point.channel)}`
-    : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
+    : t
+      ? t('fields.externalAssignment', { name: names[point.id] ?? point.id, profile: point.hardwareProfile })
+      : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
 }
 
-export function readableValue(value: unknown, names: Record<string, string>): string {
-  if (value === undefined || value === null) return 'Not configured';
-  if (Array.isArray(value)) return value.map((item) => readableValue(item, names)).join(', ') || 'None';
+export function presetDisplayName(profile: string, t?: TFunction): string {
+  if (!Object.hasOwn(englishPresets.items, profile)) return profile;
+  return t
+    ? t(`presets.items.${profile}.name`)
+    : englishPresets.items[profile as keyof typeof englishPresets.items].name;
+}
+
+type ValueContext = {
+  modbus?: ModbusConfiguration;
+  profile?: ModbusProfile;
+  translateName: (name: string) => string;
+  metadataNames: Record<string, string>;
+};
+
+function profileForDevice(modbus: ModbusConfiguration | undefined, deviceId: string) {
+  const device = modbus?.devices.find((item) => item.id === deviceId);
+  return modbus && device ? findProfile(modbus, device) : undefined;
+}
+
+export function readableValue(
+  value: unknown,
+  names: Record<string, string>,
+  t?: TFunction,
+  field = '',
+  context?: ValueContext,
+): string {
+  if (value === undefined || value === null) return t ? t('fields.notConfigured') : 'Not configured';
+  if (Array.isArray(value))
+    return (
+      value.map((item) => readableValue(item, names, t, field, context)).join(', ') || (t ? t('fields.none') : 'None')
+    );
   if (typeof value === 'object') {
+    if (
+      context &&
+      'profileId' in value &&
+      typeof value.profileId === 'string' &&
+      'profileVersion' in value &&
+      typeof value.profileVersion === 'number'
+    )
+      context = {
+        ...context,
+        profile: [...BUILTIN_MODBUS_PROFILES, ...(context.modbus?.profiles ?? [])].find(
+          (profile) => profile.id === value.profileId && profile.version === value.profileVersion,
+        ),
+      };
+    if (
+      context &&
+      'hardwareProfile' in value &&
+      'modbus' in value &&
+      value.modbus &&
+      typeof value.modbus === 'object' &&
+      'deviceId' in value.modbus &&
+      typeof value.modbus.deviceId === 'string'
+    )
+      context = { ...context, profile: profileForDevice(context.modbus, value.modbus.deviceId) };
     if (
       'hardwareProfile' in value &&
       value.hardwareProfile === '751-9301' &&
@@ -90,11 +150,48 @@ export function readableValue(value: unknown, names: Record<string, string>): st
     return Object.entries(value)
       .map(
         ([key, item]) =>
-          `${fieldLabels[key] ?? (key === 'id' ? 'Name' : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names)}`,
+          `${fieldLabel(field ? `${field}.${key}` : key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t, key, context)}`,
       )
       .join('; ');
   }
-  if (typeof value === 'string') return names[value] ?? words(value);
+  if (typeof value === 'string') {
+    if (field === 'id') return value;
+    if (context && (field === 'measurementId' || field === 'actionId')) {
+      if (context.metadataNames[value]) return context.metadataNames[value];
+      const entries = field === 'measurementId' ? context.profile?.measurements : context.profile?.actions;
+      const entry = entries?.find((item) => item.id === value);
+      return entry && context.profile ? modbusDisplayName(context.profile, entry.name, context.translateName) : value;
+    }
+    // Only localize application-defined choices, never identifiers or user text.
+    if (field === 'profile' || field === 'presetId') return presetDisplayName(value, t);
+    if (context && ['connectionId', 'deviceId', 'profileId'].includes(field)) {
+      if (context.metadataNames[value]) return context.metadataNames[value];
+      if (field === 'deviceId') return context.modbus?.devices.find((device) => device.id === value)?.name ?? value;
+      if (field === 'profileId') {
+        const profile =
+          context.profile?.id === value
+            ? context.profile
+            : [...BUILTIN_MODBUS_PROFILES, ...(context.modbus?.profiles ?? [])].find((item) => item.id === value);
+        return profile ? modbusDisplayName(profile, profile.name, context.translateName) : value;
+      }
+      const index = context.modbus?.connections.findIndex((connection) => connection.id === value) ?? -1;
+      return index < 0 ? value : t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`;
+    }
+    if (['physicalPointId', 'channelId', 'channelIds'].includes(field))
+      return (context?.metadataNames ?? names)[value] ?? value;
+    const choiceCatalog = ['unit', 'kind', 'parity', 'byteOrder', 'wordOrder'].includes(field)
+      ? { prefix: 'modbus.options', values: englishModbus.options }
+      : field === 'mode' || field === 'expected'
+        ? { prefix: 'channels', values: englishChannels }
+        : field === 'capabilities' || field === 'when'
+          ? { prefix: 'fields.values', values: englishFields.values }
+          : undefined;
+    if (choiceCatalog && Object.hasOwn(choiceCatalog.values, value)) {
+      const fallback = choiceCatalog.values[value as keyof typeof choiceCatalog.values];
+      if (typeof fallback === 'string') return t ? t(`${choiceCatalog.prefix}.${value}`) : fallback;
+    }
+    return value;
+  }
   return String(value);
 }
 
@@ -103,12 +200,34 @@ export function readableChangeValue(
   value: unknown,
   snapshot: WagoConfigurationSnapshot | null,
   names: Record<string, string>,
+  t?: TFunction,
+  options?: Pick<ValueContext, 'translateName' | 'metadataNames'>,
 ) {
   if (/\.(name|host|path)$/.test(path) && typeof value === 'string') return value;
   const point = path.match(/^(?:\$\.)?physicalPoints\[(\d+)\]\.channel$/);
   if (point && typeof value === 'number' && snapshot?.physicalPoints[Number(point[1])]?.hardwareProfile === '751-9301')
     return `CC100 ${digitalTerminalLabel(value)}`;
-  return readableValue(value, names);
+  const context: ValueContext = {
+    modbus: snapshot?.modbus,
+    translateName: options?.translateName ?? ((name) => name),
+    metadataNames: options?.metadataNames ?? names,
+  };
+  const pointPath = path.match(/^(?:\$\.)?physicalPoints\[(?:(\d+)|id:([^\]]*))\]/);
+  const physicalPoint =
+    pointPath &&
+    (pointPath[1] !== undefined
+      ? snapshot?.physicalPoints[Number(pointPath[1])]
+      : snapshot?.physicalPoints.find((item) => item.id === decodeURIComponent(pointPath[2])));
+  if (physicalPoint?.modbus) context.profile = profileForDevice(context.modbus, physicalPoint.modbus.deviceId);
+  const devicePath = path.match(/^(?:\$\.)?modbus\.devices\[(\d+)\]/);
+  const device = devicePath && context.modbus?.devices[Number(devicePath[1])];
+  if (device) context.profile = profileForDevice(context.modbus, device.id);
+  const field =
+    path
+      .split('.')
+      .at(-1)
+      ?.replace(/\[\d+\]$/, '') ?? '';
+  return readableValue(value, names, t, field, context);
 }
 
 function words(value: string) {
@@ -118,39 +237,18 @@ function words(value: string) {
     .replaceAll('.', ' · ');
 }
 
-const fieldLabels: Record<string, string> = {
-  physicalPointId: 'Physical terminal',
-  channel: 'Physical terminal',
-  profile: 'Setup preset',
-  capabilities: 'Capabilities',
-  disconnectPolicy: 'On disconnect',
-  mode: 'Mode',
-  timeoutMs: 'Timeout (ms)',
-  durationMs: 'Duration (ms)',
-  channelId: 'Channel',
-  presetId: 'Preset',
-  pulse: 'Pulse',
-  guard: 'Guard',
-  feedback: 'Feedback',
-  measurement: 'Measurement',
-  range: 'Expected range',
-  minimum: 'Minimum',
-  maximum: 'Maximum',
-  when: 'When',
-  expected: 'Expected state',
-  unit: 'Unit',
-  scale: 'Scale',
-  offset: 'Offset',
-  kind: 'Measurement kind',
-  'disconnectPolicy.mode': 'On disconnect',
-  'disconnectPolicy.timeoutMs': 'Watchdog timeout',
-  'pulse.durationMs': 'Pulse duration',
-  'guard.channelId': 'Guard input',
-  'guard.when': 'Guard condition',
-  'feedback.channelId': 'Feedback input',
-  'feedback.expected': 'Expected feedback',
-  'feedback.timeoutMs': 'Feedback timeout',
-};
+function fieldLabel(field: string, t?: TFunction) {
+  const normalized = field.replace(/\[\d+\]/g, '');
+  for (const candidate of [normalized, normalized.split('.').at(-1) ?? normalized]) {
+    const key = candidate.replaceAll('.', '_');
+    const fallback = englishFields[key as keyof typeof englishFields];
+    if (typeof fallback === 'string') return t ? t(`fields.${key}`) : fallback;
+    const modbusFallback = englishModbus[key as keyof typeof englishModbus];
+    if (typeof modbusFallback === 'string' && !modbusFallback.includes('{{'))
+      return t ? t(`modbus.${key}`) : modbusFallback;
+  }
+  return undefined;
+}
 
 /** Read-only reviews match structural edits by identity, not shifting array positions. */
 export function readableStructuralChanges(
@@ -205,43 +303,63 @@ export function changeLabel(
   before: WagoConfigurationSnapshot | null,
   after: WagoConfigurationSnapshot,
   names: Record<string, string>,
+  t?: TFunction,
 ) {
   const structural = change.path.match(/^\$\.(logicalChannels|physicalPoints)\[id:(.*)\]$/);
   if (structural) {
     const id = decodeURIComponent(structural[2]);
     const label = names[id] ?? id;
-    return `${label} · ${change.current === undefined ? 'Removed' : change.previous === undefined ? 'Added' : 'Changed'}`;
+    return `${label} · ${t ? t(change.current === undefined ? 'fields.removed' : change.previous === undefined ? 'fields.added' : 'fields.changed') : change.current === undefined ? 'Removed' : change.previous === undefined ? 'Added' : 'Changed'}`;
   }
   const modbus = change.path.match(/^(?:\$\.)?modbus\.(connections|devices|profiles)\[(\d+)\](.*)$/);
   if (modbus) {
     const collection = modbus[1] as 'connections' | 'devices' | 'profiles';
     const index = Number(modbus[2]);
     const item = after.modbus?.[collection][index] ?? before?.modbus?.[collection][index];
-    const label = item && 'name' in item ? item.name : `Connection ${index + 1}`;
-    return `${label}${modbus[3] ? ` · ${names[modbus[3].slice(1)] ?? words(modbus[3].slice(1))}` : ''}`;
+    const label =
+      item && 'name' in item ? item.name : t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`;
+    const field = modbus[3].slice(1);
+    return `${label}${field ? ` · ${names[field] ?? fieldLabel(field, t) ?? words(field)}` : ''}`;
   }
   const match = change.path.match(/^(?:\$\.)?(logicalChannels|physicalPoints)\[(\d+)\](.*)$/);
-  if (!match) return change.path === '$' ? 'Configuration' : words(change.path.replace(/^\$\./, ''));
+  if (!match)
+    return change.path === '$'
+      ? t
+        ? t('fields.configuration')
+        : 'Configuration'
+      : words(change.path.replace(/^\$\./, ''));
   const collection = match[1] as 'logicalChannels' | 'physicalPoints';
   const item = after[collection][Number(match[2])] ?? before?.[collection][Number(match[2])];
   const label =
     item && names[item.id]
       ? names[item.id]
-      : `${collection === 'logicalChannels' ? 'Channel' : 'Physical point'} ${Number(match[2]) + 1}`;
+      : t
+        ? t(collection === 'logicalChannels' ? 'fields.channelTitle' : 'fields.pointTitle', {
+            index: Number(match[2]) + 1,
+          })
+        : `${collection === 'logicalChannels' ? 'Channel' : 'Physical point'} ${Number(match[2]) + 1}`;
   const field = match[3].slice(1);
-  return `${label}${field ? ` · ${fieldLabels[field] ?? words(field)}` : ''}`;
+  return `${label}${field ? ` · ${fieldLabel(field, t) ?? words(field)}` : ''}`;
 }
 
-export function configurationNames(snapshot: WagoConfigurationSnapshot | null, names: Record<string, string>) {
+export function configurationNames(
+  snapshot: WagoConfigurationSnapshot | null,
+  names: Record<string, string>,
+  t?: TFunction,
+  translateName: (name: string) => string = (name) => name,
+) {
   const modbus = snapshot?.modbus;
   if (!modbus) return names;
   return {
     ...Object.fromEntries([
-      ...modbus.connections.map((c, index) => [c.id, `Connection ${index + 1}`]),
+      ...modbus.connections.map((c, index) => [
+        c.id,
+        t ? t('fields.connection', { index: index + 1 }) : `Connection ${index + 1}`,
+      ]),
       ...modbus.devices.map((d) => [d.id, d.name]),
-      ...[...BUILTIN_MODBUS_PROFILES, ...modbus.profiles].flatMap((p) => [
-        [p.id, p.name],
-        ...[...p.measurements, ...p.actions].map((entry) => [entry.id, entry.name]),
+      ...[...BUILTIN_MODBUS_PROFILES, ...modbus.profiles].map((p) => [
+        p.id,
+        modbusDisplayName(p, p.name, translateName),
       ]),
     ]),
     ...names,

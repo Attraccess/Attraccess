@@ -6,8 +6,49 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ModbusConfigurationForm } from './ModbusConfigurationForm';
 import { BUILTIN_MODBUS_PROFILES, type ModbusConfiguration } from '../../modbus/model';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
+import germanModbus from './modbus.de.json';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useTranslationState.setState({ language: 'en' });
+});
+
+it('creates language-independent default names from a German form and preserves later user edits', async () => {
+  useTranslationState.setState({ language: 'de' });
+  let latest: ModbusConfiguration = { connections: [], devices: [], profiles: [] };
+  function Editor() {
+    const [value, onChange] = useState(latest);
+    latest = value;
+    return <ModbusConfigurationForm value={value} onChange={onChange} />;
+  }
+  render(<Editor />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: germanModbus.addDevice }));
+  expect(latest.devices[0].name).toBe('Modbus device');
+  await user.click(screen.getByRole('button', { name: germanModbus.createProfile }));
+  expect(latest.profiles[0].name).toBe('Custom profile');
+  const measurementButton = screen
+    .getAllByRole('button', { name: germanModbus.addMeasurement })
+    .find((button) => !button.hasAttribute('disabled'));
+  expect(measurementButton).toBeTruthy();
+  if (!measurementButton) throw new Error('Missing editable custom profile');
+  await user.click(measurementButton);
+  const actionButton = screen
+    .getAllByRole('button', { name: germanModbus.addAction })
+    .find((button) => !button.hasAttribute('disabled'));
+  if (!actionButton) throw new Error('Missing editable custom profile');
+  await user.click(actionButton);
+  expect(latest.profiles[0].measurements[0].name).toBe('Measurement');
+  expect(latest.profiles[0].actions[0].name).toBe('Switch');
+  const name = screen.getByDisplayValue('Measurement');
+  await user.clear(name);
+  await user.type(name, 'My reading');
+  const saved = JSON.stringify(latest);
+  act(() => useTranslationState.setState({ language: 'en' }));
+  expect(screen.getByDisplayValue('My reading')).toBe(name);
+  expect(JSON.stringify(latest)).toBe(saved);
+});
 describe('Modbus custom profile editing', () => {
   it('edits only the selected profile during a temporary ID collision', async () => {
     const other = { id: 'other', name: 'Other profile', version: 2, measurements: [], actions: [] };

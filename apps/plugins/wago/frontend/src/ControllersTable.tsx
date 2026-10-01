@@ -29,6 +29,9 @@ import {
 } from './api';
 import { useQuery } from '@tanstack/react-query';
 import { useCommissioningVerification } from './useCommissioningVerification';
+import { useWagoTranslations } from './i18n';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
 
 interface ControllersTableProps {
   controllers: WagoController[];
@@ -53,6 +56,7 @@ export function ControllersTable({
   onRemove,
   onResume,
 }: ControllersTableProps) {
+  const { t } = useWagoTranslations();
   const [runtimeUpdateTarget, setRuntimeUpdateTarget] = useState<ManagedAccessTarget | null>(null);
   const activeSessions = sessions.filter(
     (session) =>
@@ -79,16 +83,16 @@ export function ControllersTable({
     <>
       <Table>
         <TableScrollContainer>
-          <TableContent aria-label="WAGO controllers and commissioning sessions">
+          <TableContent aria-label={t('controllers.table')}>
             <TableHeader>
-              <TableColumn isRowHeader>Controller</TableColumn>
-              <TableColumn>Trust</TableColumn>
-              <TableColumn>Connection</TableColumn>
-              <TableColumn className="wg:hidden wg:md:table-cell">Runtime</TableColumn>
-              <TableColumn className="wg:hidden wg:lg:table-cell">Last heartbeat</TableColumn>
-              <TableColumn className="wg:text-end">Actions</TableColumn>
+              <TableColumn isRowHeader>{t('controllers.controller')}</TableColumn>
+              <TableColumn>{t('controllers.trust')}</TableColumn>
+              <TableColumn>{t('controllers.connection')}</TableColumn>
+              <TableColumn className="wg:hidden wg:md:table-cell">{t('controllers.runtime')}</TableColumn>
+              <TableColumn className="wg:hidden wg:lg:table-cell">{t('controllers.heartbeat')}</TableColumn>
+              <TableColumn className="wg:text-end">{t('controllers.actions')}</TableColumn>
             </TableHeader>
-            <TableBody items={rows} renderEmptyState={EmptyControllers}>
+            <TableBody items={rows} renderEmptyState={() => <EmptyControllers />}>
               {(row) =>
                 row.kind === 'session' ? (
                   <CommissioningRow
@@ -134,6 +138,7 @@ function ControllerRow({
   onShowRuntimeUpdate: (controller: WagoController) => void;
   onRecover: (session: CommissioningSession) => void;
 }) {
+  const { t, language, tBackendMessage } = useWagoTranslations();
   const { controller, session } = row;
   return (
     <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-primary/5' : undefined}>
@@ -155,36 +160,40 @@ function ControllerRow({
           {controller.protocolVersion} / {controller.runtimeVersion}
         </div>
         {controller.compatibilityError && (
-          <p className="wg:mt-1 wg:text-xs wg:text-danger">{controller.compatibilityError}</p>
+          <p className="wg:mt-1 wg:text-xs wg:text-danger">{tBackendMessage(controller.compatibilityError)}</p>
         )}
       </TableCell>
-      <TableCell className="wg:hidden wg:lg:table-cell">{formatHeartbeat(controller.lastHeartbeatAt)}</TableCell>
+      <TableCell className="wg:hidden wg:lg:table-cell">
+        {controller.lastHeartbeatAt
+          ? new Date(controller.lastHeartbeatAt).toLocaleString(language)
+          : t('controllers.never')}
+      </TableCell>
       <TableCell>
         <div className="wg:flex wg:justify-end wg:gap-2">
           {session && <SessionProgressAction session={session} onResume={onResume} />}
           {controller.trustState === 'untrusted' ? (
             !session && (
               <Button size="sm" onPress={() => onClaim(controller.id)}>
-                Claim
+                {t('controllers.claim')}
               </Button>
             )
           ) : (
             <>
               <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>
-                Configure
+                {t('controllers.configure')}
               </Button>
               <Button size="sm" variant="ghost" onPress={() => onShowRuntimeUpdate(controller)}>
-                Runtime updates
+                {t('controllers.updateRuntime')}
               </Button>
             </>
           )}
           {session?.managedAccessAvailable && controller.trustState !== 'claimed' && (
             <Button size="sm" variant="secondary" onPress={() => onRecover(session)}>
-              Managed SSH recovery
+              {t('runtimeManagement.recoveryTitle')}
             </Button>
           )}
           <Button size="sm" variant="danger" onPress={() => onRemove(controller)}>
-            Remove
+            {t('common.remove')}
           </Button>
         </div>
       </TableCell>
@@ -200,11 +209,12 @@ function SessionProgressAction({
   session: CommissioningSession;
   onResume: (session: CommissioningSession) => void;
 }) {
+  const { t } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   if (verification.enrollmentComplete) return null;
   return (
     <Button size="sm" variant="secondary" onPress={() => onResume(session)}>
-      View progress
+      {t('controllers.progress')}
     </Button>
   );
 }
@@ -216,8 +226,9 @@ function RuntimeUpdateModal({
   target: ManagedAccessTarget | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useWagoTranslations();
   const controller = target && 'controller' in target ? target.controller : null;
-  const title = controller ? 'Runtime update' : 'Managed SSH recovery';
+  const title = controller ? t('runtimeUpdate.title') : t('runtimeManagement.recoveryTitle');
   return (
     <StandardModal isOpen={target !== null} onOpenChange={onOpenChange} size="lg" dialogProps={{ 'aria-label': title }}>
       <ModalHeader>
@@ -226,7 +237,8 @@ function RuntimeUpdateModal({
       <ModalBody className="wg:space-y-3">
         {controller && (
           <p className="wg:text-sm">
-            Running runtime: <strong>{controller?.runtimeVersion}</strong> · protocol {controller?.protocolVersion}
+            {t('runtimeUpdate.running')} <strong>{controller?.runtimeVersion}</strong> · {t('runtimeUpdate.protocol')}{' '}
+            {controller?.protocolVersion}
           </p>
         )}
         {target && (
@@ -237,13 +249,14 @@ function RuntimeUpdateModal({
         )}
       </ModalBody>
       <ModalFooter>
-        <Button onPress={() => onOpenChange(false)}>Understood</Button>
+        <Button onPress={() => onOpenChange(false)}>{t('runtimeUpdate.understood')}</Button>
       </ModalFooter>
     </StandardModal>
   );
 }
 
 function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
+  const { t, language } = useWagoTranslations();
   const controllerId = 'controller' in target ? target.controller.id : null;
   const sessionId = 'session' in target ? target.session.id : null;
   const query = useQuery({
@@ -275,28 +288,24 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
     return (
       <Alert status="warning">
         <Alert.Content>
-          <Alert.Title>Update status unavailable</Alert.Title>
-          <Alert.Description>
-            Check access to Attraccess, then reopen this dialog. No update result is inferred from an unavailable
-            status.
-          </Alert.Description>
+          <Alert.Title>{t('runtimeManagement.unavailable')}</Alert.Title>
+          <Alert.Description>{t('runtimeManagement.unavailableDescription')}</Alert.Description>
         </Alert.Content>
       </Alert>
     );
-  if (!status) return <p role="status">Loading runtime update status…</p>;
+  if (!status) return <p role="status">{t('runtimeManagement.loading')}</p>;
   if (status.management === 'reenrol_required')
     return (
-      <Alert status="warning">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Re-enrolment required</Alert.Title>
-          <Alert.Description>
-            This controller has no verified managed SSH identity. Remove it and enrol it again to provision encrypted
-            management credentials for automatic updates. Re-enrolment is destructive and wipes applications, data and
-            configuration on the CC100.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
+      <>
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>{t('runtimeManagement.reenrol')}</Alert.Title>
+            <Alert.Description>{t('runtimeManagement.reenrolDescription')}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+        {status.rolloutEnabled === false && <p role="status">{t('runtimeManagement.disabledDescription')}</p>}
+      </>
     );
   const action = async (kind: 'password' | 'retry' | 'restore' | 'runtime') => {
     if (!status.sessionId) return;
@@ -334,39 +343,45 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
           <Alert.Title>
             {status.management === 'managed'
               ? status.rolloutEnabled === false
-                ? 'Runtime updates paused'
-                : 'Automatic runtime updates'
+                ? t('runtimeManagement.paused')
+                : t('runtimeManagement.automatic')
               : status.management === 'retired'
-                ? 'Automatic management retired'
-                : 'Managed SSH needs attention'}
+                ? t('runtimeManagement.retired')
+                : t('runtimeManagement.attention')}
           </Alert.Title>
           <Alert.Description>
             {status.management === 'retired'
-              ? 'This enrolment was retired. Its encrypted recovery credential remains available to administrators.'
-              : 'Server builds update the runtime using its encrypted SSH key. Enrolled credentials and runtime state are preserved; failed updates restore the previous runtime.'}
+              ? t('runtimeManagement.retiredDescription')
+              : t('runtimeManagement.automaticDescription')}
           </Alert.Description>
         </Alert.Content>
       </Alert>
       <p>
-        Management: <strong>{status.management.replaceAll('_', ' ')}</strong>
+        {t('runtimeManagement.managementLabel')} <strong>{t(`runtimeManagement.states.${status.management}`)}</strong>
       </p>
       <p>
-        Update: <strong>{status.update?.phase.replaceAll('_', ' ') ?? 'Waiting for reconciliation'}</strong>
+        {t('runtimeManagement.updateLabel')}{' '}
+        <strong>
+          {status.update ? t(`runtimeManagement.phases.${status.update.phase}`) : t('runtimeManagement.waiting')}
+        </strong>
       </p>
       {status.update && (
         <>
           <p>
-            Desired image: <code className="wg:break-all">{status.update.desiredImageId}</code>
+            {t('runtimeManagement.desired')} <code className="wg:break-all">{status.update.desiredImageId}</code>
           </p>
           {status.update.failure && (
             <p role="status">
-              Last failure: {status.update.failure.replaceAll('_', ' ')}.{' '}
-              {status.update.retryAt > 0 && `Retry after ${new Date(status.update.retryAt).toLocaleString()}.`}
+              {t('runtimeManagement.failure', { failure: t(`runtimeManagement.failures.${status.update.failure}`) })}{' '}
+              {status.update.retryAt > 0 &&
+                t('runtimeManagement.retryAfter', { date: new Date(status.update.retryAt).toLocaleString(language) })}
             </p>
           )}
           {!!status.update.cleanupRetryAt && (
             <p role="status">
-              Runtime accepted; cleanup needs a retry after {new Date(status.update.cleanupRetryAt).toLocaleString()}.
+              {t('runtimeManagement.cleanup', {
+                date: new Date(status.update.cleanupRetryAt).toLocaleString(language),
+              })}
             </p>
           )}
         </>
@@ -378,7 +393,7 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
           isDisabled={status.rolloutEnabled === false}
           onPress={() => void action('retry')}
         >
-          Retry managed access
+          {t('runtimeManagement.retryAccess')}
         </Button>
       )}
       {controllerId &&
@@ -392,16 +407,11 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
             isDisabled={status.rolloutEnabled === false}
             onPress={() => void action('runtime')}
           >
-            Retry runtime update
+            {t('runtimeManagement.retryRuntime')}
           </Button>
         )}
-      {status.rolloutEnabled === false && (
-        <p role="status">
-          Managed enrolment and automatic updates are disabled pending FW31 qualification. Administrator recovery
-          remains available.
-        </p>
-      )}
-      <p className="wg:text-sm wg:text-muted">Physical FW31 qualification: unverified.</p>
+      {status.rolloutEnabled === false && <p role="status">{t('runtimeManagement.disabledDescription')}</p>}
+      <p className="wg:text-sm wg:text-muted">{t('runtimeManagement.physical')}</p>
       <Accordion>
         <Accordion.Item
           onExpandedChange={(expanded) => {
@@ -414,16 +424,13 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
         >
           <Accordion.Heading>
             <Accordion.Trigger>
-              Administrator recovery
+              {t('runtimeManagement.administratorRecovery')}
               <Accordion.Indicator />
             </Accordion.Trigger>
           </Accordion.Heading>
           <Accordion.Panel>
             <Accordion.Body>
-              <p className="wg:mb-3 wg:text-sm wg:text-muted">
-                Root SSH is disabled after cutover. The recovery password is for administrator recovery, not routine
-                updates.
-              </p>
+              <p className="wg:mb-3 wg:text-sm wg:text-muted">{t('runtimeManagement.recoveryDescription')}</p>
               <Button
                 fullWidth
                 size="sm"
@@ -431,17 +438,14 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
                 isDisabled={pending || !status.sessionId}
                 onPress={() => (password ? setPassword(null) : void action('password'))}
               >
-                {password ? 'Hide recovery password' : 'Reveal root password (audited)'}
+                {t(password ? 'runtimeManagement.hidePassword' : 'runtimeManagement.revealPassword')}
               </Button>
               {password && (
-                <code className="wg:break-all" aria-label="Root recovery password">
+                <code className="wg:break-all" aria-label={t('runtimeManagement.passwordLabel')}>
                   {password}
                 </code>
               )}
-              <p className="wg:text-sm wg:text-muted">
-                For recovery or re-enrolment, restoring bootstrap SSH retires automatic management and re-enables the
-                previous SSH policy.
-              </p>
+              <p className="wg:text-sm wg:text-muted">{t('runtimeManagement.restoreDescription')}</p>
               <Button
                 fullWidth
                 size="sm"
@@ -449,15 +453,13 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
                 isDisabled={pending || !status.sessionId}
                 onPress={() => void action('restore')}
               >
-                Restore bootstrap SSH (audited)
+                {t('runtimeManagement.restore')}
               </Button>
             </Accordion.Body>
           </Accordion.Panel>
         </Accordion.Item>
       </Accordion>
-      {failed && (
-        <p role="alert">Action failed. Check administrator permissions, audit availability and controller access.</p>
-      )}
+      {failed && <p role="alert">{t('runtimeManagement.actionFailed')}</p>}
     </>
   );
 }
@@ -471,12 +473,13 @@ function CommissioningRow({
   onResume: (session: CommissioningSession) => void;
   onRecover: (session: CommissioningSession) => void;
 }) {
+  const { t, language } = useWagoTranslations();
   const { session } = row;
   return (
     <TableRow key={row.key} id={row.key} className="wg:bg-primary/5">
       <TableCell>
         <div className="wg:flex wg:min-w-0 wg:flex-col">
-          <span className="wg:truncate wg:font-medium">{session.controllerName ?? 'CC100 enrollment'}</span>
+          <span className="wg:truncate wg:font-medium">{session.controllerName ?? t('controllers.enrollment')}</span>
           <span className="wg:truncate wg:text-xs wg:text-muted">
             {session.targetHost} · {session.hardwareId}
           </span>
@@ -485,17 +488,17 @@ function CommissioningRow({
       </TableCell>
       <TableCell>
         <Chip color={session.state === 'revoked' ? 'default' : 'accent'} size="sm" variant="soft">
-          {session.state === 'revoked' ? 'Revoked' : 'Enrolling'}
+          {t(session.state === 'revoked' ? 'commissioning.revoked' : 'controllers.enrolling')}
         </Chip>
       </TableCell>
       <TableCell>
         <Chip color="warning" size="sm" variant="soft">
-          {session.state === 'revoked' ? 'Recovery available' : 'In progress'}
+          {t(session.state === 'revoked' ? 'runtimeManagement.recoveryAvailable' : 'controllers.inProgress')}
         </Chip>
       </TableCell>
       <TableCell className="wg:hidden wg:md:table-cell">{session.firmwareBaseline}</TableCell>
       <TableCell className="wg:hidden wg:lg:table-cell">
-        Updated {new Date(session.updatedAt).toLocaleString()}
+        {t('controllers.updated', { date: new Date(session.updatedAt).toLocaleString(language) })}
       </TableCell>
       <TableCell>
         <div className="wg:flex wg:justify-end wg:gap-2">
@@ -504,11 +507,17 @@ function CommissioningRow({
             variant={isResumable(session.state) ? 'primary' : 'secondary'}
             onPress={() => onResume(session)}
           >
-            {isResumable(session.state) ? 'Resume' : session.state === 'revoked' ? 'Session details' : 'View progress'}
+            {t(
+              isResumable(session.state)
+                ? 'controllers.resume'
+                : session.state === 'revoked'
+                  ? 'runtimeManagement.sessionDetails'
+                  : 'controllers.progress',
+            )}
           </Button>
           {session.managedAccessAvailable && (
             <Button size="sm" variant="secondary" onPress={() => onRecover(session)}>
-              Managed SSH recovery
+              {t('runtimeManagement.recoveryTitle')}
             </Button>
           )}
         </div>
@@ -518,43 +527,43 @@ function CommissioningRow({
 }
 
 function CommissioningStatus({ session }: { session: CommissioningSession }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   const label = verification.enrollmentComplete
     ? verification.runtimeVerified
-      ? 'Enrollment complete · runtime verified'
-      : 'Enrollment complete · runtime setup pending'
+      ? t('controllers.verified')
+      : t('controllers.pending')
     : verification.unavailable
-      ? 'Verification status unavailable'
-      : commissioningLabel(session.state);
+      ? t('controllers.unavailable')
+      : commissioningLabel(session.state, t);
   return (
     <span className="wg:mt-1 wg:text-xs wg:text-primary">
       {label}
-      {session.failureReason ? `: ${session.failureReason}` : ''}
+      {session.failureReason ? `: ${tBackendMessage(session.failureReason)}` : ''}
     </span>
   );
 }
 
 function EmptyControllers() {
-  return (
-    <div className="wg:px-4 wg:py-12 wg:text-center wg:text-sm wg:text-muted">
-      No controllers or commissioning sessions yet.
-    </div>
-  );
+  const { t } = useWagoTranslations();
+  return <div className="wg:px-4 wg:py-12 wg:text-center wg:text-sm wg:text-muted">{t('controllers.empty')}</div>;
 }
 
 function TrustChip({ trustState }: Pick<WagoController, 'trustState'>) {
+  const { t } = useWagoTranslations();
   return (
     <Chip color={trustState === 'claimed' ? 'success' : 'warning'} size="sm" variant="soft">
-      {trustState}
+      {t(`trust.${trustState}`)}
     </Chip>
   );
 }
 
 function ConnectivityChip({ connectivity }: Pick<WagoController, 'connectivity'>) {
+  const { t } = useWagoTranslations();
   const color = connectivity === 'online' ? 'success' : connectivity === 'stale' ? 'warning' : 'default';
   return (
     <Chip color={color} size="sm" variant="soft">
-      {connectivity}
+      {t(`connectivity.${connectivity}`)}
     </Chip>
   );
 }
@@ -569,23 +578,6 @@ function isResumable(state: WagoCommissioningState): boolean {
   ].includes(state);
 }
 
-export function commissioningLabel(state: WagoCommissioningState): string {
-  return {
-    awaiting_delivery: 'Preparing automatic delivery',
-    delivering: 'Delivering commissioning runtime',
-    awaiting_identity_confirmation: 'Ready to verify the physical controller',
-    awaiting_codesys_confirmation: 'Waiting for destructive installation approval',
-    delivery_failed: 'Delivery needs attention',
-    awaiting_discovery: 'Waiting for the controller to connect',
-    awaiting_claim: 'Claiming automatically',
-    completed: 'Claimed',
-    awaiting_verification: 'Verification required',
-    claim_interrupted: 'Claim recovery required',
-    recovery_revocation_pending: 'Restored; revocation pending',
-    revoked: 'Revoked',
-  }[state];
-}
-
-function formatHeartbeat(lastHeartbeatAt: string | null): string {
-  return lastHeartbeatAt ? new Date(lastHeartbeatAt).toLocaleString() : 'Never';
+export function commissioningLabel(state: WagoCommissioningState, t?: TFunction): string {
+  return t ? t(`commissioning.${state}`) : en.commissioning[state];
 }

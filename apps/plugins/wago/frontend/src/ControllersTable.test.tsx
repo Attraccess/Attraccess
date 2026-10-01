@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ControllersTable } from './ControllersTable';
@@ -39,6 +40,7 @@ const verified: CommissioningVerification = {
   ready: false,
 };
 beforeEach(() => {
+  useTranslationState.setState({ language: 'en' });
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   getVerification.mockResolvedValue(verified);
   getUpdateStatus.mockResolvedValue({
@@ -49,6 +51,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  useTranslationState.setState({ language: 'en' });
   cleanup();
   client.clear();
   vi.clearAllMocks();
@@ -88,6 +91,24 @@ it('explains the destructive re-enrolment required for legacy controllers', asyn
   expect(screen.getByText(/wipes applications, data and configuration/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Understood' }));
   expect(screen.queryByText('Re-enrolment required')).toBeNull();
+});
+
+it('translates runtime retries and recovery in place when the host language changes', async () => {
+  getUpdateStatus.mockResolvedValue({
+    rolloutEnabled: true,
+    management: 'managed',
+    sessionId: 7,
+    update: { phase: 'failed', desiredImageId: 'sha256:desired', failure: 'readiness', retryAt: 0 },
+  });
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Runtime updates' }));
+  await screen.findByText(/Last failure: readiness/);
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(screen.getByText(/Letzter Fehler: Betriebsbereitschaft/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Laufzeit-Update erneut versuchen' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Wiederherstellung durch Administrator' }));
+  expect(screen.getByRole('button', { name: 'Root-Passwort anzeigen (protokolliert)' })).toBeTruthy();
+  expect(getRootPassword).not.toHaveBeenCalled();
 });
 
 it('shows durable update failure and requests recovery secrets only on the explicit audited action', async () => {
@@ -236,4 +257,14 @@ it('keeps session recovery reachable when merged into an untrusted controller ro
   expect(await screen.findByText('Managed SSH needs attention')).toBeTruthy();
   expect(getSessionStatus).toHaveBeenCalledWith(7);
   expect(getUpdateStatus).not.toHaveBeenCalled();
+});
+
+it('can transition between empty and populated collections without changing hook order', () => {
+  const props = { sessions: [], onResume: vi.fn(), onConfigure: vi.fn(), onClaim: vi.fn(), onRemove: vi.fn() };
+  const { rerender } = render(<ControllersTable {...props} controllers={[]} />);
+  expect(screen.getByText('No controllers or commissioning sessions yet.')).toBeTruthy();
+  rerender(<ControllersTable {...props} controllers={[controller]} />);
+  expect(screen.getByText('Fixture')).toBeTruthy();
+  rerender(<ControllersTable {...props} controllers={[]} />);
+  expect(screen.getByText('No controllers or commissioning sessions yet.')).toBeTruthy();
 });
