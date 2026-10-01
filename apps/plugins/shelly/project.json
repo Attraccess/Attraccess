@@ -18,7 +18,7 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*"],
+      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"],
       "outputs": [],
       "options": {
         "cwd": "apps/plugins/shelly",

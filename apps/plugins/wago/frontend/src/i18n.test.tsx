@@ -17,7 +17,8 @@ import rabbitmqEn from '../../../rabbitmq/frontend/src/en.json';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import rabbitmqDe from '../../../rabbitmq/frontend/src/de.json';
 import { ChannelWorkspace } from './ChannelWorkspace';
-import { ConfigurationChanges } from './ConfigurationChanges';
+import { ConfigurationChanges, ConfigurationErrors, ConfigurationMetadataChanges } from './ConfigurationChanges';
+import { ModbusChannels } from './ModbusChannels';
 import englishPresets from './presets.en.json';
 import germanPresets from './presets.de.json';
 import {
@@ -91,6 +92,93 @@ it('translates retained backend messages, statuses and builtin names while prese
   );
   act(() => useTranslationState.getState().setLanguage('en'));
   expect(result.current.tBackendMessage('Confirm controller identity')).toBe('Confirm controller identity');
+});
+
+it('localizes Modbus add buttons without saving translated signal names', async () => {
+  const builtin = BUILTIN_MODBUS_PROFILES[0];
+  const custom = duplicateProfile(builtin, 'custom-meter');
+  custom.actions = [
+    { ...custom.measurements[0], id: 'relay', name: 'Active power', functionCode: 5, onValue: 1, offValue: 0 },
+  ];
+  const configuration = {
+    connections: [],
+    profiles: [custom],
+    devices: [builtin, custom].map((profile, index) => ({
+      id: `meter-${index}`,
+      name: `Meter ${index}`,
+      connectionId: 'bus',
+      unitId: index + 1,
+      profileId: profile.id,
+      profileVersion: profile.version,
+    })),
+  };
+  const onAdd = vi.fn();
+  render(<ModbusChannels configuration={configuration} onAdd={onAdd} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Add Active power from Meter 0' }));
+  expect(onAdd).toHaveBeenLastCalledWith(
+    { deviceId: 'meter-0', measurementId: 'active-power' },
+    'Meter 0: Active power',
+  );
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(onAdd).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole('button', { name: 'Wirkleistung von Meter 0 hinzufügen' }));
+  expect(onAdd).toHaveBeenLastCalledWith(
+    { deviceId: 'meter-0', measurementId: 'active-power' },
+    'Meter 0: Active power',
+  );
+  for (const button of screen.getAllByRole('button', { name: 'Active power von Meter 1 hinzufügen' }))
+    await user.click(button);
+  expect(onAdd).toHaveBeenLastCalledWith({ deviceId: 'meter-1', actionId: 'relay' }, 'Meter 1: Active power');
+});
+
+it('localizes preset metadata objects and leaves while preserving unknown preset IDs and names', () => {
+  const presetId = 'generic-digital-output';
+  const changes = [
+    { path: '$.presets[0]', previous: null, current: { presetId, channelId: 'channel' } },
+    { path: '$.presets[0].presetId', previous: 'vendor.preset-v2', current: presetId },
+    { path: '$.names.channel', previous: null, current: presetId },
+  ];
+  render(
+    <ConfigurationMetadataChanges
+      changes={changes}
+      names={{ channel: 'Workshop', [presetId]: 'Unrelated ID alias' }}
+    />,
+  );
+  expect(screen.getByText(`After: ${englishPresets.items[presetId].name}`)).toBeTruthy();
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(screen.getByText(`Nachher: ${germanPresets.items[presetId].name}`)).toBeTruthy();
+  expect(screen.getByText('Vorher: vendor.preset-v2')).toBeTruthy();
+  expect(screen.getByText(`Nachher: ${presetId}`)).toBeTruthy();
+  expect(screen.getByText(/Nachher: Vorlage:/).textContent).toContain(germanPresets.items[presetId].name);
+  expect(screen.getByText(/Nachher: Vorlage:/).textContent).toContain('Workshop');
+});
+
+it('preserves literal validation text and resolves only exact references in recognized messages', () => {
+  const messages = [
+    'Unknown diagnostic: point-10 / on / Connection closed',
+    'physical point point-10 does not exist in this snapshot',
+    'physical point point-100 does not exist in this snapshot',
+  ];
+  const { container } = render(
+    <ConfigurationErrors
+      errors={messages.map((message, index) => ({
+        path: `$.logicalChannels[${index}].physicalPointId`,
+        code: 'missing_reference',
+        message,
+      }))}
+      snapshot={emptyConfiguration}
+      names={{ point: 'Wrong substring', 'point-10': 'R&D <Workshop>', on: 'Unrelated alias' }}
+    />,
+  );
+  const texts = () => [...container.querySelectorAll('li')].map((item) => item.textContent);
+  expect(texts()[0]).toContain(messages[0]);
+  expect(texts()[1]).toContain('physical point R&D <Workshop> does not exist in this snapshot');
+  expect(texts()[2]).toContain(messages[2]);
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(texts()[0]).toContain(messages[0]);
+  expect(texts()[1]).toContain('Physischer Punkt R&D <Workshop> ist in dieser Konfigurationsaufnahme nicht vorhanden');
+  expect(texts()[2]).toContain('Physischer Punkt point-100 ist in dieser Konfigurationsaufnahme nicht vorhanden');
 });
 
 it('translates every diagnostic freshness, acknowledgement and commissioning readiness status', () => {
@@ -190,6 +278,17 @@ it('localizes built-in Modbus review names while preserving custom names and met
   );
   expect(screen.getByText(/^Nachher:/).textContent).toContain('Wirkleistung');
   expect(screen.getByText(/^Nachher:/).textContent).toContain('Meter.v1');
+  const fullReview = screen.getByText(/^Nachher:/).textContent ?? '';
+  expect(fullReview.match(/Name: active-power/g)).toHaveLength(2);
+  rerender(
+    <ConfigurationChanges
+      changes={[{ path: '$.modbus.profiles[0].measurements[0].id', previous: null, current: 'active-power' }]}
+      before={null}
+      after={before}
+      names={{ 'active-power': 'Unrelated metadata alias' }}
+    />,
+  );
+  expect(screen.getByText('Nachher: active-power')).toBeTruthy();
   rerender(
     <ConfigurationChanges
       changes={[{ path: '$', previous: null, current: after }]}
@@ -235,6 +334,34 @@ it('translates the backend-owned reasons that diagnostic samples are not current
     expect(result.current.tBackendMessage(reason)).toBe(german);
     act(() => useTranslationState.getState().setLanguage('en'));
   }
+});
+
+it('resolves Modbus profile references by the selected device version', () => {
+  const first = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'shared-profile');
+  first.name = 'First profile';
+  const second = { ...first, version: 2, name: 'Second profile' };
+  const snapshot: WagoConfigurationSnapshot = {
+    ...emptyConfiguration,
+    modbus: {
+      connections: [],
+      profiles: [first, second],
+      devices: [
+        {
+          id: 'meter',
+          name: 'Meter',
+          connectionId: 'bus',
+          unitId: 1,
+          profileId: first.id,
+          profileVersion: 2,
+        },
+      ],
+    },
+  };
+  const { result } = renderHook(() => useWagoTranslations());
+  expect(readableChangeValue('$.modbus.devices[0].profileId', first.id, snapshot, {}, result.current.t)).toBe(
+    'Second profile',
+  );
+  expect(readableChangeValue('$', snapshot, snapshot, {}, result.current.t)).toContain('Profile ID: Second profile');
 });
 
 it('updates visible labels while preserving a channel creation form and its user-entered name', async () => {

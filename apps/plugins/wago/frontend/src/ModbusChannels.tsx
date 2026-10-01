@@ -31,10 +31,13 @@ export function ModbusChannels({
                   className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
                   variant="secondary"
                   onPress={() =>
-                    onAdd({ deviceId: device.id, measurementId: measurement.id }, `${device.name}: ${modbusDisplayName(profile, measurement.name, tBackendMessage)}`)
+                    onAdd({ deviceId: device.id, measurementId: measurement.id }, `${device.name}: ${measurement.name}`)
                   }
                 >
-                  {t('modbus.addPoint', { name: modbusDisplayName(profile, measurement.name, tBackendMessage), device: device.name })}
+                  {t('modbus.addPoint', {
+                    name: modbusDisplayName(profile, measurement.name, tBackendMessage),
+                    device: device.name,
+                  })}
                 </Button>
               ))}
               {profile?.actions.map((action) => (
@@ -42,9 +45,12 @@ export function ModbusChannels({
                   key={action.id}
                   className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
                   variant="secondary"
-                  onPress={() => onAdd({ deviceId: device.id, actionId: action.id }, `${device.name}: ${modbusDisplayName(profile, action.name, tBackendMessage)}`)}
+                  onPress={() => onAdd({ deviceId: device.id, actionId: action.id }, `${device.name}: ${action.name}`)}
                 >
-                  {t('modbus.addPoint', { name: modbusDisplayName(profile, action.name, tBackendMessage), device: device.name })}
+                  {t('modbus.addPoint', {
+                    name: modbusDisplayName(profile, action.name, tBackendMessage),
+                    device: device.name,
+                  })}
                 </Button>
               ))}
               {profile && !profile.actions.length && <p>{t('modbus.noActions')}</p>}
