@@ -26,6 +26,24 @@ function required<T>(value: T | null | undefined): T {
 }
 
 describe('front panel configuration', () => {
+  it('preserves measurement calibration on both edited and unrelated devices', () => {
+    let configuration = addDevice(empty(), 'First meter').configuration;
+    configuration = addDevice(configuration, 'Second meter').configuration;
+    configuration.snapshot.logicalChannels = configuration.snapshot.logicalChannels.map((channel) => ({
+      ...channel,
+      measurement: { ...required(channel.measurement), scale: 1.25, offset: -3 },
+    }));
+    const device = required(configuration.snapshot.modbus).devices[0];
+    const next = saveDevice(
+      configuration,
+      { ...device, name: 'Renamed', pollIntervalMs: 2500 },
+      busConnection(configuration.snapshot),
+      BUILTIN_MODBUS_PROFILES[0],
+    );
+    expect(next.snapshot.logicalChannels.map((channel) => channel.measurement)).toEqual(
+      configuration.snapshot.logicalChannels.map((channel) => channel.measurement),
+    );
+  });
   it('uses each fixed terminal and preserves the channel identity when renaming', () => {
     let configuration = empty();
     for (const terminal of DIGITAL_TERMINALS)

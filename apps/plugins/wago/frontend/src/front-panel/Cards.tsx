@@ -257,9 +257,9 @@ export function DeviceCard({
         {!appliedDevice && <p className="wg:text-sm wg:text-muted">{t('panel.applyFirst')}</p>}
         {shownProfile?.measurements.map((register) => {
           const channel =
-            live.applied &&
-            appliedProfile?.measurements.some((item) => item.id === register.id) &&
-            registerChannel(live.applied.snapshot, device.id, register.id, 'measurementId');
+            live.applied && appliedProfile?.measurements.some((item) => item.id === register.id)
+              ? registerChannel(live.applied.snapshot, device.id, register.id, 'measurementId')
+              : undefined;
           const sample = channelSample(live, channel?.id, 'measurement');
           const value = typeof sample?.value === 'number' ? sample.value : undefined;
           const unit = sample?.unit ?? register.unit;
@@ -289,9 +289,9 @@ export function DeviceCard({
         })}
         {shownProfile?.actions.map((register) => {
           const channel =
-            live.applied &&
-            appliedProfile?.actions.some((item) => item.id === register.id) &&
-            registerChannel(live.applied.snapshot, device.id, register.id, 'actionId');
+            live.applied && appliedProfile?.actions.some((item) => item.id === register.id)
+              ? registerChannel(live.applied.snapshot, device.id, register.id, 'actionId')
+              : undefined;
           return (
             <div key={register.id} className="wg:flex wg:items-center wg:justify-between wg:gap-3">
               <span className="wg:min-w-0 wg:break-words wg:text-sm">{register.name}</span>

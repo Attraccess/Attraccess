@@ -9,7 +9,7 @@ import {
 } from '../../../modbus/model';
 import type { DeviceAdapter, Snapshot } from '../runtime';
 import { type WriteAdmission, WriteAdmissionError } from '../runtime-types';
-import { decodeRaw, readPdu, writePdu } from './protocol';
+import { decodeRaw, encode, readPdu, writePdu } from './protocol';
 import { type ModbusTransport, ModbusTransportError, QueuedModbusTransport } from './transports';
 
 type Point = Snapshot['physicalPoints'][number];
@@ -158,10 +158,12 @@ export class ModbusDeviceRouter implements DeviceAdapter {
       );
       if (generation !== this.generation) throw new Error('Modbus configuration changed during acquisition');
       const raw = action.functionCode === 5 ? Number(Boolean(bytes[0] & 1)) : decodeRaw(bytes, action);
-      const physical = action.functionCode === 5 ? raw : raw * action.scale + action.offset;
-      if (physical !== action.onValue && physical !== action.offValue)
-        throw new Error('switch register has an unknown state');
-      const value = physical === action.onValue;
+      // Compare the actual wire representation, including float32 rounding and
+      // register scale/offset, with exactly what a command would write.
+      const on = action.functionCode === 5 ? action.onValue : decodeRaw(encode(action.onValue, action), action);
+      const off = action.functionCode === 5 ? action.offValue : decodeRaw(encode(action.offValue, action), action);
+      if (raw !== on && raw !== off) throw new Error('switch register has an unknown state');
+      const value = raw === on;
       this.outputSamples.set(point.id, { result: { value }, expiresAt });
       return value;
     } catch (error) {
