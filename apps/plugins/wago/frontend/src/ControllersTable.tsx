@@ -433,6 +433,7 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
               <p className="wg:mb-3 wg:text-sm wg:text-muted">{t('runtimeManagement.recoveryDescription')}</p>
               <Button
                 fullWidth
+                className="wg:h-auto wg:min-h-8 wg:whitespace-normal wg:py-2"
                 size="sm"
                 variant="secondary"
                 isDisabled={pending || !status.sessionId}
@@ -448,6 +449,7 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
               <p className="wg:text-sm wg:text-muted">{t('runtimeManagement.restoreDescription')}</p>
               <Button
                 fullWidth
+                className="wg:h-auto wg:min-h-8 wg:whitespace-normal wg:py-2"
                 size="sm"
                 variant="secondary"
                 isDisabled={pending || !status.sessionId}
