@@ -101,7 +101,7 @@ function PermissionEditor({
         </TextField>
       </div>
 
-      <div className="rmq:flex rmq:justify-end rmq:gap-2">
+      <div className="rmq:flex rmq:flex-wrap rmq:justify-end rmq:gap-2">
         <Button
           size="sm"
           variant="ghost"

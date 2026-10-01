@@ -17,15 +17,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: [
-      'apps/plugins/wago/frontend/tests/*.test.tsx',
-      'apps/plugins/wago/frontend/src/ModbusConfigurationForm.spec.tsx',
-      'apps/plugins/wago/frontend/src/CommissioningModal.test.tsx',
-      'apps/plugins/wago/frontend/src/CommissioningPreflight.test.tsx',
-      'apps/plugins/wago/frontend/src/ControllersTable.test.tsx',
-      'apps/plugins/wago/frontend/src/useCommissioningVerification.test.tsx',
-      'apps/plugins/wago/frontend/src/i18n.test.tsx',
-    ],
+    include: ['apps/plugins/wago/frontend/tests/*.test.tsx', 'apps/plugins/wago/frontend/src/**/*.{test,spec}.tsx'],
     // The visual editor and Modbus form tests both render into jsdom's global document.
     // Running files concurrently allows user-event interactions in one file to target
     // another file's DOM, producing intermittent input corruption and timeouts.
