@@ -223,6 +223,28 @@ describe('front panel', () => {
     expect(api.save).not.toHaveBeenCalled();
   });
 
+  it('preserves a saved unapplied draft when another session applies a new revision', async () => {
+    const savedDraft = {
+      ...draft,
+      presetProvenance: JSON.stringify({ editor: { names: { output: 'Saved draft name' }, presets: [] } }),
+    };
+    api.getDraft.mockResolvedValue(savedDraft);
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.configuration?.metadata.names.output).toBe('Saved draft name');
+    act(() =>
+      client.setQueryData(['wago', 'configuration-baseline', 1], {
+        ...draft,
+        presetProvenance: JSON.stringify({ editor: { names: { output: 'External applied name' }, presets: [] } }),
+        revision: 8,
+        state: 'applied',
+      }),
+    );
+    await waitFor(() => expect(result.current.applied?.metadata.names.output).toBe('External applied name'));
+    expect(result.current.configuration?.metadata.names.output).toBe('Saved draft name');
+    expect(result.current.dirty).toBe(true);
+  });
+
   it('saves, reviews and publishes from one apply action and retains the revision acknowledgement wait', async () => {
     const { result } = renderHook(() => useFrontPanel(1), { wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));

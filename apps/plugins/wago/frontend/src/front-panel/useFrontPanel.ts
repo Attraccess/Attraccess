@@ -72,6 +72,9 @@ export function useFrontPanel(controllerId: number) {
       loadedBaseline.current = baseline.data?.revision ?? null;
       initialized.current = true;
       setConfiguration(next);
+      // A persisted draft is still a working copy: external baseline updates
+      // must not replace it merely because this session has not typed yet.
+      setEditing(JSON.stringify(next) !== JSON.stringify(readConfiguration(baseline.data)));
     } catch {
       setErrorKey('panel.readError');
     }

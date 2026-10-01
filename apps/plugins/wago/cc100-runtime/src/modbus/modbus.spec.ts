@@ -5,6 +5,7 @@ import {
   duplicateProfile,
   type ModbusConfiguration,
   type ModbusConnection,
+  type ModbusAction,
   validateModbus,
 } from '../../../modbus/model';
 import { CumulativeCounter, ModbusDeviceRouter } from './adapter';
@@ -312,10 +313,7 @@ describe('Modbus switch readback', () => {
     channel: 0,
     modbus: { deviceId: 'relay', actionId: 'switch' },
   };
-  function routerFor(
-    register: typeof action | (Omit<typeof action, 'functionCode'> & { functionCode: 5 | 16 }),
-    request: jest.Mock,
-  ) {
+  function routerFor(register: ModbusAction, request: jest.Mock) {
     const router = new ModbusDeviceRouter({ read: async () => false, write: async () => undefined }, () => ({
       request,
     }));
@@ -375,4 +373,31 @@ describe('Modbus switch readback', () => {
     await expect(router.readOutput(point)).rejects.toThrow('No response');
     expect(request).toHaveBeenCalledTimes(1);
   });
+  it.each(['big', 'little'] as const)(
+    'recognizes encoded float32 switch values with %s word order',
+    async (wordOrder) => {
+      const register = {
+        ...action,
+        functionCode: 16 as const,
+        dataType: 'float32' as const,
+        wordOrder,
+        scale: 2,
+        offset: 3,
+        onValue: 3.2,
+        offValue: 3.4,
+      };
+      let actual = register.onValue;
+      const request = jest.fn(async (_unit: number, pdu: Buffer) =>
+        pdu[0] === 3 ? encode(actual, register) : pdu.subarray(0, 5),
+      );
+      const router = routerFor(register, request);
+      expect(await router.readOutput(point)).toBe(true);
+      await router.write(point, false);
+      actual = register.offValue;
+      expect(await router.readOutput(point)).toBe(false);
+      await router.write(point, true);
+      actual = 4;
+      await expect(router.readOutput(point)).rejects.toThrow('unknown state');
+    },
+  );
 });

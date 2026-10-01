@@ -84,7 +84,7 @@ export function addModbusChannel(snapshot: WagoConfigurationSnapshot, binding: M
   };
 }
 
-/** Editing a map's unit/kind updates dependent transforms without changing bindings or capabilities. */
+/** Synchronize a map's unit/kind without discarding existing channel calibration. */
 export function updateModbusConfiguration(
   snapshot: WagoConfigurationSnapshot,
   modbus: ModbusConfiguration,
@@ -96,7 +96,15 @@ export function updateModbusConfiguration(
       const point = snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
       const measurement = boundMeasurement(modbus, point?.modbus);
       return measurement && channel.capabilities.includes('measurement')
-        ? { ...channel, measurement: { unit: measurement.unit, kind: measurement.kind, scale: 1, offset: 0 } }
+        ? {
+            ...channel,
+            measurement: {
+              unit: measurement.unit,
+              kind: measurement.kind,
+              scale: channel.measurement?.scale ?? 1,
+              offset: channel.measurement?.offset ?? 0,
+            },
+          }
         : channel;
     }),
   };
