@@ -1,12 +1,14 @@
 import { Button, Checkbox, Input, Label, ListBox, Select, TextField } from '@heroui/react';
 import type { ReactNode } from 'react';
 import type { Channel } from './configuration-model';
-import { pointLabel } from './configuration-model';
+import { pointLabel, presetDisplayName } from './configuration-model';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { ModbusPointForm } from './ModbusConfigurationForm';
 import { bindModbusPoint, emptyModbus } from './modbus-editor';
 import { outputBehavior } from '../../channel-behavior';
 import { availableDigitalTerminals } from '../../backend/configuration-digital';
+import { useWagoTranslations } from './i18n';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
 
 export function Choice({
   label,
@@ -19,13 +21,14 @@ export function Choice({
   options: Array<{ id: string; label: string }>;
   onChange: (value: string) => void;
 }) {
+  const { t } = useWagoTranslations();
   return (
     <Select
       value={value || null}
       onChange={(key) => {
         if (key !== null) onChange(String(key));
       }}
-      placeholder="Select…"
+      placeholder={t('channels.select')}
     >
       <Label>{label}</Label>
       <Select.Trigger>
@@ -73,7 +76,8 @@ export function NumericField({
   );
 }
 
-const options = <T extends string>(values: readonly T[]) => values.map((id) => ({ id, label: id }));
+const options = <T extends string>(values: readonly T[], t: TFunction) =>
+  values.map((id) => ({ id, label: t(`channels.${id}`) }));
 
 export function DigitalChannelEditor({
   channel,
@@ -94,13 +98,14 @@ export function DigitalChannelEditor({
   onAssign: (terminal: number) => void;
   assignment?: ReactNode;
 }) {
+  const { t } = useWagoTranslations();
   const inputs = snapshot.logicalChannels
     .filter((item) => item.id !== channel.id && item.capabilities.includes('input'))
     .map((item) => ({ id: item.id, label: metadata.names[item.id] ?? item.id }));
   const output = channel.capabilities.includes('output');
   const point = snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
   const { guard, feedback, range } = channel;
-  if (!point) return <p role="alert">This channel has no physical assignment.</p>;
+  if (!point) return <p role="alert">{t('channels.noAssignment')}</p>;
   function capability(kind: 'pulse' | 'guard' | 'feedback', enabled: boolean) {
     const next = { ...channel, capabilities: channel.capabilities.filter((item) => item !== kind) };
     delete next[kind];
@@ -116,10 +121,10 @@ export function DigitalChannelEditor({
     <fieldset className="wg:flex wg:flex-col wg:gap-3">
       <legend className="wg:sr-only">{metadata.names[channel.id] ?? channel.id}</legend>
       <p className="wg:text-sm wg:text-muted">
-        Setup preset: {channel.profile.replaceAll('-', ' ')}. Customize the behavior below.
+        {t('channels.preset', { preset: presetDisplayName(channel.profile, t) })}
       </p>
       <TextField isRequired>
-        <Label>Channel name</Label>
+        <Label>{t('channels.name')}</Label>
         <Input
           maxLength={120}
           value={metadata.names[channel.id] ?? channel.id}
@@ -128,7 +133,7 @@ export function DigitalChannelEditor({
       </TextField>
       {assignment ?? (
         <Choice
-          label="Physical terminal"
+          label={t('channels.terminal')}
           value={String(point.channel)}
           options={availableDigitalTerminals(snapshot, output ? 'output' : 'input', point.id).map((terminal) => ({
             id: String(terminal.channel),
@@ -138,29 +143,27 @@ export function DigitalChannelEditor({
         />
       )}
       <details className="wg:rounded-lg wg:border wg:border-border wg:p-3">
-        <summary className="wg:cursor-pointer wg:font-medium">Wiring label</summary>
+        <summary className="wg:cursor-pointer wg:font-medium">{t('channels.wiringLabel')}</summary>
         <TextField isRequired>
-          <Label>Physical point label</Label>
+          <Label>{t('channels.pointLabel')}</Label>
           <Input
             maxLength={120}
-            value={metadata.names[point.id] ?? pointLabel(point, metadata.names)}
+            value={metadata.names[point.id] ?? pointLabel(point, metadata.names, t)}
             onChange={(event) => onRename(point.id, event.target.value)}
           />
         </TextField>
       </details>
-      <h3 className="wg:mt-3 wg:font-semibold">Behavior</h3>
+      <h3 className="wg:mt-3 wg:font-semibold">{t('channels.behavior')}</h3>
       <p className="wg:text-sm wg:text-muted">
-        {output
-          ? 'Define how flows control this output and what happens when its connection is lost.'
-          : 'Choose what happens when the controller loses its connection.'}
+        {t(output ? 'channels.outputDescription' : 'channels.inputDescription')}
       </p>
       <Choice
-        label="On disconnect"
+        label={t('channels.disconnect')}
         value={channel.disconnectPolicy.mode}
         options={[
-          { id: 'immediate', label: 'Immediately off' },
-          { id: 'watchdog', label: 'Off after watchdog timeout' },
-          { id: 'hold', label: 'Hold last state' },
+          { id: 'immediate', label: t('channels.immediate') },
+          { id: 'watchdog', label: t('channels.watchdog') },
+          { id: 'hold', label: t('channels.hold') },
         ]}
         onChange={(mode) =>
           onChange({
@@ -171,7 +174,7 @@ export function DigitalChannelEditor({
       />
       {channel.disconnectPolicy.mode === 'watchdog' && (
         <NumericField
-          label="Watchdog timeout (ms)"
+          label={t('channels.watchdogTimeout')}
           min={1}
           value={channel.disconnectPolicy.timeoutMs ?? 1000}
           onChange={(timeoutMs) => onChange({ ...channel, disconnectPolicy: { mode: 'watchdog', timeoutMs } })}
@@ -180,34 +183,29 @@ export function DigitalChannelEditor({
       {output && (
         <>
           <Choice
-            label="Output behavior"
+            label={t('channels.outputBehavior')}
             value={outputBehavior(channel) ?? 'switched'}
             options={[
-              { id: 'switched', label: 'Switched — turn on / turn off' },
-              { id: 'pulsed', label: 'Pulsed — trigger for a duration' },
+              { id: 'switched', label: t('channels.switched') },
+              { id: 'pulsed', label: t('channels.pulsed') },
             ]}
             onChange={(behavior) => capability('pulse', behavior === 'pulsed')}
           />
           <p className="wg:text-sm wg:text-muted">
-            {outputBehavior(channel) === 'pulsed'
-              ? 'Flows can trigger a pulse for the duration below. The controller turns the output off automatically.'
-              : 'Flows can turn this output on or off. It keeps that state until another command or the disconnect policy changes it.'}
+            {t(outputBehavior(channel) === 'pulsed' ? 'channels.pulsedDescription' : 'channels.switchedDescription')}
           </p>
           {channel.pulse && (
             <NumericField
-              label="Pulse duration (ms)"
+              label={t('channels.pulseDuration')}
               min={1}
               value={channel.pulse.durationMs}
               onChange={(durationMs) => onChange({ ...channel, pulse: { durationMs } })}
             />
           )}
           <details className="wg:rounded-lg wg:border wg:border-border wg:p-3" open={!!guard || !!feedback}>
-            <summary className="wg:cursor-pointer wg:font-medium">Conditions & feedback</summary>
+            <summary className="wg:cursor-pointer wg:font-medium">{t('channels.conditions')}</summary>
             <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
-              <p className="wg:text-sm wg:text-muted">
-                Operational controls only. Guards and enable requests do not replace certified electrical safety
-                functions.
-              </p>
+              <p className="wg:text-sm wg:text-muted">{t('channels.safetyHint')}</p>
               <Checkbox
                 isSelected={channel.capabilities.includes('guard')}
                 onChange={(enabled) => capability('guard', enabled)}
@@ -216,21 +214,21 @@ export function DigitalChannelEditor({
                   <Checkbox.Indicator />
                 </Checkbox.Control>
                 <Checkbox.Content>
-                  <Label>Operational guard</Label>
+                  <Label>{t('channels.guard')}</Label>
                 </Checkbox.Content>
               </Checkbox>
               {guard && (
                 <>
                   <Choice
-                    label="Guard input"
+                    label={t('channels.guardInput')}
                     value={guard.channelId}
                     options={inputs}
                     onChange={(channelId) => onChange({ ...channel, guard: { ...guard, channelId } })}
                   />
                   <Choice
-                    label="Allow output when guard is"
+                    label={t('channels.guardWhen')}
                     value={guard.when}
-                    options={options(['on', 'off'])}
+                    options={options(['on', 'off'], t)}
                     onChange={(when) => onChange({ ...channel, guard: { ...guard, when: when as 'on' | 'off' } })}
                   />
                 </>
@@ -243,41 +241,41 @@ export function DigitalChannelEditor({
                   <Checkbox.Indicator />
                 </Checkbox.Control>
                 <Checkbox.Content>
-                  <Label>Monitor feedback</Label>
+                  <Label>{t('channels.feedback')}</Label>
                 </Checkbox.Content>
               </Checkbox>
               {feedback && (
                 <>
                   <Choice
-                    label="Feedback input"
+                    label={t('channels.feedbackInput')}
                     value={feedback.channelId}
                     options={inputs}
                     onChange={(channelId) => onChange({ ...channel, feedback: { ...feedback, channelId } })}
                   />
                   <Choice
-                    label="Expected feedback"
+                    label={t('channels.expectedFeedback')}
                     value={feedback.expected}
-                    options={options(['match', 'inverse'])}
+                    options={options(['match', 'inverse'], t)}
                     onChange={(expected) =>
                       onChange({ ...channel, feedback: { ...feedback, expected: expected as 'match' | 'inverse' } })
                     }
                   />
                   <NumericField
-                    label="Feedback timeout (ms)"
+                    label={t('channels.feedbackTimeout')}
                     min={1}
                     value={feedback.timeoutMs}
                     onChange={(timeoutMs) => onChange({ ...channel, feedback: { ...feedback, timeoutMs } })}
                   />
                 </>
               )}
-              {!inputs.length && <p>Add a digital input to configure guards or feedback.</p>}
+              {!inputs.length && <p>{t('channels.addInput')}</p>}
             </div>
           </details>
         </>
       )}
       {(channel.capabilities.includes('input') || channel.capabilities.includes('measurement')) && (
         <details className="wg:rounded-lg wg:border wg:border-border wg:p-3" open={!!range}>
-          <summary className="wg:cursor-pointer wg:font-medium">Expected range</summary>
+          <summary className="wg:cursor-pointer wg:font-medium">{t('channels.range')}</summary>
           <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
             <Checkbox
               isSelected={!!channel.range}
@@ -292,19 +290,19 @@ export function DigitalChannelEditor({
                 <Checkbox.Indicator />
               </Checkbox.Control>
               <Checkbox.Content>
-                <Label>Expected value range</Label>
+                <Label>{t('channels.valueRange')}</Label>
               </Checkbox.Content>
             </Checkbox>
             {range && (
               <>
                 <NumericField
-                  label="Minimum"
+                  label={t('channels.minimum')}
                   integer={false}
                   value={range.minimum}
                   onChange={(minimum) => onChange({ ...channel, range: { ...range, minimum } })}
                 />
                 <NumericField
-                  label="Maximum"
+                  label={t('channels.maximum')}
                   integer={false}
                   value={range.maximum}
                   onChange={(maximum) => onChange({ ...channel, range: { ...range, maximum } })}
@@ -315,11 +313,11 @@ export function DigitalChannelEditor({
         </details>
       )}
       <details>
-        <summary>Stable internal reference</summary>
+        <summary>{t('channels.reference')}</summary>
         <p>{channel.id}</p>
       </details>
       <Button variant="danger" onPress={onRemove}>
-        Remove channel
+        {t('channels.remove')}
       </Button>
     </fieldset>
   );
@@ -334,6 +332,7 @@ export function PhysicalAssignments({
   metadata: ConfigurationEditorMetadata;
   onChange: (snapshot: WagoConfigurationSnapshot) => void;
 }) {
+  const { t } = useWagoTranslations();
   const unused = snapshot.physicalPoints.filter(
     (point) =>
       (point.hardwareProfile === '751-9301' || point.hardwareProfile === 'modbus') &&
@@ -341,12 +340,12 @@ export function PhysicalAssignments({
   );
   if (!unused.length) return null;
   return (
-    <section aria-label="Unused physical assignments" className="wg:min-w-0">
-      <h3>Unused physical assignments</h3>
+    <section aria-label={t('channels.unusedAssignments')} className="wg:min-w-0">
+      <h3>{t('channels.unusedAssignments')}</h3>
       {unused.map((point) => (
         <fieldset key={point.id} className="wg:flex wg:min-w-0 wg:flex-col wg:gap-3">
           <legend className="wg:max-w-full wg:whitespace-normal wg:break-words">
-            {pointLabel(point, metadata.names)}
+            {pointLabel(point, metadata.names, t)}
           </legend>
           {point.hardwareProfile === 'modbus' && (
             <ModbusPointForm
@@ -362,7 +361,7 @@ export function PhysicalAssignments({
               onChange({ ...snapshot, physicalPoints: snapshot.physicalPoints.filter((item) => item.id !== point.id) })
             }
           >
-            Release {pointLabel(point, metadata.names)}
+            {t('channels.release', { point: pointLabel(point, metadata.names, t) })}
           </Button>
         </fieldset>
       ))}

@@ -25,6 +25,8 @@ import { CommissioningPlatformPreflight } from './CommissioningPlatformPreflight
 import { useQuery } from '@tanstack/react-query';
 import { commissioningLabel } from './ControllersTable';
 import { StandardDrawer } from './drawer';
+import { useWagoTranslations } from './i18n';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import {
   useCommissioningSessionsQuery,
   useConfirmCommissioningHostKeyMutation,
@@ -46,6 +48,7 @@ interface CommissioningModalProps {
 const DEFAULT_SSH = { username: 'root', password: 'wago' };
 
 function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onConfigure }: CommissioningModalProps) {
+  const { t } = useWagoTranslations();
   const createSessionMutation = useCreateCommissioningSessionMutation();
   const confirmHostKeyMutation = useConfirmCommissioningHostKeyMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
@@ -101,12 +104,15 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     deliverSessionMutation.isPending ||
     recoverSessionMutation.isPending ||
     removeSessionMutation.isPending;
-  const loadingStatus = commissioningLoadingStatus({
-    recoverSessionMutation,
-    createSessionMutation,
-    removeSessionMutation,
-    confirmHostKeyMutation,
-  });
+  const loadingStatus = commissioningLoadingStatus(
+    {
+      recoverSessionMutation,
+      createSessionMutation,
+      removeSessionMutation,
+      confirmHostKeyMutation,
+    },
+    t,
+  );
 
   useEffect(() => {
     setSshUsername(DEFAULT_SSH.username);
@@ -222,7 +228,7 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
   }
 
   const activeStep = session ? sessionStep(session) : step;
-  const title = session?.controllerName || name || 'New CC100 controller';
+  const title = session?.controllerName || name || t('commissioningUI.newController');
 
   return {
     isOpen,
@@ -284,15 +290,16 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
 type CommissioningModel = ReturnType<typeof useCommissioning>;
 
 export function CommissioningModal(props: CommissioningModalProps) {
+  const { t } = useWagoTranslations();
   const model = useCommissioning(props);
   return (
     <StandardDrawer
-      ariaLabel="Commission a controller"
+      ariaLabel={t('commissioningUI.title')}
       isOpen={props.isOpen}
       onOpenChange={(open) => !open && model.close()}
     >
       <DrawerHeader>
-        <h2 className="wg:text-xl wg:font-semibold">Commission a controller</h2>
+        <h2 className="wg:text-xl wg:font-semibold">{t('commissioningUI.title')}</h2>
       </DrawerHeader>
       <CommissioningContent model={model} />
       <CommissioningActions model={model} />
@@ -301,6 +308,7 @@ export function CommissioningModal(props: CommissioningModalProps) {
 }
 
 function CommissioningContent({ model }: { model: CommissioningModel }) {
+  const { t } = useWagoTranslations();
   const {
     onConfigure,
     session,
@@ -328,9 +336,7 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
   const isFullyDone = !!session && verification.runtimeVerified === true;
   return (
     <DrawerBody>
-      <div
-        className={`wg:grid wg:min-w-0 wg:gap-5 ${isFullyDone ? '' : 'wg:md:grid-cols-[13rem_minmax(0,1fr)]'}`}
-      >
+      <div className={`wg:grid wg:min-w-0 wg:gap-5 ${isFullyDone ? '' : 'wg:md:grid-cols-[13rem_minmax(0,1fr)]'}`}>
         {/* The step passport only makes sense while a step is still active; the summary below already
             repeats identity/runtime/claim once commissioning is done. */}
         {!isFullyDone && <DevicePassport className="wg:hidden wg:md:block" name={title} step={activeStep} />}
@@ -358,11 +364,7 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
                   <Checkbox.Control>
                     <Checkbox.Indicator />
                   </Checkbox.Control>
-                  <Checkbox.Content>
-                    Alternatively, I verified the physical 751-9301 label and connected this controller as the only
-                    device on an isolated service network. I accept first-key pinning on that connection, not
-                    independent cryptographic identity verification. Do not select this on a shared LAN.
-                  </Checkbox.Content>
+                  <Checkbox.Content>{t('commissioningUI.isolatedIdentity')}</Checkbox.Content>
                 </Checkbox>
               )}
               {session && activeStep === 4 && session.state !== 'awaiting_identity_confirmation' && (
@@ -386,7 +388,7 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
               {session && activeStep === 5 && <ProgressStep name={title} session={session} />}
               {session && canInstall(session) && (
                 <details>
-                  <summary className="wg:cursor-pointer">Optional: inspect controller before installation</summary>
+                  <summary className="wg:cursor-pointer">{t('commissioningUI.inspect')}</summary>
                   <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
                 </details>
               )}
@@ -403,9 +405,7 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
                 <Alert status="warning">
                   <Alert.Indicator />
                   <Alert.Content>
-                    <Alert.Description>
-                      Canceling revokes the enrollment credential and deletes this commissioning session.
-                    </Alert.Description>
+                    <Alert.Description>{t('commissioningUI.cancelDescription')}</Alert.Description>
                   </Alert.Content>
                 </Alert>
               )}
@@ -427,27 +427,33 @@ function CompletedSessionSummary({
   verification: ReturnType<typeof useCommissioningVerification>;
   onConfigure?: (controllerId: number) => void;
 }) {
+  const { t, language, tBackendMessage } = useWagoTranslations();
   const controllerId = verification.data?.controllerId ?? session.managementControllerId ?? null;
   return (
     <div className="wg:space-y-4">
       <Alert status="success">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Commissioning complete</Alert.Title>
+          <Alert.Title>{t('commissioningUI.complete')}</Alert.Title>
           <Alert.Description>
-            {session.controllerName ?? session.hardwareId} is enrolled on permanent credentials, connected, and its
-            configuration is applied.
+            {t('commissioningUI.completeDescription', { name: session.controllerName ?? session.hardwareId })}
           </Alert.Description>
         </Alert.Content>
       </Alert>
       <dl className="wg:grid wg:gap-3 wg:text-sm wg:sm:grid-cols-2">
-        <SummaryField label="Hardware ID" value={session.hardwareId} />
-        <SummaryField label="Firmware baseline" value={session.firmwareBaseline} />
-        <SummaryField label="Claimed" value={new Date(session.updatedAt).toLocaleString()} />
-        <SummaryField label="Management hardening" value={verification.data?.managementHardening ?? 'unverified'} />
+        <SummaryField label={t('commissioningUI.hardwareId')} value={session.hardwareId} />
+        <SummaryField label={t('commissioningUI.firmware')} value={session.firmwareBaseline} />
+        <SummaryField
+          label={t('commissioningUI.claimed')}
+          value={new Date(session.updatedAt).toLocaleString(language)}
+        />
+        <SummaryField
+          label={t('commissioningUI.management')}
+          value={tBackendMessage(verification.data?.managementHardening ?? t('commissioningUI.unverified'))}
+        />
       </dl>
       {onConfigure && controllerId && (
-        <Button onPress={() => onConfigure(controllerId)}>Configure inputs and outputs</Button>
+        <Button onPress={() => onConfigure(controllerId)}>{t('commissioningUI.configure')}</Button>
       )}
     </div>
   );
@@ -463,6 +469,7 @@ function SummaryField({ label, value }: { label: string; value: string }) {
 }
 
 function CommissioningActions({ model }: { model: CommissioningModel }) {
+  const { t } = useWagoTranslations();
   const {
     session,
     isLoading,
@@ -488,7 +495,7 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
     return (
       <DrawerFooter>
         <Button variant="secondary" onPress={close}>
-          Close
+          {t('commissioningUI.close')}
         </Button>
       </DrawerFooter>
     );
@@ -502,11 +509,11 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
           isDisabled={isLoading || !confirmRecovery || !recoveryUsername.trim() || !recoveryPassword}
           onPress={recoverSession}
         >
-          Clean up failed installation
+          {t('commissioningUI.cleanup')}
         </Button>
       )}
       <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>
-        {isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}
+        {t(isCancelConfirmationOpen ? 'commissioningUI.keep' : 'commissioningUI.close')}
       </Button>
       <CreateSessionActions model={model} />
       {session?.state === 'awaiting_identity_confirmation' && (
@@ -515,7 +522,7 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
           isDisabled={!isolatedIdentity && (!hostKeyFingerprint || hostKeyFingerprint !== session.hostKeyFingerprint)}
           onPress={confirmHostKey}
         >
-          {isLoading ? 'Confirming identity' : 'Confirm host key'}
+          {t(isLoading ? 'commissioningUI.confirmingIdentity' : 'commissioningUI.confirmKey')}
         </Button>
       )}
       {session && canInstall(session) && (
@@ -525,11 +532,13 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
           isDisabled={isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword}
           onPress={deliverSession}
         >
-          {isLoading
-            ? 'Starting installation'
-            : session.state === 'delivery_failed'
-              ? 'Retry installation'
-              : 'Install runtime'}
+          {t(
+            isLoading
+              ? 'commissioningUI.starting'
+              : session.state === 'delivery_failed'
+                ? 'commissioningUI.retry'
+                : 'commissioningUI.install',
+          )}
         </Button>
       )}
       <CancelSessionAction model={model} />
@@ -538,6 +547,7 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
 }
 
 function RecoveryFields({ model }: { model: CommissioningModel }) {
+  const { t } = useWagoTranslations();
   const {
     session,
     isLoading,
@@ -557,11 +567,8 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
           <Alert status="warning">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title>Clean up failed installation</Alert.Title>
-              <Alert.Description>
-                This stops and removes the failed Attraccess installation. It cannot restore previous applications,
-                data, or CODESYS. You can retry after cleanup.
-              </Alert.Description>
+              <Alert.Title>{t('commissioningUI.cleanup')}</Alert.Title>
+              <Alert.Description>{t('commissioningUI.cleanupDescription')}</Alert.Description>
             </Alert.Content>
           </Alert>
           <CredentialFields
@@ -588,10 +595,7 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
             <Checkbox.Control>
               <Checkbox.Indicator />
             </Checkbox.Control>
-            <Checkbox.Content>
-              I approve interrupting the Attraccess runtime and cleaning up this failed installation. This does not
-              restore preexisting applications or data.
-            </Checkbox.Content>
+            <Checkbox.Content>{t('commissioningUI.approveCleanup')}</Checkbox.Content>
           </Checkbox>
         </div>
       )}
@@ -638,6 +642,7 @@ function ConnectionFields({ model }: { model: CommissioningModel }) {
 }
 
 function CreateSessionActions({ model }: { model: CommissioningModel }) {
+  const { t } = useWagoTranslations();
   const {
     session,
     isLoading,
@@ -662,7 +667,7 @@ function CreateSessionActions({ model }: { model: CommissioningModel }) {
             setStep(1);
           }}
         >
-          Continue
+          {t('commissioningUI.continue')}
         </Button>
       )}
       {!session && activeStep === 1 && (
@@ -675,12 +680,12 @@ function CreateSessionActions({ model }: { model: CommissioningModel }) {
           }
           onPress={() => setStep(2)}
         >
-          Continue
+          {t('commissioningUI.continue')}
         </Button>
       )}
       {!session && activeStep === 2 && (
         <Button variant="secondary" onPress={() => setStep(1)}>
-          Back to connection
+          {t('commissioningUI.back')}
         </Button>
       )}
       {!session && activeStep === 2 && (
@@ -696,7 +701,7 @@ function CreateSessionActions({ model }: { model: CommissioningModel }) {
           }
           onPress={createSession}
         >
-          {isLoading ? 'Preparing commissioning' : 'Scan controller for review'}
+          {t(isLoading ? 'commissioningUI.preparing' : 'commissioningUI.scan')}
         </Button>
       )}
     </>
@@ -704,6 +709,7 @@ function CreateSessionActions({ model }: { model: CommissioningModel }) {
 }
 
 function CancelSessionAction({ model }: { model: CommissioningModel }) {
+  const { t } = useWagoTranslations();
   const { session, isLoading, removeSessionMutation, isCancelConfirmationOpen, setCancelConfirmationOpen, close } =
     model;
   return (
@@ -716,40 +722,37 @@ function CancelSessionAction({ model }: { model: CommissioningModel }) {
             isPending={isLoading}
             onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}
           >
-            {isLoading ? 'Removing record' : 'Confirm cancellation'}
+            {t(isLoading ? 'commissioningUI.removing' : 'commissioningUI.confirmCancel')}
           </Button>
         ) : (
           <Button variant="secondary" isDisabled={isLoading} onPress={() => setCancelConfirmationOpen(true)}>
-            {session.state === 'revoked' ? 'Delete commissioning record' : 'Cancel enrollment'}
+            {t(session.state === 'revoked' ? 'commissioningUI.deleteRecord' : 'commissioningUI.cancel')}
           </Button>
         ))}
     </>
   );
 }
 
-function commissioningLoadingStatus({
-  recoverSessionMutation,
-  createSessionMutation,
-  removeSessionMutation,
-  confirmHostKeyMutation,
-}: Pick<
-  CommissioningModel,
-  'recoverSessionMutation' | 'createSessionMutation' | 'removeSessionMutation' | 'confirmHostKeyMutation'
->): [string, string] | null {
+function commissioningLoadingStatus(
+  {
+    recoverSessionMutation,
+    createSessionMutation,
+    removeSessionMutation,
+    confirmHostKeyMutation,
+  }: Pick<
+    CommissioningModel,
+    'recoverSessionMutation' | 'createSessionMutation' | 'removeSessionMutation' | 'confirmHostKeyMutation'
+  >,
+  t: TFunction,
+): [string, string] | null {
   return recoverSessionMutation.isPending
-    ? [
-        'Cleaning up failed installation',
-        'Cleaning up the runtime installation and credentials. CODESYS and preexisting workloads are not restored.',
-      ]
+    ? [t('commissioningUI.cleaning'), t('commissioningUI.cleaningDescription')]
     : createSessionMutation.isPending
-      ? [
-          'Preparing commissioning',
-          'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
-        ]
+      ? [t('commissioningUI.preparing'), t('commissioningUI.scanningDescription')]
       : removeSessionMutation.isPending
-        ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
+        ? [t('commissioningUI.canceling'), t('commissioningUI.cancelingDescription')]
         : confirmHostKeyMutation.isPending
-          ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
+          ? [t('commissioningUI.confirming'), t('commissioningUI.confirmingDescription')]
           : null;
 }
 
@@ -773,17 +776,27 @@ function CommissioningErrors({ model }: { model: CommissioningModel }) {
 }
 
 function DevicePassport({ className, name, step }: { className?: string; name: string; step: number }) {
+  const { t } = useWagoTranslations();
   return (
     <aside className={`wg:min-w-0 wg:rounded-large wg:bg-default-100 wg:p-5 ${className ?? ''}`}>
       <CpuIcon className="wg:h-10 wg:w-10 wg:text-primary" />
       <p className="wg:mt-4 wg:text-xs wg:font-semibold wg:uppercase wg:tracking-wider wg:text-muted">
-        CC100 device passport
+        {t('commissioningUI.passport')}
       </p>
       <p className="wg:mt-1 wg:truncate wg:text-lg wg:font-semibold">{name}</p>
       <div className="wg:mt-5 wg:space-y-3">
-        <PassportRow label="Identity" value={step >= 3 ? 'See session status' : 'Not scanned'} />
-        <PassportRow label="Runtime" value={step >= 4 ? 'See session status' : 'Not installed'} />
-        <PassportRow label="Claim" value={step >= 5 ? 'See session status' : 'Pending'} />
+        <PassportRow
+          label={t('commissioningUI.identity')}
+          value={t(step >= 3 ? 'commissioningUI.sessionStatus' : 'commissioningUI.notScanned')}
+        />
+        <PassportRow
+          label={t('commissioningUI.runtime')}
+          value={t(step >= 4 ? 'commissioningUI.sessionStatus' : 'commissioningUI.notInstalled')}
+        />
+        <PassportRow
+          label={t('commissioningUI.claim')}
+          value={t(step >= 5 ? 'commissioningUI.sessionStatus' : 'commissioningUI.pending')}
+        />
       </div>
       <div className="wg:mt-6 wg:flex wg:gap-1">
         {[0, 1, 2, 3, 4, 5].map((index) => (
@@ -807,19 +820,12 @@ function PassportRow({ label, value }: { label: string; value: string }) {
 }
 
 function StepHeading({ step }: { step: number }) {
-  const content = [
-    ['Name the controller', 'Choose a name you will recognize later.'],
-    ['Connect the controller', 'Enter its IP address and choose the MQTT server it will use.'],
-    ['Choose a runtime release', 'Select the release to install on this controller.'],
-    ['Verify the controller', 'Check the SSH fingerprint before installation.'],
-    ['Install the runtime', 'Review what installation changes, then approve it.'],
-    ['Installation progress', 'You can close this window and return to the saved session later.'],
-  ][step];
+  const { t } = useWagoTranslations();
   return (
     <div>
-      <p className="wg:text-sm wg:font-medium">Step {step + 1} of 6</p>
-      <h2 className="wg:mt-1 wg:text-xl wg:font-semibold">{content[0]}</h2>
-      <p className="wg:mt-1 wg:text-sm wg:text-muted">{content[1]}</p>
+      <p className="wg:text-sm wg:font-medium">{t('commissioningUI.step', { step: step + 1 })}</p>
+      <h2 className="wg:mt-1 wg:text-xl wg:font-semibold">{t(`commissioningUI.steps.${step}.title`)}</h2>
+      <p className="wg:mt-1 wg:text-sm wg:text-muted">{t(`commissioningUI.steps.${step}.description`)}</p>
     </div>
   );
 }
@@ -840,13 +846,14 @@ function OperationStatus({ title, description }: { title: string; description: s
 }
 
 function NameStep({ name, onNameChange }: { name: string; onNameChange: (name: string) => void }) {
+  const { t } = useWagoTranslations();
   return (
     <TextField isRequired name="controller-name">
-      <Label>Controller name</Label>
+      <Label>{t('claim.name')}</Label>
       <Input
         autoFocus
         value={name}
-        placeholder="e.g. Pool house controller"
+        placeholder={t('commissioningUI.namePlaceholder')}
         onChange={(event) => onNameChange(event.target.value)}
       />
     </TextField>
@@ -866,20 +873,18 @@ function ConnectionStep({
   onControllerIpChange: (value: string) => void;
   onMqttServerIdChange: (value: Key | null) => void;
 }) {
+  const { t } = useWagoTranslations();
   return (
     <div className="wg:space-y-4">
       <Alert status="accent">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Prepare the CC100 (751-9301), firmware 31</Alert.Title>
-          <Alert.Description>
-            Power on the CC100 and connect it to the local network. Keep it connected during installation. Check the
-            device label and firmware if you are unsure which controller this is.
-          </Alert.Description>
+          <Alert.Title>{t('commissioningUI.prepare')}</Alert.Title>
+          <Alert.Description>{t('commissioningUI.prepareDescription')}</Alert.Description>
         </Alert.Content>
       </Alert>
       <TextField isRequired name="controller-ip">
-        <Label>Controller IP address</Label>
+        <Label>{t('commissioningUI.ip')}</Label>
         <Input
           value={controllerIp}
           placeholder="192.168.1.42"
@@ -896,11 +901,11 @@ function ConnectionStep({
         <Select
           className="wg:w-full"
           name="mqttServerId"
-          placeholder="Select an MQTT server"
+          placeholder={t('settings.select')}
           value={mqttServerId}
           onChange={onMqttServerIdChange}
         >
-          <Label>MQTT server</Label>
+          <Label>{t('commissioningUI.mqtt')}</Label>
           <Select.Trigger>
             <Select.Value />
             <Select.Indicator />
@@ -908,7 +913,7 @@ function ConnectionStep({
           <Select.Popover>
             <ListBox
               renderEmptyState={() => (
-                <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">No MQTT servers configured.</span>
+                <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">{t('settings.empty')}</span>
               )}
             >
               {(mqttServersQuery.data ?? []).map((server) => (
@@ -934,21 +939,19 @@ function HostKeyConfirmationStep({
   expectedFingerprint: string;
   onFingerprintChange: (value: string) => void;
 }) {
+  const { t } = useWagoTranslations();
   return (
     <div className="wg:space-y-4">
       <Alert status="warning">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Review the controller SSH key</Alert.Title>
-          <Alert.Description>
-            Compare this fingerprint with a trusted record. If you do not have one, connect only this controller to an
-            isolated service network and confirm its physical label. Stop if you cannot identify the controller.
-          </Alert.Description>
+          <Alert.Title>{t('commissioningUI.reviewKey')}</Alert.Title>
+          <Alert.Description>{t('commissioningUI.reviewKeyDescription')}</Alert.Description>
         </Alert.Content>
       </Alert>
-      <p className="wg:break-all wg:text-sm">Scanned fingerprint: {expectedFingerprint}</p>
+      <p className="wg:break-all wg:text-sm">{t('commissioningUI.scannedKey', { fingerprint: expectedFingerprint })}</p>
       <TextField isRequired name="host-key-fingerprint">
-        <Label>Reviewed SSH host-key fingerprint</Label>
+        <Label>{t('commissioningUI.reviewedKey')}</Label>
         <Input value={fingerprint} onChange={(event) => onFingerprintChange(event.target.value)} />
       </TextField>
     </div>
@@ -982,24 +985,28 @@ function CredentialFields({
   custom: boolean;
   onCustomChange: (value: boolean) => void;
 }) {
-  const prefix = intent === 'recovery' ? 'Recovery SSH' : 'Temporary SSH';
+  const { t } = useWagoTranslations();
   return (
     <div className="wg:space-y-3">
-      <p className="wg:text-sm">SSH login: {custom ? 'Custom credentials' : 'Default root account'}</p>
+      <p className="wg:text-sm">
+        {t('commissioningUI.sshLogin', {
+          account: t(custom ? 'commissioningUI.custom' : 'commissioningUI.defaultAccount'),
+        })}
+      </p>
       <Checkbox isSelected={custom} isDisabled={isDisabled} onChange={onCustomChange}>
         <Checkbox.Control>
           <Checkbox.Indicator />
         </Checkbox.Control>
-        <Checkbox.Content>Advanced: use different SSH credentials</Checkbox.Content>
+        <Checkbox.Content>{t('commissioningUI.advanced')}</Checkbox.Content>
       </Checkbox>
       {custom && (
         <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
           <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-username`}>
-            <Label>{prefix} username</Label>
+            <Label>{t(`commissioningUI.${intent}Username`)}</Label>
             <Input autoComplete="off" value={username} onChange={(event) => onUsernameChange(event.target.value)} />
           </TextField>
           <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-password`}>
-            <Label>{prefix} password</Label>
+            <Label>{t(`commissioningUI.${intent}Password`)}</Label>
             <Input
               autoComplete="off"
               type="password"
@@ -1036,6 +1043,7 @@ function DeliveryStep({
   confirmInstall: boolean;
   onConfirmInstallChange: (value: boolean) => void;
 }) {
+  const { t } = useWagoTranslations();
   return (
     <div className="wg:space-y-4">
       <CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />
@@ -1044,10 +1052,9 @@ function DeliveryStep({
           <Alert status="warning">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title>Destructive installation</Alert.Title>
+              <Alert.Title>{t('commissioningUI.destructive')}</Alert.Title>
               <Alert.Description>
-                Make connected equipment safe before continuing. Installation stops and disables CODESYS on{' '}
-                {session.targetHost}. Existing applications and data may be lost and cannot be restored by Attraccess.
+                {t('commissioningUI.destructiveDescription', { host: session.targetHost })}
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -1070,15 +1077,9 @@ function DeliveryStep({
             <Checkbox.Control>
               <Checkbox.Indicator />
             </Checkbox.Control>
-            <Checkbox.Content>
-              I approve this destructive installation, including synchronization of controller system and hardware
-              clocks to application UTC, permanent CODESYS disablement and possible loss of existing applications and
-              data, without preservation, backup, or restoration by Attraccess.
-            </Checkbox.Content>
+            <Checkbox.Content>{t('commissioningUI.approveInstall')}</Checkbox.Content>
           </Checkbox>
-          <p className="wg:text-sm wg:text-muted">
-            Each attempt needs your approval. Custom passwords are cleared after use.
-          </p>
+          <p className="wg:text-sm wg:text-muted">{t('commissioningUI.attemptApproval')}</p>
         </>
       )}
     </div>
@@ -1086,6 +1087,7 @@ function DeliveryStep({
 }
 
 function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   const complete =
     verification.enrollmentComplete ||
@@ -1093,10 +1095,10 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
   const progress = verification.enrollmentComplete
     ? {
         ...session,
-        progressStep: 'Runtime enrollment complete',
+        progressStep: t('commissioningUI.enrollmentComplete'),
         progressDetail: verification.runtimeVerified
-          ? 'Permanent MQTT access, enrollment credential revocation, applied configuration and a fresh runtime probe are verified.'
-          : 'Permanent MQTT access and enrollment credential revocation are verified. Configure inputs and outputs to finish runtime setup.',
+          ? t('commissioningUI.verifiedDescription')
+          : t('commissioningUI.setupPendingDescription'),
       }
     : session;
   return (
@@ -1104,18 +1106,14 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
       <DevicePassport className="wg:md:hidden" name={name} step={5} />
       <CommissioningStatusPanel isActive={!complete} session={progress} />
       <div className="wg:rounded-large wg:border wg:border-default-200 wg:p-4 wg:text-sm">
-        <p className="wg:font-medium">Safe to close</p>
-        <p className="wg:mt-1 wg:text-muted">
-          This session is saved in the CC100 devices table. Closing this window does not cancel an installation already
-          submitted. If installation is interrupted, reopening the session or restarting the server does not authorize
-          another attempt.
-        </p>
+        <p className="wg:font-medium">{t('commissioningUI.safeToClose')}</p>
+        <p className="wg:mt-1 wg:text-muted">{t('commissioningUI.savedDescription')}</p>
       </div>
       {session.failureReason && (
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Description>{session.failureReason}</Alert.Description>
+            <Alert.Description>{tBackendMessage(session.failureReason)}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}
@@ -1130,6 +1128,7 @@ function VerificationStatus({
   session: CommissioningSession;
   onConfigure?: (controllerId: number) => void;
 }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   const controllerId = verification.data?.controllerId;
   const managementControllerId = controllerId ?? session.managementControllerId;
@@ -1138,36 +1137,66 @@ function VerificationStatus({
       <Alert status={verification.enrollmentComplete ? 'success' : 'warning'}>
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>{verification.enrollmentComplete ? 'Enrollment complete' : 'Verifying enrollment'}</Alert.Title>
+          <Alert.Title>
+            {t(verification.enrollmentComplete ? 'commissioningUI.enrolled' : 'commissioningUI.verifying')}
+          </Alert.Title>
           <Alert.Description>
             {verification.unavailable ? (
-              'Current verification is unavailable. Waiting for a fresh status check.'
+              t('commissioningUI.verificationUnavailable')
             ) : verification.data ? (
               <ul>
-                <li>Permanent heartbeat: {verification.data.permanentConnection ? 'received' : 'pending'}</li>
-                <li>Enrollment credential revoked: {verification.data.enrollmentRevoked ? 'verified' : 'pending'}</li>
+                <li>
+                  {t('commissioningUI.heartbeat', {
+                    status: t(
+                      verification.data.permanentConnection ? 'commissioningUI.received' : 'commissioningUI.pending',
+                    ),
+                  })}
+                </li>
+                <li>
+                  {t('commissioningUI.credentialRevoked', {
+                    status: t(
+                      verification.data.enrollmentRevoked ? 'commissioningUI.verified' : 'commissioningUI.pending',
+                    ),
+                  })}
+                </li>
               </ul>
             ) : (
-              'Checking commissioning evidence...'
+              t('commissioningUI.checkingEvidence')
             )}
           </Alert.Description>
         </Alert.Content>
       </Alert>
       {verification.data && (
-        <section aria-label="Runtime setup and qualification">
-          <h3>{verification.runtimeVerified ? 'Runtime configuration verified' : 'Runtime setup checks'}</h3>
+        <section aria-label={t('commissioningUI.qualification')}>
+          <h3>
+            {t(verification.runtimeVerified ? 'commissioningUI.configurationVerified' : 'commissioningUI.setupChecks')}
+          </h3>
           <ul>
-            <li>Desired/reported configuration: {verification.data.configurationApplied ? 'applied' : 'pending'}</li>
-            <li>Runtime hardware probe: {verification.data.hardwareReadiness ?? 'unverified'}</li>
-            <li>Management hardening: {verification.data.managementHardening}</li>
-            <li>Physical qualification: required before production use</li>
+            <li>
+              {t('commissioningUI.configuration', {
+                status: t(
+                  verification.data.configurationApplied ? 'commissioningUI.applied' : 'commissioningUI.pending',
+                ),
+              })}
+            </li>
+            <li>
+              {t('commissioningUI.hardwareProbe', {
+                status: tBackendMessage(verification.data.hardwareReadiness ?? t('commissioningUI.unverified')),
+              })}
+            </li>
+            <li>
+              {t('commissioningUI.managementStatus', {
+                status: tBackendMessage(verification.data.managementHardening),
+              })}
+            </li>
+            <li>{t('commissioningUI.physicalQualification')}</li>
           </ul>
         </section>
       )}
       {managementControllerId && (
         <>
           {onConfigure && controllerId && (
-            <Button onPress={() => onConfigure(controllerId)}>Configure inputs and outputs</Button>
+            <Button onPress={() => onConfigure(controllerId)}>{t('commissioningUI.configure')}</Button>
           )}
           <CommissioningSecurityPanel key={session.id} sessionId={session.id} controllerId={managementControllerId} />
         </>
@@ -1177,15 +1206,16 @@ function VerificationStatus({
 }
 
 function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; session: CommissioningSession }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   const percent = session.progressPercent ?? 0;
   const isQueued = session.state === 'awaiting_delivery';
   const hasFailure = !isActive && Boolean(session.failureReason);
   const title = isQueued
-    ? 'Installation approval required'
-    : (session.progressStep ?? (isActive ? 'Preparing commissioning' : commissioningLabel(session.state)));
+    ? t('commissioningUI.approvalRequired')
+    : (session.progressStep ?? (isActive ? t('commissioningUI.preparing') : commissioningLabel(session.state, t)));
   const detail = isQueued
-    ? 'Review the installation and approve this attempt. Saved sessions do not start automatically.'
-    : (session.progressDetail ?? 'Waiting for the next commissioning operation.');
+    ? t('commissioningUI.approvalDescription')
+    : (session.progressDetail ?? t('commissioningUI.waiting'));
   return (
     <div aria-live="polite" className="wg:rounded-large wg:border wg:border-primary/30 wg:bg-primary/5 wg:p-4">
       <div className="wg:flex wg:items-start wg:gap-3">
@@ -1200,10 +1230,10 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
         )}
         <div className="wg:min-w-0 wg:flex-1">
           <div className="wg:flex wg:items-center wg:justify-between wg:gap-3">
-            <p className="wg:font-medium">{title}</p>
+            <p className="wg:font-medium">{tBackendMessage(title)}</p>
             <span className="wg:text-sm wg:text-muted">{percent}%</span>
           </div>
-          <p className="wg:mt-1 wg:text-sm wg:text-muted">{detail}</p>
+          <p className="wg:mt-1 wg:text-sm wg:text-muted">{tBackendMessage(detail)}</p>
           <div className="wg:mt-3 wg:h-1.5 wg:overflow-hidden wg:rounded-full wg:bg-default-200">
             <div
               className={`wg:h-full wg:rounded-full wg:transition-[width] wg:duration-500 ${hasFailure ? 'wg:bg-danger' : 'wg:bg-primary'}`}
@@ -1216,8 +1246,8 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
         <Alert className="wg:mt-4" status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Delivery error</Alert.Title>
-            <Alert.Description>{session.failureReason}</Alert.Description>
+            <Alert.Title>{t('commissioningUI.deliveryError')}</Alert.Title>
+            <Alert.Description>{tBackendMessage(session.failureReason)}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}
@@ -1227,16 +1257,19 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
 }
 
 function ActivityLog({ auditLog }: { auditLog: string }) {
+  const { t, language } = useWagoTranslations();
   const events = parseActivityLog(auditLog);
   if (!events.length) return null;
   return (
     <div className="wg:mt-4 wg:border-t wg:border-default-200 wg:pt-3">
-      <p className="wg:text-xs wg:font-semibold wg:uppercase wg:tracking-wider wg:text-muted">Activity</p>
+      <p className="wg:text-xs wg:font-semibold wg:uppercase wg:tracking-wider wg:text-muted">
+        {t('commissioningUI.activity')}
+      </p>
       <ol className="wg:mt-2 wg:space-y-1">
         {events.map((event) => (
           <li key={`${event.at}-${event.event}`} className="wg:text-xs wg:text-muted">
             <span className="wg:text-foreground">{formatActivity(event.event)}</span>{' '}
-            <span>{new Date(event.at).toLocaleTimeString()}</span>
+            <span>{new Date(event.at).toLocaleTimeString(language)}</span>
           </li>
         ))}
       </ol>
@@ -1271,11 +1304,12 @@ function sessionStep(session: CommissioningSession | null): number {
 }
 
 function ErrorAlert({ error }: { error: unknown }) {
+  const { t } = useWagoTranslations();
   return (
     <Alert status="danger">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Description>{error instanceof Error ? error.message : 'Please try again.'}</Alert.Description>
+        <Alert.Description>{error instanceof Error ? error.message : t('common.retry')}</Alert.Description>
       </Alert.Content>
     </Alert>
   );

@@ -15,6 +15,8 @@ import { addModbusChannel, emptyModbus, updateModbusConfiguration } from './modb
 import { validateModbus, validateModbusBindings } from '../../modbus/model';
 import { ControllerDiagnostics } from './ControllerDiagnostics';
 import { useWagoDiagnostics } from './diagnostics';
+import { useWagoTranslations } from './i18n';
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 type Section = 'channels' | 'devices' | 'review' | 'history' | 'diagnostics';
 interface WorkingCopy {
@@ -38,6 +40,7 @@ export function ConfigurationEditor({
   return <ConfigurationSession key={controllerId} controllerId={controllerId} onClose={() => onOpenChange(false)} />;
 }
 function ConfigurationSession({ controllerId, onClose }: { controllerId: number; onClose: () => void }) {
+  const { t } = useWagoTranslations();
   const client = useQueryClient();
   const localKey = ['wago', 'configuration-working-copy', controllerId] as const;
   const [restored] = useState(() => client.getQueryData<WorkingCopy>(localKey));
@@ -53,8 +56,8 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
   const [initialized, setInitialized] = useState(!!restored);
   const [dirty, setDirty] = useState(!!restored);
   const [draftConflict, setDraftConflict] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState('');
+  const [error, setError] = useState<string | TranslationMessage | null>(null);
+  const [notice, setNotice] = useState<string | TranslationMessage>('');
   const [discard, setDiscard] = useState(false);
   const [generation, setGeneration] = useState(0);
   const [revisionBusy, setRevisionBusy] = useState(false);
@@ -80,7 +83,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       const source = draft.data ?? baseline.data;
       const value = source ? JSON.parse(source.snapshot) : emptyConfiguration;
       if (value.version !== 1 || !Array.isArray(value.physicalPoints) || !Array.isArray(value.logicalChannels))
-        throw new Error('This draft has an unsupported configuration structure.');
+        throw new Error(t('editor.unsupported'));
       setSnapshot(value);
       setMetadata(readMetadata((draft.data ?? baseline.data)?.presetProvenance ?? null));
       setInitialized(true);
@@ -90,9 +93,9 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       setGeneration((value) => value + 1);
     } catch (error) {
       setInitialized(false);
-      setError(error instanceof Error ? error.message : 'Could not read draft.');
+      setError(error instanceof Error ? error.message : { key: 'editor.readError' });
     }
-  }, [draft.data, draft.isPending, draft.isError, dirty, initialized, baseline.data, baseline.isSuccess]);
+  }, [draft.data, draft.isPending, draft.isError, dirty, initialized, baseline.data, baseline.isSuccess, t]);
   useEffect(() => {
     client.setQueryDefaults(['wago', 'configuration-working-copy'], { gcTime: Infinity });
   }, [client]);
@@ -154,11 +157,11 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       setDirty(false);
       setDraftConflict(false);
       setMetadata(savedMetadata);
-      setNotice('Draft saved. Review and publish separately to send it to the controller.');
+      setNotice({ key: 'editor.saved' });
       setGeneration((value) => value + 1);
     } catch (error) {
       if (mounted.current) {
-        setError(error instanceof Error ? error.message : 'Could not save draft.');
+        setError(error instanceof Error ? error.message : { key: 'editor.saveError' });
         void draft.refetch();
       }
     }
@@ -187,23 +190,23 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
   return (
     <main
       className="wg:mx-auto wg:flex wg:w-full wg:max-w-[1440px] wg:min-w-0 wg:flex-col wg:gap-5 wg:p-4 wg:md:p-6"
-      aria-label="Controller configuration"
+      aria-label={t('editor.title')}
     >
       <header className="wg:flex wg:flex-col wg:gap-4">
         <Button variant="ghost" isDisabled={busy} onPress={close}>
-          <ArrowLeft className="wg:size-4" /> WAGO controllers
+          <ArrowLeft className="wg:size-4" /> {t('controllers.title')}
         </Button>
         <div className="wg:flex wg:flex-wrap wg:items-start wg:justify-between wg:gap-4">
           <div>
             <p className="wg:text-sm wg:font-medium wg:text-muted">
-              WAGO / {diagnostics.data?.name ?? `Controller ${controllerId}`}
+              WAGO / {diagnostics.data?.name ?? t('editor.controller', { id: controllerId })}
             </p>
-            <h1 className="wg:mt-1 wg:text-3xl wg:font-semibold">Controller configuration</h1>
-            <p className="wg:mt-2 wg:text-muted">
-              Give each connection a purpose. Review changes before they reach your controller.
-            </p>
+            <h1 className="wg:mt-1 wg:text-3xl wg:font-semibold">{t('editor.title')}</h1>
+            <p className="wg:mt-2 wg:text-muted">{t('editor.description')}</p>
           </div>
-          {diagnostics.data && <Chip variant="soft">Runtime {diagnostics.data.runtimeVersion}</Chip>}
+          {diagnostics.data && (
+            <Chip variant="soft">{t('editor.runtime', { version: diagnostics.data.runtimeVersion })}</Chip>
+          )}
         </div>
       </header>
       <ConfigurationToolbar
@@ -232,15 +235,15 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       />
       <nav
         className="wg:flex wg:flex-wrap wg:gap-2 wg:border-b wg:border-border wg:pb-3"
-        aria-label="Controller configuration sections"
+        aria-label={t('editor.sections')}
       >
         {(
           [
-            { id: 'channels', label: 'Channels', icon: Settings2 },
-            { id: 'devices', label: 'External devices', icon: Network },
-            { id: 'review', label: 'Review & publish', icon: GitCompareArrows },
-            { id: 'history', label: 'History', icon: History },
-            { id: 'diagnostics', label: 'Diagnostics', icon: Activity },
+            { id: 'channels', icon: Settings2 },
+            { id: 'devices', icon: Network },
+            { id: 'review', icon: GitCompareArrows },
+            { id: 'history', icon: History },
+            { id: 'diagnostics', icon: Activity },
           ] as const
         ).map((item) => (
           <Button
@@ -251,7 +254,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
             onPress={() => setSection(item.id)}
           >
             <item.icon className="wg:size-4" />
-            {item.label}
+            {t(`editor.${item.id}`)}
           </Button>
         ))}
       </nav>
@@ -264,7 +267,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
             }}
           >
             <fieldset disabled={editingDisabled} inert={editingDisabled} className="wg:min-w-0">
-              <legend className="wg:sr-only">I/O configuration</legend>
+              <legend className="wg:sr-only">{t('editor.io')}</legend>
               <div hidden={section !== 'channels'}>
                 <ChannelWorkspace
                   focusChannelId={focusChannelId}
@@ -275,7 +278,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                   onExternal={() => setSection('devices')}
                 />
                 <details className="wg:mt-5 wg:rounded-xl wg:border wg:border-border wg:p-4">
-                  <summary className="wg:cursor-pointer wg:font-medium">Apply a preset to an existing channel</summary>
+                  <summary className="wg:cursor-pointer wg:font-medium">{t('editor.applyPreset')}</summary>
                   <div className="wg:mt-4 wg:max-w-3xl">
                     <ConfigurationPresets
                       controllerId={controllerId}
@@ -315,7 +318,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                             [next.point.id]: name.slice(0, 120),
                           },
                         }));
-                        setNotice(`Added ${name} to Channels. Save the draft when ready.`);
+                        setNotice({ key: 'editor.added', data: { name } });
                       }}
                     />
                   )}
@@ -326,8 +329,8 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
           {modbusErrors.length > 0 && (
             <Card>
               <Card.Header>
-                <Card.Title>Configuration needs attention</Card.Title>
-                <Card.Description>Resolve these assignments or device settings before saving.</Card.Description>
+                <Card.Title>{t('editor.needsAttention')}</Card.Title>
+                <Card.Description>{t('editor.resolveAssignments')}</Card.Description>
               </Card.Header>
               <Card.Content>
                 <ConfigurationErrors errors={modbusErrors} snapshot={snapshot} names={metadata.names} />
@@ -364,24 +367,33 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                         value.version !== 1 ||
                         !Array.isArray(value.physicalPoints) ||
                         !Array.isArray(value.logicalChannels)
-                      )
-                        throw new Error('This draft has an unsupported configuration structure.');
+                      ) {
+                        setInitialized(false);
+                        setNotice('');
+                        setError({ key: 'editor.unsupported' });
+                        return;
+                      }
                       loadedDraft.current = draftIdentity(refreshed.data);
                       setDraftConflict(false);
                       setSnapshot(value);
                       setMetadata(readMetadata(refreshed.data?.presetProvenance ?? null));
                       setDirty(false);
                       setGeneration((value) => value + 1);
-                      setNotice(
-                        'Reloaded the saved draft after the rollback attempt. Check revision history for delivery status.',
+                      setNotice({ key: 'editor.rollbackReloaded' });
+                      setError(
+                        failure
+                          ? failure instanceof Error
+                            ? failure.message
+                            : { key: 'editor.rollbackFailed' }
+                          : null,
                       );
-                      setError(failure ? (failure instanceof Error ? failure.message : 'Rollback failed.') : null);
                     } catch (error) {
                       setInitialized(false);
                       setNotice('');
-                      setError(
-                        `Could not reconcile the saved draft after rollback. Close and reopen the editor before continuing. ${error instanceof Error ? error.message : ''}`,
-                      );
+                      setError({
+                        key: 'editor.reconcileError',
+                        data: { error: error instanceof Error ? error.message : '' },
+                      });
                     } finally {
                       setRevisionBusy(false);
                     }
@@ -400,12 +412,12 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
           <Modal.Container>
             <Modal.Dialog>
               <Modal.Header>
-                <Modal.Heading>Discard unsaved local edits?</Modal.Heading>
+                <Modal.Heading>{t('editor.discard')}</Modal.Heading>
               </Modal.Header>
-              <Modal.Body>Your last saved draft will remain available.</Modal.Body>
+              <Modal.Body>{t('editor.draftRemains')}</Modal.Body>
               <Modal.Footer>
                 <Button variant="secondary" onPress={() => setDiscard(false)}>
-                  Keep editing
+                  {t('editor.keepEditing')}
                 </Button>
                 <Button
                   variant="danger"
@@ -414,7 +426,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                     onClose();
                   }}
                 >
-                  Discard edits and close
+                  {t('editor.discardAndClose')}
                 </Button>
               </Modal.Footer>
             </Modal.Dialog>
@@ -440,29 +452,30 @@ function DraftFeedback({
   baseline: ReturnType<typeof useConfigurationBaselineQuery>;
   draftConflict: boolean;
   reloadSavedDraft: () => void;
-  error: string | null;
-  notice: string;
+  error: string | TranslationMessage | null;
+  notice: string | TranslationMessage;
   validate: ReturnType<typeof useConfigurationActions>['validate'];
   snapshot: WagoConfigurationSnapshot;
   metadata: ConfigurationEditorMetadata;
 }) {
+  const { t, tMessage } = useWagoTranslations();
   return (
     <>
-      {draft.isPending && <p role="status">Loading draft…</p>}
+      {draft.isPending && <p role="status">{t('editor.loadingDraft')}</p>}
       {draft.isError && (
         <p role="alert">
-          Could not load draft: {draft.error.message}{' '}
+          {t('editor.loadError', { error: draft.error.message })}{' '}
           <Button variant="secondary" onPress={() => void draft.refetch()}>
-            Retry loading draft
+            {t('editor.retryDraft')}
           </Button>
         </p>
       )}
-      {draft.data === null && baseline.isPending && <p role="status">Loading applied configuration…</p>}
+      {draft.data === null && baseline.isPending && <p role="status">{t('editor.loadingApplied')}</p>}
       {draft.data === null && baseline.isError && (
         <p role="alert">
-          Could not load applied configuration: {baseline.error.message}{' '}
+          {t('editor.appliedError', { error: baseline.error.message })}{' '}
           <Button variant="secondary" onPress={() => void baseline.refetch()}>
-            Retry loading configuration
+            {t('editor.retryConfiguration')}
           </Button>
         </p>
       )}
@@ -470,23 +483,20 @@ function DraftFeedback({
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Saved draft changed</Alert.Title>
-            <Alert.Description>
-              Another editor saved a newer draft. Your local edits are preserved here. Reload the saved draft before
-              editing or publishing.
-            </Alert.Description>
+            <Alert.Title>{t('editor.draftChanged')}</Alert.Title>
+            <Alert.Description>{t('editor.conflict')}</Alert.Description>
             <Button variant="secondary" onPress={reloadSavedDraft}>
-              Reload saved draft
+              {t('editor.reload')}
             </Button>
           </Alert.Content>
         </Alert>
       )}
-      {(error || validate.error) && <p role="alert">{error ?? validate.error?.message}</p>}
-      {notice && <p role="status">{notice}</p>}
+      {(error || validate.error) && <p role="alert">{error ? tMessage(error) : validate.error?.message}</p>}
+      {notice && <p role="status">{tMessage(notice)}</p>}
       {validate.data && !validate.data.valid && (
         <Alert status="danger">
           <Alert.Content>
-            <Alert.Title>Resolve these configuration fields</Alert.Title>
+            <Alert.Title>{t('editor.resolveFields')}</Alert.Title>
             <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
           </Alert.Content>
         </Alert>
@@ -512,15 +522,16 @@ function LocalDraftReview({
   metadata: ConfigurationEditorMetadata;
   setError: (error: string | null) => void;
 }) {
+  const { t } = useWagoTranslations();
   return (
     <Card>
       <Card.Header>
-        <Card.Title>Check, save, then publish</Card.Title>
-        <Card.Description>Your edits reach the controller only after you publish a reviewed draft.</Card.Description>
+        <Card.Title>{t('editor.checkSavePublish')}</Card.Title>
+        <Card.Description>{t('editor.publishDescription')}</Card.Description>
       </Card.Header>
       <Card.Content className="wg:flex wg:flex-col wg:gap-3">
-        {dirty && <p>Save your local edits before reviewing the draft.</p>}
-        {!hasDraft && !dirty && <p>Save this configuration as a draft to review and publish it.</p>}
+        {dirty && <p>{t('editor.saveBeforeReview')}</p>}
+        {!hasDraft && !dirty && <p>{t('editor.saveToReview')}</p>}
         <Button
           variant="secondary"
           isDisabled={disabled}
@@ -529,11 +540,11 @@ function LocalDraftReview({
             void validate.mutateAsync(snapshot).catch((error) => setError(error.message));
           }}
         >
-          Validate local edits
+          {t('editor.validate')}
         </Button>
         {validate.data?.valid && (
           <div role="status">
-            {validate.data.valid ? 'Configuration contract is valid.' : 'Resolve these configuration fields:'}
+            {validate.data.valid ? t('editor.valid') : t('editor.resolveFields')}
             <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
           </div>
         )}
@@ -567,28 +578,32 @@ function ConfigurationToolbar({
   onSave: () => void;
   onReview: () => void;
 }) {
+  const { t } = useWagoTranslations();
   return (
     <div className="wg:sticky wg:top-0 wg:z-10 wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-3 wg:rounded-xl wg:border wg:border-border wg:bg-surface wg:p-4">
       <div>
         <p role="status" className="wg:font-medium">
           {dirty
-            ? 'Unsaved local edits'
+            ? t('editor.unsaved')
             : draft
-              ? 'Draft is saved'
+              ? t('editor.draftSaved')
               : baseline
-                ? `Starting from applied revision ${baseline.revision}`
-                : 'No saved draft yet'}
+                ? t('editor.startingFrom', { revision: baseline.revision })
+                : t('editor.noDraft')}
         </p>
         <p className="wg:text-sm wg:text-muted">
-          {snapshot.logicalChannels.length} channels · {snapshot.modbus?.devices.length ?? 0} external devices
+          {t('editor.counts', {
+            channels: snapshot.logicalChannels.length,
+            devices: snapshot.modbus?.devices.length ?? 0,
+          })}
         </p>
       </div>
       <div className="wg:flex wg:flex-wrap wg:gap-2">
         <Button variant="secondary" isDisabled={editingDisabled || hasErrors} isPending={saving} onPress={onSave}>
-          Save draft
+          {t('editor.save')}
         </Button>
         <Button isDisabled={busy || !initialized} onPress={onReview}>
-          Review changes <ArrowRight className="wg:size-4" />
+          {t('editor.reviewChanges')} <ArrowRight className="wg:size-4" />
         </Button>
       </div>
     </div>

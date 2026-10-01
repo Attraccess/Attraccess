@@ -18,7 +18,7 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*"],
+      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"],
       "outputs": [],
       "options": {
         "cwd": "apps/plugins/shelly",
@@ -49,7 +49,11 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
+      ],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": {
         "cwd": "apps/plugins/shelly",
@@ -100,7 +104,8 @@
       ],
       "options": {
         "cwd": "apps/plugins/shelly",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css"
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
       }
     },
     "publish": {

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import type { WagoResourceDiagnostics } from '../../diagnostics-types';
 import { WagoDiagnosticsBoundary } from './ControllerDiagnostics';
+import { useWagoTranslations } from './i18n';
 
 const api = createPluginApiClient('/api/wago');
 
@@ -35,6 +36,7 @@ function nodeProblems(controller: Controller) {
 
 /** Silent when the WAGO setup is healthy; only surfaces actionable problems to resource managers. */
 function ResourceDiagnosticsContent({ resourceId }: { resourceId: number }) {
+  const { t } = useWagoTranslations();
   const query = useQuery({
     queryKey: ['wago', 'resource-diagnostics', resourceId],
     queryFn: ({ signal }) => api.request<WagoResourceDiagnostics>(`/resources/${resourceId}/diagnostics`, { signal }),
@@ -50,28 +52,28 @@ function ResourceDiagnosticsContent({ resourceId }: { resourceId: number }) {
   if (!controllers.length && !data.invalidControllerReferences && !data.truncated) return null;
 
   return (
-    <Alert status="warning" aria-label="Resource WAGO diagnostics">
+    <Alert status="warning" aria-label={t('diagnostics.resourceTitle')}>
       <Alert.Indicator />
       <Alert.Content className="wg:min-w-0 wg:break-words">
-        <Alert.Title>WAGO setup needs attention</Alert.Title>
-        <Alert.Description>Resource usage is not blocked. Fix these in the flow editor.</Alert.Description>
+        <Alert.Title>{t('diagnostics.resourceAttention')}</Alert.Title>
+        <Alert.Description>{t('diagnostics.resourceDescription')}</Alert.Description>
         <ul className="wg:mt-2 wg:flex wg:flex-col wg:gap-2 wg:text-sm">
           {controllers.map((controller) => (
             <li key={controller.controllerId}>
               <Link href={`/wago/controllers/${controller.controllerId}/configuration`}>{controller.name}</Link>
-              {controller.unavailable && <span> — controller unavailable</span>}
-              {controller.referencesTruncated && <span> — lookup incomplete, more issues may exist</span>}
+              {controller.unavailable && <span>{t('diagnostics.controllerUnavailable')}</span>}
+              {controller.referencesTruncated && <span>{t('diagnostics.lookupIncomplete')}</span>}
               {controller.nodes.length > 0 && (
                 <ul className="wg:mt-1 wg:flex wg:flex-col wg:gap-1">
                   {controller.nodes.map((node) => (
                     <li key={node.nodeId}>
                       <Link href={node.href}>{node.nodeId}</Link>
                       {node.channelId && <span className="wg:text-muted"> ({node.channelId})</span>}:{' '}
-                      {node.invalid && 'channel missing or outdated on the controller'}
+                      {node.invalid && t('diagnostics.channelMissing')}
                       {node.invalid && node.conflict && '; '}
                       {node.conflict && (
                         <>
-                          channel is also switched by{' '}
+                          {t('diagnostics.alsoSwitched')}{' '}
                           {node.conflictResources.map((resource, index) => (
                             <span key={resource.id}>
                               {index > 0 && ', '}
@@ -88,11 +90,11 @@ function ResourceDiagnosticsContent({ resourceId }: { resourceId: number }) {
           ))}
           {data.invalidControllerReferences > 0 && (
             <li>
-              {data.invalidControllerReferences} flow node(s) have no valid controller selected.{' '}
-              <Link href={`/resources/${resourceId}/flows`}>Open flow</Link>
+              {t('diagnostics.invalidControllers', { count: data.invalidControllerReferences })}{' '}
+              <Link href={`/resources/${resourceId}/flows`}>{t('diagnostics.openFlow')}</Link>
             </li>
           )}
-          {data.truncated && <li>Too many WAGO nodes to check all of them; more issues may exist.</li>}
+          {data.truncated && <li>{t('diagnostics.tooMany')}</li>}
         </ul>
       </Alert.Content>
     </Alert>

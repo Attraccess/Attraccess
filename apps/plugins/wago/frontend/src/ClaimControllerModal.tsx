@@ -16,6 +16,7 @@ import {
 } from '@heroui/react';
 import { useEffectEvent, useState } from 'react';
 import { useClaimControllerMutation } from './queries';
+import { useWagoTranslations } from './i18n';
 
 interface ClaimControllerModalProps {
   controllerId: number | null;
@@ -23,6 +24,7 @@ interface ClaimControllerModalProps {
 }
 
 export function ClaimControllerModal({ controllerId, onOpenChange }: ClaimControllerModalProps) {
+  const { t } = useWagoTranslations();
   const claimMutation = useClaimControllerMutation();
   const [name, setName] = useState('');
   const [verifier, setVerifier] = useState('');
@@ -59,7 +61,7 @@ export function ClaimControllerModal({ controllerId, onOpenChange }: ClaimContro
         <ModalContainer size="sm">
           <ModalDialog>
             <ModalHeader>
-              <ModalHeading>Claim controller</ModalHeading>
+              <ModalHeading>{t('claim.title')}</ModalHeading>
             </ModalHeader>
             <Form
               onSubmit={(event) => {
@@ -68,32 +70,32 @@ export function ClaimControllerModal({ controllerId, onOpenChange }: ClaimContro
               }}
             >
               <ModalBody>
-                <p className="wg:text-sm wg:text-muted">
-                  Verify physical access to this controller before it can receive commands.
-                </p>
+                <p className="wg:text-sm wg:text-muted">{t('claim.description')}</p>
                 <TextField isRequired name="name">
-                  <Label>Controller name</Label>
+                  <Label>{t('claim.name')}</Label>
                   <Input value={name} onChange={(event) => setName(event.target.value)} />
                 </TextField>
                 <TextField isRequired name="verifier">
-                  <Label>Physical pairing code or fingerprint</Label>
+                  <Label>{t('claim.verifier')}</Label>
                   <Input value={verifier} onChange={(event) => setVerifier(event.target.value)} />
                 </TextField>
                 {claimMutation.isError && (
                   <Alert status="danger">
                     <Alert.Indicator />
                     <Alert.Content>
-                      <Alert.Description>{getErrorMessage(claimMutation.error)}</Alert.Description>
+                      <Alert.Description>
+                        {claimMutation.error instanceof Error ? claimMutation.error.message : t('common.retry')}
+                      </Alert.Description>
                     </Alert.Content>
                   </Alert>
                 )}
               </ModalBody>
               <ModalFooter>
                 <Button variant="secondary" onPress={close}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button type="submit" isPending={claimMutation.isPending}>
-                  Verify and claim
+                  {t('claim.submit')}
                 </Button>
               </ModalFooter>
             </Form>
@@ -102,8 +104,4 @@ export function ClaimControllerModal({ controllerId, onOpenChange }: ClaimContro
       </ModalBackdrop>
     </Modal>
   );
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Please try again.';
 }

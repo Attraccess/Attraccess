@@ -476,13 +476,63 @@ knowledge. Host slot ids available today:
 | `mqtt.server.detail`   | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
 | `mqtt.server.list.row` | MQTT server list, per-row action area             | `{ mqttServerId }` |
 
+### Translations and language switching
+
+Use the core `useTranslations` hook from `@attraccess/plugins-frontend-ui` with
+your plugin's own English and German catalogs. The hook reads the host's active
+language and updates mounted plugin pages, drawers and slot contributions when
+the user switches language. Plugins do not run language detection or maintain
+their own language preference.
+
+```tsx
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
+
+export function DevicesPage() {
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
+  return <h1>{t('title')}</h1>;
+}
+```
+
+Include every user-facing label, description, placeholder and accessibility label
+in both catalogs. Use `{{name}}` interpolation for dynamic values and `{ one,
+many }` messages with `t('key', { count })` for pluralization. Missing German
+keys fall back to English. Use the returned `language` for date and number
+formatting; keep user-entered names and protocol identifiers intact. For status
+messages retained in React state, store the translation key and parameters and
+translate during rendering so existing messages also switch language.
+
+For plain React text, `{ escapeValues: false }` preserves names such as `R&D`
+without displaying HTML entities; React escapes the text when rendering it. Do
+not use this option for translated HTML or `Trans`. For retained local messages,
+store `{ key: 'saved', data: { name } }` and render `tMessage(message)`. Literal
+server errors passed to `tMessage` are preserved.
+
+**Share `@attraccess/plugins-frontend-ui` through module federation.** Bundling
+a private copy creates a separate language store and prevents automatic switching.
+The repository's `createPluginFederationConfig` already declares it with
+`import: false` and `generate: false`, so remotes always use the host's copy.
+External plugin builds must include the same shared entry:
+
+```ts
+'@attraccess/plugins-frontend-ui': {
+  requiredVersion: '*', import: false, generate: false,
+}
+```
+
+Declare `@attraccess/plugins-frontend-ui` as a peer dependency and require
+Attraccess 1.11.0 or later in both the npm `attraccess.host` range and the ZIP
+manifest's `attraccessVersion.min`, since older hosts do not share this module.
+
 ### Packaging the frontend
 
 Build the frontend as a module federation remote exposing `./plugin`. Its
 `shared` list must include every host singleton your plugin **imports at
 runtime**, so it reuses the host's copy instead of bundling its own. The host
 shares: `react`, `react-dom`, `react-router-dom`, `react-pluggable`,
-`@heroui/react`, `lucide-react`, `@tanstack/react-query`.
+`@heroui/react`, `lucide-react`, `@tanstack/react-query`,
+`@attraccess/plugins-frontend-ui` (including the core translation hooks).
 
 > [!TIP]
 > List `@heroui/react` and `lucide-react` here when you follow the recommended

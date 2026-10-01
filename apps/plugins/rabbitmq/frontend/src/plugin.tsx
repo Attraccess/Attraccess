@@ -20,6 +20,7 @@ import { useDetection } from './detection';
 import { RabbitmqListBadge } from './RabbitmqListBadge';
 import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
 import { RabbitmqUserPanel } from './RabbitmqUserPanel';
+import { useRabbitmqTranslations } from './i18n';
 
 // Host slot ids exposed by the MQTT UI. The SDK is vendor-agnostic and does not
 // export them, and the host owns them in apps/frontend (which a plugin cannot
@@ -54,6 +55,7 @@ function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
 }
 
 function RabbitmqPage() {
+  const { t } = useRabbitmqTranslations();
   return (
     <div className="rmq:flex rmq:flex-col rmq:gap-6 rmq:p-6 rmq:max-w-4xl rmq:mx-auto">
       <div className="rmq:flex rmq:items-center rmq:gap-3">
@@ -62,11 +64,7 @@ function RabbitmqPage() {
       </div>
       <Card className="rmq:border rmq:border-default-200 rmq:dark:border-default-100">
         <Card.Content>
-          <p className="rmq:text-sm rmq:text-default-500">
-            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in the
-            MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT server
-            detail view.
-          </p>
+          <p className="rmq:text-sm rmq:text-default-500">{t('page.description')}</p>
         </Card.Content>
       </Card>
     </div>

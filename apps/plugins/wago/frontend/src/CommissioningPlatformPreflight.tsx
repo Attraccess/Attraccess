@@ -4,9 +4,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import type { CommissioningSession } from './api';
 import type { WagoCommissioningPreflightReport } from '../../shared/commissioning';
+import { useWagoTranslations } from './i18n';
 
 const api = createPluginApiClient('/api/wago/commissioning/sessions');
 export function CommissioningPlatformPreflight({ session }: { session: CommissioningSession }) {
+  const { t, tBackendMessage, language } = useWagoTranslations();
+  const formatUtc = (value: string) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? tBackendMessage(value)
+      : date.toLocaleString(language, { timeZone: 'UTC', timeZoneName: 'short' });
+  };
   const client = useQueryClient();
   const [updated, setUpdated] = useState<CommissioningSession | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,8 +65,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
         );
       }
     } catch {
-      if (request === generation.current)
-        setError('Could not inspect or clean up the controller. Check SSH access and try again.');
+      if (request === generation.current) setError('security.inspectError');
     } finally {
       temporarySsh.password = '';
       if (request === generation.current) setBusy(false);
@@ -66,163 +73,103 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
   }
 
   return (
-    <section className="wg:space-y-3" aria-label="Controller installation preflight">
-      <h3>Check the controller</h3>
-      <p>Optional: check firmware and installation prerequisites. This does not change the controller.</p>
-      {codesysDisabled && (
-        <p role="status">
-          Controller preparation verified CODESYS stopped and permanently disabled. This is a saved result, not a live
-          controller status check.
-        </p>
-      )}
+    <section className="wg:space-y-3" aria-label={t('security.preflight')}>
+      <h3>{t('security.check')}</h3>
+      <p>{t('security.description')}</p>
+      {codesysDisabled && <p role="status">{t('security.codesysDisabled')}</p>}
       {report?.clock && (
         <dl>
-          <dt>Saved clock result (not live)</dt>
-          <dd>{report.clock.result}</dd>
-          <dt>Application UTC reference</dt>
-          <dd>{report.clock.hostUtc}</dd>
-          <dt>Controller UTC</dt>
-          <dd>{report.clock.controllerUtc}</dd>
-          <dt>Clock observation</dt>
+          <dt>{t('security.clockResult')}</dt>
+          <dd>{tBackendMessage(report.clock.result)}</dd>
+          <dt>{t('security.utcReference')}</dt>
+          <dd>{formatUtc(report.clock.hostUtc)}</dd>
+          <dt>{t('security.controllerUtc')}</dt>
+          <dd>{formatUtc(report.clock.controllerUtc)}</dd>
+          <dt>{t('security.clockObservation')}</dt>
           <dd>
-            {report.clock.observation}; uncertainty {report.clock.uncertaintySeconds} seconds. A failed action does not
-            prove the clock was unchanged.
+            {t('security.observation', {
+              observation: tBackendMessage(report.clock.observation),
+              seconds: report.clock.uncertaintySeconds,
+            })}
           </dd>
-          <dt>Clock skew (controller minus application)</dt>
-          <dd>{report.clock.skewSeconds} seconds</dd>
+          <dt>{t('security.skew')}</dt>
+          <dd>{t('security.seconds', { seconds: report.clock.skewSeconds })}</dd>
           {report.clock.previousSkewSeconds !== undefined && (
             <>
-              <dt>Before correction</dt>
-              <dd>{report.clock.previousSkewSeconds} seconds</dd>
+              <dt>{t('security.beforeCorrection')}</dt>
+              <dd>{t('security.seconds', { seconds: report.clock.previousSkewSeconds })}</dd>
             </>
           )}
-          <dt>Clock tool / action</dt>
+          <dt>{t('security.clockAction')}</dt>
           <dd>
-            {report.clock.tool} / {report.clock.action}
+            {tBackendMessage(report.clock.tool)} / {tBackendMessage(report.clock.action)}
           </dd>
         </dl>
       )}
-      {report?.clock?.result === 'correction-required' && (
-        <p>
-          Installation will synchronize supported FW31 clocks to application UTC under your install approval, then
-          verify the result before enrollment. Inspection never changes time.
-        </p>
-      )}
+      {report?.clock?.result === 'correction-required' && <p>{t('security.clockCorrection')}</p>}
       {report?.platform && (
         <dl>
-          <dt>Report source</dt>
-          <dd>Saved inspection snapshot; these values are not live controller status.</dd>
-          <dt>Platform</dt>
-          <dd>{report.platform}</dd>
-          <dt>Hardware access</dt>
-          <dd>{report.hardware}</dd>
-          <dt>Output exclusivity</dt>
-          <dd>{report.exclusivity}</dd>
+          <dt>{t('security.reportSource')}</dt>
+          <dd>{t('security.savedSnapshot')}</dd>
+          <dt>{t('security.platform')}</dt>
+          <dd>{tBackendMessage(report.platform)}</dd>
+          <dt>{t('security.hardware')}</dt>
+          <dd>{tBackendMessage(report.hardware)}</dd>
+          <dt>{t('security.exclusivity')}</dt>
+          <dd>{tBackendMessage(report.exclusivity)}</dd>
           <dt>Docker</dt>
-          <dd>{report.docker}</dd>
-          <dt>Supported provisioning</dt>
-          <dd>{report.provision}</dd>
+          <dd>{tBackendMessage(report.docker)}</dd>
+          <dt>{t('security.provision')}</dt>
+          <dd>{tBackendMessage(report.provision)}</dd>
         </dl>
       )}
-      {report?.platform === 'unsupported-firmware' && (
-        <p>
-          The controller has not reported an unambiguous CC100 FW31 release identity. A BSP version alone is
-          insufficient.
-        </p>
-      )}
-      {report && (
-        <p>
-          Installation prepares supported Docker and persistent, limited digital I/O access. It must verify CODESYS is
-          stopped and disabled before enabling I/O. An inspection report does not prove installation, management
-          hardening or physical qualification is complete.
-        </p>
-      )}
-      {report?.hardware === 'uid10001-access-denied' && (
-        <p>
-          The runtime account cannot currently access the digital registers. Installation must establish and verify
-          persistent access limited to the required input and output registers, or fail without enabling I/O.
-        </p>
-      )}
-      {report?.hardware === 'permission-tool-unavailable' && (
-        <p>
-          The available tools cannot verify runtime-account permissions. A supported permission probe is needed before
-          installation can proceed.
-        </p>
-      )}
-      {report?.hardware === 'missing-register' && (
-        <p>
-          The expected digital registers are missing. Check the controller model and supported firmware; installation
-          will not create substitute directories.
-        </p>
-      )}
-      {!codesysDisabled && report?.exclusivity === 'codesys-active' && (
-        <p>
-          CODESYS is active. Destructive installation will stop and permanently disable it. Existing PLC applications
-          and data may be lost; Attraccess will not preserve, back up, or restore them. Installation fails if CODESYS
-          cannot be verified stopped and disabled before I/O.
-        </p>
-      )}
-      {!codesysDisabled && report?.exclusivity === 'codesys-boot-enabled' && (
-        <p>
-          CODESYS is configured to start at boot. Destructive installation must disable that startup and verify CODESYS
-          is stopped before I/O. A stopped process alone is insufficient. No separate PLC preservation or restoration
-          approval is required.
-        </p>
-      )}
-      {report?.exclusivity === 'output-container-conflict' && (
-        <p>
-          Another container can write the digital outputs. Resolve exclusive ownership before installing this runtime.
-        </p>
-      )}
+      {report?.platform === 'unsupported-firmware' && <p>{t('security.unsupportedFirmware')}</p>}
+      {report && <p>{t('security.preparationHint')}</p>}
+      {report?.hardware === 'uid10001-access-denied' && <p>{t('security.accessDenied')}</p>}
+      {report?.hardware === 'permission-tool-unavailable' && <p>{t('security.permissionTool')}</p>}
+      {report?.hardware === 'missing-register' && <p>{t('security.missingRegister')}</p>}
+      {!codesysDisabled && report?.exclusivity === 'codesys-active' && <p>{t('security.codesysActive')}</p>}
+      {!codesysDisabled && report?.exclusivity === 'codesys-boot-enabled' && <p>{t('security.codesysBoot')}</p>}
+      {report?.exclusivity === 'output-container-conflict' && <p>{t('security.containerConflict')}</p>}
       {report?.provision === 'unsupported-fw31-package-activation' && (
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Description>
-              This report could not establish a supported Docker package installation path. Retry installation only
-              after the reported package or compatibility issue is resolved. An old inspection does not authorize
-              activation by itself.
-            </Alert.Description>
+            <Alert.Description>{t('security.packageActivation')}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}
-      {report?.provision === 'unsupported-lifecycle-dependencies' && (
-        <p>
-          This report could not verify the Docker lifecycle dependencies. Installation must validate a supported
-          activation path before changing Docker. Vendor activation can change startup, routing and firewall settings;
-          preexisting settings are not restored by commissioning.
-        </p>
-      )}
+      {report?.provision === 'unsupported-lifecycle-dependencies' && <p>{t('security.lifecycle')}</p>}
       {current.dockerProvisionState && (
-        <p role="status">
-          Saved controller preparation: {current.dockerProvisionState}. If runtime installation began, use Clean up
-          failed installation first. Preparation cleanup reconciles its operation record; it does not restore previous
-          workloads or host settings, re-enable CODESYS, or qualify physical I/O.
-        </p>
+        <p role="status">{t('security.savedPreparation', { state: tBackendMessage(current.dockerProvisionState) })}</p>
       )}
-      {current.failureReason && <p role="alert">{current.failureReason}</p>}
+      {current.failureReason && <p role="alert">{tBackendMessage(current.failureReason)}</p>}
       <form ref={form} onSubmit={(event) => event.preventDefault()}>
-        <p>SSH login: {customSsh ? 'Custom credentials' : 'Default root account'}</p>
+        <p>
+          {t('commissioningUI.sshLogin', {
+            account: t(customSsh ? 'commissioningUI.custom' : 'commissioningUI.defaultAccount'),
+          })}
+        </p>
         <Checkbox isSelected={customSsh} onChange={setCustomSsh} isDisabled={busy}>
           <Checkbox.Control>
             <Checkbox.Indicator />
           </Checkbox.Control>
-          <Checkbox.Content>Advanced: use different SSH credentials</Checkbox.Content>
+          <Checkbox.Content>{t('commissioningUI.advanced')}</Checkbox.Content>
         </Checkbox>
         {customSsh && (
           <>
             <TextField name="preflightUsername" isRequired isDisabled={busy}>
-              <Label>Preflight SSH username</Label>
+              <Label>{t('security.username')}</Label>
               <Input autoComplete="off" />
             </TextField>
             <TextField name="preflightPassword" isRequired isDisabled={busy}>
-              <Label>Preflight SSH password</Label>
+              <Label>{t('security.password')}</Label>
               <Input type="password" autoComplete="off" />
             </TextField>
           </>
         )}
         <Button type="button" variant="secondary" isDisabled={busy} onPress={() => void run('inspect')}>
-          Inspect installation prerequisites
+          {t('security.inspectPrerequisites')}
         </Button>
         {recovery && (
           <>
@@ -230,18 +177,15 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
               <Checkbox.Control>
                 <Checkbox.Indicator />
               </Checkbox.Control>
-              <Checkbox.Content>
-                I approve cleaning up this controller preparation. Preexisting workloads and host settings will not be
-                restored.
-              </Checkbox.Content>
+              <Checkbox.Content>{t('security.approveCleanup')}</Checkbox.Content>
             </Checkbox>
             <Button type="button" isDisabled={busy || !approved} onPress={() => void run('recover')}>
-              Clean up controller preparation
+              {t('security.cleanup')}
             </Button>
           </>
         )}
       </form>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{t(error)}</p>}
     </section>
   );
 }

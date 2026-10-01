@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { setAdminPassword, type ShellyDevice } from './api';
 import { PasswordFieldRow, StandardDrawer } from './drawer';
 import { StatusAlert } from './StatusAlert';
+import { useShellyTranslations } from './i18n';
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 export function AdminPasswordDrawer({
   device,
@@ -16,10 +18,11 @@ export function AdminPasswordDrawer({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const { t, tMessage } = useShellyTranslations();
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | TranslationMessage | null>(null);
 
   useEffect(() => {
     if (device) {
@@ -35,7 +38,7 @@ export function AdminPasswordDrawer({
     if (!device) return;
     const nextPassword = password.trim();
     if (!nextPassword) {
-      setError('New password is required.');
+      setError({ key: 'password.required' });
       return;
     }
     setSubmitting(true);
@@ -66,15 +69,15 @@ export function AdminPasswordDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <KeyRoundIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">Admin password</h2>
+              <h2 className="sh:text-lg sh:font-semibold">{t('password.title')}</h2>
             </div>
             {device && (
               <p className="sh:text-sm sh:text-muted">
-                Set or change the admin password of {device.name} ({device.ipAddress}).
+                {t('password.description', { name: device.name, address: device.ipAddress })}
               </p>
             )}
           </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
+          <Button isIconOnly variant="ghost" aria-label={t('common.close')} onPress={close}>
             <XIcon size={16} />
           </Button>
         </div>
@@ -83,26 +86,26 @@ export function AdminPasswordDrawer({
         <Form onSubmit={onSubmit} className="sh:flex sh:flex-col sh:gap-4">
           {device?.authState === 'required' && (
             <PasswordFieldRow
-              label="Current password"
+              label={t('password.current')}
               value={currentPassword}
               onChange={setCurrentPassword}
-              description="Required because this device already has authentication enabled."
+              description={t('password.currentDescription')}
               autoComplete="current-password"
               dataCy="shelly-auth-current-password"
             />
           )}
           <PasswordFieldRow
-            label="New admin password"
+            label={t('password.new')}
             value={password}
             onChange={setPassword}
-            description="Protects the device's local web interface and API."
+            description={t('password.newDescription')}
             required
             autoComplete="new-password"
             dataCy="shelly-auth-password"
           />
           {error && (
-            <StatusAlert status="danger" title="Could not set password" dataCy="shelly-auth-error">
-              {error}
+            <StatusAlert status="danger" title={t('password.error')} dataCy="shelly-auth-error">
+              {tMessage(error)}
             </StatusAlert>
           )}
           <input type="submit" hidden />
@@ -110,10 +113,10 @@ export function AdminPasswordDrawer({
       </DrawerBody>
       <DrawerFooter>
         <Button variant="secondary" onPress={close}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" isPending={submitting} onPress={() => void submit()} data-cy="shelly-auth-submit">
-          <KeyRoundIcon className="sh:h-4 sh:w-4" /> Save password
+          <KeyRoundIcon className="sh:h-4 sh:w-4" /> {t('password.save')}
         </Button>
       </DrawerFooter>
     </StandardDrawer>

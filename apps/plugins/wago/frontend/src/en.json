@@ -1,0 +1,91 @@
+{
+  "controllers": {
+    "title": "WAGO controllers",
+    "description": "Commission a controller through a host-key-pinned SSH session; controller credentials are never displayed here.",
+    "loadError": "Could not load WAGO controllers",
+    "commission": "Commission controller",
+    "table": "WAGO controllers and commissioning sessions",
+    "controller": "Controller",
+    "trust": "Trust",
+    "connection": "Connection",
+    "runtime": "Runtime",
+    "heartbeat": "Last heartbeat",
+    "actions": "Actions",
+    "claim": "Claim",
+    "configure": "Configure",
+    "updateRuntime": "Update runtime",
+    "progress": "View progress",
+    "resume": "Resume",
+    "empty": "No controllers or commissioning sessions yet.",
+    "never": "Never",
+    "enrollment": "CC100 enrollment",
+    "enrolling": "Enrolling",
+    "inProgress": "In progress",
+    "updated": "Updated {{date}}",
+    "verified": "Enrollment complete · runtime verified",
+    "pending": "Enrollment complete · runtime setup pending",
+    "unavailable": "Verification status unavailable"
+  },
+  "trust": { "claimed": "claimed", "untrusted": "untrusted" },
+  "connectivity": { "online": "online", "offline": "offline", "stale": "stale", "unknown": "unknown" },
+  "commissioning": {
+    "awaiting_delivery": "Preparing automatic delivery",
+    "delivering": "Delivering commissioning runtime",
+    "awaiting_identity_confirmation": "Ready to verify the physical controller",
+    "awaiting_codesys_confirmation": "Waiting for destructive installation approval",
+    "delivery_failed": "Delivery needs attention",
+    "awaiting_discovery": "Waiting for the controller to connect",
+    "awaiting_claim": "Claiming automatically",
+    "completed": "Claimed",
+    "awaiting_verification": "Verification required",
+    "claim_interrupted": "Claim recovery required",
+    "recovery_revocation_pending": "Restored; revocation pending",
+    "revoked": "Revoked"
+  },
+  "runtimeUpdate": {
+    "title": "Runtime update",
+    "running": "Running runtime:",
+    "protocol": "protocol",
+    "unavailable": "No in-place update yet",
+    "description": "Attraccess cannot update this controller's runtime without a full reinstall. The only current path is re-running commissioning, which wipes applications, data and configuration on the CC100 and reinstalls from scratch. That is why it is not offered here as a one-click action. Automatic, non-destructive runtime updates are tracked in ATT-1099.",
+    "understood": "Understood"
+  },
+  "settings": {
+    "title": "WAGO settings",
+    "description": "Choose the MQTT server used for new WAGO commissioning sessions. Change it before commissioning a controller.",
+    "select": "Select an MQTT server",
+    "server": "Default MQTT server",
+    "empty": "No MQTT servers configured.",
+    "save": "Save settings"
+  },
+  "claim": {
+    "title": "Claim controller",
+    "description": "Verify physical access to this controller before it can receive commands.",
+    "name": "Controller name",
+    "verifier": "Physical pairing code or fingerprint",
+    "submit": "Verify and claim"
+  },
+  "remove": {
+    "title": "Remove controller",
+    "question": "Remove {{name}} from Attraccess?",
+    "description": "This revokes MQTT access and removes the controller registration and configuration. Commissioning records with unfinished installation cleanup or management access recovery are retained. The runtime remains installed on the CC100. Removing a registration does not restore preexisting applications or data, or re-enable CODESYS. An active operation blocks removal.",
+    "error": "Could not remove the controller.",
+    "keep": "Keep controller"
+  },
+  "configuration": {
+    "invalidController": "Invalid controller.",
+    "empty": "No configuration changes.",
+    "before": "Before:",
+    "after": "After:",
+    "metadata": "Names and presets",
+    "nameFor": "Name for {{name}}",
+    "presetApplication": "Preset application"
+  },
+  "common": {
+    "settings": "Settings",
+    "refresh": "Refresh",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "retry": "Please try again."
+  }
+}
