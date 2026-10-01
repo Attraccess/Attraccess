@@ -226,6 +226,7 @@ export interface RuntimeUpdateStatus {
   update: {
     phase:
       | 'blocked'
+      | 'preparing'
       | 'staging'
       | 'activating'
       | 'verifying'
@@ -255,6 +256,8 @@ export const getRootRecoveryPassword = (sessionId: number) =>
   });
 export const retryManagedAccess = (sessionId: number) =>
   api.request<void>(`/commissioning/sessions/${sessionId}/managed-access/retry`, { method: 'POST' });
+export const retryRuntimeUpdate = (controllerId: number) =>
+  api.request<void>(`/controllers/${controllerId}/runtime-update/retry`, { method: 'POST' });
 export const restoreManagedAccess = (sessionId: number) =>
   api.request<void>(`/commissioning/sessions/${sessionId}/managed-access/restore`, {
     method: 'POST',

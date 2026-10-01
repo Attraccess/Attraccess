@@ -8,12 +8,14 @@ const getVerification = vi.hoisted(() => vi.fn());
 const getUpdateStatus = vi.hoisted(() => vi.fn());
 const getRootPassword = vi.hoisted(() => vi.fn());
 const getSessionStatus = vi.hoisted(() => vi.fn());
+const retryRuntimeUpdate = vi.hoisted(() => vi.fn());
 vi.mock('./api', () => ({
   getCommissioningVerification: getVerification,
   getRuntimeUpdateStatus: getUpdateStatus,
   getRootRecoveryPassword: getRootPassword,
   getManagedAccessStatus: getSessionStatus,
   retryManagedAccess: vi.fn(),
+  retryRuntimeUpdate,
   restoreManagedAccess: vi.fn(),
 }));
 let client: QueryClient;
@@ -114,6 +116,37 @@ it('does not infer enrollment verification from an online claimed row', async ()
   mount();
   expect(await screen.findByText('Verification required')).toBeTruthy();
   expect(screen.queryByText(/Enrollment complete/)).toBeNull();
+});
+
+it.each(['failed', 'blocked', 'recovery_required'])(
+  'offers a runtime retry for a managed controller in %s without retrying enrolment',
+  async (phase) => {
+    getUpdateStatus.mockResolvedValue({
+      rolloutEnabled: true,
+      management: 'managed',
+      sessionId: 7,
+      update: { phase, desiredImageId: 'sha256:desired', failure: 'readiness', retryAt: 0 },
+    });
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Runtime updates' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry runtime update' }));
+    expect(retryRuntimeUpdate).toHaveBeenCalledWith(1);
+  },
+);
+
+it('disables runtime retry while the qualification gate is off', async () => {
+  getUpdateStatus.mockResolvedValue({
+    rolloutEnabled: false,
+    management: 'managed',
+    sessionId: 7,
+    update: { phase: 'failed', desiredImageId: 'sha256:desired', failure: 'readiness', retryAt: 0 },
+  });
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Runtime updates' }));
+  const retry = await screen.findByRole('button', { name: 'Retry runtime update' });
+  expect((retry as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(retry);
+  expect(retryRuntimeUpdate).not.toHaveBeenCalled();
 });
 
 it('keeps administrator recovery available for a removed controller session', async () => {

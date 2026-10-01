@@ -313,6 +313,31 @@ describe('commissioning workflows with a real isolated database and mocked devic
     ).toBe(currentDigest);
   });
 
+  it('delivers the current build to a legacy session whose stored digest belongs to an older build', async () => {
+    const currentDigest = 'b'.repeat(64);
+    const currentPath = join(directory, 'current-build.tar');
+    artifacts.current.mockResolvedValue({ digest: currentDigest });
+    artifacts.acquire.mockResolvedValue({
+      digest: currentDigest,
+      bytes: 512,
+      directory,
+      path: currentPath,
+      image: `ghcr.io/attraccess/wago-cc100-runtime@sha256:${currentDigest}`,
+    });
+    jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockImplementation((async (_host, _pin, _credential, script: string) =>
+        script.includes("printf 'epoch=") ? clockOutput() : '') as never);
+    const copy = jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
+    const result = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+    expect(result.state).toBe('awaiting_discovery');
+    expect(copy.mock.calls[0]).toContain(currentPath);
+    expect(artifacts.acquire).toHaveBeenCalledWith();
+    expect(
+      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).runtimeArtifactDigest,
+    ).toBe(currentDigest);
+  });
+
   it('does not transfer a snapshot after the current release changes mid-delivery', async () => {
     artifacts.current.mockResolvedValueOnce({ digest }).mockResolvedValue({ digest: 'b'.repeat(64) });
     jest

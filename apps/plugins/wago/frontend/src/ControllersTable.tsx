@@ -24,6 +24,7 @@ import {
   getManagedAccessStatus,
   getRootRecoveryPassword,
   retryManagedAccess,
+  retryRuntimeUpdate,
   restoreManagedAccess,
 } from './api';
 import { useQuery } from '@tanstack/react-query';
@@ -218,7 +219,7 @@ function RuntimeUpdateModal({
   const controller = target && 'controller' in target ? target.controller : null;
   const title = controller ? 'Runtime update' : 'Managed SSH recovery';
   return (
-    <StandardModal isOpen={target !== null} onOpenChange={onOpenChange} size="md" dialogProps={{ 'aria-label': title }}>
+    <StandardModal isOpen={target !== null} onOpenChange={onOpenChange} size="lg" dialogProps={{ 'aria-label': title }}>
       <ModalHeader>
         <ModalHeading>{title}</ModalHeading>
       </ModalHeader>
@@ -297,7 +298,7 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
         </Alert.Content>
       </Alert>
     );
-  const action = async (kind: 'password' | 'retry' | 'restore') => {
+  const action = async (kind: 'password' | 'retry' | 'restore' | 'runtime') => {
     if (!status.sessionId) return;
     const generation = lifetime.recoveryGeneration;
     setPending(true);
@@ -308,7 +309,8 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
         if (lifetime.active && lifetime.recoveryExpanded && lifetime.recoveryGeneration === generation)
           setPassword(result.password);
       } else {
-        if (kind === 'restore') await restoreManagedAccess(status.sessionId);
+        if (kind === 'runtime' && controllerId) await retryRuntimeUpdate(controllerId);
+        else if (kind === 'restore') await restoreManagedAccess(status.sessionId);
         else await retryManagedAccess(status.sessionId);
         if (lifetime.active) await query.refetch();
       }
@@ -320,12 +322,20 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
   };
   return (
     <>
-      <Alert status={status.management === 'managed' && !status.update?.failure ? 'success' : 'warning'}>
+      <Alert
+        status={
+          status.management === 'managed' && !status.update?.failure && status.rolloutEnabled !== false
+            ? 'success'
+            : 'warning'
+        }
+      >
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>
             {status.management === 'managed'
-              ? 'Automatic runtime updates'
+              ? status.rolloutEnabled === false
+                ? 'Runtime updates paused'
+                : 'Automatic runtime updates'
               : status.management === 'retired'
                 ? 'Automatic management retired'
                 : 'Managed SSH needs attention'}
@@ -362,10 +372,29 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
         </>
       )}
       {status.management === 'recovery_required' && (
-        <Button variant="secondary" isPending={pending} onPress={() => void action('retry')}>
+        <Button
+          variant="secondary"
+          isPending={pending}
+          isDisabled={status.rolloutEnabled === false}
+          onPress={() => void action('retry')}
+        >
           Retry managed access
         </Button>
       )}
+      {controllerId &&
+        status.management === 'managed' &&
+        status.update &&
+        (['failed', 'blocked', 'recovery_required'].includes(status.update.phase) ||
+          !!status.update.cleanupRetryAt) && (
+          <Button
+            variant="secondary"
+            isPending={pending}
+            isDisabled={status.rolloutEnabled === false}
+            onPress={() => void action('runtime')}
+          >
+            Retry runtime update
+          </Button>
+        )}
       {status.rolloutEnabled === false && (
         <p role="status">
           Managed enrolment and automatic updates are disabled pending FW31 qualification. Administrator recovery
@@ -427,9 +456,7 @@ function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
         </Accordion.Item>
       </Accordion>
       {failed && (
-        <p role="alert">
-          Recovery action failed. Check administrator permissions, audit availability and controller access.
-        </p>
+        <p role="alert">Action failed. Check administrator permissions, audit availability and controller access.</p>
       )}
     </>
   );

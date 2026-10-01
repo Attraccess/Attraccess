@@ -417,3 +417,10 @@ Record evidence against [ATT-984](https://linear.app/attraccess/issue/ATT-984/va
 ### Qualification gate
 
 Managed enrolment, managed-access retry and automatic reconciliation are disabled by default. Commissioning delivery fails before remote preparation while disabled. The deployment environment must explicitly set `WAGO_MANAGED_RUNTIME_ENABLED=true` to enable them; keep it unset until FW31 recovery, SSH rejection, watchdog/reboot and repeated-update acceptance pass on an isolated bench controller. Existing encrypted recovery disclosure and bootstrap-restoration actions remain available when the rollout is disabled. Status includes `rolloutEnabled` so operators can distinguish a paused rollout from a pending update. Runtime heartbeats coalesce fleet reconciliation into at most one new scan per 30 seconds.
+
+Administrators can retry a failed, blocked or recovery-required runtime update from
+the runtime dialog. This advances the durable retry deadline under the shared device
+lease; it preserves outstanding rollback and accepted-cleanup receipts and finishes
+those before starting a newer image. Retry remains disabled while rollout is paused.
+Retirement is checked again after acquiring device ownership, and conditional access
+transitions cannot overwrite durable retirement intent.

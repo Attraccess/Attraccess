@@ -95,6 +95,37 @@ describe('durable managed runtime reconciliation', () => {
   });
   afterEach(() => coordinator.stop());
 
+  it('administrator retry advances backoff without discarding the rollback token', async () => {
+    host.activate.mockRejectedValueOnce(new RuntimeUpdateError('load'));
+    host.recover.mockRejectedValueOnce(new RuntimeUpdateError('recovery'));
+    await coordinator.reconcile(1);
+    const pending = { ...rows.get(1)! };
+    expect(pending.phase).toBe('recovery_required');
+    expect(await coordinator.reconcile(1)).toBe('deferred');
+    host.recover.mockImplementationOnce(async (id, token, previous) => {
+      expect(token).toBe(pending.token);
+      expect(previous).toBe(pending.previousImageId);
+      expect(rows.get(id)?.phase).toBe('recovering');
+    });
+    expect(await coordinator.reconcile(1, true)).toBe('settled');
+    expect(rows.get(1)).toMatchObject({ phase: 'current', token: null });
+    expect(host.recover).toHaveBeenCalledTimes(2);
+  });
+
+  it('administrator retry honors retained accepted cleanup before staging a new release', async () => {
+    host.acknowledge.mockRejectedValueOnce(new Error('interrupted'));
+    await coordinator.reconcile(1);
+    const pending = { ...rows.get(1)! };
+    desired = release('c');
+    host.acknowledge.mockImplementationOnce(async (id, token) => {
+      expect(token).toBe(pending.token);
+      expect(rows.get(id)?.phase).toBe('current');
+      expect(host.stage).toHaveBeenCalledTimes(1);
+    });
+    expect(await coordinator.reconcile(1, true)).toBe('settled');
+    expect(rows.get(1)).toMatchObject({ phase: 'current', desiredImageId: desired.imageId, token: null });
+  });
+
   it('persists and audits installer preparation before publication, and audit failure prevents it', async () => {
     host.prepare = jest.fn<
       ReturnType<NonNullable<ManagedRuntimeUpdateHost['prepare']>>,

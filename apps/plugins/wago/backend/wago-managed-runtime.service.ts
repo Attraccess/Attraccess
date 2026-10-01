@@ -220,11 +220,11 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       await this.prove(access, signal);
       if (!this.rootProbe || !(await this.rootProbe(access.host, access.fingerprint, credentials.recoveryPassword)))
         throw new Error();
-      await this.access.update(access.sessionId, { state: 'verified' });
+      await this.setActiveState(access.sessionId, 'verified');
       if ((await this.connection(access, `access-key-commit ${access.token}`, signal)) !== 'OK\n') throw new Error();
       await this.prove(access, signal);
     } catch {
-      await this.access.update(access.sessionId, { state: 'recovery_required' });
+      await this.setActiveState(access.sessionId, 'recovery_required');
       throw new ConflictException(
         'Managed SSH provisioning requires recovery. Generated recovery credentials remain encrypted; use the administrator recovery action.',
       );
@@ -247,8 +247,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         if (!stored) throw new Error();
         this.credentials(stored);
       } catch {
-        await this.access.update(access.sessionId, { state: 'recovery_required' });
-        access.state = 'recovery_required';
+        await this.setActiveState(access.sessionId, 'recovery_required').catch(() => undefined);
+        access = await this.access.findOneBy({ sessionId: access.sessionId });
       }
     }
     const row = access?.controllerId ? await this.updates.findOneBy({ controllerId: access.controllerId }) : null;
@@ -360,37 +360,61 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
 
   async retryAccess(sessionId: number): Promise<void> {
     this.assertEnabled();
-    const access = await this.loadSession(sessionId);
+    let access = await this.loadSession(sessionId);
     if (!access || ['retiring', 'retired'].includes(access.state))
       throw new ConflictException('Managed access cannot be retried');
+    const fingerprint = access.fingerprint;
     const owner = randomBytes(16).toString('hex');
     if (!(await this.operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 60_000)))
       throw new ConflictException('Controller is busy');
     const operation = new AbortController();
     const timer = setTimeout(() => operation.abort(), 50_000).unref();
     try {
+      access = await this.loadSession(sessionId);
+      if (!access || ['retiring', 'retired'].includes(access.state))
+        throw new ConflictException('Managed access cannot be retried');
       await this.prove(access, operation.signal);
       const status = await this.connection(access, `access-status ${access.token}`, operation.signal);
       await this.operations.assertOwned(access.fingerprint, owner);
       if (status === 'committed\n') {
         if ((await this.connection(access, `access-policy ${access.token}`, operation.signal)) !== 'OK\n')
           throw new Error('Managed SSH policy is unverified');
-        await this.access.update(sessionId, { state: 'managed' });
+        await this.setActiveState(sessionId, 'managed');
       } else if (
         status === 'open\n' &&
         this.rootProbe &&
         (await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword))
       ) {
-        await this.access.update(sessionId, { state: 'verified' });
+        await this.setActiveState(sessionId, 'verified');
         await this.connection(access, `access-key-commit ${access.token}`, operation.signal);
         await this.prove(access, operation.signal);
       } else throw new ConflictException('Wait for the SSH-policy watchdog to restore access before retrying');
     } finally {
       clearTimeout(timer);
       operation.abort();
-      await this.operations.release(access.fingerprint, owner);
+      await this.operations.release(fingerprint, owner);
     }
     this.wake();
+  }
+
+  private async setActiveState(sessionId: number, state: 'verified' | 'managed' | 'recovery_required'): Promise<void> {
+    const result = await this.access
+      .createQueryBuilder()
+      .update()
+      .set({ state })
+      .where('session_id = :sessionId AND state NOT IN (:...retired)', {
+        sessionId,
+        retired: ['retiring', 'retired'],
+      })
+      .execute();
+    if (result.affected !== 1) throw new ConflictException('Managed access is being retired');
+  }
+
+  async retryRuntime(controllerId: number): Promise<void> {
+    this.assertEnabled();
+    await this.required(controllerId);
+    if ((await this.coordinator.reconcile(controllerId, true)) === 'busy')
+      throw new ConflictException('Controller is busy; retry after its current operation finishes');
   }
 
   private async desired(): Promise<BuildRuntimeArtifact> {
@@ -527,12 +551,12 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     const session = await this.sessions.findOneBy({ id: bound.sessionId });
     if (!session || !['awaiting_verification', 'completed'].includes(session.state)) return false;
     if (session.hardwareId !== controller.hardwareId || session.mqttServerId !== controller.mqttServerId) return false;
-    const access = await this.loadSession(session.id);
+    let access = await this.loadSession(session.id);
     if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return false;
     try {
       if (this.credentials(access).hardwareId !== controller.hardwareId) throw new Error();
     } catch {
-      await this.access.update(access.sessionId, { state: 'recovery_required' });
+      await this.setActiveState(access.sessionId, 'recovery_required');
       return false;
     }
     if (access.state === 'managed') {
@@ -569,6 +593,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     let attempted = false;
     try {
       await this.operations.assertOwned(access.fingerprint, owner);
+      access = await this.loadSession(session.id);
+      if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return false;
       const remoteStatus = await this.connection(access, `access-status ${access.token}`, operation.signal);
       if (remoteStatus === 'cutover\n') return false; // an independent watchdog still owns this decision
       if (remoteStatus !== 'open\n' && remoteStatus !== 'committed\n') throw new Error('Unknown management receipt');
@@ -584,7 +610,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         await this.prove(access, operation.signal);
         if (!(await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword)))
           throw new Error('Root recovery path is unverified');
-        await this.access.update(access.sessionId, { state: 'verified' });
+        await this.setActiveState(access.sessionId, 'verified');
         await this.connection(access, `access-key-commit ${access.token}`, operation.signal);
         await this.prove(access, operation.signal);
         await this.connection(access, `commissioning-accept ${session.deliveryToken}`, operation.signal);
@@ -627,14 +653,22 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       }
       await this.operations.assertOwned(access.fingerprint, owner);
       if (!committed) await this.connection(access, `access-commit ${access.token}`, operation.signal);
-      await this.access.update(access.sessionId, { state: 'managed' });
+      await this.setActiveState(access.sessionId, 'managed');
       await this.finishSession(session.id);
       await this.securityAudit(session.id, 'security_apply', principal, operationId, 'succeeded');
       return true;
     } catch {
       if (attempted && principal)
         await this.securityAudit(session.id, 'security_apply', principal, operationId, 'failed').catch(() => undefined);
-      await this.access.update(access.sessionId, { state: 'recovery_required' });
+      await this.access
+        .createQueryBuilder()
+        .update()
+        .set({ state: 'recovery_required' })
+        .where('session_id = :sessionId AND state NOT IN (:...retired)', {
+          sessionId: session.id,
+          retired: ['retiring', 'retired'],
+        })
+        .execute();
       await this.sessions.update(session.id, {
         failureReason:
           'Managed SSH cutover needs recovery. The independent watchdog restores prior SSH policy unless commit was verified.',
@@ -643,7 +677,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     } finally {
       clearTimeout(timer);
       operation.abort();
-      await this.operations.release(access.fingerprint, owner);
+      await this.operations.release(bound.fingerprint, owner);
     }
   }
 
@@ -684,6 +718,12 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       acquire: async (controllerId, owner, now, until) => {
         const access = await this.required(controllerId);
         if (!(await this.operations.acquire(access.fingerprint, owner, now, until))) return false;
+        try {
+          await this.required(controllerId);
+        } catch (error) {
+          await this.operations.release(access.fingerprint, owner);
+          throw error;
+        }
         owners.set(owner, access.fingerprint);
         await this.updates.createQueryBuilder().insert().values({ controllerId }).orIgnore().execute();
         return true;

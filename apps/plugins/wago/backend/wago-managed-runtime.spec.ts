@@ -331,7 +331,42 @@ describe('managed enrolment and durable credential lifecycle', () => {
     expect(await first.acquire('device-a', 'third', 202, 500)).toBe(false);
   });
 
-  it.each(['committed', 'open'] as const)(
+  it('does not resurrect retirement recorded while managed-access retry acquires its lease', async () => {
+    await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+    const operations = service['operations'];
+    const acquire = operations.acquire.bind(operations);
+    jest.spyOn(operations, 'acquire').mockImplementation(async (...args) => {
+      await db.getRepository(WagoManagedAccess).update(1, { state: 'retiring' });
+      return acquire(...args);
+    });
+    jest.mocked(managedSsh).mockClear();
+    await expect(service.retryAccess(1)).rejects.toThrow('cannot be retried');
+    expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
+    expect((await service.sessionStatus(1)).management).toBe('retiring');
+    expect(
+      await db.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: session().hostKeyFingerprint }),
+    ).toMatchObject({ owner: null });
+  });
+
+  it('fences runtime retries when retirement wins ownership and retains pending recovery metadata', async () => {
+    await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+    await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'managed' });
+    const operations = service['operations'];
+    const acquire = operations.acquire.bind(operations);
+    jest.spyOn(operations, 'acquire').mockImplementation(async (...args) => {
+      await db.getRepository(WagoManagedAccess).update(1, { state: 'retiring' });
+      return acquire(...args);
+    });
+    jest.mocked(managedSsh).mockClear();
+    await expect(service.retryRuntime(1)).rejects.toThrow('management_required');
+    expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
+    expect((await service.sessionStatus(1)).management).toBe('retiring');
+    expect(
+      await db.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: session().hostKeyFingerprint }),
+    ).toMatchObject({ owner: null });
+  });
+
+  it.each(['committed', 'open', 'retiring'] as const)(
     'reconciles %s cutover with reboot proof before a new commit',
     async (remoteStatus) => {
       const current = await db.getRepository(WagoController).save(
@@ -392,6 +427,19 @@ describe('managed enrolment and durable credential lifecycle', () => {
         physicalQualification: 'required',
         ready: false,
       });
+      if (remoteStatus === 'retiring') {
+        const operations = service['operations'];
+        const acquire = operations.acquire.bind(operations);
+        jest.spyOn(operations, 'acquire').mockImplementation(async (...args) => {
+          await db.getRepository(WagoManagedAccess).update(1, { state: 'retiring' });
+          return acquire(...args);
+        });
+        jest.mocked(managedSsh).mockClear();
+        expect(await service['completeEnrolment'](current)).toBe(false);
+        expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
+        expect((await service.sessionStatus(1)).management).toBe('retiring');
+        return;
+      }
       rootProbe.mockResolvedValue(remoteStatus === 'open');
       let boot = '00000000-0000-4000-8000-000000000001\n';
       jest.mocked(managedSsh).mockImplementation(async (_access, _key, header) => {

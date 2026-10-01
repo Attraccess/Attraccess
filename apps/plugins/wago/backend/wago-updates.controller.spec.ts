@@ -8,11 +8,12 @@ import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
 describe('administrator root recovery HTTP boundary', () => {
   let app: INestApplication;
   const recoverPassword = jest.fn(async () => ({ password: 'test-only-recovery-secret' }));
+  const retryRuntime = jest.fn(async () => undefined);
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [WagoUpdatesController],
-      providers: [{ provide: WagoManagedRuntimeService, useValue: { recoverPassword } }],
+      providers: [{ provide: WagoManagedRuntimeService, useValue: { recoverPassword, retryRuntime } }],
     })
       // The host supplies authentication. Exercise the plugin's real permission
       // guard and HTTP decorators with authenticated identities at that seam.
@@ -33,8 +34,25 @@ describe('administrator root recovery HTTP boundary', () => {
     app = module.createNestApplication();
     await app.init();
   });
-  beforeEach(() => recoverPassword.mockClear());
+  beforeEach(() => {
+    recoverPassword.mockClear();
+    retryRuntime.mockClear();
+  });
   afterAll(() => app.close());
+
+  it('restricts runtime retries to authenticated administrators', async () => {
+    await request(app.getHttpServer()).post('/wago/controllers/1/runtime-update/retry').expect(401);
+    await request(app.getHttpServer())
+      .post('/wago/controllers/1/runtime-update/retry')
+      .set('x-test-identity', 'operator')
+      .expect(403);
+    expect(retryRuntime).not.toHaveBeenCalled();
+    await request(app.getHttpServer())
+      .post('/wago/controllers/1/runtime-update/retry')
+      .set('x-test-identity', 'admin')
+      .expect(201);
+    expect(retryRuntime).toHaveBeenCalledWith(1);
+  });
 
   it('denies anonymous and non-administrator requests before secret disclosure', async () => {
     await request(app.getHttpServer())

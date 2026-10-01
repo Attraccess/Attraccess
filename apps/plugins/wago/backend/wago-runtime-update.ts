@@ -138,7 +138,7 @@ export class WagoRuntimeUpdateCoordinator {
    * Busy work is coalesced; callers retain/paginate their inventory rather than
    * creating an unbounded in-memory queue. Retry deadlines survive server restart.
    */
-  async reconcile(controllerId: number): Promise<'busy' | 'deferred' | 'settled'> {
+  async reconcile(controllerId: number, retry = false): Promise<'busy' | 'deferred' | 'settled'> {
     if (!Number.isSafeInteger(controllerId) || controllerId <= 0) throw new Error('Invalid controller ID');
     if (this.stopped || this.running.has(controllerId) || this.running.size >= this.concurrency) return 'busy';
     this.running.add(controllerId);
@@ -184,6 +184,17 @@ export class WagoRuntimeUpdateCoordinator {
       acquired = await this.store.acquire(controllerId, owner, this.now(), this.now() + LEASE_MS);
       if (!acquired) return 'busy';
       let record = await this.store.load(controllerId);
+      if (
+        retry &&
+        record &&
+        (['blocked', 'failed', 'recovery_required'].includes(record.phase) || record.cleanupRetryAt)
+      ) {
+        // Administrator retry only advances deadlines under the shared lease;
+        // retained rollback/acceptance receipts still run before new work.
+        record.retryAt = 0;
+        record.cleanupRetryAt = 0;
+        await persist(record);
+      }
       if (record && ['current', 'failed'].includes(record.phase) && record.token) {
         if (!(await acknowledge(record))) return 'deferred';
       }

@@ -29,6 +29,11 @@ export class WagoUpdatesController {
     return this.managed.sessionStatus(id);
   }
 
+  @Post('controllers/:id/runtime-update/retry')
+  retryRuntime(@Param('id', ParseIntPipe) id: number) {
+    return this.managed.retryRuntime(id);
+  }
+
   @Post('commissioning/sessions/:id/root-recovery')
   @Header('Cache-Control', 'no-store')
   @Header('Pragma', 'no-cache')
