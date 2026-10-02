@@ -12,6 +12,8 @@ export interface PersonRow {
   introducers: ResourceIntroducer[];
   introduction: ResourceIntroduction | null;
   hasValidIntroduction: boolean;
+  hasValidDirectIntroduction: boolean;
+  inheritedIntroductions: ResourceIntroduction[];
   introductionLastEventAt: string | null;
   activityAt: string;
 }

@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   ],
 }));
 vi.mock('@attraccess/react-query-client', () => ({
+  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn: (params: unknown) => ['introductions', params],
   useResourcesServiceGetAllResourcesKey: 'resources',
   UseResourcesServiceGetOneResourceByIdKeyFn: ({ id }: { id: number }) => ['resource', id],
   useResourcesServiceGetOneResourceById: ({ id }: { id: number }) =>
@@ -72,6 +73,7 @@ it('optimistically adds membership, locks the pending row and invalidates both r
   await waitFor(() => expect(screen.getByRole('button', { name: 'Remove Printer from Workshop' })).not.toBeDisabled());
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['resource', 7] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['introductions', { resourceId: 7 }] });
   expect(screen.getByRole('link', { name: 'open: Workshop' })).toHaveAttribute('href', '/resource-groups/2');
 });
 it('removes existing membership and restores the previous cache on a rejected change', async () => {

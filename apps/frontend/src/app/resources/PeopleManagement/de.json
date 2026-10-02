@@ -33,7 +33,8 @@
     "revokeIntroducer": "Einweiser-Status entziehen",
     "revokeMaintainer": "Wartenden-Status entziehen",
     "revokeIntroduction": "Einweisung widerrufen",
-    "grantIntroduction": "Einweisung erneut gewähren"
+    "grantIntroduction": "Einweisung erneut gewähren",
+    "revokeDirectIntroduction": "Direkte Einweisung widerrufen"
   },
   "addModal": {
     "title": {
@@ -91,5 +92,9 @@
       "title": "Fehler beim Widerrufen der Einweisung",
       "description": "{{error}}"
     }
+  },
+  "sources": {
+    "direct": "Direkte Einweisung",
+    "group": "Eingewiesen über {{{group}}}"
   }
 }

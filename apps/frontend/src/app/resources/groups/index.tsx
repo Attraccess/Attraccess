@@ -12,6 +12,7 @@ import {
 } from '@heroui/react';
 import { Button } from '../../../components/button';
 import {
+  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn,
   Resource,
   ResourceGroup,
   useResourcesServiceGetAllResourcesKey,
@@ -62,6 +63,9 @@ export function ManageResourceGroups({
   const allGroups = useMemo(() => groups ?? [], [groups]);
 
   const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn({ resourceId }),
+    });
     queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
     queryClient.invalidateQueries({
       queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }),
