@@ -32,10 +32,14 @@ export function ResourceIntroducersList({
 }: Readonly<ResourceIntroducersListProps>) {
   const { t } = useTranslations({ en, de });
 
-  const { data: introducers, isLoading } = useAccessControlServiceResourceIntroducersGetMany({
-    resourceId,
-    type,
-  });
+  const { data: introducers, isLoading } = useAccessControlServiceResourceIntroducersGetMany(
+    {
+      resourceId,
+      type,
+    },
+    undefined,
+    { refetchInterval: 10000 },
+  );
 
   if (isLoading) {
     return (

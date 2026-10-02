@@ -26,6 +26,8 @@ const state = vi.hoisted(() => ({
       ],
       introduction: { id: 20 },
       hasValidIntroduction: true,
+      hasValidDirectIntroduction: true,
+      inheritedIntroductions: [] as Array<{ id: number; resourceGroupId: number; resourceGroup: { name: string } }>,
       introductionLastEventAt: '2026-09-01T12:00:00Z',
     },
     {
@@ -35,6 +37,8 @@ const state = vi.hoisted(() => ({
       introducers: [],
       introduction: { id: 21 },
       hasValidIntroduction: false,
+      hasValidDirectIntroduction: false,
+      inheritedIntroductions: [] as Array<{ id: number; resourceGroupId: number; resourceGroup: { name: string } }>,
       introductionLastEventAt: '2026-08-01T12:00:00Z',
     },
     {
@@ -44,6 +48,8 @@ const state = vi.hoisted(() => ({
       introducers: [],
       introduction: null,
       hasValidIntroduction: false,
+      hasValidDirectIntroduction: false,
+      inheritedIntroductions: [] as Array<{ id: number; resourceGroupId: number; resourceGroup: { name: string } }>,
       introductionLastEventAt: null,
     },
   ],
@@ -150,7 +156,7 @@ it('renders people, limits inherited-role removal, and handles history and intro
   expect(screen.getByText('History for 1')).toBeTruthy();
   fireEvent.click(screen.getByText('Close history'));
   expect(screen.queryByText('History for 1')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Revoke introduction' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Revoke direct introduction' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Refresher required' } });
   fireEvent.click(screen.getByText('Submit reason'));
   await waitFor(() => expect(state.revokeIntroduction).toHaveBeenCalledWith(1, 'Refresher required'));
@@ -216,7 +222,7 @@ it('filters roles and introduced users with distinct memberships', async () => {
 it('hides modification controls for read-only viewers while retaining history', () => {
   mount({ canManageIntroducers: false, canManageIntroductions: false });
   expect(screen.queryByRole('button', { name: 'Grant introduction' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Revoke introduction' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Revoke direct introduction' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Revoke maintainer status' })).toBeNull();
   expect(screen.getAllByRole('button', { name: 'View history' })).toHaveLength(2);
 });
@@ -240,4 +246,63 @@ it('shows loading and fetch failure states without stale people', () => {
   mount();
   expect(screen.getByText('Failed to load data')).toBeTruthy();
   expect(screen.queryByRole('table')).toBeNull();
+});
+
+it('shows group-only users in All and Introduced with group links and no resource revoke', async () => {
+  const original = state.rows;
+  state.rows = [
+    {
+      ...original[2],
+      user: { id: 8, username: 'Group trainee' },
+      hasValidIntroduction: true,
+      inheritedIntroductions: [
+        { id: 80, resourceGroupId: 10, resourceGroup: { name: 'Deposition & Etch' } },
+        { id: 81, resourceGroupId: 11, resourceGroup: { name: 'Cleanroom' } },
+      ],
+    },
+  ];
+  try {
+    mount();
+    expect(screen.getAllByText('Group trainee')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Introduced via Deposition & Etch' })).toHaveAttribute(
+      'href',
+      '/resource-groups/10',
+    );
+    expect(screen.getByRole('link', { name: 'Introduced via Cleanroom' })).toHaveAttribute(
+      'href',
+      '/resource-groups/11',
+    );
+    expect(screen.queryByRole('button', { name: 'Revoke direct introduction' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View history' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /All/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Only introduced' }));
+    expect(screen.getByText('Group trainee')).toBeTruthy();
+  } finally {
+    state.rows = original;
+  }
+});
+
+it('keeps inherited access and navigation visible after direct revocation', () => {
+  const original = state.rows;
+  const trainee = {
+    ...original[0],
+    inheritedIntroductions: [{ id: 80, resourceGroupId: 10, resourceGroup: { name: 'Etch' } }],
+  };
+  state.rows = [trainee];
+  try {
+    const view = mount();
+    expect(screen.getByText('Direct introduction')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Revoke direct introduction' })).toBeTruthy();
+    state.rows = [{ ...trainee, hasValidDirectIntroduction: false }];
+    view.rerender(
+      <MemoryRouter>
+        <PeopleManagement target={{ type: 'resource', id: 7 }} canManageIntroducers canManageIntroductions />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Introduced via Etch' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Revoke direct introduction' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Re-grant introduction' })).toBeTruthy();
+  } finally {
+    state.rows = original;
+  }
 });

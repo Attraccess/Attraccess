@@ -2,6 +2,7 @@
 // FEATURE: api-resources
 
 #include "api.hpp"
+#include "resource_introducers.hpp"
 #include <functional>
 #include <string.h>
 #include <string>
@@ -137,19 +138,7 @@ void API::onResourceList(JsonObject data)
         }
 
         // Parse introducers: array of strings (usernames)
-        JsonArray introducers = resource["introducers"].as<JsonArray>();
-        if (!introducers.isNull())
-        {
-            dst.introducers.reserve(introducers.size());
-            for (JsonVariant v : introducers)
-            {
-                const char *introName = v.is<const char *>() ? v.as<const char *>() : nullptr;
-                if (introName && introName[0] != '\0')
-                {
-                    dst.introducers.emplace_back(introName);
-                }
-            }
-        }
+        dst.introducers = parseResourceIntroducers(resource["introducers"].as<JsonArrayConst>());
 
         // Parse flowButtons: array of { id, label }
         dst.flowButtonCount = 0;

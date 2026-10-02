@@ -4,6 +4,7 @@ import { Button } from '../../../components/button';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
+  useAccessControlServiceResourceIntroductionsGetPeopleKey,
   useResourcesServiceResourceGroupsGetOne,
   useResourcesServiceResourceGroupsUpdateOne,
   UseResourcesServiceResourceGroupsGetOneKeyFn,
@@ -37,6 +38,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
 
   const { mutateAsync: updateGroup, isPending: isUpdating } = useResourcesServiceResourceGroupsUpdateOne({
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [useAccessControlServiceResourceIntroductionsGetPeopleKey] });
       success({
         title: t('operations.update.success.title'),
         description: t('operations.update.success.description'),
@@ -73,6 +75,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
 
   const { isPending: isDeleting, mutate: deleteGroupMutation } = useResourcesServiceResourceGroupsDeleteOne({
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [useAccessControlServiceResourceIntroductionsGetPeopleKey] });
       success({
         title: t('operations.delete.success.title'),
         description: t('operations.delete.success.description'),

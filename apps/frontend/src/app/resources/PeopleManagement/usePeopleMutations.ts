@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
+  useAccessControlServiceResourceIntroductionsGetPeopleKey,
+  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn,
   UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn,
   UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn,
   UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn,
@@ -64,6 +66,11 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
         ? UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId: target.id })
         : UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId: target.id });
       queryClient.invalidateQueries({ queryKey: listKey });
+      queryClient.invalidateQueries({
+        queryKey: isResource
+          ? UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn({ resourceId: target.id })
+          : [useAccessControlServiceResourceIntroductionsGetPeopleKey],
+      });
       if (userId !== undefined) {
         const historyKey = isResource
           ? UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId: target.id, userId })
