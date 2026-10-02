@@ -83,10 +83,12 @@ export function ColumnPicker(props: Props) {
       >
         {filtered.map((column) => (
           <Checkbox key={column.key} value={column.key}>
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>{column.label}</Checkbox.Content>
+            <Checkbox.Content className="items-start">
+              <Checkbox.Control className="mt-0.5">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              {column.label}
+            </Checkbox.Content>
           </Checkbox>
         ))}
       </CheckboxGroup>
@@ -100,10 +102,12 @@ export function ColumnPicker(props: Props) {
               onChange={(nextValue) => onOptionChange?.(option.key, nextValue)}
               data-cy="resource-usage-export-grouping-checkbox"
             >
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>{option.label}</Checkbox.Content>
+              <Checkbox.Content className="items-start">
+                <Checkbox.Control className="mt-0.5">
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                {option.label}
+              </Checkbox.Content>
             </Checkbox>
           ))}
         </div>

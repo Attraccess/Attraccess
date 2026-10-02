@@ -1,4 +1,4 @@
-import { Checkbox, Label } from '@heroui/react';
+import { Checkbox } from '@heroui/react';
 import { useWagoTranslations } from './i18n';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import type { ConfigurationDiff, ConfigurationValidationError, WagoConfigurationSnapshot } from './api';
@@ -59,11 +59,11 @@ export function ConfigurationChanges({
         <li key={change.path}>
           {onSelect ? (
             <Checkbox isSelected={selected?.includes(change.path)} onChange={(value) => onSelect(change.path, value)}>
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>
-                <Label>{changeLabel(change, before, after, names, t)}</Label>
+              <Checkbox.Content className="wg:items-start">
+                <Checkbox.Control className="wg:mt-0.5">
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                {changeLabel(change, before, after, names, t)}
               </Checkbox.Content>
             </Checkbox>
           ) : (
