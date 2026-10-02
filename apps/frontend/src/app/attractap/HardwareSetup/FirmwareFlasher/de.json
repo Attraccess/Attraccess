@@ -2,7 +2,7 @@
   "success": {
     "toast": {
       "title": "Installation erfolgreich",
-      "description": "Du kannst den NFC-Leser nun einrichten und verwenden."
+      "description": "Du kannst den RFID-Leser nun einrichten und verwenden."
     }
   },
   "action": {
@@ -16,7 +16,7 @@
     "FLASH_FAILED": "Installation fehlgeschlagen",
     "DEVICE_NOT_FOUND": "Gerät nicht gefunden",
     "FIRMWARE_READ_FAILED": "Firmware konnte nicht gelesen werden",
-    "RESET_FAILED": "Neustart des NFC-Lesers fehlgeschlagen",
+    "RESET_FAILED": "Neustart des RFID-Lesers fehlgeschlagen",
     "UNKNOWN_ERROR": "Unbekannter Fehler"
   },
   "downloading": {

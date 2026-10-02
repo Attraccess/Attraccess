@@ -87,7 +87,7 @@ it('enrolls on the selected reader and hides the page without a license', () => 
       <NfcCardList />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Enroll NFC Card' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Enroll RFID Card' }));
   expect(screen.getByRole('button', { name: 'Enroll' })).toBeDisabled();
   fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));

@@ -1,7 +1,7 @@
 {
-  "nfcCards": "NFC-Karten",
+  "nfcCards": "RFID-Karten",
   "readers": "Attractap-Reader",
-  "noNfcCardsFound": "Keine NFC-Karten gefunden",
+  "noNfcCardsFound": "Keine RFID-Karten gefunden",
   "nfcCardsTable": {
     "headers": {
       "id": "ID",
@@ -16,18 +16,18 @@
       "activate": "Aktivieren"
     },
     "deleteModal": {
-      "title": "NFC-Karte löschen",
-      "description": "Sie sind dabei, die NFC-Karte mit der ID {{id}} zu löschen. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "title": "RFID-Karte löschen",
+      "description": "Sie sind dabei, die RFID-Karte mit der ID {{id}} zu löschen. Diese Aktion kann nicht rückgängig gemacht werden.",
       "readerLabel": "Attractap auswählen",
       "readerPlaceholder": "Wählen Sie einen Attractap aus",
       "cancel": "Abbrechen",
       "delete": "Löschen"
     }
   },
-  "enroll": "NFC-Karte registrieren",
+  "enroll": "RFID-Karte registrieren",
   "enrollModal": {
-    "title": "NFC-Karte registrieren",
-    "description": "Um eine neue NFC-Karte zu registrieren, wählen Sie einen verbundenen Attractap aus der Liste unten aus. Klicken Sie dann auf die Schaltfläche \"Neue NFC-Karte registrieren\" und folgen dann den Anweisungen auf dem Attractap.",
+    "title": "RFID-Karte registrieren",
+    "description": "Um eine neue RFID-Karte zu registrieren, wählen Sie einen verbundenen Attractap aus der Liste unten aus. Klicken Sie dann auf die Schaltfläche \"Neue RFID-Karte registrieren\" und folgen dann den Anweisungen auf dem Attractap.",
     "readerLabel": "Attractap auswählen",
     "readerPlaceholder": "Wählen Sie einen Attractap aus",
     "cancel": "Abbrechen",

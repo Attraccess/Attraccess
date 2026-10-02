@@ -1,10 +1,10 @@
-# NFC-Karten
+# RFID-Karten
 
-NFC-Karten sind die physischen Schluessel, mit denen Benutzer ueber Attractap-Leser auf Maschinen und Tueren zugreifen koennen. Jede Karte ist mit einem Benutzerkonto in Attraccess verknuepft.
+RFID-Karten sind die physischen Schluessel, mit denen Benutzer ueber Attractap-Leser auf Maschinen und Tueren zugreifen koennen. Jede Karte ist mit einem Benutzerkonto in Attraccess verknuepft.
 
-## Wie NFC-Karten funktionieren
+## Wie RFID-Karten funktionieren
 
-Wenn ein Benutzer eine NFC-Karte an einen Attractap-Leser haelt, sendet der Leser die eindeutige ID der Karte an das Attraccess-Backend. Das Backend prueft:
+Wenn ein Benutzer eine RFID-Karte an einen Attractap-Leser haelt, sendet der Leser die eindeutige ID der Karte an das Attraccess-Backend. Das Backend prueft:
 
 1. Ist diese Karte im System registriert?
 2. Mit welchem Benutzerkonto ist die Karte verknuepft?
@@ -12,33 +12,33 @@ Wenn ein Benutzer eine NFC-Karte an einen Attractap-Leser haelt, sendet der Lese
 
 Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt.
 
-## NFC-Karten verwalten
+## RFID-Karten verwalten
 
 ### Alle Karten anzeigen
 
-1. Navigieren Sie zu **NFC-Karten** in der Seitenleiste
-2. Sie sehen eine Liste aller registrierten NFC-Karten mit ihren zugewiesenen Benutzern
+1. Navigieren Sie zu **RFID-Karten** in der Seitenleiste
+2. Sie sehen eine Liste aller registrierten RFID-Karten mit ihren zugewiesenen Benutzern
 
-<!-- TODO: Screenshot der NFC-Kartenliste -->
+<!-- TODO: Screenshot der RFID-Kartenliste -->
 
 ### Neue Karte registrieren
 
-Um eine neue NFC-Karte zu registrieren:
+Um eine neue RFID-Karte zu registrieren:
 
-1. Navigieren Sie zu **NFC-Karten** in der Seitenleiste
-2. Klicken Sie auf **NFC-Karte hinzufuegen**
+1. Navigieren Sie zu **RFID-Karten** in der Seitenleiste
+2. Klicken Sie auf **RFID-Karte hinzufuegen**
 3. Waehlen Sie den Benutzer aus, der die Karte erhalten soll
-4. Halten Sie die neue NFC-Karte an einen beliebigen verbundenen Attractap-Leser
+4. Halten Sie die neue RFID-Karte an einen beliebigen verbundenen Attractap-Leser
 5. Die Karten-ID wird automatisch erkannt und registriert
 
 > [!TIP]
 > Sie koennen eine Karte auch direkt ueber die Profilseite des Benutzers registrieren.
 
-<!-- TODO: Screenshot des Dialogs "NFC-Karte hinzufuegen" -->
+<!-- TODO: Screenshot des Dialogs "RFID-Karte hinzufuegen" -->
 
 ### Karte entfernen
 
-1. Navigieren Sie zu **NFC-Karten** in der Seitenleiste
+1. Navigieren Sie zu **RFID-Karten** in der Seitenleiste
 2. Suchen Sie die Karte, die Sie entfernen moechten
 3. Klicken Sie auf die Schaltflaeche **Loeschen**
 4. Bestaetigen Sie die Entfernung
@@ -48,7 +48,7 @@ Um eine neue NFC-Karte zu registrieren:
 
 ## Mehrere Karten pro Benutzer
 
-Jeder Benutzer kann mehrere NFC-Karten mit seinem Konto verknuepfen. Dies ist nuetzlich, wenn:
+Jeder Benutzer kann mehrere RFID-Karten mit seinem Konto verknuepfen. Dies ist nuetzlich, wenn:
 
 - Ein Benutzer eine Ersatzkarte benoetigt
 - Ein Benutzer verschiedene Karten fuer verschiedene Standorte hat
