@@ -1,21 +1,23 @@
 import { AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
-import { AddMode } from './types';
+import { AddMode, PeopleTarget } from './types';
 
 interface PeopleHeaderProps {
   t: TFunction;
+  targetType: PeopleTarget['type'];
   canManageIntroducers: boolean;
   canManageIntroductions: boolean;
   onAdd: (mode: AddMode) => void;
 }
 
 export function PeopleHeader(props: Readonly<PeopleHeaderProps>) {
-  const { t, canManageIntroducers, canManageIntroductions, onAdd } = props;
+  const { t, targetType, canManageIntroducers, canManageIntroductions, onAdd } = props;
+  const subtitle = t(`subtitle.${targetType}`);
 
   const canAdd = canManageIntroducers || canManageIntroductions;
   if (!canAdd) {
-    return <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<ShieldCheckIcon />} noMargin />;
+    return <PageHeader title={t('title')} subtitle={subtitle} icon={<ShieldCheckIcon />} noMargin />;
   }
 
   const actions: PageAction[] = [];
@@ -55,7 +57,7 @@ export function PeopleHeader(props: Readonly<PeopleHeaderProps>) {
   return (
     <PageHeader
       title={t('title')}
-      subtitle={t('subtitle')}
+      subtitle={subtitle}
       icon={<ShieldCheckIcon />}
       noMargin
       actions={actions}
