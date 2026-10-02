@@ -76,7 +76,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
           >
             {(row) => (
               <TableRow key={row.user.id} id={row.user.id}>
-                <TableCell className="w-full">
+                <TableCell>
                   <AttraccessUser user={row.user} />
                 </TableCell>
                 <TableCell>
@@ -98,7 +98,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="min-w-64">
                   <div className="flex flex-col gap-1">
                     {row.introduction && row.introductionLastEventAt && (
                       <span className={row.hasValidDirectIntroduction ? 'text-success' : 'text-danger'}>
