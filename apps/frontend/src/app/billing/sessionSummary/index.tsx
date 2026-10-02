@@ -21,10 +21,18 @@ export function SessionBillingSummary() {
   const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
   const seen = useRef(new Set<number>());
   const transaction = transactions[0];
+  // Keep the receipt visible during the modal's closing animation.
+  const lastTransaction = useRef<BillingTransaction | undefined>(undefined);
+  if (transaction) lastTransaction.current = transaction;
+  const displayedTransaction = transaction ?? lastTransaction.current;
   // Live updates include the receipt fields but do not load the session/resource relations.
-  const { data: details } = useBillingServiceGetBillingTransaction({ transactionId: transaction?.id ?? 0 }, undefined, {
-    enabled: !!transaction,
-  });
+  const { data: details } = useBillingServiceGetBillingTransaction(
+    { transactionId: displayedTransaction?.id ?? 0 },
+    undefined,
+    {
+      enabled: !!transaction,
+    },
+  );
   const {
     data: configuration,
     isError,
@@ -43,6 +51,7 @@ export function SessionBillingSummary() {
       if (
         incoming.userId !== user?.id ||
         incoming.status !== BillingTransactionStatus.COMPLETED ||
+        incoming.amount === 0 ||
         !incoming.resourceUsageId ||
         incoming.refundOfId ||
         incoming.correctionOfId ||
@@ -76,7 +85,10 @@ export function SessionBillingSummary() {
             {configuration ? (
               <p className="text-3xl font-semibold" data-cy="session-billing-total">
                 {formatNumber(
-                  dbCurrencyToUserCurrency(transaction?.amount ? -transaction.amount : 0, configuration.minorUnit),
+                  dbCurrencyToUserCurrency(
+                    displayedTransaction?.amount ? -displayedTransaction.amount : 0,
+                    configuration.minorUnit,
+                  ),
                 )}{' '}
                 {configuration.currency}
               </p>

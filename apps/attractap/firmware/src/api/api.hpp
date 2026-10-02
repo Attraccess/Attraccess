@@ -235,6 +235,7 @@ public:
         uint32_t requestId = 0;
         std::string error;
         bool sumUpEnabled = false;
+        std::string billingTotal;
     };
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
 

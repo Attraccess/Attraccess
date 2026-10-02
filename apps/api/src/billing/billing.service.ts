@@ -148,6 +148,14 @@ export class BillingService {
     });
   }
 
+  async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransaction | null> {
+    return this.billingTransactionRepository.findOneBy({
+      resourceUsageId,
+      userId,
+      status: BillingTransactionStatus.Completed,
+    });
+  }
+
   async createManualTransaction(
     userId: number,
     initiatorId: number,

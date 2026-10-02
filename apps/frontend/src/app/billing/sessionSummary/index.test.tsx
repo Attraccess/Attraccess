@@ -79,6 +79,7 @@ it('queues simultaneous session receipts and does not reopen dismissed duplicate
   fireEvent.click(screen.getByRole('button', { name: 'close' }));
   expect(screen.getByText('5.00 EUR')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'close' }));
+  expect(screen.queryByText('0.00 EUR')).toBeNull();
   emit();
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
@@ -96,8 +97,8 @@ it('shows a loading state and lets the user retry a failed currency lookup', () 
   expect(state.refetch).toHaveBeenCalledOnce();
 });
 
-it('shows a zero-cost finalized receipt', () => {
+it('does not show a zero-cost finalized receipt', () => {
   render(<SessionBillingSummary />);
   emit({ amount: 0 });
-  expect(screen.getByText('0.00 EUR')).toBeTruthy();
+  expect(screen.queryByRole('dialog')).toBeNull();
 });
