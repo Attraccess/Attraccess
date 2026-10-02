@@ -3,10 +3,9 @@ import {
   useAccessControlServiceResourceGroupIntroducersGetMany,
   useAccessControlServiceResourceGroupIntroductionsGetMany,
   useAccessControlServiceResourceIntroducersGetMany,
-  useAccessControlServiceResourceIntroductionsGetMany,
+  useAccessControlServiceResourceIntroductionsGetPeople,
 } from '@attraccess/react-query-client';
 import { ResourceIntroducerType } from '@attraccess/react-query-client';
-import { useHasValidIntroduction } from '../../../hooks/useHasValidIntroduction';
 import { PeopleTarget, PersonRow } from './types';
 
 interface Params {
@@ -33,7 +32,7 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
     data: resourceIntroductions,
     error: resourceIntroductionsError,
     isLoading: isResourceIntroductionsLoading,
-  } = useAccessControlServiceResourceIntroductionsGetMany({ resourceId: target.id }, undefined, {
+  } = useAccessControlServiceResourceIntroductionsGetPeople({ resourceId: target.id }, undefined, {
     enabled: isResource,
   });
 
@@ -55,8 +54,6 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
   const introductionsError = isResource ? resourceIntroductionsError : groupIntroductionsError;
   const isIntroducersLoading = isResource ? isResourceIntroducersLoading : isGroupIntroducersLoading;
   const isIntroductionsLoading = isResource ? isResourceIntroductionsLoading : isGroupIntroductionsLoading;
-
-  const userHasValidIntroduction = useHasValidIntroduction({ introductions: introductions ?? [] });
 
   const rows = useMemo<PersonRow[]>(() => {
     const byUserId = new Map<number, PersonRow>();
@@ -80,6 +77,8 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
         introducers: [introducer],
         introduction: null,
         hasValidIntroduction: false,
+        hasValidDirectIntroduction: false,
+        inheritedIntroductions: [],
         introductionLastEventAt: null,
         activityAt: introducer.grantedAt,
       });
@@ -90,20 +89,30 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
       if (!user) return;
       let latestHistoryAt: string | null = null;
       let latestHistoryTime = -Infinity;
+      let latestAction: string | undefined;
       for (const event of introduction.history ?? []) {
         const time = new Date(event.createdAt).getTime();
         if (time > latestHistoryTime) {
           latestHistoryTime = time;
           latestHistoryAt = event.createdAt;
+          latestAction = event.action;
         }
       }
       const lastEventAt = latestHistoryAt ?? introduction.createdAt;
-      const isValid = userHasValidIntroduction(user);
+      const isValid = latestAction === 'grant';
+      const isInherited = isResource && introduction.resourceGroupId != null;
+      // Revoked group records are not a resource-level relationship.
+      if (isInherited && !isValid) return;
       const existing = byUserId.get(user.id);
       if (existing) {
-        existing.introduction = introduction;
-        existing.hasValidIntroduction = isValid;
-        existing.introductionLastEventAt = lastEventAt;
+        if (isInherited) {
+          existing.inheritedIntroductions.push(introduction);
+        } else {
+          existing.introduction = introduction;
+          existing.hasValidDirectIntroduction = isValid;
+          existing.introductionLastEventAt = lastEventAt;
+        }
+        existing.hasValidIntroduction ||= isValid;
         if (new Date(lastEventAt).getTime() > new Date(existing.activityAt).getTime()) {
           existing.activityAt = lastEventAt;
         }
@@ -113,9 +122,11 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
           isIntroducer: false,
           isMaintainer: false,
           introducers: [],
-          introduction,
+          introduction: isInherited ? null : introduction,
           hasValidIntroduction: isValid,
-          introductionLastEventAt: lastEventAt,
+          hasValidDirectIntroduction: !isInherited && isValid,
+          inheritedIntroductions: isInherited ? [introduction] : [],
+          introductionLastEventAt: isInherited ? null : lastEventAt,
           activityAt: lastEventAt,
         });
       }
@@ -124,7 +135,7 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
     return Array.from(byUserId.values()).sort(
       (a, b) => new Date(b.activityAt).getTime() - new Date(a.activityAt).getTime(),
     );
-  }, [introducers, introductions, userHasValidIntroduction]);
+  }, [introducers, introductions, isResource]);
 
   return {
     rows,
