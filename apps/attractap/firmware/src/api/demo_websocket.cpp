@@ -2,6 +2,7 @@
 
 #include "demo_websocket.hpp"
 #include "../state/state.hpp"
+#include "../demo/demo_localization.hpp"
 #include <ArduinoJson.h>
 #include <cstring>
 #include <cstdio>
@@ -16,15 +17,7 @@
 namespace
 {
     // A handful of fake projects to pick from in the project selector.
-    const char *const DEMO_PROJECTS[] = {
-        "Möbelbau Eiche",
-        "Prototyp Gehäuse",
-        "Reparatur Fahrradrahmen",
-        "Weihnachtsgeschenke",
-        "CNC Schild Gravur",
-        "Ersatzteil Drucker",
-    };
-    constexpr uint32_t DEMO_PROJECT_COUNT = sizeof(DEMO_PROJECTS) / sizeof(DEMO_PROJECTS[0]);
+    constexpr uint32_t DEMO_PROJECT_COUNT = 6;
     constexpr uint32_t DEMO_PROJECT_PAGE_SIZE = 4;
 
     // Start form shown when a session on the CNC (resource id 1) begins.
@@ -39,14 +32,21 @@ namespace
         const char *type; // text | number | boolean | select
         bool required;
     };
-    const CncField CNC_FIELDS[] = {
+    const CncField CNC_FIELDS_DE[] = {
         {101, "Material", "Werkstoff des Werkstücks", "select", true},
         {102, "Auftragsnummer", "Interne Auftrags-ID", "text", true},
         {103, "Geschätzte Laufzeit (Min)", "Optional", "number", false},
         {104, "Absaugung geprüft", "Späneabsaugung aktiv?", "boolean", true},
     };
-    constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS) / sizeof(CNC_FIELDS[0]);
-    const char *const CNC_MATERIALS[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
+    const CncField CNC_FIELDS_EN[] = {
+        {101, "Material", "Workpiece material", "select", true},
+        {102, "Job number", "Internal job ID", "text", true},
+        {103, "Estimated runtime (min)", "Estimated runtime", "number", false},
+        {104, "Extraction checked", "Is chip extraction active?", "boolean", true},
+    };
+    constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS_DE) / sizeof(CNC_FIELDS_DE[0]);
+    const char *const CNC_MATERIALS_DE[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
+    const char *const CNC_MATERIALS_EN[] = {"Aluminium", "Wood", "Plastic", "Brass", "Steel"};
 
     std::string toIso8601(time_t t)
     {
@@ -226,6 +226,8 @@ void DemoWebsocket::respondAuthenticated()
     doc["event"] = "EVENT";
     doc["data"]["type"] = "READER_AUTHENTICATED";
     doc["data"]["payload"]["name"] = "Demo Gerät";
+    // Keep the standalone demo's unauthenticated screens in English by default.
+    doc["data"]["payload"]["language"] = "en";
 
     char buf[256];
     size_t n = serializeJson(doc, buf, sizeof(buf));
@@ -264,8 +266,8 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
         const DemoStore::DemoResource &r = DemoStore::getResource(i);
         JsonObject obj = resources.createNestedObject();
         obj["id"] = r.id;
-        obj["name"] = r.name;
-        obj["description"] = "Demo Ressource";
+        obj["name"] = DemoLocalization::resourceName(r.id, State::getActiveLanguage() == "en");
+        obj["description"] = State::getActiveLanguage() == "en" ? "Demo resource" : "Demo Ressource";
         obj["type"] = (r.type == 1) ? "door" : "machine";
         if (!_currentUser.empty()) {
             obj["hasIntroduction"] = _currentHasIntroduction;
@@ -332,6 +334,9 @@ void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resource
     doc["data"]["payload"]["keyNo"] = 0;
     doc["data"]["payload"]["key"] = "00000000000000000000000000000000";
     doc["data"]["payload"]["username"] = DemoStore::displayName(card);
+    // Demo cards represent an English-speaking cardholder so the localized
+    // fixture form is reachable in the normal demo card-authentication flow.
+    doc["data"]["payload"]["language"] = "en";
     doc["data"]["payload"]["canManageResource"] = (card.role == DemoStore::UserRole::ADMIN);
     doc["data"]["payload"]["hasIntroduction"] = (card.role != DemoStore::UserRole::NO_PERMISSION);
     doc["data"]["payload"]["isIntroducer"] = (card.role == DemoStore::UserRole::ADMIN);
@@ -390,7 +395,7 @@ void DemoWebsocket::respondProjects(uint32_t page)
     {
         JsonObject obj = projects.createNestedObject();
         obj["id"] = i + 1;
-        obj["name"] = DEMO_PROJECTS[i];
+        obj["name"] = DemoLocalization::projectName(i, State::getActiveLanguage() == "en");
     }
 
     char buf[1024];
@@ -446,9 +451,9 @@ bool DemoWebsocket::cncFormComplete() const
 {
     for (uint32_t i = 0; i < CNC_FIELD_COUNT; i++)
     {
-        if (!CNC_FIELDS[i].required)
+        if (!CNC_FIELDS_DE[i].required)
             continue;
-        auto it = _cncDraft.find(CNC_FIELDS[i].id);
+        auto it = _cncDraft.find(CNC_FIELDS_DE[i].id);
         if (it == _cncDraft.end() || it->second.empty())
             return false;
     }
@@ -462,13 +467,14 @@ void DemoWebsocket::respondFormRequest(uint32_t resourceId)
     doc["data"]["type"] = "RESOURCE_USAGE_FORM_REQUEST";
     doc["data"]["payload"]["requestId"] = _actionRequestId;
     doc["data"]["payload"]["resourceId"] = resourceId;
-    doc["data"]["payload"]["resourceName"] = "CNC Fräse";
+    const bool english = State::getActiveLanguage() == "en";
+    doc["data"]["payload"]["resourceName"] = english ? "CNC mill" : "CNC Fräse";
     doc["data"]["payload"]["action"] = "start";
 
     JsonArray forms = doc["data"]["payload"]["forms"].to<JsonArray>();
     JsonObject form = forms.createNestedObject();
     form["id"] = CNC_FORM_ID;
-    form["name"] = "CNC Einrichtung";
+    form["name"] = english ? "CNC setup" : "CNC Einrichtung";
     form["fieldCount"] = CNC_FIELD_COUNT;
 
     char buf[512];
@@ -492,7 +498,8 @@ void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, u
     // The client fetches a one-field window (MAX_FORM_PAGE_FIELDS == 1).
     if (offset < CNC_FIELD_COUNT)
     {
-        const CncField &f = CNC_FIELDS[offset];
+        const bool english = State::getActiveLanguage() == "en";
+        const CncField &f = (english ? CNC_FIELDS_EN : CNC_FIELDS_DE)[offset];
         JsonObject obj = fields.createNestedObject();
         obj["id"] = f.id;
         obj["name"] = f.name;
@@ -503,7 +510,7 @@ void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, u
         if (strcmp(f.type, "select") == 0)
         {
             JsonArray options = obj["options"].to<JsonArray>();
-            for (const char *material : CNC_MATERIALS)
+            for (const char *material : (english ? CNC_MATERIALS_EN : CNC_MATERIALS_DE))
                 options.add(material);
         }
         else if (strcmp(f.type, "number") == 0)
@@ -515,7 +522,7 @@ void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, u
         }
         else if (strcmp(f.type, "text") == 0)
         {
-            obj["options"]["placeholder"] = "z.B. 2024-042";
+            obj["options"]["placeholder"] = english ? "e.g. 2024-042" : "z.B. 2024-042";
         }
 
         auto draft = _cncDraft.find(f.id);
@@ -569,9 +576,9 @@ void DemoWebsocket::respondFormPageResult(JsonObjectConst data)
         bool required = false;
         for (uint32_t i = 0; i < CNC_FIELD_COUNT; i++)
         {
-            if (CNC_FIELDS[i].id == fieldId)
+            if (CNC_FIELDS_DE[i].id == fieldId)
             {
-                required = CNC_FIELDS[i].required;
+                required = CNC_FIELDS_DE[i].required;
                 break;
             }
         }

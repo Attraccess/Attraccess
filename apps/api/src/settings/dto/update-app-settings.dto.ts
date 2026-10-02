@@ -1,10 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
 
 /** Allow URLs without TLD (e.g. http://localhost:3000) for development. */
 const urlOptions = { require_tld: false };
 
 export class UpdateAppSettingsDto {
+  @IsOptional()
+  @IsIn(['en', 'de'])
+  @ApiPropertyOptional({ description: 'Default language used by Attractap devices', enum: ['en', 'de'] })
+  attractapLanguage?: 'en' | 'de';
+
   @IsOptional()
   @IsUrl(urlOptions)
   @ApiPropertyOptional({

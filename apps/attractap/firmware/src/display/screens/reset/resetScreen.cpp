@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "resetScreen.hpp"
 #include "display/theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
@@ -42,7 +43,7 @@ void ResetScreen::init()
    lv_obj_t *title = lv_label_create(this->screen);
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   lv_label_set_text(title, "Karte zurücksetzen");
+   FirmwareI18n::setLabel(title, "Karte zurücksetzen");
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -53,7 +54,7 @@ void ResetScreen::init()
    lv_obj_set_height(this->userNameLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->userNameLabel, LV_LABEL_LONG_WRAP);
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
-   lv_label_set_text(this->userNameLabel, initialName);
+   FirmwareI18n::setDynamicLabel(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -76,7 +77,7 @@ void ResetScreen::init()
 
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(cancelLabel, "Abbrechen");
+   FirmwareI18n::setLabel(cancelLabel, "Abbrechen");
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -137,7 +138,7 @@ void ResetScreen::applyStatus()
       break;
    }
 
-   lv_label_set_text(this->statusLabel, text);
+   FirmwareI18n::setLabel(this->statusLabel, text);
    lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Hide the cancel button once the reset has succeeded — nothing left to
@@ -171,7 +172,7 @@ void ResetScreen::setUserName(std::string userName)
    this->userNameCache = userName;
    if (this->userNameLabel)
    {
-      lv_label_set_text(this->userNameLabel, userName.c_str());
+      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str());
    }
 }
 

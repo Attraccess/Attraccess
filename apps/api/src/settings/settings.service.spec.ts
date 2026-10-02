@@ -23,7 +23,7 @@ import { METRICS_TOGGLE_INVALIDATOR } from './metrics-toggle-invalidator.token';
 
 describe('SettingsService', () => {
   let service: SettingsService;
-  let store: { getPlainSetting: jest.Mock; setPlainSetting: jest.Mock; setSecretSetting: jest.Mock };
+  let store: { getPlainSetting: jest.Mock; getSecretSetting: jest.Mock; setPlainSetting: jest.Mock; setSecretSetting: jest.Mock };
   let smtpSettings: { getSettings: jest.Mock };
   let userRepository: { count: jest.Mock };
   let invalidator: { refresh: jest.Mock };
@@ -31,6 +31,7 @@ describe('SettingsService', () => {
   beforeEach(async () => {
     store = {
       getPlainSetting: jest.fn().mockResolvedValue(null),
+      getSecretSetting: jest.fn().mockResolvedValue({ configured: false, value: null }),
       setPlainSetting: jest.fn().mockResolvedValue(undefined),
       setSecretSetting: jest.fn().mockResolvedValue(undefined),
     };
@@ -60,6 +61,21 @@ describe('SettingsService', () => {
     expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.url, null);
     expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.publicInternetUrl, null);
     expect(store.setSecretSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.licenseKey, null);
+  });
+
+  it('defaults existing readers to German, persists the selected language, and falls back to English for corrupt values', async () => {
+    expect(await service.getAttractapLanguage()).toBe('de');
+    await service.updateAppSettings({ attractapLanguage: 'en' });
+    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.attractapLanguage, 'en');
+    store.getPlainSetting.mockResolvedValue('unexpected');
+    expect(await service.getAttractapLanguage()).toBe('en');
+  });
+
+  it.each(['de-DE', 'de_AT', 'en-US', 'fr-FR'])('normalizes saved Attractap language %s in both settings reads', async (stored) => {
+    store.getPlainSetting.mockResolvedValue(stored);
+    const expected = stored.toLowerCase().startsWith('de') ? 'de' : 'en';
+    expect(await service.getAttractapLanguage()).toBe(expected);
+    expect((await service.getAppSettings()).attractapLanguage).toBe(expected);
   });
 
   it('persists every authentication rate-limit option and returns the resolved policy', async () => {

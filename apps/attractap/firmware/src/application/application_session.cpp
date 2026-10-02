@@ -2,6 +2,7 @@
 // FEATURE: application-session
 
 #include "application.hpp"
+#include "../state/state.hpp"
 #include "platform.hpp"
 #include <cstdlib>
 #include <cstring>
@@ -399,6 +400,7 @@ void Application::finishReaderAction(bool success) {
 }
 
 void Application::logoutReader() {
+  State::setUserLanguage("");
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;
@@ -427,6 +429,7 @@ void Application::finishCardAuthentication(bool success) {
     this->restartSessionTimeout();
     this->selectedResourceChanged = true;
   } else {
+    State::setUserLanguage("");
     this->externalState = EXTERNAL_STATE_NONE;
     this->state = APPLICATION_STATE_INIT;
     this->nfc.enableCardDetection();

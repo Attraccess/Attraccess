@@ -8,3 +8,4 @@ int64_t esp_timer_get_time() { return static_cast<int64_t>(Fixtures::nowMs) * 10
 State::NetworkState State::getNetworkState() { return Fixtures::network; }
 State::WebsocketState State::getWebsocketState() { return Fixtures::websocket; }
 State::ApiState State::getApiState() { return Fixtures::api; }
+std::string State::getActiveLanguage() { return Fixtures::activeLanguage; }

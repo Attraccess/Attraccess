@@ -1,5 +1,7 @@
 #pragma once
 
+#include "display/i18n.hpp"
+
 #include <cstring>
 #include <string>
 
@@ -20,11 +22,12 @@ static inline void setLabelTextIfChanged(lv_obj_t *label, const char *text)
         return;
     }
     const char *current = lv_label_get_text(label);
-    if (current != nullptr && strcmp(current, text) == 0)
+    const char *localizedText = FirmwareI18n::translate(text);
+    if (current != nullptr && strcmp(current, localizedText) == 0)
     {
         return;
     }
-    lv_label_set_text(label, text);
+    FirmwareI18n::setLabel(label, text);
 }
 
 class IScreen

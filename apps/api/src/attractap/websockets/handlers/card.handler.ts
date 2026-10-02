@@ -392,6 +392,7 @@ export class AttractapCardHandler {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
+        language: normalizeDeviceLanguage(nfcCard.user.locale),
         canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
         hasIntroduction,
         isIntroducer,
@@ -405,4 +406,9 @@ export class AttractapCardHandler {
       this.logger.error(`Failed to refresh resources after card authentication for reader ${socket.readerId}`, error);
     });
   }
+}
+
+function normalizeDeviceLanguage(locale: string | null | undefined): 'en' | 'de' {
+  const language = (locale ?? '').trim().toLowerCase().split(/[-_]/, 1)[0];
+  return language === 'de' ? 'de' : 'en';
 }

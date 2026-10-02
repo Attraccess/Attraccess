@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "resourceDetailsScreen.hpp"
 #include <lvgl.h>
 #include <time.h>
@@ -60,7 +61,7 @@ void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
    // Replace content
    lv_obj_clean(this->successToast);
    lv_obj_t *lbl = lv_label_create(this->successToast);
-   lv_label_set_text(lbl, text ? text : "Erfolgreich");
+   FirmwareI18n::setLabel(lbl, text ? text : "Erfolgreich");
    lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Show now

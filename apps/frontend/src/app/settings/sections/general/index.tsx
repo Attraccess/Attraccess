@@ -42,7 +42,7 @@ export function GeneralSection() {
   // and the displayed value falls back to the server's. The alternative — an effect that reassigns
   // the whole draft whenever the query object changes — overwrites edits the operator has not saved
   // yet as soon as a background refetch lands (ATT-868).
-  const [draft, setDraft] = useState<Partial<Record<'url' | 'publicInternetUrl' | 'licenseKey', string>>>({});
+  const [draft, setDraft] = useState<Partial<{ url: string; publicInternetUrl: string; licenseKey: string; attractapLanguage: 'en' | 'de' }>>({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   // Same query/mutation contract as the old AppSettingsForm — only the presentation changed.
@@ -54,6 +54,8 @@ export function GeneralSection() {
   const url = draft.url ?? savedUrl;
   const publicInternetUrl = draft.publicInternetUrl ?? savedPublicUrl;
   const licenseKey = draft.licenseKey ?? '';
+  const savedLanguage = (settings?.app as typeof settings.app & { attractapLanguage?: 'en' | 'de' } | undefined)?.attractapLanguage ?? 'de';
+  const attractapLanguage = draft.attractapLanguage ?? savedLanguage;
 
   const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
     onSuccess(data) {
@@ -71,7 +73,7 @@ export function GeneralSection() {
     },
   });
 
-  const isDirty = url !== savedUrl || publicInternetUrl !== savedPublicUrl || licenseKey.trim() !== '';
+  const isDirty = url !== savedUrl || publicInternetUrl !== savedPublicUrl || licenseKey.trim() !== '' || attractapLanguage !== savedLanguage;
 
   const trimmedUrl = url.trim();
   const trimmedPublicUrl = publicInternetUrl.trim();
@@ -105,6 +107,7 @@ export function GeneralSection() {
           // means "unchanged" there and stays undefined.
           publicInternetUrl: trimmedPublicUrl || null,
           licenseKey: licenseKey.trim() || undefined,
+          attractapLanguage,
         },
       },
     });
@@ -151,6 +154,12 @@ export function GeneralSection() {
             <Input type="url" />
             <FieldError>{urlError}</FieldError>
           </TextField>
+        </SettingsRow>
+        <SettingsRow stacked label={t('inputs.attractapLanguage.label')}>
+          <select aria-label={t('inputs.attractapLanguage.label')} value={attractapLanguage} onChange={(event) => setDraft((current) => ({ ...current, attractapLanguage: event.target.value as 'en' | 'de' }))} className="w-full rounded-medium border border-default-300 bg-default-100 px-3 py-2">
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+          </select>
         </SettingsRow>
 
         <SettingsRow

@@ -52,6 +52,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/firmwareUpdate/firmwareUpdateScreen.cpp"
     ${ATTRACTAP_LATIN1_FONTS}
     "${FIRMWARE_DIR}/src/display/shared/pinInput/pinInputPage.cpp")
 target_include_directories(display-theme-host PRIVATE shims "${FIRMWARE_DIR}/src")

@@ -119,6 +119,7 @@ private:
     static uint8_t reboot_count;
 
     static void advanceScreenRouter();
+    static void refreshVisibleTextForLanguageChange();
 
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);

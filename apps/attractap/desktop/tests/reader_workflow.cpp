@@ -157,13 +157,13 @@ int main(int argc, char **argv) {
     auto login = [&](bool refresh = true) {
         nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
         if (drawerSettingsBeforeLogin) {
-            assert(!lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
+            assert(!lv_obj_is_visible(label(lv_layer_top(), FirmwareI18n::translate("Wartung"))));
             lv_obj_send_event(drawerSettingsBeforeLogin, LV_EVENT_CLICKED, nullptr);
             pump();
             assert(lv_screen_active() == Display::resourceListScreen.getScreen());
             drawerSettingsBeforeLogin = nullptr;
         }
-        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
+        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","language":"de","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
         pump(250); nfc.setPresent(0, false);
         if (refresh) list();
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
@@ -200,8 +200,8 @@ int main(int argc, char **argv) {
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 140, true}; pump();
     display.touch.pressed = false; pump();
-    assert(lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
-    drawerSettingsBeforeLogin = lv_obj_get_parent(label(lv_layer_top(), "Settings"));
+    assert(lv_obj_is_visible(label(lv_layer_top(), FirmwareI18n::translate("Wartung"))));
+    drawerSettingsBeforeLogin = lv_obj_get_parent(label(lv_layer_top(), FirmwareI18n::translate("Einstellungen")));
     login();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Alex"));
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 140, true}; pump();
     display.touch.pressed = false; pump();
-    assert(!lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
+    assert(!lv_obj_is_visible(label(lv_layer_top(), FirmwareI18n::translate("Wartung"))));
     display.capture(output, "03-pending-start");
     server.push("START_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
     assert(server.count("REQUEST_RESOURCE_LIST") > 0);

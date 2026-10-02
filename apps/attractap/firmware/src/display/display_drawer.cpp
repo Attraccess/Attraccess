@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "display.hpp"
 #include "display/theme.hpp"
 #include <functional>
@@ -33,11 +34,11 @@ namespace
         lv_obj_set_style_pad_row(btn, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_t *icon = lv_label_create(btn);
-        lv_label_set_text(icon, symbol);
+        FirmwareI18n::setLabel(icon, symbol);
         lv_obj_set_style_text_font(icon, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_t *lbl = lv_label_create(btn);
-        lv_label_set_text(lbl, text);
+        FirmwareI18n::setLabel(lbl, text);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
@@ -108,7 +109,7 @@ void Display::initDrawer()
     lv_obj_add_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t *titleLbl = lv_label_create(Display::drawerPanel);
-    lv_label_set_text(titleLbl, "Maintenance");
+    FirmwareI18n::setLabel(titleLbl, "Maintenance");
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -131,7 +132,7 @@ void Display::initDrawer()
                              Display::onOpenSettingsCallback();
                      });
 
-    makeDrawerButton(row, LV_SYMBOL_POWER, "Reboot", DisplayTheme::danger(),
+    makeDrawerButton(row, LV_SYMBOL_POWER, "Neustart", DisplayTheme::danger(),
                      [](lv_event_t *e)
                      {
                          if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
@@ -215,12 +216,12 @@ void Display::showRebootConfirm()
     lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
 
     lv_obj_t *titleLbl = lv_label_create(dialog);
-    lv_label_set_text(titleLbl, "Reboot device?");
+    FirmwareI18n::setLabel(titleLbl, "Reboot device?");
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *msgLbl = lv_label_create(dialog);
-    lv_label_set_text(msgLbl, "The reader will restart now.");
+    FirmwareI18n::setLabel(msgLbl, "The reader will restart now.");
     lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
@@ -238,7 +239,7 @@ void Display::showRebootConfirm()
     lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
     DisplayTheme::secondaryButton(cancelBtn);
     lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
-    lv_label_set_text(cancelLbl, "Cancel");
+    FirmwareI18n::setLabel(cancelLbl, "Cancel");
     lv_obj_add_event_cb(cancelBtn, [](lv_event_t *e)
                         {
         if (lv_event_get_code(e) != LV_EVENT_CLICKED)
@@ -252,7 +253,7 @@ void Display::showRebootConfirm()
     lv_obj_set_width(rebootBtn, LV_SIZE_CONTENT);
     DisplayTheme::button(rebootBtn, DisplayTheme::danger());
     lv_obj_t *rebootLbl = lv_label_create(rebootBtn);
-    lv_label_set_text(rebootLbl, "Reboot");
+    FirmwareI18n::setLabel(rebootLbl, "Neustart");
     lv_obj_add_event_cb(rebootBtn, [](lv_event_t *e)
                         {
         if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())

@@ -35,6 +35,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource } from '@attraccess/database-entities';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { AuditService } from '../../audit/audit.service';
+import { SettingsService } from '../../settings/settings.service';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -110,6 +111,7 @@ describe('AttractapGateway', () => {
         { provide: SupervisionService, useValue: {} },
         { provide: RbacService, useValue: {} },
         { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
+        { provide: SettingsService, useValue: { getAttractapLanguage: jest.fn().mockResolvedValue('de') } },
         { provide: getRepositoryToken(Resource), useValue: {} },
         ResourceListService,
         ResourceActionGuard,

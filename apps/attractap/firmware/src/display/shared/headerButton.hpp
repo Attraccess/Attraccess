@@ -1,5 +1,7 @@
 #pragma once
 
+#include "display/i18n.hpp"
+
 #include "display/theme.hpp"
 
 namespace ReaderHeader {
@@ -19,7 +21,7 @@ inline lv_obj_t *createBackButton(lv_obj_t *parent, lv_event_cb_t callback, void
     auto *icon = lv_label_create(button);
     // LVGL's bundled icon glyph, not an ASCII angle bracket.
     lv_obj_set_style_text_font(icon, &lv_font_montserrat_24, 0);
-    lv_label_set_text(icon, LV_SYMBOL_LEFT);
+    FirmwareI18n::setLabel(icon, LV_SYMBOL_LEFT);
     lv_obj_center(icon);
     lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, userData);
     return button;

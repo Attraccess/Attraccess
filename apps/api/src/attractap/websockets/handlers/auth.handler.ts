@@ -5,6 +5,7 @@ import { ResourceListService } from './resource-list.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuditService } from '../../../audit/audit.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import { SettingsService } from '../../../settings/settings.service';
 
 @Injectable()
 export class AttractapAuthHandler {
@@ -21,6 +22,9 @@ export class AttractapAuthHandler {
 
   @Inject(AuditService)
   private audit: AuditService;
+
+  @Inject(SettingsService)
+  private settingsService: SettingsService;
 
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     this.logger.debug('Received REGISTER event');
@@ -72,6 +76,7 @@ export class AttractapAuthHandler {
 
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
       name: reader.name,
+      language: await this.settingsService.getAttractapLanguage(),
     });
     await socket.sendMessage(authenticatedResponse);
 

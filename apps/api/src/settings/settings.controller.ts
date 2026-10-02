@@ -277,6 +277,7 @@ function systemSettingChanges(before: SystemSettingsDto, after: SystemSettingsDt
       safeAuditOrigin(after.app.publicInternetUrl ?? ''),
     ],
     ['app.licenseKeyConfigured', before.app.licenseKeyConfigured, after.app.licenseKeyConfigured],
+    ['app.attractapLanguage', before.app.attractapLanguage, after.app.attractapLanguage],
     ['smtp.service', before.smtp.service, after.smtp.service],
     ['smtp.host', safeAuditHost(before.smtp.host ?? ''), safeAuditHost(after.smtp.host ?? '')],
     ['smtp.port', before.smtp.port, after.smtp.port],

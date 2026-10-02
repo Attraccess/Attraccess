@@ -42,6 +42,12 @@ import {
 import { MetricsTogglesDto } from './dto/metrics-toggles.dto';
 import { UpdateMetricsTogglesDto } from './dto/update-metrics-toggles.dto';
 import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-toggle-invalidator.token';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+function normalizeAttractapLanguage(language: string): 'en' | 'de' {
+  const baseLanguage = language.trim().toLowerCase().replace('_', '-').split('-')[0];
+  return baseLanguage === 'de' ? 'de' : 'en';
+}
 
 @Injectable()
 export class SettingsService {
@@ -66,6 +72,9 @@ export class SettingsService {
     @Optional()
     @Inject(METRICS_TOGGLE_INVALIDATOR)
     private readonly metricsToggleInvalidator: MetricsToggleInvalidator | null = null,
+    @Optional()
+    @Inject(EventEmitter2)
+    private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   async isFirstTimeSetupAvailable(): Promise<boolean> {
@@ -118,16 +127,19 @@ export class SettingsService {
   }
 
   async getAppSettings(): Promise<AppSettingsDto> {
-    const [url, publicInternetUrl, licenseKey] = await Promise.all([
+    const [url, publicInternetUrl, licenseKey, attractapLanguage] = await Promise.all([
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url),
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl),
       this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey),
+      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage),
     ]);
 
     return {
       url,
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
+      // Missing values preserve the legacy German behavior; malformed stored values use English.
+      attractapLanguage: attractapLanguage === null ? 'de' : normalizeAttractapLanguage(attractapLanguage),
     };
   }
 
@@ -141,6 +153,15 @@ export class SettingsService {
     if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
       await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
     }
+    if (update.attractapLanguage !== undefined) {
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage, update.attractapLanguage);
+      this.eventEmitter?.emit('settings.attractap-language', update.attractapLanguage);
+    }
+  }
+
+  async getAttractapLanguage(): Promise<'en' | 'de'> {
+    const language = await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage);
+    return language === null ? 'de' : normalizeAttractapLanguage(language);
   }
 
   async getSmtpSettings(): Promise<SmtpSettingsDto> {

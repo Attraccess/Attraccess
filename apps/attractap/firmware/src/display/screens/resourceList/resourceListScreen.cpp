@@ -1,11 +1,13 @@
+#include "display/i18n.hpp"
 #include "resourceListScreen.hpp"
 #include "display/images/logo_40h.hpp"
 #include "display/images/lockscreen_background_image.hpp"
 
 namespace {
-lv_obj_t *text(lv_obj_t *parent, const char *value, const lv_font_t *font, lv_color_t color) {
+lv_obj_t *text(lv_obj_t *parent, const char *value, const lv_font_t *font, lv_color_t color, bool uiText = true) {
     auto *label = lv_label_create(parent);
-    lv_label_set_text(label, value);
+    if (uiText) FirmwareI18n::setLabel(label, value);
+    else FirmwareI18n::setDynamicLabel(label, value);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_width(label, lv_pct(100));
@@ -96,16 +98,17 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
         return button;
     };
     auto *details = makeButton(false, DisplayTheme::surfaceSecondary());
-    auto *name = text(details, resource.name, &attractap_font_montserrat_latin1_20, DisplayTheme::text());
+    auto *name = text(details, resource.name, &attractap_font_montserrat_latin1_20, DisplayTheme::text(), false);
     lv_obj_set_height(name, 26);
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
     std::string status = resource.description;
-    if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser ? "Von dir verwendet" : std::string("In Verwendung: ") + resource.activeUser;
-    else if (resource.isUnderMaintenance) status = "Wartung";
-    else if (!resource.isHealthy) status = "Nicht betriebsbereit";
-    else if (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource) status = "Einweisung fehlt";
-    else if (status.empty()) status = "Verfügbar";
-    auto *description = text(details, status.c_str(), &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
+    bool statusIsUiText = false;
+    if (resource.hasActiveUsage) { status = signedIn && username == resource.activeUser ? "Von dir verwendet" : std::string(State::getActiveLanguage() == "en" ? "In use: " : "In Verwendung: ") + resource.activeUser; statusIsUiText = true; }
+    else if (resource.isUnderMaintenance) { status = "Wartung"; statusIsUiText = true; }
+    else if (!resource.isHealthy) { status = "Nicht betriebsbereit"; statusIsUiText = true; }
+    else if (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource) { status = "Einweisung fehlt"; statusIsUiText = true; }
+    else if (status.empty()) { status = "Verfügbar"; statusIsUiText = true; }
+    auto *description = text(details, status.c_str(), &attractap_font_montserrat_latin1_14, DisplayTheme::muted(), statusIsUiText);
     lv_obj_set_height(description, 18);
     lv_obj_align(description, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     if (!signedIn) {

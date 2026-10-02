@@ -21,6 +21,7 @@ import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.serv
 import { WS_METRICS } from '../../metrics/definitions/tokens';
 import { ATTRACTAP_GATEWAY_LABEL, WsMetrics } from '../../metrics/definitions/ws.metrics';
 import { WsMetricsInterceptor } from '../../metrics/instrumentation/ws/ws.interceptor';
+import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceListService } from './handlers/resource-list.service';
 import { AttractapAuthHandler } from './handlers/auth.handler';
 import { AttractapFirmwareHandler } from './handlers/firmware.handler';
@@ -475,6 +476,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_LANGUAGE]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
@@ -490,6 +492,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   public async sendResourceList(readerId: number) {
     return this.resourceListService.sendResourceList(readerId);
+  }
+
+  @OnEvent('settings.attractap-language')
+  async updateReaderLanguage(language: 'en' | 'de') {
+    const readers = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId !== null);
+    await Promise.all(readers.map((socket) => socket.sendMessage(new AttractapEvent(AttractapEventType.READER_LANGUAGE, { language }))));
   }
 
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {

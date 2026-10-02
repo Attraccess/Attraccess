@@ -21,7 +21,8 @@
     "licenseKey": {
       "label": "License Key",
       "description": "Paste a new license key to update. Leave empty to keep the current one."
-    }
+    },
+    "attractapLanguage": { "label": "Default Attractap device language" }
   },
   "success": {
     "title": "Settings saved",
