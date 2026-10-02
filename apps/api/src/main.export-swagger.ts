@@ -1,5 +1,6 @@
 import { join } from 'path';
 import { writeFileSync } from 'fs';
+import { Logger } from '@nestjs/common';
 
 /* eslint-disable no-console */
 
@@ -9,6 +10,7 @@ async function main() {
   console.log('Bootstrapping');
 
   process.env.DISABLE_PLUGINS = 'true';
+  Logger.attachBuffer();
   const main = await import('./main.bootstrap');
   const { app, swaggerDocumentFactory } = await main.bootstrap();
 
