@@ -13,3 +13,6 @@ compile_commands.json
 dependencies.lock
 managed_components/
 sdkconfig
+test/build/
+test-results/
+test/helpers/__pycache__/

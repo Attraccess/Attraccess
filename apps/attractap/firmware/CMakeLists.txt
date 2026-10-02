@@ -9,6 +9,7 @@ set(ATTRACTAP_VARIANT "attractap-touch" CACHE STRING "Attractap firmware variant
 # Runtime log level compiled into the firmware banner/filter (bare token, stringified
 # by logger.cpp). build_firmwares.py passes ERROR for production builds.
 set(ATTRACTAP_LOG_LEVEL "INFO" CACHE STRING "Runtime log level (ERROR/WARN/INFO/DEBUG)")
+option(ATTRACTAP_HIL "Enable the unattended API integration driver (test builds only)" OFF)
 
 set(ATTRACTAP_VARIANT_FILE "${CMAKE_CURRENT_LIST_DIR}/variants/${ATTRACTAP_VARIANT}.cmake")
 if(NOT EXISTS "${ATTRACTAP_VARIANT_FILE}")
@@ -20,6 +21,12 @@ include("${ATTRACTAP_VARIANT_FILE}")
 # Single source of truth for the firmware version (also read by
 # scripts/check-attractap-firmware-version.sh and build_firmwares.py).
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/version.txt" ATTRACTAP_VERSION LIMIT_COUNT 1)
+if(ATTRACTAP_HIL)
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_HIL=1)
+    # A distinct OTA image proves that the device booted the transferred binary.
+    set(ATTRACTAP_HIL_VERSION "${ATTRACTAP_VERSION}-hil" CACHE STRING "HIL build identity")
+    set(ATTRACTAP_VERSION "${ATTRACTAP_HIL_VERSION}")
+endif()
 
 # The lvgl managed component compiles against our lv_conf.h instead of its
 # Kconfig (defining LV_CONF_PATH overrides lvgl's CONFIG_LV_CONF_SKIP default;

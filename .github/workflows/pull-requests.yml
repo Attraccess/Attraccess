@@ -72,6 +72,7 @@ jobs:
         build-companion,
         plugins,
         attractap-firmware-version,
+        attractap-firmware-test-gate,
         balena-compose-check,
         fail2ban-smoke,
         grafana-provisioning-smoke,
@@ -202,6 +203,99 @@ jobs:
         run: pnpm nx run generators:test
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
+
+  attractap-firmware-unit:
+    name: Attractap Firmware C++ and Harness Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+      - name: Run C++ serial, supervision and LVGL integration tests
+        run: pnpm nx run attractap-firmware:test
+      - name: Typecheck hardware harness
+        run: pnpm exec tsc -p apps/attractap/firmware/test/tsconfig.json
+      - name: Test hardware harness
+        run: pnpm exec vitest run --root apps/attractap/firmware --config test/vitest.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: attractap-harness-results
+          path: apps/attractap/firmware/test-results/*.xml
+
+  attractap-firmware-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: changes
+        env:
+          BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
+        run: |
+          changed=$(bash apps/attractap/firmware/test/hil-changes.sh "$BASE")
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+  attractap-firmware-e2e:
+    name: Attractap Firmware HIL (${{ matrix.variant }})
+    needs: attractap-firmware-changes
+    if: needs.attractap-firmware-changes.outputs.changed == 'true'
+    runs-on: [self-hosted, attractap-hw, '${{ matrix.variant }}']
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    # Exactly one runner service owns each device; GitHub's runner queue preserves
+    # pending runs. A shared concurrency group would cancel older pending PRs.
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        variant: [attractap-touch, attractap-touch-v2, attractap-touch-ethernet, attractap-lite-ethernet]
+    env:
+      HIL_VARIANT: ${{ matrix.variant }}
+      # Serial path, HIL_HOST and lab WiFi credentials are runner service env.
+      NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ''
+      NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ''
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'true'
+      - name: Build, erase, flash and run unattended real-firmware tests
+        shell: bash
+        run: |
+          source "$HOME/esp/esp-idf/export.sh"
+          bash apps/attractap/firmware/test/run-hil.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: attractap-hil-${{ matrix.variant }}
+          path: apps/attractap/firmware/test-results/
+          if-no-files-found: warn
+
+  attractap-firmware-test-gate:
+    needs: [attractap-firmware-changes, attractap-firmware-unit, attractap-firmware-e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require real hardware results whenever firmware or harness inputs change
+        env:
+          CHANGES_RESULT: ${{ needs.attractap-firmware-changes.result }}
+          UNIT_RESULT: ${{ needs.attractap-firmware-unit.result }}
+          HIL_REQUIRED: ${{ needs.attractap-firmware-changes.outputs.changed }}
+          HIL_RESULT: ${{ needs.attractap-firmware-e2e.result }}
+        run: |
+          [[ "$CHANGES_RESULT" == success && "$UNIT_RESULT" == success ]]
+          if [[ "$HIL_REQUIRED" == true ]]; then
+            [[ "$HIL_RESULT" == success ]]
+          else
+            [[ "$HIL_REQUIRED" == false && "$HIL_RESULT" == skipped ]]
+          fi
 
   fail2ban-smoke:
     runs-on: ubuntu-latest

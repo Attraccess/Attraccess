@@ -17,6 +17,9 @@
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include "platform.hpp"
+#ifdef ATTRACTAP_HIL
+bool handleHilCommand(const std::string &topic, JsonObject payload);
+#endif
 
 std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
@@ -272,6 +275,14 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
         sendErrorResponse(topic, authError.c_str());
         return;
     }
+
+#ifdef ATTRACTAP_HIL
+    if (topic.rfind("hil.", 0) == 0 && handleHilCommand(topic, payloadObj))
+    {
+        sendJsonResponse(topic, "{\"success\":true}");
+        return;
+    }
+#endif
 
     if (topic == "network.status.get")
     {

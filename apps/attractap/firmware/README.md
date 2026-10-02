@@ -94,6 +94,14 @@ Host renders are not photographs or tests of a physical panel. Confirm actual
 device colors, touch/keyboard interactions and heap headroom on the target
 hardware before deployment.
 
+## Unattended Hardware Tests
+
+The [firmware test guide](test/README.md) documents the C++ serial tests and
+ESP32 hardware-in-the-loop suite, dedicated GitHub runner setup, coverage
+boundaries, JUnit artifacts, and unverified hardware acceptance steps. Run the
+real-device suite with `pnpm nx run attractap-firmware:test-hil`; it requires
+dedicated hardware and never requires physical NFC card presentation.
+
 ## Flashing
 
 - **Web flasher (initial install):** the Attraccess frontend flashes the merged

@@ -54,6 +54,9 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     FIRMWARE_VERSION="${ATTRACTAP_VERSION}"
     LOG_LEVEL=${ATTRACTAP_LOG_LEVEL}
 )
+if(ATTRACTAP_HIL)
+    target_sources(${COMPONENT_LIB} PRIVATE ../test/device/api_driver.cpp)
+endif()
 
 # LVGL's canonical selector idiom `LV_PART_MAIN | LV_STATE_DEFAULT` ORs two
 # distinct enum types. GCC 14 (IDF v6) promotes this to
