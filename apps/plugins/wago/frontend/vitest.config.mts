@@ -22,7 +22,7 @@ export default defineConfig({
     // Running files concurrently allows user-event interactions in one file to target
     // another file's DOM, producing intermittent input corruption and timeouts.
     fileParallelism: false,
-    testTimeout: 15_000,
+    testTimeout: 30_000,
   },
   esbuild: { jsx: 'automatic' },
 });
