@@ -10,7 +10,7 @@ async function main() {
 
   process.env.DISABLE_PLUGINS = 'true';
   const main = await import('./main.bootstrap');
-  const { swaggerDocumentFactory } = await main.bootstrap();
+  const { app, swaggerDocumentFactory } = await main.bootstrap();
 
   console.log('Creating swagger document');
   const distDir = join(__dirname, '../../apps/api-swagger');
@@ -20,6 +20,7 @@ async function main() {
   writeFileSync(join(distDir, 'swagger.json'), JSON.stringify(swaggerDocument, null, 2));
 
   console.log('Done');
+  await app.close();
   process.exit(0);
 }
 

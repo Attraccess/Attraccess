@@ -12,6 +12,12 @@ import { PluginMigrationService } from './plugin-system/plugin-migration.service
 import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { createCert } from 'mkcert';
+import { initializeProcessLogging } from './logging/process-logging';
+
+jest.mock('./logging/process-logging', () => ({
+  initializeProcessLogging: jest.fn(() => ({ log: jest.fn(), error: jest.fn(), warn: jest.fn() })),
+  withLoggingLifecycle: jest.fn((module) => module),
+}));
 
 jest.mock('./app/app.module', () => ({ AppModule: class AppModule {} }));
 jest.mock('./plugin-system/plugin.service', () => ({
@@ -51,6 +57,7 @@ describe('API bootstrap ordering and configuration', () => {
     VERSION: 'test',
     PORT: 3999,
     NODE_ENV: 'test',
+    LOG_LEVELS: ['error', 'warn', 'log'],
   };
   const datasource = {
     isInitialized: false,
@@ -61,7 +68,7 @@ describe('API bootstrap ordering and configuration', () => {
   };
   const settings = { getUrl: jest.fn() };
   const config = { get: jest.fn((key: string) => (key === 'app' ? appConfig : { root: '/storage' })) };
-  const early = { get: jest.fn(() => config), close: jest.fn() };
+  const early = { get: jest.fn(() => config), close: jest.fn(), useLogger: jest.fn() };
   const app = {
     get: jest.fn((token: unknown) => {
       if (token === ConfigService) return config;
@@ -100,6 +107,8 @@ describe('API bootstrap ordering and configuration', () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => {
+    Logger.detachBuffer();
+    Logger.flush();
     jest.restoreAllMocks();
     if (originalSkip === undefined) delete process.env.SKIP_DATABASE_MIGRATIONS;
     else process.env.SKIP_DATABASE_MIGRATIONS = originalSkip;
@@ -133,6 +142,8 @@ describe('API bootstrap ordering and configuration', () => {
       .invocationCallOrder[0];
     expect(migrationOrder).toBeLessThan(jest.mocked(NestFactory.create).mock.invocationCallOrder[0]);
     expect(early.close).toHaveBeenCalled();
+    expect(initializeProcessLogging).toHaveBeenCalledTimes(1);
+    expect(early.useLogger).toHaveBeenCalledWith(jest.mocked(initializeProcessLogging).mock.results[0].value);
     expect(PluginModule.resetHostReferences).toHaveBeenCalled();
     expect(datasource.initialize).toHaveBeenCalled();
     expect(datasource.runMigrations).toHaveBeenCalled();
@@ -170,10 +181,7 @@ describe('API bootstrap ordering and configuration', () => {
   it('records migration failures and stops boot before accepting requests', async () => {
     const error = new Error('migration failed');
     datasource.runMigrations.mockRejectedValue(error);
-    jest.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process exited');
-    });
-    await expect(bootstrap()).rejects.toThrow('process exited');
+    await expect(bootstrap()).rejects.toThrow('migration failed');
     expect(PluginService.recordBootFailure).toHaveBeenCalledWith(error);
     expect(app.setGlobalPrefix).not.toHaveBeenCalled();
   });
