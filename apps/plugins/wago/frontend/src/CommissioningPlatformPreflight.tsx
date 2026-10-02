@@ -151,10 +151,12 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           })}
         </p>
         <Checkbox isSelected={customSsh} onChange={setCustomSsh} isDisabled={busy}>
-          <Checkbox.Control>
-            <Checkbox.Indicator />
-          </Checkbox.Control>
-          <Checkbox.Content>{t('commissioningUI.advanced')}</Checkbox.Content>
+          <Checkbox.Content className="wg:items-start">
+            <Checkbox.Control className="wg:mt-0.5">
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            {t('commissioningUI.advanced')}
+          </Checkbox.Content>
         </Checkbox>
         {customSsh && (
           <>
@@ -174,10 +176,12 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
         {recovery && (
           <>
             <Checkbox isSelected={approved} onChange={setApproved} isDisabled={busy}>
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>{t('security.approveCleanup')}</Checkbox.Content>
+              <Checkbox.Content className="wg:items-start">
+                <Checkbox.Control className="wg:mt-0.5">
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                {t('security.approveCleanup')}
+              </Checkbox.Content>
             </Checkbox>
             <Button type="button" isDisabled={busy || !approved} onPress={() => void run('recover')}>
               {t('security.cleanup')}

@@ -159,10 +159,12 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
                 setConfirmed(false);
               }}
             >
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>{label}</Checkbox.Content>
+              <Checkbox.Content className="wg:items-start">
+                <Checkbox.Control className="wg:mt-0.5">
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                {label}
+              </Checkbox.Content>
             </Checkbox>
           ))}
           <Button
@@ -175,10 +177,12 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
           </Button>
           {reviewed && <p>{t(mode === 'key_only' ? 'security.keyReview' : 'security.baselineReview')}</p>}
           <Checkbox isSelected={confirmed} isDisabled={pending} onChange={setConfirmed}>
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>{t('security.confirm')}</Checkbox.Content>
+            <Checkbox.Content className="wg:items-start">
+              <Checkbox.Control className="wg:mt-0.5">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              {t('security.confirm')}
+            </Checkbox.Content>
           </Checkbox>
           <Button
             type="button"
