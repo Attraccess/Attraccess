@@ -564,7 +564,7 @@ export class BillingService {
       refundOfId: transaction.id,
     } as Partial<BillingTransaction>);
 
-    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    this.liveNotificationsService.notifyTransactionUpdate(refundTransaction);
     void this.auditService.recordBillingTransaction({
       transactionId: refundTransaction.id,
       userId: refundTransaction.userId,

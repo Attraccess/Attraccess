@@ -33,12 +33,74 @@ describe('useSSE', () => {
 
   afterEach(() => {
     abortSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('reconnects a disconnected stream without remounting and still delivers events', async () => {
+    vi.useFakeTimers();
+    const onUpdate = vi.fn();
+    vi.mocked(events)
+      .mockReturnValueOnce(
+        stubStream({
+          async *[Symbol.asyncIterator]() {
+            /* connection closed */
+          },
+        }),
+      )
+      .mockReturnValueOnce(
+        stubStream({
+          async *[Symbol.asyncIterator]() {
+            yield { data: JSON.stringify({ resourceId: 1 }) };
+            await new Promise(() => undefined);
+          },
+        }),
+      );
+    const view = renderHook(() => useSSE({ path: '/reconnect', onUpdate }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(onUpdate).toHaveBeenCalledWith({ resourceId: 1 });
+    view.unmount();
+  });
+
+  it('cancels a pending reconnect when the last subscriber unmounts', async () => {
+    vi.useFakeTimers();
+    vi.mocked(events).mockReturnValue(
+      stubStream({
+        async *[Symbol.asyncIterator]() {
+          /* connection closed */
+        },
+      }),
+    );
+    const view = renderHook(() => useSSE({ path: '/cancel-reconnect', onUpdate: vi.fn() }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry an unauthorized stream', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
+    const view = renderHook(() => useSSE({ path: '/logout', onUpdate: vi.fn() }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    view.unmount();
   });
 
   it('aborts the connection when the component unmounts', async () => {
-    const { unmount } = renderHook(() =>
-      useSSE({ path: '/test', onUpdate: vi.fn(), enabled: true })
-    );
+    const { unmount } = renderHook(() => useSSE({ path: '/test', onUpdate: vi.fn(), enabled: true }));
 
     // Let connect() advance past the fetch await
     await act(async () => {
@@ -152,9 +214,7 @@ describe('useSSE', () => {
       await Promise.resolve();
     });
 
-    const second = renderHook(() =>
-      useSSE({ path: '/resources/1/events', onUpdate: secondSubscriber, enabled: true }),
-    );
+    const second = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: secondSubscriber, enabled: true }));
 
     await act(async () => {
       await Promise.resolve();
