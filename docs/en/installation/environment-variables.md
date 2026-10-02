@@ -17,7 +17,7 @@ All configuration options for Attraccess that can be set via environment variabl
 | `ATTRACCESS_PUBLIC_INTERNET_URL` | – | Public URL for external callbacks (e.g. SumUp payments). Only needed if different from `ATTRACCESS_URL`. |
 | `LOG_LEVELS` | `error,warn,log` | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose` |
 | `LOG_DESTINATIONS` | `console` | Comma-separated registered API log drivers: initially `console`, `file`. Names are trimmed, lowercased and deduplicated. |
-| `LOG_FILE_PATH` | – | Required non-blank path when selecting `file`; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |
+| `LOG_FILE_PATH` | `<STORAGE_ROOT>/api.log` | Optional override when selecting `file`; defaults to `api.log` at the storage root (`./storage` when `STORAGE_ROOT` is unset). Explicit overrides must be non-blank; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |
 | `LICENSE_KEY` | – | Attraccess license key |
 | `TZ` | – | Time zone, e.g. `Europe/Berlin` |
 | `TRUST_PROXY` | – | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy. |
@@ -30,16 +30,16 @@ All configuration options for Attraccess that can be set via environment variabl
 ```dotenv
 LOG_LEVELS=error,warn,log
 LOG_DESTINATIONS=console,file
-LOG_FILE_PATH=./log/api.log
+# Optional override: LOG_FILE_PATH=./custom/api.log
 ```
 
-Without destination configuration, existing deployments keep console-only logging. Fresh local setups copy these active destination entries from `.env.example`: `pnpm serve` appends API logs to `./log/api.log` in that worktree as well as printing them. Existing `.env` files are never rewritten. Select `LOG_DESTINATIONS=file` for file-only output, or `console` for console-only output. An empty selection, unknown name or invalid selected-driver option stops startup with a configuration error.
+Without destination configuration, existing deployments keep console-only logging. Fresh local setups copy these active destination entries from `.env.example`: `pnpm serve` appends API logs to `api.log` at the storage root in that worktree as well as printing them. Existing `.env` files are never rewritten. Select `LOG_DESTINATIONS=file` for file-only output, or `console` for console-only output. An empty selection, unknown name or invalid selected-driver option stops startup with a configuration error.
 
 All destinations share the existing Nest 11 `LOG_LEVELS` filter. Explicitly listed levels are enabled, as are levels at least as severe as the most severe listed level. For example, `log` enables `log,warn,error,fatal`, but `debug,error` enables only `debug,error,fatal`; a blank `LOG_LEVELS` disables application entries. `fatal` calls follow Nest's filter but `fatal` is not an accepted configuration name. The file driver creates missing parent directories and appends readable UTF-8 without ANSI codes, keeping earlier entries across restarts. Console retains Nest formatting and routing: errors go to stderr, other levels to stdout. Authentication lines remain compatible with fail2ban.
 
 Configuration changes take effect after restarting the API. Buffered startup logs use the same routing. Graceful shutdown (SIGINT/SIGTERM) flushes pending writes and closes destinations; forced termination cannot guarantee a flush. A destination that fails during initialization or operation is disabled for the rest of the process, with one emergency stderr diagnostic. Healthy destinations continue; if all fail, the API continues without application log delivery. Correct the cause and restart to reopen the destination. Before routing can be configured, startup failures retain console diagnostics.
 
-In containers, give the API write access to the file path and mount its directory if logs must survive container replacement. Rotation, retention, remote drivers, per-driver levels and live reconfiguration are not included. Only API application/framework logs are routed: persisted audit records, opt-in flow recordings, frontend, firmware, companion and dev-launcher output retain their own behavior. Generated `log/` files are gitignored. Developers can [register another transport](developer/logging.md).
+In containers, give the API write access to the file path and mount its directory if logs must survive container replacement. Rotation, retention, remote drivers, per-driver levels and live reconfiguration are not included. Only API application/framework logs are routed: persisted audit records, opt-in flow recordings, frontend, firmware, companion and dev-launcher output retain their own behavior. Generated `storage/` and `log/` files are gitignored. Developers can [register another transport](developer/logging.md).
 
 ## Storage
 

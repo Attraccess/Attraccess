@@ -1,6 +1,6 @@
 import { ConsoleLogger, LogLevel } from '@nestjs/common';
 import { createWriteStream, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 import { format, transports } from 'winston';
 import Transport from 'winston-transport';
@@ -76,7 +76,7 @@ export const consoleDriver: LogDestinationDriver = {
 
 export const fileDriver: LogDestinationDriver = {
   configure(env, cwd) {
-    const path = env.LOG_FILE_PATH?.trim();
+    const path = env.LOG_FILE_PATH?.trim() ?? join(env.STORAGE_ROOT ?? 'storage', 'api.log');
     if (!path || path.includes('\0')) {
       throw new Error('LOG_FILE_PATH must be a non-blank path without null bytes when LOG_DESTINATIONS includes file.');
     }

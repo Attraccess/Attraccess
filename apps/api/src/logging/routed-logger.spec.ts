@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import fs from 'node:fs';
 import { once } from 'node:events';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 import { format } from 'winston';
 import Transport from 'winston-transport';
@@ -95,7 +95,7 @@ describe('API log destinations on installed Nest 11', () => {
     ).toThrow('Unknown LOG_DESTINATIONS driver "remote". Registered drivers: console, file');
     const factory = configure.mock.results[0].value;
     expect(factory).not.toHaveBeenCalled();
-    for (const path of [undefined, '', '   ', 'bad\0path']) {
+    for (const path of ['', '   ', 'bad\0path']) {
       expect(() => create({ LOG_DESTINATIONS: 'file', LOG_FILE_PATH: path })).toThrow('LOG_FILE_PATH');
     }
     expect(() => create({ LOG_DESTINATIONS: ' , ' })).toThrow('at least one driver');
@@ -170,6 +170,17 @@ describe('API log destinations on installed Nest 11', () => {
     expect({ stdout: stdout.join(''), stderr: stderr.join('') }).toEqual(expected);
     expect(stripVTControlCharacters(stdout.join(''))).toContain(`[AuthAudit] ${audit}\n`);
     expect(stderr.join('')).not.toContain(audit);
+  });
+
+  it.each(['default', 'relative', 'absolute'])('defaults file output to the storage root (%s)', async (kind) => {
+    const storageRoot =
+      kind === 'default' ? undefined : kind === 'relative' ? 'custom-storage' : join(directory, 'custom-storage');
+    const logger = create({ LOG_DESTINATIONS: 'file', STORAGE_ROOT: storageRoot });
+    logger.log('storage-default-entry');
+    await logger.close();
+    expect(readFileSync(resolve(directory, storageRoot ?? 'storage', 'api.log'), 'utf8')).toContain(
+      'storage-default-entry',
+    );
   });
 
   it.each([false, true])(
