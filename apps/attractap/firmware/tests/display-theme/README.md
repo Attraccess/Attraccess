@@ -163,6 +163,9 @@ The production resource details screen renders 30 long tutor names for an ordina
 unintroduced user, both available and occupied. The test scrolls to the last name,
 checks wrapping, and replaces the list with a refreshed assignment. The four
 `introducers-{available,occupied}-{top,bottom}.rgba` fixtures show those states.
+Pending actions cover the full viewport when opened at the bottom of the list
+and while scrolling back to the top, in both occupancy states. The two
+`introducers-{available,occupied}-pending.rgba` fixtures show the fixed overlay.
 Clock formatting is deterministic in this host harness; device input and transport
 still require a physical reader check.
 

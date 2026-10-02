@@ -887,7 +887,23 @@ void testIntroducerDetails(Renderer &renderer)
         expect(bounds.y2 < 480 && bounds.y2 > 0, "Last tutor is reachable by scrolling");
         expect(lv_obj_get_width(list) <= lv_obj_get_content_width(panel), "Long names wrap inside the panel");
         renderer.capture(occupied ? "introducers-occupied-bottom" : "introducers-available-bottom");
+        details.showActionProgress("Bitte warten");
+        settle();
+        auto *overlay = lv_obj_get_child(guard.root, -1);
+        const auto expectOverlayCoverage = [&] {
+            lv_area_t area;
+            lv_obj_get_coords(overlay, &area);
+            expect(area.x1 == 0 && area.y1 == 0 && area.x2 == 479 && area.y2 == 479,
+                   "Pending action covers the viewport even when details are scrolled");
+            expect(lv_obj_has_flag(overlay, LV_OBJ_FLAG_CLICKABLE), "Pending overlay intercepts input");
+        };
+        expectOverlayCoverage();
+        renderer.capture(occupied ? "introducers-occupied-pending" : "introducers-available-pending");
         lv_obj_scroll_to_y(guard.root, 0, LV_ANIM_OFF);
+        settle();
+        expectOverlayCoverage();
+        details.hideActionProgress();
+        expect(lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN), "Completed action hides its overlay");
     }
     resource.introducers = {"Updated tutor"};
     details.setResourceAndUsageDetails(resource);
