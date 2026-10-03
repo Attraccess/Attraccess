@@ -12,12 +12,24 @@ type Subscriber = (data: unknown) => void;
 
 interface SseConnection {
   abortController: AbortController;
+  retryDelay: number;
 }
 
 const connections = new Map<string, SseConnection>();
 const subscribers = new Map<string, Set<Subscriber>>();
+const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function connect(url: string, retryDelay = 1000) {
+  const timer = reconnectTimers.get(url);
+  clearTimeout(timer);
+  reconnectTimers.delete(url);
+  const connection = { abortController: new AbortController(), retryDelay };
+  connections.set(url, connection);
+  void consume(url, connection);
+}
 
 async function consume(url: string, connection: SseConnection) {
+  let reconnect = true;
   try {
     // eslint-disable-next-line no-restricted-syntax -- SSE streams are consumed as raw responses.
     const res = await fetch(url, {
@@ -29,12 +41,14 @@ async function consume(url: string, connection: SseConnection) {
     if (!res.ok) {
       // A 401 is expected while a previously authenticated app is logging out.
       if (res.status === 401) {
+        reconnect = false;
         return;
       }
       throw new Error(`Failed to connect to SSE: ${res.status} ${res.statusText}`);
     }
 
     for await (const event of events(res, connection.abortController.signal)) {
+      connection.retryDelay = 1000;
       try {
         const nextPacket = JSON.parse(event.data as string);
 
@@ -61,6 +75,17 @@ async function consume(url: string, connection: SseConnection) {
   } finally {
     if (connections.get(url) === connection) {
       connections.delete(url);
+      if (reconnect && !connection.abortController.signal.aborted && subscribers.get(url)?.size) {
+        reconnectTimers.set(
+          url,
+          setTimeout(() => {
+            reconnectTimers.delete(url);
+            if (subscribers.get(url)?.size && !connections.has(url)) {
+              connect(url, Math.min(connection.retryDelay * 2, 30000));
+            }
+          }, connection.retryDelay),
+        );
+      }
     }
   }
 }
@@ -73,17 +98,11 @@ function subscribe(url: string, subscriber: Subscriber): () => void {
     subscribers.set(url, subscriberSet);
   }
 
-  let connection = connections.get(url);
-
-  if (!connection) {
-    connection = {
-      abortController: new AbortController(),
-    };
-    connections.set(url, connection);
-    void consume(url, connection);
-  }
-
   subscriberSet.add(subscriber);
+
+  if (!connections.has(url)) {
+    connect(url);
+  }
 
   return () => {
     subscriberSet.delete(subscriber);
@@ -92,6 +111,8 @@ function subscribe(url: string, subscriber: Subscriber): () => void {
       const activeConnection = connections.get(url);
       subscribers.delete(url);
       connections.delete(url);
+      clearTimeout(reconnectTimers.get(url));
+      reconnectTimers.delete(url);
       activeConnection?.abortController.abort();
     }
   };

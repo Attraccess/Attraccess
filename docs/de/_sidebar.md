@@ -91,6 +91,7 @@
 - **Für Entwickler**
   - [Überblick](developer/overview.md)
   - [Architektur](developer/architecture.md)
+  - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
   - [Mitwirken](developer/contributing.md)
 

@@ -22,6 +22,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
   let mockResourceListService: { sendResourceListToSocket: jest.Mock };
   let mockFormsHandler: { ensureFormsSatisfied: jest.Mock; clearFormDraft: jest.Mock };
   let mockSupervisionService: { settleByCard: jest.Mock };
+  let mockBillingService: { getResourceUsageCharge: jest.Mock; getConfiguration: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
 
@@ -48,7 +49,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
     mockResourceUsageService = {
       startSession: jest.fn().mockResolvedValue({}),
-      endSession: jest.fn().mockResolvedValue({}),
+      endSession: jest.fn().mockResolvedValue({ id: 99, userId: 1 }),
     };
 
     mockResourceFlowsExecutorService = {
@@ -84,6 +85,11 @@ describe('AttractapSessionHandler – session + flow button', () => {
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).formsHandler = mockFormsHandler;
     (handler as any).supervisionService = mockSupervisionService;
+    mockBillingService = {
+      getResourceUsageCharge: jest.fn().mockResolvedValue(null),
+      getConfiguration: jest.fn().mockResolvedValue({ currency: 'EUR', minorUnit: 2 }),
+    };
+    (handler as any).billingService = mockBillingService;
   });
 
   describe('handleStartResourceUsageSession', () => {
@@ -288,6 +294,70 @@ describe('AttractapSessionHandler – session + flow button', () => {
   });
 
   describe('handleStopResourceUsageSession', () => {
+    it('sends the final charge with configured precision and the action request ID', async () => {
+      mockBillingService.getResourceUsageCharge.mockResolvedValue({ amount: -1234 });
+      mockBillingService.getConfiguration.mockResolvedValue({ currency: 'KWD', minorUnit: 3 });
+      await handler.handleStopResourceUsageSession(
+        mockSocket as any,
+        {
+          payload: { resourceId: 10, requestId: 5 },
+        } as AttractapEvent['data'],
+      );
+      expect(mockBillingService.getResourceUsageCharge).toHaveBeenCalledWith(99, 1);
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payload: {
+              success: true,
+              requestId: 5,
+              billingSummary: { amount: 1234, total: '1,234 KWD' },
+            },
+          }),
+        }),
+      );
+    });
+
+    it.each([null, { amount: 0 }])('omits the summary for an absent or zero charge (%p)', async (charge) => {
+      mockBillingService.getResourceUsageCharge.mockResolvedValue(charge);
+      await handler.handleStopResourceUsageSession(
+        mockSocket as any,
+        {
+          payload: { resourceId: 10 },
+        } as AttractapEvent['data'],
+      );
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ payload: { success: true } }),
+        }),
+      );
+      expect(mockBillingService.getConfiguration).not.toHaveBeenCalled();
+    });
+
+    it('does not expose another user’s charge when an administrator ends their session', async () => {
+      mockResourceUsageService.endSession.mockResolvedValue({ id: 99, userId: 2 });
+      await handler.handleStopResourceUsageSession(
+        mockSocket as any,
+        {
+          payload: { resourceId: 10 },
+        } as AttractapEvent['data'],
+      );
+      expect(mockBillingService.getResourceUsageCharge).not.toHaveBeenCalled();
+    });
+
+    it('keeps the action successful if the receipt lookup fails after ending the session', async () => {
+      mockBillingService.getResourceUsageCharge.mockRejectedValue(new Error('billing unavailable'));
+      await handler.handleStopResourceUsageSession(
+        mockSocket as any,
+        {
+          payload: { resourceId: 10 },
+        } as AttractapEvent['data'],
+      );
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ payload: { success: true } }),
+        }),
+      );
+    });
     const eventData = { payload: { resourceId: 10 } } as AttractapEvent['data'];
 
     it('returns early and does not end a session when the guard rejects the action', async () => {

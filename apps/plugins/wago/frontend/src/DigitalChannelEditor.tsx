@@ -213,11 +213,11 @@ export function DigitalChannelEditor({
                 isSelected={channel.capabilities.includes('guard')}
                 onChange={(enabled) => capability('guard', enabled)}
               >
-                <Checkbox.Control>
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                <Checkbox.Content>
-                  <Label>{t('channels.guard')}</Label>
+                <Checkbox.Content className="wg:items-start">
+                  <Checkbox.Control className="wg:mt-0.5">
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                  {t('channels.guard')}
                 </Checkbox.Content>
               </Checkbox>
               {guard && (
@@ -240,11 +240,11 @@ export function DigitalChannelEditor({
                 isSelected={channel.capabilities.includes('feedback')}
                 onChange={(enabled) => capability('feedback', enabled)}
               >
-                <Checkbox.Control>
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                <Checkbox.Content>
-                  <Label>{t('channels.feedback')}</Label>
+                <Checkbox.Content className="wg:items-start">
+                  <Checkbox.Control className="wg:mt-0.5">
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                  {t('channels.feedback')}
                 </Checkbox.Content>
               </Checkbox>
               {feedback && (
@@ -289,11 +289,11 @@ export function DigitalChannelEditor({
                 onChange(next);
               }}
             >
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>
-                <Label>{t('channels.valueRange')}</Label>
+              <Checkbox.Content className="wg:items-start">
+                <Checkbox.Control className="wg:mt-0.5">
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                {t('channels.valueRange')}
               </Checkbox.Content>
             </Checkbox>
             {range && (
