@@ -9,6 +9,7 @@ import {
   runtimeUpdateAcknowledgeScript,
 } from './wago-runtime-update-shell';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
+import { networkChangeShell } from './wago-network-change-shell';
 import { MANAGED_HELPER_PROTOCOL, managedInstallerPublishScript } from './wago-managed-installer';
 import {
   managedCutoverScript,
@@ -98,6 +99,26 @@ case "$action" in
   commissioning-accept)
     test "$digest$bytes$image$reference$previous" = '' || exit 1
     ${commissioningAcceptanceScript(tokenExample, testRoot, true)}
+    exit 0 ;;
+  mqtt-apply)
+    test "$image$reference$previous" = '' || exit 1
+    ${networkChangeShell('apply', testRoot)}
+    exit 0 ;;
+  mqtt-address)
+    test "$digest$bytes$image$reference$previous" = '' || exit 1
+    (${wagoShellFilesystemGuard({ waitForLock: true, createConfiguration: false })}
+    test "$(cat ${quote(testRoot + '/etc/attraccess-wago-management/token')})" = "$token" || exit 1
+    test ! -e ${quote(testRoot + '/var/lib/attraccess-wago-network-transaction')} || exit 1
+    test ! -L ${quote(testRoot + '/var/lib/attraccess-wago-network-transaction')} || exit 1
+    printf 'OK\\n')
+    exit 0 ;;
+  mqtt-ack)
+    test "$bytes$image$reference$previous" = '' || exit 1
+    ${networkChangeShell('ack', testRoot)}
+    exit 0 ;;
+  mqtt-release)
+    test "$image$reference$previous" = '' || exit 1
+    ${networkChangeShell('release', testRoot)}
     exit 0 ;;
 esac
 case "$action" in

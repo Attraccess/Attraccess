@@ -1162,6 +1162,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         await deviceOperations?.assertOwned(key, owner);
       };
       try {
+        const enrolled = session.hardwareId
+          ? await this.context.getRepository(WagoController).findOneBy({ hardwareId: session.hardwareId })
+          : null;
+        await this.managedRuntime?.assertNetworkSettled(enrolled?.id ?? null, session.hostKeyFingerprint ?? undefined);
         this.activeDeadlines.set(id, deadline);
         return await this.operationContext.run(guard, operation);
       } finally {

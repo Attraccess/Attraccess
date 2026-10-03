@@ -34,7 +34,7 @@ describe('production managed SSH transport', () => {
   const host = '10.77.0.7',
     token = 'a'.repeat(32);
 
-  function fixture(mode: 'ok' | 'host-change' | 'wait' | 'noisy' | 'storage') {
+  function fixture(mode: 'ok' | 'host-change' | 'wait' | 'noisy' | 'storage', selectedHost = host) {
     const hostKey = generateManagementKey(),
       identity = generateManagementKey();
     const actualSpawn = jest.requireActual<typeof processes>('node:child_process').spawn;
@@ -58,7 +58,7 @@ describe('production managed SSH transport', () => {
           [
             '-e',
             'process.stdout.write(process.argv[1])',
-            `${host} ${mode === 'host-change' ? identity.publicKey : hostKey.publicKey}\n`,
+            `${selectedHost} ${mode === 'host-change' ? identity.publicKey : hostKey.publicKey}\n`,
           ],
           options,
         );
@@ -79,7 +79,7 @@ describe('production managed SSH transport', () => {
       return child;
     }) as typeof processes.spawn);
     const target = Object.assign(new WagoManagedAccess(), {
-      host,
+      host: selectedHost,
       fingerprint: hostKey.fingerprint,
       keyFingerprint: identity.fingerprint,
     });
@@ -99,6 +99,16 @@ describe('production managed SSH transport', () => {
       managedSsh(test.target, test.identity.privateKey, `proof ${token}`, new AbortController().signal),
     ).rejects.toMatchObject({ failure: 'host_identity' });
     expect(test.calls.map((call) => call.command)).toEqual(['ssh-keyscan']);
+    expectReaped(test.children);
+  });
+
+  it('scans and authenticates only the new IP with the existing pinned fingerprint', async () => {
+    const newHost = '192.168.2.50', test = fixture('ok', newHost);
+    const output = await managedSsh(test.target, test.identity.privateKey, `proof ${token}`, new AbortController().signal);
+    expect(Buffer.from(output, 'base64').toString()).toBe(`proof ${token}\n`);
+    expect(test.calls.find(call => call.command === 'ssh-keyscan')?.args).toContain(newHost);
+    expect(test.calls.find(call => call.command === 'ssh')?.args).toContain(`attraccess@${newHost}`);
+    expect(test.calls.some(call => call.args.includes(host) || call.args.includes(`attraccess@${host}`))).toBe(false);
     expectReaped(test.children);
   });
 

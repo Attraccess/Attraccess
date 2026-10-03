@@ -50,6 +50,7 @@
     "offline": "Offline",
     "stale": "Keine Rückmeldung",
     "unknown": "Status unbekannt",
+    "runtime_check": "Software wird geprüft",
     "runtime_update": "Software-Update"
   },
   "commissioning": {

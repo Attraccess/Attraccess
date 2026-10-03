@@ -6,6 +6,7 @@ import { commissioningAcceptanceScript } from './wago-commissioning-accept';
 import { RuntimeUpdateError } from './wago-runtime-update';
 import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
 import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './wago-managed-access.entity';
+import { WagoNetworkChange, WagoMqttCredentialRetirement } from './wago-network-change.entity';
 import { WagoDeviceOperations } from './wago-device-operations';
 import { WagoManagedUpdates1780010650000 } from './migrations/1780010650000-add-wago-managed-updates';
 import { WagoController } from './wago-controller.entity';
@@ -84,6 +85,8 @@ describe('managed enrolment and durable credential lifecycle', () => {
       database: ':memory:',
       entities: [
         WagoManagedAccess,
+        WagoNetworkChange,
+        WagoMqttCredentialRetirement,
         WagoRuntimeUpdateEntity,
         WagoDeviceOperation,
         WagoController,

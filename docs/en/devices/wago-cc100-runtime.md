@@ -12,6 +12,18 @@ Live controls require a current runtime advertising `front-panel-v1` and a match
 
 Input inversion affects reported input state, guards and feedback. Modbus switches read coils using FC01 and holding registers using FC03; readback runs in the polling loop rather than blocking configuration acceptance or command acknowledgements. Modbus state is never inferred from a command alone. Polling uses each device's configured interval. The page refreshes received diagnostics every two seconds; this is a live polling view, not a push stream.
 
+## Change the MQTT server or stored SSH address
+
+For a fully managed controller, open **Details → Advanced → Change or update MQTT server**. Enter its private IPv4 address on the new network and select an Attraccess MQTT server. Selecting the current server again refreshes its current address, TLS settings and device credentials. Select **Update only the CC100 address** to verify and save the new SSH destination without provisioning MQTT credentials or restarting the runtime. The address field changes where Attraccess connects; it does not configure the CC100's network.
+
+The first SSH connection uses the entered address and the existing pinned host fingerprint. Neither the previous controller address nor the previous broker needs to respond. The restricted management account receives only fixed helper commands; signed helper publication supplies the updated operation. **Restore previous SSH access** retires automatic management and is not part of a network change.
+
+An MQTT change stops the runtime under the shared installation lock, updates `/etc/attraccess-wago/runtime.env` and permanent credentials in `/var/lib/attraccess-wago/state.json`, and recreates `attraccess-wago` using its installed image and captured Docker configuration. The existing mounts, devices, hardware profile, required environment and retained runtime state survive. A short-lived fixed maintenance program uses Node from that same image and the local Docker API to preserve container settings; the managed runtime itself never receives the Docker socket. Startup goes through the existing hardware gate and supervisor with restart policy `no`.
+
+Attraccess first refreshes its shared MQTT connection using the selected server’s current settings, preserving its registered topic subscriptions. This requires the matching Attraccess API build. It clears the previous retained credential acknowledgement and requires a new authenticated device acknowledgement on the selected broker. It then saves the controller, commissioning session, credential epoch and encrypted SSH address binding consistently. The drawer reports progress and specific failures without returning credentials. An interrupted change retains an encrypted server intent and private controller journal; **Retry saved change** finishes applying the same settings and credentials, including after interruption between container deletion and creation. If applying finished but MQTT verification failed, correct the configured server address or TLS settings and retry: Attraccess provisions and saves a replacement intent before releasing the previous journal. An interrupted replacement continues with its saved credentials. Commissioning, runtime updates, credential rotation and SSH recovery remain blocked until it finishes.
+
+Migration retains the previous broker association for credential cleanup. When that broker is available, use **Retire previous broker credentials**. Cleanup is independent of migration success, rejects a broker destination shared with the current server, and must finish before controller removal.
+
 ## Deployment Paths Must Not Be Mixed
 
 ### Build-owned assets and managed-update engineering status (ATT-1099)
@@ -118,6 +130,9 @@ including when an earlier current-image checkpoint still has a recheck deadline.
 Controllers whose image differs from this server build use the dedicated
 **Software update** status. Manual commands, flow commands and current flow samples
 remain unavailable during a mismatch, including after rollback to an older image.
+After a server restart, **Checking software** means the running image is awaiting
+confirmation; this alone does not queue an update. Controllers without a fresh
+heartbeat show **Not responding**, including while an update is pending.
 
 The runtime advertises `runtime-update-gate-v1`. It switches every configured output
 off before requesting confirmation at startup and after MQTT disconnection, overriding

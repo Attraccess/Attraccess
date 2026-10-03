@@ -271,6 +271,9 @@ export class PluginModule {
         publish(serverId, topic, payload, options) {
           return PluginModule.pluginMqtt().publish(serverId, topic, payload, options);
         },
+        refreshConnection(serverId) {
+          return PluginModule.pluginMqtt().refreshConnection(serverId);
+        },
       },
       get events(): EventEmitter2 {
         return PluginModule.requireRef(PluginModule.eventsRef, 'EventEmitter2');

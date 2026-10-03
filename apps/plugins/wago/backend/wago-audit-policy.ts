@@ -70,6 +70,8 @@ const controllerActions: PluginAuditActionPolicy[] = [
   { action: 'wago.claim', subjectTypes: ['wago.controller'] },
   { action: 'wago.unclaim', subjectTypes: ['wago.controller'] },
   { action: 'wago.credential_rotation', subjectTypes: ['wago.controller'] },
+  { action: 'wago.network_change', subjectTypes: ['wago.controller'] },
+  { action: 'wago.network_credential_retirement', subjectTypes: ['wago.controller'] },
   { action: 'wago.manual_credential_fallback', subjectTypes: ['wago.controller'] },
   { action: 'wago.publication', subjectTypes: ['wago.controller'], details: { revision } },
   { action: 'wago.forced_publication', subjectTypes: ['wago.controller'], details: { revision } },

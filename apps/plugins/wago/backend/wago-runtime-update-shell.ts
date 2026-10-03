@@ -15,7 +15,7 @@ const imageIdPattern = /^sha256:[a-f0-9]{64}$/;
 // Minimal FW31 head may lack -c. One dd input block can be short on a pipe;
 // account for its actual output before choosing the next bounded read. No fancy
 // dd flags, pipefail, byte-at-a-time archive copy, or unbounded disk writes.
-const boundedReceiver = String.raw`file=$1
+export const boundedReceiver = String.raw`file=$1
 limit=$2
 mode=$3
 case "$mode" in native|terse) ;; *) exit 1 ;; esac

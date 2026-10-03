@@ -172,6 +172,10 @@ export async function bootstrap() {
   });
   bootstrapLogger.log('Main application instance created.');
 
+  // Plugin configurations can include large device profiles and a previous
+  // draft for conflict detection, exceeding Express's default 100 KiB limit.
+  app.useBodyParser('json', { limit: '10mb' });
+
   // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told
   // how many proxy hops to trust. Without this, auth rate limiting buckets every request under the
   // proxy IP. Opt-in via TRUST_PROXY (default off) so a misconfiguration can never be self-spoofed.

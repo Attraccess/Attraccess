@@ -24,6 +24,7 @@ import { useWagoTranslations } from './i18n';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import { RuntimeUpdateSummary } from './RuntimeUpdateSummary';
+import { NetworkChangeDetails } from './NetworkChangeDetails';
 
 export { RuntimeUpdateDetails } from './RuntimeUpdateDetails';
 
@@ -267,10 +268,16 @@ function ControllerStatus({
   const updating = controller.connectivity === 'runtime_update' || status?.runtimeUpdateRequired || imageMismatch;
   let label = t(`connectivity.${controller.connectivity}`);
   let color: 'success' | 'warning' | 'danger' | 'default' =
-    controller.connectivity === 'online' ? 'success' : controller.connectivity === 'stale' ? 'warning' : 'default';
+    controller.connectivity === 'online'
+      ? 'success'
+      : ['stale', 'runtime_check'].includes(controller.connectivity)
+        ? 'warning'
+        : 'default';
   if (controller.trustState !== 'claimed') {
     label = t(session ? 'controllers.enrolling' : 'connectivity.untrusted');
     color = 'warning';
+  } else if (controller.connectivity === 'stale' || controller.connectivity === 'runtime_check') {
+    label = t(`connectivity.${controller.connectivity}`);
   } else if (updating) {
     label = t('connectivity.runtime_update');
     color = 'warning';
@@ -299,9 +306,6 @@ function ControllerStatus({
       <Chip size="sm" variant="soft" color={color}>
         {label}
       </Chip>
-      {updating && controller.connectivity === 'stale' && (
-        <div className="wg:text-xs wg:text-muted">{t('connectivity.stale')}</div>
-      )}
     </div>
   );
 }
@@ -390,6 +394,7 @@ function ControllerDetailsDrawer({
               </Alert>
             )}
             {target && <RuntimeUpdateDetails target={target} />}
+            {controller?.trustState === 'claimed' && <NetworkChangeDetails controllerId={controller.id} />}
             {session?.failureReason && <p role="alert">{tBackendMessage(session.failureReason)}</p>}
           </Drawer.Body>
           <Drawer.Footer className="wg:flex wg:flex-wrap wg:gap-2">

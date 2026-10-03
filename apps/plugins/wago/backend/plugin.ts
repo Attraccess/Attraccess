@@ -24,6 +24,8 @@ import { WAGO_AUDIT_DOMAIN } from './wago-audit-policy';
 import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './wago-managed-access.entity';
 import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
 import { WagoUpdatesController } from './wago-updates.controller';
+import { WagoNetworkChange, WagoMqttCredentialRetirement } from './wago-network-change.entity';
+import { WagoNetworkChangeService } from './wago-network-change.service';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -50,6 +52,8 @@ const plugin: PluginBackendModule = {
     WagoManagedAccess,
     WagoRuntimeUpdateEntity,
     WagoDeviceOperation,
+    WagoNetworkChange,
+    WagoMqttCredentialRetirement,
   ],
   flowNodes: (context) => [
     createWagoCommandNode(() => services(context).command),
@@ -83,6 +87,7 @@ const plugin: PluginBackendModule = {
         WagoManagedRuntimeService,
         WagoCommissioningService,
         WagoCredentialRotationService,
+        WagoNetworkChangeService,
       ],
     };
   },

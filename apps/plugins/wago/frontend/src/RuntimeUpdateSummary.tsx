@@ -34,14 +34,17 @@ export function RuntimeUpdateSummary({
     status?.runtime?.runningImageId && afterImage && status.runtime.runningImageId !== afterImage,
   );
   const required = status?.runtimeUpdateRequired || controller.connectivity === 'runtime_update' || runningMismatch;
+  const waitingForController = controller.connectivity === 'stale' || controller.connectivity === 'runtime_check';
   const changedImage = Boolean(beforeImage && afterImage && beforeImage !== afterImage);
-  const transition = changedImage || required || Boolean(before && after && before !== after);
+  const transition =
+    changedImage || (required && !waitingForController) || Boolean(before && after && before !== after);
   const completed = matchesTarget && transition && update?.phase === 'current' && !required && !status?.blocker;
   const active =
     !unavailable &&
     (!status || status.management === 'managed') &&
     !status?.blocker &&
-    (activePhases.has(update?.phase ?? '') || (required && (!update || update.phase === 'current')));
+    (activePhases.has(update?.phase ?? '') ||
+      (required && !waitingForController && (!update || update.phase === 'current')));
   const phase = activePhases.has(update?.phase ?? '') ? update?.phase : 'waiting';
   const label = (version: string | null | undefined, image: string | null | undefined) => {
     const text = version ? `v${version}` : t('runtimeManagement.unknownVersion');

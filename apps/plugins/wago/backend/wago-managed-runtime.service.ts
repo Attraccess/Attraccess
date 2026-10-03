@@ -39,6 +39,7 @@ import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import { WagoService } from './wago.service';
 import { commissioningVerification } from './wago-commissioning-verification';
 import { admitEnvelope, emptyStream, type DiagnosticStream } from './diagnostics-envelope';
+import { WagoNetworkChange, WagoMqttCredentialRetirement } from './wago-network-change.entity';
 
 type Credentials = {
   sessionId: number;
@@ -51,7 +52,10 @@ type Credentials = {
   installerPrivateKey: string;
 };
 type RootAcceptance = (
-  host: string, fingerprint: string, password: string, token: string,
+  host: string,
+  fingerprint: string,
+  password: string,
+  token: string,
   guard: import('./wago-operation-guard').CommissioningOperationGuard,
   management: CommissioningManagementRefresh,
 ) => Promise<void>;
@@ -376,15 +380,94 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
 
   async assertRemovable(controllerId: number): Promise<void> {
     await this.assertUpdateSettled(controllerId);
+    if (await this.context.getRepository(WagoMqttCredentialRetirement).countBy({ controllerId }))
+      throw new ConflictException('Retire previous broker credentials before removing this controller.');
     const access = await this.access.findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
     if (access && access.state !== 'retired')
       throw new ConflictException('Restore bootstrap SSH and retire managed access before removing this controller');
   }
 
   private async assertUpdateSettled(controllerId: number): Promise<void> {
+    await this.assertNetworkSettled(controllerId);
     const row = await this.updates.findOneBy({ controllerId });
     const update = row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null;
     if (update?.token) throw new ConflictException('Finish runtime update recovery before removing this controller');
+  }
+
+  async assertNetworkSettled(controllerId: number | null, fingerprint?: string): Promise<void> {
+    if (controllerId === null && !fingerprint) return;
+    const change = await this.context
+      .getRepository(WagoNetworkChange)
+      .findOneBy(controllerId === null ? { fingerprint } : { controllerId });
+    if (change && change.phase !== 'completed')
+      throw new ConflictException('Finish the pending MQTT/address change before another controller operation.');
+  }
+
+  /** Uses the replacement address on the FIRST SSH connection. The stored
+   * credential binding is validated at its original address; only the transport
+   * destination changes, with the same pinned host identity and managed key.
+   */
+  async networkManagement(controllerId: number, targetHost: string, signal: AbortSignal) {
+    const access = await this.required(controllerId);
+    const credentials = this.credentials(access);
+    const session = await this.sessions.findOneBy({ id: access.sessionId });
+    if (
+      !session ||
+      session.state !== 'completed' ||
+      session.targetHost !== access.host ||
+      session.hostKeyFingerprint !== access.fingerprint ||
+      session.hardwareId !== credentials.hardwareId
+    )
+      throw new RuntimeUpdateError('management_required');
+    const command = (header: string, payload?: Buffer) => this.connection(access, header, signal, payload, targetHost);
+    const nonce = randomBytes(16).toString('hex');
+    if ((await command(`proof ${nonce}`)) !== `OK ${nonce}\n`) throw new RuntimeUpdateError('authentication');
+    const plaintext = JSON.stringify({ ...credentials, host: targetHost });
+    const encryptedCredentials = this.context.secrets.encrypt(plaintext);
+    if (
+      !encryptedCredentials ||
+      encryptedCredentials === plaintext ||
+      this.context.secrets.decrypt(encryptedCredentials) !== plaintext
+    )
+      throw new RuntimeUpdateError('management_required');
+    return {
+      sessionId: access.sessionId,
+      fingerprint: access.fingerprint,
+      hardwareId: credentials.hardwareId,
+      managementToken: access.token,
+      encryptedCredentials,
+      command,
+      prepare: async () => {
+        const desired = await this.desired();
+        const helper = managedHostHelper(desired);
+        const digest = createHash('sha256').update(helper).digest('hex');
+        const inspect = () => command(`inspect ${access.token}`);
+        const pattern = new RegExp(
+          `^${MANAGED_HELPER_PROTOCOL}\\n([a-f0-9]{64})\\n(sha256:[a-f0-9]{64}) (true|false)\\n$`,
+        );
+        let match = pattern.exec(await inspect());
+        if (!match) throw new RuntimeUpdateError('incompatible');
+        if (match[1] !== digest) {
+          const signature = signInstaller(credentials.installerPrivateKey, access.token, helper);
+          if (
+            (await command(
+              `installer-publish ${access.token} ${digest} ${Buffer.byteLength(helper)} ${signature}`,
+              Buffer.from(helper),
+            )) !== 'OK\n'
+          )
+            throw new RuntimeUpdateError('incompatible');
+          match = pattern.exec(await inspect());
+        }
+        if (match?.[1] !== digest) throw new RuntimeUpdateError('incompatible');
+      },
+    };
+  }
+
+  networkChanged(controllerId: number): void {
+    this.heartbeats.delete(controllerId);
+    this.heartbeatStreams.delete(controllerId);
+    this.wago.blockRuntime?.(controllerId);
+    this.wake();
   }
 
   async hasAccess(sessionId: number): Promise<boolean> {
@@ -481,6 +564,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       access = await this.loadSession(sessionId);
       if (!access || ['retiring', 'retired'].includes(access.state))
         throw new ConflictException('Managed access cannot be retried');
+      if (access.controllerId) await this.assertNetworkSettled(access.controllerId);
       await this.prove(access, operation.signal);
       const status = await this.connection(access, `access-status ${access.token}`, operation.signal);
       await this.operations.assertOwned(access.fingerprint, owner);
@@ -582,7 +666,13 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     }
   }
 
-  private async connection(access: WagoManagedAccess, header: string, signal?: AbortSignal, file?: string | Buffer) {
+  private async connection(
+    access: WagoManagedAccess,
+    header: string,
+    signal?: AbortSignal,
+    file?: string | Buffer,
+    targetHost = access.host,
+  ) {
     const operation = new AbortController();
     this.connections.add(operation);
     const abort = () => operation.abort();
@@ -596,7 +686,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       } catch {
         throw new RuntimeUpdateError('management_required');
       }
-      return await managedSsh(access, credentials.privateKey, header, operation.signal, file);
+      return await managedSsh({ ...access, host: targetHost }, credentials.privateKey, header, operation.signal, file);
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
@@ -623,6 +713,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   private async refreshRuntimePolicy(id: number): Promise<LiveHeartbeat | undefined> {
+    await this.assertNetworkSettled(id);
     let desired: BuildRuntimeArtifact;
     try {
       desired = await this.desired();
@@ -637,6 +728,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   private async reconcileConnection(id: number): Promise<void> {
+    await this.assertNetworkSettled(id);
     const heartbeat = await this.refreshRuntimePolicy(id);
     if (!heartbeat) return;
     const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
@@ -657,6 +749,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         await Promise.all(
           controllers.slice(index, index + 2).map(async (controller) => {
             try {
+              await this.assertNetworkSettled(controller.id);
               if (this.heartbeats.has(controller.id)) await this.refreshRuntimePolicy(controller.id);
               if (!(await this.completeEnrolment(controller))) return;
               this.verifyingControllers.add(controller.id);
@@ -788,7 +881,10 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
           // Finish only these owned journals through the still-verified bootstrap
           // login; all runtime updates after cutover continue to use the scoped key.
           await this.rootAcceptance(
-            access.host, access.fingerprint, this.credentials(access).recoveryPassword, session.deliveryToken,
+            access.host,
+            access.fingerprint,
+            this.credentials(access).recoveryPassword,
+            session.deliveryToken,
             {
               assertOwned: () => this.operations.assertOwned(access.fingerprint, owner),
               signal: operation.signal,
@@ -865,7 +961,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         .execute();
       // Keep the last audited attempt's diagnosis through transient offline
       // probes while the controller reboots or its rollback is still running.
-      const transientOfflineProbe = stage === 'status' && error instanceof RuntimeUpdateError && error.failure === 'offline';
+      const transientOfflineProbe =
+        stage === 'status' && error instanceof RuntimeUpdateError && error.failure === 'offline';
       if (attempted || !session.failureReason || !transientOfflineProbe)
         await this.sessions.update(session.id, {
           failureReason: managedSetupFailure(stage, error, operation.signal.aborted),
@@ -918,6 +1015,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         const access = await this.required(controllerId);
         if (!(await this.operations.acquire(access.fingerprint, owner, now, until))) return false;
         try {
+          await this.assertNetworkSettled(controllerId);
           await this.required(controllerId);
         } catch (error) {
           await this.operations.release(access.fingerprint, owner);

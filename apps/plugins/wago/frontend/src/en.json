@@ -50,6 +50,7 @@
     "offline": "offline",
     "stale": "Not responding",
     "unknown": "Status unknown",
+    "runtime_check": "Checking software",
     "runtime_update": "Software update"
   },
   "commissioning": {

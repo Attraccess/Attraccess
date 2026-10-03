@@ -124,7 +124,9 @@ it('shows the saved SSH setup failure in the details drawer in the selected lang
   await openDetails();
   expect(await screen.findByText(/Another installation or supervisor check may still be running/)).toBeTruthy();
   act(() => useTranslationState.getState().setLanguage('de'));
-  expect(screen.getByText(/Möglicherweise läuft noch eine Installation oder eine Prüfung der Laufzeitüberwachung/)).toBeTruthy();
+  expect(
+    screen.getByText(/Möglicherweise läuft noch eine Installation oder eine Prüfung der Laufzeitüberwachung/),
+  ).toBeTruthy();
 });
 
 it('shows the actual configuration prerequisite and automatic SSH progress without a continue action', async () => {
@@ -253,7 +255,9 @@ it('distinguishes builds sharing a version and shows failures without an active 
   expect(screen.queryByText(/insufficient free space/)).toBeNull();
   await openDetails();
   expect(await screen.findByText(/insufficient free space/)).toBeTruthy();
-  expect(await screen.findByText('/var/lib needs 176.2 MiB; 175.5 MiB is available. At least 0.7 MiB more is needed.')).toBeTruthy();
+  expect(
+    await screen.findByText('/var/lib needs 176.2 MiB; 175.5 MiB is available. At least 0.7 MiB more is needed.'),
+  ).toBeTruthy();
   expect(await screen.findByText(/The previous runtime is running/)).toBeTruthy();
   expect(screen.queryByRole('progressbar')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Retry runtime update' })).toBeNull();
@@ -323,6 +327,63 @@ it('withholds the runtime verified label while an enrolled controller requires a
   expect(await screen.findByText('Software update')).toBeTruthy();
   expect(screen.queryByText('Setup complete')).toBeNull();
   expect(screen.getByRole('progressbar', { name: 'Update queued' })).toBeTruthy();
+});
+
+it('shows startup software verification without announcing or queuing an update', async () => {
+  getUpdateStatus.mockResolvedValue({
+    management: 'managed',
+    sessionId: 7,
+    runtimeUpdateRequired: true,
+    runtime: {
+      runningVersion: '0.1.0',
+      runningImageId: null,
+      desiredVersion: '0.1.0',
+      desiredImageId: 'sha256:desired',
+    },
+    update: null,
+  });
+  mount(vi.fn(), vi.fn(), { ...controller, connectivity: 'runtime_check' });
+  await waitFor(() => expect(getUpdateStatus).toHaveBeenCalled());
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+
+  expect(screen.getByText('Checking software')).toBeTruthy();
+  expect(screen.queryByText('Software update')).toBeNull();
+  expect(screen.queryByRole('progressbar', { name: 'Update queued' })).toBeNull();
+  expect(screen.getByText('v0.1.0')).toBeTruthy();
+});
+
+it('keeps an offline controller visibly not responding while runtime verification is pending', async () => {
+  getUpdateStatus.mockResolvedValue({ management: 'managed', sessionId: 7, runtimeUpdateRequired: true, update: null });
+  mount(vi.fn(), vi.fn(), { ...controller, connectivity: 'stale' });
+  await waitFor(() => expect(getUpdateStatus).toHaveBeenCalled());
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+
+  expect(screen.getByText('Not responding')).toBeTruthy();
+  expect(screen.queryByText('Software update')).toBeNull();
+  expect(screen.queryByRole('progressbar', { name: 'Update queued' })).toBeNull();
+});
+
+it('keeps an offline update failure visible without replacing connectivity with the pending image mismatch', async () => {
+  getUpdateStatus.mockResolvedValue({
+    management: 'managed',
+    sessionId: 7,
+    runtimeUpdateRequired: true,
+    runtime: {
+      runningVersion: '0.1.0',
+      runningImageId: 'sha256:previous',
+      desiredVersion: '0.2.0',
+      desiredImageId: 'sha256:desired',
+    },
+    update: { phase: 'blocked', desiredImageId: 'sha256:desired', failure: 'offline' },
+  });
+  mount(vi.fn(), vi.fn(), { ...controller, connectivity: 'stale' });
+  await waitFor(() => expect(getUpdateStatus).toHaveBeenCalled());
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+
+  expect(screen.getByText('Not responding')).toBeTruthy();
+  expect(screen.queryByText('Software update')).toBeNull();
+  expect(screen.getByRole('status').textContent).toBe('blocked');
+  expect(screen.queryByRole('progressbar')).toBeNull();
 });
 
 it.each(['failed', 'blocked', 'recovery_required'])(

@@ -144,7 +144,9 @@ describe('WagoCommissioningService', () => {
       jest.spyOn(WagoDeviceOperations.prototype, 'release').mockResolvedValue(undefined),
     ];
     inspect.mockResolvedValue({ firmware: fw31IdentityOutput(), codesys: 'inactive' });
-    Object.assign(service, { managedRuntime: { hasAccess: async () => false } });
+    Object.assign(service, {
+      managedRuntime: { hasAccess: async () => false, assertNetworkSettled: async () => undefined },
+    });
     service['requireRuntimeArtifact'] = jest.fn().mockResolvedValue(undefined);
     service['acquireRuntimeBundle'] = jest
       .fn()

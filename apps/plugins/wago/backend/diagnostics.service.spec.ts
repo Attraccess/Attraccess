@@ -151,7 +151,7 @@ describe('controller diagnostics', () => {
     try {
       let stored = { id: 1, hardwareId: 'cc100', trustState: 'claimed', lastSequence: 0, lastHeartbeatAt: null };
       const save = jest.fn(async (value) => {
-        stored = { ...value };
+        stored = { ...stored, ...value };
       });
       const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
       Reflect.set(service, 'controllers', { findOneBy: async () => ({ ...stored }), save });
@@ -195,7 +195,7 @@ describe('controller diagnostics', () => {
         lastHeartbeatAt: null,
       };
       const save = jest.fn(async (value) => {
-        stored = { ...value };
+        stored = { ...stored, ...value };
       });
       const context = { logger: { warn: jest.fn() } } as unknown as PluginContext;
       const service = new WagoService(context);

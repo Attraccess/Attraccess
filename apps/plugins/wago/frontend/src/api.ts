@@ -16,7 +16,7 @@ export interface WagoController {
   lastHeartbeatAt: string | null;
   lastSeenAt: string;
   compatibilityError: string | null;
-  connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_update';
+  connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_check' | 'runtime_update';
 }
 export interface WagoSettings {
   defaultMqttServerId: number | null;
@@ -161,6 +161,27 @@ export const setSettings = (defaultMqttServerId: number | null) =>
   api.request<WagoSettings>('/settings', { method: 'POST', body: { defaultMqttServerId } });
 
 export const listMqttServers = () => hostApi.request<MqttServer[]>('/mqtt/servers');
+
+export interface NetworkChangeStatus {
+  available: boolean;
+  targetHost: string | null;
+  mqttServerId: number | null;
+  pendingCredentialRetirements: number;
+  operation: {
+    targetHost: string;
+    mqttServerId: number | null;
+    phase: 'connecting' | 'provisioning' | 'applying' | 'verifying' | 'saving' | 'completed';
+    failure: string | null;
+    running: boolean;
+  } | null;
+}
+export const getNetworkChangeStatus = (id: number) => api.request<NetworkChangeStatus>(`/controllers/${id}/network-change`);
+export const changeControllerNetwork = (id: number, input: { targetHost: string; mqttServerId: number | null }) =>
+  api.request<NetworkChangeStatus>(`/controllers/${id}/network-change`, { method: 'POST', body: input });
+export const retryControllerNetworkChange = (id: number) =>
+  api.request<NetworkChangeStatus>(`/controllers/${id}/network-change/retry`, { method: 'POST' });
+export const retirePreviousMqttCredentials = (id: number) =>
+  api.request<NetworkChangeStatus>(`/controllers/${id}/network-change/retire-credentials`, { method: 'POST' });
 
 export const claimController = (id: number, input: ClaimControllerInput) =>
   api.request<WagoController>(`/controllers/${id}/claim`, { method: 'POST', body: input });
