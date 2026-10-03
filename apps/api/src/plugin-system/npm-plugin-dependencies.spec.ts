@@ -150,6 +150,36 @@ describe('npm plugin dependency lifecycle', () => {
     await service.install(provider, '1.0.0', undefined, undefined, plan.token);
     expect(service.listInstalled().map(({ classification }) => classification)).toEqual(['official', 'official']);
   });
+  it('inspects only the first matching tarball release needed for a dependency plan', async () => {
+    for (const version of ['0.9.0', '1.0.0', '1.1.0', '2.0.0']) await publish(pkg('core', [], version));
+    await publish(pkg('provider', [dep('core')]));
+    for (const version of Object.values(metadata.core.versions))
+      delete (version as { attraccess?: unknown }).attraccess;
+
+    const plan = await service.installPlan('provider', '1.0.0');
+    expect(plan.plugins.map(({ name, version }) => [name, version])).toEqual([
+      ['core', '1.1.0'],
+      ['provider', '1.0.0'],
+    ]);
+    expect((internals.download as jest.Mock).mock.calls.map(([url]) => url)).toEqual(['core/1.1.0']);
+  });
+  it('inspects alternative tarball releases lazily when backtracking changes dependency ranges', async () => {
+    await publish(pkg('core'));
+    await publish(pkg('core', [], '2.0.0'));
+    await publish(pkg('adapter', [dep('core')]));
+    await publish(pkg('adapter', [dep('core', '^2'), dep('missing')], '1.1.0'));
+    await publish(pkg('provider', [dep('adapter')]));
+    for (const version of Object.values(metadata.core.versions))
+      delete (version as { attraccess?: unknown }).attraccess;
+
+    const plan = await service.installPlan('provider', '1.0.0');
+    expect(plan.plugins.map(({ name, version }) => [name, version])).toEqual([
+      ['core', '1.0.0'],
+      ['adapter', '1.0.0'],
+      ['provider', '1.0.0'],
+    ]);
+    expect((internals.download as jest.Mock).mock.calls.map(([url]) => url)).toEqual(['core/2.0.0', 'core/1.0.0']);
+  });
   it('rejects a stale approval when registry permissions change', async () => {
     await publish(pkg('core'));
     await publish(pkg('provider', [dep('core')]));

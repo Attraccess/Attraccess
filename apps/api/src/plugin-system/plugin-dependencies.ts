@@ -50,11 +50,33 @@ export function orderPluginDependencies<T extends DependencyPlugin>(plugins: T[]
 export async function resolvePluginDependencies<T extends DependencyPlugin>(
   root: T,
   installed: T[],
-  candidates: (name: string) => Promise<T[]>,
+  candidates: (name: string, ranges: string[]) => Promise<T[]> | AsyncIterable<T>,
 ): Promise<T[]> {
   const fixed = new Map(installed.filter(({ name }) => name !== root.name).map((plugin) => [plugin.name, plugin]));
   fixed.set(root.name, root);
-  const cache = new Map<string, T[]>();
+  const cache = new Map<string, { plugins: T[]; iterator: Iterator<T> | AsyncIterator<T>; done: boolean }>();
+  const matchingCandidates = async function* (name: string, ranges: string[]): AsyncGenerator<T> {
+    const key = JSON.stringify([name, ...new Set(ranges.sort())]);
+    if (!cache.has(key)) {
+      const source = await candidates(name, ranges);
+      cache.set(key, {
+        plugins: [],
+        iterator: Array.isArray(source) ? source[Symbol.iterator]() : source[Symbol.asyncIterator](),
+        done: false,
+      });
+    }
+    const entry = cache.get(key);
+    for (let index = 0; ; index++) {
+      if (index === entry.plugins.length && !entry.done) {
+        const next = await entry.iterator.next();
+        if (next.done) entry.done = true;
+        else entry.plugins.push(next.value);
+      }
+      if (index === entry.plugins.length) return;
+      const plugin = entry.plugins[index];
+      if (ranges.every((range) => semver.satisfies(plugin.version, range))) yield plugin;
+    }
+  };
   let attempts = 0;
   const solve = async (selected: Map<string, T>): Promise<T[]> => {
     if (++attempts > 1000 || selected.size > 100)
@@ -78,12 +100,11 @@ export async function resolvePluginDependencies<T extends DependencyPlugin>(
           );
         continue;
       }
-      if (!cache.has(name)) cache.set(name, await candidates(name));
-      const options = cache
-        .get(name)
-        .filter((plugin) => requirements.every(({ range }) => semver.satisfies(plugin.version, range)));
       let lastError: unknown;
-      for (const option of options) {
+      for await (const option of matchingCandidates(
+        name,
+        requirements.map(({ range }) => range),
+      )) {
         try {
           return await solve(new Map([...selected, [name, option]]));
         } catch (error) {

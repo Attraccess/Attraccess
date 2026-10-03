@@ -316,6 +316,11 @@ export function PluginsSection() {
   const installApprovalToken = hasDependencies
     ? dependencyPlan?.token
     : pluginToInstall && `${pluginToInstall.registry.id}:${pluginToInstall.name}@${pluginToInstall.version}`;
+  const installPlanRoot = hasDependencies
+    ? dependencyPlan?.plugins.find(
+        (plugin) => plugin.name === pluginToInstall?.name && plugin.version === pluginToInstall?.version,
+      )
+    : undefined;
   const installApproved = Boolean(installApprovalToken && approvedInstallPlanToken === installApprovalToken);
   const dependencyChangesApproved = Boolean(versionPlan && approvedVersionPlanToken === versionPlan.token);
   const removalApprovalToken = JSON.stringify(removalPlan?.map(({ name, version }) => ({ name, version })));
@@ -1180,18 +1185,23 @@ export function PluginsSection() {
         <ModalBody>
           {pluginToInstall ? (
             <div className="flex flex-col gap-3">
-              <PluginClassificationBadge classification={pluginToInstall.classification} />
+              <PluginClassificationBadge
+                classification={installPlanRoot?.classification ?? pluginToInstall.classification}
+              />
               <p>{t('marketplace.installDescription')}</p>
-              <p>{t('marketplace.source', { registry: pluginToInstall.registry.url })}</p>
-              <p>{t('marketplace.version', { version: pluginToInstall.version ?? '-' })}</p>
+              <p>
+                {t('marketplace.source', { registry: installPlanRoot?.registryUrl ?? pluginToInstall.registry.url })}
+              </p>
+              <p>{t('marketplace.version', { version: installPlanRoot?.version ?? pluginToInstall.version ?? '-' })}</p>
               <p>
                 {t('marketplace.permissions', {
-                  permissions: pluginToInstall.permissions.join(', ') || t('noPermissions'),
+                  permissions:
+                    (installPlanRoot?.permissions ?? pluginToInstall.permissions).join(', ') || t('noPermissions'),
                 })}
               </p>
               {hasDependencies ? (
                 <DependencyPlanDetails
-                  dependencies={pluginToInstall.dependencies ?? []}
+                  dependencies={installPlanRoot?.dependencies ?? pluginToInstall.dependencies ?? []}
                   plan={dependencyPlan}
                   error={dependencyError(planError)}
                   loading={isResolvingDependencies}

@@ -534,6 +534,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     const stateHash = createHash('sha256').update(JSON.stringify(readInstalledNpmPlugins())).digest('hex');
     const installed = this.listInstalled();
     const metadataCache = new Map<string, Awaited<ReturnType<NpmPluginService['resolveVersion']>>['metadata']>();
+    const pluginCache = new Map<string, ResolvedPlugin>();
     const { version, metadata } = await this.resolveVersion(name, spec, registry);
     metadataCache.set(name, metadata);
     const fromMetadata = async (
@@ -541,6 +542,8 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
       version: string,
       metadata: Awaited<ReturnType<NpmPluginService['resolveVersion']>>['metadata'],
     ): Promise<ResolvedPlugin> => {
+      const key = JSON.stringify([packageName, version]);
+      if (pluginCache.has(key)) return pluginCache.get(key);
       const published = metadata.versions?.[version] as PackageVersion & { attraccess?: unknown };
       let value: unknown = published;
       if (published?.attraccess === undefined) {
@@ -571,7 +574,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
       if (details.name !== packageName || details.version !== version)
         throw new BadRequestException('Registry metadata identity does not match the dependency');
       const current = installed.find((plugin) => plugin.name === packageName);
-      return {
+      const resolved: ResolvedPlugin = {
         name: packageName,
         registryUrl: registry.url,
         version,
@@ -582,6 +585,8 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         classification: details.classification,
         action: current ? 'replace' : 'install',
       };
+      pluginCache.set(key, resolved);
+      return resolved;
     };
     const root = await fromMetadata(name, version, metadata);
     const existing: ResolvedPlugin[] = installed.map((plugin) => ({
@@ -591,22 +596,23 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
       action: 'reuse',
       integrity: plugin.integrity,
     }));
-    const plugins = await resolvePluginDependencies(root, existing, async (dependencyName) => {
-      const data =
-        metadataCache.get(dependencyName) ??
-        ((await this.packageMetadata(dependencyName, registry.id)) as typeof metadata);
-      metadataCache.set(dependencyName, data);
-      const candidates: ResolvedPlugin[] = [];
+    const dependencyMetadata = async (dependencyName: string) => {
+      if (!metadataCache.has(dependencyName))
+        metadataCache.set(dependencyName, (await this.packageMetadata(dependencyName, registry.id)) as typeof metadata);
+      return metadataCache.get(dependencyName);
+    };
+    const plugins = await resolvePluginDependencies(root, existing, async function* (dependencyName, ranges) {
+      const data = await dependencyMetadata(dependencyName);
       for (const version of Object.keys(data.versions ?? {})
         .filter((version) => semver.valid(version))
+        .filter((version) => ranges.every((range) => semver.satisfies(version, range)))
         .sort(semver.rcompare)) {
         try {
-          candidates.push(await fromMetadata(dependencyName, version, data));
+          yield await fromMetadata(dependencyName, version, data);
         } catch {
           // Invalid releases are excluded, as with incompatible metadata.
         }
       }
-      return candidates;
     });
     for (const plugin of plugins.filter((plugin) => plugin.action === 'reuse')) {
       const current = installed.find(({ name }) => name === plugin.name);

@@ -1243,6 +1243,28 @@ describe('plugin dependency confirmations', () => {
     await user.click(within(dialog).getByRole('checkbox'));
     expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
   });
+  it('shows refreshed root permissions and classification before renewed approval', async () => {
+    hoisted.dependencyPlan = { root: provider.name, token: 'original-plan', plugins: [core, adapter, provider] };
+    const { user, rerender } = await openProvider();
+    await user.click(screen.getByRole('button', { name: 'Install' }));
+    const dialog = (await screen.findByRole('heading', { name: `Install ${provider.displayName}?` })).closest(
+      '[role="dialog"]',
+    ) as HTMLElement;
+    await user.click(within(dialog).getByRole('checkbox'));
+
+    hoisted.dependencyPlan = {
+      root: provider.name,
+      token: 'changed-root-plan',
+      plugins: [core, adapter, { ...provider, permissions: ['MANAGE_USERS'], classification: 'official' }],
+    };
+    rerender(<PluginsSection />);
+    expect(within(dialog).getByRole('checkbox')).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeDisabled();
+    expect(within(dialog).getByText('Requested permissions: MANAGE_USERS')).toBeInTheDocument();
+    expect(within(dialog).getByText('Official')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('checkbox'));
+    expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
+  });
 
   it('requires explicit approval of all dependants before removing a dependency', async () => {
     hoisted.plugins = [makePlugin({ name: core.name, id: 'core-id' })];

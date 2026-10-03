@@ -33,7 +33,7 @@ describe('plugin dependency graph', () => {
     const resolved = await resolvePluginDependencies(root, [plugin('core')], candidates);
     expect(resolved.map(({ name }) => name)).toEqual(['core', 'left', 'right', 'provider']);
     expect(resolved.find(({ name }) => name === 'left').version).toBe('1.0.0');
-    expect(candidates).not.toHaveBeenCalledWith('core');
+    expect(candidates.mock.calls.map(([name]) => name)).not.toContain('core');
   });
 
   it('rejects cycles, range conflicts, missing packages and incompatible updates', async () => {
