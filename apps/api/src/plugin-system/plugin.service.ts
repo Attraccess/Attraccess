@@ -193,6 +193,10 @@ export class PluginService {
     PluginService.bootGuardSignalHandlers = {};
   }
 
+  public static pluginQuarantineError(pluginDirectory: string): string | undefined {
+    return PluginService.pluginFailures.get(pluginDirectory)?.message;
+  }
+
   public static clearPluginQuarantine(pluginDirectory: string): void {
     const failure = PluginService.pluginFailures.get(pluginDirectory);
     if (!failure) return;

@@ -73,9 +73,11 @@ function primeManifest(options: ManifestOptions = {}) {
     },
   };
   hoisted.refetchMock.mockResolvedValue({ data: [manifest] });
-  hoisted.getRemoteMock.mockResolvedValue({ default: function () {
-    return createFakePlugin(name, options.routes ?? []);
-  } });
+  hoisted.getRemoteMock.mockResolvedValue({
+    default: function () {
+      return createFakePlugin(name, options.routes ?? []);
+    },
+  });
   return { name, manifest };
 }
 
@@ -99,7 +101,7 @@ describe('PluginProvider', () => {
     render(
       <PluginProvider>
         <div>app-shell</div>
-      </PluginProvider>
+      </PluginProvider>,
     );
     expect(screen.getByText('app-shell')).toBeInTheDocument();
   });
@@ -110,7 +112,7 @@ describe('PluginProvider', () => {
     render(
       <PluginProvider>
         <div>core route</div>
-      </PluginProvider>
+      </PluginProvider>,
     );
 
     expect(screen.getByText('core route')).toBeInTheDocument();
@@ -122,20 +124,17 @@ describe('PluginProvider', () => {
     render(
       <PluginProvider>
         <div>app-shell</div>
-      </PluginProvider>
+      </PluginProvider>,
     );
 
     await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
 
-    expect(hoisted.setRemoteMock).toHaveBeenCalledWith(
-      name,
-      expect.objectContaining({ format: 'esm', from: 'vite' })
-    );
+    expect(hoisted.setRemoteMock).toHaveBeenCalledWith(name, expect.objectContaining({ format: 'esm', from: 'vite' }));
     expect(hoisted.getRemoteMock).toHaveBeenCalledWith(name, './plugin');
 
     const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
     await expect(remoteConfig.url()).resolves.toBe(
-      `http://test.local/api/plugins/${name}/frontend/module-federation/index.js?v=1.0.0`
+      `http://test.local/api/plugins/${name}/frontend/module-federation/index.js?v=1.0.0`,
     );
   });
 
@@ -214,13 +213,13 @@ describe('PluginProvider', () => {
 
     const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
     await expect(remoteConfig.url()).resolves.toBe(
-      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/index.js?v=1.0.0'
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/index.js?v=1.0.0',
     );
     const styleLink = appendChild.mock.calls.find(([node]) => node instanceof HTMLLinkElement)?.[0];
     expect(styleLink).toHaveAttribute('id', `plugin-styles-${name}`);
     expect(styleLink).toHaveAttribute(
       'href',
-      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/style.css?v=1.0.0'
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/style.css?v=1.0.0',
     );
   });
 
@@ -246,7 +245,7 @@ describe('PluginProvider', () => {
     const instance = usePluginState.getState().plugins[0].plugin;
     await waitFor(() => expect(instance.onApiEndpointChange).toHaveBeenCalledWith('http://test.local'));
     expect(instance.onApiAuthStateChange).toHaveBeenCalledWith(
-      expect.objectContaining({ authToken: '', user: hoisted.user })
+      expect.objectContaining({ authToken: '', user: hoisted.user }),
     );
   });
 
@@ -280,7 +279,7 @@ describe('PluginProvider', () => {
     render(
       <PluginProvider>
         <div>app-shell</div>
-      </PluginProvider>
+      </PluginProvider>,
     );
 
     await waitFor(() => expect(consoleError).toHaveBeenCalled());
@@ -305,7 +304,10 @@ describe('PluginProvider', () => {
 
     await waitFor(() => expect(hoisted.toastWarningMock).toHaveBeenCalled());
     expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Plugin "BrokenPlugin" is disabled', description: expect.stringContaining('startup failed') }),
+      expect.objectContaining({
+        title: 'Plugin "BrokenPlugin" is disabled',
+        description: expect.stringContaining('startup failed'),
+      }),
     );
     expect(hoisted.getRemoteMock).not.toHaveBeenCalled();
   });
@@ -318,8 +320,7 @@ describe('PluginProvider', () => {
           authRequired: false,
           element: (
             <div>
-              Plugin Page A
-              <Link to="/plugin-b">Go to B</Link>
+              Plugin Page A<Link to="/plugin-b">Go to B</Link>
             </div>
           ),
         },
@@ -330,9 +331,10 @@ describe('PluginProvider', () => {
     render(<PluginProvider />);
     await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
 
-    const routes = usePluginState
-      .getState()
-      .plugins.flatMap((p) => p.plugin.getRoutes?.() ?? []) as Array<{ path: string; element: React.ReactNode }>;
+    const routes = usePluginState.getState().plugins.flatMap((p) => p.plugin.getRoutes?.() ?? []) as Array<{
+      path: string;
+      element: React.ReactNode;
+    }>;
 
     const user = userEvent.setup();
     render(
@@ -342,11 +344,117 @@ describe('PluginProvider', () => {
             <Route key={route.path} path={route.path} element={route.element} />
           ))}
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('Plugin Page A')).toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Go to B' }));
     expect(screen.getByText('Plugin Page B')).toBeInTheDocument();
+  });
+});
+
+describe('required frontend dependencies', () => {
+  const manifest = (name: string, dependencies: string[] = []) => ({
+    name,
+    version: '1.0.0',
+    status: 'loaded',
+    dependencies: dependencies.map((name) => ({ name, version: '^1', required: true })),
+    main: { frontend: { entryPoint: 'index.js' } },
+  });
+  it('loads a dependency frontend before its dependant', async () => {
+    hoisted.refetchMock.mockResolvedValue({ data: [manifest('provider', ['core']), manifest('core')] });
+    hoisted.getRemoteMock.mockImplementation(async (name) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(2));
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core', 'provider']);
+  });
+  it('loads unrelated plugins while a required remote is still pending, loading shared dependencies once', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        manifest('provider', ['core']),
+        manifest('second-provider', ['core']),
+        manifest('core'),
+        manifest('independent'),
+      ],
+    });
+    let finishCore: (value: unknown) => void;
+    const coreRemote = new Promise((resolve) => {
+      finishCore = resolve;
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) =>
+      name === 'core'
+        ? coreRemote
+        : {
+            default: function () {
+              return createFakePlugin(name);
+            },
+          },
+    );
+    render(<PluginProvider />);
+
+    try {
+      await waitFor(() => expect(usePluginState.getState().plugins.map(({ name }) => name)).toEqual(['independent']));
+      expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core', 'independent']);
+    } finally {
+      finishCore({
+        default: function () {
+          return createFakePlugin('core');
+        },
+      });
+    }
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(4));
+    expect(hoisted.getRemoteMock.mock.calls.filter(([name]) => name === 'core')).toHaveLength(1);
+  });
+  it('rejects dependency cycles without blocking independent plugins', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [manifest('a', ['b']), manifest('b', ['a']), manifest('independent')],
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins.map(({ name }) => name)).toEqual(['independent']));
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['independent']);
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin "a" is disabled' }));
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin "b" is disabled' }));
+  });
+  it('skips a dependant after a dependency frontend fails and explains the failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    hoisted.refetchMock.mockResolvedValue({ data: [manifest('provider', ['core']), manifest('core')] });
+    hoisted.getRemoteMock.mockRejectedValue(new Error('core remote unavailable'));
+    render(<PluginProvider />);
+    await waitFor(() =>
+      expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Plugin "provider" is disabled',
+          description: expect.stringContaining('core failed to load'),
+        }),
+      ),
+    );
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core']);
+    expect(usePluginState.getState().plugins).toHaveLength(0);
+  });
+  it('allows a required plugin with only a backend and rejects missing dependencies', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [manifest('provider', ['core']), { ...manifest('core'), main: {} }, manifest('broken', ['missing'])],
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+    render(<PluginProvider />);
+    await waitFor(() =>
+      expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Plugin "broken" is disabled' }),
+      ),
+    );
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['provider']);
   });
 });

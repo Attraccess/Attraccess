@@ -9,7 +9,7 @@ import { PluginService } from './plugin.service';
 
 describe('npm plugin request DTOs (HTTP integration)', () => {
   let app: INestApplication;
-const npmPluginService = {
+  const npmPluginService = {
     addRegistry: jest.fn(),
     install: jest.fn(),
     listInstalled: jest.fn(),
@@ -80,9 +80,15 @@ const npmPluginService = {
 
     await request(app.getHttpServer())
       .post('/api/plugins/npm/example/versions/1.2.3')
-      .send({ registryId: 'private' })
+      .send({ registryId: 'private', planToken: 'confirmed-dependency-plan' })
       .expect(201);
-    expect(npmPluginService.install).toHaveBeenCalledWith('example', '1.2.3', 'private', expect.any(Object));
+    expect(npmPluginService.install).toHaveBeenCalledWith(
+      'example',
+      '1.2.3',
+      'private',
+      expect.any(Object),
+      'confirmed-dependency-plan',
+    );
 
     await request(app.getHttpServer())
       .post('/api/plugins/installed/example/update-policy')
@@ -92,7 +98,11 @@ const npmPluginService = {
 
     await request(app.getHttpServer())
       .post('/api/plugins/installed/example/versions/1.2.3')
-      .send({ approvedPermissionAdditions: ['resources.read'], approvedMajorVersion: true })
+      .send({
+        approvedPermissionAdditions: ['resources.read'],
+        approvedMajorVersion: true,
+        planToken: 'confirmed-update-plan',
+      })
       .expect(201);
     expect(npmPluginService.replaceInstalled).toHaveBeenCalledWith(
       'example',
@@ -100,6 +110,7 @@ const npmPluginService = {
       ['resources.read'],
       true,
       expect.any(Object),
+      'confirmed-update-plan',
     );
   });
 
