@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { useState } from 'react';
 import { LogViewer } from './index';
 type Log = { id: number; flowRunId: string; nodeId?: string; type: string; createdAt: string; payload?: string };
 const state = vi.hoisted(() => ({
@@ -53,10 +54,18 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
+function Viewer() {
+  const [confettiEnabled, setConfettiEnabled] = useState(false);
+  return (
+    <LogViewer resourceId={7} confettiEnabled={confettiEnabled} onConfettiEnabledChange={setConfettiEnabled}>
+      {(open) => <button onClick={open}>View logs</button>}
+    </LogViewer>
+  );
+}
 async function open() {
   render(
     <MemoryRouter>
-      <LogViewer resourceId={7}>{(open) => <button onClick={open}>View logs</button>}</LogViewer>
+      <Viewer />
     </MemoryRouter>,
   );
   fireEvent.click(screen.getByText('View logs'));
@@ -64,6 +73,13 @@ async function open() {
 }
 it('starts a recording using the selected duration and refreshes its status', async () => {
   await open();
+  const confetti = screen.getByRole('button', { name: 'confetti' });
+  expect(confetti).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(confetti);
+  expect(confetti).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(confetti);
+  expect(confetti).toHaveAttribute('aria-pressed', 'false');
+  expect(state.start).not.toHaveBeenCalled();
   expect(screen.getByText('recording.hint')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /recording.duration$/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'duration.h1' }));

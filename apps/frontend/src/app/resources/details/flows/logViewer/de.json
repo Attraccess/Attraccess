@@ -1,6 +1,7 @@
 {
   "title": "Flow Logs",
   "subtitle": "Logs werden nur während einer Aufzeichnung gesammelt und danach gelöscht",
+  "confetti": "Konfetti für diesen Besuch aktivieren",
   "recording": {
     "start": "Aufzeichnung starten",
     "stop": "Aufzeichnung stoppen",

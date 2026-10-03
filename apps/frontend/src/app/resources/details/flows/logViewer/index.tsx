@@ -11,6 +11,7 @@ import {
   DrawerBody,
   DrawerHeader,
   TextArea,
+  ToggleButton,
   useOverlayState,
 } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -29,7 +30,7 @@ import {
   useResourceFlowsServiceStopFlowLogRecording,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { CircleStopIcon, CircleDotIcon } from 'lucide-react';
+import { CircleStopIcon, CircleDotIcon, PartyPopperIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import de from './de.json';
@@ -42,6 +43,8 @@ import { useFlowContext } from '../flowContext';
 interface Props {
   children: (open: () => void) => React.ReactNode;
   resourceId: number;
+  confettiEnabled: boolean;
+  onConfettiEnabledChange: (enabled: boolean) => void;
 }
 
 const DURATION_OPTIONS = [
@@ -261,6 +264,15 @@ export function LogViewer(props: Props) {
                 </>
               )}
             </div>
+
+            <ToggleButton
+              className="self-start"
+              isSelected={props.confettiEnabled}
+              onChange={props.onConfettiEnabledChange}
+            >
+              <PartyPopperIcon />
+              {t('confetti')}
+            </ToggleButton>
 
             {!isRecording && <EmptyState message={t('recording.hint')} />}
             {isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.waiting')} />}
