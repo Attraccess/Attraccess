@@ -10,7 +10,7 @@ import {
   Select,
   TextField,
 } from '@heroui/react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   changeControllerNetwork,
@@ -55,19 +55,18 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
     retry: false,
   });
   const servers = useQuery({ queryKey: ['mqtt', 'servers'], queryFn: listMqttServers, retry: false });
-  const [targetHost, setTargetHost] = useState(''),
-    [server, setServer] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const [editedTargetHost, setTargetHost] = useState<string | undefined>(),
+    [editedServer, setServer] = useState<string | null | undefined>();
   const status = statusQuery.data,
     operation = status?.operation;
   const pending = !!operation && operation.phase !== 'completed';
   const editable = !pending || (operation?.phase === 'connecting' && !!operation.failure && !operation.running);
-  useEffect(() => {
-    if (!status || initialized) return;
-    setTargetHost(pending && operation ? operation.targetHost : (status.targetHost ?? ''));
-    setServer(String((pending && operation ? operation.mqttServerId : status.mqttServerId) ?? 'address'));
-    setInitialized(true);
-  }, [initialized, operation, pending, status]);
+  // Untouched fields follow fresh status; each deliberate edit survives refetches.
+  const targetHost = editedTargetHost ?? (pending && operation ? operation.targetHost : (status?.targetHost ?? ''));
+  const server =
+    editedServer !== undefined
+      ? editedServer
+      : String((pending && operation ? operation.mqttServerId : status?.mqttServerId) ?? 'address');
   const mutation = useMutation({
     mutationFn: (kind: 'apply' | 'retry' | 'retire') =>
       kind === 'retry'
@@ -80,6 +79,8 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
             }),
     onSuccess: async (value) => {
       client.setQueryData(queryKey, value);
+      setTargetHost(undefined);
+      setServer(undefined);
       await client.invalidateQueries({ queryKey: ['wago'] });
     },
     onError: async () => {

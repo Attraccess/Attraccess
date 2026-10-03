@@ -147,6 +147,53 @@ describe('WagoRuntime', () => {
     expect(await device.read(snapshot.physicalPoints[0])).toBe(true);
   });
 
+  it('retains image approval while retrying a failed failsafe shutdown', async () => {
+    const imageId = `sha256:${'a'.repeat(64)}`;
+    const store = new JsonStateStore(`/tmp/wago-policy-retry-${Date.now()}-${Math.random()}.json`);
+    const held = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' as const } }],
+    };
+    await store.save({
+      accepted: { revision: 1, contentHash: hash(held), snapshot: held },
+      outputs: { load: true },
+      commandIds: [],
+    });
+    await device.write(snapshot.physicalPoints[0], true);
+    const write = device.write.bind(device);
+    let shutdownAvailable = false;
+    jest.spyOn(device, 'write').mockImplementation(async (point, value) => {
+      if (!value && !shutdownAvailable) throw new Error('shutdown unavailable');
+      await write(point, value);
+    });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      runtimeImageId: imageId,
+      store,
+      transport,
+      device,
+    });
+    await runtime.start();
+    const heartbeat = transport.published.filter((item) => item.topic.endsWith('/heartbeat')).at(-1)?.payload as {
+      runtimePolicyToken: string;
+    };
+    await transport.send(desired, { runtimeImageId: imageId, runtimePolicyToken: heartbeat.runtimePolicyToken });
+    await transport.send(commands, validCommand({ id: 'shutdown-pending' }));
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({ payload: expect.objectContaining({ id: 'shutdown-pending', code: 'runtime_update' }) }),
+    );
+    shutdownAvailable = true;
+    await runtime.publishHeartbeat();
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(false);
+    expect(transport.published.filter((item) => item.topic.endsWith('/state')).at(-1)?.payload).toEqual(
+      expect.objectContaining({ readiness: expect.objectContaining({ ready: true }) }),
+    );
+    await transport.send(commands, validCommand({ id: 'shutdown-recovered' }));
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(true);
+  });
+
   it.each(['{', 'null', '{}', '{"id":"bad","channelId":"load","action":"unexpected"}'])(
     'ignores malformed command %s without performing device writes',
     async (payload) => {
@@ -1715,53 +1762,58 @@ describe('WagoRuntime', () => {
   }, 15000);
 
   it('does not let a stale pulse shutoff override a set command after changing to switched behavior', async () => {
-    let resolvePulseWrite: (() => void) | undefined;
-    let notifyPulseWriteStarted: (() => void) | undefined;
-    const pulseWriteStarted = new Promise<void>((resolve) => {
-      notifyPulseWriteStarted = resolve;
-    });
-    const writes: boolean[] = [];
-    const delayedPulseDevice = {
-      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
-        writes.push(value);
-        if (writes.length === 1) {
-          notifyPulseWriteStarted?.();
-          await new Promise<void>((resolve) => {
-            resolvePulseWrite = resolve;
-          });
-        }
-      },
-      read: async () => false,
-    };
-    runtime = new WagoRuntime({
-      hardwareId: 'cc100-1',
-      prefix: 'attraccess/wago',
-      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
-      transport,
-      device: delayedPulseDevice,
-    });
-    await runtime.start();
-    await transport.send(desired, {
-      protocolVersion: 1,
-      revision: 1,
-      contentHash: hash(pulsedSnapshot),
-      snapshot: pulsedSnapshot,
-    });
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    try {
+      let resolvePulseWrite: (() => void) | undefined;
+      let notifyPulseWriteStarted: (() => void) | undefined;
+      const pulseWriteStarted = new Promise<void>((resolve) => {
+        notifyPulseWriteStarted = resolve;
+      });
+      const writes: boolean[] = [];
+      const delayedPulseDevice = {
+        write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+          writes.push(value);
+          if (writes.length === 1) {
+            notifyPulseWriteStarted?.();
+            await new Promise<void>((resolve) => {
+              resolvePulseWrite = resolve;
+            });
+          }
+        },
+        read: async () => false,
+      };
+      runtime = new WagoRuntime({
+        hardwareId: 'cc100-1',
+        prefix: 'attraccess/wago',
+        store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+        transport,
+        device: delayedPulseDevice,
+      });
+      await runtime.start();
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 1,
+        contentHash: hash(pulsedSnapshot),
+        snapshot: pulsedSnapshot,
+      });
 
-    const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
-    await pulseWriteStarted;
-    const replacement = transport.send(desired, {
-      protocolVersion: 1,
-      revision: 2,
-      contentHash: hash(snapshot),
-      snapshot,
-    });
-    resolvePulseWrite?.();
-    await Promise.all([pulse, replacement]);
-    await transport.send(commands, validCommand({ id: 'command-2', expectedConfigurationRevision: 2 }));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+      const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
+      await pulseWriteStarted;
+      const replacement = transport.send(desired, {
+        protocolVersion: 1,
+        revision: 2,
+        contentHash: hash(snapshot),
+        snapshot,
+      });
+      resolvePulseWrite?.();
+      await Promise.all([pulse, replacement]);
+      await transport.send(commands, validCommand({ id: 'command-2', expectedConfigurationRevision: 2 }));
+      await jest.advanceTimersByTimeAsync(20);
 
-    expect(writes).toEqual([true, true]);
+      expect(writes).toEqual([true, true]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('reports a feedback mismatch after the configured feedback timeout', async () => {

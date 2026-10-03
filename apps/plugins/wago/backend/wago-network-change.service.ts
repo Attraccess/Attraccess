@@ -124,24 +124,31 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
       const repository = this.context.getRepository(WagoMqttCredentialRetirement);
       for (const row of await repository.findBy({ controllerId })) {
         const previous = await this.context.getMqttServerConfig(row.mqttServerId);
-        // Different Attraccess IDs may point to the same broker. Never revoke a
-        // username on a possibly shared destination that is still in use.
-        if (
-          !previous ||
-          previous.host.toLowerCase().replace(/\.$/, '') === current.host.toLowerCase().replace(/\.$/, '')
-        )
-          throw new Error();
-        const destinations = await Promise.all([
-          lookup(previous.host, { all: true }),
-          lookup(current.host, { all: true }),
-        ]);
-        const address = (value: string) => value.toLowerCase().replace(/^::ffff:/, '');
-        if (
-          !destinations[0].length ||
-          !destinations[1].length ||
-          destinations[0].some((old) => destinations[1].some((now) => address(old.address) === address(now.address)))
-        )
-          throw new Error();
+        if (!previous) throw new Error();
+        // Duplicate server records and DNS aliases share the active credentials.
+        // Clear that redundant association without revoking the username in use.
+        const sameHost =
+          previous.host.toLowerCase().replace(/\.$/, '') === current.host.toLowerCase().replace(/\.$/, '');
+        let sharedDestination = sameHost;
+        if (!sameHost) {
+          const destinations = await Promise.all([
+            lookup(previous.host, { all: true }),
+            lookup(current.host, { all: true }),
+          ]);
+          const address = (value: string) => value.toLowerCase().replace(/^::ffff:/, '');
+          if (!destinations[0].length || !destinations[1].length) throw new Error();
+          sharedDestination = destinations[0].some((old) =>
+            destinations[1].some((now) => address(old.address) === address(now.address)),
+          );
+        }
+        if (sharedDestination) {
+          // Different listeners on a shared host may belong to distinct brokers.
+          // Keep ambiguous retirements retryable rather than revoking active credentials.
+          if (previous.port !== current.port || previous.useTls !== current.useTls) throw new Error();
+          await operations.assertOwned(access.fingerprint, owner);
+          await repository.delete({ controllerId, mqttServerId: row.mqttServerId });
+          continue;
+        }
         await operations.assertOwned(access.fingerprint, owner);
         const identity = `wago-controller-${controller.hardwareId}`;
         const result = await this.context
@@ -347,7 +354,8 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
             await this.phase(row, 'applying', assertOwned);
             if (
               payload.supersededDigest &&
-              (await host.command(`mqtt-release ${host.managementToken} ${payload.supersededDigest} ${digest}`)) !== 'OK\n'
+              (await host.command(`mqtt-release ${host.managementToken} ${payload.supersededDigest} ${digest}`)) !==
+                'OK\n'
             )
               throw new RuntimeUpdateError('recovery');
             if ((await host.command(`mqtt-apply ${host.managementToken} ${digest} ${bytes.length}`, bytes)) !== 'OK\n')

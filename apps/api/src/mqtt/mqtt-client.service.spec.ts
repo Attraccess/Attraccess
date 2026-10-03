@@ -478,11 +478,13 @@ describe('MqttClientService', () => {
         await new Promise(setImmediate);
         await jest.advanceTimersByTimeAsync(10_000);
         await failure;
+        expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(0);
         expect(replacement.end).not.toHaveBeenCalled();
         replacement.connected = true;
         replacement.emit('connect');
         expect(internal.clients.get(1)).toBe(replacement);
         expect(replacement.subscribe).toHaveBeenCalledWith('devices/#', { qos: 2 }, expect.any(Function));
+        expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(1);
       } finally {
         jest.useRealTimers();
       }

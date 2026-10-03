@@ -60,6 +60,7 @@ export class MqttClientService implements OnModuleDestroy {
     this.connectionCancellations.get(serverId)?.forEach((cancel) => cancel());
     this.connectionCancellations.delete(serverId);
     this.clients.delete(serverId);
+    this.updateHealthyServerCount();
     this.connectionPromises.delete(serverId);
     await this.getOrCreateClient(serverId, true);
   }

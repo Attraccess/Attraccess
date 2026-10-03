@@ -28,8 +28,13 @@ function configuration(): ModbusConfiguration {
   };
 }
 describe('Modbus persisted configuration', () => {
-  it('offers only the 879-3020 4PS map with the documented float registers', () => {
-    expect(BUILTIN_MODBUS_PROFILES.map((profile) => profile.id)).toEqual(['wago-879-3020']);
+  it('offers the 879-3020 4PS map alongside compatible legacy profiles', () => {
+    expect(BUILTIN_MODBUS_PROFILES.map((profile) => profile.id)).toEqual([
+      'wago-879-3020',
+      'wago-879-3000',
+      'wago-879-3000-unverified',
+      'wago-879-1300-unverified',
+    ]);
     const meter = BUILTIN_MODBUS_PROFILES[0];
     expect(meter.actions).toEqual([]);
     expect(

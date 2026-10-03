@@ -338,9 +338,11 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
   it('refreshes corrected broker settings after failed verification and retains the replacement across interruption', async () => {
     allowEvidence = false;
     const originalTimeout = setTimeout;
-    const timeout = jest.spyOn(global, 'setTimeout').mockImplementation((callback, milliseconds, ...args) =>
-      originalTimeout(callback, milliseconds === 120_000 ? 1 : milliseconds, ...args),
-    );
+    const timeout = jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation((callback, milliseconds, ...args) =>
+        originalTimeout(callback, milliseconds === 120_000 ? 1 : milliseconds, ...args),
+      );
     const first = service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
     const rejected = expect(first).rejects.toThrow('incomplete');
     await rejected;
@@ -359,16 +361,24 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
       supersededDigest: previousDigest,
     });
     expect(replacement.operationToken).not.toBe(JSON.parse(payloads[0].toString()).operationToken);
-    expect(jest.mocked(managedSsh).mock.calls.some((call) =>
-      call[2] === `mqtt-release ${call[0].token} ${previousDigest} ${createHash('sha256').update(payloads[1]).digest('hex')}`,
-    )).toBe(true);
+    expect(
+      jest
+        .mocked(managedSsh)
+        .mock.calls.some(
+          (call) =>
+            call[2] ===
+            `mqtt-release ${call[0].token} ${previousDigest} ${createHash('sha256').update(payloads[1]).digest('hex')}`,
+        ),
+    ).toBe(true);
     failure = null;
     allowEvidence = true;
     brokerHost = 'another-edit.test'; // An interrupted recreation must finish its durable replacement first.
     expect(await restarted.apply(1, null, principal, true)).toMatchObject({ operation: { phase: 'completed' } });
     expect(payloads[2]).toEqual(payloads[1]);
     expect(provision).toHaveBeenCalledTimes(2);
-    expect(JSON.stringify(await service.status(1)) + JSON.stringify(audit.mock.calls)).not.toContain('replacement-device-secret');
+    expect(JSON.stringify(await service.status(1)) + JSON.stringify(audit.mock.calls)).not.toContain(
+      'replacement-device-secret',
+    );
   });
 
   it('recovers an ambiguous acknowledgement after atomic address and broker commit', async () => {
@@ -430,9 +440,36 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
     expect(await service.retirePreviousCredentials(1, principal)).toMatchObject({ pendingCredentialRetirements: 0 });
   });
 
-  it('rejects old-credential retirement through an alias of the current broker', async () => {
+  it('clears redundant broker aliases without revoking the active credentials', async () => {
     await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
     jest.mocked(lookup).mockResolvedValue([{ address: '192.168.4.10', family: 4 }] as never);
+    await db.getRepository(WagoManagedAccess).update(1, { state: 'retired' });
+    expect(await service.retirePreviousCredentials(1, principal)).toMatchObject({ pendingCredentialRetirements: 0 });
+    expect(revoke).not.toHaveBeenCalled();
+    await expect(managed.assertRemovable(1)).resolves.toBeUndefined();
+  });
+
+  it('clears duplicate broker hostnames without requiring DNS or revoking credentials', async () => {
+    brokerHost = 'unreachable-old.test';
+    await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
+    jest.mocked(lookup).mockRejectedValue(new Error('DNS unavailable'));
+    expect(await service.retirePreviousCredentials(1, principal)).toMatchObject({ pendingCredentialRetirements: 0 });
+    expect(revoke).not.toHaveBeenCalled();
+  });
+
+  it('retains ambiguous shared-host retirements for different broker listeners', async () => {
+    await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
+    jest.mocked(lookup).mockResolvedValue([{ address: '192.168.4.10', family: 4 }] as never);
+    jest.mocked(context.getMqttServerConfig).mockImplementation(async (id) => ({
+      id,
+      host: 'shared.test',
+      name: 'Shared host',
+      username: null,
+      password: null,
+      clientId: null,
+      port: id === 1 ? 1883 : 1884,
+      useTls: false,
+    }));
     await expect(service.retirePreviousCredentials(1, principal)).rejects.toThrow('could not be retired');
     expect(revoke).not.toHaveBeenCalled();
     expect((await service.status(1)).pendingCredentialRetirements).toBe(1);

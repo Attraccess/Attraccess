@@ -92,6 +92,38 @@ it.each([
   );
 });
 
+it.each(['none', 'host', 'server'] as const)(
+  'refreshes cached endpoints while preserving the edited %s field',
+  async (edited) => {
+    client.setQueryData(['wago', 'network-change', 7], initial);
+    let resolve!: (value: NetworkChangeStatus) => void;
+    api.getNetworkChangeStatus.mockReturnValue(
+      new Promise<NetworkChangeStatus>((done) => {
+        resolve = done;
+      }),
+    );
+    const input = await mount(),
+      user = userEvent.setup();
+    if (edited === 'host') fireEvent.change(input, { target: { value: '192.168.2.50' } });
+    if (edited === 'server') {
+      await user.click(screen.getByRole('button', { name: 'Current server MQTT server' }));
+      await user.click(await screen.findByRole('option', { name: en.addressOnly }));
+    }
+    resolve({ ...initial, targetHost: '10.0.0.8', mqttServerId: 2 });
+    await waitFor(() =>
+      expect((input as HTMLInputElement).value).toBe(edited === 'host' ? '192.168.2.50' : '10.0.0.8'),
+    );
+    await screen.findByRole('button', { name: `${edited === 'server' ? en.addressOnly : 'New server'} MQTT server` });
+    await user.click(screen.getByRole('button', { name: edited === 'server' ? en.saveAddress : en.apply }));
+    await waitFor(() =>
+      expect(api.changeControllerNetwork).toHaveBeenCalledWith(7, {
+        targetHost: edited === 'host' ? '192.168.2.50' : '10.0.0.8',
+        mqttServerId: edited === 'server' ? null : 2,
+      }),
+    );
+  },
+);
+
 it('shows an actionable pinned-host failure and permits correcting an address before device mutation', async () => {
   api.getNetworkChangeStatus.mockResolvedValue({
     ...initial,

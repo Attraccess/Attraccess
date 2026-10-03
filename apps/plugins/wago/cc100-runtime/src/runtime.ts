@@ -119,7 +119,7 @@ export class WagoRuntime {
     }
     this.outputs.recoverPulses();
     this.loaded = true;
-    if (this.runtimeUpdateRequired) await this.applyRuntimeUpdateFailsafe();
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
     else await this.outputs.applyDisconnectPolicies(this.connected);
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
@@ -579,7 +579,7 @@ export class WagoRuntime {
     }
     const transition = this.connectionPolicies.then(async () => {
       this.connected = connected;
-      if (this.runtimeUpdateRequired) await this.applyRuntimeUpdateFailsafe();
+      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
       else await this.outputs.applyDisconnectPolicies(connected);
     });
     this.connectionPolicies = transition.catch(() => undefined);
@@ -598,7 +598,7 @@ export class WagoRuntime {
     this.heartbeatPublication = (async () => {
       do {
         this.heartbeatRefreshRequested = false;
-        if (this.runtimeUpdateRequired) await this.applyRuntimeUpdateFailsafe();
+        if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
         try {
           await this.publishOperational('heartbeat', {
             hardwareId: this.options.hardwareId,
@@ -1002,8 +1002,8 @@ export class WagoRuntime {
       await this.runConfigurationUpdate(() => this.outputs.applyRuntimeUpdateFailsafe());
       this.runtimeFailsafePending = false;
     } catch {
-      // Continue heartbeat/update transport and retry shutdown; never report ready.
-      this.runtimeUpdateRequired = true;
+      // The pending shutdown blocks readiness and is retried by heartbeats.
+      // Preserve any matching image approval received while hardware was unavailable.
     }
   }
   private async releaseFailedWrite(id: string, channelId: string): Promise<{ error: string; code: string }> {
