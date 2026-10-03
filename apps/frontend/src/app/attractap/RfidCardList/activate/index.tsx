@@ -44,7 +44,7 @@ export function NfcCardActivateModal(props: Props) {
       {activator(() => {
         open();
       })}
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen} dialogProps={{ 'aria-label': t('title') }}>
         <div data-cy="nfc-card-activate-modal" className="contents">
           <DrawerHeader>
             <h2 className="text-lg font-semibold">{t('title')}</h2>
