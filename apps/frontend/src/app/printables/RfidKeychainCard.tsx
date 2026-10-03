@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Spinner, TextField } from '@heroui/react';
 import { useTranslations, type TFunction } from '@attraccess/plugins-frontend-ui';
-import scadSource from './nfc-keychain-card.scad?raw';
+import scadSource from './rfid-keychain-card.scad?raw';
 import { Button } from '../../components/button';
 import { Select } from '../../components/select';
 import { AlertStatusIcon } from '../../components/AlertStatusIcon';
@@ -26,7 +26,7 @@ export function resolveErrorMessage(error: string | null, t: TFunction): string 
   return error === NO_OUTPUT_ERROR ? t('errorNoOutput') : error;
 }
 
-export function NfcKeychainCard() {
+export function RfidKeychainCard() {
   const { t } = useTranslations({ de, en });
   const [label, setLabel] = useState('Tobias J.');
   const [format, setFormat] = useState<DownloadFormat>('3mf');

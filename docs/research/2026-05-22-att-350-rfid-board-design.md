@@ -130,7 +130,7 @@ so read range is shorter, but the design is fully fabricated by JLC at
 no extra cost. Reference range target: ~5 cm for MIFARE / NTAG cards
 against the PN532's full TX power.
 
-Geometry (parametric in `libs/attractap-hw-shared/src/parts/nfc.tsx::NfcPcbAntenna`):
+Geometry (parametric in `libs/attractap-hw-shared/src/parts/rfid.tsx::NfcPcbAntenna`):
 
 | Field         | Value (v0)            |
 |---------------|-----------------------|

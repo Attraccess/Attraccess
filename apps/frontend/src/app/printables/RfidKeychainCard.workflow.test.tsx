@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { NfcKeychainCard } from './NfcKeychainCard';
+import { RfidKeychainCard } from './RfidKeychainCard';
 import type { CardRender, RenderStatus } from './useCardRender';
 import { NO_OUTPUT_ERROR } from './errors';
 const state = vi.hoisted(() => ({
@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 it('announces rendering and allows source downloads before a mesh exists', async () => {
-  render(<NfcKeychainCard />);
+  render(<RfidKeychainCard />);
   expect(screen.getByRole('status')).toHaveTextContent('rendering');
   expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
   fireEvent.change(screen.getByRole('textbox', { name: 'labelField' }), { target: { value: 'Workshop' } });
@@ -58,7 +58,7 @@ it('announces rendering and allows source downloads before a mesh exists', async
 it('downloads a ready mesh in the selected format', async () => {
   state.status = 'ready';
   state.result = renderedCard;
-  render(<NfcKeychainCard />);
+  render(<RfidKeychainCard />);
   expect(screen.getByText('Mesh preview')).toBeTruthy();
   expect(screen.getByRole('status')).toHaveTextContent('renderReady');
   fireEvent.click(screen.getByRole('button', { name: 'download' }));
@@ -74,7 +74,7 @@ it.each([NO_OUTPUT_ERROR, 'Model exceeds card dimensions'])(
     state.status = 'error';
     state.error = error;
     state.result = renderedCard;
-    render(<NfcKeychainCard />);
+    render(<RfidKeychainCard />);
     expect(screen.getByRole('alert')).toHaveTextContent(error === NO_OUTPUT_ERROR ? 'errorNoOutput' : error);
     expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
   },

@@ -42,7 +42,7 @@ The application is designed as a Progressive Web App (PWA) and also works on mob
 | **SMTP Server** | Email delivery (registration, notifications) |
 | **Reverse Proxy** | SSL termination, e.g. Nginx Proxy Manager or Traefik |
 | **MQTT Broker** | IoT integration (e.g. RabbitMQ, Mosquitto) |
-| **Attractap NFC Reader** | Physical NFC access control |
+| **Attractap RFID Reader** | Physical RFID access control |
 
 ## Next Steps
 

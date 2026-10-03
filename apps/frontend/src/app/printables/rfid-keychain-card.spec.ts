@@ -14,7 +14,7 @@ import { parseBinaryStl, type Mesh } from './stl';
 import { boundingBox } from './testBoundingBox';
 
 const PUBLIC_DIR = join(__dirname, '../../../public/openscad');
-const SCAD = readFileSync(join(__dirname, 'nfc-keychain-card.scad'), 'utf8');
+const SCAD = readFileSync(join(__dirname, 'rfid-keychain-card.scad'), 'utf8');
 
 interface RenderResult {
   mesh: Mesh | null;
@@ -95,7 +95,7 @@ function pocketWallZ(mesh: Mesh): number[] {
   return [...found].sort((a, b) => a - b);
 }
 
-describe('nfc-keychain-card.scad', () => {
+describe('rfid-keychain-card.scad', () => {
   it('renders a body of exactly 60 x 40 x 2 mm', async () => {
     const { mesh } = await render({ PART: 'body', LABEL: 'Makerspace' });
     expect(mesh).not.toBeNull();

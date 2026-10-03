@@ -73,6 +73,7 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
       }}
       data-cy="nfc-card-delete-modal"
       size="md"
+      dialogProps={{ 'aria-label': t('nfcCardsTable.deleteModal.title') }}
     >
       {({ close }) => (
         <>
@@ -219,6 +220,7 @@ const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
       {children(() => setShow(true))}
       <StandardDrawer
         isOpen={show}
+        dialogProps={{ 'aria-label': t('enrollModal.title') }}
         onOpenChange={(open) => {
           if (!open) close();
         }}
@@ -260,7 +262,7 @@ const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
   );
 };
 
-export function NfcCardList() {
+export function RfidCardList() {
   const { t } = useTranslations({
     de,
     en,

@@ -1,5 +1,5 @@
-// NFC board PN532 IC plus 24 WS2812 ring with discrete coil antenna and J_NFC
-// FEATURE: hardware/nfc — Phase 2 Attractap V2 board ATT-350
+// RFID board PN532 IC plus 24 WS2812 ring with discrete coil antenna and J_NFC
+// FEATURE: hardware/rfid — Phase 2 Attractap V2 board ATT-350
 
 import {
   AttraccessLogo,
@@ -152,7 +152,7 @@ export default () => (
     <hole diameter="3.2mm" {...at(3, 47)} />
     <hole diameter="3.2mm" {...at(47, 47)} />
 
-    <BoardLabel name="ATT-350 NFC" rev="v0" {...at(25, 3)} />
+    <BoardLabel name="ATT-350 RFID" rev="v0" {...at(25, 3)} />
     <AttraccessLogo {...at(7, 4.5)} scale={1.1} />
     <AttraccessLogo {...at(43, 4.5)} scale={1.1} />
     <Pin1Marker {...atBottom(32.2, 47)} />

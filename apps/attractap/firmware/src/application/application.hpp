@@ -7,7 +7,7 @@
 #include "../demo/demo_store.hpp"
 #endif
 
-#include "../nfc/nfc_contract.hpp"
+#include "../rfid/rfid_contract.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
 #include "../network/network.hpp"

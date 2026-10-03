@@ -1,10 +1,10 @@
-# NFC Cards
+# RFID Cards
 
-NFC cards are the physical keys that let users access machines and doors via Attractap readers. Each card is linked to a user account in Attraccess.
+RFID cards are the physical keys that let users access machines and doors via Attractap readers. Each card is linked to a user account in Attraccess.
 
-## How NFC Cards Work
+## How RFID Cards Work
 
-When a user holds an NFC card to an Attractap reader, the reader sends the card's unique ID to the Attraccess backend. The backend checks:
+When a user holds an RFID card to an Attractap reader, the reader sends the card's unique ID to the Attraccess backend. The backend checks:
 
 1. Is this card registered in the system?
 2. Which user account is the card linked to?
@@ -12,33 +12,33 @@ When a user holds an NFC card to an Attractap reader, the reader sends the card'
 
 If all checks pass, access is granted.
 
-## Managing NFC Cards
+## Managing RFID Cards
 
 ### Viewing All Cards
 
-1. Navigate to **NFC-Cards** in the sidebar
-2. You see a list of all registered NFC cards with their assigned users
+1. Navigate to **RFID-Cards** in the sidebar
+2. You see a list of all registered RFID cards with their assigned users
 
-<!-- TODO: Screenshot of the NFC Cards list -->
+<!-- TODO: Screenshot of the RFID Cards list -->
 
 ### Registering a New Card
 
-To register a new NFC card:
+To register a new RFID card:
 
-1. Navigate to **NFC-Cards** in the sidebar
-2. Click **Add NFC Card**
+1. Navigate to **RFID-Cards** in the sidebar
+2. Click **Add RFID Card**
 3. Select the user who should receive the card
-4. Hold the new NFC card to any connected Attractap reader
+4. Hold the new RFID card to any connected Attractap reader
 5. The card ID is automatically detected and registered
 
 > [!TIP]
 > You can also register a card directly from the user's profile page.
 
-<!-- TODO: Screenshot of the Add NFC Card dialog -->
+<!-- TODO: Screenshot of the Add RFID Card dialog -->
 
 ### Removing a Card
 
-1. Navigate to **NFC-Cards** in the sidebar
+1. Navigate to **RFID-Cards** in the sidebar
 2. Find the card you want to remove
 3. Click the **Delete** button
 4. Confirm the removal
@@ -48,7 +48,7 @@ To register a new NFC card:
 
 ## Multiple Cards Per User
 
-Each user can have multiple NFC cards linked to their account. This is useful when:
+Each user can have multiple RFID cards linked to their account. This is useful when:
 
 - A user needs a backup card
 - A user has different cards for different locations

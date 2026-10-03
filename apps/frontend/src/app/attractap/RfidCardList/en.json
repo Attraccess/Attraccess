@@ -1,7 +1,7 @@
 {
-  "nfcCards": "NFC Cards",
+  "nfcCards": "RFID Cards",
   "readers": "Attractap Readers",
-  "noNfcCardsFound": "No NFC Cards found",
+  "noNfcCardsFound": "No RFID Cards found",
   "nfcCardsTable": {
     "headers": {
       "id": "ID",
@@ -16,18 +16,18 @@
       "activate": "Activate"
     },
     "deleteModal": {
-      "title": "Delete NFC Card",
-      "description": "You are about to delete the NFC Card with the ID {{id}}. This action cannot be undone.",
+      "title": "Delete RFID Card",
+      "description": "You are about to delete the RFID Card with the ID {{id}}. This action cannot be undone.",
       "readerLabel": "Select Attractap",
       "readerPlaceholder": "Select a Attractap",
       "cancel": "Cancel",
       "delete": "Delete"
     }
   },
-  "enroll": "Enroll NFC Card",
+  "enroll": "Enroll RFID Card",
   "enrollModal": {
-    "title": "Enroll NFC Card",
-    "description": "To enroll a new NFC Card, choose a connected Attractap in the list below. Then click on the button \"Enroll new NFC Card\" and follow the instructions on the Attractap.",
+    "title": "Enroll RFID Card",
+    "description": "To enroll a new RFID Card, choose a connected Attractap in the list below. Then click on the button \"Enroll new RFID Card\" and follow the instructions on the Attractap.",
     "readerLabel": "Select Attractap",
     "readerPlaceholder": "Select a Attractap",
     "cancel": "Cancel",

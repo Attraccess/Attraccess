@@ -51,7 +51,7 @@ describe('AttractapService', () => {
     );
   });
 
-  it('notifies the card owner when an NFC card is registered', async () => {
+  it('notifies the card owner when an RFID card is registered', async () => {
     nfcCardRepository.manager.transaction.mockImplementation(async (callback) => {
       return callback({
         update: jest.fn().mockResolvedValue(undefined),
@@ -65,15 +65,15 @@ describe('AttractapService', () => {
       expect.objectContaining({
         category: NotificationCategory.NFC_CARDS,
         recipients: [user],
-        title: 'NFC card registered',
-        body: 'NFC card #7 was registered for your account.',
+        title: 'RFID card registered',
+        body: 'RFID card #7 was registered for your account.',
         url: '/attractap/nfc-cards',
         dedupeKey: 'nfc-card-7-registered',
       }),
     );
   });
 
-  it('notifies the card owner when an NFC card is activated', async () => {
+  it('notifies the card owner when an RFID card is activated', async () => {
     nfcCardRepository.manager.transaction.mockImplementation(async (callback) => {
       return callback({
         findOne: jest.fn().mockResolvedValue(card),
@@ -93,15 +93,15 @@ describe('AttractapService', () => {
       expect.objectContaining({
         category: NotificationCategory.NFC_CARDS,
         recipients: [user],
-        title: 'NFC card activated',
-        body: 'NFC card #7 was activated.',
+        title: 'RFID card activated',
+        body: 'RFID card #7 was activated.',
         url: '/attractap/nfc-cards',
         dedupeKey: 'nfc-card-7-activated',
       }),
     );
   });
 
-  it('notifies the card owner when an NFC card is deactivated', async () => {
+  it('notifies the card owner when an RFID card is deactivated', async () => {
     nfcCardRepository.update.mockResolvedValue({ affected: 1 } as never);
     nfcCardRepository.findOne.mockResolvedValue(card as never);
 
@@ -111,15 +111,15 @@ describe('AttractapService', () => {
       expect.objectContaining({
         category: NotificationCategory.NFC_CARDS,
         recipients: [user],
-        title: 'NFC card deactivated',
-        body: 'NFC card #7 was deactivated.',
+        title: 'RFID card deactivated',
+        body: 'RFID card #7 was deactivated.',
         url: '/attractap/nfc-cards',
         dedupeKey: 'nfc-card-7-deactivated',
       }),
     );
   });
 
-  it('notifies the card owner when an NFC card is deleted', async () => {
+  it('notifies the card owner when an RFID card is deleted', async () => {
     nfcCardRepository.findOne.mockResolvedValue(card as never);
     nfcCardRepository.delete.mockResolvedValue({ affected: 1 } as DeleteResult);
 
@@ -129,8 +129,8 @@ describe('AttractapService', () => {
       expect.objectContaining({
         category: NotificationCategory.NFC_CARDS,
         recipients: [user],
-        title: 'NFC card deleted',
-        body: 'NFC card #7 was deleted from your account.',
+        title: 'RFID card deleted',
+        body: 'RFID card #7 was deleted from your account.',
         url: '/attractap/nfc-cards',
         dedupeKey: 'nfc-card-7-deleted',
       }),

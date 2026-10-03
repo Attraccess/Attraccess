@@ -16,7 +16,7 @@ interface Props {
   cardId: number;
 }
 
-export function NfcCardActivateModal(props: Props) {
+export function NfcCardDeactivateModal(props: Props) {
   const { children: activator } = props;
 
   const queryClient = useQueryClient();
@@ -35,8 +35,8 @@ export function NfcCardActivateModal(props: Props) {
     },
   });
 
-  const onActivate = useCallback(() => {
-    mutate({ id: props.cardId, requestBody: { active: true } });
+  const onDeactivate = useCallback(() => {
+    mutate({ id: props.cardId, requestBody: { active: false } });
   }, [mutate, props.cardId]);
 
   return (
@@ -44,8 +44,8 @@ export function NfcCardActivateModal(props: Props) {
       {activator(() => {
         open();
       })}
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
-        <div data-cy="nfc-card-activate-modal" className="contents">
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen} dialogProps={{ 'aria-label': t('title') }}>
+        <div data-cy="nfc-card-deactivate-modal" className="contents">
           <DrawerHeader>
             <h2 className="text-lg font-semibold">{t('title')}</h2>
           </DrawerHeader>
@@ -54,8 +54,8 @@ export function NfcCardActivateModal(props: Props) {
             <Button variant="secondary" onPress={close}>
               {t('cancel')}
             </Button>
-            <Button variant="primary" onPress={onActivate} isPending={isPending}>
-              {t('activate')}
+            <Button variant="primary" onPress={onDeactivate} isPending={isPending}>
+              {t('deactivate')}
             </Button>
           </DrawerFooter>
         </div>
