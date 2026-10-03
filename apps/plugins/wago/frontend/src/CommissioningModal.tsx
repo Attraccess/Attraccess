@@ -361,10 +361,12 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
               )}
               {session?.state === 'awaiting_identity_confirmation' && (
                 <Checkbox isSelected={isolatedIdentity} onChange={setIsolatedIdentity}>
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Checkbox.Content>{t('commissioningUI.isolatedIdentity')}</Checkbox.Content>
+                  <Checkbox.Content className="wg:items-start">
+                    <Checkbox.Control className="wg:mt-0.5">
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                    {t('commissioningUI.isolatedIdentity')}
+                  </Checkbox.Content>
                 </Checkbox>
               )}
               {session && activeStep === 4 && session.state !== 'awaiting_identity_confirmation' && (
@@ -592,10 +594,12 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
             onChange={setConfirmRecovery}
             name="confirm-recovery"
           >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>{t('commissioningUI.approveCleanup')}</Checkbox.Content>
+            <Checkbox.Content className="wg:items-start">
+              <Checkbox.Control className="wg:mt-0.5">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              {t('commissioningUI.approveCleanup')}
+            </Checkbox.Content>
           </Checkbox>
         </div>
       )}
@@ -994,10 +998,12 @@ function CredentialFields({
         })}
       </p>
       <Checkbox isSelected={custom} isDisabled={isDisabled} onChange={onCustomChange}>
-        <Checkbox.Control>
-          <Checkbox.Indicator />
-        </Checkbox.Control>
-        <Checkbox.Content>{t('commissioningUI.advanced')}</Checkbox.Content>
+        <Checkbox.Content className="wg:items-start">
+          <Checkbox.Control className="wg:mt-0.5">
+            <Checkbox.Indicator />
+          </Checkbox.Control>
+          {t('commissioningUI.advanced')}
+        </Checkbox.Content>
       </Checkbox>
       {custom && (
         <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
@@ -1074,10 +1080,12 @@ function DeliveryStep({
             onChange={onConfirmInstallChange}
             name="confirm-install"
           >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>{t('commissioningUI.approveInstall')}</Checkbox.Content>
+            <Checkbox.Content className="wg:items-start">
+              <Checkbox.Control className="wg:mt-0.5">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              {t('commissioningUI.approveInstall')}
+            </Checkbox.Content>
           </Checkbox>
           <p className="wg:text-sm wg:text-muted">{t('commissioningUI.attemptApproval')}</p>
         </>

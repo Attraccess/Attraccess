@@ -5,6 +5,7 @@ import { AttractapService } from '../attractap.service';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import { AttractapFirmwareService } from '../firmware.service';
 import { SumUpService } from '../../billing/sumup.service';
+import { BillingService } from '../../billing/billing.service';
 import { LicenseService } from '../../license/license.service';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
@@ -94,6 +95,7 @@ describe('AttractapGateway', () => {
         { provide: UsersService, useValue: {} },
         { provide: AttractapFirmwareService, useValue: {} },
         { provide: SumUpService, useValue: {} },
+        { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
         { provide: LicenseService, useValue: licenseService },
         { provide: ResourceUsageService, useValue: {} },
         { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },

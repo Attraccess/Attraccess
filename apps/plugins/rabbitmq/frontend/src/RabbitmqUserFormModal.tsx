@@ -169,7 +169,12 @@ export function RabbitmqUserFormModal({
                       onChange={setGrantMqttDefaults}
                       data-cy="rabbitmq-user-form-mqtt-defaults-checkbox"
                     >
-                      {t('form.grant')}
+                      <Checkbox.Content className="rmq:items-start">
+                        <Checkbox.Control className="rmq:mt-0.5">
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                        {t('form.grant')}
+                      </Checkbox.Content>
                     </Checkbox>
                     <p className="rmq:text-xs rmq:text-default-500">{t('form.defaults', DEFAULT_MQTT_PERMISSIONS)}</p>
                     {grantMqttDefaults && (

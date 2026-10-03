@@ -52,6 +52,11 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsSession.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjects.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsForms.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsActionFeedback.cpp"
     ${ATTRACTAP_LATIN1_FONTS}
     "${FIRMWARE_DIR}/src/display/shared/pinInput/pinInputPage.cpp")
 target_include_directories(display-theme-host PRIVATE shims "${FIRMWARE_DIR}/src")
@@ -75,3 +80,14 @@ add_test(NAME display-theme-repeatability COMMAND "${CMAKE_COMMAND}"
     "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/repeatability"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_repeatability.cmake")
 set_tests_properties(display-theme-host display-theme-repeatability PROPERTIES TIMEOUT 120)
+
+# Exercise the production introducer parser with real ArduinoJson, not JSON shims.
+include(FetchContent)
+FetchContent_Declare(arduinojson
+    URL https://codeload.github.com/bblanchon/ArduinoJson/tar.gz/e868711b56df8c9db2967fed989bd795e81866a3
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+FetchContent_MakeAvailable(arduinojson)
+add_executable(resource-introducers-parser resource_introducers_test.cpp)
+target_include_directories(resource-introducers-parser PRIVATE "${FIRMWARE_DIR}/src")
+target_link_libraries(resource-introducers-parser PRIVATE ArduinoJson)
+add_test(NAME resource-introducers-parser COMMAND resource-introducers-parser)

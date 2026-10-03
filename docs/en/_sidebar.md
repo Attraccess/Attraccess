@@ -95,6 +95,7 @@
 - **Developer Guide**
   - [Overview](developer/overview.md)
   - [Architecture](developer/architecture.md)
+  - [API Log Destinations](developer/logging.md)
   - [API Reference](developer/api-reference.md)
   - [Contributing](developer/contributing.md)
 

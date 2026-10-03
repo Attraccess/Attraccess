@@ -71,6 +71,7 @@ public:
 
     // Global error popup helpers
     static void showErrorPopup(const std::string &title, const std::string &message);
+    static void showBillingSummary(const std::string &total);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
 
@@ -89,6 +90,7 @@ public:
     static void asyncCall(lv_async_cb_t cb, void *user_data);
 
 private:
+    static void showMessagePopup(const std::string &title, const std::string &message, bool error);
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.

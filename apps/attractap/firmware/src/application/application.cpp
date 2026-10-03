@@ -254,7 +254,13 @@ void Application::setup() {
       const auto &result = payload->result;
       if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
         self->finishReaderAction(result.success);
-        if (result.success) self->onActionResult(result.type);
+        if (result.success) {
+          self->onActionResult(result.type);
+          if (!result.billingTotal.empty()) {
+            self->restartSessionTimeout();
+            Display::showBillingSummary(result.billingTotal);
+          }
+        }
         else {
           self->handleFormsCancel();
           if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {

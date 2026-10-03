@@ -121,8 +121,18 @@ describe('ResourceIntroducersService', () => {
     });
 
     it('lists both roles granted to the same user', async () => {
-      const introducer = { id: 1, userId: 10, type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer;
-      const maintainer = { id: 2, userId: 10, type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer;
+      const introducer = {
+        id: 1,
+        userId: 10,
+        type: ResourceIntroducerType.INTRODUCER,
+        user: { id: 10 },
+      } as ResourceIntroducer;
+      const maintainer = {
+        id: 2,
+        userId: 10,
+        type: ResourceIntroducerType.MAINTAINER,
+        user: { id: 10 },
+      } as ResourceIntroducer;
       repository.find.mockResolvedValue([introducer, maintainer]);
 
       const result = await service.getMany(1);
@@ -157,8 +167,8 @@ describe('ResourceIntroducersService', () => {
         andWhere: jest.fn().mockReturnThis(),
         getRawAndEntities: jest.fn().mockResolvedValue({
           raw: [
-            { introducerId: 2, resourceId: 1 },
-            { introducerId: 2, resourceId: 2 },
+            { introducer_id: 2, resourceId: 1 },
+            { introducer_id: 2, resourceId: 2 },
           ],
           entities: [groupIntroducer],
         }),

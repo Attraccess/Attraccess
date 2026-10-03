@@ -36,6 +36,9 @@ vi.mock('../components/attraccessUserActionsBridge', () => ({
 vi.mock('../components/supervisorApproval/SupervisorApprovalListener', () => ({
   SupervisorApprovalListener: () => <p>Supervisor listener</p>,
 }));
+vi.mock('./billing/sessionSummary', () => ({
+  SessionBillingSummary: () => <p>Session billing listener</p>,
+}));
 vi.mock('../components/themeToggle', () => ({ ThemeToggle: () => <button>Theme</button> }));
 vi.mock('../components/bootScreen', () => ({ BootScreen: () => <p>Starting app</p> }));
 vi.mock('./unauthorized/unauthorized', () => ({ Unauthorized: () => <p>Sign in</p> }));
@@ -87,6 +90,7 @@ it('shows boot and theme controls before initialization, then routes the authent
   expect(screen.getByText('Starting app')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Theme' })).toBeInTheDocument();
   expect(screen.queryByText('Supervisor listener')).toBeNull();
+  expect(screen.queryByText('Session billing listener')).toBeNull();
   view.unmount();
   state.initialized = true;
   state.authenticated = true;
@@ -97,6 +101,7 @@ it('shows boot and theme controls before initialization, then routes the authent
   );
   expect(screen.getByText('Home route')).toBeInTheDocument();
   expect(screen.getByText('Supervisor listener')).toBeInTheDocument();
+  expect(screen.getByText('Session billing listener')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Theme' })).toBeNull();
   expect(state.sync).toHaveBeenCalled();
 });

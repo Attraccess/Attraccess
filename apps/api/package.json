@@ -46,6 +46,8 @@
     "uuid": "^14.0.0",
     "nestjs-asyncapi": "^1.4.0",
     "ws": "^8.19.0",
-    "zod": "^4.1.5"
+    "zod": "^4.1.5",
+    "winston": "^3.19.0",
+    "winston-transport": "^4.9.0"
   }
 }

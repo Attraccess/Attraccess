@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Label, Link } from '@heroui/react';
+import { Alert, Button, Checkbox, Link } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import type { ConfigurationEditorMetadata, ConfigurationImpact, ConfigurationValidationError } from './api';
 import {
@@ -51,11 +51,11 @@ function ImpactWarning({
           ))}
         </ul>
         <Checkbox isSelected={acknowledged} onChange={onChange}>
-          <Checkbox.Control>
-            <Checkbox.Indicator />
-          </Checkbox.Control>
-          <Checkbox.Content>
-            <Label>{t('revisions.accept')}</Label>
+          <Checkbox.Content className="wg:items-start">
+            <Checkbox.Control className="wg:mt-0.5">
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            {t('revisions.accept')}
           </Checkbox.Content>
         </Checkbox>
       </Alert.Content>

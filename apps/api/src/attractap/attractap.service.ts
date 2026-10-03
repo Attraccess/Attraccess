@@ -16,6 +16,11 @@ import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
 import { AuditService } from '../audit/audit.service';
+import { createTranslator } from '../i18n/translate';
+import * as en from './rfid-card-notification.en.json';
+import * as de from './rfid-card-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class AttractapService {
@@ -50,13 +55,8 @@ export class AttractapService {
     void this.notifications.dispatch({
       category: NotificationCategory.NFC_CARDS,
       recipients: [card.user],
-      title: `RFID card ${action}`,
-      body:
-        action === 'registered'
-          ? `RFID card #${card.id} was registered for your account.`
-          : action === 'deleted'
-            ? `RFID card #${card.id} was deleted from your account.`
-            : `RFID card #${card.id} was ${action}.`,
+      title: (recipient) => t(recipient.locale, `${action}Title`),
+      body: (recipient) => t(recipient.locale, `${action}Body`, { cardId: card.id }),
       url: '/attractap/nfc-cards',
       dedupeKey: `nfc-card-${card.id}-${action}`,
     }).catch((error) => {

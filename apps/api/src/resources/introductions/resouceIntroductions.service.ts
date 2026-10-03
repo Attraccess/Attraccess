@@ -225,13 +225,14 @@ export class ResourceIntroductionsService {
     return hasValid;
   }
 
-  public async getMany(resourceId: number): Promise<ResourceIntroduction[]> {
+  public async getMany(resourceId: number, includeGroups = false): Promise<ResourceIntroduction[]> {
     this.logger.debug(`Getting all introductions for resourceId: ${resourceId}`);
     const introductions = await this.resourceIntroductionRepository.find({
-      where: {
-        resource: { id: resourceId },
-      },
-      relations: ['receiverUser', 'tutorUser', 'history'],
+      where: includeGroups
+        ? [{ resource: { id: resourceId } }, { resourceGroup: { resources: { id: resourceId } } }]
+        : { resource: { id: resourceId } },
+      relations: ['receiverUser', 'tutorUser', 'history', ...(includeGroups ? ['resourceGroup'] : [])],
+      cache: false,
     });
     this.logger.debug(`Found ${introductions.length} introductions for resource ${resourceId}`);
     return introductions;
