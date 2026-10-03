@@ -3,7 +3,7 @@ description: >
   Log in to GHCR (and Docker Hub, when credentials are supplied), read the
   Node.js version from .nvmrc, set up Buildx, and build+push the image.
   Callers are responsible for computing the tags list; this action handles
-  the mechanical setup. Omit the Docker Hub credentials to push to GHCR
+  the runtime build and mechanical setup. Omit the Docker Hub credentials to push to GHCR
   only; set push to "false" to build without pushing at all (fork PRs get
   neither registry credentials nor a writable GITHUB_TOKEN).
 
@@ -35,6 +35,9 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    # Required for every server image, including future callers of this action.
+    - uses: ./.github/actions/build-cc100-runtime
+
     - name: Login to GitHub Container Registry
       if: inputs.push == 'true'
       uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
