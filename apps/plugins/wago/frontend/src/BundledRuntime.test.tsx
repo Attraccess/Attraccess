@@ -44,7 +44,7 @@ describe('BundledRuntime', () => {
     const onSelectionChange = vi.fn();
     const { container } = render(<BundledRuntime onSelectionChange={onSelectionChange} />);
     await screen.findByText(/^Selected: 0.1.0/);
-    expect(onSelectionChange).toHaveBeenLastCalledWith(artifact);
+    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(artifact));
     expect(container.querySelector('input[type="file"]')).toBeNull();
     expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
       '/api/wago/runtime-artifacts/current',
