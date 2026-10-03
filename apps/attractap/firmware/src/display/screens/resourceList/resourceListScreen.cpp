@@ -173,7 +173,7 @@ void ResourceListScreen::loop() {
     sessionHeader.update();
     if (!footer) return;
     if (!successMessage.empty() && static_cast<int32_t>(successUntil - millis()) <= 0) successMessage.clear();
-    setLabelTextIfChanged(footer, !successMessage.empty() ? successMessage.c_str() : username.empty() ? "NFC-Karte auflegen oder Ressource öffnen" : "Ressource links: Details · Aktion rechts");
+    setLabelTextIfChanged(footer, !successMessage.empty() ? successMessage.c_str() : username.empty() ? "RFID-Karte auflegen oder Ressource öffnen" : "Ressource links: Details · Aktion rechts");
     if (footerShowsSuccess != !successMessage.empty()) {
         footerShowsSuccess = !successMessage.empty();
         lv_obj_set_style_text_color(footer, footerShowsSuccess ? DisplayTheme::success() : DisplayTheme::muted(), 0);

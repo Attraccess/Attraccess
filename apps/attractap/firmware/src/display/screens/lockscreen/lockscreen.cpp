@@ -25,7 +25,7 @@ void Lockscreen::init()
     lv_obj_set_x(label, 12);
     lv_obj_set_y(label, -57);
     lv_obj_set_align(label, LV_ALIGN_CENTER);
-    lv_label_set_text(label, "Bitte mit NFC \n        Karte/Tag anmelden");
+    lv_label_set_text(label, "Bitte mit RFID \n        Karte/Tag anmelden");
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
