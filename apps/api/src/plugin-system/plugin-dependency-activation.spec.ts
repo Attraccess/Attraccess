@@ -33,8 +33,28 @@ describe('plugin dependency activation', () => {
       }),
     );
     writeFileSync(
+      join(root, name, 'dist', 'fixture.json'),
+      JSON.stringify({ name, fail, loadOrderPath: join(root, '.load-order'), initOrderPath: join(root, '.init-order') }),
+    );
+    writeFileSync(
       join(root, name, 'dist', 'index.js'),
-      `require('fs').appendFileSync(${JSON.stringify(join(root, '.load-order'))}, ${JSON.stringify(name + '\n')}); ${fail ? "throw new Error('core crashed');" : `module.exports = { default: { register: () => ({ module: class TestModule {}, providers: [{ provide: 'lifecycle-${name}', useValue: { onModuleInit: () => require('fs').appendFileSync(${JSON.stringify(join(root, '.init-order'))}, ${JSON.stringify(name + '\n')}) } }] }) } };`}`,
+      String.raw`
+        const { appendFileSync } = require('fs');
+        const { name, fail, loadOrderPath, initOrderPath } = require('./fixture.json');
+        appendFileSync(loadOrderPath, name + '\n');
+        if (fail) throw new Error('core crashed');
+        module.exports = {
+          default: {
+            register: () => ({
+              module: class TestModule {},
+              providers: [{
+                provide: 'lifecycle-' + name,
+                useValue: { onModuleInit: () => appendFileSync(initOrderPath, name + '\n') },
+              }],
+            }),
+          },
+        };
+      `,
     );
   };
   it('loads required backends before their dependants even when discovery returns the opposite order', () => {
