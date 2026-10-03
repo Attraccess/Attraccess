@@ -143,6 +143,8 @@
     "usb": "^2.18.0",
     "uuid": "^14.0.1",
     "web-push": "^3.6.7",
+    "winston": "^3.19.0",
+    "winston-transport": "^4.9.0",
     "workbox-core": "^7.4.1",
     "workbox-expiration": "^7.4.1",
     "workbox-precaching": "^7.4.1",

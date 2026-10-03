@@ -5,12 +5,12 @@ import { loadEnv } from '@attraccess/env';
 import { join, resolve } from 'path';
 import { entities } from '@attraccess/database-entities';
 import * as migrations from './migrations';
+import { Logger } from '@nestjs/common';
 
 const storageEnv = loadEnv((z) => ({ STORAGE_ROOT: z.string().default(join(process.cwd(), 'storage')) }));
 const dbFile = resolve(join(storageEnv.STORAGE_ROOT, 'attraccess.sqlite'));
 
-// eslint-disable-next-line no-console
-console.log('dbFile', dbFile);
+new Logger('Database').log(`dbFile ${dbFile}`);
 
 const dbConfig: Partial<DataSourceOptions> = {
   synchronize: false,
