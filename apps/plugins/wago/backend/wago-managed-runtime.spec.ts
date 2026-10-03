@@ -474,7 +474,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
     },
   );
 
-  it.each(['committed', 'open', 'retiring', 'slow-preparation', 'slow-cutover', 'acceptance-failed', 'slow-policy', 'bootstrap-acceptance', 'stuck-cutover'] as const)(
+  it.each(['committed', 'open', 'new-server-runtime', 'retiring', 'slow-preparation', 'slow-cutover', 'acceptance-failed', 'slow-policy', 'bootstrap-acceptance', 'stuck-cutover'] as const)(
     'reconciles %s cutover with reboot proof before a new commit',
     async (remoteStatus) => {
       const current = await db.getRepository(WagoController).save(
@@ -506,7 +506,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
         }),
       );
       await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'recovery_required' });
+      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: remoteStatus === 'new-server-runtime' ? 'verified' : 'recovery_required' });
       const now = Date.now();
       service['heartbeats'].set(1, {
         imageId: artifact.imageId,
@@ -548,7 +548,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
         expect((await service.sessionStatus(1)).management).toBe('retiring');
         return;
       }
-      const open = remoteStatus === 'open' || remoteStatus === 'slow-preparation' || remoteStatus === 'slow-cutover' || remoteStatus === 'acceptance-failed' || remoteStatus === 'slow-policy' || remoteStatus === 'bootstrap-acceptance';
+      const open = remoteStatus === 'new-server-runtime' || remoteStatus === 'open' || remoteStatus === 'slow-preparation' || remoteStatus === 'slow-cutover' || remoteStatus === 'acceptance-failed' || remoteStatus === 'slow-policy' || remoteStatus === 'bootstrap-acceptance';
       rootProbe.mockResolvedValue(open);
       const bootstrapAcceptance = jest.fn(async (_host, _fingerprint, _password, _token, guard) => {
         await guard.assertOwned();
@@ -602,6 +602,30 @@ describe('managed enrolment and durable credential lifecycle', () => {
         }
         return header.startsWith('proof ') ? `OK ${header.split(' ')[1]}\n` : 'OK\n';
       });
+      if (remoteStatus === 'new-server-runtime') {
+        const oldImage = `sha256:${'0'.repeat(64)}`;
+        const heartbeat = service['heartbeats'].get(1);
+        if (!heartbeat) throw new Error('Missing enrollment heartbeat');
+        heartbeat.imageId = oldImage;
+        const publishPolicy = jest.fn(async (_id: number, desired: string, observed: string) => {
+          service['readiness'].observe = jest.fn(() => ({
+            timestamp: now,
+            streamId: 'boot-new',
+            sequence: 1,
+            revision: 1,
+            contentHash: 'a'.repeat(64),
+            connected: true,
+            configurationAccepted: true,
+            hardwareAvailable: true,
+            ready: desired === observed,
+          }));
+        });
+        service['wago'].setRuntimePolicy = publishPolicy;
+        service['wago'].blockRuntime = jest.fn();
+        await service['refreshRuntimePolicy'](1);
+        expect(publishPolicy).toHaveBeenLastCalledWith(1, oldImage, oldImage, undefined);
+        expect(service['wago'].blockRuntime).toHaveBeenCalledWith(1);
+      }
       if (remoteStatus === 'stuck-cutover') {
         expect(await service['completeEnrolment'](current)).toBe(false);
         expect(await service.status(1)).toMatchObject({
@@ -684,6 +708,10 @@ describe('managed enrolment and durable credential lifecycle', () => {
         state: 'completed',
         deliveryToken: null,
       });
+      if (remoteStatus === 'new-server-runtime') {
+        await service['refreshRuntimePolicy'](1);
+        expect(service['wago'].setRuntimePolicy).toHaveBeenLastCalledWith(1, artifact.imageId, `sha256:${'0'.repeat(64)}`, undefined);
+      }
       const commands = jest.mocked(managedSsh).mock.calls.map((call) => call[2].split(' ')[0]);
       if (remoteStatus === 'committed') expect(commands).not.toContain('access-cutover');
       else {

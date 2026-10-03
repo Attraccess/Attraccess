@@ -24,10 +24,10 @@ function regular(path, max = 1048576) {
     return fs.readFileSync(fd, 'utf8');
   } finally { fs.closeSync(fd); }
 }
-function atomic(path, value, uid = 0) {
+function atomic(path, value, uid = 0, mode = 0o600) {
   const next = path + '.' + crypto.randomBytes(8).toString('hex');
   const fd = fs.openSync(next, 'wx', 0o600);
-  try { fs.writeFileSync(fd, value); fs.fchmodSync(fd, 0o600); fs.fchownSync(fd, uid, uid); fs.fsyncSync(fd); }
+  try { fs.writeFileSync(fd, value); fs.fchmodSync(fd, mode); fs.fchownSync(fd, uid, uid); fs.fsyncSync(fd); }
   finally { fs.closeSync(fd); }
   fs.renameSync(next, path);
   const parent = fs.openSync(require('node:path').dirname(path), 'r');
@@ -86,7 +86,7 @@ async function apply() {
   state.credentialRotation = { revision: 1, token: input.token };
   atomic(data + '/state.json', JSON.stringify(state), 10001);
   atomic(config + '/runtime.env', environment(regular(config + '/runtime.env').split('\n')).join('\n') + '\n');
-  if (input.caCert) atomic(config + '/runtime-ca.pem', input.caCert);
+  if (input.caCert) atomic(config + '/runtime-ca.pem', input.caCert, 0, 0o444);
   const spec = { ...original.Config, Image: original.Image, Env: environment(env),
     Labels: { ...original.Config.Labels, 'io.attraccess.wago.network-token': input.operationToken },
     HostConfig: { ...original.HostConfig } };
@@ -148,7 +148,9 @@ require_journal() {
 ${
   action !== 'apply'
     ? `
-${action === 'release' ? `
+${
+  action === 'release'
+    ? `
 # The backend saved the replacement before requesting this release. A retry
 # after the new apply began must retain its journal, even if recreation stopped
 # between DELETE and CREATE. Unknown journals are never discarded.
@@ -161,7 +163,9 @@ if test -e "$tx" || test -L "$tx"; then
     digest="$bytes"; require_journal; printf 'OK\\n'; exit 0
   fi
 fi
-` : ''}
+`
+    : ''
+}
 if test ! -e "$tx" && test ! -L "$tx"; then
   test -f "$receipt" && test ! -L "$receipt" && test "$(stat -c '%u:%g:%a:%h' "$receipt")" = 0:0:600:1 && test "$(cat "$receipt")" = "$digest" || fail 'Network acknowledgement unavailable'
 else

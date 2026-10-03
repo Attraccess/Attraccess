@@ -5,7 +5,7 @@ import { encodeMeasurement } from '../../measurement-contract';
 // The API and standalone runtime enforce the same configured output behavior.
 import { supportsOutputAction } from '../../channel-behavior';
 import { hash, validateDesired } from './configuration';
-import { OutputController } from './output-controller';
+import { OutputController, OutputRoutingBusyError } from './output-controller';
 import {
   WriteAdmissionError,
   type DeviceAdapter,
@@ -362,6 +362,7 @@ export class WagoRuntime {
       // Keep the command barrier through this commit so old-revision commands cannot cross the boundary.
       try {
         await this.outputs.replaceConfiguration(async () => {
+          this.outputs.assertConfigurationSafe(desired.snapshot);
           const accepted = {
             revision: desired.revision,
             contentHash: desired.contentHash,
@@ -386,7 +387,11 @@ export class WagoRuntime {
             this.configurationPending = false;
           }
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof OutputRoutingBusyError)
+          return this.reportRejected(desired.revision, desired.contentHash, [
+            { path: 'snapshot', code: 'outputs_busy', message: 'switch outputs off before changing their routing' },
+          ]);
         return this.reportRejected(desired.revision, desired.contentHash, [
           { path: 'snapshot', code: 'configuration_commit_failed', message: 'failed to commit configuration' },
         ]);

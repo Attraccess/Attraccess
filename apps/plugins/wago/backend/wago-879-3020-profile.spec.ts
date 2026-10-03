@@ -37,3 +37,40 @@ describe('complete WAGO 879-3020 readable register map', () => {
       expect(profile.measurements.find((m) => m.address === address)?.kind).toBe('live');
   });
 });
+
+describe('persisted legacy Modbus profiles', () => {
+  it.each(['wago-879-3000', 'wago-879-3000-unverified', 'wago-879-1300-unverified'])(
+    'keeps %s version 1 loadable with its original register transforms',
+    (id) => {
+      const profile = BUILTIN_MODBUS_PROFILES.find((profile) => profile.id === id && profile.version === 1);
+      expect(profile).toBeDefined();
+      expect(profile?.measurements.find((m) => m.id === 'active-power')).toMatchObject({
+        address: 0x5012,
+        scale: 1000,
+        dataType: 'float32',
+      });
+      expect(profile?.measurements.find((m) => m.id === 'import-energy')).toMatchObject({
+        address: 0x600c,
+        scale: id.includes('1300') ? 1 : 1000,
+        dataType: id.includes('1300') ? 'uint32' : 'float32',
+      });
+      expect(
+        validateModbus({
+          connections: [
+            {
+              id: 'bus',
+              transport: 'tcp',
+              host: '127.0.0.1',
+              port: 502,
+              timeoutMs: 1000,
+              reconnectMs: 1000,
+              queueLimit: 8,
+            },
+          ],
+          devices: [{ id: 'meter', name: 'Meter', connectionId: 'bus', unitId: 1, profileId: id, profileVersion: 1 }],
+          profiles: [],
+        }),
+      ).toEqual([]);
+    },
+  );
+});

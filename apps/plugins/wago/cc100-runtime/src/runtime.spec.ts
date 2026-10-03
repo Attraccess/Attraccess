@@ -839,50 +839,55 @@ describe('WagoRuntime', () => {
   });
 
   it('shuts down a pulse that completes while configuration replacement is waiting', async () => {
-    const snapshot = pulsedSnapshot;
-    let releaseWrite!: () => void;
-    let writeStarted!: () => void;
-    const write = new Promise<void>((resolve) => {
-      releaseWrite = resolve;
-    });
-    const started = new Promise<void>((resolve) => {
-      writeStarted = resolve;
-    });
-    const delayedDevice = {
-      write: async (point: Snapshot['physicalPoints'][number], value: boolean) => {
-        if (value) {
-          writeStarted();
-          await write;
-        }
-        device.values.set(`${point.hardwareProfile}:${point.channel}`, value);
-      },
-      read: async () => false,
-    };
-    runtime = new WagoRuntime({
-      hardwareId: 'cc100-1',
-      prefix: 'attraccess/wago',
-      pairingCode: '482931',
-      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
-      transport,
-      device: delayedDevice,
-    });
-    await runtime.start();
-    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    try {
+      const snapshot = pulsedSnapshot;
+      let releaseWrite!: () => void;
+      let writeStarted!: () => void;
+      const write = new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      });
+      const started = new Promise<void>((resolve) => {
+        writeStarted = resolve;
+      });
+      const delayedDevice = {
+        write: async (point: Snapshot['physicalPoints'][number], value: boolean) => {
+          if (value) {
+            writeStarted();
+            await write;
+          }
+          device.values.set(`${point.hardwareProfile}:${point.channel}`, value);
+        },
+        read: async () => false,
+      };
+      runtime = new WagoRuntime({
+        hardwareId: 'cc100-1',
+        prefix: 'attraccess/wago',
+        pairingCode: '482931',
+        store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+        transport,
+        device: delayedDevice,
+      });
+      await runtime.start();
+      await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
 
-    const pulse = transport.send(commands, validCommand({ action: 'pulse' }));
-    await started;
-    const replacement = transport.send(desired, {
-      protocolVersion: 1,
-      revision: 2,
-      contentHash: hash(snapshot),
-      snapshot,
-    });
-    releaseWrite();
-    await Promise.all([pulse, replacement]);
+      const pulse = transport.send(commands, validCommand({ action: 'pulse' }));
+      await started;
+      const replacement = transport.send(desired, {
+        protocolVersion: 1,
+        revision: 2,
+        contentHash: hash(snapshot),
+        snapshot,
+      });
+      releaseWrite();
+      await Promise.all([pulse, replacement]);
 
-    expect(device.values.get('751-9301:0')).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(device.values.get('751-9301:0')).toBe(false);
+      expect(device.values.get('751-9301:0')).toBe(true);
+      await jest.advanceTimersByTimeAsync(20);
+      expect(device.values.get('751-9301:0')).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('serializes desired configuration replacements in arrival order', async () => {
@@ -1406,6 +1411,7 @@ describe('WagoRuntime', () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
     const noOutputs: Snapshot = { ...snapshot, logicalChannels: [] };
+    await transport.send(commands, validCommand({ id: 'off-before-removal', value: false }));
     await transport.send(desired, {
       protocolVersion: 1,
       revision: 2,

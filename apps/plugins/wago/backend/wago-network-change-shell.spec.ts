@@ -225,6 +225,14 @@ describe('fixed MQTT recreation program and durable state', () => {
     expect(JSON.parse(fixture.read('var/lib/attraccess-wago/state.json')).accepted).toEqual(state.accepted);
   });
 
+  it('makes the public broker CA readable by the non-root runtime while keeping credentials private', async () => {
+    await run();
+    const mode = (path: string) => fs.statSync(join(fixture.root, path)).mode & 0o777;
+    expect(mode('etc/attraccess-wago/runtime-ca.pem')).toBe(0o444);
+    expect(mode('etc/attraccess-wago/runtime.env')).toBe(0o600);
+    expect(mode('var/lib/attraccess-wago/state.json')).toBe(0o600);
+  });
+
   it('rejects a state-file symlink without modifying its target or recreating a container', async () => {
     const statePath = join(fixture.root, 'var/lib/attraccess-wago/state.json');
     fs.renameSync(statePath, statePath + '.saved');
@@ -257,21 +265,38 @@ describe('fixed MQTT recreation program and durable state', () => {
     fixture.file('etc/attraccess-wago/install.lock', '');
     fixture.file('etc/attraccess-wago-management/token', 'a'.repeat(32));
     const previous = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
-    const nextPayload = JSON.stringify({ ...payload, operationToken: 'e'.repeat(32), url: 'mqtt://corrected.test:1883' });
+    const nextPayload = JSON.stringify({
+      ...payload,
+      operationToken: 'e'.repeat(32),
+      url: 'mqtt://corrected.test:1883',
+    });
     const next = createHash('sha256').update(nextPayload).digest('hex');
     fixture.file(`${journal}/digest`, previous);
-    const release = `token=${'a'.repeat(32)}; digest=${previous}; bytes=${next};\n` + networkChangeShell('release', fixture.root);
+    const release =
+      `token=${'a'.repeat(32)}; digest=${previous}; bytes=${next};\n` + networkChangeShell('release', fixture.root);
     for (let i = 0; i < 2; i++) {
       const result = fixture.run(release);
-      expect({ status: result.status, stderr: result.stderr, stdout: result.stdout }).toEqual({ status: 0, stderr: '', stdout: 'OK\n' });
+      expect({ status: result.status, stderr: result.stderr, stdout: result.stdout }).toEqual({
+        status: 0,
+        stderr: '',
+        stdout: 'OK\n',
+      });
       expect(fs.existsSync(join(fixture.root, journal))).toBe(false);
     }
     for (const [field, content] of Object.entries({
-      digest: next, payload: nextPayload, 'container.json': JSON.stringify([original]), 'ca-source': '/etc/attraccess-wago/runtime-ca.pem\n',
-    })) fixture.file(`${journal}/${field}`, content);
+      digest: next,
+      payload: nextPayload,
+      'container.json': JSON.stringify([original]),
+      'ca-source': '/etc/attraccess-wago/runtime-ca.pem\n',
+    }))
+      fixture.file(`${journal}/${field}`, content);
     for (let i = 0; i < 2; i++) {
       const result = fixture.run(release);
-      expect({ status: result.status, stderr: result.stderr, stdout: result.stdout }).toEqual({ status: 0, stderr: '', stdout: 'OK\n' });
+      expect({ status: result.status, stderr: result.stderr, stdout: result.stdout }).toEqual({
+        status: 0,
+        stderr: '',
+        stdout: 'OK\n',
+      });
       expect(fixture.read(`${journal}/payload`)).toBe(nextPayload);
     }
     fixture.file(`${journal}/digest`, 'f'.repeat(64));

@@ -295,6 +295,36 @@ describe('WagoService', () => {
     expect((await service.list())[0].connectivity).toBe('online');
   });
 
+  it.each([1, 2])(
+    'retries runtime policy after publication %s fails without unblocking commands',
+    async (failedPublication) => {
+      const { service, context, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+      service.registerRuntimeStatusHandler(() => undefined);
+      revisionRepository.find.mockResolvedValue([{ revision: 1, state: 'published', snapshot: '{}' }]);
+      const publish = jest.mocked(context.mqtt.publish);
+      if (failedPublication === 2) publish.mockResolvedValueOnce(undefined);
+      publish.mockRejectedValueOnce(new Error('broker unavailable'));
+      const image = `sha256:${'a'.repeat(64)}`;
+      await expect(service.setRuntimePolicy(1, image, image, 'boot-token')).rejects.toThrow('broker unavailable');
+      expect(service.isRuntimeUpdateRequired(1)).toBe(true);
+      publish.mockClear();
+      await service.setRuntimePolicy(1, image, image, 'boot-token');
+      expect(publish).toHaveBeenCalledTimes(2);
+      expect(service.isRuntimeUpdateRequired(1)).toBe(false);
+    },
+  );
+
+  it.each(['pending', 'rejected', 'published', 'applied'])(
+    'replays only published configuration when the latest revision is %s',
+    async (state) => {
+      const { service, context, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+      revisionRepository.find.mockResolvedValue([{ revision: 1, state, snapshot: '{}' }]);
+      const image = `sha256:${'a'.repeat(64)}`;
+      await service.setRuntimePolicy(1, image, image, 'boot-token');
+      expect(context.mqtt.publish).toHaveBeenCalledTimes(['published', 'applied'].includes(state) ? 2 : 1);
+    },
+  );
+
   it('revokes a claimed controller before deleting its local records', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, enrollmentId: null };
     const { service, context, controllerRepository, draftRepository, revisionRepository } = createService([claimed]);

@@ -722,7 +722,18 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     }
     const heartbeat = this.heartbeats.get(id);
     if (!heartbeat || this.destroyed) return;
-    await this.wago.setRuntimePolicy?.(id, desired.imageId, heartbeat.imageId, heartbeat.runtimePolicyToken);
+    const access = await this.access.findOne({ where: { controllerId: id }, order: { sessionId: 'DESC' } });
+    // Verified enrollment needs a ready runtime before management can be hardened.
+    // Confirm its running image during bootstrap; the server still blocks commands
+    // until management is complete and the bundled image policy can be enforced.
+    const enrolling = access?.state === 'verified' || access?.state === 'recovery_required';
+    await this.wago.setRuntimePolicy?.(
+      id,
+      enrolling ? heartbeat.imageId : desired.imageId,
+      heartbeat.imageId,
+      heartbeat.runtimePolicyToken,
+    );
+    if (enrolling) this.wago.blockRuntime?.(id);
     this.reconciliationFailures.delete(id);
     return heartbeat;
   }

@@ -61,7 +61,7 @@ export class MqttClientService implements OnModuleDestroy {
     this.connectionCancellations.delete(serverId);
     this.clients.delete(serverId);
     this.connectionPromises.delete(serverId);
-    await this.getOrCreateClient(serverId);
+    await this.getOrCreateClient(serverId, true);
   }
 
   private async getOrCreateClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {

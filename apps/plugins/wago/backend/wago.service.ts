@@ -347,7 +347,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       previous.runtimePolicyToken === runtimePolicyToken
     )
       return;
-    this.runtimePolicies.set(controllerId, { desired, observed, runtimePolicyToken });
+    this.runtimeUpdateBlocks.add(controllerId);
     const controller = await this.claimedController(controllerId);
     if (!controller.mqttServerId) return;
     const settings = await this.getSettings();
@@ -360,7 +360,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     );
     // Replay configuration skipped by the boot-time runtime gate, without creating a revision.
     const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
-    if (revision && revision.state !== 'rejected')
+    if (revision && (revision.state === 'published' || revision.state === 'applied'))
       await this.context.mqtt.publish(
         controller.mqttServerId,
         topic,
@@ -374,6 +374,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         }),
         { qos: 1, retain: true },
       );
+    this.runtimePolicies.set(controllerId, { desired, observed, runtimePolicyToken });
     this.runtimeUpdateBlocks.delete(controllerId);
   }
 

@@ -359,10 +359,7 @@ describe('MqttClientService', () => {
 
       const servicePrivate = service as unknown as MqttClientServicePrivate;
       const client = await servicePrivate.getOrCreateClient(1);
-      servicePrivate.subscriptions.set(
-        1,
-        new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]),
-      );
+      servicePrivate.subscriptions.set(1, new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]));
       client.subscribe = jest.fn(
         (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
           callback?.(new Error('Subscribe error'));
@@ -462,6 +459,33 @@ describe('MqttClientService', () => {
       });
       expect(internal.clients.get(1)).toBe(current);
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('keeps reconnecting after refresh times out and restores existing subscriptions when the broker recovers', async () => {
+      const internal = useRealConnections();
+      await internal.getOrCreateClient(1);
+      await service.subscribe(1, 'devices/#', 2);
+      const replacement = Object.assign(new EventEmitter(), {
+        connected: false,
+        end: jest.fn(),
+        subscribe: jest.fn((_topic, _options, done) => done()),
+      }) as unknown as mqtt.MqttClient;
+      jest.mocked(mqtt.connect).mockReturnValueOnce(replacement);
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+      try {
+        const refresh = service.refreshConnection(1);
+        const failure = expect(refresh).rejects.toThrow('Timeout connecting');
+        await new Promise(setImmediate);
+        await jest.advanceTimersByTimeAsync(10_000);
+        await failure;
+        expect(replacement.end).not.toHaveBeenCalled();
+        replacement.connected = true;
+        replacement.emit('connect');
+        expect(internal.clients.get(1)).toBe(replacement);
+        expect(replacement.subscribe).toHaveBeenCalledWith('devices/#', { qos: 2 }, expect.any(Function));
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('replaces an unreachable pending client without waiting for the previous broker and prevents it from reconnecting', async () => {
