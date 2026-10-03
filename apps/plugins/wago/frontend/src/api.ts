@@ -16,7 +16,7 @@ export interface WagoController {
   lastHeartbeatAt: string | null;
   lastSeenAt: string;
   compatibilityError: string | null;
-  connectivity: 'online' | 'stale' | 'untrusted';
+  connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_update';
 }
 export interface WagoSettings {
   defaultMqttServerId: number | null;
@@ -49,6 +49,7 @@ export type WagoCommissioningState =
   | 'recovery_revocation_pending'
   | 'revoked';
 export interface CommissioningSession {
+  operationDeadlineAt?: string | null;
   runtimeRecoveryAvailable?: boolean;
   managedAccessAvailable?: boolean;
   managementControllerId?: number | null;
@@ -181,8 +182,8 @@ export const confirmCommissioningHostKey = (
     },
   });
 
-export const listCommissioningSessions = (limit = 100, offset = 0) =>
-  api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`);
+export const listCommissioningSessions = (limit = 100, offset = 0, signal?: AbortSignal) =>
+  api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`, { signal });
 
 export interface CommissioningVerification {
   controllerId: number | null;
@@ -218,7 +219,16 @@ export const removeCommissioningSession = (id: number) =>
 export const removeController = (id: number) => api.request<void>(`/controllers/${id}`, { method: 'DELETE' });
 
 export interface RuntimeUpdateStatus {
-  rolloutEnabled: boolean;
+  managementFailure?: string;
+  managementSetup?: { state: 'waiting' | 'running'; reason: string };
+  runtime?: {
+    runningVersion: string;
+    runningImageId: string | null;
+    desiredVersion: string | null;
+    desiredImageId: string | null;
+  };
+  blocker?: string;
+  runtimeUpdateRequired?: boolean;
   sessionId: number | null;
   management: 'pending' | 'verified' | 'managed' | 'recovery_required' | 'retiring' | 'retired' | 'reenrol_required';
   keyFingerprint: string | null;
@@ -236,10 +246,13 @@ export interface RuntimeUpdateStatus {
       | 'failed'
       | 'current';
     desiredImageId: string;
+    desiredRuntimeVersion?: string;
+    previousRuntimeVersion?: string | null;
     previousImageId: string | null;
     buildId: string;
     attempt: number;
     failure: string | null;
+    storageDiagnostics?: { path: string; requiredKiB: number; availableKiB: number }[];
     retryAt: number;
     cleanupAttempt?: number;
     cleanupRetryAt?: number;

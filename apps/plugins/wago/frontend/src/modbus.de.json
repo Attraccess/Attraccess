@@ -51,13 +51,13 @@
   "editProfiles": "Profil bearbeiten",
   "emptyConnections": "Füge eine TCP-Netzwerk- oder RTU-Seriellverbindung hinzu, um zu beginnen.",
   "emptyDevices": "Füge ein Gerät hinzu und wähle seine Verbindung und sein Profil.",
-  "builtinHint": "WAGO 879-3000 verwendet die dokumentierte schreibgeschützte Registerzuordnung. Als nicht verifiziert markierte Profile bleiben für vorhandene Konfigurationen erhalten.",
+  "builtinHint": "WAGO 879-3020 (4PS) verwendet die dokumentierte schreibgeschützte Registerzuordnung im Standard-Gleitkommaformat.",
   "connectionTitle": "Verbindung {{index}}: {{address}}",
   "connectionId": "Verbindungs-ID",
   "transport": "Transport",
   "host": "Host",
   "port": "Port",
-  "serialHint": "CC100 Zweidraht-RS-485: /dev/serial. WAGO 879-3000 Werkseinstellungen: Einheit 1, 9600 Baud, 8N1.",
+  "serialHint": "CC100 Zweidraht-RS-485: /dev/serial. WAGO 879-3020 (4PS) Werkseinstellungen: Einheit 1, 9600 Baud, 8E1. Die tatsächlichen Einstellungen des Zählers müssen übereinstimmen.",
   "path": "Pfad des seriellen Geräts",
   "baud": "Baudrate",
   "parity": "Parität",
@@ -94,6 +94,17 @@
     "volt": "Volt",
     "watt": "Watt",
     "watt-hour": "Wattstunde",
-    "percent": "Prozent"
-  }
+    "percent": "Prozent",
+    "hertz": "Hertz",
+    "var": "Blindleistung (var)",
+    "var-hour": "Blindenergie (varh)",
+    "volt-ampere": "Voltampere",
+    "ratio": "Verhältnis",
+    "number": "Zahl / Code",
+    "second": "Sekunde",
+    "pulse-per-kilowatt-hour": "Impulse pro Kilowattstunde",
+    "binary": "Binäre Ganzzahl",
+    "bcd": "Dezimalziffern (BCD)"
+  },
+  "numericEncoding": "Zahlenkodierung"
 }

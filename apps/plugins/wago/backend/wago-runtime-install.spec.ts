@@ -387,7 +387,7 @@ process.exit(result.status ?? 1);
     rmSync(join(fixture.root, config, 'runtime.env.next'));
     fixture.file(
       'bin/flock',
-      `#!${process.env.PYTHON || '/usr/bin/python3'}\nimport fcntl,sys\ntry: fcntl.flock(int(sys.argv[2]),fcntl.LOCK_EX|fcntl.LOCK_NB)\nexcept OSError: sys.exit(1)\n`,
+      `#!${process.env.PYTHON || '/usr/bin/python3'}\nimport fcntl,sys\nflags=fcntl.LOCK_EX|(fcntl.LOCK_NB if '-n' in sys.argv else 0)\ntry: fcntl.flock(int(sys.argv[-1]),flags)\nexcept OSError: sys.exit(1)\n`,
       0o700,
     );
     const { bundle, script } = delivery();
@@ -411,7 +411,10 @@ process.exit(result.status ?? 1);
         await new Promise((resolve) => setTimeout(resolve, 20));
       if (!existsSync(join(fixture.root, config, 'delivery/token')))
         throw new Error(`Delivery did not reach the locked receiving phase: ${stderr}`);
-      expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).stderr).toContain('lock');
+      // Simulate the deadline while the real upload still owns its flock.
+      expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token), 'lock-wait-expired').stderr).toContain(
+        'lock',
+      );
       child.stdin.end(bundle);
       expect(await completion).toBe(0);
     } finally {
@@ -426,4 +429,34 @@ process.exit(result.status ?? 1);
     expect(r.status).not.toBe(0);
     expect(fixture.containers()).toEqual([]);
   });
+
+  it('waits for an active runtime monitor before cleaning up its retained installation', async () => {
+    expect(install().status).toBe(0);
+    fixture.file(
+      'bin/flock',
+      `#!${process.env.PYTHON || '/usr/bin/python3'}\nimport fcntl,sys,os\nopen(os.environ['FIXTURE_ROOT']+'/recovery-lock-attempt','w').close()\nflags=fcntl.LOCK_EX|(fcntl.LOCK_NB if '-n' in sys.argv else 0)\ntry: fcntl.flock(int(sys.argv[-1]),flags)\nexcept OSError: sys.exit(1)\n`,
+      0o700,
+    );
+    const holder = spawn(process.env.PYTHON || '/usr/bin/python3', [
+      '-c',
+      'import fcntl,sys,time,os; f=open(sys.argv[1],"r+"); fcntl.flock(f,fcntl.LOCK_EX); print("locked",flush=True)\nwhile not os.path.exists(sys.argv[2]): time.sleep(0.01)\ntime.sleep(0.5)',
+      join(fixture.root, config, 'install.lock'),
+      join(fixture.root, 'recovery-lock-attempt'),
+    ]);
+    const completion = new Promise<void>((resolve) => holder.on('close', () => resolve()));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        holder.stdout.once('data', () => resolve());
+        holder.once('error', reject);
+      });
+      const result = recover();
+      expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+      expect(fixture.containers()).toEqual([]);
+      expect(existsSync(join(fixture.root, tx))).toBe(false);
+      expect(existsSync(join(fixture.root, config, 'install.lock'))).toBe(true);
+    } finally {
+      if (holder.exitCode === null) holder.kill();
+      await completion;
+    }
+  }, 30000);
 });

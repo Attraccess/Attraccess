@@ -46,6 +46,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('explains cleanup lock contention in the selected language, including partial cleanup', () => {
+  const { result } = renderHook(() => useWagoTranslations());
+  const reason =
+    'The runtime monitor or another operation did not release the controller lock within 310 seconds. Wait a few minutes and retry cleanup. Do not delete the lock file.';
+  const message = `Installation cleanup failed (busy). ${reason}`;
+  expect(result.current.tBackendMessage(message)).toBe(message);
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(result.current.tBackendMessage(message)).toContain('Steuerungssperre');
+  expect(result.current.tBackendMessage(message)).toContain('310 Sekunden');
+  expect(
+    result.current.tBackendMessage(
+      `${message} Runtime cleanup completed; retry cleanup to finish controller preparation and credential revocation.`,
+    ),
+  ).toContain('Die Laufzeit wurde bereinigt');
+});
+
 it('all official plugins follow the core language before mounting and switch without remounting', () => {
   useTranslationState.getState().setLanguage('de');
   const { result } = renderHook(() => ({
@@ -226,7 +242,7 @@ it('translates every diagnostic freshness, acknowledgement and commissioning rea
 });
 
 it('localizes built-in Modbus review names while preserving custom names and metadata overrides', () => {
-  const builtin = BUILTIN_MODBUS_PROFILES[1];
+  const builtin = BUILTIN_MODBUS_PROFILES[0];
   const custom = duplicateProfile(builtin, 'custom-meter');
   custom.name = builtin.name;
   const snapshotFor = (profile: ModbusProfile): WagoConfigurationSnapshot => ({
@@ -278,7 +294,7 @@ it('localizes built-in Modbus review names while preserving custom names and met
   expect(screen.getByText(`Before: ${builtin.name}`)).toBeTruthy();
   expect(screen.getByText(`After: ${custom.name}`)).toBeTruthy();
   act(() => useTranslationState.getState().setLanguage('de'));
-  expect(screen.getByText('Vorher: WAGO 879-3000 — NICHT QUALIFIZIERT / Zuordnung nicht verifiziert')).toBeTruthy();
+  expect(screen.getByText('Vorher: WAGO 879-3020 (4PS) — Modbus RTU')).toBeTruthy();
   expect(screen.getByText('Vorher: Wirkleistung')).toBeTruthy();
   expect(screen.getByText(`Nachher: ${custom.name}`)).toBeTruthy();
   expect(screen.getByText('Nachher: Active power')).toBeTruthy();
@@ -293,7 +309,7 @@ it('localizes built-in Modbus review names while preserving custom names and met
   expect(screen.getByText(/^Nachher:/).textContent).toContain('Wirkleistung');
   expect(screen.getByText(/^Nachher:/).textContent).toContain('Meter.v1');
   const fullReview = screen.getByText(/^Nachher:/).textContent ?? '';
-  expect(fullReview.match(/Name: active-power/g)).toHaveLength(2);
+  expect(fullReview.match(/Name: active-power(?![-\w])/g)).toHaveLength(2);
   rerender(
     <ConfigurationChanges
       changes={[{ path: '$.modbus.profiles[0].measurements[0].id', previous: null, current: 'active-power' }]}
@@ -525,6 +541,14 @@ it('covers every configuration enum and reuses editor labels in English and Germ
       watt: 'modbus.options.watt',
       'watt-hour': 'modbus.options.watt-hour',
       percent: 'modbus.options.percent',
+      hertz: 'modbus.options.hertz',
+      var: 'modbus.options.var',
+      'var-hour': 'modbus.options.var-hour',
+      'volt-ampere': 'modbus.options.volt-ampere',
+      ratio: 'modbus.options.ratio',
+      number: 'modbus.options.number',
+      second: 'modbus.options.second',
+      'pulse-per-kilowatt-hour': 'modbus.options.pulse-per-kilowatt-hour',
     },
     kind: { live: 'modbus.options.live', cumulative: 'modbus.options.cumulative' },
     parity: { none: 'modbus.options.none', even: 'modbus.options.even', odd: 'modbus.options.odd' },

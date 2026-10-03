@@ -55,7 +55,7 @@ interface RuntimeDiagnostics extends DiagnosticStream {
     receivedAt: string;
     errors: Array<{ path: string; code: string }>;
   };
-  faults: Record<string, { code: string; receivedAt: string }>;
+  faults: Record<string, { code: string; receivedAt: string; sourceAt: string | null }>;
   acknowledgements: Record<string, DiagnosticAcknowledgement>;
   events: Array<{ kind: string; receivedAt: string }>;
 }
@@ -68,6 +68,7 @@ const faultCodes = new Set([
   'feedback_mismatch',
   'feedback_read_failed',
   'modbus_read_failed',
+  'modbus_rtu_quarantined',
   'digital_read_failed',
 ]);
 function identifier(value: unknown): value is string {
@@ -408,11 +409,20 @@ export class WagoDiagnosticsStore {
         ...(canonical ? { measurementKind: data.kind as 'live' | 'cumulative' } : {}),
         ...metadata,
       };
+      const fault = state.faults[data.channelId];
+      if (
+        canonical &&
+        fault?.sourceAt &&
+        ['measurement_read_failed', 'modbus_read_failed', 'modbus_rtu_quarantined'].includes(fault.code) &&
+        (sourceTime(metadata.sourceAt) as number) > (sourceTime(fault.sourceAt) as number)
+      )
+        delete state.faults[data.channelId];
     }
     if (kind === 'faults' && identifier(data.channelId))
       state.faults[data.channelId] = {
         code: faultCodes.has(data.code as string) ? (data.code as string) : 'runtime_fault',
         receivedAt,
+        sourceAt: metadata.sourceAt,
       };
     if (
       kind === 'acknowledgements' &&

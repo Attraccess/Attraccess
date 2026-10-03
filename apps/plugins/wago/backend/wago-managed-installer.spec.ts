@@ -99,7 +99,7 @@ describe('authenticated installer publication', () => {
         expect(fixture.read('usr/sbin/attraccess-wago-management')).toBe(old);
       }
       for (let attempt = 0; attempt < 2; attempt++) {
-        const result = fixture.run(program(next), '', Buffer.from(next));
+        const result = fixture.run(program(next), attempt === 0 ? 'supervisor-lock-held' : '', Buffer.from(next));
         expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
         expect(fixture.read('usr/sbin/attraccess-wago-management')).toBe(next);
         expect(fixture.read('etc/attraccess-wago/runtime.env')).toBe('enrolled-secret-fixture');

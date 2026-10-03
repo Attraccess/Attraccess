@@ -1,4 +1,6 @@
 import ipaddr from 'ipaddr.js';
+import { ENGINEERING_UNITS, type EngineeringUnit } from '../measurement-contract';
+import { wago8793020Measurements } from './wago-879-3020';
 
 /** Persisted engineering units, never wire milli-units. No hardware is qualified by this model. */
 export type ModbusConnection = { id: string; timeoutMs: number; reconnectMs: number; queueLimit: number } & (
@@ -31,13 +33,18 @@ export type ModbusMeasurement = RegisterFormat & {
   id: string;
   name: string;
   functionCode: 3 | 4;
-  unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent';
+  unit: EngineeringUnit;
   kind: 'live' | 'cumulative';
   pollIntervalMs: number;
   /** Explicit rounding in engineering units, before integer MQTT encoding. Absent preserves exact values. */
   decimalPlaces?: number;
+  /** Packed decimal digits, decoded before register scaling. Read measurements only. */
+  encoding?: 'bcd';
   /** Explicit raw counter modulus; absent means decreases fault. Never inferred from dtype. */
   rollover?: number;
+  section?: 'electrical' | 'active-energy' | 'reactive-energy' | 'quadrant-energy' | 'information';
+  display?: 'hex' | 'ascii';
+  valueLabels?: Record<string, string>;
 };
 export type ModbusAction = RegisterFormat & {
   id: string;
@@ -78,79 +85,15 @@ export function wireAddress(format: RegisterFormat): number {
   return address;
 }
 
-const base = {
-  addressBase: 0,
-  byteOrder: 'big',
-  wordOrder: 'big',
-  offset: 0,
-  pollIntervalMs: 5000,
-  functionCode: 3,
-} as const;
-const legacyProfiles: ModbusProfile[] = ['879-3000', '879-1300'].map((model) => ({
-  id: `wago-${model}-unverified`,
-  name: `WAGO ${model} — UNQUALIFIED / map unverified`,
-  version: 1,
-  actions: [],
-  measurements: [
-    {
-      ...base,
-      id: 'active-power',
-      name: 'Active power',
-      address: 0x5012,
-      dataType: 'float32',
-      scale: 1000,
-      unit: 'watt',
-      kind: 'live',
-    },
-    ...[
-      { id: 'import-energy', name: 'Imported energy', address: 0x600c },
-      { id: 'export-energy', name: 'Exported energy', address: 0x6018 },
-    ].map((entry): ModbusMeasurement => ({
-      ...base,
-      ...entry,
-      dataType: model === '879-3000' ? 'float32' : 'uint32',
-      scale: model === '879-3000' ? 1000 : 1,
-      unit: 'watt-hour',
-      kind: 'cumulative',
-    })),
-  ],
-}));
-// WAGO manual 5937710, V1.8, pp. 35–38: FC03, hexadecimal wire addresses,
-// IEEE float ABCD, kW/kWh. Read-tested on the development 879-3000 over CC100 RS-485.
-// Keep the old profile IDs/maps unchanged for already-published configurations.
+// Additive map: the original five signal identities and transforms stay compatible.
 export const BUILTIN_MODBUS_PROFILES: readonly ModbusProfile[] = [
   {
-    id: 'wago-879-3000',
-    name: 'WAGO 879-3000 — Modbus RTU',
+    id: 'wago-879-3020',
+    name: 'WAGO 879-3020 (4PS) — Modbus RTU',
     version: 1,
     actions: [],
-    measurements: [
-      ...legacyProfiles[0].measurements.map((measurement) => ({ ...measurement, decimalPlaces: 3 })),
-      {
-        ...base,
-        id: 'voltage-l1',
-        name: 'L1 voltage',
-        address: 0x5002,
-        dataType: 'float32',
-        scale: 1,
-        unit: 'volt',
-        kind: 'live',
-        decimalPlaces: 3,
-      },
-      {
-        ...base,
-        id: 'current-l1',
-        name: 'L1 current',
-        address: 0x500c,
-        dataType: 'float32',
-        scale: 1,
-        unit: 'ampere',
-        kind: 'live',
-        decimalPlaces: 3,
-      },
-    ],
+    measurements: wago8793020Measurements(),
   },
-  ...legacyProfiles,
 ];
 // Freeze nested maps: callers must duplicate before editing. Evidence URLs are documented in README.
 function freeze(value: object): void {
@@ -260,8 +203,8 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
     keys(p, ['id', 'name', 'version', 'measurements', 'actions'], path);
     if (BUILTIN_MODBUS_PROFILES.some((b) => b.id === p.id) || !name(p.name) || !integer(p.version, 1, 1000000))
       fail(path, 'custom ID, name and positive version required; built-ins are immutable');
-    if (!Array.isArray(p.measurements) || !Array.isArray(p.actions) || p.measurements.length + p.actions.length > 128) {
-      fail(path, 'measurements/actions arrays required, maximum 128 entries');
+    if (!Array.isArray(p.measurements) || !Array.isArray(p.actions) || p.measurements.length + p.actions.length > 256) {
+      fail(path, 'measurements/actions arrays required, maximum 256 entries');
       return;
     }
     const ids = new Set<string>();
@@ -286,7 +229,17 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
           'offset',
           'functionCode',
           ...(p.measurements.includes(f as ModbusMeasurement)
-            ? ['unit', 'kind', 'pollIntervalMs', 'rollover', 'decimalPlaces']
+            ? [
+                'unit',
+                'kind',
+                'pollIntervalMs',
+                'rollover',
+                'decimalPlaces',
+                'encoding',
+                'section',
+                'display',
+                'valueLabels',
+              ]
             : ['onValue', 'offValue']),
         ],
         `${path}.${f.id}`,
@@ -296,7 +249,7 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
       if (
         !m ||
         ![3, 4].includes(m.functionCode) ||
-        !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(m.unit) ||
+        !ENGINEERING_UNITS.includes(m.unit) ||
         !['live', 'cumulative'].includes(m.kind) ||
         (m.decimalPlaces !== undefined && !integer(m.decimalPlaces, 0, 3)) ||
         !integer(m.pollIntervalMs, 100, 3600000)
@@ -305,6 +258,22 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
       if (m?.rollover !== undefined && (m.kind !== 'cumulative' || !Number.isFinite(m.rollover) || m.rollover <= 0))
         fail(path, 'rollover must be an explicit positive raw modulus on cumulative measurements');
       if (m?.kind === 'cumulative' && m.scale <= 0) fail(path, 'cumulative measurements require a positive scale');
+      if (m?.encoding !== undefined && (m.encoding !== 'bcd' || !['uint16', 'uint32'].includes(m.dataType)))
+        fail(path, 'BCD encoding requires an unsigned integer measurement');
+      if (
+        m?.section !== undefined &&
+        !['electrical', 'active-energy', 'reactive-energy', 'quadrant-energy', 'information'].includes(m.section)
+      )
+        fail(path, 'unsupported measurement section');
+      if (m?.display !== undefined && !['hex', 'ascii'].includes(m.display))
+        fail(path, 'unsupported measurement display');
+      if (
+        m?.valueLabels !== undefined &&
+        (!object(m.valueLabels) ||
+          Object.keys(m.valueLabels).length > 64 ||
+          Object.entries(m.valueLabels).some(([key, label]) => !/^-?\d+$/.test(key) || !name(label)))
+      )
+        fail(path, 'measurement value labels require at most 64 named integer values');
     });
     p.actions.forEach((a) => {
       if (!a || ![5, 6, 16].includes(a.functionCode) || !Number.isFinite(a.onValue) || !Number.isFinite(a.offValue)) {

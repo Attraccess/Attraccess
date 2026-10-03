@@ -76,7 +76,7 @@ class MqttSubscriptionError extends Error {
 }
 
 type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHash'> & {
-  connectivity: 'online' | 'stale' | 'untrusted';
+  connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_update';
 };
 
 @Injectable()
@@ -97,13 +97,32 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   private runtimeStatusHandler:
     | ((
         id: number,
-        heartbeat: { imageId: string; streamId: string; timestamp: number; receivedAt: number; sequence: number },
+        heartbeat: {
+          imageId: string;
+          streamId: string;
+          timestamp: number;
+          receivedAt: number;
+          sequence: number;
+          runtimePolicyToken?: string;
+        },
       ) => void)
     | null = null;
+  private readonly runtimePolicies = new Map<
+    number,
+    { desired: string; observed: string; runtimePolicyToken?: string }
+  >();
+  private readonly runtimeUpdateBlocks = new Set<number>();
   private readonly commands = new WagoCommandHandler({
     context: this.context,
     controllers: () => this.controllers,
-    claimedController: (id) => this.claimedController(id),
+    claimedController: async (id) => {
+      const controller = await this.claimedController(id);
+      if (this.isRuntimeUpdateRequired(id))
+        throw new ConflictException(
+          'Runtime update required; outputs are held in failsafe until the server runtime is installed',
+        );
+      return controller;
+    },
     getSettings: () => this.getSettings(),
     appliedRevision: (id) => this.appliedRevision(id),
     onCommand: (controllerId, channelId, id) => this.diagnostics.command(controllerId, channelId, id),
@@ -244,6 +263,62 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
 
   registerRuntimeStatusHandler(handler: NonNullable<WagoService['runtimeStatusHandler']>): void {
     this.runtimeStatusHandler = handler;
+  }
+
+  isRuntimeUpdateRequired(controllerId: number): boolean {
+    const policy = this.runtimePolicies.get(controllerId);
+    return (
+      this.runtimeUpdateBlocks.has(controllerId) ||
+      (!!this.runtimeStatusHandler && (!policy || policy.desired !== policy.observed))
+    );
+  }
+
+  blockRuntime(controllerId: number): void {
+    this.runtimeUpdateBlocks.add(controllerId);
+  }
+
+  async setRuntimePolicy(
+    controllerId: number,
+    desired: string,
+    observed: string,
+    runtimePolicyToken?: string,
+  ): Promise<void> {
+    const previous = this.runtimePolicies.get(controllerId);
+    if (
+      !this.runtimeUpdateBlocks.has(controllerId) &&
+      previous?.desired === desired &&
+      previous.observed === observed &&
+      previous.runtimePolicyToken === runtimePolicyToken
+    )
+      return;
+    this.runtimePolicies.set(controllerId, { desired, observed, runtimePolicyToken });
+    const controller = await this.claimedController(controllerId);
+    if (!controller.mqttServerId) return;
+    const settings = await this.getSettings();
+    const topic = configurationDesiredTopic(settings.operationalPrefix, controller.hardwareId);
+    await this.context.mqtt.publish(
+      controller.mqttServerId,
+      topic,
+      JSON.stringify({ runtimeImageId: desired, runtimePolicyToken }),
+      { qos: 1, retain: false },
+    );
+    // Replay configuration skipped by the boot-time runtime gate, without creating a revision.
+    const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    if (revision && revision.state !== 'rejected')
+      await this.context.mqtt.publish(
+        controller.mqttServerId,
+        topic,
+        JSON.stringify({
+          protocolVersion: CONFIGURATION_PROTOCOL_VERSION,
+          runtimeImageId: desired,
+          runtimePolicyToken,
+          revision: revision.revision,
+          contentHash: revision.contentHash,
+          snapshot: JSON.parse(revision.snapshot),
+        }),
+        { qos: 1, retain: true },
+      );
+    this.runtimeUpdateBlocks.delete(controllerId);
   }
 
   async getSettings(): Promise<WagoSettings> {
@@ -1639,16 +1714,16 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (
       canonical &&
       (admitted || !canTrackDiagnostics) &&
-      heartbeat.runtimeImageId &&
       typeof rawHeartbeat.streamId === 'string' &&
       typeof rawHeartbeat.timestamp === 'string'
     ) {
       this.runtimeStatusHandler?.(controller.id, {
-        imageId: heartbeat.runtimeImageId,
+        imageId: heartbeat.runtimeImageId ?? '',
         streamId: rawHeartbeat.streamId,
         timestamp: Date.parse(rawHeartbeat.timestamp),
         receivedAt: Date.now(),
         sequence: rawHeartbeat.sequence as number,
+        ...(heartbeat.runtimePolicyToken ? { runtimePolicyToken: heartbeat.runtimePolicyToken } : {}),
       });
     }
     // Avoid a database write for every permanent heartbeat.
@@ -1819,11 +1894,18 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     });
     if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
     const settings = await this.getSettings();
+    const runtimePolicy = this.runtimePolicies.get(controller.id);
     await this.context.mqtt.publish(
       controller.mqttServerId,
       configurationDesiredTopic(settings.operationalPrefix ?? 'attraccess/wago', controller.hardwareId),
       JSON.stringify({
         protocolVersion: CONFIGURATION_PROTOCOL_VERSION,
+        ...(runtimePolicy
+          ? {
+              runtimeImageId: runtimePolicy.desired,
+              runtimePolicyToken: runtimePolicy.runtimePolicyToken,
+            }
+          : {}),
         revision: revision.revision,
         contentHash: revision.contentHash,
         snapshot: JSON.parse(revision.snapshot),
@@ -1834,8 +1916,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.revisions.save(revision);
   }
 
-  private connectivity(controller: WagoController): 'online' | 'stale' | 'untrusted' {
+  private connectivity(controller: WagoController): WagoControllerSummary['connectivity'] {
     if (controller.trustState === 'untrusted') return 'untrusted';
+    if (this.isRuntimeUpdateRequired(controller.id)) return 'runtime_update';
     const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt;
     return freshness(heartbeatAt, Date.now(), STALE_AFTER_MS) === 'fresh' ? 'online' : 'stale';
   }

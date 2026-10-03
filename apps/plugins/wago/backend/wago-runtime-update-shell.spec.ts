@@ -87,8 +87,25 @@ describe('state-preserving update shell (isolated FW31 interfaces)', () => {
   });
   afterEach(() => fixture.dispose());
 
+  it('waits for a supervisor gate before staging instead of reporting a transfer failure', () => {
+    success(stage('supervisor-lock-held'));
+    expect(fixture.read(tx + '/phase')).toBe('staged\n');
+    expect(fixture.containers()[0]).toMatchObject({ name: 'attraccess-wago', running: true, imageId: previousImageId });
+    expect(fixture.read(data + '/credentials.json')).toBe('permanent-credentials');
+  });
+
+  it('expires a busy controller wait before creating an update journal or stopping the runtime', () => {
+    const result = stage('lock-wait-expired');
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Another runtime transaction holds the controller lock');
+    expect(existsSync(join(fixture.root, tx))).toBe(false);
+    expect(fixture.containers()[0]).toMatchObject({ running: true, imageId: previousImageId });
+  });
+
   it('loads before stopping, preserves credentials/configuration, and retains the prior runtime until acknowledgement', () => {
     success(stage());
+    expect(existsSync(join(fixture.root, tx, 'image.tar'))).toBe(false);
+    expect(existsSync(join(fixture.root, tx, 'bundle.tar'))).toBe(false);
     expect(fixture.read('etc/rc.d/S99_zz_attraccess_wago')).toContain('previous-build-hook');
     expect(fixture.containers()[0].running).toBe(true);
     expect(fixture.read(tx + '/phase')).toBe('staged\n');
@@ -108,6 +125,32 @@ describe('state-preserving update shell (isolated FW31 interfaces)', () => {
     success(acknowledge());
     expect(fixture.containers()).toHaveLength(1);
     expect(existsSync(join(fixture.root, tx))).toBe(false);
+  });
+
+  it('does not charge the unused temporary filesystem for a direct update transfer', () => {
+    fixture.file('bin/df', `#!/bin/sh\necho 'Filesystem 1024-blocks Used Available Capacity Mounted on'\ncase "$2" in */tmp) echo 'tmpfs 100 99 1 99% /tmp' ;; *) echo 'disk 999999 0 999999 0% /fixture' ;; esac\n`, 0o700);
+    success(stage());
+  });
+
+  it('receives the verified bundle when FW31 head has no byte-count option', () => {
+    rmSync(join(fixture.root, 'bin/head'));
+    fixture.file('bin/head', '#!/bin/sh\necho "head: invalid option -- c" >&2\nexit 1\n', 0o700);
+    success(stage());
+  });
+
+  it('does not mistake short dd input blocks for the end of a valid transfer', () => {
+    rmSync(join(fixture.root, 'bin/dd'));
+    fixture.file('bin/dd', '#!/bin/sh\ncase "$1" in bs=1) if test "$2" = count=8193 && test -e "$FIXTURE_ROOT/var/lib/attraccess-wago-update-transaction/bundle.tar"; then echo capture >> "$FIXTURE_ROOT/receiver-metadata-captures.log"; fi; exec /bin/dd "$@" ;; esac\nsize=${1#bs=}\nif test "$size" -gt 256 && test "$2" = count=1; then exec /bin/dd bs=256 count=1; fi\nexec /bin/dd "$@"\n', 0o700);
+    success(stage());
+    // Full guarded metadata capture is needed for final validation, not for
+    // every short input block of an 80 MiB transfer.
+    expect(fixture.read('receiver-metadata-captures.log').trim().split('\n')).toHaveLength(1);
+  });
+
+  it('rejects failed image extraction even if Docker accepts the partial input', () => {
+    fixture.file('bin/tar', '#!/bin/sh\nif [ "$1" = --version ]; then echo "GNU tar fixture"; exit 0; fi\ncase "$*" in *image.tar*) printf partial; exit 1 ;; esac\nshift 2\nexec /usr/bin/tar "$@"\n', 0o700);
+    expect(stage().status).not.toBe(0);
+    expect(fixture.containers()[0]).toMatchObject({ running: true, imageId: previousImageId });
   });
 
   it('restores the prior container and its stopped-state checkpoint after readiness failure or reboot', () => {

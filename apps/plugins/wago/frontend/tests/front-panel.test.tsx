@@ -1,14 +1,16 @@
 // Tests live controls and apply behavior with isolated controller endpoints.
 // FEATURE: WAGO front panel edits never replace applied control routing.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { FrontPanel } from '../src/front-panel/FrontPanel';
 import { useFrontPanel } from '../src/front-panel/useFrontPanel';
 import { DIGITAL_TERMINALS } from '../../backend/configuration-digital';
-import { updateTerminal } from '../src/front-panel/model';
+import { addDevice, updateTerminal } from '../src/front-panel/model';
+import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
+import { encodeMeasurement } from '../../measurement-contract';
 
 const api = vi.hoisted(() => ({
   getDraft: vi.fn(),
@@ -56,6 +58,62 @@ let client: QueryClient;
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={client}>{children}</QueryClientProvider>
 );
+
+it('shows all meter sections and keeps available phases current when one register faults', async () => {
+  const configuration = addDevice(
+    { snapshot: { version: 1, physicalPoints: [], logicalChannels: [] }, metadata: { names: {}, presets: [] } },
+    'Three-phase meter',
+  ).configuration;
+  const meterDraft = {
+    ...draft,
+    snapshot: JSON.stringify(configuration.snapshot),
+    presetProvenance: JSON.stringify({ editor: configuration.metadata }),
+  };
+  api.getDraft.mockResolvedValue(meterDraft);
+  api.baseline.mockResolvedValue({ ...meterDraft, revision: 7, state: 'applied' });
+  const data = api.diagnostics().data;
+  api.diagnostics.mockReturnValue({
+    ...api.diagnostics(),
+    data: {
+      ...data,
+      channels: configuration.snapshot.logicalChannels.map((channel) => {
+        const point = configuration.snapshot.physicalPoints.find((point) => point.id === channel.physicalPointId);
+        const measurement = BUILTIN_MODBUS_PROFILES[0].measurements.find((m) => m.id === point?.modbus?.measurementId);
+        if (!measurement) throw new Error('Missing measurement fixture');
+        const fault = measurement.id === 'ct-ratio' ? { code: 'modbus_exception' } : null;
+        const value = measurement.id === 'meter-code' ? 0x1112 : measurement.id === 'frequency' ? 50.123 : 0;
+        return {
+          id: channel.id,
+          current: !fault,
+          fault,
+          samples: [
+            {
+              ...encodeMeasurement(channel.id, value, {
+                unit: measurement.unit,
+                scale: 1,
+                offset: 0,
+                kind: measurement.kind,
+              }),
+              kind: 'measurement',
+              current: !fault,
+            },
+          ],
+        };
+      }),
+    },
+  });
+  render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+  await screen.findByText('L2 voltage');
+  expect(screen.getByText('L3 voltage')).toBeTruthy();
+  expect(screen.getByText('50.123 Hz')).toBeTruthy();
+  expect(screen.getByLabelText('Online')).toBeTruthy();
+  expect(screen.queryByText(/No response from address/)).toBeNull();
+  expect(screen.getByText('Some registers could not be read. Available readings remain current.')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Active energy & tariffs' }));
+  expect(await screen.findByText('Imported energy T4')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Meter information & settings' }));
+  expect(await screen.findByText('0x1112')).toBeTruthy();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -245,7 +303,7 @@ describe('front panel', () => {
     expect(result.current.dirty).toBe(true);
   });
 
-  it('saves, reviews and publishes from one apply action and retains the revision acknowledgement wait', async () => {
+  it('requires confirmation even without flow impacts and retains the revision acknowledgement wait', async () => {
     const { result } = renderHook(() => useFrontPanel(1), { wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     act(() =>
@@ -254,10 +312,45 @@ describe('front panel', () => {
       ),
     );
     act(() => result.current.apply());
-    await waitFor(() => expect(api.publish).toHaveBeenCalledWith(1, false, 'reviewed'));
+    await waitFor(() => expect(result.current.review).not.toBeNull());
+    expect(api.publish).not.toHaveBeenCalled();
+    act(() => result.current.confirmApply());
+    await waitFor(() => expect(api.publish).toHaveBeenCalledWith(1, true, 'reviewed'));
     expect(api.validate).toHaveBeenCalledTimes(1);
     expect(api.save).toHaveBeenCalledWith(1, expect.anything(), expect.anything(), draft);
     await waitFor(() => expect(result.current.pending).toBe(true));
+  });
+
+  it.each([
+    { value: true, current: true, label: 'HIGH (on)' },
+    { value: false, current: true, label: 'LOW (off)' },
+    { value: true, current: false, label: 'State unavailable' },
+  ])('shows $label and allows confirmation regardless of output state', async ({ value, current, label }) => {
+    const diagnostics = api.diagnostics();
+    diagnostics.data.channels[0].samples[0] = { kind: 'output', value, current };
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: /^Configure DO1/ }));
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'Changed label' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Apply configuration?' });
+    expect(within(dialog).getByText(label)).toBeTruthy();
+    expect(dialog.textContent).toContain('DO1 · Laser power');
+    expect(api.publish).not.toHaveBeenCalled();
+    const confirm = within(dialog).getByRole('button', { name: 'Apply to controller' });
+    await waitFor(() => expect(confirm.hasAttribute('disabled')).toBe(false));
+    fireEvent.click(confirm);
+    await waitFor(() => expect(api.publish).toHaveBeenCalledWith(1, true, 'reviewed'));
+  });
+
+  it('cancels apply confirmation without publishing', async () => {
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    act(() => result.current.apply());
+    await waitFor(() => expect(result.current.review).not.toBeNull());
+    act(() => result.current.cancelReview());
+    expect(result.current.review).toBeNull();
+    expect(api.publish).not.toHaveBeenCalled();
   });
 
   it('requires flow impact confirmation before publication', async () => {

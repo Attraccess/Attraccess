@@ -1,14 +1,33 @@
 #!/usr/bin/env node
-// Run after docker buildx build --platform linux/arm/v7 --load -t <image>.
+// --build compiles the ARMv7 image first. CI can package an already-built image.
 // Local dev and CI use the same packaging path; no registry or admin import is needed.
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { savedImageIdentity } from './docker-image-identity.mjs';
 
 const buildId = process.env.CC100_BUILD_ID ?? execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 if (!/^[a-f0-9]{40}$/.test(buildId)) throw new Error('CC100_BUILD_ID must be a full commit SHA');
 const image = `ghcr.io/attraccess/wago-cc100-runtime:${buildId}`;
+if (process.argv.includes('--build')) {
+  execFileSync(
+    'docker',
+    [
+      'buildx',
+      'build',
+      '--platform',
+      'linux/arm/v7',
+      '--load',
+      '-t',
+      image,
+      '-f',
+      'apps/plugins/wago/cc100-runtime/Dockerfile',
+      '.',
+    ],
+    { stdio: 'inherit' },
+  );
+}
 const [info] = JSON.parse(execFileSync('docker', ['image', 'inspect', image], { encoding: 'utf8' }));
 if (
   info.Os !== 'linux' ||
@@ -23,6 +42,7 @@ const stage = await mkdtemp(join(tmpdir(), 'cc100-build-'));
 try {
   const archive = join(stage, 'image.tar');
   execFileSync('docker', ['save', image, '-o', archive], { stdio: 'inherit' });
+  const imageId = savedImageIdentity(archive, image);
   // The offline reference is pinned by Docker config identity. It is never pulled
   // from a registry; the host verifies docker load against release.json.imageId.
   execFileSync(
@@ -32,9 +52,9 @@ try {
       '--image-archive',
       archive,
       '--image',
-      `${image}@${info.Id}`,
+      `${image}@${imageId}`,
       '--image-id',
-      info.Id,
+      imageId,
       '--build-id',
       buildId,
       '--version',

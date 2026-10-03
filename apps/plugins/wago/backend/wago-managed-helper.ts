@@ -1,3 +1,5 @@
+import { commissioningAcceptanceScript } from './wago-commissioning-accept';
+import { runtimeUpdateCapacityPreflightScript } from './wago-runtime-install';
 import type { BuildRuntimeArtifact } from './wago-build-runtime';
 import {
   runtimeUpdateStageScript,
@@ -6,8 +8,6 @@ import {
   runtimeUpdateRollbackScript,
   runtimeUpdateAcknowledgeScript,
 } from './wago-runtime-update-shell';
-import { runtimeBundleAcceptScript } from './wago-runtime-install';
-import { wagoDockerProvisionFinishScript } from './wago-hardware-deployment';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
 import { MANAGED_HELPER_PROTOCOL, managedInstallerPublishScript } from './wago-managed-installer';
 import {
@@ -49,7 +49,7 @@ case "$action" in proof) test "$digest$bytes$image$reference$previous" = '' || e
 config=${quote(testRoot + '/etc/attraccess-wago')}
 root=${quote(testRoot)}
 fail() { exit 1; }
-${wagoShellFilesystemGuard({ acquireLock: false })}
+${wagoShellFilesystemGuard({ acquireLock: false, createConfiguration: false })}
 case "$action" in
   access-boot)
     test "$digest$bytes$image$reference$previous" = '' || exit 1
@@ -97,29 +97,33 @@ case "$action" in
     exit 0 ;;
   commissioning-accept)
     test "$digest$bytes$image$reference$previous" = '' || exit 1
-    ${wagoShellFilesystemGuard()}
-    # Repeated acceptance is safe only when no installation journal remains.
-    if test -e ${quote(testRoot + '/var/lib/attraccess-wago-install-transaction')} || test -e ${quote(testRoot + '/var/lib/attraccess-wago-install-transaction.accepted-cleanup')}; then
-      for journal in ${quote(testRoot + '/var/lib/attraccess-wago-install-transaction')} ${quote(testRoot + '/var/lib/attraccess-wago-install-transaction.accepted-cleanup')}; do
-        if test -e "$journal" || test -L "$journal"; then
-          test -d "$journal" && test ! -L "$journal" || exit 1
-          test -f "$journal/token" && test ! -L "$journal/token" || exit 1
-          test "$(cat "$journal/token")" = "$token" || exit 1
-        fi
-      done
-      (${runtimeBundleAcceptScript(testRoot, true)})
-    fi
-    # Preparation acceptance forbids a pending runtime journal. Keep both
-    # receipts under one install lock and retire them in dependency order.
-    ${update(wagoDockerProvisionFinishScript(tokenExample, 'accepted', testRoot, true, true))}
-    printf 'OK\\n'; exit 0 ;;
+    ${commissioningAcceptanceScript(tokenExample, testRoot, true)}
+    exit 0 ;;
 esac
 case "$action" in
   installer-publish) ${managedInstallerPublishScript(testRoot)}
     exit 0 ;;
+  receiver-status)
+    test "$digest$bytes$image$reference$previous" = '' || exit 1
+    test "$(cat ${quote(testRoot + '/etc/attraccess-wago-management/token')})" = "$token" || exit 1
+    # Read-only compatibility evidence for older helpers using head -c.
+    if sample=$(printf x | timeout -k 5 10 head -c 1 2>/dev/null) && test "$sample" = x; then
+      printf 'head-byte-count supported\\n'
+    else printf 'head-byte-count unsupported\\n'; fi ;;
+  storage-status)
+    test "$digest$bytes$image$reference$previous" = '' || exit 1
+    test "$(cat ${quote(testRoot + '/etc/attraccess-wago-management/token')})" = "$token" || exit 1
+    (${runtimeUpdateCapacityPreflightScript(artifact.bytes, testRoot, false, true)}
+    # Inventory only this system's retained upload/journal paths. No pruning.
+    for retained in "$root/tmp/attraccess-wago-runtime.tar" "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib"/attraccess-wago-update-*; do
+      if test -e "$retained" || test -L "$retained"; then du -sk "$retained"; fi
+    done) ;;
   inspect)
     test "$digest$bytes$image$reference$previous" = '' || exit 1
-    ${wagoShellFilesystemGuard()}
+    # This is a point-in-time read. Ownership was validated above; taking the
+    # writer lock here would make a healthy runtime appear offline throughout
+    # every hardware gate. Mutating operations acquire their own bounded lock
+    # and validate the actual container/journal again before changing anything.
     printf '%s\\n' '${MANAGED_HELPER_PROTOCOL}'
     sha256sum -- ${quote(testRoot + '/usr/sbin/attraccess-wago-management')} | cut -d' ' -f1
     timeout -k 5 45 docker --host unix:///var/run/docker.sock inspect --format '{{.Image}} {{.State.Running}}' attraccess-wago ;;

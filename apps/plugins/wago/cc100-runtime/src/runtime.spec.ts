@@ -73,6 +73,80 @@ describe('WagoRuntime', () => {
     await runtime.start();
   });
 
+  it('forces hold-policy outputs off and rejects work while the server requires another image', async () => {
+    const held = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' as const } }],
+    };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(held), snapshot: held });
+    await transport.send(commands, validCommand());
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(true);
+    await transport.send(desired, { runtimeImageId: `sha256:${'b'.repeat(64)}` });
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(false);
+    await transport.send(commands, validCommand({ id: 'during-update' }));
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(false);
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ id: 'during-update', status: 'rejected', code: 'runtime_update' }),
+      }),
+    );
+    await runtime.publishHeartbeat();
+    expect(transport.published.filter((item) => item.topic.endsWith('/state')).at(-1)?.payload).toEqual(
+      expect.objectContaining({ readiness: expect.objectContaining({ ready: false, runtimeUpdate: true }) }),
+    );
+  });
+
+  it('requires fresh server confirmation at startup and after reconnect, rejecting retained confirmations', async () => {
+    const imageId = `sha256:${'a'.repeat(64)}`;
+    const store = new JsonStateStore(`/tmp/wago-policy-${Date.now()}-${Math.random()}.json`);
+    const held = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' as const } }],
+    };
+    await store.save({
+      accepted: { revision: 1, contentHash: hash(held), snapshot: held },
+      outputs: { load: true },
+      commandIds: [],
+    });
+    await device.write(snapshot.physicalPoints[0], true);
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      runtimeImageId: imageId,
+      store,
+      transport,
+      device,
+    });
+    await runtime.start();
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(false);
+    const token = () =>
+      (
+        transport.published.filter((item) => item.topic.endsWith('/heartbeat')).at(-1)?.payload as {
+          runtimePolicyToken: string;
+        }
+      ).runtimePolicyToken;
+    await transport.send(desired, { runtimeImageId: imageId, runtimePolicyToken: 'old-connection' });
+    await transport.send(commands, validCommand());
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(false);
+    const firstToken = token();
+    await transport.send(desired, { runtimeImageId: imageId, runtimePolicyToken: firstToken });
+    await transport.send(commands, validCommand({ id: 'confirmed' }));
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(true);
+    await runtime.setConnected(false);
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(false);
+    await runtime.setConnected(true);
+    await new Promise(setImmediate);
+    await runtime.publishHeartbeat();
+    await transport.send(desired, { runtimeImageId: imageId, runtimePolicyToken: firstToken });
+    await transport.send(commands, validCommand({ id: 'stale-policy' }));
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(false);
+    expect(token()).not.toBe(firstToken);
+    await transport.send(desired, { runtimeImageId: imageId, runtimePolicyToken: token() });
+    await transport.send(commands, validCommand({ id: 'reconnected' }));
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(true);
+  });
+
   it.each(['{', 'null', '{}', '{"id":"bad","channelId":"load","action":"unexpected"}'])(
     'ignores malformed command %s without performing device writes',
     async (payload) => {
@@ -682,7 +756,7 @@ describe('WagoRuntime', () => {
     expect(writes).toEqual([true, false, false]);
   });
 
-  it('de-energizes active pulses before applying a replacement configuration', async () => {
+  it('keeps active pulses until their deadline after applying a replacement configuration', async () => {
     const snapshot = pulsedSnapshot;
     const replacement: Snapshot = {
       ...snapshot,
@@ -699,10 +773,12 @@ describe('WagoRuntime', () => {
       snapshot: replacement,
     });
 
+    expect(device.values.get('751-9301:0')).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(device.values.get('751-9301:0')).toBe(false);
   });
 
-  it('keeps retrying a failed pulse shutdown until a replacement can de-energize it', async () => {
+  it('applies configuration while a scheduled pulse shutdown keeps retrying', async () => {
     const snapshot = pulsedSnapshot;
     jest.useFakeTimers();
     let failShutdown = false;
@@ -736,11 +812,11 @@ describe('WagoRuntime', () => {
       expect(transport.published).toContainEqual(
         expect.objectContaining({
           topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
-          payload: expect.objectContaining({ revision: 2, errors: expect.arrayContaining([expect.any(Object)]) }),
+          payload: expect.objectContaining({ revision: 2, errors: [] }),
         }),
       );
-      expect(shutdownAttempts).toBe(1);
-      await jest.advanceTimersByTimeAsync(3_100);
+      expect(shutdownAttempts).toBe(0);
+      await jest.advanceTimersByTimeAsync(3_110);
       expect(shutdownAttempts).toBe(6);
       await jest.advanceTimersByTimeAsync(5_000);
       expect(shutdownAttempts).toBe(7);
@@ -748,6 +824,8 @@ describe('WagoRuntime', () => {
       failShutdown = false;
       await transport.send(desired, { protocolVersion: 1, revision: 3, contentHash: hash(snapshot), snapshot });
 
+      expect(device.values.get('751-9301:0')).toBe(true);
+      await jest.advanceTimersByTimeAsync(5_000);
       expect(device.values.get('751-9301:0')).toBe(false);
       expect(transport.published).toContainEqual(
         expect.objectContaining({
@@ -802,7 +880,7 @@ describe('WagoRuntime', () => {
     releaseWrite();
     await Promise.all([pulse, replacement]);
 
-    expect(device.values.get('751-9301:0')).toBe(false);
+    expect(device.values.get('751-9301:0')).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(device.values.get('751-9301:0')).toBe(false);
   });
@@ -1677,7 +1755,7 @@ describe('WagoRuntime', () => {
     await transport.send(commands, validCommand({ id: 'command-2', expectedConfigurationRevision: 2 }));
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(writes).toEqual([true, false, true]);
+    expect(writes).toEqual([true, true]);
   });
 
   it('reports a feedback mismatch after the configured feedback timeout', async () => {

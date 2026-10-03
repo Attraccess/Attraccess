@@ -521,7 +521,9 @@ export function wagoCommissioningPreparationScript(
   testRoot = '',
   profile: Cc100HardwareProfile = WAGO_HARDWARE_PROFILE,
 ): string {
-  return `${provisionLock(token, testRoot)}
+  return `printf 'WAGO_PROGRESS=preparation-lock\\n'
+${provisionLock(token, testRoot)}
+printf 'WAGO_PROGRESS=preparation-inspect\\n'
 ${checks(testRoot)}
 [ "$platform" = supported ] || fail "$platform"
 case "$provision" in prepare-controller|install-vendor-runtime) ;; *) fail "$provision" ;; esac
@@ -554,6 +556,7 @@ if docker info >/dev/null 2>&1; then
 fi
 # The FW31 init has no status command. Explicit stop covers an active process
 # even when runtime selection is already 0; the selection override is vendor API.
+printf 'WAGO_PROGRESS=preparation-codesys\\n'
 timeout -k 5 30 "$root/etc/init.d/runtime" stop 1 >/dev/null 2>&1 || fail 'codesys-stop-failed'
 timeout -k 5 30 "$root/etc/init.d/runtime" stop 2 >/dev/null 2>&1 || fail 'codesys-stop-failed'
 ${codesysStopped()}
@@ -562,6 +565,7 @@ ${codesysDisabled()}
 sync || fail 'Controller persistence flush failed'
 ${codesysDisabled()}
 # Vendor install is a supported activation preparation using present binaries.
+printf 'WAGO_PROGRESS=preparation-docker\\n'
 if [ "$provision" = install-vendor-runtime ]; then
   boot_medium=$(timeout -k 5 10 "$root/etc/config-tools/get_filesystem_data" active-partition-medium) || fail 'Cannot verify Docker boot medium'
   case "$boot_medium" in ''|sd-card) fail 'Unsupported Docker boot medium' ;; esac
@@ -588,9 +592,12 @@ for container in $containers; do
     test "$(docker inspect --format '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$container")" = 'false no' || fail 'Previous runtime stop unverified'
   fi
 done
+printf 'WAGO_PROGRESS=preparation-io\\n'
 ${checks(testRoot)}
 [ "$exclusivity" = clear ] || fail "$exclusivity"
+printf 'WAGO_PROGRESS=preparation-permissions\\n'
 ${hardwareOwnership()}
+printf 'WAGO_PROGRESS=preparation-final\\n'
 ${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 test ! -L "$root/etc/rc.d/S99_zz_attraccess_wago" || fail 'Invalid runtime boot hook'
 wago_require_root_directory "$root/etc/rc.d" || fail 'Unsafe boot directory'
@@ -602,6 +609,7 @@ test -f "$boot_stage" && test ! -L "$boot_stage" && test "$(stat -c '%u:%g:%a:%h
 mv -f "$boot_stage" "$root/etc/rc.d/S99_zz_attraccess_wago"
 touch "$journal/started"
 trap - EXIT HUP INT TERM
+printf 'WAGO_PROGRESS=preparation-ready\\n'
 echo 'docker-provision=started'
 `;
 }

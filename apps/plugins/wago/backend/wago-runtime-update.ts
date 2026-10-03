@@ -20,10 +20,30 @@ export type RuntimeUpdateFailure =
   | 'host_gate'
   | 'release_changed'
   | 'transfer'
+  | 'transfer_size'
+  | 'transfer_checksum'
+  | 'transfer_timeout'
+  | 'receiver_tools'
   | 'load'
   | 'readiness'
   | 'interrupted'
-  | 'recovery';
+  | 'recovery'
+  | 'host_identity'
+  | 'authentication'
+  | 'ssh_agent'
+  | 'lock_tools'
+  | 'audit'
+  | 'runtime_assets'
+  | 'codesys_active'
+  | 'codesys_boot_enabled'
+  | 'io_unavailable'
+  | 'writer_conflict';
+
+export interface RuntimeStorageDiagnostic {
+  path: string;
+  requiredKiB: number;
+  availableKiB: number;
+}
 
 /** Public and durable metadata contains no SSH/MQTT credentials or raw transport errors. */
 export interface RuntimeUpdateRecord {
@@ -31,6 +51,8 @@ export interface RuntimeUpdateRecord {
   phase: RuntimeUpdatePhase;
   token: string | null;
   desiredImageId: string;
+  desiredRuntimeVersion?: string;
+  previousRuntimeVersion?: string | null;
   desiredDigest: string;
   buildId: string;
   installerSha256?: string;
@@ -40,6 +62,8 @@ export interface RuntimeUpdateRecord {
   updatedAt: number;
   retryAt: number;
   failure: RuntimeUpdateFailure | null;
+  /** Only validated capacity figures, never raw SSH output. */
+  storageDiagnostics?: RuntimeStorageDiagnostic[];
   /** Independent cleanup backoff preserves the accepted rollout and its receipt. */
   cleanupAttempt?: number;
   cleanupRetryAt?: number;
@@ -55,6 +79,7 @@ export interface RuntimeUpdateStore {
 
 export interface RuntimeUpdateInspection {
   imageId: string;
+  runtimeVersion?: string;
   /** Observed under pinned SSH, not inferred from the semver in a heartbeat. */
   managed: boolean;
   claimed: boolean;
@@ -96,8 +121,10 @@ export interface ManagedRuntimeUpdateHost {
 }
 
 export class RuntimeUpdateError extends Error {
-  constructor(readonly failure: RuntimeUpdateFailure) {
-    super(failure);
+  constructor(readonly failure: RuntimeUpdateFailure, readonly storageDiagnostics?: RuntimeStorageDiagnostic[]) {
+    super(
+      `CC100 runtime update failed: ${failure}. See the controller runtime status for the reason and recovery steps.`,
+    );
   }
 }
 
@@ -121,6 +148,7 @@ const CURRENT_RECHECK_MS = 5 * 60_000;
 export class WagoRuntimeUpdateCoordinator {
   private readonly running = new Set<number>();
   private readonly operations = new Set<AbortController>();
+  private readonly shutdownWaiters = new Set<() => void>();
   private stopped = false;
 
   constructor(
@@ -139,7 +167,11 @@ export class WagoRuntimeUpdateCoordinator {
    * Busy work is coalesced; callers retain/paginate their inventory rather than
    * creating an unbounded in-memory queue. Retry deadlines survive server restart.
    */
-  async reconcile(controllerId: number, retry = false): Promise<'busy' | 'deferred' | 'settled'> {
+  async reconcile(
+    controllerId: number,
+    retry = false,
+    observedImageId?: string,
+  ): Promise<'busy' | 'deferred' | 'settled'> {
     if (!Number.isSafeInteger(controllerId) || controllerId <= 0) throw new Error('Invalid controller ID');
     if (this.stopped || this.running.has(controllerId) || this.running.size >= this.concurrency) return 'busy';
     this.running.add(controllerId);
@@ -221,10 +253,17 @@ export class WagoRuntimeUpdateCoordinator {
         record.retryAt = this.now();
         await persist(record);
         if (!(await acknowledge(record))) return 'deferred';
+        // Recovery and supervisor handoff can consume most of an operation's
+        // deadline. Release the lease here; the next automatic scan starts the
+        // new rollout with its own full budget and the acknowledged journal gone.
+        return 'settled';
       }
       const desired = await this.desired();
       assertOwned();
-      if (record && record.desiredImageId === desired.imageId && record.retryAt > this.now()) return 'deferred';
+      const contradictedCurrent =
+        record?.phase === 'current' && observedImageId !== undefined && observedImageId !== desired.imageId;
+      if (record && !contradictedCurrent && record.desiredImageId === desired.imageId && record.retryAt > this.now())
+        return 'deferred';
       const attempt = (record?.desiredImageId === desired.imageId ? record.attempt : 0) + 1;
       let inspection: RuntimeUpdateInspection;
       try {
@@ -236,9 +275,12 @@ export class WagoRuntimeUpdateCoordinator {
           phase: 'blocked',
           token: null,
           desiredImageId: desired.imageId,
+          desiredRuntimeVersion: desired.manifest.runtimeVersion,
+          previousRuntimeVersion:
+            record?.desiredImageId === desired.imageId ? (record.previousRuntimeVersion ?? null) : null,
           desiredDigest: desired.digest,
           buildId: desired.buildId,
-          previousImageId: null,
+          previousImageId: record?.desiredImageId === desired.imageId ? record.previousImageId : null,
           attempt,
           startedAt: this.now(),
           updatedAt: this.now(),
@@ -247,15 +289,21 @@ export class WagoRuntimeUpdateCoordinator {
         });
         return 'settled';
       }
+      const previous = record;
+      const retainPrevious = previous?.desiredImageId === desired.imageId && inspection.imageId === desired.imageId;
       record = {
         controllerId,
         phase: 'blocked',
         token: null,
         desiredImageId: desired.imageId,
+        desiredRuntimeVersion: desired.manifest.runtimeVersion,
+        previousRuntimeVersion: retainPrevious
+          ? (previous.previousRuntimeVersion ?? inspection.runtimeVersion ?? null)
+          : (inspection.runtimeVersion ?? null),
         desiredDigest: desired.digest,
         buildId: desired.buildId,
         ...(desired.installerSha256 ? { installerSha256: desired.installerSha256 } : {}),
-        previousImageId: inspection.imageId,
+        previousImageId: retainPrevious ? (previous.previousImageId ?? inspection.imageId) : inspection.imageId,
         attempt,
         startedAt: this.now(),
         updatedAt: this.now(),
@@ -372,6 +420,8 @@ export class WagoRuntimeUpdateCoordinator {
         // for a later owner and the independently running host watchdog.
         assertOwned();
         record.failure = error instanceof RuntimeUpdateError ? error.failure : 'interrupted';
+        if (error instanceof RuntimeUpdateError && error.storageDiagnostics?.length)
+          record.storageDiagnostics = error.storageDiagnostics;
         record.phase = 'recovering';
         await persist(record);
         try {
@@ -391,15 +441,22 @@ export class WagoRuntimeUpdateCoordinator {
     } finally {
       clearTimeout(timer);
       operation.abort();
-      this.operations.delete(operation);
       if (acquired) await this.store.release(controllerId, owner).catch(() => undefined);
       this.running.delete(controllerId);
+      this.operations.delete(operation);
+      if (this.operations.size === 0) {
+        for (const resolve of this.shutdownWaiters) resolve();
+        this.shutdownWaiters.clear();
+      }
     }
   }
 
-  stop() {
+  async stop(): Promise<void> {
     this.stopped = true;
     for (const operation of this.operations) operation.abort();
+    // Nest must not close the store while cancelled connections are still
+    // unwinding their finally blocks and releasing the device-operation lease.
+    if (this.operations.size > 0) await new Promise<void>((resolve) => this.shutdownWaiters.add(resolve));
   }
 
   private async assertCurrent(imageId: string) {

@@ -1,54 +1,70 @@
 {
   "controllers": {
     "title": "WAGO controllers",
-    "description": "Commission a controller through a host-key-pinned SSH session; controller credentials are never displayed here.",
+    "description": "Manage your CC100 controllers, configuration and software updates.",
     "loadError": "Could not load WAGO controllers",
     "commission": "Commission controller",
     "table": "WAGO controllers and commissioning sessions",
-    "controller": "Controller",
-    "trust": "Trust",
-    "connection": "Connection",
-    "runtime": "Runtime",
-    "heartbeat": "Last heartbeat",
+    "controller": "Device",
+    "runtime": "Software",
+    "heartbeat": "Last seen",
     "actions": "Actions",
-    "claim": "Claim",
+    "claim": "Enroll",
     "configure": "Configure",
-    "updateRuntime": "Runtime updates",
-    "progress": "View progress",
-    "resume": "Resume",
+    "progress": "Setup progress",
+    "resume": "Continue setup",
     "empty": "No controllers or commissioning sessions yet.",
-    "never": "Never",
-    "enrollment": "CC100 enrollment",
-    "enrolling": "Enrolling",
+    "never": "Not seen yet",
+    "enrollment": "CC100 setup",
+    "enrolling": "Setting up",
     "inProgress": "In progress",
     "updated": "Updated {{date}}",
-    "verified": "Enrollment complete · runtime verified",
-    "pending": "Enrollment complete · runtime setup pending",
-    "unavailable": "Verification status unavailable"
+    "verified": "Setup complete",
+    "pending": "Configuration pending",
+    "unavailable": "Status unavailable",
+    "runtimeUpdatePending": "Software update pending",
+    "status": "Status",
+    "registration": "Enrollment",
+    "setupPending": "Setup pending",
+    "attention": "Needs attention",
+    "details": "Details",
+    "detailsFor": "Details for {{name}}",
+    "hardwareId": "Device ID",
+    "address": "IP address",
+    "systemFirmware": "WAGO firmware",
+    "search": "Search by name, device ID or IP address",
+    "noResults": "No matching controllers.",
+    "pagination": "Controller pages",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "pageSummary": "{{from}}–{{to}} of {{total}} devices",
+    "pageNumber": "Page {{page}} of {{total}}"
   },
-  "trust": { "claimed": "claimed", "untrusted": "untrusted" },
-  "connectivity": { "online": "online", "offline": "offline", "stale": "stale", "unknown": "unknown" },
+  "trust": {
+    "claimed": "Enrolled",
+    "untrusted": "Not enrolled"
+  },
+  "connectivity": {
+    "untrusted": "not enrolled",
+    "online": "online",
+    "offline": "offline",
+    "stale": "Not responding",
+    "unknown": "Status unknown",
+    "runtime_update": "Software update"
+  },
   "commissioning": {
-    "awaiting_delivery": "Preparing automatic delivery",
-    "delivering": "Delivering commissioning runtime",
-    "awaiting_identity_confirmation": "Ready to verify the physical controller",
-    "awaiting_codesys_confirmation": "Waiting for destructive installation approval",
-    "delivery_failed": "Delivery needs attention",
-    "awaiting_discovery": "Waiting for the controller to connect",
-    "awaiting_claim": "Claiming automatically",
-    "completed": "Claimed",
-    "awaiting_verification": "Verification required",
-    "claim_interrupted": "Claim recovery required",
-    "recovery_revocation_pending": "Restored; revocation pending",
-    "revoked": "Revoked"
-  },
-  "runtimeUpdate": {
-    "title": "Runtime update",
-    "running": "Running runtime:",
-    "protocol": "protocol",
-    "unavailable": "No in-place update yet",
-    "description": "Attraccess cannot update this controller's runtime without a full reinstall. The only current path is re-running commissioning, which wipes applications, data and configuration on the CC100 and reinstalls from scratch. That is why it is not offered here as a one-click action. Automatic, non-destructive runtime updates are tracked in ATT-1099.",
-    "understood": "Understood"
+    "awaiting_delivery": "Waiting to install",
+    "delivering": "Installing software",
+    "awaiting_identity_confirmation": "Confirm device identity",
+    "awaiting_codesys_confirmation": "Approve installation",
+    "delivery_failed": "Installation failed",
+    "awaiting_discovery": "Waiting for connection",
+    "awaiting_claim": "Completing enrollment",
+    "completed": "Enrolled",
+    "awaiting_verification": "Checking setup",
+    "claim_interrupted": "Enrollment interrupted",
+    "recovery_revocation_pending": "Finishing recovery",
+    "revoked": "Enrollment cancelled"
   },
   "settings": {
     "title": "WAGO settings",
@@ -59,11 +75,11 @@
     "save": "Save settings"
   },
   "claim": {
-    "title": "Claim controller",
+    "title": "Enroll controller",
     "description": "Verify physical access to this controller before it can receive commands.",
     "name": "Controller name",
     "verifier": "Physical pairing code or fingerprint",
-    "submit": "Verify and claim"
+    "submit": "Verify and enroll"
   },
   "remove": {
     "title": "Remove controller",
@@ -86,6 +102,7 @@
     "refresh": "Refresh",
     "cancel": "Cancel",
     "remove": "Remove",
-    "retry": "Please try again."
+    "retry": "Please try again.",
+    "close": "Close"
   }
 }

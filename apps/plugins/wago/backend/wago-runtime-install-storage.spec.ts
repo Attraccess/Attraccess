@@ -6,6 +6,7 @@ import {
   runtimeBundleCapacityPreflightScript,
   runtimeBundlePreflightScript,
   runtimeBundleStagingCapacityPreflightScript,
+  runtimeUpdateCapacityPreflightScript,
 } from './wago-runtime-install';
 
 describe('read-only runtime capacity preflight (isolated commands only)', () => {
@@ -65,6 +66,20 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
     );
   });
   afterEach(() => fixture.dispose());
+
+  it('budgets one update archive and Docker reserve only on their actual filesystems', () => {
+    layout([1, 2, 3, 4], [0, 0, b + reserve, 3 * b + reserve]);
+    const update = () => fixture.run(runtimeUpdateCapacityPreflightScript(bytes, fixture.root));
+    expect(update().status).toBe(0);
+    layout([1, 2, 3, 4], [0, 0, b + reserve - 1, 3 * b + reserve]);
+    expect(update().stderr).toContain(`/var/lib requires ${b + reserve} KiB, available ${b + reserve - 1} KiB`);
+    layout([1, 2, 3, 4], [0, 0, b + reserve, 3 * b + reserve - 1]);
+    expect(update().stderr).toContain(`/home requires ${3 * b + reserve} KiB`);
+    layout([1, 2, 3, 3], [0, 0, 4 * b + reserve - 1, 4 * b + reserve - 1]);
+    expect(update().status).not.toBe(0);
+    layout([1, 2, 3, 3], [0, 0, 4 * b + reserve, 4 * b + reserve]);
+    expect(update().status).toBe(0);
+  });
 
   it('checks unprepared staging with inactive Docker without querying or activating it', () => {
     fixture.file('daemon', 'stopped');

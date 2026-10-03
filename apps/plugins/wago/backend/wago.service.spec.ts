@@ -139,6 +139,37 @@ describe('WagoService', () => {
     };
   }
 
+  it('lists a connected mismatched runtime in a dedicated update status and publishes a connection-bound policy', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: new Date().toISOString() };
+    const { service, context, revisionRepository } = createService([claimed]);
+    service.registerRuntimeStatusHandler(() => undefined);
+    expect((await service.list())[0].connectivity).toBe('runtime_update');
+    revisionRepository.find.mockResolvedValueOnce([
+      { revision: 1, snapshot: JSON.stringify({ logicalChannels: [{ id: 'load', capabilities: ['output'] }] }) },
+    ]);
+    await expect(
+      service.executeCommand({
+        controllerId: 1,
+        channelId: 'load',
+        action: 'set',
+        value: true,
+        expectedConfigurationRevision: 1,
+      }),
+    ).rejects.toThrow('Runtime update required');
+    expect(context.mqtt.publish).not.toHaveBeenCalled();
+    const desired = `sha256:${'a'.repeat(64)}`;
+    await service.setRuntimePolicy(1, desired, `sha256:${'b'.repeat(64)}`, 'connection-token');
+    expect((await service.list())[0].connectivity).toBe('runtime_update');
+    expect(context.mqtt.publish).toHaveBeenCalledWith(
+      2,
+      expect.stringContaining('configuration/desired'),
+      JSON.stringify({ runtimeImageId: desired, runtimePolicyToken: 'connection-token' }),
+      { qos: 1, retain: false },
+    );
+    await service.setRuntimePolicy(1, desired, desired, 'connection-token');
+    expect((await service.list())[0].connectivity).toBe('online');
+  });
+
   it('revokes a claimed controller before deleting its local records', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, enrollmentId: null };
     const { service, context, controllerRepository, draftRepository, revisionRepository } = createService([claimed]);

@@ -4,14 +4,37 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { generateManagementKey } from './wago-management-key';
 import { WagoManagedAccess } from './wago-managed-access.entity';
-import { managedSsh } from './wago-managed-ssh';
+import { managedSsh, managedSshFailure, managedSshStorageDiagnostics } from './wago-managed-ssh';
+
+it.each([
+  ['head: invalid option -- c', 'receiver_tools'],
+  ['Runtime transfer receiver failed', 'receiver_tools'],
+  ['Runtime transfer receiver timed out', 'transfer_timeout'],
+  ['Incomplete or oversized runtime transfer', 'transfer_size'],
+  ['Runtime checksum mismatch', 'transfer_checksum'],
+] as const)('keeps the specific transfer failure %s', (stderr, failure) => {
+  expect(managedSshFailure(stderr, 'transfer')).toBe(failure);
+});
+
+it('preserves only bounded numeric storage diagnostics from SSH stderr', () => {
+  expect(managedSshStorageDiagnostics('fixture-secret\nInsufficient runtime storage: /var/lib requires 180397 KiB, available 176652 KiB\n')).toEqual([
+    { path: '/var/lib', requiredKiB: 180397, availableKiB: 176652 },
+  ]);
+  for (const line of [
+    'Insufficient runtime storage: /var/lib requires nope KiB, available 1 KiB',
+    'Insufficient runtime storage: /var/../secret requires 2 KiB, available 1 KiB',
+    'Insufficient runtime storage: /var/lib requires 9999999999999 KiB, available 1 KiB',
+    'Insufficient runtime storage: /var/lib requires 1 KiB, available 2 KiB',
+    'Insufficient runtime storage: /var/lib requires 2 KiB, available 1 KiB fixture-secret',
+  ]) expect(managedSshStorageDiagnostics(line)).toEqual([]);
+});
 
 describe('production managed SSH transport', () => {
   afterEach(() => jest.restoreAllMocks());
   const host = '10.77.0.7',
     token = 'a'.repeat(32);
 
-  function fixture(mode: 'ok' | 'host-change' | 'wait' | 'noisy') {
+  function fixture(mode: 'ok' | 'host-change' | 'wait' | 'noisy' | 'storage') {
     const hostKey = generateManagementKey(),
       identity = generateManagementKey();
     const actualSpawn = jest.requireActual<typeof processes>('node:child_process').spawn;
@@ -46,6 +69,8 @@ describe('production managed SSH transport', () => {
             ? 'process.stdin.resume(); setInterval(()=>{},1000)'
             : mode === 'noisy'
               ? 'process.stderr.write("fixture-secret".repeat(2000)); setInterval(()=>{},1000)'
+              : mode === 'storage'
+                ? 'process.stdin.resume(); process.stdin.on("end",()=>{process.stderr.write("Insufficient runtime storage: /var/lib requires 180396 KiB, available 179724 KiB\\nfixture-secret\\n");process.exitCode=1})'
               : 'const chunks=[];process.stdin.on("data",c=>chunks.push(c));process.stdin.on("end",()=>process.stdout.write(Buffer.concat(chunks).toString("base64")))';
         child = actualSpawn(process.execPath, ['-e', script], options);
         releaseStarted();
@@ -72,8 +97,16 @@ describe('production managed SSH transport', () => {
     const test = fixture('host-change');
     await expect(
       managedSsh(test.target, test.identity.privateKey, `proof ${token}`, new AbortController().signal),
-    ).rejects.toThrow('identity changed');
+    ).rejects.toMatchObject({ failure: 'host_identity' });
     expect(test.calls.map((call) => call.command)).toEqual(['ssh-keyscan']);
+    expectReaped(test.children);
+  });
+
+  it('returns actionable capacity figures from a failed SSH operation without returning raw stderr', async () => {
+    const test = fixture('storage');
+    const failure = await managedSsh(test.target, test.identity.privateKey, `storage-status ${token}`, new AbortController().signal).catch(error => error);
+    expect(failure).toMatchObject({ failure: 'storage', storageDiagnostics: [{ path: '/var/lib', requiredKiB: 180396, availableKiB: 179724 }] });
+    expect(failure.message).not.toContain('fixture-secret');
     expectReaped(test.children);
   });
 

@@ -12,7 +12,7 @@ import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import { WagoCredentialRotationService } from './wago-credential-rotation';
 import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
-import { WagoArtifactsController, WagoArtifactUploadInterceptor } from './wago-artifacts.controller';
+import { WagoArtifactsController } from './wago-artifacts.controller';
 import { WagoDiagnosticsController } from './diagnostics.controller';
 import { WagoDiagnosticsService } from './diagnostics.service';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
@@ -78,7 +78,6 @@ const plugin: PluginBackendModule = {
           },
         },
         WagoRuntimeArtifactsService,
-        WagoArtifactUploadInterceptor,
         WagoCommissioningReadiness,
         WagoDiagnosticsService,
         WagoManagedRuntimeService,

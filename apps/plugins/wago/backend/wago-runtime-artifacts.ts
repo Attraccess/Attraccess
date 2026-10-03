@@ -433,7 +433,10 @@ export class WagoRuntimeArtifactCatalog {
 /** Register alongside WagoArtifactsController. */
 @Injectable()
 export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
-  private readonly buildDirectory = process.env.WAGO_CC100_BUILD_ASSETS_PATH?.trim();
+  private readonly buildDirectory = resolve(
+    process.env.WAGO_CC100_BUILD_ASSETS_PATH?.trim() ||
+      join(process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage'), 'cc100-runtime'),
+  );
   private owned?: Promise<WagoRuntimeArtifactCatalog>;
 
   constructor() {
@@ -444,7 +447,6 @@ export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
 
   private buildCatalog(): Promise<WagoRuntimeArtifactCatalog> {
     const directory = this.buildDirectory;
-    if (!directory) throw new Error('No build runtime assets configured');
     // Lazy loading avoids a module cycle with the reusable base catalog.
     this.owned ??= import('./wago-build-runtime').then(
       ({ WagoBuildRuntimeCatalog }) =>
@@ -458,7 +460,7 @@ export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
 
   override async onModuleInit() {
     await super.onModuleInit();
-    if (this.buildDirectory) await (await this.buildCatalog()).onModuleInit();
+    if (process.env.NODE_ENV === 'production') await (await this.buildCatalog()).onModuleInit();
   }
 
   override async onModuleDestroy() {
@@ -467,18 +469,31 @@ export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
   }
 
   override async current() {
-    return this.buildDirectory ? (await this.buildCatalog()).current() : super.current();
+    // Development can start before the explicit build/install target has run.
+    // Never fall back to the legacy mutable import pointer in shared storage.
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        await lstat(join(this.buildDirectory, 'release.json'));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      }
+    }
+    return (await this.buildCatalog()).current();
   }
 
   override async list() {
-    return this.buildDirectory ? (await this.buildCatalog()).list() : super.list();
+    const current = await this.current();
+    return current ? [current] : [];
   }
 
   override async acquire(digest?: string) {
-    return this.buildDirectory ? (await this.buildCatalog()).acquire(digest) : super.acquire(digest);
+    if (!(await this.current())) throw new ConflictException('Build and install the bundled CC100 runtime first.');
+    return (await this.buildCatalog()).acquire(digest);
   }
 
-  override async import(upload: RuntimeArtifactUpload) {
-    return this.buildDirectory ? (await this.buildCatalog()).import(upload) : super.import(upload);
+  override async import(upload: RuntimeArtifactUpload): Promise<never> {
+    for (const stream of Object.values(upload)) stream.destroy();
+    throw new ConflictException('The server build owns the CC100 runtime. Custom runtime imports are not supported.');
   }
 }
