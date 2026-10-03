@@ -206,8 +206,8 @@ Das Haupt-Dashboard enthält Panels für:
 | **Resources** | Gesamtressourcen und aktive Nutzungssitzungen |
 | **Resource Usage Duration** | p50- und p95-Sitzungsdauern |
 | **Resource Usage Sessions** | Gestartete und beendete Sitzungen über die Zeit |
-| **Connected Devices** | Anzahl verbundener Attractap-NFC-Leser |
-| **NFC Tap Events** | Tap-Ereignisse über die Zeit |
+| **Connected Devices** | Anzahl verbundener Attractap-RFID-Leser |
+| **RFID Tap Events** | Tap-Ereignisse über die Zeit |
 | **Billing Transactions** | Transaktionsanzahl nach Status |
 | **Emails Sent** | E-Mail-Zustellungsanzahl |
 | **System Overview** | Projekte, Gruppen, MQTT-Server, überfällige Wartung |

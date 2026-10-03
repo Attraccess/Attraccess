@@ -55,7 +55,7 @@ FetchContent_MakeAvailable(ArduinoJson)
 
 file(GLOB_RECURSE ATTRACTAP_FIRMWARE_SOURCES "${FIRMWARE_DIR}/src/*.cpp")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/main\\.cpp$")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/nfc/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/rfid/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/websocket/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/demo_websocket\\.cpp$")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/ota/")
@@ -104,7 +104,7 @@ add_library(attractap-desktop-runtime
     src/host_runtime.cpp
     src/host_websocket.cpp
     src/profile_store.cpp
-    src/virtual_nfc.cpp
+    src/virtual_rfid.cpp
     src/sdl_display.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/device_shell.S")
 target_include_directories(attractap-desktop-runtime PUBLIC
@@ -135,7 +135,7 @@ add_executable(attractap-desktop-tests
     src/host_runtime.cpp
     src/host_websocket.cpp
     src/profile_store.cpp
-    src/virtual_nfc.cpp)
+    src/virtual_rfid.cpp)
 target_include_directories(attractap-desktop-tests PRIVATE src "${FIRMWARE_DIR}/src")
 target_compile_definitions(attractap-desktop-tests PRIVATE ATTRACTAP_HOST)
 target_link_libraries(attractap-desktop-tests PRIVATE CURL::libcurl Threads::Threads attractap-production-host)

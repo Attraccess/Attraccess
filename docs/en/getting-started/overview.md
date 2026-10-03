@@ -18,9 +18,9 @@ Require users to receive a safety briefing before they can use a resource. Intro
 
 Schedule regular maintenance for your resources. Attraccess shows the current maintenance status and sends reminders when maintenance is due.
 
-### NFC Access Control
+### RFID Access Control
 
-With the **Attractap NFC Reader**, you can control physical access to machines via NFC cards. Users hold their card to the reader, and Attraccess checks their permissions.
+With the **Attractap RFID Reader**, you can control physical access to machines via RFID cards. Users hold their card to the reader, and Attraccess checks their permissions.
 
 ### Flows & Automation
 
@@ -44,7 +44,7 @@ Attraccess consists of:
 
 - **Web Application** – React frontend with NestJS backend
 - **Database** – SQLite (no separate database server needed)
-- **NFC Hardware** – Attractap reader (ESP32-based, optional)
+- **RFID Hardware** – Attractap reader (ESP32-based, optional)
 - **Deployment** – Docker container
 
 ## Next Steps

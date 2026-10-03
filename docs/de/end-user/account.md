@@ -50,18 +50,18 @@ Die Zwei-Faktor-Authentifizierung fügt Ihrem Konto eine zusätzliche Sicherheit
 > [!WARNING]
 > Wenn Sie den Zugang zu Ihrer Authenticator-App verlieren, müssen Sie sich an Ihren Werkstattadministrator wenden, um 2FA auf Ihrem Konto zurückzusetzen.
 
-## NFC-Karten
+## RFID-Karten
 
-Wenn Ihre Werkstatt Attractap-NFC-Leser verwendet, können Sie die mit Ihrem Konto verknüpften NFC-Karten einsehen.
+Wenn Ihre Werkstatt Attractap-RFID-Leser verwendet, können Sie die mit Ihrem Konto verknüpften RFID-Karten einsehen.
 
 1. Navigieren Sie zu **Mein Konto**
-2. Finden Sie den Abschnitt **NFC-Karten**
+2. Finden Sie den Abschnitt **RFID-Karten**
 3. Sehen Sie Ihre registrierten Karten ein
 
-<!-- TODO: Screenshot des NFC-Karten-Abschnitts -->
+<!-- TODO: Screenshot des RFID-Karten-Abschnitts -->
 
 > [!NOTE]
-> NFC-Karten werden in der Regel von einem Werkstattadministrator oder über einen Attractap-Leser registriert. Wenden Sie sich an Ihren Administrator, wenn Sie eine neue Karte registrieren müssen.
+> RFID-Karten werden in der Regel von einem Werkstattadministrator oder über einen Attractap-Leser registriert. Wenden Sie sich an Ihren Administrator, wenn Sie eine neue Karte registrieren müssen.
 
 ## Konto löschen
 

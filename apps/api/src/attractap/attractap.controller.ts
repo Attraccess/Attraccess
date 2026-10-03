@@ -20,11 +20,11 @@ import { AuthenticatedRequest, Auth, Attractap } from '@attraccess/plugins-backe
 import { ApiOperation, ApiResponse, ApiParam, ApiTags, ApiBody, ApiProduces } from '@nestjs/swagger';
 import { WebsocketService } from './websockets/websocket.service';
 import { AttractapService } from './attractap.service';
-import { EnrollNfcCardDto } from './dtos/enroll-nfc-card.dto';
-import { ResetNfcCardDto } from './dtos/reset-nfc-card.dto';
+import { EnrollNfcCardDto } from './dtos/enroll-rfid-card.dto';
+import { ResetNfcCardDto } from './dtos/reset-rfid-card.dto';
 import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
-import { EnrollNfcCardResponseDto } from './dtos/enroll-nfc-card-response.dto';
-import { ResetNfcCardResponseDto } from './dtos/reset-nfc-card-response.dto';
+import { EnrollNfcCardResponseDto } from './dtos/enroll-rfid-card-response.dto';
+import { ResetNfcCardResponseDto } from './dtos/reset-rfid-card-response.dto';
 import { UpdateReaderDto } from './dtos/update-reader.dto';
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 import { RequiresLicense } from '../license/require-license.decorator';

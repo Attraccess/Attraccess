@@ -1,8 +1,8 @@
 # Den Attractap-Leser benutzen
 
-Mit Ihrer NFC-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
+Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
 
-Sie benötigen eine NFC-Karte, die mit Ihrem Attraccess-Konto verknüpft ist. Wenn Sie noch keine haben, bitten Sie Ihr Werkstattteam, eine Karte für Sie zu registrieren.
+Sie benötigen eine RFID-Karte, die mit Ihrem Attraccess-Konto verknüpft ist. Wenn Sie noch keine haben, bitten Sie Ihr Werkstattteam, eine Karte für Sie zu registrieren.
 
 ## Mit der Karte anmelden
 
@@ -92,5 +92,5 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 ## Weiterführende Anleitungen
 
 - [Ressourcen nutzen](end-user/using-resources.md) – Maschinen und Werkzeuge über die Attraccess-App nutzen
-- [NFC-Karten](attractap/nfc-cards.md) – Karten registrieren und verwalten
+- [RFID-Karten](attractap/rfid-cards.md) – Karten registrieren und verwalten
 - [Einweisungen](resources/introductions.md) – Wie Sie Zugang zu einer Ressource erhalten
