@@ -29,12 +29,22 @@ import { NpmPluginPackage, parseNpmPluginPackage } from './npm-plugin-contract';
 import { PluginMigrationService } from './plugin-migration.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 import * as semver from 'semver';
+import {
+  PluginDependency,
+  orderPluginDependencies,
+  pluginRemovalClosure,
+  resolvePluginDependencies,
+} from './plugin-dependencies';
 import { PluginClassificationService } from './plugin-classification.service';
 
 const REGISTRY_PARENT = 'plugin-registry';
 const REGISTRIES_KEY = 'registries';
 const UPDATE_POLICY_KEY = 'update-policy';
 const STATE_FILE = '.npm-plugin-state.json';
+const TRANSACTION_FILE = '.npm-plugin-transaction.json';
+type PluginFileMove = { installPath: string; backupName: string; hadTarget: boolean; quarantineError?: string };
+type PluginTransaction = { after: string; moves: PluginFileMove[] };
+
 const BACKUP_DIRECTORY = '.npm-backups';
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 const MAX_METADATA_BYTES = 10 * 1024 * 1024;
@@ -68,6 +78,7 @@ export type NpmPluginAuditState = {
 };
 
 export type InstalledNpmPluginVersion = {
+  dependencies?: PluginDependency[];
   version: string;
   publishedAt: string | null;
   direction: 'current' | 'newer' | 'older';
@@ -101,6 +112,7 @@ export const DEFAULT_PLUGIN_UPDATE_POLICY: PluginUpdatePolicy = {
 };
 
 export type InstalledNpmPlugin = {
+  dependencies?: PluginDependency[];
   name: string;
   version: string;
   requestedSpec: string;
@@ -130,7 +142,27 @@ export type InstalledNpmPlugin = {
   knownGoodVersion?: string | null;
 };
 
+export type PluginInstallPlan = {
+  root: string;
+  stateHash: string;
+  token: string;
+  plugins: Array<{
+    name: string;
+    version: string;
+    displayName: string;
+    action: 'install' | 'reuse' | 'replace';
+    permissions: string[];
+    dependencies: PluginDependency[];
+    integrity: string | null;
+    classification: 'official' | 'community';
+    registryUrl?: string;
+  }>;
+};
+type ResolvedPlugin = PluginInstallPlan['plugins'][number];
+type PreparedPlugin = { installed: InstalledNpmPlugin; source: string; staging: string };
+
 export type MarketplacePlugin = {
+  dependencies?: PluginDependency[];
   name: string;
   version: string | null;
   displayName: string | null;
@@ -231,6 +263,25 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   static async recoverBackups(): Promise<void> {
     if (!PluginService.PLUGIN_PATH) return;
     const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
+    const journalPath = join(PluginService.PLUGIN_PATH, TRANSACTION_FILE);
+    if (existsSync(journalPath)) {
+      const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as PluginTransaction;
+      const committed = JSON.stringify(readInstalledNpmPlugins()) === journal.after;
+      for (const move of [...journal.moves].reverse()) {
+        if (!/^npm-[A-Za-z0-9_-]+$/.test(move.installPath) || backupInstallPath(move.backupName) !== move.installPath)
+          throw new Error('Invalid npm plugin transaction journal');
+        const target = join(PluginService.PLUGIN_PATH, move.installPath);
+        const backup = join(backupDirectory, move.backupName);
+        if (committed) await rm(backup, { recursive: true, force: true });
+        else if (existsSync(backup)) {
+          await rm(target, { recursive: true, force: true });
+          await rename(backup, target);
+        } else if (!move.hadTarget) await rm(target, { recursive: true, force: true });
+        if (!committed && move.quarantineError)
+          PluginService.quarantinePluginDirectory(move.installPath, new Error(move.quarantineError));
+      }
+      await rm(journalPath, { force: true });
+    }
     if (!existsSync(backupDirectory)) return;
     try {
       for (const entry of await readdir(backupDirectory, { withFileTypes: true })) {
@@ -374,9 +425,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     // No hardcoded package list: official plugins are discovered through the same
     // keyword search as community plugins and classified by publisher and scope.
     const results = new Map(
-      responses
-        .flatMap(({ results }) => results)
-        .map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
+      responses.flatMap(({ results }) => results).map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
     );
     return {
       results: [...results.values()],
@@ -406,46 +455,279 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     spec: string,
     registryId?: string,
     audit?: NpmPluginAuditState,
+    planToken?: string,
   ): Promise<InstalledNpmPlugin> {
     if (this.listInstalled().some((plugin) => plugin.name === name)) {
       throw new BadRequestException('Package is already installed; use the replacement endpoint');
     }
     const registry = await this.registry(registryId);
     const { version, metadata } = await this.resolveVersion(name, spec, registry);
+    const plan = await this.installPlan(name, version, registry.id);
+    if (plan.plugins.length > 1) return this.installGraph(plan, registry, spec, undefined, [], audit, planToken);
     return this.installFromRegistry(name, version, registry, undefined, [], spec, metadata, audit);
   }
 
-  async removeInstalled(name: string, deferRestart = false): Promise<void> {
-    await this.mutateInstalls(async () => {
-      const installed = this.installed(name);
-      const target = join(PluginService.PLUGIN_PATH, installed.installPath);
-      const backup = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY, backupDirectoryName(installed.installPath));
+  removalPlan(name: string): InstalledNpmPlugin[] {
+    this.installed(name);
+    return pluginRemovalClosure(name, this.listInstalled());
+  }
 
-      if (existsSync(target)) {
-        await mkdir(join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY), { recursive: true });
-        await rename(target, backup);
-      }
+  async removeInstalled(name: string, deferRestart = false, approvedDependants: string[] = []): Promise<void> {
+    await this.mutateInstalls(async () => {
+      const removing = this.removalPlan(name);
+      const dependants = removing.filter((plugin) => plugin.name !== name).map((plugin) => plugin.name);
+      if (!samePermissions(dependants, approvedDependants))
+        throw new BadRequestException(
+          `Cannot remove ${name}: required by ${dependants.join(', ') || 'a changed dependency graph'}. Explicitly approve removing these plugins together, or keep it.`,
+        );
+      const moved: Array<{ target: string; backup: string }> = [];
+      const records = readInstalledNpmPlugins().filter((plugin) => !removing.some(({ name }) => name === plugin.name));
+      const moves = removing.map((plugin) => ({
+        installPath: plugin.installPath,
+        backupName: backupDirectoryName(plugin.installPath),
+        hadTarget: existsSync(join(PluginService.PLUGIN_PATH, plugin.installPath)),
+      }));
+      await this.writeTransaction(records, moves);
       try {
-        await this.writeStateWithout(name);
+        for (const [index, installed] of removing.entries()) {
+          const target = join(PluginService.PLUGIN_PATH, installed.installPath);
+          const backup = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY, moves[index].backupName);
+          if (existsSync(target)) {
+            await mkdir(join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY), { recursive: true });
+            await rename(target, backup);
+            moved.push({ target, backup });
+          }
+        }
+        if (removing.length === 1) await this.writeStateWithout(name);
+        else await this.writeRecords(records);
       } catch (error) {
-        if (existsSync(backup) && !existsSync(target)) await rename(backup, target);
+        for (const { target, backup } of moved.reverse()) await rename(backup, target);
+        await rm(join(PluginService.PLUGIN_PATH, TRANSACTION_FILE), { force: true });
         throw error;
       }
       try {
-        PluginService.clearPluginQuarantine(installed.installPath);
+        await rm(join(PluginService.PLUGIN_PATH, TRANSACTION_FILE), { force: true });
       } catch (error) {
-        this.logger.error(`Failed to clear quarantine for removed package ${name}`, error);
+        this.logger.error('Failed to clear plugin transaction journal', error);
       }
-
-      try {
-        await rm(backup, { recursive: true, force: true });
-      } catch (error) {
-        this.logger.error(`Failed to remove uninstalled package files for ${name}`, error);
+      for (const installed of removing) {
+        try {
+          PluginService.clearPluginQuarantine(installed.installPath);
+        } catch (error) {
+          this.logger.error(`Failed to clear quarantine for ${installed.name}`, error);
+        }
       }
-      // Data and secrets are deliberately retained. Removing them is a separate,
-      // destructive recovery operation rather than part of package deactivation.
+      for (const { backup } of moved) {
+        try {
+          await this.removeBackup(backup);
+        } catch (error) {
+          this.logger.error('Failed to remove uninstalled package files', error);
+        }
+      }
+      // Keep plugin data and secrets, as in the existing npm removal lifecycle.
       if (!deferRestart) new PluginService().requestRestart();
     });
+  }
+
+  async installPlan(name: string, spec: string, registryId?: string): Promise<PluginInstallPlan> {
+    const registry = await this.registry(registryId);
+    const stateHash = createHash('sha256').update(JSON.stringify(readInstalledNpmPlugins())).digest('hex');
+    const installed = this.listInstalled();
+    const metadataCache = new Map<string, Awaited<ReturnType<NpmPluginService['resolveVersion']>>['metadata']>();
+    const { version, metadata } = await this.resolveVersion(name, spec, registry);
+    metadataCache.set(name, metadata);
+    const fromMetadata = (
+      packageName: string,
+      version: string,
+      metadata: Awaited<ReturnType<NpmPluginService['resolveVersion']>>['metadata'],
+    ): ResolvedPlugin => {
+      const value = metadata.versions?.[version];
+      const details = this.marketplacePlugin(value, registry, registryPublisher(value), packageName);
+      if (!details.installable) throw new BadRequestException(details.incompatibilityReason);
+      if (details.name !== packageName || details.version !== version)
+        throw new BadRequestException('Registry metadata identity does not match the dependency');
+      const current = installed.find((plugin) => plugin.name === packageName);
+      return {
+        name: packageName,
+        registryUrl: registry.url,
+        version,
+        displayName: details.displayName,
+        permissions: details.permissions,
+        dependencies: details.dependencies ?? [],
+        integrity: details.integrity,
+        classification: details.classification,
+        action: current ? 'replace' : 'install',
+      };
+    };
+    // Some registries expose only distribution metadata. The tarball is still
+    // validated, and undeclared dependencies cannot bypass graph validation.
+    const rootValue = metadata.versions?.[version] as PackageVersion & { attraccess?: unknown };
+    const root = rootValue?.attraccess
+      ? fromMetadata(name, version, metadata)
+      : {
+          name,
+          version,
+          displayName: name,
+          permissions: [],
+          dependencies: [],
+          integrity: distIntegrity(rootValue.dist),
+          classification: 'community' as const,
+          action: installed.some((plugin) => plugin.name === name) ? ('replace' as const) : ('install' as const),
+        };
+    const existing: ResolvedPlugin[] = installed.map((plugin) => ({
+      ...plugin,
+      displayName: plugin.name,
+      dependencies: plugin.dependencies ?? [],
+      action: 'reuse',
+      integrity: plugin.integrity,
+    }));
+    const plugins = await resolvePluginDependencies(root, existing, async (dependencyName) => {
+      const data =
+        metadataCache.get(dependencyName) ??
+        ((await this.packageMetadata(dependencyName, registry.id)) as typeof metadata);
+      metadataCache.set(dependencyName, data);
+      return Object.keys(data.versions ?? {})
+        .filter((version) => semver.valid(version))
+        .sort(semver.rcompare)
+        .flatMap((version) => {
+          try {
+            return [fromMetadata(dependencyName, version, data)];
+          } catch {
+            return [];
+          }
+        });
+    });
+    for (const plugin of plugins.filter((plugin) => plugin.action === 'reuse')) {
+      const current = installed.find(({ name }) => name === plugin.name);
+      if (
+        current.state === 'quarantined' ||
+        PluginService.isPluginQuarantined({ pluginDirectory: current.installPath })
+      )
+        throw new BadRequestException(
+          `Required plugin ${plugin.name} is disabled. Retry or repair it before installing its dependant.`,
+        );
+    }
+    const token = createHash('sha256')
+      .update(
+        JSON.stringify({
+          plugins,
+          installed: installed
+            .map(({ name, version, integrity, dependencies, state }) => ({
+              name,
+              version,
+              integrity,
+              dependencies,
+              state,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        }),
+      )
+      .digest('hex');
+    return { root: name, stateHash, token, plugins };
+  }
+
+  private async installGraph(
+    plan: PluginInstallPlan,
+    registry: Registry,
+    requestedSpec: string,
+    replacing?: InstalledNpmPlugin,
+    approvedPermissions: string[] = [],
+    audit?: NpmPluginAuditState,
+    planToken?: string,
+  ): Promise<InstalledNpmPlugin> {
+    if (planToken !== plan.token)
+      throw new BadRequestException(
+        'Dependency plan changed or requires confirmation. Review the plugin versions and permissions again.',
+      );
+    const before = JSON.stringify(readInstalledNpmPlugins());
+    if (createHash('sha256').update(before).digest('hex') !== plan.stateHash)
+      throw new BadRequestException('Installed plugins changed. Review the dependency plan again.');
+    const prepared: PreparedPlugin[] = [];
+    try {
+      for (const plugin of plan.plugins.filter((plugin) => plugin.action !== 'reuse')) {
+        const item = await this.prepareInstallFromRegistry(
+          plugin.name,
+          plugin.version,
+          registry,
+          plugin.action === 'replace' ? replacing : undefined,
+          plugin.action === 'replace' ? approvedPermissions : [],
+          plugin.name === plan.root ? requestedSpec : plugin.version,
+          undefined,
+          plugin.name === audit?.packageName ? audit : undefined,
+        );
+        prepared.push(item);
+        if (
+          JSON.stringify(item.installed.dependencies ?? []) !== JSON.stringify(plugin.dependencies) ||
+          !samePermissions(item.installed.permissions, plugin.permissions) ||
+          item.installed.integrity !== plugin.integrity ||
+          item.installed.classification !== plugin.classification
+        )
+          throw new BadRequestException(`Package ${plugin.name} does not match its confirmed dependency plan`);
+      }
+      return await this.mutateInstalls(async () => {
+        if (JSON.stringify(readInstalledNpmPlugins()) !== before)
+          throw new BadRequestException('Installed plugins changed. Review the dependency plan again.');
+        const activations: Array<{ target: string; backup: string }> = [];
+        const quarantines = prepared.map(({ installed }) => ({
+          directory: installed.installPath,
+          error: PluginService.pluginQuarantineError(installed.installPath),
+        }));
+        const names = new Set(prepared.map(({ installed }) => installed.name));
+        const records = [
+          ...readInstalledNpmPlugins().filter(({ name }) => !names.has(name)),
+          ...prepared.map(({ installed }) => ({
+            ...installed,
+            ...(installed.name === audit?.packageName && this.pendingAudit(audit)
+              ? { pendingAudit: this.pendingAudit(audit) }
+              : {}),
+          })),
+        ];
+        const moves = prepared.map(({ installed }) => ({
+          installPath: installed.installPath,
+          backupName: backupDirectoryName(installed.installPath),
+          hadTarget: existsSync(join(PluginService.PLUGIN_PATH, installed.installPath)),
+          quarantineError: PluginService.pluginQuarantineError(installed.installPath),
+        }));
+        await this.writeTransaction(records, moves);
+        try {
+          for (const [index, item] of prepared.entries()) {
+            activations.push(await this.activate(item.source, item.installed.name, audit, moves[index].backupName));
+            PluginService.clearPluginQuarantine(item.installed.installPath);
+          }
+          await this.writeRecords(records);
+        } catch (error) {
+          for (const activation of activations.reverse()) await this.rollbackForAudit(activation, audit);
+          for (const quarantine of quarantines)
+            if (quarantine.error)
+              PluginService.quarantinePluginDirectory(quarantine.directory, new Error(quarantine.error));
+          await rm(join(PluginService.PLUGIN_PATH, TRANSACTION_FILE), { force: true });
+          throw error;
+        }
+        // State is the commit point; startup can finish journal cleanup after a crash.
+        try {
+          await rm(join(PluginService.PLUGIN_PATH, TRANSACTION_FILE), { force: true });
+        } catch (error) {
+          this.logger.error('Failed to clear plugin transaction journal', error);
+        }
+        for (const { backup } of activations) {
+          try {
+            await this.removeBackup(backup);
+          } catch (error) {
+            this.logger.error('Failed to remove plugin backup', error);
+          }
+        }
+        if (audit)
+          Object.assign(audit, {
+            activationOutcome: 'restart-requested',
+            migrationOutcome: 'pending-restart',
+            restartRequested: 1,
+          });
+        if (!audit?.context) new PluginService().requestRestart();
+        return prepared.find(({ installed }) => installed.name === plan.root).installed;
+      });
+    } finally {
+      for (const { staging } of prepared) await rm(staging, { recursive: true, force: true });
+    }
   }
 
   async installedVersionCandidates(name: string): Promise<InstalledNpmPluginVersion[]> {
@@ -466,6 +748,19 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
           const { manifest } = parseNpmPluginPackage(pkg, this.hostVersion());
           if (manifest.name !== name)
             throw new BadRequestException('Package identity does not match the installed package');
+          const graph = [
+            ...this.listInstalled().filter((plugin) => plugin.name !== name),
+            { name, version, dependencies: manifest.dependencies },
+          ];
+          // Missing dependencies can be resolved and confirmed in the update plan.
+          // Existing versions and reverse constraints must already be compatible.
+          const present = new Set(graph.map((plugin) => plugin.name));
+          orderPluginDependencies(
+            graph.map((plugin) => ({
+              ...plugin,
+              dependencies: plugin.dependencies?.filter((dependency) => present.has(dependency.name)),
+            })),
+          );
           return this.versionCandidate(
             installed,
             version,
@@ -491,6 +786,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     approvedPermissionAdditions: string[] = [],
     approvedMajorVersion = false,
     audit?: NpmPluginAuditState,
+    planToken?: string,
   ): Promise<InstalledNpmPlugin> {
     const installed = this.installed(name);
     const candidates = await this.installedVersionCandidates(name);
@@ -504,6 +800,18 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         `Permission approval required for: ${candidate.permissionAdditions.join(', ') || 'none'}`,
       );
     }
+    const registry = await this.registry(installed.registryId);
+    const plan = await this.installPlan(name, version, registry.id);
+    if (plan.plugins.length > 1)
+      return this.installGraph(
+        plan,
+        registry,
+        installed.requestedSpec,
+        installed,
+        approvedPermissionAdditions,
+        audit,
+        planToken,
+      );
     return this.installFromRegistry(
       name,
       version,
@@ -656,6 +964,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   ): InstalledNpmPluginVersion {
     const classification = this.classification.classify(installed.name, installed.registryUrl, publisher);
     return {
+      dependencies: pkg?.attraccess.dependencies ?? [],
       version,
       publishedAt,
       direction: semver.eq(version, installed.version)
@@ -690,7 +999,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     return installed;
   }
 
-  private async installFromRegistry(
+  private async prepareInstallFromRegistry(
     name: string,
     version: string,
     registry: Registry,
@@ -704,7 +1013,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
       maintainers?: unknown;
     },
     audit?: NpmPluginAuditState,
-  ): Promise<InstalledNpmPlugin> {
+  ): Promise<PreparedPlugin> {
     if (audit)
       Object.assign(audit, {
         newVersion: version,
@@ -775,6 +1084,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
       const classification = this.classification.classify(name, registry.url, publisher);
       if (audit) audit.classification = classification.kind;
       const installed: InstalledNpmPlugin = {
+        dependencies: manifest.dependencies ?? [],
         name,
         version,
         requestedSpec,
@@ -795,12 +1105,48 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         updateCheck: null,
         knownGoodVersion: replacing?.version ?? null,
       };
+      return { installed, source, staging };
+    } catch (error) {
+      await rm(staging, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  private async installFromRegistry(
+    name: string,
+    version: string,
+    registry: Registry,
+    replacing?: InstalledNpmPlugin,
+    approvedPermissionAdditions: string[] = [],
+    requestedSpec = version,
+    resolvedMetadata?: {
+      versions?: Record<string, PackageVersion>;
+      publisher?: unknown;
+      _npmUser?: unknown;
+      maintainers?: unknown;
+    },
+    audit?: NpmPluginAuditState,
+  ): Promise<InstalledNpmPlugin> {
+    const { installed, source, staging } = await this.prepareInstallFromRegistry(
+      name,
+      version,
+      registry,
+      replacing,
+      approvedPermissionAdditions,
+      requestedSpec,
+      resolvedMetadata,
+      audit,
+    );
+    try {
       // Activation and its state update must commit together so a rollback cannot
       // remove another install's target or overwrite its state entry.
       return await this.mutateInstalls(async () => {
         if (!replacing && this.listInstalled().some((plugin) => plugin.name === name)) {
           throw new BadRequestException('Package is already installed; use the replacement endpoint');
         }
+        orderPluginDependencies([...this.listInstalled().filter((plugin) => plugin.name !== name), installed]);
+        if (replacing && this.installed(name).version !== replacing.version)
+          throw new BadRequestException('Installed version changed; review again');
         if (audit) audit.activationOutcome = 'failed';
         const activation = await this.activate(source, name, audit);
         // Do not expose replacement code as active until its prior quarantine has
@@ -959,6 +1305,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         version: pkg.version,
         displayName: pkg.attraccess.displayName,
         description: pkg.attraccess.description ?? null,
+        dependencies: pkg.attraccess.dependencies,
         permissions: pkg.attraccess.permissions,
         hostRange: pkg.attraccess.host,
         sdkCompatibility: {
@@ -984,6 +1331,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         version,
         displayName: null,
         description: null,
+        dependencies: [],
         permissions: [],
         hostRange: null,
         sdkCompatibility: { backend: null, frontend: null },
@@ -1007,10 +1355,11 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     source: string,
     name: string,
     audit?: NpmPluginAuditState,
+    backupName?: string,
   ): Promise<{ target: string; backup: string }> {
     const target = join(PluginService.PLUGIN_PATH, pluginDirectory(name));
     const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
-    const backup = join(backupDirectory, backupDirectoryName(pluginDirectory(name)));
+    const backup = join(backupDirectory, backupName ?? backupDirectoryName(pluginDirectory(name)));
     await mkdir(backupDirectory, { recursive: true });
     if (existsSync(target)) await rename(target, backup);
     try {
@@ -1062,6 +1411,34 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     } catch (error) {
       await rm(temporaryPath, { force: true });
       throw error;
+    }
+  }
+
+  private async writeTransaction(
+    records: ReturnType<typeof readInstalledNpmPlugins>,
+    moves: PluginFileMove[],
+  ): Promise<void> {
+    const journalPath = join(PluginService.PLUGIN_PATH, TRANSACTION_FILE);
+    // Refuse to overwrite an unfinished transaction, including cleanup failures.
+    if (existsSync(journalPath))
+      throw new BadRequestException('An unfinished plugin transaction must be recovered by restarting first.');
+    const temporaryPath = `${journalPath}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporaryPath, JSON.stringify({ after: JSON.stringify(records), moves }), { flag: 'wx' });
+      await rename(temporaryPath, journalPath);
+    } finally {
+      await rm(temporaryPath, { force: true });
+    }
+  }
+
+  private async writeRecords(records: ReturnType<typeof readInstalledNpmPlugins>): Promise<void> {
+    const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
+    const temporaryPath = `${statePath}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporaryPath, JSON.stringify(records));
+      await rename(temporaryPath, statePath);
+    } finally {
+      await rm(temporaryPath, { force: true });
     }
   }
 
@@ -1127,7 +1504,13 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   }
 
   private async mutateInstalls<T>(operation: () => Promise<T>): Promise<T> {
-    const mutation = this.installMutation.then(operation);
+    const mutation = this.installMutation.then(async () => {
+      // Recovery compares the state with the journal's commit point. Any later
+      // state change could make a committed tree look like an interrupted one.
+      if (existsSync(join(PluginService.PLUGIN_PATH, TRANSACTION_FILE)))
+        throw new BadRequestException('An unfinished plugin transaction must be recovered by restarting first.');
+      return operation();
+    });
     this.installMutation = mutation.then(
       () => undefined,
       () => undefined,
@@ -1211,6 +1594,7 @@ function readInstalledNpmPlugins(): Array<InstalledNpmPlugin & { pendingAudit?: 
     if (!Array.isArray(records)) return [];
     return records.map((record) => ({
       ...record,
+      dependencies: record.dependencies ?? [],
       requestedSpec: record.requestedSpec ?? record.version,
       compatibility: record.compatibility ?? { host: 'unknown', sdk: {} },
       state: record.state ?? 'active',
@@ -1416,9 +1800,7 @@ function publisherName(value: unknown): string | null {
 function distIntegrity(value: { integrity?: unknown; shasum?: unknown } | NpmPluginPackage): string | null {
   const dist = ('dist' in value ? value.dist : value) as { integrity?: unknown; shasum?: unknown };
   if (typeof dist?.integrity === 'string') return dist.integrity;
-  return typeof dist?.shasum === 'string'
-    ? `sha1-${Buffer.from(dist.shasum, 'hex').toString('base64')}`
-    : null;
+  return typeof dist?.shasum === 'string' ? `sha1-${Buffer.from(dist.shasum, 'hex').toString('base64')}` : null;
 }
 
 function packageProvenance(pkg: NpmPluginPackage): string | null {

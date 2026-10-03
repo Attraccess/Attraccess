@@ -11,6 +11,10 @@ interface DeleteOptions {
 
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
+  dependencyPlan: undefined as unknown,
+  dependencyPlanError: null as unknown,
+  removalPlan: [] as unknown[],
+  removeGraphMock: vi.fn(),
   checkAllInstalledPackagesMock: vi.fn(),
   addRegistryMock: vi.fn(),
   testRegistryMock: vi.fn(),
@@ -37,6 +41,16 @@ function deferred<T>() {
 }
 
 vi.mock('@attraccess/react-query-client', () => ({
+  usePluginsServicePluginControllerDependencyPlan: () => ({
+    data: hoisted.dependencyPlan,
+    error: hoisted.dependencyPlanError,
+    isFetching: false,
+  }),
+  usePluginsServicePluginControllerRemovalPlan: () => ({ data: hoisted.removalPlan, isFetching: false }),
+  usePluginsServicePluginControllerRemovePackageGraph: () => ({
+    mutateAsync: hoisted.removeGraphMock,
+    isPending: false,
+  }),
   usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
   usePluginsServiceGetPluginSystemStatus: () => ({
     data: hoisted.pluginSystemStatus,
@@ -93,6 +107,11 @@ function makePlugin(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   hoisted.deleteMutateMock.mockReset();
+  hoisted.dependencyPlan = undefined;
+  hoisted.dependencyPlanError = null;
+  hoisted.removalPlan = [];
+  hoisted.removeGraphMock.mockReset();
+  hoisted.removeGraphMock.mockResolvedValue({ ok: true });
   hoisted.checkAllInstalledPackagesMock.mockReset();
   hoisted.addRegistryMock.mockReset();
   hoisted.testRegistryMock.mockReset();
@@ -1115,5 +1134,143 @@ it('opens installed package details from the original registry', async () => {
   expect(await screen.findByText('Installed package details')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/marketplace/Cool%20Plugin?registryId=private'), {
     credentials: 'include',
+  });
+});
+
+describe('plugin dependency confirmations', () => {
+  const core = {
+    name: '@vendor/core',
+    displayName: '3D Printer Core',
+    version: '1.0.0',
+    action: 'install',
+    permissions: ['READ_USERS'],
+    dependencies: [],
+    classification: 'community',
+  };
+  const adapter = {
+    ...core,
+    name: '@vendor/adapter',
+    displayName: 'Printer Adapter',
+    dependencies: [{ name: core.name, version: '^1', required: true }],
+  };
+  const provider = {
+    ...core,
+    name: '@vendor/bambu',
+    displayName: '3D Printer - Bambu Lab',
+    dependencies: [{ name: adapter.name, version: '^1', required: true }],
+    registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+    installable: true,
+    description: 'Printer provider',
+  };
+  const openProvider = async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: async () =>
+            url.endsWith('/installed') || url.endsWith('/registries')
+              ? []
+              : url.includes('/marketplace/search')
+                ? { results: [provider], errors: [] }
+                : provider,
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    const view = render(<PluginsSection />);
+    await user.click(screen.getByText('Install plugin'));
+    await user.click(screen.getByText('Browse marketplace'));
+    await user.click(await screen.findByText(provider.displayName));
+    return { user, rerender: view.rerender };
+  };
+  it('shows direct and transitive plugins, reuse status and permissions before one confirmation', async () => {
+    hoisted.dependencyPlan = {
+      root: provider.name,
+      token: 'reviewed-plan',
+      plugins: [{ ...core, action: 'reuse' }, adapter, provider],
+    };
+    const { user } = await openProvider();
+    expect(await screen.findByText('3D Printer Core · 1.0.0')).toBeInTheDocument();
+    expect(screen.getByText('Already installed · will be reused')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Install' }));
+    const dialog = (await screen.findByRole('heading', { name: `Install ${provider.displayName}?` })).closest(
+      '[role="dialog"]',
+    ) as HTMLElement;
+    expect(within(dialog).getByText('Printer Adapter · 1.0.0')).toBeInTheDocument();
+    expect(within(dialog).getByText('3D Printer Core · 1.0.0')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeDisabled();
+    await user.click(within(dialog).getByRole('checkbox'));
+    hoisted.installPackageMock.mockRejectedValue({ body: { message: 'test complete' } });
+    await user.click(within(dialog).getByRole('button', { name: 'Install plugin' }));
+    expect(hoisted.installPackageMock).toHaveBeenCalledWith({
+      packageName: provider.name,
+      version: '1.0.0',
+      requestBody: { registryId: 'npm', planToken: 'reviewed-plan' },
+    });
+  });
+  it('surfaces dependency conflicts and keeps installation disabled', async () => {
+    hoisted.dependencyPlanError = { body: { message: 'Provider requires core@^2; installed version is 1.0.0' } };
+    const { user } = await openProvider();
+    expect(await screen.findByText('Provider requires core@^2; installed version is 1.0.0')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Install' }));
+    const dialog = (await screen.findByRole('heading', { name: `Install ${provider.displayName}?` })).closest(
+      '[role="dialog"]',
+    ) as HTMLElement;
+    await user.click(within(dialog).getByRole('checkbox'));
+    expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeDisabled();
+    expect(hoisted.installPackageMock).not.toHaveBeenCalled();
+  });
+  it('requires renewed approval when a refreshed install plan changes dependency permissions', async () => {
+    hoisted.dependencyPlan = { root: provider.name, token: 'original-plan', plugins: [core, adapter, provider] };
+    const { user, rerender } = await openProvider();
+    await user.click(screen.getByRole('button', { name: 'Install' }));
+    const dialog = (await screen.findByRole('heading', { name: `Install ${provider.displayName}?` })).closest(
+      '[role="dialog"]',
+    ) as HTMLElement;
+    await user.click(within(dialog).getByRole('checkbox'));
+    expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
+
+    hoisted.dependencyPlan = {
+      root: provider.name,
+      token: 'changed-plan',
+      plugins: [{ ...core, permissions: ['READ_USERS', 'MANAGE_USERS'] }, adapter, provider],
+    };
+    rerender(<PluginsSection />);
+    expect(within(dialog).getByRole('checkbox')).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeDisabled();
+    expect(within(dialog).getByText('Requested permissions: READ_USERS, MANAGE_USERS')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('checkbox'));
+    expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
+  });
+
+  it('requires explicit approval of all dependants before removing a dependency', async () => {
+    hoisted.plugins = [makePlugin({ name: core.name, id: 'core-id' })];
+    hoisted.removalPlan = [core, provider];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? [core] : []) }),
+      ),
+    );
+    const user = userEvent.setup();
+    const view = render(<PluginsSection />);
+    await waitFor(() => expect(screen.getByText(core.name)).toBeInTheDocument());
+    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-core-id"]') as HTMLElement);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(`${provider.name} · ${provider.version}`)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeDisabled();
+    await user.click(within(dialog).getByRole('switch'));
+    expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeEnabled();
+    hoisted.removalPlan = [core, adapter, provider];
+    view.rerender(<PluginsSection />);
+    expect(within(dialog).getByRole('switch')).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeDisabled();
+    await user.click(within(dialog).getByRole('switch'));
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    expect(hoisted.removeGraphMock).toHaveBeenCalledWith({
+      packageName: core.name,
+      requestBody: { approvedDependants: [adapter.name, provider.name] },
+    });
   });
 });
