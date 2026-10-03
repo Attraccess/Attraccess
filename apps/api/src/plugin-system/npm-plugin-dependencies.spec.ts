@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { rename } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -114,6 +114,41 @@ describe('npm plugin dependency lifecycle', () => {
     await service.install('provider', '1.0.0', undefined, undefined, plan.token);
     expect(internals.download).toHaveBeenCalledTimes(1);
     expect(service.listInstalled().find(({ name }) => name === 'core')).toEqual(existing);
+  });
+  it('resolves and confirms the complete dependency tree from distribution-only registry metadata', async () => {
+    await publish(pkg('core'));
+    await publish(pkg('adapter', [dep('core')]));
+    await publish(pkg('provider', [dep('adapter')]));
+    for (const entry of Object.values(metadata)) {
+      for (const version of Object.values(entry.versions)) delete (version as { attraccess?: unknown }).attraccess;
+    }
+
+    const plan = await service.installPlan('provider', '1.0.0');
+    expect(plan.plugins.map(({ name, action, permissions }) => ({ name, action, permissions }))).toEqual([
+      { name: 'core', action: 'install', permissions: ['READ_USERS'] },
+      { name: 'adapter', action: 'install', permissions: ['READ_USERS'] },
+      { name: 'provider', action: 'install', permissions: ['READ_USERS'] },
+    ]);
+    expect(service.listInstalled()).toEqual([]);
+    expect(readdirSync(root)).toEqual([]);
+    await expect(service.install('provider', '1.0.0')).rejects.toThrow('requires confirmation');
+    expect(service.listInstalled()).toEqual([]);
+    await service.install('provider', '1.0.0', undefined, undefined, plan.token);
+    expect(service.listInstalled().map(({ name }) => name)).toEqual(['core', 'adapter', 'provider']);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalledTimes(1);
+    expect(readdirSync(root).some((name) => name.startsWith('.npm-staging-'))).toBe(false);
+  });
+  it('uses the registry package publisher consistently during planning and installation', async () => {
+    const core = '@attraccess/plugin-core';
+    const provider = '@attraccess/plugin-provider';
+    await publish(pkg(core));
+    await publish(pkg(provider, [dep(core)]));
+    for (const entry of Object.values(metadata)) Object.assign(entry, { _npmUser: { name: 'attraccess' } });
+
+    const plan = await service.installPlan(provider, '1.0.0');
+    expect(plan.plugins.map(({ classification }) => classification)).toEqual(['official', 'official']);
+    await service.install(provider, '1.0.0', undefined, undefined, plan.token);
+    expect(service.listInstalled().map(({ classification }) => classification)).toEqual(['official', 'official']);
   });
   it('rejects a stale approval when registry permissions change', async () => {
     await publish(pkg('core'));

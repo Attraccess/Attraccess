@@ -372,6 +372,58 @@ describe('required frontend dependencies', () => {
     await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(2));
     expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core', 'provider']);
   });
+  it('loads unrelated plugins while a required remote is still pending, loading shared dependencies once', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        manifest('provider', ['core']),
+        manifest('second-provider', ['core']),
+        manifest('core'),
+        manifest('independent'),
+      ],
+    });
+    let finishCore: (value: unknown) => void;
+    const coreRemote = new Promise((resolve) => {
+      finishCore = resolve;
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) =>
+      name === 'core'
+        ? coreRemote
+        : {
+            default: function () {
+              return createFakePlugin(name);
+            },
+          },
+    );
+    render(<PluginProvider />);
+
+    try {
+      await waitFor(() => expect(usePluginState.getState().plugins.map(({ name }) => name)).toEqual(['independent']));
+      expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core', 'independent']);
+    } finally {
+      finishCore({
+        default: function () {
+          return createFakePlugin('core');
+        },
+      });
+    }
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(4));
+    expect(hoisted.getRemoteMock.mock.calls.filter(([name]) => name === 'core')).toHaveLength(1);
+  });
+  it('rejects dependency cycles without blocking independent plugins', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [manifest('a', ['b']), manifest('b', ['a']), manifest('independent')],
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins.map(({ name }) => name)).toEqual(['independent']));
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['independent']);
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin "a" is disabled' }));
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin "b" is disabled' }));
+  });
   it('skips a dependant after a dependency frontend fails and explains the failure', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     hoisted.refetchMock.mockResolvedValue({ data: [manifest('provider', ['core']), manifest('core')] });

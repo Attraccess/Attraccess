@@ -536,13 +536,37 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     const metadataCache = new Map<string, Awaited<ReturnType<NpmPluginService['resolveVersion']>>['metadata']>();
     const { version, metadata } = await this.resolveVersion(name, spec, registry);
     metadataCache.set(name, metadata);
-    const fromMetadata = (
+    const fromMetadata = async (
       packageName: string,
       version: string,
       metadata: Awaited<ReturnType<NpmPluginService['resolveVersion']>>['metadata'],
-    ): ResolvedPlugin => {
-      const value = metadata.versions?.[version];
-      const details = this.marketplacePlugin(value, registry, registryPublisher(value), packageName);
+    ): Promise<ResolvedPlugin> => {
+      const published = metadata.versions?.[version] as PackageVersion & { attraccess?: unknown };
+      let value: unknown = published;
+      if (published?.attraccess === undefined) {
+        // Distribution-only registries require inspecting the verified tarball
+        // before dependency versions and permissions can be confirmed.
+        const prepared = await this.prepareInstallFromRegistry(
+          packageName,
+          version,
+          registry,
+          undefined,
+          [],
+          version,
+          metadata,
+        );
+        try {
+          value = { ...JSON.parse(readFileSync(join(prepared.source, 'package.json'), 'utf8')), dist: published.dist };
+        } finally {
+          await rm(prepared.staging, { recursive: true, force: true });
+        }
+      }
+      const details = this.marketplacePlugin(
+        value,
+        registry,
+        registryPublisher(published) ?? registryPublisher(metadata),
+        packageName,
+      );
       if (!details.installable) throw new BadRequestException(details.incompatibilityReason);
       if (details.name !== packageName || details.version !== version)
         throw new BadRequestException('Registry metadata identity does not match the dependency');
@@ -559,21 +583,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         action: current ? 'replace' : 'install',
       };
     };
-    // Some registries expose only distribution metadata. The tarball is still
-    // validated, and undeclared dependencies cannot bypass graph validation.
-    const rootValue = metadata.versions?.[version] as PackageVersion & { attraccess?: unknown };
-    const root = rootValue?.attraccess
-      ? fromMetadata(name, version, metadata)
-      : {
-          name,
-          version,
-          displayName: name,
-          permissions: [],
-          dependencies: [],
-          integrity: distIntegrity(rootValue.dist),
-          classification: 'community' as const,
-          action: installed.some((plugin) => plugin.name === name) ? ('replace' as const) : ('install' as const),
-        };
+    const root = await fromMetadata(name, version, metadata);
     const existing: ResolvedPlugin[] = installed.map((plugin) => ({
       ...plugin,
       displayName: plugin.name,
@@ -586,16 +596,17 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         metadataCache.get(dependencyName) ??
         ((await this.packageMetadata(dependencyName, registry.id)) as typeof metadata);
       metadataCache.set(dependencyName, data);
-      return Object.keys(data.versions ?? {})
+      const candidates: ResolvedPlugin[] = [];
+      for (const version of Object.keys(data.versions ?? {})
         .filter((version) => semver.valid(version))
-        .sort(semver.rcompare)
-        .flatMap((version) => {
-          try {
-            return [fromMetadata(dependencyName, version, data)];
-          } catch {
-            return [];
-          }
-        });
+        .sort(semver.rcompare)) {
+        try {
+          candidates.push(await fromMetadata(dependencyName, version, data));
+        } catch {
+          // Invalid releases are excluded, as with incompatible metadata.
+        }
+      }
+      return candidates;
     });
     for (const plugin of plugins.filter((plugin) => plugin.action === 'reuse')) {
       const current = installed.find(({ name }) => name === plugin.name);
@@ -732,6 +743,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
 
   async installedVersionCandidates(name: string): Promise<InstalledNpmPluginVersion[]> {
     const installed = this.installed(name);
+    const otherInstalled = this.listInstalled().filter((plugin) => plugin.name !== name);
     const metadata = (await this.packageMetadata(name, installed.registryId)) as {
       versions?: Record<string, unknown>;
       time?: Record<string, string>;
@@ -749,7 +761,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
           if (manifest.name !== name)
             throw new BadRequestException('Package identity does not match the installed package');
           const graph = [
-            ...this.listInstalled().filter((plugin) => plugin.name !== name),
+            ...otherInstalled,
             { name, version, dependencies: manifest.dependencies },
           ];
           // Missing dependencies can be resolved and confirmed in the update plan.

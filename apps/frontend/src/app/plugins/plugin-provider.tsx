@@ -172,42 +172,63 @@ export function PluginProvider(props: PropsWithChildren) {
           description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
         });
       }
-      const outcomes = new Map<string, boolean>();
-      const loadManifest = async (manifest: LoadedPluginManifest, path: string[] = []): Promise<boolean> => {
-        if (outcomes.has(manifest.name)) return outcomes.get(manifest.name);
+      const byName = new Map(pluginsArray.map((manifest) => [manifest.name, manifest]));
+      const dependencyFailures = new Map<string, string | null>();
+      const dependencyFailure = (manifest: LoadedPluginManifest, path: string[] = []): string | null => {
+        if (path.includes(manifest.name)) return `Plugin dependency cycle: ${[...path, manifest.name].join(' → ')}`;
+        if (dependencyFailures.has(manifest.name)) return dependencyFailures.get(manifest.name);
         let failure: string | null = manifest.status === 'error' ? (manifest.error ?? 'Plugin failed to load') : null;
-        if (path.includes(manifest.name)) failure = `Plugin dependency cycle: ${[...path, manifest.name].join(' → ')}`;
         if (!failure) {
           for (const dependency of manifest.dependencies ?? []) {
             if (!dependency.required) continue;
-            const required = pluginsArray.find((plugin) => plugin.name === dependency.name);
-            if (!required || !(await loadManifest(required, [...path, manifest.name]))) {
+            const required = byName.get(dependency.name);
+            if (!required || dependencyFailure(required, [...path, manifest.name])) {
               failure = `Required plugin ${dependency.name} failed to load; ${manifest.name} is inactive.`;
               break;
             }
           }
         }
-        const key = `${manifest.name}@${manifest.version}`;
-        if (!failure && manifest.main.frontend && loadedManifests.current.get(manifest.name) !== manifest.version) {
-          if (await loadPlugin(manifest)) {
-            loadedManifests.current.set(manifest.name, manifest.version);
-            warnedFailures.current.delete(key);
-          } else failure = `Plugin ${manifest.name} frontend failed to load.`;
-        }
-        if (failure) {
-          const installed = usePluginState.getState().plugins.find((plugin) => plugin.name === manifest.name);
-          if (installed) pluginStore.uninstall(installed.plugin.getPluginName());
-          removePlugin(manifest.name);
-          loadedManifests.current.delete(manifest.name);
-          if (!warnedFailures.current.has(key)) {
-            warnedFailures.current.add(key);
-            toastRef.current.warning({ title: `Plugin "${manifest.name}" is disabled`, description: failure });
-          }
-        }
-        outcomes.set(manifest.name, !failure);
-        return !failure;
+        dependencyFailures.set(manifest.name, failure);
+        return failure;
       };
-      for (const manifest of pluginsArray) await loadManifest(manifest);
+      const loads = new Map<string, Promise<boolean>>();
+      const loadManifest = (manifest: LoadedPluginManifest): Promise<boolean> => {
+        const existing = loads.get(manifest.name);
+        if (existing) return existing;
+        // Cache before descending, and check the graph synchronously so
+        // concurrently started roots cannot wait on each other in a cycle.
+        const loading = Promise.resolve().then(async () => {
+          let failure = dependencyFailure(manifest);
+          if (!failure) {
+            const required = (manifest.dependencies ?? []).filter((dependency) => dependency.required);
+            const outcomes = await Promise.all(required.map((dependency) => loadManifest(byName.get(dependency.name))));
+            const failedIndex = outcomes.findIndex((loaded) => !loaded);
+            if (failedIndex >= 0)
+              failure = `Required plugin ${required[failedIndex].name} failed to load; ${manifest.name} is inactive.`;
+          }
+          const key = `${manifest.name}@${manifest.version}`;
+          if (!failure && manifest.main.frontend && loadedManifests.current.get(manifest.name) !== manifest.version) {
+            if (await loadPlugin(manifest)) {
+              loadedManifests.current.set(manifest.name, manifest.version);
+              warnedFailures.current.delete(key);
+            } else failure = `Plugin ${manifest.name} frontend failed to load.`;
+          }
+          if (failure) {
+            const installed = usePluginState.getState().plugins.find((plugin) => plugin.name === manifest.name);
+            if (installed) pluginStore.uninstall(installed.plugin.getPluginName());
+            removePlugin(manifest.name);
+            loadedManifests.current.delete(manifest.name);
+            if (!warnedFailures.current.has(key)) {
+              warnedFailures.current.add(key);
+              toastRef.current.warning({ title: `Plugin "${manifest.name}" is disabled`, description: failure });
+            }
+          }
+          return !failure;
+        });
+        loads.set(manifest.name, loading);
+        return loading;
+      };
+      await Promise.all(pluginsArray.map((manifest) => loadManifest(manifest)));
     } catch (error) {
       console.error('Attraccess Plugin System: Failed to fetch plugins', error);
     } finally {
