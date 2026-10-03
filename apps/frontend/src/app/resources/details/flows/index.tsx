@@ -552,7 +552,7 @@ export default function FlowsPage() {
   const { id: resourceId } = useParams();
 
   return (
-    <FlowProvider resourceId={Number(resourceId)}>
+    <FlowProvider key={resourceId} resourceId={Number(resourceId)}>
       <FlowsPageInner />
     </FlowProvider>
   );
