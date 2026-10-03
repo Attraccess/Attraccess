@@ -7,6 +7,14 @@ Plugins are installed by uploading them through the Attraccess web interface. Th
 - You must have **administrator access** to manage plugins
 - The plugin system must not be disabled (see [Environment Variables](installation/environment-variables.md))
 
+## Marketplace dependencies
+
+Open **Settings → Plugins → Install plugin → Browse marketplace** and select a plugin. Its details and install confirmation show required plugins, including transitive dependencies, resolved versions, permissions, and whether each plugin will be installed or reused. Confirm once to install the complete tree. Dependency conflicts or cycles prevent installation and explain which packages need attention.
+
+Updates and downgrades cannot break the dependency graph. If a required plugin is removed, the confirmation lists its dependants: cancel to keep it, or explicitly approve removing those plugins together. Automatically installed dependencies remain normal plugins. Removing a provider does not automatically remove its dependencies; npm removal retains plugin data and secrets.
+
+If a dependency fails to load, its dependants stay inactive. Open the failure details in **Settings → Plugins**, repair or retry the failed dependency, then restart.
+
 ## Uploading a Plugin
 
 1. Open **Settings** in the sidebar and select the **Plugins** section
