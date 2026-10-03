@@ -1,3 +1,4 @@
+import { ENGINEERING_UNITS, type EngineeringUnit } from '../measurement-contract';
 import { pulseBehaviorError } from '../channel-behavior';
 import { createHash } from 'node:crypto';
 import { CONFIGURATION_PROTOCOL_VERSION } from './protocol';
@@ -60,7 +61,7 @@ export interface WagoConfigurationSnapshot {
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
     measurement?: {
-      unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent';
+      unit: EngineeringUnit;
       scale: number;
       offset: number;
       kind?: 'live' | 'cumulative';
@@ -434,7 +435,7 @@ function validateMeasurement(
   if (value === undefined) return;
   if (!record(value, path, errors)) return;
   exactKeys(value, path, ['unit', 'scale', 'offset', 'kind'], errors, ['kind']);
-  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'watt-hour', 'percent'], errors);
+  enumValue(value.unit, `${path}.unit`, ENGINEERING_UNITS, errors);
   if (!Number.isFinite(value.scale) || !Number.isFinite(value.offset))
     errors.push({ path, code: 'invalid_measurement', message: 'scale and offset must be finite numbers' });
   if (value.kind !== undefined && !['live', 'cumulative'].includes(value.kind as string))

@@ -1,5 +1,6 @@
 import { WagoDiagnosticsStore, freshness } from './diagnostics-store';
 import { safeValidationSummaries } from './diagnostics-validation';
+import { ENGINEERING_UNITS, encodeMeasurement } from '../measurement-contract';
 
 describe('canonical diagnostic consumer', () => {
   let now: number;
@@ -34,6 +35,16 @@ describe('canonical diagnostic consumer', () => {
   beforeEach(() => {
     now = Date.parse('2026-09-05T12:00:00Z');
     store = new WagoDiagnosticsStore(() => now);
+  });
+  it.each(ENGINEERING_UNITS)('retains current canonical meter readings in %s', (unit) => {
+    expect(state()).toBe(true);
+    const reading = encodeMeasurement('meter', 12.345, { unit, scale: 1, offset: 0 });
+    expect(send('measurements', { ...reading, ...envelope(1) })).toBe(true);
+    expect(store.read(1).measurements.meter).toMatchObject({
+      value: 12345,
+      unit: reading.unit,
+      sourceAt: new Date(now).toISOString(),
+    });
   });
   it.each([42, 2100, 5000])('admits a controller clock %i ms ahead without rewriting source times', (skew) => {
     const timestamp = new Date(now + skew).toISOString();
@@ -181,6 +192,29 @@ describe('canonical diagnostic consumer', () => {
     now++;
     expect(state(5)).toBe(true);
     expect(store.read(1).faults[channelId]).toBeUndefined();
+  });
+  it.each(['measurement_read_failed', 'modbus_read_failed', 'modbus_rtu_quarantined'])(
+    'clears %s only after a newer successful meter acquisition',
+    (code) => {
+      expect(state()).toBe(true);
+      now += 10;
+      expect(send('faults', { channelId: 'meter', code, ...envelope(1) })).toBe(true);
+      expect(store.read(1).faults.meter.code).toBe(code);
+      expect(measurement(1, { timestamp: new Date(now - 5).toISOString() })).toBe(true);
+      expect(store.read(1).faults.meter.code).toBe(code);
+      now++;
+      expect(measurement(2)).toBe(true);
+      expect(store.read(1).faults.meter).toBeUndefined();
+      expect(store.read(1).events.some((event) => event.kind === 'faults')).toBe(true);
+    },
+  );
+  it('does not clear an actuator fault when a meter measurement succeeds', () => {
+    state();
+    now++;
+    send('faults', { channelId: 'meter', code: 'device_write_failed', ...envelope(1) });
+    now++;
+    measurement();
+    expect(store.read(1).faults.meter.code).toBe('device_write_failed');
   });
   it('fails closed when retired stream tracking is full and bounds category tracking', () => {
     for (let index = 1; index <= 17; index++) {

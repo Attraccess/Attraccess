@@ -84,6 +84,11 @@
   "done": "Done",
   "closeSettings": "Close settings",
   "cancel": "Cancel",
+  "applyTitle": "Apply configuration?",
+  "applyHint": "Current reported output levels are shown below. HIGH or LOW does not tell us whether the connected machine is running. Do you want to apply these changes?",
+  "high": "HIGH (on)",
+  "low": "LOW (off)",
+  "noAppliedOutputs": "No outputs are configured in the applied configuration.",
   "flowImpactTitle": "Existing flows may be affected",
   "flowImpactHint": "These changes affect {{count}} configured channels. Applying requires confirming the impact on existing flows.",
   "flowReferences": "{{count}} flow references",
@@ -95,5 +100,13 @@
     "timeout": "The controller did not acknowledge the command in time. Check its connection before retrying.",
     "transport_failure": "Could not send the controller command."
   },
-  "discardError": "Could not discard changes. Reload the current configuration and try again."
+  "discardError": "Could not discard changes. Reload the current configuration and try again.",
+  "sections": {
+    "electrical": "Electrical measurements",
+    "active-energy": "Active energy & tariffs",
+    "reactive-energy": "Reactive energy & tariffs",
+    "quadrant-energy": "Quadrant energy & tariffs",
+    "information": "Meter information & settings"
+  },
+  "partialReadings": "Some registers could not be read. Available readings remain current."
 }

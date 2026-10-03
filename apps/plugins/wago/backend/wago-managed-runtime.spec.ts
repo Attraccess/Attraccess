@@ -2,6 +2,8 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 import { spawnSync } from 'node:child_process';
 import { DataSource } from 'typeorm';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { commissioningAcceptanceScript } from './wago-commissioning-accept';
+import { RuntimeUpdateError } from './wago-runtime-update';
 import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
 import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './wago-managed-access.entity';
 import { WagoDeviceOperations } from './wago-device-operations';
@@ -25,7 +27,7 @@ import type { BuildRuntimeArtifact } from './wago-build-runtime';
 import { generateManagementKey } from './wago-management-key';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { WAGO_DIN, WAGO_DOUT } from './wago-hardware-deployment';
 import { runtimeBundleDeliveryScript } from './wago-runtime-install';
@@ -76,9 +78,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
       hardwareId: `cc100-${id}`,
     });
 
-  const previousCapability = process.env.WAGO_MANAGED_RUNTIME_ENABLED;
   beforeEach(async () => {
-    process.env.WAGO_MANAGED_RUNTIME_ENABLED = 'true';
     db = await new DataSource({
       type: 'sqlite',
       database: ':memory:',
@@ -129,31 +129,27 @@ describe('managed enrolment and durable credential lifecycle', () => {
       );
   });
   afterEach(async () => {
-    if (previousCapability === undefined) delete process.env.WAGO_MANAGED_RUNTIME_ENABLED;
-    else process.env.WAGO_MANAGED_RUNTIME_ENABLED = previousCapability;
-    service.onModuleDestroy();
+    await service.onModuleDestroy();
     await new Promise(setImmediate);
     await db.destroy();
     jest.clearAllMocks();
   });
 
-  it('blocks enrolment before persistence or remote mutation when the capability is disabled', async () => {
-    delete process.env.WAGO_MANAGED_RUNTIME_ENABLED;
-    const disabled = new WagoManagedRuntimeService(
+  it('starts background reconciliation on bootstrap without additional configuration', async () => {
+    const restarted = new WagoManagedRuntimeService(
       context,
       { registerRuntimeStatusHandler: jest.fn() } as unknown as WagoService,
       {} as WagoRuntimeArtifactsService,
       {} as WagoCommissioningReadiness,
     );
-    const execute = jest.fn();
-    await expect(disabled.enrol(session(), execute, new AbortController().signal)).rejects.toThrow('disabled');
-    expect(execute).not.toHaveBeenCalled();
-    expect(encrypt).not.toHaveBeenCalled();
-    const scan = jest.spyOn(disabled as unknown as { scan(): Promise<void> }, 'scan').mockResolvedValue(undefined);
-    disabled.onApplicationBootstrap();
-    await new Promise(setImmediate);
-    expect(scan).not.toHaveBeenCalled();
-    disabled.onModuleDestroy();
+    const scan = jest.spyOn(restarted as unknown as { scan(): Promise<void> }, 'scan').mockResolvedValue(undefined);
+    try {
+      restarted.onApplicationBootstrap();
+      await new Promise(setImmediate);
+      expect(scan).toHaveBeenCalledTimes(1);
+    } finally {
+      await restarted.onModuleDestroy();
+    }
   });
 
   it('coalesces repeated heartbeat wakes into one bounded fleet scan window', async () => {
@@ -177,6 +173,27 @@ describe('managed enrolment and durable credential lifecycle', () => {
     internals.wake();
     await new Promise(setImmediate);
     expect(scan).toHaveBeenCalledTimes(2);
+  });
+
+  it('processes a new connection immediately inside the fleet scan cooldown', async () => {
+    const internals = service as unknown as {
+      nextScanAt: number;
+      scanning: boolean;
+      reconcileConnection(id: number): Promise<void>;
+    };
+    while (internals.scanning) await new Promise(setImmediate);
+    internals.nextScanAt = Date.now() + 30_000;
+    const reconcile = jest.spyOn(internals, 'reconcileConnection').mockResolvedValue(undefined);
+    const handler = jest.mocked(service['wago'].registerRuntimeStatusHandler).mock.calls[0][0];
+    handler(1, {
+      imageId: artifact.imageId,
+      streamId: '00000000-0000-4000-8000-000000000001',
+      sequence: 1,
+      timestamp: Date.now(),
+      receivedAt: Date.now(),
+    });
+    await new Promise(setImmediate);
+    expect(reconcile).toHaveBeenCalledWith(1);
   });
 
   it('persists authenticated ciphertext before remote mutation and rotates per enrolment', async () => {
@@ -203,7 +220,6 @@ describe('managed enrolment and durable credential lifecycle', () => {
     expect(await service.status(100)).toEqual({
       sessionId: null,
       management: 'reenrol_required',
-      rolloutEnabled: true,
       keyFingerprint: null,
       update: null,
       physicalQualification: 'unverified',
@@ -243,7 +259,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
       return `OK ${header.split(' ')[1]}\n`;
     });
     await expect(service.enrol(session(), async () => 'OK\n', new AbortController().signal)).rejects.toThrow(
-      'requires recovery',
+      'Managed SSH setup failed (commit)',
     );
     const before = (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access'))[0]
       .encrypted_credentials;
@@ -261,7 +277,9 @@ describe('managed enrolment and durable credential lifecycle', () => {
   it('retains recovery intent on failed second key connection without disabling SSH policy', async () => {
     jest.mocked(managedSsh).mockRejectedValue(new Error('transport output with fixture secret'));
     const execute = jest.fn(async (_script: string) => 'OK\n');
-    await expect(service.enrol(session(), execute, new AbortController().signal)).rejects.toThrow('requires recovery');
+    await expect(service.enrol(session(), execute, new AbortController().signal)).rejects.toThrow(
+      'Managed SSH setup failed (proof)',
+    );
     expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).toMatchObject({
       state: 'recovery_required',
     });
@@ -281,6 +299,19 @@ describe('managed enrolment and durable credential lifecycle', () => {
     const result = await service.recoverPassword(1, principal);
     expect(result).toEqual({ password: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) });
     expect(result).not.toHaveProperty('privateKey');
+  });
+
+  it('selects encrypted recovery access only after proving the pinned root login', async () => {
+    await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+    const row = (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access'))[0];
+    const credentials = JSON.parse(decrypt(row.encrypted_credentials));
+    expect(await service.commissioningRecoveryPassword(session())).toBe(credentials.recoveryPassword);
+    rootProbe.mockResolvedValue(false);
+    expect(await service.commissioningRecoveryPassword(session())).toBeNull();
+    expect(await service.sessionStatus(1)).not.toHaveProperty('password');
+    await expect(
+      service.commissioningRecoveryPassword(Object.assign(session(), { targetHost: '10.77.0.8' })),
+    ).rejects.toThrow('identity changed');
   });
 
   it('rejects encrypted envelopes copied to another controller/session', async () => {
@@ -366,7 +397,81 @@ describe('managed enrolment and durable credential lifecycle', () => {
     ).toMatchObject({ owner: null });
   });
 
-  it.each(['committed', 'open', 'retiring'] as const)(
+  it.each(['connection', 'runtime_state', 'enrollment_credentials', 'configuration', 'readiness'] as const)(
+    'explains the %s prerequisite holding up automatic SSH completion without touching SSH',
+    async (reason) => {
+      const now = new Date().toISOString();
+      const current = await db.getRepository(WagoController).save(
+        Object.assign(new WagoController(), {
+          id: 1,
+          hardwareId: 'cc100-1',
+          trustState: 'claimed',
+          mqttServerId: 7,
+          pairingCodeHash: 'fixture',
+          protocolVersion: '1',
+          runtimeVersion: '1',
+          capabilities: '[]',
+          lastSeenAt: now,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+      await db.getRepository(WagoCommissioningSession).save(
+        Object.assign(session(), {
+          mqttServerId: 7,
+          firmwareBaseline: '31',
+          state: 'awaiting_verification',
+          initiatingPrincipal: JSON.stringify(principal),
+          auditLog: '[]',
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+      await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'verified' });
+      if (reason !== 'connection')
+        service['heartbeats'].set(1, {
+          imageId: artifact.imageId,
+          streamId: 'boot-new',
+          timestamp: Date.now(),
+          receivedAt: Date.now(),
+        });
+      service['readiness'].observe = jest.fn(() =>
+        reason === 'runtime_state'
+          ? undefined
+          : {
+              timestamp: Date.now(),
+              streamId: 'boot-new',
+              sequence: 1,
+              revision: 1,
+              contentHash: 'a'.repeat(64),
+              connected: true,
+              configurationAccepted: reason !== 'configuration',
+              hardwareAvailable: reason !== 'readiness',
+              ready: reason !== 'configuration' && reason !== 'readiness',
+            },
+      );
+      jest.mocked(commissioningVerification).mockResolvedValue({
+        controllerId: 1,
+        permanentConnection: true,
+        enrollmentRevoked: reason !== 'enrollment_credentials',
+        configurationApplied: reason !== 'configuration',
+        hardwareReadiness: reason === 'readiness' ? 'not_ready' : 'ready',
+        managementHardening: 'unverified',
+        physicalQualification: 'required',
+        ready: false,
+      });
+      jest.mocked(managedSsh).mockClear();
+      expect(await service['completeEnrolment'](current)).toBe(false);
+      expect(await service.status(1)).toMatchObject({
+        management: 'verified',
+        managementSetup: { state: 'waiting', reason },
+      });
+      expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['committed', 'open', 'retiring', 'slow-preparation', 'slow-cutover', 'acceptance-failed', 'slow-policy', 'bootstrap-acceptance', 'stuck-cutover'] as const)(
     'reconciles %s cutover with reboot proof before a new commit',
     async (remoteStatus) => {
       const current = await db.getRepository(WagoController).save(
@@ -440,16 +545,135 @@ describe('managed enrolment and durable credential lifecycle', () => {
         expect((await service.sessionStatus(1)).management).toBe('retiring');
         return;
       }
-      rootProbe.mockResolvedValue(remoteStatus === 'open');
+      const open = remoteStatus === 'open' || remoteStatus === 'slow-preparation' || remoteStatus === 'slow-cutover' || remoteStatus === 'acceptance-failed' || remoteStatus === 'slow-policy' || remoteStatus === 'bootstrap-acceptance';
+      rootProbe.mockResolvedValue(open);
+      const bootstrapAcceptance = jest.fn(async (_host, _fingerprint, _password, _token, guard) => {
+        await guard.assertOwned();
+        expect(guard.signal.aborted).toBe(false);
+      });
+      if (remoteStatus === 'bootstrap-acceptance') service.registerPreparationAcceptance(bootstrapAcceptance);
+      let preparationStarted!: () => void;
+      let cutoverStarted!: () => void;
+      let rebootStarted!: () => void;
+      let policyStarted!: () => void;
+      const preparing = new Promise<void>((resolve) => { preparationStarted = resolve; });
+      const cuttingOver = new Promise<void>((resolve) => { cutoverStarted = resolve; });
+      const rebooting = new Promise<void>((resolve) => { rebootStarted = resolve; });
+      const checkingPolicy = new Promise<void>((resolve) => { policyStarted = resolve; });
+      let slowStepAborted = false;
       let boot = '00000000-0000-4000-8000-000000000001\n';
-      jest.mocked(managedSsh).mockImplementation(async (_access, _key, header) => {
-        if (header.startsWith('access-status ')) return remoteStatus + '\n';
-        if (header.startsWith('access-cutover ')) rootProbe.mockResolvedValue(false);
+      jest.mocked(managedSsh).mockImplementation(async (_access, _key, header, signal) => {
+        if (header.startsWith('access-status ')) return (open ? 'open' : remoteStatus === 'stuck-cutover' ? 'cutover' : remoteStatus) + '\n';
+        if (remoteStatus === 'stuck-cutover' && header.startsWith('access-restore '))
+          throw new RuntimeUpdateError('lock_tools');
+        if (remoteStatus === 'slow-preparation' && header.startsWith('access-key-commit ')) {
+          preparationStarted();
+          await new Promise((resolve) => setTimeout(resolve, 200_000));
+          slowStepAborted = signal.aborted;
+          signal.throwIfAborted();
+        }
+        if (remoteStatus === 'slow-policy' && header.startsWith('access-policy ')) {
+          policyStarted();
+          await new Promise((resolve) => setTimeout(resolve, 200_000));
+          signal.throwIfAborted();
+        }
+        if (remoteStatus === 'acceptance-failed' && header.startsWith('commissioning-accept '))
+          throw new Error('internal detail with a secret must not be persisted');
+        if (header.startsWith('access-cutover ')) {
+          expect(await service.status(1)).toMatchObject({
+            managementSetup: { state: 'running', reason: 'ssh_cutover' },
+          });
+          rootProbe.mockResolvedValue(false);
+          cutoverStarted();
+          if (remoteStatus === 'slow-cutover') {
+            await new Promise((resolve) => setTimeout(resolve, 200_000));
+            slowStepAborted = signal.aborted;
+            signal.throwIfAborted();
+          }
+        }
         if (header.startsWith('access-boot ')) return boot;
-        if (header.startsWith('access-reboot ')) boot = '00000000-0000-4000-8000-000000000002\n';
+        if (header.startsWith('access-reboot ')) {
+          expect(await service.status(1)).toMatchObject({ managementSetup: { state: 'running', reason: 'reboot' } });
+          boot = '00000000-0000-4000-8000-000000000002\n';
+          rebootStarted();
+        }
         return header.startsWith('proof ') ? `OK ${header.split(' ')[1]}\n` : 'OK\n';
       });
-      expect(await service['completeEnrolment'](current)).toBe(true);
+      if (remoteStatus === 'stuck-cutover') {
+        expect(await service['completeEnrolment'](current)).toBe(false);
+        expect(await service.status(1)).toMatchObject({
+          management: 'recovery_required',
+          managementFailure: expect.stringContaining('Automatic SSH setup failed (rollback).'),
+        });
+        expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason).toContain('lock option unsupported');
+        expect(jest.mocked(managedSsh).mock.calls.some(call => call[2].startsWith('access-commit '))).toBe(false);
+        return;
+      }
+      if (remoteStatus === 'acceptance-failed') {
+        expect(await service['completeEnrolment'](current)).toBe(false);
+        const failure = (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason;
+        expect(failure).toContain('Automatic SSH setup failed (acceptance).');
+        expect(failure).toContain('retained transaction records');
+        expect(failure).not.toContain('secret');
+        expect(await service.status(1)).toMatchObject({ management: 'recovery_required', managementFailure: failure });
+        expect(jest.mocked(managedSsh).mock.calls.some((call) => call[2].startsWith('access-cutover '))).toBe(false);
+        // A transient offline status probe on the next scan must not replace
+        // the useful failure from the last audited setup attempt.
+        jest.mocked(managedSsh).mockRejectedValue(new RuntimeUpdateError('offline'));
+        expect(await service['completeEnrolment'](current)).toBe(false);
+        expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason).toBe(failure);
+        jest.mocked(managedSsh).mockRejectedValue(new RuntimeUpdateError('host_identity'));
+        expect(await service['completeEnrolment'](current)).toBe(false);
+        expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason).toContain('SSH host key differs');
+        return;
+      }
+      if (remoteStatus === 'slow-policy') {
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+        try {
+          const completion = service['completeEnrolment'](current);
+          await cuttingOver;
+          await jest.advanceTimersByTimeAsync(3000);
+          await checkingPolicy;
+          await jest.advanceTimersByTimeAsync(200_000);
+          expect(await completion).toBe(false);
+          expect(await service.status(1)).toMatchObject({
+            management: 'recovery_required',
+            managementFailure: expect.stringContaining('Automatic SSH setup failed (policy).'),
+          });
+          expect(jest.mocked(managedSsh).mock.calls.some((call) => call[2].startsWith('access-commit '))).toBe(false);
+        } finally {
+          jest.useRealTimers();
+        }
+        return;
+      }
+      if (remoteStatus === 'slow-preparation' || remoteStatus === 'slow-cutover') {
+        // A legitimate supervisor gate can hold install.lock for up to 300s.
+        // Waiting for it must not consume the later SSH rollback window.
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+        try {
+          const completion = service['completeEnrolment'](current);
+          await (remoteStatus === 'slow-preparation' ? preparing : cuttingOver);
+          await jest.advanceTimersByTimeAsync(200_000);
+          if (slowStepAborted) {
+            expect(await completion).toBe(true);
+            return;
+          }
+          await cuttingOver;
+          await jest.advanceTimersByTimeAsync(3000);
+          await rebooting;
+          await jest.advanceTimersByTimeAsync(1000);
+          expect(await completion).toBe(true);
+        } finally {
+          jest.useRealTimers();
+        }
+      } else expect(await service['completeEnrolment'](current)).toBe(true);
+      if (remoteStatus === 'bootstrap-acceptance') {
+        expect(bootstrapAcceptance).toHaveBeenCalledTimes(1);
+        expect(bootstrapAcceptance.mock.calls[0].slice(0, 2)).toEqual([session().targetHost, session().hostKeyFingerprint]);
+        expect(bootstrapAcceptance.mock.calls[0][3]).toBe('a'.repeat(32));
+        expect(jest.mocked(managedSsh).mock.calls.some((call) => call[2].startsWith('commissioning-accept '))).toBe(false);
+      }
+      expect(await service.status(1)).not.toHaveProperty('managementSetup');
       expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).toMatchObject({
         state: 'managed',
       });
@@ -511,15 +735,19 @@ describe('managed enrolment and durable credential lifecycle', () => {
       await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access WHERE session_id = 1')
     )[0].encrypted_credentials;
     const credentials = JSON.parse(decrypt(envelope));
-    service.onModuleDestroy();
+    await service.onModuleDestroy();
     let heartbeat: Parameters<WagoService['registerRuntimeStatusHandler']>[0] = () => undefined;
     let boot = '00000000-0000-4000-8000-000000000001';
     let sequence = 1;
+    let policyConfirmed = false;
     const restarted = new WagoManagedRuntimeService(
       service['context'],
       {
         registerRuntimeStatusHandler: (handler) => {
           heartbeat = handler;
+        },
+        setRuntimePolicy: async (_id: number, desired: string, observed: string) => {
+          policyConfirmed = desired === observed;
         },
         getSettings: async () => ({ operationalPrefix: 'attraccess/wago' }),
       } as WagoService,
@@ -537,7 +765,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
           connected: true,
           configurationAccepted: true,
           hardwareAvailable: true,
-          ready: true,
+          ready: policyConfirmed,
         }),
       } as unknown as WagoCommissioningReadiness,
     );
@@ -555,6 +783,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
         );
       }
       if (header.startsWith('activate ')) {
+        policyConfirmed = false;
         await new Promise((resolve) => setTimeout(resolve, 5));
         boot = '00000000-0000-4000-8000-000000000002';
         heartbeat(1, {
@@ -578,7 +807,19 @@ describe('managed enrolment and durable credential lifecycle', () => {
       }
       expect(await restarted.status(1)).toMatchObject({
         management: 'managed',
-        update: { phase: 'current', token: null, desiredImageId: artifact.imageId },
+        runtime: {
+          runningVersion: current.runtimeVersion,
+          runningImageId: artifact.imageId,
+          desiredVersion: artifact.manifest.runtimeVersion,
+          desiredImageId: artifact.imageId,
+        },
+        update: {
+          phase: 'current',
+          token: null,
+          desiredImageId: artifact.imageId,
+          previousRuntimeVersion: current.runtimeVersion,
+          desiredRuntimeVersion: artifact.manifest.runtimeVersion,
+        },
       });
       expect(rootProbe).not.toHaveBeenCalled();
       expect(jest.mocked(managedSsh).mock.calls.map((call) => call[2].split(' ')[0])).toEqual(
@@ -589,13 +830,68 @@ describe('managed enrolment and durable credential lifecycle', () => {
           .encrypted_credentials,
       ).toBe(envelope);
     } finally {
-      restarted.onModuleDestroy();
+      await restarted.onModuleDestroy();
       await new Promise(setImmediate);
     }
   });
 });
 
 describe('fixed managed executor and recovery programs', () => {
+  it('reports the legacy receiver capability without taking the mutation lock', () => {
+    const fixture = fw31ShellFixture();
+    try {
+      fixture.file('bin/id', '#!/bin/sh\necho 0\n', 0o700);
+      fixture.file('etc/attraccess-wago/install.lock', '');
+      fixture.file('etc/attraccess-wago-management/token', 'a'.repeat(32));
+      const request = Buffer.from(`receiver-status ${'a'.repeat(32)}\n`);
+      const helper = managedHostHelper(artifact, fixture.root);
+      expect(fixture.run(helper, 'supervisor-lock-held', request).stdout).toBe('head-byte-count supported\n');
+      rmSync(join(fixture.root, 'bin/head'));
+      fixture.file('bin/head', '#!/bin/sh\nexit 1\n', 0o700);
+      const unsupported = fixture.run(helper, 'supervisor-lock-held', request);
+      expect({ status: unsupported.status, stdout: unsupported.stdout, stderr: unsupported.stderr }).toEqual({ status: 0, stdout: 'head-byte-count unsupported\n', stderr: '' });
+      expect(fixture.run(helper, '', Buffer.from(`receiver-status ${'b'.repeat(32)}\n`)).status).not.toBe(0);
+    } finally { fixture.dispose(); }
+  });
+  it.each(['native', 'terse'] as const)('reports update storage requirements without writing controller state (%s stat)', statStyle => {
+    const fixture = fw31ShellFixture(statStyle);
+    try {
+      fixture.file('bin/id', '#!/bin/sh\necho 0\n', 0o700);
+      fixture.file('etc/attraccess-wago/install.lock', '');
+      fixture.file('etc/attraccess-wago-management/token', 'a'.repeat(32));
+      const containers = fixture.read('containers.json');
+      const result = fixture.run(managedHostHelper(artifact, fixture.root), 'supervisor-lock-held', Buffer.from(`storage-status ${'a'.repeat(32)}\n`));
+      expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+      expect(result.stdout).toBe(['/var/lib', '/var/lib'].map(path => `${fixture.root}${path} 999999 16704 disk /fixture\n`).join(''));
+      expect(fixture.read('containers.json')).toBe(containers);
+      expect(existsSync(join(fixture.root, 'var/lib/attraccess-wago-update-transaction'))).toBe(false);
+      expect(fixture.run(managedHostHelper(artifact, fixture.root), '', Buffer.from(`storage-status ${'b'.repeat(32)}\n`)).status).not.toBe(0);
+      rmSync(join(fixture.root, 'etc/attraccess-wago'), { recursive: true });
+      expect(fixture.run(managedHostHelper(artifact, fixture.root), '', Buffer.from(`storage-status ${'a'.repeat(32)}\n`)).status).not.toBe(0);
+      expect(existsSync(join(fixture.root, 'etc/attraccess-wago'))).toBe(false);
+    } finally {
+      fixture.dispose();
+    }
+  });
+  it.each(['native', 'terse'] as const)('inspects the running image without interrupting a busy hardware supervisor (%s stat)', statStyle => {
+    const fixture = fw31ShellFixture(statStyle);
+    try {
+      fixture.file('bin/id', '#!/bin/sh\necho 0\n', 0o700);
+      fixture.file('bin/cut', '#!/bin/sh\nexec /usr/bin/cut "$@"\n', 0o700);
+      fixture.file('etc/attraccess-wago/install.lock', '');
+      const helper = managedHostHelper(artifact, fixture.root);
+      fixture.file('usr/sbin/attraccess-wago-management', helper, 0o700);
+      const containers = JSON.stringify([{ id: 'a'.repeat(64), name: 'attraccess-wago', imageId: artifact.imageId, running: true }]);
+      fixture.file('containers.json', containers);
+      const result = fixture.run(helper, 'supervisor-lock-held', Buffer.from(`inspect ${'a'.repeat(32)}\n`));
+      expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+      expect(result.stdout).toMatch(new RegExp(`^${MANAGED_HELPER_PROTOCOL}\\n[a-f0-9]{64}\\n${artifact.imageId} true\\n$`));
+      expect(fixture.read('containers.json')).toBe(containers);
+      expect(fixture.read('usr/sbin/attraccess-wago-management')).toBe(helper);
+    } finally {
+      fixture.dispose();
+    }
+  });
   it('uses the same RTU contract in stage, activation, acceptance and recovery, and preserves fixed diagnostic categories', () => {
     const helper = managedHostHelper({
       ...artifact,
@@ -609,146 +905,164 @@ describe('fixed managed executor and recovery programs', () => {
     expect(new Set(comparisons)).toEqual(new Set(['cc100-751-9301-fw31-digital-rtu-v1']));
     expect(managedSshFailure('Insufficient update journal storage', 'transfer')).toBe('storage');
     expect(managedSshFailure('Runtime load failed', 'transfer')).toBe('load');
-    expect(managedSshFailure('codesys-boot-enabled', 'transfer')).toBe('host_gate');
+    expect(managedSshFailure('codesys-boot-enabled', 'transfer')).toBe('codesys_boot_enabled');
+    expect(managedSshFailure('codesys-active', 'transfer')).toBe('codesys_active');
+    expect(managedSshFailure('missing-register', 'transfer')).toBe('io_unavailable');
+    expect(managedSshFailure('output-host-process-conflict', 'transfer')).toBe('writer_conflict');
+    expect(managedSshFailure('Permission denied (publickey).', 'offline')).toBe('authentication');
+    expect(managedSshFailure("flock: invalid option -- 'w'\nBusyBox v1.37.0 () multi-call binary.", 'offline')).toBe('lock_tools');
     expect(managedSshFailure('unexpected remote fixture-secret text', 'transfer')).toBe('transfer');
   });
-  it('provisions unique scoped access and restores the previous SSH policy on interrupted cutover/reboot', () => {
-    const fixture = fw31ShellFixture();
-    try {
-      const node = (name: string, source: string) =>
-        fixture.file(`bin/${name}`, `#!${process.execPath}\n${source}`, 0o700);
-      fixture.file('accounts.json', JSON.stringify({ root: { uid: 0, gid: 0, home: '/root' } }));
-      fixture.file('groups.json', JSON.stringify({ root: 0 }));
-      node(
-        'id',
-        `const fs=require('fs'),r=process.env.FIXTURE_ROOT,a=JSON.parse(fs.readFileSync(r+'/accounts.json')),args=process.argv.slice(2),u=a[args[0]?.startsWith('-')?(args[1]||'root'):(args[0]||'root')];if(!u)process.exit(1);if(args[0]==='-u')console.log(u.uid);else if(args[0]==='-g')console.log(u.gid);`,
-      );
-      node(
-        'getent',
-        `const fs=require('fs'),r=process.env.FIXTURE_ROOT,args=process.argv.slice(2),groups=JSON.parse(fs.readFileSync(r+'/groups.json')),accounts=JSON.parse(fs.readFileSync(r+'/accounts.json'));if(args[0]==='group'){if(groups[args[1]]===undefined)process.exit(2);console.log(args[1]+':x:'+groups[args[1]]+':');}else{for(const [name,u] of Object.entries(accounts)){if(!args[1]||args[1]===name)console.log(name+':x:'+u.uid+':'+u.gid+'::'+u.home+':/bin/sh');}}`,
-      );
-      node(
-        'groupadd',
-        `const fs=require('fs'),r=process.env.FIXTURE_ROOT,g=JSON.parse(fs.readFileSync(r+'/groups.json'));g.attraccess=1111;fs.writeFileSync(r+'/groups.json',JSON.stringify(g));`,
-      );
-      node(
-        'useradd',
-        `const fs=require('fs'),r=process.env.FIXTURE_ROOT,a=JSON.parse(fs.readFileSync(r+'/accounts.json'));a.attraccess={uid:1111,gid:1111,home:r+'/home/attraccess'};fs.writeFileSync(r+'/accounts.json',JSON.stringify(a));fs.mkdirSync(r+'/home/attraccess',{recursive:true,mode:0o700});`,
-      );
-      node(
-        'chpasswd',
-        `const fs=require('fs'),crypto=require('crypto'),r=process.env.FIXTURE_ROOT,text=fs.readFileSync(0,'utf8').trim().split(':'),file=r+'/password-hashes.json',hashes=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):{};hashes[text[0]]=crypto.scryptSync(text[1],'isolated-fixture',32).toString('hex');fs.writeFileSync(file,JSON.stringify(hashes));`,
-      );
-      fixture.file('bin/cut', '#!/bin/sh\nexec /usr/bin/cut "$@"\n', 0o700);
-      fixture.file('bin/sudo', '#!/bin/sh\nexit 0\n', 0o700);
-      fixture.file('bin/visudo', '#!/bin/sh\nexit 0\n', 0o700);
-      fixture.file('usr/sbin/dropbear', '#!/bin/sh\necho "Dropbear v2025.88"\n', 0o700);
-      fixture.file('etc/sudoers.d/fixture', '');
-      fixture.file('etc/init.d/dropbear', '#!/bin/sh\nprintf old-policy >> "$FIXTURE_ROOT/ssh-restarts"\n', 0o755);
-      const token = 'a'.repeat(32),
-        key = generateManagementKey(),
-        password = 'b'.repeat(43);
-      const success = (result: ReturnType<typeof fixture.run>) =>
-        expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
-      fixture.file(
-        'accounts.json',
-        JSON.stringify({
-          root: { uid: 0, gid: 0, home: '/root' },
-          attraccess: { uid: 1111, gid: 1111, home: fixture.root + '/home/attraccess' },
-        }),
-      );
-      expect(
-        fixture.run(
-          managedProvisionScript(
-            token,
-            key.publicKey,
-            password,
-            managedHostHelper(artifact, fixture.root),
-            fixture.root,
+  it.each(['native', 'terse'] as const)(
+    'provisions on actual FW31 tools without chpasswd, getent or visudo and restores interrupted cutover/reboot (%s stat)',
+    (statStyle) => {
+      const fixture = fw31ShellFixture(statStyle);
+      try {
+        const node = (name: string, source: string) =>
+          fixture.file(`bin/${name}`, `#!${process.execPath}\n${source}`, 0o700);
+        fixture.file('accounts.json', JSON.stringify({ root: { uid: 0, gid: 0, home: '/root' } }));
+        fixture.file('groups.json', JSON.stringify({ root: 0 }));
+        node(
+          'id',
+          `const fs=require('fs'),r=process.env.FIXTURE_ROOT,a=JSON.parse(fs.readFileSync(r+'/accounts.json')),args=process.argv.slice(2),u=a[args[0]?.startsWith('-')?(args[1]||'root'):(args[0]||'root')];if(!u)process.exit(1);if(args[0]==='-u')console.log(u.uid);else if(args[0]==='-g')console.log(u.gid);`,
+        );
+        node(
+          'groupadd',
+          `const fs=require('fs'),r=process.env.FIXTURE_ROOT,g=JSON.parse(fs.readFileSync(r+'/groups.json'));g.attraccess=1111;fs.writeFileSync(r+'/groups.json',JSON.stringify(g));fs.writeFileSync(r+'/etc/group',Object.entries(g).map(([n,id])=>n+':x:'+id+':').join('\\n')+'\\n');`,
+        );
+        node(
+          'useradd',
+          `const fs=require('fs'),r=process.env.FIXTURE_ROOT,a=JSON.parse(fs.readFileSync(r+'/accounts.json'));a.attraccess={uid:1111,gid:1111,home:r+'/home/attraccess'};fs.writeFileSync(r+'/accounts.json',JSON.stringify(a));fs.mkdirSync(r+'/home/attraccess',{recursive:true,mode:0o700});fs.writeFileSync(r+'/etc/passwd',Object.entries(a).map(([n,u])=>n+':x:'+u.uid+':'+u.gid+'::'+u.home+':/bin/sh').join('\\n')+'\\n');`,
+        );
+        node(
+          'passwd',
+          `const fs=require('fs'),crypto=require('crypto'),r=process.env.FIXTURE_ROOT,text=fs.readFileSync(0,'utf8').trim().split('\\n');if(text.length!==2||text[0]!==text[1])process.exit(1);const file=r+'/password-hashes.json',hashes=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):{};hashes[process.argv.at(-1)]=crypto.scryptSync(text[0],'isolated-fixture',32).toString('hex');fs.writeFileSync(file,JSON.stringify(hashes));`,
+        );
+        fixture.file('bin/cut', '#!/bin/sh\nexec /usr/bin/cut "$@"\n', 0o700);
+        fixture.file('bin/sudo', '#!/bin/sh\nexit 0\n', 0o700);
+        fixture.file('etc/sudoers', '#includedir ' + fixture.root + '/etc/sudoers.d\n');
+        fixture.file('usr/sbin/dropbear', '#!/bin/sh\necho "Dropbear v2025.88"\n', 0o700);
+        fixture.file('etc/sudoers.d/fixture', '');
+        fixture.file('etc/init.d/dropbear', '#!/bin/sh\nprintf old-policy >> "$FIXTURE_ROOT/ssh-restarts"\n', 0o755);
+        const token = 'a'.repeat(32),
+          key = generateManagementKey(),
+          password = 'b'.repeat(43);
+        const success = (result: ReturnType<typeof fixture.run>) =>
+          expect({
+            status: result.status,
+            stderr: result.stderr,
+            failure: result.stdout.match(/WAGO_MANAGEMENT_FAILURE=([a-z]+)/)?.[1],
+          }).toEqual({ status: 0, stderr: '', failure: undefined });
+        fixture.file(
+          'accounts.json',
+          JSON.stringify({
+            root: { uid: 0, gid: 0, home: '/root' },
+            attraccess: { uid: 1111, gid: 1111, home: fixture.root + '/home/attraccess' },
+          }),
+        );
+        expect(
+          fixture.run(
+            managedProvisionScript(
+              token,
+              key.publicKey,
+              password,
+              managedHostHelper(artifact, fixture.root),
+              fixture.root,
+            ),
+          ).status,
+        ).not.toBe(0);
+        expect(existsSync(join(fixture.root, 'password-hashes.json'))).toBe(false);
+        fixture.file('accounts.json', JSON.stringify({ root: { uid: 0, gid: 0, home: '/root' } }));
+        success(
+          fixture.run(
+            managedProvisionScript(
+              token,
+              key.publicKey,
+              password,
+              managedHostHelper(artifact, fixture.root),
+              fixture.root,
+            ),
           ),
-        ).status,
-      ).not.toBe(0);
-      expect(existsSync(join(fixture.root, 'password-hashes.json'))).toBe(false);
-      fixture.file('accounts.json', JSON.stringify({ root: { uid: 0, gid: 0, home: '/root' } }));
-      success(
-        fixture.run(
-          managedProvisionScript(
-            token,
-            key.publicKey,
-            password,
-            managedHostHelper(artifact, fixture.root),
-            fixture.root,
+        );
+        expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(
+          `command="${fixture.root}/usr/bin/sudo -n ${fixture.root}/usr/sbin/attraccess-wago-management"`,
+        );
+        expect(fixture.read('etc/sudoers.d/attraccess-wago')).toContain('NOPASSWD:');
+        const hashes = JSON.parse(fixture.read('password-hashes.json'));
+        expect(hashes.root).toBe(scryptSync(password, 'isolated-fixture', 32).toString('hex'));
+        expect(hashes.attraccess).not.toBe(hashes.root);
+        // Re-enrolment stages an additional key; cleanup only follows a fresh
+        // key-only proof persisted by the server. Both old and new work meanwhile.
+        const replacement = generateManagementKey();
+        success(
+          fixture.run(
+            managedProvisionScript(
+              token,
+              replacement.publicKey,
+              password,
+              managedHostHelper(artifact, fixture.root),
+              fixture.root,
+            ),
           ),
-        ),
-      );
-      expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(
-        `command="${fixture.root}/usr/bin/sudo -n ${fixture.root}/usr/sbin/attraccess-wago-management"`,
-      );
-      expect(fixture.read('etc/sudoers.d/attraccess-wago')).toContain('NOPASSWD:');
-      const hashes = JSON.parse(fixture.read('password-hashes.json'));
-      expect(hashes.root).toBe(scryptSync(password, 'isolated-fixture', 32).toString('hex'));
-      expect(hashes.attraccess).not.toBe(hashes.root);
-      // Re-enrolment stages an additional key; cleanup only follows a fresh
-      // key-only proof persisted by the server. Both old and new work meanwhile.
-      const replacement = generateManagementKey();
-      success(
-        fixture.run(
-          managedProvisionScript(
-            token,
-            replacement.publicKey,
-            password,
-            managedHostHelper(artifact, fixture.root),
-            fixture.root,
-          ),
-        ),
-      );
-      expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(key.publicKey);
-      expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(replacement.publicKey);
-      success(fixture.run(managedHostHelper(artifact, fixture.root), '', Buffer.from(`access-key-commit ${token}\n`)));
-      expect(fixture.read('home/attraccess/.ssh/authorized_keys')).not.toContain(key.publicKey);
-      expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(replacement.publicKey);
-      success(fixture.run(managedHostHelper(artifact, fixture.root), '', Buffer.from(`access-key-commit ${token}\n`)));
-      success(fixture.run(managedCutoverScript(token, fixture.root)));
-      expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess -w -s');
-      success(fixture.run(`set -- boot\n${managedWatchdogScript(fixture.root)}`));
-      // Boot arms a fresh bounded watchdog, allowing managed reboot verification.
-      expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess');
-      success(fixture.run(`set --\n${managedWatchdogScript(fixture.root)}`));
-      expect(fixture.read('etc/init.d/dropbear')).not.toContain('-G attraccess');
-      // Retrying with the same verified generated identity must survive a second cutover.
-      success(fixture.run(managedCutoverScript(token, fixture.root)));
-      success(fixture.run(managedCommitScript(token, fixture.root)));
-      success(fixture.run(`set -- boot\n${managedWatchdogScript(fixture.root)}`));
-      expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess -w -s');
-      expect(fixture.read('password-hashes.json')).not.toContain(password);
-      const helper = managedHostHelper(artifact, fixture.root);
-      expect(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)).status).not.toBe(0);
-      expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(replacement.publicKey);
-      success(fixture.run(helper, '', Buffer.from(`access-restore ${token}\n`)));
-      const previousPolicy = fixture.read('etc/attraccess-wago-management/dropbear.previous');
-      fixture.file('etc/attraccess-wago-management/dropbear.previous', '#!/bin/sh\nexit 1\n', 0o700);
-      expect(fixture.run(`set -- restore\n${managedWatchdogScript(fixture.root)}`).status).not.toBe(0);
-      expect(existsSync(join(fixture.root, 'etc/attraccess-wago-management/cutover'))).toBe(true);
-      fixture.file('etc/attraccess-wago-management/dropbear.previous', previousPolicy, 0o700);
-      success(fixture.run(`set -- restore\n${managedWatchdogScript(fixture.root)}`));
-      // Repeating restoration must not recreate cutover or block key retirement.
-      success(fixture.run(helper, '', Buffer.from(`access-restore ${token}\n`)));
-      expect(existsSync(join(fixture.root, 'etc/attraccess-wago-management/cutover'))).toBe(false);
-      success(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)));
-      expect(existsSync(join(fixture.root, 'home/attraccess/.ssh/authorized_keys'))).toBe(false);
-      expect(existsSync(join(fixture.root, 'etc/attraccess-wago-management/key.pending'))).toBe(false);
-      success(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)));
-    } finally {
-      fixture.dispose();
-    }
-  });
-  it('accepts real commissioning journals in dependency order and fences foreign tokens before cleanup', () => {
+        );
+        expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(key.publicKey);
+        expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(replacement.publicKey);
+        success(
+          fixture.run(managedHostHelper(artifact, fixture.root), '', Buffer.from(`access-key-commit ${token}\n`)),
+        );
+        expect(fixture.read('home/attraccess/.ssh/authorized_keys')).not.toContain(key.publicKey);
+        expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(replacement.publicKey);
+        success(
+          fixture.run(managedHostHelper(artifact, fixture.root), '', Buffer.from(`access-key-commit ${token}\n`)),
+        );
+        success(fixture.run(managedCutoverScript(token, fixture.root)));
+        expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess -w -s');
+        success(fixture.run(`set -- boot\n${managedWatchdogScript(fixture.root)}`));
+        // Boot arms a fresh bounded watchdog, allowing managed reboot verification.
+        expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess');
+        success(fixture.run(`set --\n${managedWatchdogScript(fixture.root)}`));
+        expect(fixture.read('etc/init.d/dropbear')).not.toContain('-G attraccess');
+        // Retrying with the same verified generated identity must survive a second cutover.
+        success(fixture.run(managedCutoverScript(token, fixture.root)));
+        success(fixture.run(managedCommitScript(token, fixture.root)));
+        success(fixture.run(`set -- boot\n${managedWatchdogScript(fixture.root)}`));
+        expect(fixture.read('etc/init.d/dropbear')).toContain('-G attraccess -w -s');
+        expect(fixture.read('password-hashes.json')).not.toContain(password);
+        const helper = managedHostHelper(artifact, fixture.root);
+        expect(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)).status).not.toBe(0);
+        expect(fixture.read('home/attraccess/.ssh/authorized_keys')).toContain(replacement.publicKey);
+        success(fixture.run(helper, '', Buffer.from(`access-restore ${token}\n`)));
+        const previousPolicy = fixture.read('etc/attraccess-wago-management/dropbear.previous');
+        fixture.file('etc/attraccess-wago-management/dropbear.previous', '#!/bin/sh\nexit 1\n', 0o700);
+        expect(fixture.run(`set -- restore\n${managedWatchdogScript(fixture.root)}`).status).not.toBe(0);
+        expect(existsSync(join(fixture.root, 'etc/attraccess-wago-management/cutover'))).toBe(true);
+        fixture.file('etc/attraccess-wago-management/dropbear.previous', previousPolicy, 0o700);
+        success(fixture.run(`set -- restore\n${managedWatchdogScript(fixture.root)}`));
+        // Repeating restoration must not recreate cutover or block key retirement.
+        success(fixture.run(helper, '', Buffer.from(`access-restore ${token}\n`)));
+        expect(existsSync(join(fixture.root, 'etc/attraccess-wago-management/cutover'))).toBe(false);
+        success(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)));
+        expect(existsSync(join(fixture.root, 'home/attraccess/.ssh/authorized_keys'))).toBe(false);
+        expect(existsSync(join(fixture.root, 'etc/attraccess-wago-management/key.pending'))).toBe(false);
+        success(fixture.run(helper, '', Buffer.from(`access-retire ${token}\n`)));
+      } finally {
+        fixture.dispose();
+      }
+    },
+  );
+  it.each(['', 'supervisor-lock-held', 'bootstrap-refresh'])(
+    'accepts real commissioning journals in dependency order and fences foreign tokens before cleanup (%s)',
+    (lockState) => {
     const fixture = fw31ShellFixture();
     try {
       fixture.file('bin/id', '#!/bin/sh\necho 0\n', 0o700);
       const token = 'a'.repeat(32);
       const success = (result: ReturnType<typeof fixture.run>) =>
-        expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+        expect({
+          status: result.status,
+          stderr: result.stderr,
+          failure: result.stdout.match(/WAGO_MANAGEMENT_FAILURE=([a-z]+)/)?.[1],
+        }).toEqual({ status: 0, stderr: '', failure: undefined });
       fixture.file('bundle/image-reference', artifact.image + '\n');
       fixture.file('bundle/image.tar', 'compressed fixture image');
       const archive = join(fixture.root, 'tmp/install.tar');
@@ -776,9 +1090,29 @@ describe('fixed managed executor and recovery programs', () => {
         ),
       );
       const helper = managedHostHelper(artifact, fixture.root);
+      const management = { token: 'c'.repeat(32), helper, watchdog: managedWatchdogScript(fixture.root) };
+      if (lockState === 'bootstrap-refresh') {
+        fixture.file('etc/attraccess-wago-management/token', management.token + '\n');
+        fixture.file('etc/attraccess-wago-management/watchdog', '#!/bin/sh\nexit 43\n', 0o700);
+        fixture.file('usr/sbin/attraccess-wago-management', '#!/bin/sh\nexit 42\n', 0o700);
+        expect(fixture.run(commissioningAcceptanceScript(token, fixture.root, false, { ...management, token: 'd'.repeat(32) })).status).not.toBe(0);
+        expect(existsSync(join(fixture.root, 'var/lib/attraccess-wago-install-transaction/started'))).toBe(true);
+        expect(fixture.read('etc/attraccess-wago-management/watchdog')).toContain('exit 43');
+      }
+      const acceptance = lockState === 'bootstrap-refresh'
+        ? commissioningAcceptanceScript(token, fixture.root, false, management)
+        : helper;
+      const input = lockState === 'bootstrap-refresh' ? undefined : Buffer.from(`commissioning-accept ${token}\n`);
       expect(fixture.run(helper, '', Buffer.from(`commissioning-accept ${'b'.repeat(32)}\n`)).status).not.toBe(0);
       expect(existsSync(join(fixture.root, 'var/lib/attraccess-wago-install-transaction/started'))).toBe(true);
-      success(fixture.run(helper, '', Buffer.from(`commissioning-accept ${token}\n`)));
+      const bounded = fixture.run(acceptance, 'lock-wait-expired', input);
+      expect(bounded.status).not.toBe(0);
+      expect(existsSync(join(fixture.root, 'var/lib/attraccess-wago-install-transaction/started'))).toBe(true);
+      success(fixture.run(acceptance, lockState, input));
+      if (lockState === 'bootstrap-refresh') {
+        expect(fixture.read('usr/sbin/attraccess-wago-management')).toBe(helper);
+        expect(fixture.read('etc/attraccess-wago-management/watchdog')).toBe(management.watchdog);
+      }
       expect(existsSync(join(fixture.root, 'var/lib/attraccess-wago-install-transaction'))).toBe(false);
       expect(existsSync(join(fixture.root, `etc/attraccess-wago/docker-provision.completed-${token}/accepted`))).toBe(
         true,
@@ -790,8 +1124,8 @@ describe('fixed managed executor and recovery programs', () => {
       fixture.dispose();
     }
   });
-  it('executes a full repeated image update through only the fixed dispatcher, preserving enrolled state', () => {
-    const fixture = fw31ShellFixture();
+  it.each(['native', 'terse'] as const)('executes a full repeated image update through only the fixed dispatcher, preserving enrolled state (%s stat)', (statStyle) => {
+    const fixture = fw31ShellFixture(statStyle);
     try {
       fixture.file('bin/id', '#!/bin/sh\necho 0\n', 0o700);
       fixture.file('etc/attraccess-wago/runtime.env', 'WAGO_MQTT_PASSWORD=permanent-fixture-secret');
@@ -827,7 +1161,11 @@ describe('fixed managed executor and recovery programs', () => {
       const run = (header: string, bytes = Buffer.alloc(0)) =>
         fixture.run(helper, '', Buffer.concat([Buffer.from(header + '\n'), bytes]));
       const success = (result: ReturnType<typeof run>) =>
-        expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+        expect({
+          status: result.status,
+          stderr: result.stderr,
+          failure: result.stdout.match(/WAGO_MANAGEMENT_FAILURE=([a-z]+)/)?.[1],
+        }).toEqual({ status: 0, stderr: '', failure: undefined });
       success(run(`proof ${token}`));
       expect(run(`stage ${token} ${digest} ${bundle.length} ${artifact.imageId} arbitrary-image`).status).not.toBe(0);
       success(run(`stage ${token} ${digest} ${bundle.length} ${artifact.imageId} ${artifact.image}`, bundle));
@@ -855,10 +1193,14 @@ describe('fixed managed executor and recovery programs', () => {
       managedAccessWatchdog,
     ]) {
       const result = spawnSync('/bin/sh', ['-n'], { input: script, encoding: 'utf8' });
-      expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+      expect({
+        status: result.status,
+        stderr: result.stderr,
+        failure: result.stdout.match(/WAGO_MANAGEMENT_FAILURE=([a-z]+)/)?.[1],
+      }).toEqual({ status: 0, stderr: '', failure: undefined });
     }
-    expect(helper).toContain('head -c "$((bytes + 1))"');
-    expect(helper).toContain('journal_required=$((2 * kib + 16384))');
+    expect(helper).toContain('sh "$tx/bundle.tar" "$((bytes + 1))"');
+    expect(helper).toContain('-v b="$kib"');
     expect(helper).toContain('"${token}"');
     expect(helper).not.toMatch(/\beval\b|\b1234567\b|'\$\{token\}'/);
     expect(helper).toContain('*) exit 1 ;;');

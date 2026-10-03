@@ -10,7 +10,7 @@ stat() (
   export WAGO_STAT_MODE="$wago_stat_mode"
   test "$#" = 3 || exit 1
   case "$1" in -c) terse=-t ;; -Lc) terse=-Lt ;; *) exit 1 ;; esac
-  case "$2" in '%u'|'%u:%a'|'%u:%a:%h'|'%u:%g'|'%u:%g:%a'|'%u:%g:%a:%h'|'%d:%i') ;; *) exit 1 ;; esac
+  case "$2" in '%s'|'%u'|'%u:%a'|'%u:%a:%h'|'%u:%g'|'%u:%g:%a'|'%u:%g:%a:%h'|'%d:%i') ;; *) exit 1 ;; esac
   export WAGO_STAT_FORMAT="$2" WAGO_STAT_PATH="$3"
   case "$WAGO_STAT_PATH" in ''|*'
 '*) exit 1 ;; -*) WAGO_STAT_PATH="./$WAGO_STAT_PATH" ;; esac
@@ -105,7 +105,8 @@ WAGO_STAT_OK'} ;; *) exit 1 ;; esac
       mode=hexdecimal(a[3])+0
       permissions=sprintf("%o", mode%4096)
       fmt=ENVIRON["WAGO_STAT_FORMAT"]
-      if (fmt=="%u") result=a[4]
+      if (fmt=="%s") result=a[1]
+      else if (fmt=="%u") result=a[4]
       else if (fmt=="%u:%a") result=a[4] ":" permissions
       else if (fmt=="%u:%a:%h") result=a[4] ":" permissions ":" a[8]
       else if (fmt=="%u:%g") result=a[4] ":" a[5]

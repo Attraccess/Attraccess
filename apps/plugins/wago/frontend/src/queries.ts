@@ -56,8 +56,9 @@ export function useControllersQuery() {
 export function useCommissioningSessionsQuery() {
   return useQuery({
     queryKey: queryKeys.commissioningSessions,
-    queryFn: () => listCommissioningSessions(),
+    queryFn: ({ signal }) => listCommissioningSessions(100, 0, signal),
     refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
   });
 }
 

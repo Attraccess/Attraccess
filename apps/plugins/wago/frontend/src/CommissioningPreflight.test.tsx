@@ -60,7 +60,7 @@ function mountPreflight(value = session) {
   );
 }
 function credentials(prefix: string) {
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Advanced: use different SSH credentials' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Use a different SSH login' }));
   fireEvent.change(screen.getByLabelText(`${prefix} SSH username`), { target: { value: 'operator' } });
   fireEvent.change(screen.getByLabelText(`${prefix} SSH password`), { target: { value: 'fixture-password' } });
 }
@@ -90,19 +90,19 @@ it('inspects with fresh credentials, clears fields, and updates only the matchin
   expect(screen.queryByLabelText('Preflight SSH password')).toBeNull();
   expect(client.getQueryData(['wago', 'commissioning-sessions'])).toEqual([response, { ...session, id: 8 }]);
 });
-it('requires preparation cleanup approval and reports a rejected recovery', async () => {
+it('submits preparation cleanup once through its action button and reports a rejected recovery', async () => {
   mountPreflight({ ...session, dockerProvisionState: 'recovery_required', runtimeRecoveryAvailable: false });
   const button = screen.getByRole('button', { name: 'Clean up controller preparation' });
-  expect((button as HTMLButtonElement).disabled).toBe(true);
+  expect((button as HTMLButtonElement).disabled).toBe(false);
   credentials('Preflight');
-  fireEvent.click(screen.getByRole('checkbox', { name: /I approve cleaning up this controller preparation/ }));
   fail = true;
   fireEvent.click(button);
   await screen.findByText(/Could not inspect or clean up/);
+  expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  expect(requests).toHaveLength(1);
   expect(requests[0].url).toMatch(/\/platform\/recover$/);
   expect(requests[0].body?.reviewedDockerActivation).toBe(true);
   expect(screen.queryByLabelText('Preflight SSH password')).toBeNull();
-  expect((screen.getByRole('checkbox', { name: /I approve cleaning/ }) as HTMLInputElement).checked).toBe(false);
 });
 it.each(['codesys-active', 'codesys-boot-enabled', 'output-container-conflict'])(
   'renders saved clock, platform, and exclusivity findings (%s)',

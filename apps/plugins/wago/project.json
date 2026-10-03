@@ -6,6 +6,14 @@
   "tags": ["type:plugin", "scope:plugin"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
+    "install-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node apps/plugins/scripts/install-dev-plugin.mjs --src apps/plugins/wago/package"
+      }
+    },
     "production-fleet": {
       "executor": "nx:run-commands",
       "cache": false,
@@ -44,7 +52,7 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "dependsOn": ["test-frontend"],
+      "dependsOn": ["test-frontend", "test-runtime-build"],
       "options": {
         "jestConfig": "apps/plugins/wago/jest.config.ts",
         "passWithNoTests": true
@@ -216,6 +224,29 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/wago"
+      }
+    },
+    "test-runtime-build": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node --test apps/plugins/wago/scripts/install-dev-runtime.test.mjs apps/plugins/wago/scripts/docker-image-identity.test.mjs"
+      }
+    },
+    "build-runtime": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "outputs": ["{projectRoot}/runtime-assets/cc100-build"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/build-owned-runtime.mjs --build"
+      }
+    },
+    "install-runtime-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build-runtime"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/install-dev-runtime.mjs"
       }
     }
   }

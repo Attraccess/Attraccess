@@ -142,10 +142,9 @@ export function useFrontPanel(controllerId: number) {
         currentReview = await reviewConfiguration(controllerId);
         loadedDraft.current = currentReview.draft;
         client.setQueryData(['wago', 'configuration-draft', controllerId], currentReview.draft);
-        if (currentReview.impacts.length) {
-          setReview(currentReview);
-          return;
-        }
+        await diagnostics.refetch();
+        setReview(currentReview);
+        return;
       }
       const reviewedHash = currentReview.draft.reviewedHash;
       if (!reviewedHash) throw new Error('Review the current configuration draft before publishing it');

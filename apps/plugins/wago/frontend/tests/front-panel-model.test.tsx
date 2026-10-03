@@ -137,7 +137,7 @@ describe('front panel configuration', () => {
     expect(next.snapshot.logicalChannels.map((channel) => channel.id)).toEqual(before);
     expect(next.snapshot.modbus?.devices.find((device) => device.id === id)?.pollIntervalMs).toBe(2500);
     expect(next.snapshot.modbus?.profiles[0]).toEqual(profile);
-    expect(BUILTIN_MODBUS_PROFILES[0].id).toBe('wago-879-3000');
+    expect(BUILTIN_MODBUS_PROFILES[0].id).toBe('wago-879-3020');
     expect(validateEditorSnapshot(next.snapshot)).toEqual([]);
   });
 

@@ -174,8 +174,8 @@ The profile contract matches ATT-1059 / Modbus commit `20ef1db4`: `profileId` is
 string with a nonempty `trim()` result and original JavaScript `.length` at most
 160 (UTF-16 code units); `profileVersion` is a safe integer in `1..1000000`.
 Accepted IDs are preserved verbatim, never trimmed, truncated, coerced or
-restricted to UUID/ASCII syntax. Built-in references include
-`wago-879-3000-unverified` and `wago-879-1300-unverified`, version 1; custom IDs
+restricted to UUID/ASCII syntax. The sole built-in reference is
+`wago-879-3020`, version 1; custom IDs
 are user-editable strings. Invalid fields and extra keys at every level are
 dropped, not copied into error metadata. The length check is not secret detection:
 IDs must come from validated domain identities, never arbitrary request text or
