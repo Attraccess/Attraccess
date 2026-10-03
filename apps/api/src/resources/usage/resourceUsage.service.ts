@@ -75,6 +75,7 @@ import {
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import type { Redis } from 'ioredis';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
+import { FlowExecutionError } from '../flows/errors/flow-execution.error';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import { AuditService } from '../../audit/audit.service';
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
@@ -136,7 +137,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
-      if (error instanceof ExternalEffectFailureError) {
+      if (error instanceof ExternalEffectFailureError || error instanceof FlowExecutionError) {
         throw error;
       }
     }
