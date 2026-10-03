@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { NfcCardList } from './index';
+import { RfidCardList } from './index';
 const state = vi.hoisted(() => ({
   reset: vi.fn(),
   enroll: vi.fn(),
@@ -54,7 +54,7 @@ afterEach(cleanup);
 it('renders card identities and requires a reader before deleting a card', () => {
   render(
     <MemoryRouter>
-      <NfcCardList />
+      <RfidCardList />
     </MemoryRouter>,
   );
   expect(screen.getByText('AA-BB')).toBeInTheDocument();
@@ -74,7 +74,7 @@ it.each([
 ])('confirms $action for the correct card', ({ uid, action, id, active }) => {
   render(
     <MemoryRouter>
-      <NfcCardList />
+      <RfidCardList />
     </MemoryRouter>,
   );
   fireEvent.click(within(screen.getByText(uid).closest('tr')!).getByRole('button', { name: action }));
@@ -84,7 +84,7 @@ it.each([
 it('enrolls on the selected reader and hides the page without a license', () => {
   const view = render(
     <MemoryRouter>
-      <NfcCardList />
+      <RfidCardList />
     </MemoryRouter>,
   );
   fireEvent.click(screen.getByRole('button', { name: 'Enroll RFID Card' }));
@@ -97,7 +97,7 @@ it('enrolls on the selected reader and hides the page without a license', () => 
   state.licensed = false;
   render(
     <MemoryRouter>
-      <NfcCardList />
+      <RfidCardList />
     </MemoryRouter>,
   );
   expect(screen.queryByRole('grid')).toBeNull();

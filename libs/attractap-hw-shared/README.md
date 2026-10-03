@@ -30,7 +30,7 @@ libs/attractap-hw-shared/
       types.ts
       j-poe.ts
       j-pwr-dc.ts
-      j-nfc.ts
+      j-rfid.ts
       j-beep.ts
       j-disp.ts
       connectors.spec.ts # vitest unit tests

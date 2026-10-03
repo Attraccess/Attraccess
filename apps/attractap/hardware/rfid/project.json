@@ -1,8 +1,8 @@
 {
-  "name": "attractap-hw-nfc",
+  "name": "attractap-hw-rfid",
   "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "sourceRoot": "apps/attractap/hardware/nfc",
+  "sourceRoot": "apps/attractap/hardware/rfid",
   "tags": ["scope:hardware", "type:board"],
   "targets": {
     "lint": {
@@ -11,7 +11,7 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": [],
       "options": {
-        "cwd": "apps/attractap/hardware/nfc",
+        "cwd": "apps/attractap/hardware/rfid",
         "command": "pnpm exec tscircuit-cli build index.tsx --ignore-warnings"
       }
     },
@@ -21,10 +21,10 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": ["{projectRoot}/dist/build"],
       "options": {
-        "cwd": "apps/attractap/hardware/nfc",
+        "cwd": "apps/attractap/hardware/rfid",
         "commands": [
           "rm -rf dist/build && mkdir -p dist/build",
-          "pnpm exec tscircuit-cli export index.tsx -f circuit-json -o dist/build/nfc.circuit.json"
+          "pnpm exec tscircuit-cli export index.tsx -f circuit-json -o dist/build/rfid.circuit.json"
         ],
         "parallel": false
       }
@@ -36,12 +36,12 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": ["{projectRoot}/dist/export"],
       "options": {
-        "cwd": "apps/attractap/hardware/nfc",
+        "cwd": "apps/attractap/hardware/rfid",
         "commands": [
           "rm -rf dist/export && mkdir -p dist/export",
-          "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/nfc-gerbers.zip",
-          "node ../scripts/strip-dnp.mjs dist/export/nfc-gerbers.zip",
-          "node ../scripts/validate-bom.mjs dist/export/nfc-gerbers.zip"
+          "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/rfid-gerbers.zip",
+          "node ../scripts/strip-dnp.mjs dist/export/rfid-gerbers.zip",
+          "node ../scripts/validate-bom.mjs dist/export/rfid-gerbers.zip"
         ],
         "parallel": false
       }
@@ -53,13 +53,13 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": ["{projectRoot}/dist/render"],
       "options": {
-        "cwd": "apps/attractap/hardware/nfc",
+        "cwd": "apps/attractap/hardware/rfid",
         "commands": [
           "rm -rf dist/render && mkdir -p dist/render",
-          "pnpm exec tscircuit-cli export index.tsx -f pcb-svg -o dist/render/nfc-pcb.svg",
-          "pnpm exec tscircuit-cli export index.tsx -f schematic-svg -o dist/render/nfc-schematic.svg",
-          "pnpm exec tscircuit-cli export index.tsx -f assembly-svg -o dist/render/nfc-assembly.svg",
-          "node ../scripts/render-png.mjs --out-dir dist/render dist/render/nfc-pcb.svg dist/render/nfc-schematic.svg dist/render/nfc-assembly.svg"
+          "pnpm exec tscircuit-cli export index.tsx -f pcb-svg -o dist/render/rfid-pcb.svg",
+          "pnpm exec tscircuit-cli export index.tsx -f schematic-svg -o dist/render/rfid-schematic.svg",
+          "pnpm exec tscircuit-cli export index.tsx -f assembly-svg -o dist/render/rfid-assembly.svg",
+          "node ../scripts/render-png.mjs --out-dir dist/render dist/render/rfid-pcb.svg dist/render/rfid-schematic.svg dist/render/rfid-assembly.svg"
         ],
         "parallel": false
       }
@@ -71,12 +71,12 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": ["{projectRoot}/dist/render-3d"],
       "options": {
-        "cwd": "apps/attractap/hardware/nfc",
+        "cwd": "apps/attractap/hardware/rfid",
         "commands": [
           "rm -rf dist/render-3d && mkdir -p dist/render-3d",
-          "pnpm exec tscircuit-cli export index.tsx -f glb -o dist/render-3d/nfc.glb",
-          "pnpm exec tscircuit-cli export index.tsx -f step -o dist/render-3d/nfc.step",
-          "node ../scripts/render-glb-png.mjs --out-dir dist/render-3d dist/render-3d/nfc.glb"
+          "pnpm exec tscircuit-cli export index.tsx -f glb -o dist/render-3d/rfid.glb",
+          "pnpm exec tscircuit-cli export index.tsx -f step -o dist/render-3d/rfid.step",
+          "node ../scripts/render-glb-png.mjs --out-dir dist/render-3d dist/render-3d/rfid.glb"
         ],
         "parallel": false
       }
@@ -84,7 +84,7 @@
     "crap-score": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node scripts/crap-score/run.mjs apps/attractap/hardware/nfc"
+        "command": "node scripts/crap-score/run.mjs apps/attractap/hardware/rfid"
       }
     }
   }

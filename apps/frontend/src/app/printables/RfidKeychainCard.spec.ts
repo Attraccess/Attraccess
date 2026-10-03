@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveErrorMessage } from './NfcKeychainCard';
+import { resolveErrorMessage } from './RfidKeychainCard';
 import { NO_OUTPUT_ERROR } from './errors';
 
 describe('resolveErrorMessage', () => {

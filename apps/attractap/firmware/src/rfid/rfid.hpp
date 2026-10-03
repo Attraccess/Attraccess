@@ -7,7 +7,7 @@
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include <functional>
-#include "nfc_contract.hpp"
+#include "rfid_contract.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 

@@ -64,7 +64,7 @@ Mark pages with [x] when completed.
 - [x] `attractap/overview.md` — What is the Attractap NFC Reader?
 - [x] `attractap/hardware.md` — Hardware variants and specifications
 - [x] `attractap/setup.md` — Setting up a reader device
-- [x] `attractap/nfc-cards.md` — Managing NFC cards
+- [x] `attractap/rfid-cards.md` — Managing RFID cards
 - [x] `attractap/firmware-updates.md` — Firmware updates (OTA)
 
 ### MQTT & IoT Integration (IT Administrators)

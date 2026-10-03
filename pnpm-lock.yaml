@@ -801,7 +801,7 @@ importers:
         specifier: ^4.20.3
         version: 4.23.11
 
-  apps/attractap/hardware/nfc:
+  apps/attractap/hardware/rfid:
     dependencies:
       '@attraccess/attractap-hw-shared':
         specifier: workspace:*

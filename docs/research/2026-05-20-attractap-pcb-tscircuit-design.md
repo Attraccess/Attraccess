@@ -86,7 +86,7 @@ apps/attractap/
   firmware/                      # moved from apps/attractap/firmware via separate prep PR
   hardware/
     core/                        # nx app, tscircuit project — motherboard
-    nfc/                         # PN532 + WS2812 LED ring
+    rfid/                         # PN532 + WS2812 LED ring
     beeper/                      # pipeline-prove board (Phase 1.5)
     poe/                         # 802.3af PD + magnetics + PHY + RJ45
     power/                       # 5–32V DC-in

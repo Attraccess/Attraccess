@@ -260,7 +260,7 @@ const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
   );
 };
 
-export function NfcCardList() {
+export function RfidCardList() {
   const { t } = useTranslations({
     de,
     en,

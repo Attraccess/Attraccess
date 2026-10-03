@@ -1,7 +1,7 @@
 #pragma once
 
 #include "profile_store.hpp"
-#include "nfc/nfc_contract.hpp"
+#include "rfid/rfid_contract.hpp"
 
 #include <array>
 #include <cstdint>

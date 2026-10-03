@@ -59,7 +59,7 @@ Each API token has an explicit permission allow-list. Requests receive only the 
 | **Resources** | `/api/resources` | Resource CRUD, usage sessions |
 | **Projects** | `/api/projects` | Project management |
 | **Settings** | `/api/settings` | System configuration |
-| **Attractap** | `/api/attractap` | NFC reader management |
+| **Attractap** | `/api/attractap` | RFID reader management |
 | **MQTT** | `/api/mqtt` | MQTT server configuration |
 | **Billing** | `/api/billing` | Billing and transactions |
 | **Plugins** | `/api/plugins` | Plugin management |
