@@ -134,7 +134,12 @@
     "availableTitle": "Plugin updates are available",
     "availableDescription": "{{count}} installed marketplace plugin can be updated. Review the available version before applying it.",
     "reviewUpdates": "Review updates",
-    "modes": { "off": "Off", "patch": "Patch only", "minor": "Patch and minor", "follow": "Follow package policy" }
+    "modes": {
+      "off": "Off",
+      "patch": "Patch only",
+      "minor": "Patch and minor",
+      "follow": "Follow package policy"
+    }
   },
   "deleteTooltip": "Remove plugin",
   "aside": {
@@ -199,6 +204,24 @@
     "cancel": "Cancel",
     "update": "Update",
     "downgrade": "Downgrade",
-    "direction": { "current": "Current", "newer": "Newer", "older": "Older" }
+    "direction": {
+      "current": "Current",
+      "newer": "Newer",
+      "older": "Older"
+    }
+  },
+  "dependencies": {
+    "title": "Plugin dependencies",
+    "description": "Required plugins, including transitive dependencies, are included in this operation.",
+    "loading": "Resolving dependencies…",
+    "required": "Required",
+    "optional": "Optional (not installed automatically)",
+    "install": "Will be installed",
+    "reuse": "Already installed · will be reused",
+    "replace": "Will be replaced",
+    "requiredBy": "Required by installed plugins",
+    "removalDescription": "Keep this plugin, or explicitly remove the following dependants together. Plugin data is retained.",
+    "removeTogether": "Remove these dependent plugins too",
+    "approveChanges": "I approve installing these dependencies and their permissions"
   }
 }

@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { z } from 'zod';
+import { PluginDependenciesSchema, PluginDependency } from './plugin-dependencies';
 
 export class PluginMainFrontend {
   @ApiProperty({
@@ -101,7 +102,19 @@ export class PluginAttraccessVersion {
   exact?: string;
 }
 
+export class PluginDependencyInfo {
+  @ApiProperty()
+  name: string;
+  @ApiProperty()
+  version: string;
+  @ApiProperty()
+  required: boolean;
+}
+
 export class PluginManifest {
+  @ApiProperty({ type: [PluginDependencyInfo], required: false })
+  dependencies?: PluginDependency[];
+
   @ApiProperty({
     description: 'The name of the plugin',
     example: 'plugin-name',
@@ -169,6 +182,7 @@ const mainSchema = z.object({
 });
 
 export const PluginManifestSchema = z.object({
+  dependencies: PluginDependenciesSchema,
   name: z.string(),
   main: z.object({
     frontend: mainSchema.extend({ styles: z.string().optional() }).optional(),
@@ -190,7 +204,7 @@ export const PluginManifestSchema = z.object({
 
         return true;
       },
-      { message: 'min must be less than or equal to max' }
+      { message: 'min must be less than or equal to max' },
     )
     .refine(
       (data) => {
@@ -200,7 +214,7 @@ export const PluginManifestSchema = z.object({
 
         return true;
       },
-      { message: 'min, max or exact must be provided' }
+      { message: 'min, max or exact must be provided' },
     ),
   permissions: z
     .array(z.nativeEnum(PluginPermission, { message: 'unknown plugin permission' }))

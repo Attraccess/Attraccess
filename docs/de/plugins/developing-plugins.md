@@ -28,6 +28,28 @@ Ein Frontend-Plugin kann:
 > [!TIP]
 > Lesen Sie die SDK-Dokumentation, die mit `@attraccess/plugins-frontend-sdk` mitgeliefert wird, für eine detaillierte API-Referenz, Beispiele und Typdefinitionen.
 
+## Abhängigkeiten von anderen Attraccess-Plugins
+
+Deklariere Plugin-Abhängigkeiten in `package.json` unter `attraccess.dependencies`:
+
+```json
+{
+  "attraccess": {
+    "dependencies": [
+      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
+    ]
+  }
+}
+```
+
+`name` ist die unveränderliche npm-Paketidentität, `version` ein Semver-Bereich (kein Dist-Tag und keine URL). `required` ist standardmäßig `true`. Doppelte Identitäten werden abgelehnt. Diese Einträge beschreiben installierte Attraccess-Plugins mit eigenen Modulen, Berechtigungen, Migrationen und Zustand. Normale JavaScript-Abhängigkeiten gehören weiterhin in das oberste npm-Feld `dependencies`.
+
+Der Marktplatz löst alle erforderlichen direkten und indirekten Abhängigkeiten vor der Installation auf und zeigt Versionen, Quellen, Klassifizierung und Berechtigungen zur Bestätigung. Kompatible installierte Plugins werden weiterverwendet; fehlende Plugins werden gemeinsam installiert. Konflikte und Zyklen blockieren den Vorgang. Abhängigkeiten werden aus der ausgewählten Registry aufgelöst; veröffentliche sie daher dort ebenfalls. Bereits installierte kompatible Plugins können aus einer anderen Registry stammen.
+
+Optionale Abhängigkeiten (`required: false`) werden nicht automatisch installiert und blockieren die Aktivierung nicht. Wenn sie installiert sind, muss ihre Version kompatibel sein. Erforderliche Plugins werden vor ihren abhängigen Plugins geladen und migriert. Fehlende, inkompatible, deaktivierte oder fehlgeschlagene Abhängigkeiten halten abhängige Plugins inaktiv. Die Plugin-Einstellungen zeigen die Ursache. Repariere die Abhängigkeit und starte neu.
+
+Updates und Downgrades müssen auch die Anforderungen installierter abhängiger Plugins erfüllen. Beim Entfernen einer erforderlichen Abhängigkeit müssen alle direkt und indirekt abhängigen Plugins ausdrücklich zur gemeinsamen Entfernung bestätigt werden. Automatisch installierte Abhängigkeiten bleiben normale Plugins; sie werden nicht automatisch entfernt, wenn ihr letztes abhängiges Plugin entfernt wird. Paketänderungen werden gemeinsam übernommen; Migrationen und Aktivierung erfolgen beim Neustart gemäß dem bestehenden Lebenszyklus. Beim Entfernen von npm-Plugins bleiben Daten und Geheimnisse erhalten.
+
 ## Backend-Plugins
 
 Das Backend-SDK ermöglicht es Ihrem Plugin, API-Endpunkte zu registrieren, die auf dem Attraccess-Server ausgeführt werden.

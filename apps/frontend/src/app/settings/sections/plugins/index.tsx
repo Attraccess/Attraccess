@@ -44,6 +44,9 @@ import {
   usePluginsServicePluginControllerCheckAllInstalledPackages,
   usePluginsServicePluginControllerAddRegistry,
   usePluginsServicePluginControllerInstallPackage,
+  usePluginsServicePluginControllerDependencyPlan,
+  usePluginsServicePluginControllerRemovalPlan,
+  usePluginsServicePluginControllerRemovePackageGraph,
   usePluginsServicePluginControllerRemoveRegistry,
   usePluginsServicePluginControllerReplaceInstalledPackage,
   usePluginsServicePluginControllerTestRegistry,
@@ -111,7 +114,30 @@ async function waitForServerRestart(
   throw new Error('Plugin system restart timed out');
 }
 
+type PluginDependency = { name: string; version: string; required: boolean };
+type PluginInstallPlan = {
+  root: string;
+  token: string;
+  plugins: Array<{
+    name: string;
+    displayName: string;
+    version: string;
+    action: 'install' | 'reuse' | 'replace';
+    permissions: string[];
+    dependencies: PluginDependency[];
+    classification: 'official' | 'community';
+    registryUrl?: string;
+  }>;
+};
+
+function dependencyError(error: unknown): string | null {
+  if (!error) return null;
+  const body = (error as { body?: { message?: unknown } }).body;
+  return typeof body?.message === 'string' ? body.message : error instanceof Error ? error.message : String(error);
+}
+
 type VersionCandidate = {
+  dependencies?: PluginDependency[];
   version: string;
   publishedAt: string | null;
   direction: 'current' | 'newer' | 'older';
@@ -153,6 +179,7 @@ type InstalledNpmPlugin = {
 type VersionPlugin = Pick<InstalledNpmPlugin, 'name' | 'version'>;
 
 type MarketplacePlugin = {
+  dependencies?: PluginDependency[];
   name: string;
   version: string | null;
   displayName: string | null;
@@ -225,8 +252,9 @@ export function PluginsSection() {
   const [installFailure, setInstallFailure] = useState<string | null>(null);
   const [requestedSpec, setRequestedSpec] = useState('');
   const [updateOverride, setUpdateOverride] = useState<InstalledNpmPlugin['updateOverride']>('inherit');
+  const [approvedVersionPlanToken, setApprovedVersionPlanToken] = useState<string | null>(null);
   const [majorApproved, setMajorApproved] = useState(false);
-  const [installApproved, setInstallApproved] = useState(false);
+  const [approvedInstallPlanToken, setApprovedInstallPlanToken] = useState<string | null>(null);
   const [registries, setRegistries] = useState<Registry[]>([]);
   const [registryName, setRegistryName] = useState('');
   const [registryUrl, setRegistryUrl] = useState('');
@@ -239,6 +267,82 @@ export function PluginsSection() {
   const registryRequest = useRef(0);
   const latestRegistryTest = useRef<symbol | null>(null);
   const isLoadingMarketplace = isLoadingMarketplaceSearch || isLoadingMarketplaceDetail;
+
+  const [approvedRemovalPlan, setApprovedRemovalPlan] = useState<string | null>(null);
+  const [removeFailure, setRemoveFailure] = useState<string | null>(null);
+  const { mutateAsync: removePackageGraph, isPending: isRemovingGraph } =
+    usePluginsServicePluginControllerRemovePackageGraph();
+  const detailTarget = pluginToInstall ?? marketplacePlugin;
+  const hasDependencies = Boolean(detailTarget?.dependencies?.length);
+  const {
+    data: dependencyPlan,
+    error: planError,
+    isFetching: isResolvingDependencies,
+  } = usePluginsServicePluginControllerDependencyPlan<PluginInstallPlan>(
+    {
+      packageName: detailTarget?.name ?? '',
+      spec: detailTarget?.version ?? undefined,
+      registryId: detailTarget?.registry.id,
+    },
+    undefined,
+    { enabled: hasDependencies, staleTime: 0, retry: false },
+  );
+  const hasVersionDependencies = Boolean(selectedVersion?.dependencies?.length);
+  const {
+    data: versionPlan,
+    error: versionPlanError,
+    isFetching: isResolvingVersionDependencies,
+  } = usePluginsServicePluginControllerDependencyPlan<PluginInstallPlan>(
+    {
+      packageName: versionPlugin?.name ?? '',
+      spec: selectedVersion?.version,
+      registryId: versionPlugin ? installedNpmPlugins.get(versionPlugin.name)?.registryId : undefined,
+    },
+    undefined,
+    { enabled: hasVersionDependencies, staleTime: 0, retry: false },
+  );
+  const deletingPlugin = plugins?.find((plugin) => plugin.id === pluginToDelete);
+  const deletingNpm = deletingPlugin && npmPluginNames.has(deletingPlugin.name);
+  const {
+    data: removalPlan,
+    error: removalPlanError,
+    isFetching: isResolvingRemoval,
+  } = usePluginsServicePluginControllerRemovalPlan<InstalledNpmPlugin[]>(
+    { packageName: deletingPlugin?.name ?? '' },
+    undefined,
+    { enabled: Boolean(deletingNpm), staleTime: 0, retry: false },
+  );
+  const dependantsToRemove = removalPlan?.filter((plugin) => plugin.name !== deletingPlugin?.name) ?? [];
+  const installApprovalToken = hasDependencies
+    ? dependencyPlan?.token
+    : pluginToInstall && `${pluginToInstall.registry.id}:${pluginToInstall.name}@${pluginToInstall.version}`;
+  const installPlanRoot = hasDependencies
+    ? dependencyPlan?.plugins.find(
+        (plugin) => plugin.name === pluginToInstall?.name && plugin.version === pluginToInstall?.version,
+      )
+    : undefined;
+  const installApproved = Boolean(installApprovalToken && approvedInstallPlanToken === installApprovalToken);
+  const dependencyChangesApproved = Boolean(versionPlan && approvedVersionPlanToken === versionPlan.token);
+  const removalApprovalToken = JSON.stringify(removalPlan?.map(({ name, version }) => ({ name, version })));
+  const removeDependantsApproved = Boolean(removalApprovalToken && approvedRemovalPlan === removalApprovalToken);
+  const deleteConfirmedPlugin = async () => {
+    if (!pluginToDelete) return;
+    if (!deletingNpm) {
+      deletePlugin({ pluginId: pluginToDelete });
+      return;
+    }
+    try {
+      await removePackageGraph({
+        packageName: deletingPlugin.name,
+        requestBody: { approvedDependants: dependantsToRemove.map(({ name }) => name) },
+      });
+      setPluginToDelete(null);
+      toast.success({ title: t('success.delete.title'), description: t('success.delete.description') });
+      setTimeout(() => window.location.reload(), 5000);
+    } catch (error) {
+      setRemoveFailure(dependencyError(error));
+    }
+  };
 
   const retryPlugin = async () => {
     if (!failedPlugin) return;
@@ -428,12 +532,15 @@ export function PluginsSection() {
       await installPluginPackage({
         packageName: pluginToInstall.name,
         version: pluginToInstall.version,
-        requestBody: { registryId: pluginToInstall.registry.id },
+        requestBody: {
+          registryId: pluginToInstall.registry.id,
+          ...(hasDependencies ? { planToken: dependencyPlan?.token } : {}),
+        },
       });
       toast.success({ title: t('marketplace.installSuccess') });
       setTimeout(() => window.location.reload(), 5000);
       setPluginToInstall(null);
-      setInstallApproved(false);
+      setApprovedInstallPlanToken(null);
     } catch (error) {
       const response = error && typeof error === 'object' ? (error as { status?: number; body?: unknown }) : null;
       const body =
@@ -516,6 +623,7 @@ export function PluginsSection() {
         requestBody: {
           approvedPermissionAdditions: selectedVersion.permissionAdditions,
           approvedMajorVersion: majorApproved,
+          ...(hasVersionDependencies ? { planToken: versionPlan?.token } : {}),
         },
       });
       toast.success({ title: t('success.replace.title'), description: t('success.replace.description') });
@@ -790,7 +898,11 @@ export function PluginsSection() {
                             size="sm"
                             isIconOnly
                             aria-label={t('deleteTooltip')}
-                            onPress={() => setPluginToDelete(plugin.id)}
+                            onPress={() => {
+                              setApprovedRemovalPlan(null);
+                              setRemoveFailure(null);
+                              setPluginToDelete(plugin.id);
+                            }}
                             data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
                           >
                             <Trash2 size={16} />
@@ -878,7 +990,7 @@ export function PluginsSection() {
                     plugin={marketplacePlugin}
                     installedPlugin={installedNpmPlugins.get(marketplacePlugin.name)}
                     onInstall={() => {
-                      setInstallApproved(false);
+                      setApprovedInstallPlanToken(null);
                       setPluginToInstall(marketplacePlugin);
                     }}
                     onManageVersion={() => {
@@ -889,6 +1001,9 @@ export function PluginsSection() {
                           installedNpmPlugins.get(marketplacePlugin.name)?.version ?? marketplacePlugin.version ?? '',
                       });
                     }}
+                    dependencyPlan={dependencyPlan}
+                    dependencyError={dependencyError(planError)}
+                    isResolvingDependencies={isResolvingDependencies}
                     t={t}
                   />
                 ) : (
@@ -1054,7 +1169,7 @@ export function PluginsSection() {
         onOpenChange={(open) => {
           if (!open && !isInstalling) {
             setPluginToInstall(null);
-            setInstallApproved(false);
+            setApprovedInstallPlanToken(null);
             setInstallFailure(null);
           }
         }}
@@ -1070,20 +1185,36 @@ export function PluginsSection() {
         <ModalBody>
           {pluginToInstall ? (
             <div className="flex flex-col gap-3">
-              <PluginClassificationBadge classification={pluginToInstall.classification} />
+              <PluginClassificationBadge
+                classification={installPlanRoot?.classification ?? pluginToInstall.classification}
+              />
               <p>{t('marketplace.installDescription')}</p>
-              <p>{t('marketplace.source', { registry: pluginToInstall.registry.url })}</p>
-              <p>{t('marketplace.version', { version: pluginToInstall.version ?? '-' })}</p>
+              <p>
+                {t('marketplace.source', { registry: installPlanRoot?.registryUrl ?? pluginToInstall.registry.url })}
+              </p>
+              <p>{t('marketplace.version', { version: installPlanRoot?.version ?? pluginToInstall.version ?? '-' })}</p>
               <p>
                 {t('marketplace.permissions', {
-                  permissions: pluginToInstall.permissions.join(', ') || t('noPermissions'),
+                  permissions:
+                    (installPlanRoot?.permissions ?? pluginToInstall.permissions).join(', ') || t('noPermissions'),
                 })}
               </p>
+              {hasDependencies ? (
+                <DependencyPlanDetails
+                  dependencies={installPlanRoot?.dependencies ?? pluginToInstall.dependencies ?? []}
+                  plan={dependencyPlan}
+                  error={dependencyError(planError)}
+                  loading={isResolvingDependencies}
+                  t={t}
+                />
+              ) : null}
               <label className="flex gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={installApproved}
-                  onChange={(event) => setInstallApproved(event.target.checked)}
+                  onChange={(event) =>
+                    setApprovedInstallPlanToken(event.target.checked ? (installApprovalToken ?? null) : null)
+                  }
                 />
                 {t('marketplace.installApproval')}
               </label>
@@ -1104,7 +1235,7 @@ export function PluginsSection() {
             variant="ghost"
             onPress={() => {
               setPluginToInstall(null);
-              setInstallApproved(false);
+              setApprovedInstallPlanToken(null);
               setInstallFailure(null);
             }}
             isDisabled={isInstalling}
@@ -1115,7 +1246,10 @@ export function PluginsSection() {
             variant="primary"
             onPress={() => void installMarketplacePlugin()}
             isPending={isInstalling}
-            isDisabled={!installApproved}
+            isDisabled={
+              !installApproved ||
+              (hasDependencies && (!dependencyPlan || Boolean(planError) || isResolvingDependencies))
+            }
           >
             {t('marketplace.confirmInstall')}
           </Button>
@@ -1134,23 +1268,55 @@ export function PluginsSection() {
               <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
             </ModalHeader>
             <ModalBody>
-              {t('deleteConfirmation.message', {
-                pluginName: plugins?.find((plugin) => plugin.id === pluginToDelete)?.name ?? '',
-              })}
+              <p>{t('deleteConfirmation.message', { pluginName: deletingPlugin?.name ?? '' })}</p>
+              {deletingNpm && isResolvingRemoval ? <p role="status">{t('dependencies.loading')}</p> : null}
+              {dependantsToRemove.length ? (
+                <Alert status="warning">
+                  <AlertContent>
+                    <AlertTitle>{t('dependencies.requiredBy')}</AlertTitle>
+                    <AlertDescription>{t('dependencies.removalDescription')}</AlertDescription>
+                    <ul>
+                      {dependantsToRemove.map((plugin) => (
+                        <li key={plugin.name} className="break-words">
+                          {plugin.name} · {plugin.version}
+                        </li>
+                      ))}
+                    </ul>
+                    <LabeledSwitch
+                      isSelected={removeDependantsApproved}
+                      onChange={(approved) => setApprovedRemovalPlan(approved ? removalApprovalToken : null)}
+                    >
+                      {t('dependencies.removeTogether')}
+                    </LabeledSwitch>
+                  </AlertContent>
+                </Alert>
+              ) : null}
+              {removalPlanError || removeFailure ? (
+                <p role="alert" className="text-danger">
+                  {removeFailure ?? dependencyError(removalPlanError)}
+                </p>
+              ) : null}
             </ModalBody>
             <ModalFooter>
               <Button
                 variant="ghost"
                 onPress={close}
-                isDisabled={isDeleting}
+                isDisabled={isDeleting || isRemovingGraph}
                 data-cy="plugins-list-delete-confirmation-cancel-button"
               >
                 {t('deleteConfirmation.cancel')}
               </Button>
               <Button
                 variant="danger"
-                onPress={() => pluginToDelete && deletePlugin({ pluginId: pluginToDelete })}
-                isPending={isDeleting}
+                onPress={() => void deleteConfirmedPlugin()}
+                isPending={isDeleting || isRemovingGraph}
+                isDisabled={
+                  Boolean(deletingNpm) &&
+                  (isResolvingRemoval ||
+                    !removalPlan ||
+                    Boolean(removalPlanError) ||
+                    (dependantsToRemove.length > 0 && !removeDependantsApproved))
+                }
                 data-cy="plugins-list-delete-confirmation-delete-button"
               >
                 {t('deleteConfirmation.delete')}
@@ -1200,6 +1366,7 @@ export function PluginsSection() {
                     isDisabled={!candidate.compatible || candidate.direction === 'current'}
                     onPress={() => {
                       setSelectedVersion(candidate);
+                      setApprovedVersionPlanToken(null);
                       setPermissionApproved(false);
                       setMajorApproved(false);
                     }}
@@ -1213,6 +1380,25 @@ export function PluginsSection() {
               {selectedVersion ? (
                 <div className="flex flex-col gap-2 rounded-medium border border-divider p-3">
                   <p>{t('versionManagement.selected', { version: selectedVersion.version })}</p>
+                  {hasVersionDependencies ? (
+                    <DependencyPlanDetails
+                      dependencies={selectedVersion.dependencies ?? []}
+                      plan={versionPlan}
+                      error={dependencyError(versionPlanError)}
+                      loading={isResolvingVersionDependencies}
+                      t={t}
+                    />
+                  ) : null}
+                  {versionPlan?.plugins.some((plugin) => plugin.action === 'install') ? (
+                    <LabeledSwitch
+                      isSelected={dependencyChangesApproved}
+                      onChange={(approved) =>
+                        setApprovedVersionPlanToken(approved ? (versionPlan?.token ?? null) : null)
+                      }
+                    >
+                      {t('dependencies.approveChanges')}
+                    </LabeledSwitch>
+                  ) : null}
                   {selectedVersion.publishedAt ? (
                     <p>
                       {t('versionManagement.published', {
@@ -1278,6 +1464,9 @@ export function PluginsSection() {
                 isPending={isReplacing}
                 isDisabled={
                   !selectedVersion ||
+                  (hasVersionDependencies &&
+                    (!versionPlan || Boolean(versionPlanError) || isResolvingVersionDependencies)) ||
+                  (versionPlan?.plugins.some((plugin) => plugin.action === 'install') && !dependencyChangesApproved) ||
                   (selectedVersion.permissionAdditions.length > 0 && !permissionApproved) ||
                   (selectedVersion.semverImpact === 'major' && !majorApproved)
                 }
@@ -1311,12 +1500,18 @@ function MarketplacePluginDetails({
   installedPlugin,
   onInstall,
   onManageVersion,
+  dependencyPlan,
+  dependencyError,
+  isResolvingDependencies,
   t,
 }: {
   plugin: MarketplacePlugin;
   installedPlugin?: InstalledNpmPlugin;
   onInstall: () => void;
   onManageVersion: () => void;
+  dependencyPlan?: PluginInstallPlan;
+  dependencyError: string | null;
+  isResolvingDependencies: boolean;
   t: (key: string, values?: Record<string, string>) => string;
 }) {
   const isInstalled = installedPlugin !== undefined;
@@ -1344,6 +1539,15 @@ function MarketplacePluginDetails({
             <MarketplaceDetail label={t('marketplace.licenseLabel')} value={plugin.license ?? '-'} />
             <MarketplaceDetail label={t('marketplace.sourceLabel')} value={plugin.registry.url} />
           </div>
+          {plugin.dependencies?.length ? (
+            <DependencyPlanDetails
+              dependencies={plugin.dependencies}
+              plan={dependencyPlan}
+              error={dependencyError}
+              loading={isResolvingDependencies}
+              t={t}
+            />
+          ) : null}
           {(plugin.repository || plugin.homepage) && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">{t('marketplace.links')}</span>
@@ -1420,3 +1624,68 @@ function MarketplacePluginDetails({
 }
 
 export default PluginsSection;
+
+function DependencyPlanDetails({
+  dependencies,
+  plan,
+  error,
+  loading,
+  t,
+}: {
+  dependencies: PluginDependency[];
+  plan?: PluginInstallPlan;
+  error: string | null;
+  loading: boolean;
+  t: (key: string, values?: Record<string, string>) => string;
+}) {
+  return (
+    <Card>
+      <Card.Header>
+        <Card.Title>{t('dependencies.title')}</Card.Title>
+        <Card.Description>{t('dependencies.description')}</Card.Description>
+      </Card.Header>
+      <Card.Content className="flex flex-col gap-3">
+        {dependencies.map((dependency) => (
+          <p key={dependency.name} className="break-words text-sm">
+            {dependency.name} · {dependency.version} ·{' '}
+            {t(dependency.required ? 'dependencies.required' : 'dependencies.optional')}
+          </p>
+        ))}
+        {loading ? <p role="status">{t('dependencies.loading')}</p> : null}
+        {error ? (
+          <p role="alert" className="break-words text-danger">
+            {error}
+          </p>
+        ) : null}
+        {!error &&
+          !loading &&
+          plan?.plugins
+            .filter((plugin) => plugin.name !== plan.root)
+            .map((plugin) => (
+              <Card key={plugin.name}>
+                <Card.Content className="flex flex-col gap-2 pt-3">
+                  <p className="break-words font-medium">
+                    {plugin.displayName} · {plugin.version}
+                  </p>
+                  <p className="break-words text-sm text-muted">{plugin.name}</p>
+                  {plugin.registryUrl ? (
+                    <p className="break-words text-sm text-muted">
+                      {t('marketplace.source', { registry: plugin.registryUrl })}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Chip size="sm" color={plugin.action === 'reuse' ? 'success' : 'accent'}>
+                      {t(`dependencies.${plugin.action}`)}
+                    </Chip>
+                    <PluginClassificationBadge classification={plugin.classification} />
+                  </div>
+                  <p className="break-words text-sm">
+                    {t('marketplace.permissions', { permissions: plugin.permissions.join(', ') || t('noPermissions') })}
+                  </p>
+                </Card.Content>
+              </Card>
+            ))}
+      </Card.Content>
+    </Card>
+  );
+}
