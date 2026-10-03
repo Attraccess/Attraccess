@@ -449,6 +449,38 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
     await expect(managed.assertRemovable(1)).resolves.toBeUndefined();
   });
 
+  it('retains cleanup when broker DNS address sets only partially overlap', async () => {
+    await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
+    jest.mocked(lookup).mockImplementation(
+      async (host: string) =>
+        [
+          { address: '192.168.4.10', family: 4 },
+          { address: host === 'unreachable-old.test' ? '192.168.3.10' : '192.168.5.10', family: 4 },
+        ] as never,
+    );
+    await expect(service.retirePreviousCredentials(1, principal)).rejects.toThrow('could not be retired');
+    expect(revoke).not.toHaveBeenCalled();
+    expect((await service.status(1)).pendingCredentialRetirements).toBe(1);
+  });
+
+  it('clears aliases with equivalent DNS address sets regardless of order or mapped IPv4 notation', async () => {
+    await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
+    jest.mocked(lookup).mockImplementation(
+      async (host: string) =>
+        (host === 'unreachable-old.test'
+          ? [
+              { address: '192.168.4.10', family: 4 },
+              { address: '192.168.5.10', family: 4 },
+            ]
+          : [
+              { address: '::ffff:192.168.5.10', family: 6 },
+              { address: '192.168.4.10', family: 4 },
+            ]) as never,
+    );
+    expect(await service.retirePreviousCredentials(1, principal)).toMatchObject({ pendingCredentialRetirements: 0 });
+    expect(revoke).not.toHaveBeenCalled();
+  });
+
   it('clears duplicate broker hostnames without requiring DNS or revoking credentials', async () => {
     brokerHost = 'unreachable-old.test';
     await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);

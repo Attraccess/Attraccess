@@ -137,9 +137,16 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
           ]);
           const address = (value: string) => value.toLowerCase().replace(/^::ffff:/, '');
           if (!destinations[0].length || !destinations[1].length) throw new Error();
-          sharedDestination = destinations[0].some((old) =>
-            destinations[1].some((now) => address(old.address) === address(now.address)),
-          );
+          const previousAddresses = new Set(destinations[0].map((item) => address(item.address)));
+          const currentAddresses = new Set(destinations[1].map((item) => address(item.address)));
+          const overlaps = [...previousAddresses].some((item) => currentAddresses.has(item));
+          const sameAddresses =
+            previousAddresses.size === currentAddresses.size &&
+            [...previousAddresses].every((item) => currentAddresses.has(item));
+          // A partial overlap may include another credential store. Neither
+          // revocation nor dropping the cleanup obligation is safe in that case.
+          if (overlaps && !sameAddresses) throw new Error();
+          sharedDestination = sameAddresses;
         }
         if (sharedDestination) {
           // Different listeners on a shared host may belong to distinct brokers.
