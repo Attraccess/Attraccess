@@ -42,6 +42,7 @@
 - **Flows & Automation**
   - [Overview](flows/overview.md)
   - [Flow Editor](flows/flow-editor.md)
+  - [Payloads, Variables & Templates](flows/payloads-variables-templates.md)
   - [Node Types](flows/node-types.md)
   - [Energy Metering](flows/energy-metering.md)
 
