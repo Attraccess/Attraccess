@@ -1,6 +1,6 @@
 import { RuleTester } from 'eslint';
 
-const rule = require('../../eslint-rules/multiline-import-specifiers.cjs');
+const rule = require('@nx/eslint-plugin').rules['workspace-multiline-import-specifiers'];
 
 RuleTester.describe = describe;
 RuleTester.it = it;
