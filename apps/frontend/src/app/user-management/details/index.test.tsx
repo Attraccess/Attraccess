@@ -6,6 +6,7 @@ import { UserManagementDetailsPage } from './index';
 const state = vi.hoisted(() => ({
   user: undefined as Record<string, unknown> | undefined,
   me: 1,
+  manageCards: false,
   roles: [] as { id: number; rolePermissions?: { permissionKey: string }[] }[],
   permissions: [] as { key: string; label: string; description: string; category?: string }[],
   assignments: [] as { roleId: number }[],
@@ -24,7 +25,7 @@ const state = vi.hoisted(() => ({
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useUsersServiceGetOneUserById: () => ({ data: state.user }),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['sso'] } }),
+  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['sso', 'attractap'] } }),
   useAuthenticationServiceGetAllSsoProviders: () => ({ data: state.providers }),
   useRbacServiceListRoles: () => ({ data: state.roles, isLoading: state.loading }),
   useRbacServiceListPermissions: () => ({ data: state.permissions }),
@@ -37,7 +38,9 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
 }));
-vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: state.me } }) }));
+vi.mock('../../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: state.me }, hasPermission: () => state.manageCards }),
+}));
 vi.mock('../../../hooks/useRbacCatalogTranslations', () => ({
   useRbacCatalogTranslations: () => ({
     permissionLabel: (p: { label: string }) => p.label,
@@ -77,6 +80,7 @@ beforeEach(() => {
   Object.assign(state, {
     user: { id: 7, username: 'Ada', authenticationDetails: [] },
     me: 1,
+    manageCards: false,
     roles: [],
     permissions: [],
     assignments: [],
@@ -165,4 +169,14 @@ it('reports deletion failures and lets the administrator cancel', async () => {
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error, baseTranslationKey: 'apiErrors' }));
   fireEvent.click(await screen.findByRole('button', { name: 'delete.actions.cancel' }));
   expect(state.remove).not.toHaveBeenCalled();
+});
+
+it('shows the RFID management action only with the dedicated permission', () => {
+  const view = show();
+  expect(screen.queryByRole('button', { name: 'rfidCards.manage' })).toBeNull();
+  view.unmount();
+  state.manageCards = true;
+  show();
+  fireEvent.click(screen.getByRole('button', { name: 'rfidCards.manage' }));
+  expect(screen.getByText('/users/7/rfid-cards')).toBeInTheDocument();
 });

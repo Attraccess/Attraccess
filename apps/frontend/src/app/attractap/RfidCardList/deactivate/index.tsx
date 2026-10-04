@@ -30,7 +30,7 @@ export function NfcCardDeactivateModal(props: Props) {
 
   const { mutate, isPending } = useAttractapServiceToggleCardActive({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetAllCardsKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetAllCardsKeyFn({}, []) });
       close();
     },
   });

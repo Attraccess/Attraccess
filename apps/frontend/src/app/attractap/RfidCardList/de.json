@@ -32,5 +32,8 @@
     "readerPlaceholder": "Wählen Sie einen Attractap aus",
     "cancel": "Abbrechen",
     "enroll": "Registrieren"
-  }
+  },
+  "userCards": "RFID-Karten — {{username}}",
+  "errorFetchCards": "RFID-Karten konnten nicht geladen werden",
+  "errorOperation": "Die Kartenaktion konnte nicht gestartet werden"
 }

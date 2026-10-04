@@ -510,6 +510,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   public async startEnrollOfNewNfcCard(data: {
     readerId: number;
     userId: number;
+    actorId?: number;
     authenticationMethod?: 'session' | 'api-token';
     apiTokenId?: number;
   }) {
