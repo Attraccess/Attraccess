@@ -5,7 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FlatSection } from '../../../../components/flatSection';
 import { useAuth } from '../../../../hooks/useAuth';
 import { MeterNameEditor } from './MeterNameEditor';
-import { useMeterValueFormatter } from './useMeterValueFormatter';
+import { useMeterValueFormatter } from '../../../../hooks/useMeterValueFormatter';
 import en from './en.json';
 import de from './de.json';
 

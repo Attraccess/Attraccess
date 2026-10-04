@@ -4,9 +4,13 @@ import { scaleDecimal } from './decimal-scale';
 
 const handlebars = Handlebars.create();
 
+function templateOperand(value: unknown): unknown {
+  return value instanceof handlebars.SafeString ? value.toString() : value;
+}
+
 handlebars.registerHelper('json', (value: unknown) => {
   try {
-    return new handlebars.SafeString(JSON.stringify(value));
+    return new handlebars.SafeString(JSON.stringify(templateOperand(value)));
   } catch {
     return 'null';
   }
@@ -34,7 +38,7 @@ const arithmetic: Record<string, (left: number, right: number) => number> = {
 for (const [helper, operation] of Object.entries(arithmetic)) {
   handlebars.registerHelper(helper, function (this: object, ...args: unknown[]) {
     // Handlebars appends its options object to every helper invocation.
-    const operands = args.slice(0, -1);
+    const operands = args.slice(0, -1).map(templateOperand);
     const options = args[args.length - 1] as Handlebars.HelperOptions & {
       lookupProperty: (context: object, property: string) => unknown;
     };
@@ -70,7 +74,7 @@ const transformations: Record<string, (values: unknown[], options: Transformatio
   {
     render: ([template], options, context) => {
       if (typeof template !== 'string') throw new FlowExecutionError('render expects a template string');
-      return handlebars.compile(template)(context, { data: options.data });
+      return new handlebars.SafeString(handlebars.compile(template)(context, { data: options.data }));
     },
     mapValue: ([value, mapping], options) => {
       let values: unknown = mapping;
@@ -97,7 +101,7 @@ const transformations: Record<string, (values: unknown[], options: Transformatio
 
 for (const [helper, transform] of Object.entries(transformations)) {
   handlebars.registerHelper(helper, function (this: object, ...args: unknown[]) {
-    const operands = args.slice(0, -1);
+    const operands = args.slice(0, -1).map(templateOperand);
     const options = args[args.length - 1] as TransformationOptions;
     if (!operands.length && !Object.keys(options.hash).length) {
       // Preserve payload fields whose names happen to match a helper.

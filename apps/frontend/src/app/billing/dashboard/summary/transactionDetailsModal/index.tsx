@@ -1,4 +1,4 @@
-import { useMeterValueFormatter } from '../../../../resources/details/meters/useMeterValueFormatter';
+import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormatter';
 import {
   Button,
   Chip,

@@ -57,6 +57,7 @@ export class MeteringCatalog {
           ? {
               sessionId: session.id,
               usageId: session.usageId,
+              meterName: session.meterName,
               creditsPerUnit: session.creditsPerUnit,
               latestValue: session.latestValue == null ? null : formatMeterValue(BigInt(session.latestValue)),
               chargeCredits:

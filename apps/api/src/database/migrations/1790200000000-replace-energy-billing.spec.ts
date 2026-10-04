@@ -1,8 +1,12 @@
 import { DataSource, QueryRunner } from 'typeorm';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody } from '../../email-template/email-defaults';
 import { GenericMeters1790100000000 } from './1790100000000-generic-meters';
 import { ReplaceEnergyBilling1790200000000 } from './1790200000000-replace-energy-billing';
+import { MeterFlowConversions1790300000000 } from './1790300000000-meter-flow-conversions';
+import { compileFlowTemplate } from '../../resources/flows/flow-template';
 
 describe('energy billing replacement', () => {
   let source: DataSource;
@@ -168,15 +172,7 @@ describe('energy billing replacement', () => {
   it('updates the previous shipped energy receipt to the generic receipt', async () => {
     await new GenericMeters1790100000000().up(runner);
     const current = readDefaultTemplateBody(EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY);
-    const previous = current
-      .replace(
-        '          {{else}}{{this.name}}{{/if}}',
-        "          {{else if this.isEnergy}}{{t 'item_energy' 'Energy'}}\n          {{else}}{{this.name}}{{/if}}",
-      )
-      .replace(
-        '          {{#if this.isDuration}}',
-        "          {{#if this.energyKwh}}<br/>{{t 'energy_amount' '{kwh} kWh' kwh=this.energyKwh}}{{/if}}\n          {{#if this.isDuration}}",
-      );
+    const previous = readFileSync(join(__dirname, '__fixtures__', 'energy-usage-receipt.mjml'), 'utf8').trim();
     await runner.query('INSERT INTO email_templates VALUES (?, ?)', [
       EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
       previous,
@@ -184,4 +180,29 @@ describe('energy billing replacement', () => {
     await new ReplaceEnergyBilling1790200000000().up(runner);
     expect(await runner.query('SELECT body FROM email_templates')).toEqual([{ body: current }]);
   });
+
+  it.each([
+    ['report', 'value', 'unit'],
+    ['ready', 'baselineValue', 'baselineUnit'],
+  ])(
+    'preserves rejection of an explicitly empty %s unit through all meter migrations',
+    async (kind, valueField, unitField) => {
+      await runner.query('DELETE FROM resource_flow_node');
+      await runner.query('INSERT INTO resource_flow_node VALUES (?, 1, ?, ?)', [
+        kind,
+        `output.resource.metering.${kind}`,
+        JSON.stringify({ [valueField]: '{{reading}}', [unitField]: '' }),
+      ]);
+      await new GenericMeters1790100000000().up(runner);
+      await new ReplaceEnergyBilling1790200000000().up(runner);
+      await new MeterFlowConversions1790300000000().up(runner);
+
+      const [node] = await runner.query('SELECT data FROM resource_flow_node');
+      const data = JSON.parse(node.data);
+      expect(data).not.toHaveProperty('unit');
+      expect(data).not.toHaveProperty('baselineUnit');
+      expect(data).not.toHaveProperty('legacyEnergyUnit');
+      expect(() => compileFlowTemplate(data[valueField], { reading: '1500' })).toThrow('no mapping');
+    },
+  );
 });

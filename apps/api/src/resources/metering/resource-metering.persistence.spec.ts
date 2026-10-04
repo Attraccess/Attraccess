@@ -1252,6 +1252,13 @@ describe('Flow-defined metering', () => {
       await metering.updateMeter(1, other.id, 'Renamed heartbeats');
       await metering.report(1, other.id, { kind: 'reading', mode: 'increment', value: '3' });
       await metering.report(1, other.id, { kind: 'reading', mode: 'increment', value: '2' });
+      expect((await metering.getLive(1)).meters.find((meter) => meter.id === other.id)).toEqual(
+        expect.objectContaining({
+          name: 'Renamed heartbeats',
+          creditsPerUnit: 100,
+          session: expect.objectContaining({ meterName: 'Heartbeats', creditsPerUnit: 2, latestValue: '5' }),
+        }),
+      );
       await usage.endSession(1, users[0], {} as never);
       const bill = await items(started.id);
       expect(bill.transaction.amount).toBe(-55);
@@ -1289,7 +1296,30 @@ describe('Flow-defined metering', () => {
       expect((await metering.listMeters(1))[0].lifetimeValue).toBe('4');
     });
 
-    it('establishes a cumulative baseline without billing old counts during an increment session', async () => {
+    it.each(['total', undefined])('rejects mixed push-only definitions with a %s report', async (mode) => {
+      await metering.report(1, 1, { kind: 'reading', value: '100' });
+      await source.getRepository(ResourceFlowNode).save([
+        {
+          id: 'increment-report',
+          resourceId: 1,
+          type: T.OUTPUT_METERING_REPORT,
+          data: { meterId: 1, mode: 'increment', value: '1' },
+        },
+        {
+          id: 'total-report',
+          resourceId: 1,
+          type: T.OUTPUT_METERING_REPORT,
+          data: { meterId: 1, mode, value: '105' },
+        },
+      ]);
+      expect(await metering.getDefinition(1, 1)).toMatchObject({ configured: false, incrementOnly: false });
+      await expect(usage.startSession(1, users[0], {} as never)).rejects.toThrow('METER_NOT_CONFIGURED');
+      expect(await source.getRepository(ResourceMeteringSession).count()).toBe(0);
+      expect((await metering.getLive(1)).meters[0]).toMatchObject({ lifetimeValue: '0', counterValue: '100' });
+    });
+
+    it('rejects cumulative readings after an increment session definition changes', async () => {
+      await metering.report(1, 1, { kind: 'reading', value: '100' });
       await source.getRepository(ResourceFlowNode).save({
         id: 'increment-report',
         resourceId: 1,
@@ -1298,8 +1328,16 @@ describe('Flow-defined metering', () => {
       });
       const started = await usage.startSession(1, users[0], {} as never);
       await metering.report(1, 1, { kind: 'reading', mode: 'increment', value: '2' });
-      await metering.report(1, 1, { kind: 'reading', value: '100' });
-      await metering.report(1, 1, { kind: 'reading', value: '101' });
+      // Adding fresh boundary branches cannot retroactively establish the original start baseline.
+      await seedMeter();
+      expect(await metering.getDefinition(1, 1)).toMatchObject({ configured: true, incrementOnly: false });
+      await expect(metering.report(1, 1, { kind: 'reading', value: '105' })).rejects.toThrow('increment-only');
+      expect((await metering.getLive(1)).meters[0]).toMatchObject({
+        lifetimeValue: '2',
+        counterValue: '102',
+        session: { latestValue: '2' },
+      });
+      await metering.report(1, 1, { kind: 'reading', mode: 'increment', value: '1' });
       await usage.endSession(1, users[0], {} as never);
       expect((await items(started.id)).transaction.amount).toBe(-90);
       expect((await metering.listMeters(1))[0].lifetimeValue).toBe('3');

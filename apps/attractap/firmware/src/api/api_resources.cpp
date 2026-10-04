@@ -306,7 +306,13 @@ void API::onUsageStats(JsonObject data)
     for (auto meter : usage["meters"].as<JsonArray>()) {
         const char *name = meter["name"].as<const char *>();
         const char *value = meter["value"].as<const char *>();
-        if (name && value) stats.meters.push_back({name, value});
+        if (name) {
+            UsageStats::MeterValue reading{name, value ? value : ""};
+            if (meter["creditsPerUnit"].is<int64_t>() && meter["creditsPerUnit"].as<int64_t>() >= 0)
+                reading.creditsPerUnit = meter["creditsPerUnit"].as<int64_t>();
+            reading.formattedRate = meter["formattedRate"] | "";
+            stats.meters.push_back(std::move(reading));
+        }
     }
     usageStatsCallback(stats);
 }

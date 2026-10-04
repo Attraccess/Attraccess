@@ -1,7 +1,6 @@
-import { createHash } from 'node:crypto';
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { EmailTemplateType } from '@attraccess/database-entities';
-import { readDefaultTemplateBody } from '../../email-template/email-defaults';
+import { refreshDefaultEmailTemplate } from '../migration-helpers/refresh-default-email-template';
 
 /** Completes the replacement even on databases that already ran GenericMeters. */
 export class ReplaceEnergyBilling1790200000000 implements MigrationInterface {
@@ -75,22 +74,8 @@ export class ReplaceEnergyBilling1790200000000 implements MigrationInterface {
     await runner.query('ALTER TABLE billing_transaction_item DROP COLUMN energyMicroWh');
     await runner.query('ALTER TABLE billing_transaction_item DROP COLUMN energyCreditsPerKwh');
 
-    await this.refreshDefaultReceipt(runner);
-  }
-
-  private async refreshDefaultReceipt(runner: QueryRunner): Promise<void> {
-    const type = EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY;
-    const [template]: { body: string }[] = await runner.query('SELECT body FROM email_templates WHERE type = ?', [
-      type,
-    ]);
-    if (!template) return;
-    const hash = createHash('sha256').update(template.body.replace(/\r\n?/g, '\n').trim()).digest('hex');
-    if (hash !== '08932de65ce3334d43bb676deed46ba333e7a0f69145acfa06b6fd092a34a1b8') return;
-    // Keep administrator-customized templates intact.
-    await runner.query('UPDATE email_templates SET body = ? WHERE type = ? AND body = ?', [
-      readDefaultTemplateBody(type),
-      type,
-      template.body,
+    await refreshDefaultEmailTemplate(runner, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, [
+      '08932de65ce3334d43bb676deed46ba333e7a0f69145acfa06b6fd092a34a1b8',
     ]);
   }
 

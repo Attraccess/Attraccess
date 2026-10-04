@@ -21,6 +21,7 @@ export class MeterRateDto {
 class MeterSessionDto {
   @ApiProperty() sessionId!: string;
   @ApiProperty() usageId!: number;
+  @ApiProperty() meterName!: string;
   @ApiProperty() creditsPerUnit!: number;
   @ApiProperty({ type: String, nullable: true }) latestValue!: string | null;
   @ApiProperty({ type: Number, nullable: true }) chargeCredits!: number | null;

@@ -7,6 +7,9 @@
     "meterWaiting": "Warte auf die erste Messung",
     "meterAsOf": "Stand {{time}}",
     "meterCost": "{{name}}: Kosten bisher",
+    "meterRate": "{{name}}: Sitzungspreis",
+    "rateValue": "{{rate}} pro Messwert",
+    "estimateUnavailable": "Schätzung überschreitet den unterstützten Abrechnungsbereich",
     "estimate": "Voraussichtliche Kosten bisher",
     "estimateNote": "Schätzung ohne zugeordnete Betriebsminuten und zusätzliche Flow-Positionen.",
     "billingValue": "{{credits}} {{currency}}"

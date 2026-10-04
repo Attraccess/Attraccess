@@ -870,14 +870,14 @@ void testUsageStatsExpiry(Renderer &renderer)
     API::UsageStats stats{};
     stats.resourceId = 1;
     stats.usageId = 99;
-    stats.meters = {{"Energy (kWh)", "0.125"}, {"Heartbeats", "3"}};
+    stats.meters = {{"Energy (kWh)", "0.125", 30, "0,30 EUR"}, {"Heartbeats", "3", 0, "0,00 EUR"}};
     stats.operatingDurationMs = 60000;
     stats.isOperating = 1;
     const auto receivedAt = Fixtures::nowMs;
     details.setUsageStats(stats);
     Fixtures::nowMs = receivedAt + 24999;
     details.loop();
-    requireObject(guard.root, &lv_label_class, "Energy (kWh): 0.125\nHeartbeats: 3");
+    requireObject(guard.root, &lv_label_class, "Energy (kWh): 0.125\n0,30 EUR / Wert\nHeartbeats: 3\n0,00 EUR / Wert");
     requireObject(guard.root, &lv_label_class, "00:01:00 · Läuft");
     renderer.capture("usage-stats-meters");
     Fixtures::nowMs = receivedAt + 25000;
@@ -886,10 +886,10 @@ void testUsageStatsExpiry(Renderer &renderer)
     requireObject(guard.root, &lv_label_class, "Keine Daten");
     expect(!findObject(guard.root, &lv_label_class, "Heartbeats: 0"), "Expired consumption is unavailable, not zero");
     renderer.capture("usage-stats-expired");
-    stats.meters = {{"Heartbeats", "0"}};
+    stats.meters = {{"Heartbeats", "0", 0, "0,00 EUR"}};
     stats.isOperating = 0;
     details.setUsageStats(stats);
-    requireObject(guard.root, &lv_label_class, "Heartbeats: 0");
+    requireObject(guard.root, &lv_label_class, "Heartbeats: 0\n0,00 EUR / Wert");
     requireObject(guard.root, &lv_label_class, "00:01:00 · Leerlauf");
     renderer.capture("usage-stats-recovered");
 }

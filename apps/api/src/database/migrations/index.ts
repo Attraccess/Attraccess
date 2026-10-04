@@ -175,3 +175,4 @@ export * from './1783700000000-refresh-default-email-layout';
 export * from './1790100000000-generic-meters';
 export * from './1790200000000-replace-energy-billing';
 export * from './1790300000000-meter-flow-conversions';
+export * from './1790400000000-refresh-default-meter-receipt';

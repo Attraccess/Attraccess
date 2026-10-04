@@ -41,7 +41,11 @@ function mock(usage: object | null, live: object | null) {
     data: { usage },
   } as ReturnType<typeof useResourcesServiceResourceUsageGetActiveSession>);
   vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({
-    data: { meters: live ? [{ id: 1, name: 'Heartbeats', session: { creditsPerUnit: 30, ...live } }] : [] },
+    data: {
+      meters: live
+        ? [{ id: 1, name: 'Renamed meter', session: { meterName: 'Heartbeats', creditsPerUnit: 30, ...live } }]
+        : [],
+    },
   } as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringLive>);
 }
 
@@ -89,8 +93,42 @@ describe('LiveSessionBilling', () => {
       { latestValue: '1.5', chargeCredits: 45, latestObservedAt: null },
     );
     render(<LiveSessionBilling {...props} />);
-    // round(45 * 50 / 100) = 23 minor units
-    expect(screen.getByText('0.23 EUR')).toBeInTheDocument();
+    // Settlement rounds the discount: 45 - round(45 * 50 / 100) = 22 minor units.
+    expect(screen.getByText('0.22 EUR')).toBeInTheDocument();
+  });
+
+  it('uses the captured name and rate after a meter is renamed and repriced', () => {
+    mock({ startTime: '2026-09-28T10:00:00Z' }, { latestValue: '0', chargeCredits: 0, creditsPerUnit: 0 });
+    render(<LiveSessionBilling {...props} />);
+    expect(screen.getByText('Heartbeats')).toBeInTheDocument();
+    expect(screen.getByText('Heartbeats session rate')).toBeInTheDocument();
+    expect(screen.getByText('0 EUR per measured value')).toBeInTheDocument();
+    expect(screen.queryByText('Renamed meter')).not.toBeInTheDocument();
+    expect(screen.getByText('0')).toBeInTheDocument();
+  });
+
+  it('matches exact settlement for a large charge at a half-credit boundary', () => {
+    mock(
+      { startTime: '2026-09-28T10:00:00Z', billingFactor: 50 },
+      {
+        latestValue: '9007199254740991',
+        chargeCredits: Number.MAX_SAFE_INTEGER,
+      },
+    );
+    render(<LiveSessionBilling {...props} minorUnit={0} />);
+    expect(screen.getByText('4503599627370495 EUR')).toBeInTheDocument();
+  });
+
+  it('shows an unavailable estimate when the combined meter charges exceed the supported range', () => {
+    mock(
+      { startTime: '2026-09-28T10:00:00Z', creditsPerUsage: 1 },
+      {
+        latestValue: '9007199254740991',
+        chargeCredits: Number.MAX_SAFE_INTEGER,
+      },
+    );
+    render(<LiveSessionBilling {...props} />);
+    expect(screen.getByText(en.live.estimateUnavailable)).toBeInTheDocument();
   });
 
   it('says it is waiting for the first reading instead of showing a zero', () => {

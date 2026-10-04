@@ -81,6 +81,24 @@ export interface ResourceThumbnailDescriptorPayload {
   contentLength: number;
 }
 
+export interface ResourceUsageStatsPayload {
+  resourceId: number;
+  usage: {
+    id: number;
+    operatingDurationMs: number | null;
+    isOperating: boolean | null;
+    meters: {
+      id: number;
+      /** Meter name and rate captured at session start. */
+      name: string;
+      creditsPerUnit: number;
+      formattedRate: string;
+      /** Decimal quantities stay strings to preserve their full precision. */
+      value: string | null;
+    }[];
+  } | null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class AttractapEvent<TPayload = any | undefined> {
   public readonly event = 'EVENT';

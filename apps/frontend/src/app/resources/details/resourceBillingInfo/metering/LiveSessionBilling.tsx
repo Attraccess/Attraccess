@@ -1,4 +1,4 @@
-import { useMeterValueFormatter } from '../../meters/useMeterValueFormatter';
+import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormatter';
 import { Fragment, useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
 import {
@@ -6,7 +6,7 @@ import {
   useResourcesServiceResourceUsageGetActiveSession,
 } from '@attraccess/react-query-client';
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { dbCurrencyToUserCurrency, formatDurationMs } from '@attraccess/shared';
+import { applyBillingFactor, dbCurrencyToUserCurrency, formatDurationMs, toExactCredits } from '@attraccess/shared';
 import de from './de.json';
 import en from './en.json';
 
@@ -44,14 +44,21 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
     t('live.billingValue', { credits: formatNumber(dbCurrencyToUserCurrency(credits, minorUnit)), currency });
 
   const elapsedMs = Math.max(0, now - new Date(usage.startTime).getTime());
-  const meters = live?.meters.filter((meter) => meter.session != null) ?? [];
-  const meterCredits = meters.reduce((sum, meter) => sum + (meter.session?.chargeCredits ?? 0), 0);
-  const gross =
-    (usage.creditsPerUsage ?? 0) +
-    (usage.sessionDurationCreditsPerMinute ?? 0) * Math.ceil(elapsedMs / 60_000) +
-    meterCredits;
-  const estimate = Math.round((gross * (usage.billingFactor ?? 100)) / 100);
-  const hasBillableRates = gross > 0 || meters.some((meter) => (meter.session?.creditsPerUnit ?? 0) > 0);
+  const meters = live?.meters.flatMap((meter) => (meter.session ? [{ id: meter.id, ...meter.session }] : [])) ?? [];
+  let estimate: number | null = null;
+  try {
+    const gross =
+      toExactCredits(usage.creditsPerUsage ?? 0) +
+      toExactCredits(usage.sessionDurationCreditsPerMinute ?? 0) * toExactCredits(Math.ceil(elapsedMs / 60_000)) +
+      meters.reduce((sum, meter) => sum + toExactCredits(meter.chargeCredits ?? 0), BigInt(0));
+    estimate = applyBillingFactor(gross, usage.billingFactor ?? 100).amount;
+  } catch {
+    // A running estimate must not crash the resource page or show an imprecise charge.
+  }
+  const hasBillableRates =
+    (usage.creditsPerUsage ?? 0) > 0 ||
+    (usage.sessionDurationCreditsPerMinute ?? 0) > 0 ||
+    meters.some((meter) => (meter.creditsPerUnit ?? 0) > 0);
 
   return (
     <div className="flex flex-col gap-2" data-cy="live-session-billing">
@@ -64,16 +71,18 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
         <dd className={valueClass}>{formatDurationMs(elapsedMs)}</dd>
         {meters.map((meter) => (
           <Fragment key={meter.id}>
-            <dt>{meter.name}</dt>
+            <dt>{meter.meterName}</dt>
             <dd className={valueClass} data-cy="live-meter-value">
-              {meter.session?.latestValue == null ? t('live.meterWaiting') : formatValue(meter.session.latestValue)}
+              {meter.latestValue == null ? t('live.meterWaiting') : formatValue(meter.latestValue)}
             </dd>
-            {(meter.session?.creditsPerUnit ?? 0) > 0 && (
+            <dt>{t('live.meterRate', { name: meter.meterName })}</dt>
+            <dd className={valueClass} data-cy="live-meter-rate">
+              {t('live.rateValue', { rate: money(meter.creditsPerUnit) })}
+            </dd>
+            {(meter.creditsPerUnit ?? 0) > 0 && (
               <>
-                <dt>{t('live.meterCost', { name: meter.name })}</dt>
-                <dd className={valueClass}>
-                  {meter.session?.chargeCredits == null ? '-' : money(meter.session.chargeCredits)}
-                </dd>
+                <dt>{t('live.meterCost', { name: meter.meterName })}</dt>
+                <dd className={valueClass}>{meter.chargeCredits == null ? '-' : money(meter.chargeCredits)}</dd>
               </>
             )}
           </Fragment>
@@ -81,7 +90,9 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
         {hasBillableRates && (
           <>
             <dt>{t('live.estimate')}</dt>
-            <dd className={`${valueClass} font-semibold`}>{money(estimate)}</dd>
+            <dd className={`${valueClass} font-semibold`} data-cy="live-bill-estimate">
+              {estimate == null ? t('live.estimateUnavailable') : money(estimate)}
+            </dd>
           </>
         )}
       </dl>

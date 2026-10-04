@@ -48,8 +48,10 @@ export function meterDefinitionFromFlow(
   }
   const startNode = nodes.find((node) => node.type === ResourceFlowNodeType.INPUT_METERING_START);
   const collectNode = nodes.find((node) => node.type === ResourceFlowNodeType.INPUT_METERING_COLLECT);
+  const reportNodes = nodes.filter((node) => node.type === ResourceFlowNodeType.OUTPUT_METERING_REPORT);
   const incrementOnly =
-    nodes.some((n) => n.type === ResourceFlowNodeType.OUTPUT_METERING_REPORT && n.data?.mode === 'increment') &&
+    reportNodes.length > 0 &&
+    reportNodes.every((node) => node.data?.mode === 'increment') &&
     !startNode &&
     !collectNode;
   return {

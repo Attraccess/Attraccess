@@ -270,6 +270,17 @@ int main(int argc, char **argv) {
     };
     assert(label(lv_screen_active(), "Warte auf Messwert"));
     display.capture(output, "05c-usage-stats-waiting");
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9007199254740993.125\",\"creditsPerUnit\":9007199254740991,\"formattedRate\":\"90.071.992.547.409,91 EUR\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: 9007199254740993.125\n90.071.992.547.409,91 EUR / Wert"));
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":null,\"creditsPerUnit\":0,\"formattedRate\":\"0,00 EUR\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: Warte auf Messwert\n0,00 EUR / Wert"));
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Energy (kWh)\",\"value\":\"0.125\",\"creditsPerUnit\":30,\"formattedRate\":\"0,30 EUR\"},"
+          "{\"name\":\"Heartbeats\",\"value\":\"0\",\"creditsPerUnit\":0,\"formattedRate\":\"0,00 EUR\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
+    assert(label(lv_screen_active(), "Energy (kWh): 0.125\n0,30 EUR / Wert\nHeartbeats: 0\n0,00 EUR / Wert"));
+    display.capture(output, "05f-usage-stats-captured-rates");
     stats(statsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.125\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
     assert(label(lv_screen_active(), "Heartbeats: 0.125"));
     assert(label(lv_screen_active(), "00:02:03 · Läuft"));

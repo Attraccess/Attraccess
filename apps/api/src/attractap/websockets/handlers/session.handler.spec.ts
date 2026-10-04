@@ -516,7 +516,14 @@ describe('AttractapSessionHandler – session + flow button', () => {
     beforeEach(() => {
       mockResourceUsageService.getActiveSession.mockResolvedValue({ id: 99, userId: 1, startTime });
       metering.getLive.mockResolvedValue({
-        meters: [{ id: 1, name: 'Heartbeats', session: { usageId: 99, latestValue: '0.125' } }],
+        meters: [
+          {
+            id: 1,
+            name: 'Renamed Heartbeats',
+            creditsPerUnit: 100,
+            session: { usageId: 99, meterName: 'Heartbeats', creditsPerUnit: 2, latestValue: '0.125' },
+          },
+        ],
       });
       operating.getForResource.mockResolvedValue({
         operatingDataAvailable: true,
@@ -527,7 +534,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         ],
       });
     });
-    it('returns named meter values and operating time attributed to the current usage', async () => {
+    it('returns captured meter names and rates after edits, with operating time attributed to the current usage', async () => {
       await handler.handleResourceUsageStats(mockSocket as any, request);
       expect(operating.getForResource).toHaveBeenCalledWith(10, expect.any(Date), startTime);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
@@ -536,12 +543,21 @@ describe('AttractapSessionHandler – session + flow button', () => {
           requestId: 7,
           usage: {
             id: 99,
-            meters: [{ id: 1, name: 'Heartbeats', value: '0.125' }],
+            meters: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 2, formattedRate: '0,02 EUR', value: '0.125' }],
             operatingDurationMs: 120000,
             isOperating: true,
           },
         }),
       );
+    });
+    it('formats the captured rate using the configured currency precision', async () => {
+      mockBillingService.getConfiguration.mockResolvedValue({ currency: 'KWD', minorUnit: 3 });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage.meters[0]).toMatchObject({
+        name: 'Heartbeats',
+        creditsPerUnit: 2,
+        formattedRate: '0,002 KWD',
+      });
     });
     it('keeps unavailable readings distinct from zero and discards a different meter session', async () => {
       metering.getLive.mockResolvedValue({
@@ -559,18 +575,41 @@ describe('AttractapSessionHandler – session + flow button', () => {
     it('returns multiple named meters, preserving zero and unavailable values', async () => {
       metering.getLive.mockResolvedValue({
         meters: [
-          { id: 1, name: 'Energy (kWh)', session: { usageId: 99, latestValue: '0' } },
-          { id: 2, name: 'Heartbeats', session: { usageId: 99, latestValue: '9007199254740993.125' } },
-          { id: 3, name: 'Water', session: { usageId: 99, latestValue: null } },
+          {
+            id: 1,
+            name: 'Energy (kWh)',
+            session: { usageId: 99, meterName: 'Energy (kWh)', creditsPerUnit: 0, latestValue: '0' },
+          },
+          {
+            id: 2,
+            name: 'Heartbeats',
+            session: {
+              usageId: 99,
+              meterName: 'Heartbeats',
+              creditsPerUnit: Number.MAX_SAFE_INTEGER,
+              latestValue: '9007199254740993.125',
+            },
+          },
+          {
+            id: 3,
+            name: 'Water',
+            session: { usageId: 99, meterName: 'Water', creditsPerUnit: 100, latestValue: null },
+          },
           { id: 4, name: 'Other usage', session: { usageId: 100, latestValue: '9' } },
           { id: 5, name: 'Idle meter', session: null },
         ],
       });
       await handler.handleResourceUsageStats(mockSocket as any, request);
       expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage.meters).toEqual([
-        { id: 1, name: 'Energy (kWh)', value: '0' },
-        { id: 2, name: 'Heartbeats', value: '9007199254740993.125' },
-        { id: 3, name: 'Water', value: null },
+        { id: 1, name: 'Energy (kWh)', creditsPerUnit: 0, formattedRate: '0,00 EUR', value: '0' },
+        {
+          id: 2,
+          name: 'Heartbeats',
+          creditsPerUnit: Number.MAX_SAFE_INTEGER,
+          formattedRate: '90.071.992.547.409,91 EUR',
+          value: '9007199254740993.125',
+        },
+        { id: 3, name: 'Water', creditsPerUnit: 100, formattedRate: '1,00 EUR', value: null },
       ]);
     });
     it.each([null, { id: 99, userId: 2, startTime }])(
@@ -615,7 +654,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         expect(metering.getLive).toHaveBeenCalledWith(10);
         expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toMatchObject({
           id: 99,
-          meters: [{ id: 1, name: 'Heartbeats', value: '0.125' }],
+          meters: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 2, formattedRate: '0,02 EUR', value: '0.125' }],
           operatingDurationMs: 120000,
         });
       });

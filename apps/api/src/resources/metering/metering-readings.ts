@@ -107,6 +107,10 @@ export class MeteringReadings {
       );
     const value = toMeterValue(report.value);
     const increment = report.mode === 'increment';
+    // This strategy has no fresh cumulative boundary; a total can include idle consumption.
+    // Honor the strategy captured at start even when the flow definition changes mid-session.
+    if (session?.collectionMode === 'increment' && !increment)
+      throw new MeteringOperationError('An increment-only session requires incremental readings');
     const previous = meter.counterValue == null ? null : BigInt(meter.counterValue);
     if (!increment && previous !== null && value < previous)
       throw new MeteringValueError(

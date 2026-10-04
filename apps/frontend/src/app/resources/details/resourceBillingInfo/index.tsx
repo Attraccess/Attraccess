@@ -96,6 +96,7 @@ export function ResourceBillingInfo(props: Props) {
 
   const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId });
   const hasMeterRates = meters.some((meter) => meter.creditsPerUnit > 0);
+  const hasMeterSessions = meters.some((meter) => meter.session != null);
 
   const isFree = useMemo(() => {
     return (
@@ -150,9 +151,9 @@ export function ResourceBillingInfo(props: Props) {
     if (!license?.modules.includes('billing')) return false;
     if (!resourceBillingConfiguration) return false;
     if (resource?.type !== 'machine') return false;
-    if (isFree && !hasPermission('billing.manage')) return false;
+    if (isFree && !hasMeterSessions && !hasPermission('billing.manage')) return false;
     return true;
-  }, [license, resourceBillingConfiguration, resource, isFree, hasPermission]);
+  }, [license, resourceBillingConfiguration, resource, isFree, hasMeterSessions, hasPermission]);
 
   useEffect(() => {
     onVisibilityChange?.(isVisible);
@@ -174,7 +175,7 @@ export function ResourceBillingInfo(props: Props) {
     return <Skeleton className="h-10 w-full" />;
   }
 
-  if (isFree && !hasPermission('billing.manage')) {
+  if (isFree && !hasMeterSessions && !hasPermission('billing.manage')) {
     return null;
   }
 

@@ -112,6 +112,18 @@ describe('flow templates', () => {
     expect(() => compileFlowTemplate('{{mapValue kind \'{"box":"12"}\'}}', { kind: 'missing' })).toThrow('no mapping');
   });
 
+  it('escapes nested rendered values once while preserving explicitly rendered markup', () => {
+    const data = { name: '<script>A & B</script>' };
+    expect(compileFlowTemplate('{{render "{{name}}"}}', data)).toBe(compileFlowTemplate('{{name}}', data));
+    expect(compileFlowTemplate('{{render "<strong>{{name}}</strong>"}}', data)).toBe(
+      '<strong>&lt;script&gt;A &amp; B&lt;/script&gt;</strong>',
+    );
+    expect(compileFlowTemplate('{{json (render "{{name}}")}}', data)).toBe(
+      JSON.stringify(compileFlowTemplate('{{name}}', data)),
+    );
+    expect(compileFlowTemplate('{{add (render "{{count}}") 1}}', { count: 2 })).toBe('3');
+  });
+
   it.each(['{{scaleDecimal value "1/0"}}', '{{scaleDecimal value "bad"}}', '{{scaleDecimal value "1" precision=99}}'])(
     'rejects invalid scaling (%s)',
     (template) => {

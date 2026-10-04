@@ -15,7 +15,12 @@ import { ResourceActionGuard } from './resource-action.guard';
 import { ResourceListService } from './resource-list.service';
 import { AttractapFormsHandler } from './forms.handler';
 import { SupervisionService } from '../../../resources/supervision/supervision.service';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import {
+  AuthenticatedWebSocket,
+  AttractapEvent,
+  AttractapEventType,
+  ResourceUsageStatsPayload,
+} from '../websocket.types';
 
 @Injectable()
 export class AttractapSessionHandler {
@@ -75,9 +80,10 @@ export class AttractapSessionHandler {
         return;
       }
       const asOf = new Date();
-      const [meter, operating] = await Promise.all([
+      const [meter, operating, billingConfiguration] = await Promise.all([
         this.meteringService.getLive(resourceId),
         this.operatingAttributionService.getForResource(resourceId, asOf, usage.startTime),
+        this.billingService.getConfiguration(),
       ]);
       if (socket.state.lastAuthenticatedUserId !== userId) return;
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, {
@@ -94,13 +100,29 @@ export class AttractapSessionHandler {
           // Never attach a new session's meter reading to an earlier usage snapshot.
           meters: meter.meters
             .filter((entry) => entry.session?.usageId === usage.id)
-            .map((entry) => ({ id: entry.id, name: entry.name, value: entry.session.latestValue })),
+            .map((entry) => ({
+              id: entry.id,
+              name: entry.session.meterName,
+              creditsPerUnit: entry.session.creditsPerUnit,
+              formattedRate: this.formatMeterRate(entry.session.creditsPerUnit, billingConfiguration),
+              value: entry.session.latestValue,
+            })),
         },
-      });
+      } satisfies ResourceUsageStatsPayload);
     } catch (error) {
       this.logger.warn(`Failed to load live usage stats: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
     }
+  }
+
+  private formatMeterRate(creditsPerUnit: number, configuration: { minorUnit: number; currency: string }): string {
+    const scale = BigInt(`1${'0'.repeat(configuration.minorUnit)}`);
+    const credits = BigInt(creditsPerUnit);
+    const whole = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(credits / scale);
+    const fraction = configuration.minorUnit
+      ? `,${(credits % scale).toString().padStart(configuration.minorUnit, '0')}`
+      : '';
+    return `${whole}${fraction} ${configuration.currency}`;
   }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {

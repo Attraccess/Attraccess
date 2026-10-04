@@ -23,6 +23,7 @@ import { CompanionGatewayService } from '../../companion/companion-gateway.servi
 import axios from 'axios';
 import { registerPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
+import { settleFlowBranches } from './flow-execution-engine';
 
 jest.mock('axios');
 
@@ -287,7 +288,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
     const ordinaryFailure = Promise.reject(new Error('ordinary node failure'));
 
-    const settled = service['settleFlowBranches']([
+    const settled = settleFlowBranches([
       ordinaryFailure as Promise<NodeProcessingResult[]>,
       laterExternalFailure as Promise<NodeProcessingResult[]>,
     ]);
@@ -888,20 +889,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     edgesBySourceAndHandle[`${mqttNode.id}|failure`] = [];
     edgesBySourceAndHandle[`${continuationNode.id}|`] = [];
     mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
-    const processNode = jest.spyOn(
-      service as unknown as { processNode: () => Promise<NodeProcessingResult[]> },
-      'processNode',
-    );
+    flowLogs.start(1);
 
-    await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
+    const results = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
 
-    expect(processNode).toHaveBeenCalledWith(
-      expect.any(String),
-      continuationNode,
-      expect.objectContaining({ outputHandle: 'output' }),
-      undefined,
-      expect.any(Map),
-      {},
+    expect(results).toEqual([expect.objectContaining({ requestId: 'abc' })]);
+    expect(flowLogs.getLogs(1).logs).toContainEqual(
+      expect.objectContaining({ nodeId: continuationNode.id, type: 'node.processing.completed' }),
     );
   });
 

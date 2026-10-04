@@ -50,7 +50,9 @@ void ResourceDetailsScreen::updateUsageStatsDisplay()
    if (fresh) {
       for (const auto &meter : this->usageStats.meters) {
          if (!consumption.empty()) consumption += "\n";
-         consumption += meter.name + ": " + meter.value;
+         consumption += meter.name + ": " + (meter.value.empty() ? "Warte auf Messwert" : meter.value);
+         if (meter.creditsPerUnit >= 0 && !meter.formattedRate.empty())
+            consumption += "\n" + meter.formattedRate + " / Wert";
       }
    }
    if (consumption.empty()) consumption = "Warte auf Messwert";

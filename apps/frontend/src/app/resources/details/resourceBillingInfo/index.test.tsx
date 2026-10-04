@@ -13,6 +13,8 @@ import {
 import { ResourceBillingInfo } from './index';
 import en from './en.json';
 
+const auth = vi.hoisted(() => ({ canManageBilling: true }));
+
 vi.mock('@attraccess/react-query-client', () => ({
   useResourceMeteringServiceListResourceMeters: vi.fn(),
   useBillingServiceGetBillingBalance: vi.fn(),
@@ -43,7 +45,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
   };
 });
 vi.mock('../../../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 1 }, hasPermission: () => true }),
+  useAuth: () => ({ user: { id: 1 }, hasPermission: () => auth.canManageBilling }),
 }));
 vi.mock('../../../../components/flatSection', () => ({
   FlatSection: ({ title, children }: { title: string; children: ReactNode }) => (
@@ -88,7 +90,27 @@ function mockData() {
 describe('ResourceBillingInfo operating-minute billing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    auth.canManageBilling = true;
     mockData();
+  });
+
+  it('keeps the live session visible to regular users after current meter prices are removed', async () => {
+    auth.canManageBilling = false;
+    vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+      data: [
+        { id: 1, name: 'Renamed meter', creditsPerUnit: 0, session: { meterName: 'Heartbeats', creditsPerUnit: 30 } },
+      ],
+    } as never);
+    vi.mocked(useBillingServiceGetResourceBillingConfiguration).mockReturnValue({
+      data: {
+        configuration: { creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 },
+        additionalItems: [],
+      },
+    } as never);
+    const onVisibilityChange = vi.fn();
+    render(<ResourceBillingInfo resourceId={205} onVisibilityChange={onVisibilityChange} />);
+    expect(await screen.findByText(en.title)).toBeInTheDocument();
+    expect(onVisibilityChange).toHaveBeenCalledWith(true);
   });
 
   it('displays the configured operating-minute rate', async () => {

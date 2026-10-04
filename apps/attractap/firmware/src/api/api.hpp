@@ -237,6 +237,8 @@ public:
         struct MeterValue {
             std::string name;
             std::string value;
+            int64_t creditsPerUnit = -1; // -1 means no captured rate was provided
+            std::string formattedRate;
         };
         std::vector<MeterValue> meters;
     };
