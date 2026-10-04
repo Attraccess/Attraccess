@@ -23,7 +23,15 @@ import { ChangeEmailForm } from './components/changeEmail';
 import en from './en.json';
 import de from './de.json';
 import { Chip, ModalBody, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
-import { AlertTriangleIcon, KeyRoundIcon, LinkIcon, ListChecksIcon, ShieldIcon, UserIcon } from 'lucide-react';
+import {
+  AlertTriangleIcon,
+  KeyRoundIcon,
+  LinkIcon,
+  ListChecksIcon,
+  ShieldIcon,
+  UserIcon,
+  CreditCardIcon,
+} from 'lucide-react';
 import { FlatSection } from '../../../components/flatSection';
 import { Button } from '../../../components/button';
 import { StandardModal } from '../../../components/standardModal';
@@ -119,7 +127,7 @@ function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: numb
   const navigate = useNavigate();
   const toast = useToastMessage();
   const { isOpen, open, setOpen } = useOverlayState();
-  const { user: me } = useAuth();
+  const { user: me, hasPermission } = useAuth();
 
   const { data: user } = useUsersServiceGetOneUserById({ id });
   const { data: license } = useLicenseServiceGetLicenseInformation();
@@ -231,6 +239,15 @@ function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: numb
         title={`${user?.username ?? ''} (ID: ${user?.id ?? ''})`}
         subtitle={t('details.externalIdentifier', { identifier: user?.externalIdentifier })}
         backTo="/users"
+        actions={[
+          {
+            key: 'rfid-cards',
+            label: t('rfidCards.manage'),
+            icon: <CreditCardIcon />,
+            isHidden: !user || !license?.modules.includes('attractap') || !hasPermission('users.rfid-cards.manage'),
+            onPress: () => navigate(`/users/${id}/rfid-cards`),
+          },
+        ]}
       />
 
       {user && (

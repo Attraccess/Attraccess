@@ -5,6 +5,7 @@ import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
+import { CardAccessService } from './card-access.service';
 import 'sqlite3';
 import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
@@ -67,6 +68,7 @@ import { AuditModule } from '../audit/audit.module';
     ResourceOperatingAttributionModule,
   ],
   providers: [
+    CardAccessService,
     AttractapService,
     WebsocketService,
     AttractapGateway,

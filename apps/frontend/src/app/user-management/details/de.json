@@ -44,5 +44,8 @@
       "title": "Benutzer gelöscht",
       "description": "{{username}} wurde gelöscht."
     }
+  },
+  "rfidCards": {
+    "manage": "RFID-Karten verwalten"
   }
 }

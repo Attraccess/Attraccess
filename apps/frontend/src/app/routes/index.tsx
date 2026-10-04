@@ -17,7 +17,7 @@ import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
 import { AttractapList } from '../attractap/AttractapList';
 import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage';
-import { RfidCardList } from '../attractap/RfidCardList';
+import { RfidCardList, UserRfidCardsPage } from '../attractap/RfidCardList';
 import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
@@ -243,6 +243,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/users/:id',
     element: <UserManagementDetailsPage />,
     authRequired: 'users.read',
+  },
+  {
+    path: '/users/:id/rfid-cards',
+    element: <UserRfidCardsPage />,
+    authRequired: 'users.rfid-cards.manage',
   },
   {
     path: '/attractap',

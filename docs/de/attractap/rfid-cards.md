@@ -14,37 +14,25 @@ Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt.
 
 ## RFID-Karten verwalten
 
-### Alle Karten anzeigen
-
-1. Navigieren Sie zu **RFID-Karten** in der Seitenleiste
-2. Sie sehen eine Liste aller registrierten RFID-Karten mit ihren zugewiesenen Benutzern
-
-<!-- TODO: Screenshot der RFID-Kartenliste -->
+Öffnen Sie **RFID-Karten** in der Seitenleiste, um Ihre eigenen Karten zu verwalten. Die Liste zeigt ID, UID, Erstellungsdatum und den Zeitpunkt der letzten Verwendung.
 
 ### Neue Karte registrieren
 
-Um eine neue RFID-Karte zu registrieren:
+1. Klicken Sie auf **RFID-Karte registrieren**
+2. Wählen Sie einen verbundenen Attractap, der die Registrierung von Karten unterstützt
+3. Klicken Sie auf **Registrieren** und folgen Sie den Anweisungen auf dem Leser
 
-1. Navigieren Sie zu **RFID-Karten** in der Seitenleiste
-2. Klicken Sie auf **RFID-Karte hinzufuegen**
-3. Waehlen Sie den Benutzer aus, der die Karte erhalten soll
-4. Halten Sie die neue RFID-Karte an einen beliebigen verbundenen Attractap-Leser
-5. Die Karten-ID wird automatisch erkannt und registriert
+### Karten aktivieren und deaktivieren
 
-> [!TIP]
-> Sie koennen eine Karte auch direkt ueber die Profilseite des Benutzers registrieren.
-
-<!-- TODO: Screenshot des Dialogs "RFID-Karte hinzufuegen" -->
+Klicken Sie neben einer Karte auf **Aktivieren** oder **Deaktivieren** und bestätigen Sie die Aktion. Beim Aktivieren werden die anderen Karten des Benutzers automatisch deaktiviert. Somit ist pro Benutzer nur eine Karte aktiv. Deaktivieren Sie verlorene Karten sofort, um den Zugang ohne die physische Karte zu widerrufen.
 
 ### Karte entfernen
 
-1. Navigieren Sie zu **RFID-Karten** in der Seitenleiste
-2. Suchen Sie die Karte, die Sie entfernen moechten
-3. Klicken Sie auf die Schaltflaeche **Loeschen**
-4. Bestaetigen Sie die Entfernung
+1. Klicken Sie neben der Karte auf **Löschen**
+2. Wählen Sie einen verbundenen Attractap und bestätigen Sie **Löschen**
+3. Folgen Sie den Anweisungen auf dem Leser, um die physische Karte zurückzusetzen
 
-> [!NOTE]
-> Das Entfernen einer Karte widerruft den Zugang sofort. Die Karte kann an keinem Leser mehr verwendet werden.
+Die Karte wird aus dem Konto entfernt, sobald der Leser das erfolgreiche Zurücksetzen bestätigt. Die physische Karte wird benötigt; nutzen Sie **Deaktivieren**, falls die Karte nicht verfügbar ist.
 
 ## Mehrere Karten pro Benutzer
 
@@ -70,12 +58,9 @@ Attractap-Leser verwenden AES-verschluesselte Authentifizierung, die Karten mit 
 
 ## Administratorfunktionen
 
-Administratoren koennen:
+Die Berechtigung `users.rfid-cards.manage` erlaubt die Verwaltung von RFID-Karten für beliebige Benutzer. Die Rolle **Administrator** enthält sie automatisch. Sie kann auch über eine eigene Rolle vergeben werden.
 
-- Alle registrierten Karten ueber alle Benutzer hinweg einsehen
-- Karten im Namen von Benutzern registrieren
-- Karten von Benutzerkonten entfernen
-- Sehen, welcher Leser eine Karte zuletzt gescannt hat
+Öffnen Sie **Benutzer**, wählen Sie einen Benutzer und klicken Sie auf **RFID-Karten verwalten**. Dort können Sie Karten für den ausgewählten Benutzer registrieren, aktivieren, deaktivieren und löschen. Für den Zugriff auf die Benutzerdetails ist zusätzlich `users.read` erforderlich. Bei der Registrierung wird die Karte dem ausgewählten Benutzer zugeordnet; das Audit-Protokoll erfasst den ausführenden Administrator.
 
 ## Siehe auch
 
