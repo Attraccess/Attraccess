@@ -1,4 +1,5 @@
 export default {
+  openBilling: 'Open billing overview',
   sessionNotes: 'Session Notes',
   startNotes: 'Start Notes',
   endNotes: 'End Notes',

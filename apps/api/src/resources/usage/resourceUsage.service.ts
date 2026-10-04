@@ -1511,6 +1511,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       take: limit,
       order: { startTime: 'DESC' },
       relations: [
+        'billingTransaction',
         'user',
         'project',
         'supervisorUser',

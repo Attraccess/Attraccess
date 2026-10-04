@@ -16,7 +16,9 @@
     "refundOf": "Erstattung von",
     "correctionOf": "Korrektur zu",
     "externalReference": "Externe Referenz",
-    "type": "Art"
+    "type": "Art",
+    "project": "Projekt",
+    "unassignedProject": "Nicht zugeordnet"
   },
   "type": {
     "refund": "Erstattung",
@@ -47,6 +49,7 @@
     "total": "Summe Positionen"
   },
   "actions": {
-    "refund": "Erstattung"
+    "refund": "Erstattung",
+    "openUsage": "Nutzungsdetails öffnen"
   }
 }

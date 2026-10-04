@@ -75,6 +75,7 @@ export class ProjectUsageService {
       .leftJoinAndSelect('usage.user', 'user')
       .leftJoinAndSelect('usage.resource', 'resource')
       .leftJoinAndSelect('usage.project', 'project')
+      .leftJoinAndSelect('usage.billingTransaction', 'billingTransaction')
       .where('usage.projectId = :projectId', { projectId })
       .andWhere('usage.lifecyclePending = FALSE')
       .orderBy('usage.startTime', 'DESC');

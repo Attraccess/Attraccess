@@ -144,7 +144,13 @@ export class BillingService {
   async getTransaction(transactionId: number, userId?: number): Promise<BillingTransaction> {
     return await this.billingTransactionRepository.findOne({
       where: { id: transactionId, userId },
-      relations: this.DEFAULT_RELATIONS,
+      relations: [
+        ...this.DEFAULT_RELATIONS,
+        'resourceUsage.project',
+        'resourceUsage.supervisorUser',
+        'resourceUsage.formSubmissions',
+        'resourceUsage.formSubmissions.form',
+      ],
     });
   }
 

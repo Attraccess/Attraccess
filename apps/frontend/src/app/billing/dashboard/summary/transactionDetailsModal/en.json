@@ -16,7 +16,9 @@
     "refundOf": "Refund of",
     "correctionOf": "Correction of",
     "externalReference": "External reference",
-    "type": "Type"
+    "type": "Type",
+    "project": "Project",
+    "unassignedProject": "Unassigned"
   },
   "type": {
     "refund": "Refund",
@@ -47,6 +49,7 @@
     "total": "Items total"
   },
   "actions": {
-    "refund": "Refund"
+    "refund": "Refund",
+    "openUsage": "Open usage details"
   }
 }
