@@ -3,7 +3,8 @@
 // A frontend plugin is an ES module exposing a default-exported class that
 // implements `AttraccessFrontendPlugin`. The host loads it as a Vite module
 // federation remote (exposing `./plugin`) and:
-//   - calls `getRoutes()` to merge the plugin's pages into the app router, and
+//   - calls `getRoutes()` to merge the plugin's pages into the app router,
+//   - calls `getSidebarGroups()` to declare the plugin's navigation group, and
 //   - calls `getSidebarItems()` to add navigation entries to the app sidebar.
 // See ../vite.config.ts for the build.
 //
@@ -14,27 +15,12 @@
 // the single copy it already ships, so the plugin bundle stays tiny and every
 // HeroUI component picks up the host's active theme automatically.
 import './styles.css';
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  Button,
-  Card,
-  Chip,
-  Spinner,
-} from '@heroui/react';
-import {
-  BellIcon,
-  DatabaseIcon,
-  HandIcon,
-  PanelLeftIcon,
-  PlugIcon,
-  RouteIcon,
-  ServerIcon,
-} from 'lucide-react';
+import { Alert, AlertContent, AlertDescription, Button, Card, Chip, Spinner } from '@heroui/react';
+import { BellIcon, DatabaseIcon, HandIcon, PanelLeftIcon, PlugIcon, RouteIcon, ServerIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
+  PluginSidebarGroup,
   PluginSidebarItem,
   PluginSlotContribution,
   RouteConfig,
@@ -99,8 +85,8 @@ function HelloWorldPage() {
         <Card.Header className="hw:flex hw:flex-col hw:items-start hw:gap-1">
           <p className="hw:text-base hw:font-semibold hw:text-default-700">Greetings from the backend</p>
           <p className="hw:text-sm hw:text-default-500">
-            Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads host
-            users through an injected repository (needs the <code>READ_USERS</code> permission).
+            Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads host users
+            through an injected repository (needs the <code>READ_USERS</code> permission).
           </p>
         </Card.Header>
         <Card.Content>
@@ -162,10 +148,7 @@ function CapabilitiesPage() {
 
   return (
     <PluginShell title="Hello World — Capabilities">
-      <div
-        data-cy="hello-world-capabilities-page"
-        className="hw:grid hw:gap-4 hw:sm:grid-cols-2 hw:xl:grid-cols-3"
-      >
+      <div data-cy="hello-world-capabilities-page" className="hw:grid hw:gap-4 hw:sm:grid-cols-2 hw:xl:grid-cols-3">
         {items.map((item) => (
           <Card key={item.title} className="hw:border hw:border-default-200 hw:dark:border-default-100">
             <Card.Header className="hw:flex hw:flex-row hw:items-center hw:gap-2">
@@ -211,8 +194,8 @@ function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
       </Card.Header>
       <Card.Content>
         <p className="hw:text-sm hw:text-default-500">
-          This card is injected into the MQTT server detail slot via{' '}
-          <code>getSlotContributions()</code> — no core code knows about it. It is scoped to server{' '}
+          This card is injected into the MQTT server detail slot via <code>getSlotContributions()</code> — no core code
+          knows about it. It is scoped to server{' '}
           <Chip color="accent" variant="soft">
             #{mqttServerId}
           </Chip>
@@ -282,7 +265,11 @@ export default class HelloWorldPlugin implements AttraccessFrontendPlugin {
     ];
   }
 
-  // Contribute a sidebar entry that links to the plugin's landing page. The
+  getSidebarGroups(): PluginSidebarGroup[] {
+    return [{ id: 'hello-world', label: 'Hello World', icon: <PlugIcon size={16} aria-hidden /> }];
+  }
+
+  // Contribute an entry inside the declared group, linking to the landing page. The
   // host gates it behind the target route's auth, so it only shows when the
   // user can actually open it. The icon is a lucide-react glyph — the same set
   // the host sidebar uses — so it lines up visually with the built-in entries.
@@ -291,6 +278,7 @@ export default class HelloWorldPlugin implements AttraccessFrontendPlugin {
       {
         label: 'Hello World',
         path: '/hello-world',
+        group: 'hello-world',
         icon: <HandIcon className="hw:w-5 hw:h-5" />,
       },
     ];

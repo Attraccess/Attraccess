@@ -9,6 +9,7 @@ export enum FrontendLocation {}
 export enum FRONTEND_FUNCTION {
   GET_ROUTES = 'GET_ROUTES',
   GET_SIDEBAR_ITEMS = 'GET_SIDEBAR_ITEMS',
+  GET_SIDEBAR_GROUPS = 'GET_SIDEBAR_GROUPS',
   GET_SLOT_CONTRIBUTIONS = 'GET_SLOT_CONTRIBUTIONS',
 }
 
@@ -20,8 +21,16 @@ export interface PluginSidebarItem {
   label: string;
   path: string;
   icon?: ReactNode;
-  /** Host sidebar group ID, e.g. `devices`. Omitted or unknown groups render at the root. */
+  /** Host or plugin-declared group ID. Omitted or unknown groups render at the root. */
   group?: string;
+}
+
+/** A group declared by a plugin. Empty groups are hidden after route permission filtering. */
+export interface PluginSidebarGroup {
+  /** Stable, nonempty ID. Prefix with the plugin name to avoid collisions. */
+  id: string;
+  label: string;
+  icon?: ReactNode;
 }
 
 export const getPluginFunctionName = (pluginName: string, func: FRONTEND_FUNCTION) => {
@@ -40,6 +49,9 @@ export interface AttraccessFrontendPlugin extends IPlugin {
   getRoutes?(): RouteConfig[];
   // Optional. Return the sidebar navigation entries this plugin contributes.
   getSidebarItems?(): PluginSidebarItem[];
+  // Optional. Declare groups that sidebar entries can target by ID.
+  // Host groups take precedence; the first plugin declaration wins duplicate IDs.
+  getSidebarGroups?(): PluginSidebarGroup[];
   // Optional. Return the contributions this plugin renders into host slots
   // (generic embedded extension points). See frontend.slots.ts.
   getSlotContributions?(): PluginSlotContribution[];

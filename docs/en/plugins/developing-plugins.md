@@ -452,6 +452,37 @@ See [Permissions](../user-management/permissions.md) for the full list of availa
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.
 
+### Sidebar entries and groups
+
+Implement `getSidebarItems()` to add links to your plugin's routes. Set `group`
+to an existing host group ID such as `devices`, or declare your own group with
+`getSidebarGroups()`:
+
+```tsx
+import type { PluginSidebarGroup, PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
+import { PlugIcon } from 'lucide-react';
+
+getSidebarGroups(): PluginSidebarGroup[] {
+  return [{ id: 'my-plugin-tools', label: 'My Plugin', icon: <PlugIcon size={16} aria-hidden /> }];
+}
+
+getSidebarItems(): PluginSidebarItem[] {
+  return [{ label: 'Tools', path: '/my-plugin/tools', group: 'my-plugin-tools' }];
+}
+```
+
+Use stable, nonempty group IDs prefixed with your plugin's name. A group has a
+`label` and an optional React node `icon`; the host supplies a puzzle icon when
+none is provided. Plugin labels are rendered as supplied, so your plugin is
+responsible for their translations.
+
+The host checks each entry's target route permissions before displaying it and
+hides groups with no visible entries. Declared groups work in the expanded
+sidebar, collapsed menus, and mobile navigation. Entries with no group or an
+unknown group ID stay at the root. Host groups keep their labels and icons when
+a plugin declares the same ID; for duplicate plugin group IDs, the first loaded
+plugin's declaration wins and entries share that group.
+
 ### Slots (embedded extension points)
 
 Routes give a plugin its own pages. **Slots** let a plugin inject UI _into_ a

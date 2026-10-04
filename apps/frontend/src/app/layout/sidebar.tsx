@@ -43,7 +43,7 @@ import { Logo } from '../../components/logo';
 import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
 import { NavLink as RouterNavLink, useNavigate } from 'react-router-dom';
 import usePluginState from '../plugins/plugin.state';
-import type { PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
+import type { PluginSidebarGroup, PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
 import { useAppTheme } from '@attraccess/ui';
 
 interface NavLinkProps {
@@ -158,7 +158,12 @@ interface SidebarProps {
   toggleCollapsed: () => void;
 }
 
-type NavigationGroup = Omit<SidebarItemGroup, 'items'> & { items: NavLinkProps[] };
+interface NavigationGroup {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  items: NavLinkProps[];
+}
 
 export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }: SidebarProps) {
   const { logout, user, hasPermission } = useAuth();
@@ -206,6 +211,21 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
     });
   }, [plugins]);
 
+  const pluginNavGroups: PluginSidebarGroup[] = useMemo(() => {
+    return plugins.flatMap((manifest) => {
+      try {
+        return manifest.plugin.getSidebarGroups?.() ?? [];
+      } catch (error) {
+        // eslint-disable-next-line no-console -- Report isolated plugin failures without breaking navigation.
+        console.error(
+          `Attraccess Plugin System: getSidebarGroups() of plugin "${manifest.plugin.getPluginName()}" threw`,
+          error,
+        );
+        return [];
+      }
+    });
+  }, [plugins]);
+
   const showNavItem = useCallback(
     (item: Pick<SidebarItem, 'path'>) => {
       const routeOfItem = routes.find((route) => route.path === item.path);
@@ -230,10 +250,10 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
   // Get navigation items from routes that have sidebar config
   const navigationGroups: NavigationGroup[] = useMemo(() => {
     const defaultGroup: NavigationGroup = {
-      translationKey: '##default##',
+      id: '##default##',
+      label: '',
       items: [],
-      icon: () => null,
-      isGroup: true,
+      icon: null,
     };
     const groups: NavigationGroup[] = [defaultGroup];
 
@@ -248,18 +268,30 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
 
     sidebarItems.forEach((item) => {
       if ('path' in item) {
-        if (showNavItem(item)) defaultGroup.items.push(navItem(item, defaultGroup.translationKey));
+        if (showNavItem(item)) defaultGroup.items.push(navItem(item, defaultGroup.id));
         return;
       }
 
       groups.push({
-        ...item,
+        id: item.translationKey,
+        label: t('groups.' + item.translationKey + '.label'),
+        icon: <item.icon size={16} aria-hidden />,
         items: item.items.filter(showNavItem).map((child) => navItem(child, item.translationKey)),
       });
     });
 
+    pluginNavGroups.forEach((group) => {
+      if (!group.id || groups.some((existing) => existing.id === group.id)) return;
+      groups.push({
+        id: group.id,
+        label: group.label,
+        icon: group.icon ?? <PuzzleIcon size={16} aria-hidden />,
+        items: [],
+      });
+    });
+
     pluginNavItems.filter(showNavItem).forEach((item) => {
-      const group = groups.find((group) => group.translationKey === item.group) ?? defaultGroup;
+      const group = groups.find((group) => group.id === item.group) ?? defaultGroup;
       group.items.push({
         href: item.path,
         label: item.label,
@@ -269,14 +301,14 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
     });
 
     return groups.filter((group) => group.items.length > 0);
-  }, [showNavItem, sidebarItems, pluginNavItems, t]);
+  }, [showNavItem, sidebarItems, pluginNavItems, pluginNavGroups, t]);
 
   const defaultGroupItems = useMemo(() => {
-    return navigationGroups.find((group) => group.translationKey === '##default##')?.items;
+    return navigationGroups.find((group) => group.id === '##default##')?.items;
   }, [navigationGroups]);
 
   const otherGroups = useMemo(() => {
-    return navigationGroups.filter((group) => group.translationKey !== '##default##');
+    return navigationGroups.filter((group) => group.id !== '##default##');
   }, [navigationGroups]);
 
   const sidebarEndItems = useSidebarEndItems();
@@ -362,10 +394,10 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
             {isCollapsed ? (
               otherGroups.map((group) => (
                 <CollapsedGroupDropdown
-                  key={group.translationKey}
-                  label={t('groups.' + group.translationKey + '.label')}
-                  icon={<group.icon size={16} aria-hidden />}
-                  data-cy={`sidebar-group-${group.translationKey}`}
+                  key={group.id}
+                  label={group.label}
+                  icon={group.icon}
+                  data-cy={`sidebar-group-${group.id}`}
                   items={group.items.map((item) => ({
                     key: item.href,
                     path: item.href,
@@ -378,14 +410,12 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
             ) : (
               <Accordion>
                 {otherGroups.map((group) => (
-                  <AccordionItem key={group.translationKey} id={group.translationKey}>
+                  <AccordionItem key={group.id} id={group.id}>
                     <AccordionHeading>
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
-                          <span className="mr-3 flex items-center">
-                            <group.icon size={16} aria-hidden />
-                          </span>
-                          {t('groups.' + group.translationKey + '.label')}
+                          <span className="mr-3 flex items-center">{group.icon}</span>
+                          {group.label}
                         </span>
                         <AccordionIndicator />
                       </AccordionTrigger>
