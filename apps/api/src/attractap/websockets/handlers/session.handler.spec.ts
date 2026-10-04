@@ -15,7 +15,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
     sendBinaryData: jest.Mock;
   };
   let mockUsersService: { findOne: jest.Mock };
-  let mockResourceUsageService: { startSession: jest.Mock; endSession: jest.Mock };
+  let mockResourceUsageService: { startSession: jest.Mock; endSession: jest.Mock; getActiveSession: jest.Mock };
   let mockResourceFlowsExecutorService: { pressButton: jest.Mock };
   let mockSumUpService: { getIsEnabled: jest.Mock };
   let mockResourceActionGuard: { validateResourceAction: jest.Mock };
@@ -24,6 +24,8 @@ describe('AttractapSessionHandler – session + flow button', () => {
   let mockSupervisionService: { settleByCard: jest.Mock };
   let mockBillingService: { getResourceUsageCharge: jest.Mock; getConfiguration: jest.Mock };
 
+  const metering = { getLive: jest.fn() };
+  const operating = { getForResource: jest.fn() };
   const mockUser = { id: 1, username: 'testuser' };
 
   beforeEach(() => {
@@ -48,6 +50,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
     };
 
     mockResourceUsageService = {
+      getActiveSession: jest.fn().mockResolvedValue(null),
       startSession: jest.fn().mockResolvedValue({}),
       endSession: jest.fn().mockResolvedValue({ id: 99, userId: 1 }),
     };
@@ -77,6 +80,10 @@ describe('AttractapSessionHandler – session + flow button', () => {
       settleByCard: jest.fn(),
     };
 
+    (handler as any).meteringService = metering;
+    (handler as any).operatingAttributionService = operating;
+    metering.getLive.mockReset();
+    operating.getForResource.mockReset();
     (handler as any).usersService = mockUsersService;
     (handler as any).resourceUsageService = mockResourceUsageService;
     (handler as any).resourceFlowsExecutorService = mockResourceFlowsExecutorService;
@@ -500,6 +507,71 @@ describe('AttractapSessionHandler – session + flow button', () => {
           }),
         }),
       );
+    });
+  });
+  describe('live usage stats', () => {
+    const request = { payload: { resourceId: 10, requestId: 7 } } as any;
+    const startTime = new Date('2026-10-03T10:00:00Z');
+    beforeEach(() => {
+      mockResourceUsageService.getActiveSession.mockResolvedValue({ id: 99, userId: 1, startTime });
+      metering.getLive.mockResolvedValue({ session: { usageId: 99, latestKwh: '0.125' } });
+      operating.getForResource.mockResolvedValue({
+        operatingDataAvailable: true,
+        isOperating: true,
+        attributions: [
+          { usageId: 99, durationMs: 120000 },
+          { usageId: 98, durationMs: 80000 },
+        ],
+      });
+    });
+    it('returns energy and operating time attributed to the current usage', async () => {
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(operating.getForResource).toHaveBeenCalledWith(10, expect.any(Date), startTime);
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        new AttractapEvent(AttractapEventType.RESOURCE_USAGE_STATS, {
+          resourceId: 10,
+          requestId: 7,
+          usage: { id: 99, energyKwh: '0.125', operatingDurationMs: 120000, isOperating: true },
+        }),
+      );
+    });
+    it('keeps unavailable readings distinct from zero and discards a different meter session', async () => {
+      metering.getLive.mockResolvedValue({ session: { usageId: 100, latestKwh: '9' } });
+      operating.getForResource.mockResolvedValue({ operatingDataAvailable: false, attributions: [] });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toEqual({
+        id: 99,
+        energyKwh: null,
+        operatingDurationMs: null,
+        isOperating: null,
+      });
+    });
+    it.each([null, { id: 99, userId: 2, startTime }])(
+      'does not expose readings without an owned session (%p)',
+      async (usage) => {
+        mockResourceUsageService.getActiveSession.mockResolvedValue(usage);
+        await handler.handleResourceUsageStats(mockSocket as any, request);
+        expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toBeNull();
+        expect(metering.getLive).not.toHaveBeenCalled();
+      },
+    );
+    it('does not query when the reader/card guard rejects the request', async () => {
+      mockResourceActionGuard.validateResourceAction.mockResolvedValue(false);
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    });
+    it('discards results when the card changes during the lookup', async () => {
+      metering.getLive.mockImplementation(async () => {
+        mockSocket.state.lastAuthenticatedUserId = 2;
+        return { session: null };
+      });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+    });
+    it('clears readings when the data service fails without failing the reader session', async () => {
+      metering.getLive.mockRejectedValue(new Error('database unavailable'));
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toBeNull();
     });
   });
 });

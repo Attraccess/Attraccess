@@ -352,6 +352,10 @@ private:
     void handleFormPageNext(const API::FormPageSubmission &page);
     void handleFormPageBack();
     void handleFormsCancel();
+    void pollUsageStats();
+    uint32_t usageStatsResourceId = 0;
+    uint32_t usageStatsUsageId = 0;
+    uint32_t usageStatsRequestedAt = 0;
     void requestCurrentFormField();
     void advanceFormCursor();
     void retreatFormCursor();

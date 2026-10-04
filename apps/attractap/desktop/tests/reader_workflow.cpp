@@ -118,7 +118,16 @@ int main(int argc, char **argv) {
     auto click = [&](const char *text, bool popup = false) {
         auto *found = label(popup ? lv_layer_top() : lv_screen_active(), text);
         if (!found) throw std::runtime_error(std::string("Missing button: ") + text);
-        assert(!lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED));
+        // Screen transitions can leave controls disabled until their animation finishes.
+        const auto readyDeadline = millis() + 2000;
+        while (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED) &&
+               static_cast<int32_t>(readyDeadline - millis()) > 0) {
+            pump();
+            found = label(popup ? lv_layer_top() : lv_screen_active(), text);
+            if (!found) throw std::runtime_error(std::string("Button disappeared: ") + text);
+        }
+        if (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED))
+            throw std::runtime_error(std::string("Button stayed disabled: ") + text);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_PRESSED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_RELEASED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_CLICKED, nullptr);
@@ -148,7 +157,14 @@ int main(int argc, char **argv) {
             r["type"] = id == 3 ? "door" : "machine";
             r["isHealthy"] = true;
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
-            if (id == 1 && active) { r["activeUsageSession"]["user"]["username"] = username; r["activeUsageSession"]["startTime"] = "2026-09-22T07:00:00Z"; }
+            if (id == 1 && active) {
+                r["activeUsageSession"]["id"] = 99;
+                r["activeUsageSession"]["user"]["username"] = username;
+                char startTime[32];
+                const auto start = time(nullptr) - 1426;
+                std::strftime(startTime, sizeof(startTime), "%Y-%m-%dT%H:%M:%SZ", gmtime(&start));
+                r["activeUsageSession"]["startTime"] = startTime;
+            }
         }
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
         pump();
@@ -238,6 +254,32 @@ int main(int argc, char **argv) {
     assert(lv_obj_get_height(fullDescription) == 28);
     lv_area_t fullDescriptionBounds;
     lv_obj_get_coords(fullDescription, &fullDescriptionBounds);
+    assert(server.count("RESOURCE_USAGE_STATS") == 1);
+    const auto statsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    assert(server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["resourceId"].as<uint32_t>() == 1);
+    auto stats = [&](uint32_t request, uint32_t usage, const char *values) {
+        server.push("RESOURCE_USAGE_STATS", "{\"resourceId\":1,\"requestId\":" + std::to_string(request) +
+            ",\"usage\":{\"id\":" + std::to_string(usage) + "," + values + "}}");
+        pump();
+    };
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    display.capture(output, "05c-usage-stats-waiting");
+    stats(statsRequest, 99, "\"energyKwh\":\"0.125\",\"operatingDurationMs\":123000,\"isOperating\":true");
+    assert(label(lv_screen_active(), "0.125 kWh"));
+    assert(label(lv_screen_active(), "00:02:03 · Läuft"));
+    display.capture(output, "05d-usage-stats-running");
+    // Replies for earlier requests or another usage cannot overwrite the displayed reading.
+    stats(statsRequest - 1, 99, "\"energyKwh\":\"9\"");
+    stats(statsRequest, 100, "\"energyKwh\":\"9\"");
+    assert(label(lv_screen_active(), "0.125 kWh"));
+    stats(statsRequest, 99, "\"energyKwh\":\"0\",\"operatingDurationMs\":0,\"isOperating\":false");
+    assert(label(lv_screen_active(), "0 kWh"));
+    assert(label(lv_screen_active(), "00:00:00 · Leerlauf"));
+    display.capture(output, "05e-usage-stats-idle");
+    stats(statsRequest, 99, "\"energyKwh\":null,\"operatingDurationMs\":null,\"isOperating\":null");
+    assert(label(lv_screen_active(), "Keine Daten"));
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(statsRequest, 99, "\"energyKwh\":\"0.125\",\"operatingDurationMs\":123000,\"isOperating\":true");
     display.capture(output, "05-details-running");
     const auto beforeMarquee = display.pixels;
     pump(1200);
@@ -247,6 +289,13 @@ int main(int argc, char **argv) {
         for (int x = fullDescriptionBounds.x1; x <= fullDescriptionBounds.x2; ++x)
             marqueeMoved |= beforeMarquee[y * 480 + x] != display.pixels[y * 480 + x];
     assert(marqueeMoved);
+    lv_obj_send_event(lv_screen_active(), LV_EVENT_PRESSED, nullptr);
+    const auto pollsBefore = server.count("RESOURCE_USAGE_STATS");
+    pump(10000);
+    assert(server.count("RESOURCE_USAGE_STATS") > pollsBefore);
+    const auto latestStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    stats(latestStatsRequest, 99, "\"energyKwh\":\"0.250\",\"operatingDurationMs\":130000,\"isOperating\":false");
+    assert(label(lv_screen_active(), "0.250 kWh"));
     auto *backButton = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
     auto *logoutButton = lv_obj_get_parent(label(lv_screen_active(), "Abmelden"));
     assert(lv_obj_get_parent(backButton) == lv_obj_get_parent(logoutButton));

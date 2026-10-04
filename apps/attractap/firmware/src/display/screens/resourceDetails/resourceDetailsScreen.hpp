@@ -45,6 +45,7 @@ public:
     void destroy() override;
 
     void setResourceAndUsageDetails(const API::ResourceBrief &resource);
+    void setUsageStats(const API::UsageStats &stats);
     void setSessionTimeoutTime(uint32_t sessionTimeoutTime);
     void setSessionTimeoutPaused(bool paused);
     void extendSessionTimeoutBy(uint32_t ms);
@@ -193,6 +194,13 @@ private:
     std::function<void()> formPageBackCallback;
     std::function<void()> formsCancelCallback;
 
+    void updateUsageStatsDisplay();
+    lv_obj_t *usageStatsContainer = nullptr;
+    lv_obj_t *energyValue = nullptr;
+    lv_obj_t *operatingValue = nullptr;
+    API::UsageStats usageStats{};
+    bool usageStatsValid = false;
+    uint32_t usageStatsReceivedAt = 0;
     void updateElapsedTimeDisplay();
     lv_obj_t *elapsedTime = nullptr;
 

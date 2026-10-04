@@ -312,7 +312,7 @@ describe('ResourceListService', () => {
       const startTime = new Date('2026-06-04T10:00:00.000Z');
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
       resourceUsageService.getActiveSessions.mockResolvedValue(
-        new Map([[10, { user: { username: 'active-user' }, startTime }]]),
+        new Map([[10, { id: 99, user: { username: 'active-user' }, startTime }]]),
       );
       resourceMaintenanceService.getActiveMaintenanceResourceIds.mockResolvedValue(new Set([10]));
       resourceFlowsService.getNodesForResources.mockResolvedValue(
@@ -353,6 +353,7 @@ describe('ResourceListService', () => {
                   isHealthy: true,
                   healthReason: '',
                   activeUsageSession: {
+                    id: 99,
                     user: { username: 'active-user' },
                     startTime: startTime.toISOString(),
                     startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),

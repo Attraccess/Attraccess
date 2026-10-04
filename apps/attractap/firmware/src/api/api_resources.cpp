@@ -122,6 +122,7 @@ void API::onResourceList(JsonObject data)
         if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
         {
             dst.hasActiveUsage = true;
+            dst.activeUsageId = aus["id"] | 0u;
             const char *username = aus["user"]["username"].as<const char *>();
             strlcpy(dst.activeUser, username ? username : "", sizeof(dst.activeUser));
             const char *startIso = aus["startTime"].as<const char *>();
@@ -274,4 +275,35 @@ void API::unlatchDoor(uint32_t resourceId)
 void API::setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback)
 {
     this->ledBrightnessChangedCallback = callback;
+}
+
+void API::requestUsageStats(uint32_t resourceId)
+{
+    JsonDocument doc;
+    auto payload = doc.to<JsonObject>();
+    usageStatsRequestId = ++nextRequestId;
+    payload["requestId"] = usageStatsRequestId.load();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("RESOURCE_USAGE_STATS", payload);
+}
+
+void API::setUsageStatsCallback(std::function<void(const UsageStats &)> callback)
+{
+    usageStatsCallback = std::move(callback);
+}
+
+void API::onUsageStats(JsonObject data)
+{
+    auto payload = data["payload"].as<JsonObject>();
+    if (!usageStatsCallback || (payload["requestId"] | 0u) != usageStatsRequestId.load()) return;
+    UsageStats stats;
+    stats.resourceId = payload["resourceId"] | 0u;
+    auto usage = payload["usage"].as<JsonObject>();
+    stats.usageId = usage["id"] | 0u;
+    if (usage["operatingDurationMs"].is<int64_t>() && usage["operatingDurationMs"].as<int64_t>() >= 0)
+        stats.operatingDurationMs = usage["operatingDurationMs"].as<int64_t>();
+    if (usage["isOperating"].is<bool>()) stats.isOperating = usage["isOperating"].as<bool>() ? 1 : 0;
+    const char *energy = usage["energyKwh"].as<const char *>();
+    if (energy) stats.energyKwh = energy;
+    usageStatsCallback(stats);
 }

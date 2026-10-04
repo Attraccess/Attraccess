@@ -28,6 +28,12 @@ While the reader processes an action, the controls are temporarily unavailable. 
 
 To record machine usage against a project, tap the machine's name to open its details, tap **Projekt wählen** (Choose project), and select your project before starting there. Starting directly from the list records the usage without a project.
 
+## View live usage stats
+
+While signed in, tap the name of the machine you are using. Its details show the session duration and an **Aktuelle Nutzung** (Current usage) panel with consumed energy in **kWh**, machine operating time, and running or idle status. Readings refresh every 10 seconds while you view the details.
+
+Energy readings require configured metering; operating time requires operating-state tracking. **Warte auf Messwert** means no current energy reading is available, and **Keine Daten** means operating-time data is unavailable. Missing readings are not counted as zero. Stats disappear when your usage ends or you sign out.
+
 ## Stop a machine
 
 1. If you have been signed out, scan your card again.

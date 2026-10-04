@@ -28,6 +28,12 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
 
+## Live-Statistiken ansehen
+
+Tippen Sie nach der Anmeldung auf den Namen der Maschine, die Sie gerade nutzen. Die Details zeigen die Sitzungsdauer sowie **Aktuelle Nutzung** mit dem Energieverbrauch in **kWh**, der Betriebszeit und dem Status „Läuft“ oder „Leerlauf“. Die Messwerte werden alle 10 Sekunden aktualisiert, solange Sie die Details ansehen.
+
+Energiewerte benötigen eine eingerichtete Verbrauchsmessung; die Betriebszeit benötigt die Erfassung des Betriebszustands. **Warte auf Messwert** bedeutet, dass kein aktueller Energiewert vorliegt. **Keine Daten** bedeutet, dass keine Betriebszeitdaten verfügbar sind. Fehlende Messwerte werden nicht als null gezählt. Die Statistiken verschwinden, sobald Sie die Nutzung beenden oder sich abmelden.
+
 ## Die Nutzung einer Maschine beenden
 
 1. Falls Sie inzwischen abgemeldet wurden, halten Sie Ihre Karte erneut an den Leser.
