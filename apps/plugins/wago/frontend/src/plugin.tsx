@@ -1,5 +1,4 @@
 import './styles.css';
-import { CpuIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
@@ -16,6 +15,7 @@ import {
   type ResourceSlotContext,
 } from '@attraccess/plugins-frontend-sdk';
 import { ResourceDiagnostics } from './ResourceDiagnostics';
+import { WagoLogoIcon } from './WagoLogoIcon';
 
 export default class WagoPlugin implements AttraccessFrontendPlugin {
   pluginStore!: PluginStore;
@@ -86,6 +86,6 @@ export default class WagoPlugin implements AttraccessFrontendPlugin {
   }
 
   getSidebarItems(): PluginSidebarItem[] {
-    return [{ label: 'WAGO', path: '/wago', group: 'devices', icon: <CpuIcon className="wg:w-5 wg:h-5" /> }];
+    return [{ label: 'WAGO', path: '/wago', group: 'devices', icon: <WagoLogoIcon /> }];
   }
 }
