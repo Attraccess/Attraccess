@@ -119,7 +119,8 @@ export function OnboardCard({
                   >
                     <Settings2 className="wg:absolute wg:top-3 wg:right-3 wg:size-4" />
                   </Button>
-                  <div className="wg:pointer-events-none wg:flex wg:items-center wg:justify-between wg:gap-2 wg:pr-7">
+                  {/* Position content above the full-card button's hover background. */}
+                  <div className="wg:pointer-events-none wg:relative wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-2 wg:pr-7">
                     <span className="wg:text-xs wg:font-semibold">{terminal.label}</span>
                     {appliedName && (
                       <div className="wg:pointer-events-auto wg:relative">
@@ -127,8 +128,10 @@ export function OnboardCard({
                       </div>
                     )}
                   </div>
-                  <p className="wg:pointer-events-none wg:break-words wg:font-medium">{name || t('panel.unused')}</p>
-                  <p className="wg:pointer-events-none wg:mt-auto wg:text-xs wg:text-muted">
+                  <p className="wg:pointer-events-none wg:relative wg:break-words wg:font-medium">
+                    {name || t('panel.unused')}
+                  </p>
+                  <p className="wg:pointer-events-none wg:relative wg:mt-auto wg:text-xs wg:text-muted">
                     {outputBehavior(applied || channel || { capabilities: [] }) === 'pulsed'
                       ? t('panel.pulseSummary', {
                           seconds: new Intl.NumberFormat(language).format(
