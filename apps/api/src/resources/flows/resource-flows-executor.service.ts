@@ -38,6 +38,7 @@ import { randomBytes } from 'crypto';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { compileFlowTemplate } from './flow-template';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
+import { activeUsageSql } from '../usage/active-usage';
 import z from 'zod';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -937,8 +938,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         .innerJoin(
           ResourceUsage,
           'usage',
-          'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
-          { usageAction: ResourceUsageAction.Usage },
+          `usage.resourceId = node.resourceId AND ${activeUsageSql('usage')}`,
         )
         .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
         .distinct(true)
@@ -1073,7 +1073,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
-    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId, false);
+    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId);
 
     if (
       !executingUserId ||

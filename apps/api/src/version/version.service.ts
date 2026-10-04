@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Repository, IsNull, MoreThan } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
+import { activeUsageWhere } from '../resources/usage/active-usage';
 import axios, { AxiosInstance } from 'axios';
 import * as semver from 'semver';
 import { User, Resource, Project, ResourceUsage, Session } from '@attraccess/database-entities';
@@ -68,7 +69,7 @@ export class VersionService {
         this.userRepository.count(),
         this.resourceRepository.count(),
         this.projectRepository.count(),
-        this.resourceUsageRepository.count({ where: { endTime: IsNull(), lifecyclePending: false } }),
+        this.resourceUsageRepository.count({ where: activeUsageWhere() }),
         this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
       ]);
 

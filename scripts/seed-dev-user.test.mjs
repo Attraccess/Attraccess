@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import sqlite3 from 'sqlite3';
@@ -30,12 +30,79 @@ async function database() {
     CREATE TABLE resource_group (id INTEGER PRIMARY KEY, name TEXT UNIQUE, description TEXT);
     CREATE TABLE resource (id INTEGER PRIMARY KEY, name TEXT, type TEXT, description TEXT, deletedAt TEXT);
     CREATE TABLE resource_groups_resource_group (resourceId INTEGER, resourceGroupId INTEGER, UNIQUE(resourceId, resourceGroupId));
+    CREATE TABLE resource_usage (id INTEGER PRIMARY KEY, resourceId INTEGER, userId INTEGER, usageAction TEXT,
+      startTime TEXT, startNotes TEXT, endTime TEXT, isFinalized INTEGER DEFAULT 0, lifecyclePending INTEGER DEFAULT 0);
+    CREATE TABLE resource_usage_lifecycle_attempt (id TEXT PRIMARY KEY, resourceId INTEGER, candidateUsageId INTEGER);
     INSERT INTO role VALUES (1, 'administrator', 'Admin', '', 1, 0);
     INSERT INTO permission VALUES ('resources.read');
   `,
   );
   return { directory, file, db };
 }
+
+test('rolls back a seed when legacy usage corruption is detected', async () => {
+  const { directory, file, db } = await database();
+  try {
+    await execute(
+      db,
+      `INSERT INTO resource_usage (id, resourceId, userId, usageAction, startTime)
+      VALUES (1, 1, 1, 'usage', datetime('now'))`,
+    );
+    const result = spawnSync(process.execPath, [script, '--db', file, '--allow-external-db'], { encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Invalid usage lifecycle state after seed\/import: orphans=1/);
+    assert.deepEqual(await rows(db, 'SELECT * FROM user'), []);
+    assert.equal((await rows(db, 'SELECT * FROM resource_usage')).length, 1);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('accepts published sessions and pending candidates with a matching reservation', async () => {
+  const { directory, file, db } = await database();
+  try {
+    await execute(
+      db,
+      `INSERT INTO resource_usage (id, resourceId, userId, usageAction, startTime, isFinalized, lifecyclePending)
+      VALUES (1, 1, 1, 'usage', datetime('now'), 1, 0), (2, 1, 1, 'usage', datetime('now'), 0, 1);
+      INSERT INTO resource_usage_lifecycle_attempt VALUES ('takeover', 1, 2)`,
+    );
+    run(file);
+    assert.equal((await rows(db, 'SELECT * FROM resource_usage')).length, 2);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('the flyer seed publishes a valid demo session and its post-seed check rolls back corruption', async () => {
+  const { directory, db } = await database();
+  try {
+    // Execute the actual usage insert and transaction guard from the SQL seed.
+    const seed = readFileSync('scripts/seed-demo-flyer.sql', 'utf8');
+    const usageInsert = seed.match(/INSERT INTO resource_usage[\s\S]*?;/)[0];
+    const integrityCheck = seed.slice(seed.indexOf('CREATE TEMP TABLE usage_seed_integrity'), seed.indexOf('COMMIT;'));
+    await execute(db, `BEGIN; ${usageInsert} ${integrityCheck} COMMIT;`);
+    const [session] = await rows(db, 'SELECT * FROM resource_usage');
+    assert.equal(session.isFinalized, 1);
+    assert.equal(session.lifecyclePending, 0);
+    assert.equal(session.endTime, null);
+    await assert.rejects(
+      execute(
+        db,
+        `BEGIN;
+      INSERT INTO resource_usage (resourceId, userId, usageAction, startTime) VALUES (2, 1, 'usage', datetime('now'));
+      ${integrityCheck}`,
+      ),
+      /Seed left invalid usage lifecycle state/,
+    );
+    assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage'), [session]);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 function run(file, args = []) {
   return execFileSync(

@@ -373,6 +373,7 @@ describe('ResourceUsageService', () => {
           );
         }
         if (entity === ResourceUsage) {
+          if (opts.where.lifecyclePending && !opts.where.userId) return null; // Reservation gate.
           return resourceUsageRepository.findOne(opts as never);
         }
         if (entity === Resource) {
@@ -1224,7 +1225,7 @@ describe('ResourceUsageService', () => {
       const mockActiveSession = { id: 1, resourceId: 1, userId: 1, user: { id: 1 } as User } as ResourceUsage;
       resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
 
-      const result = await service.getActiveSession(1, true);
+      const result = await service.getActiveSession(1);
 
       expect(result).toBe(mockActiveSession);
       expect(resourceUsageRepository.findOne).toHaveBeenCalledWith({
@@ -1233,7 +1234,9 @@ describe('ResourceUsageService', () => {
           endTime: IsNull(),
           isFinalized: true,
           lifecyclePending: false,
+          usageAction: ResourceUsageAction.Usage,
         },
+        order: { startTime: 'DESC', id: 'DESC' },
         relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
       });
     });
@@ -1241,7 +1244,7 @@ describe('ResourceUsageService', () => {
     it('should return null when no active session exists', async () => {
       resourceUsageRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.getActiveSession(1, true);
+      const result = await service.getActiveSession(1);
 
       expect(result).toBeNull();
     });

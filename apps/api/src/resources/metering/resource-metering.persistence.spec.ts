@@ -755,7 +755,7 @@ describe('Flow-defined energy metering', () => {
           throw new Error('meter did not answer');
         };
         await expect(start(users[1], { forceTakeOver: true })).rejects.toBeInstanceOf(BadRequestException);
-        expect((await usage.getActiveSession(1, true))?.id).toBe(first.id);
+        expect((await usage.getActiveSession(1))?.id).toBe(first.id);
         expect((await sessionOf(first.id)).compromisedReason).toMatch(/re-initialized by a takeover/);
 
         onStart = ready;

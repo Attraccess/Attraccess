@@ -50,8 +50,8 @@ INSERT INTO resource_groups_resource_group (resourceId, resourceGroupId) VALUES
  (7,4);                      -- Elektroniklabor
 
 -- ---------- BELEGT: active usage session on the Lasercutter ----------
-INSERT INTO resource_usage (resourceId, userId, startTime, startNotes, usageAction, isFinalized)
-VALUES (3, 4, datetime('now','-26 minutes'), 'Acrylglas-Gehäuse, 3 mm', 'usage', 0);
+INSERT INTO resource_usage (resourceId, userId, startTime, startNotes, usageAction, isFinalized, lifecyclePending)
+VALUES (3, 4, datetime('now','-26 minutes'), 'Acrylglas-Gehäuse, 3 mm', 'usage', 1, 0);
 
 -- ---------- GESPERRT: active maintenance on the CNC-Fräse ----------
 INSERT INTO resource_maintenance (createdAt, updatedAt, startTime, endTime, reason, resourceId, createdByUserId)
@@ -110,5 +110,18 @@ INSERT INTO resource_billing_configuration (resourceId, creditsPerUsage, credits
  (4, 30, 4, datetime('now','-100 days'), datetime('now','-10 days')),
  (8, 20, 2, datetime('now','-90 days'),  datetime('now','-10 days'));
 
+-- Roll back the entire seed if usage state is corrupt, even on a legacy DB without the guards.
+CREATE TEMP TABLE usage_seed_integrity (valid integer NOT NULL);
+CREATE TEMP TRIGGER usage_seed_integrity_check BEFORE INSERT ON usage_seed_integrity
+WHEN NEW.valid = 0 BEGIN SELECT RAISE(ROLLBACK, 'Seed left invalid usage lifecycle state'); END;
+INSERT INTO usage_seed_integrity SELECT CASE WHEN
+  EXISTS (SELECT 1 FROM resource_usage WHERE endTime IS NULL AND isFinalized = 0 AND lifecyclePending = 0)
+  OR EXISTS (SELECT resourceId FROM resource_usage
+    WHERE usageAction = 'usage' AND endTime IS NULL AND isFinalized = 1 AND lifecyclePending = 0
+    GROUP BY resourceId HAVING COUNT(*) > 1)
+  OR EXISTS (SELECT 1 FROM resource_usage u WHERE u.lifecyclePending = 1 AND NOT EXISTS (
+    SELECT 1 FROM resource_usage_lifecycle_attempt a WHERE a.resourceId = u.resourceId AND a.candidateUsageId = u.id))
+  THEN 0 ELSE 1 END;
+DROP TABLE usage_seed_integrity;
 COMMIT;
 PRAGMA foreign_keys = ON;

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import axios from 'axios';
-import { User, Resource, Project, ResourceUsage, Session } from '@attraccess/database-entities';
+import { User, Resource, Project, ResourceUsage, ResourceUsageAction, Session } from '@attraccess/database-entities';
 import { GithubReleaseApiResponse, VersionService } from './version.service';
 import { IsNull } from 'typeorm';
 
@@ -101,7 +101,7 @@ describe('VersionService', () => {
       expect(result.projectsTotal).toBe(3);
       expect(result.activeResourceUsageSessions).toBe(2);
       expect(usageRepository.count).toHaveBeenCalledWith({
-        where: { endTime: IsNull(), lifecyclePending: false },
+        where: { endTime: IsNull(), lifecyclePending: false, isFinalized: true, usageAction: ResourceUsageAction.Usage },
       });
       expect(result.activeAuthSessions).toBe(7);
     });

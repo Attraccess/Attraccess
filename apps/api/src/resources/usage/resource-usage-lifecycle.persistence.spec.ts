@@ -5,6 +5,7 @@ import {
   BillingTransactionItem,
   BillingTransactionStatus,
   FormSubmission,
+  Form,
   Project,
   Resource,
   ResourceFormAction,
@@ -26,6 +27,9 @@ import { ResourceOperatingAttributionService } from '../operating-intervals/reso
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
 import { closeResourceTransactionConnection } from '../../database/run-serialized-transaction';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
+import { recoverOrphanedUsages, USAGE_RECOVERY_TABLE_SQL } from '../../database/resource-usage-integrity';
+import { ResourceUsageIntegrity1790100000000 } from '../../database/migrations/1790100000000-resource-usage-integrity';
+import { ResourceInUseError } from './errors/resource-in-use.error';
 
 // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
 const schemas = [
@@ -73,6 +77,13 @@ const schemas = [
       startNotes: { type: String, nullable: true },
       endTime: { type: 'datetime', nullable: true },
       endNotes: { type: String, nullable: true },
+      usageInMinutes: {
+        type: Number,
+        generatedType: 'STORED',
+        insert: false,
+        update: false,
+        asExpression: `CASE WHEN endTime IS NULL THEN -1 ELSE (julianday(endTime) - julianday(startTime)) * 1440 END`,
+      },
       isFinalized: { type: Boolean, default: false },
       lifecyclePending: { type: Boolean, default: false },
       supervisorUserId: { type: Number, nullable: true },
@@ -89,6 +100,7 @@ const schemas = [
       supervisorUser: { type: 'many-to-one', target: 'User', joinColumn: { name: 'supervisorUserId' } },
       project: { type: 'many-to-one', target: 'Project', joinColumn: { name: 'projectId' } },
       billingTransaction: { type: 'one-to-one', target: 'BillingTransaction', inverseSide: 'resourceUsage' },
+      formSubmissions: { type: 'one-to-many', target: 'FormSubmission', inverseSide: 'resourceUsage' },
     },
   }),
   new EntitySchema<BillingTransaction>({
@@ -132,6 +144,17 @@ const schemas = [
       action: { type: String },
       data: { type: 'simple-json' },
     },
+    relations: {
+      resourceUsage: { type: 'many-to-one', target: 'ResourceUsage', joinColumn: { name: 'resourceUsageId' } },
+      form: { type: 'many-to-one', target: 'Form', joinColumn: { name: 'formId' } },
+      user: { type: 'many-to-one', target: 'User', joinColumn: { name: 'userId' } },
+    },
+  }),
+  new EntitySchema<Form>({
+    name: 'Form',
+    target: Form,
+    tableName: 'form',
+    columns: { id: { type: Number, primary: true }, name: { type: String } },
   }),
   new EntitySchema<ResourceUsageLifecycleAttempt>({
     name: 'ResourceUsageLifecycleAttempt',
@@ -173,6 +196,7 @@ describe('Usage lifecycle persistence around external flows', () => {
   let usage: ResourceUsageService;
   let operating: ResourceOperatingIntervalService;
   let users: User[];
+  let events: EventEmitter2;
   let flow: { runFlow: jest.Mock; trackResourceActivity: jest.Mock };
   let billing: {
     getResourceBillingConfiguration: jest.Mock;
@@ -201,6 +225,7 @@ describe('Usage lifecycle persistence around external flows', () => {
       synchronize: true,
       entities: schemas,
     }).initialize();
+    await source.query(USAGE_RECOVERY_TABLE_SQL);
     await source.getRepository(Resource).save({
       id: 1,
       name: 'Machine',
@@ -213,7 +238,8 @@ describe('Usage lifecycle persistence around external flows', () => {
       { id: 2, username: 'next-user' },
     ]);
     users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(['resources.update']) }));
-    const events = new EventEmitter2();
+    await source.getRepository(Form).save({ id: 11, name: 'Safety checklist' });
+    events = new EventEmitter2();
     operating = new ResourceOperatingIntervalService(
       source.getRepository(ResourceOperatingInterval),
       {
@@ -341,9 +367,250 @@ describe('Usage lifecycle persistence around external flows', () => {
     };
   }
 
+  async function migrateIntegrity() {
+    const runner = source.createQueryRunner();
+    try {
+      await runner.startTransaction();
+      await new ResourceUsageIntegrity1790100000000().up(runner);
+      await runner.commitTransaction();
+    } catch (error) {
+      await runner.rollbackTransaction();
+      throw error;
+    } finally {
+      await runner.release();
+    }
+  }
+
+  it.each([false, true])(
+    'recovers a legacy orphan on restart without losing forms or changing billing (bill=%s)',
+    async (hasBill) => {
+      await source.getRepository(Resource).update(1, { allowTakeOver: false });
+      const orphan = await source.getRepository(ResourceUsage).save({
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date('2026-09-23T14:00:40Z'),
+        endTime: null,
+        isFinalized: false,
+        lifecyclePending: false,
+        startNotes: 'DEMO: ongoing laboratory run',
+        endNotes: 'Original note',
+        attributedOperatingDurationInMinutes: 17,
+      });
+      await source.getRepository(FormSubmission).save({
+        formId: 11,
+        resourceUsageId: orphan.id,
+        userId: 1,
+        action: ResourceFormAction.START,
+        data: { answer: 'kept' },
+      });
+      if (hasBill)
+        await source.getRepository(BillingTransaction).save({
+          resourceUsageId: orphan.id,
+          userId: 1,
+          amount: 7,
+          status: BillingTransactionStatus.Completed,
+        });
+      const before = await publishedState();
+      const emitted = jest.spyOn(events, 'emit');
+      expect((await usage.getResourceUsageHistory(1)).data.map((row) => row.id)).toEqual([orphan.id]);
+      expect(await usage.getActiveSession(1)).toBeNull();
+      expect((await usage.getActiveSessions([1])).get(1)).toBeNull();
+      await expect(usage.endSession(1, users[0], {})).rejects.toThrow('No active session found');
+
+      await usage.onModuleInit();
+      const after = await publishedState();
+      expect(after.sessions).toEqual([
+        expect.objectContaining({
+          id: orphan.id,
+          startTime: orphan.startTime,
+          endTime: orphan.startTime,
+          startNotes: orphan.startNotes,
+          isFinalized: false,
+          lifecyclePending: false,
+          usageInMinutes: 0,
+          attributedOperatingDurationInMinutes: 0,
+          endNotes: expect.stringContaining('Original note\n[Recovery: cancelled orphan'),
+        }),
+      ]);
+      expect(after.submissions).toEqual(before.submissions);
+      expect(after.transactions).toEqual(before.transactions);
+      expect(after.users).toEqual(before.users);
+      const journal = await source.query('SELECT * FROM resource_usage_recovery');
+      expect(journal).toEqual([
+        expect.objectContaining({
+          usageId: orphan.id,
+          resourceId: 1,
+          userId: 1,
+          originalEndNotes: 'Original note',
+          originalAttributedOperatingDurationInMinutes: 17,
+          reason: 'cancelled_orphan_unfinalized_session',
+        }),
+      ]);
+      await usage.recoverInterruptedLifecycles();
+      expect(await publishedState()).toEqual(after);
+      expect(await source.query('SELECT * FROM resource_usage_recovery')).toEqual(journal);
+      expect(emitted).not.toHaveBeenCalled();
+      expect(flow.runFlow).not.toHaveBeenCalled();
+      expect(billing.chargeForResourceUsage).not.toHaveBeenCalled();
+      expect(billing.handleResourceUsageStart).not.toHaveBeenCalled();
+      expect(billing.notifyResourceUsageCharge).not.toHaveBeenCalled();
+      expect((await usage.getResourceUsageHistory(1)).data[0].formSubmissions).toHaveLength(1);
+      const started = await usage.startSession(1, users[1], {});
+      expect((await usage.getActiveSession(1))?.id).toBe(started.id);
+      expect((await usage.getActiveSessions([1])).get(1)?.id).toBe(started.id);
+    },
+  );
+
+  it('reconciles legacy orphans before enforcing open-state and occupancy constraints', async () => {
+    const orphan = await source.getRepository(ResourceUsage).save({
+      resourceId: 1,
+      userId: 1,
+      startTime: new Date(),
+      isFinalized: false,
+      lifecyclePending: false,
+    });
+    await migrateIntegrity();
+    expect(await source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toMatchObject({
+      endTime: orphan.startTime,
+      isFinalized: false,
+      usageInMinutes: 0,
+    });
+    await expect(
+      source.getRepository(ResourceUsage).save({
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(),
+      }),
+    ).rejects.toThrow('Open usage must be finalized or lifecycle-pending');
+    await expect(source.getRepository(ResourceUsage).update(orphan.id, { endTime: null })).rejects.toThrow(
+      'Open usage must be finalized or lifecycle-pending',
+    );
+    const active = await seedActiveSession();
+    await expect(seedActiveSession()).rejects.toThrow('Resource already has an active usage session');
+    const candidate = await source.getRepository(ResourceUsage).save({
+      resourceId: 1,
+      userId: 2,
+      startTime: new Date(),
+      lifecyclePending: true,
+      isFinalized: false,
+    });
+    await expect(
+      source.getRepository(ResourceUsage).update(candidate.id, {
+        isFinalized: true,
+        lifecyclePending: false,
+      }),
+    ).rejects.toThrow('Resource already has an active usage session');
+    await expect(
+      source.getRepository(ResourceUsage).save({
+        resourceId: 1,
+        userId: 2,
+        startTime: new Date(),
+        lifecyclePending: true,
+      }),
+    ).rejects.toThrow('UNIQUE constraint');
+    await expect(usage.startSession(1, users[1], {})).rejects.toThrow(
+      'A usage lifecycle operation is already in progress',
+    );
+    await expect(usage.endSession(1, users[0], {})).rejects.toThrow(
+      'A usage lifecycle operation is already in progress',
+    );
+    expect((await usage.getActiveSession(1))?.id).toBe(active.id);
+    expect((await usage.getActiveSessions([1])).get(1)?.id).toBe(active.id);
+    await source.getRepository(ResourceUsage).delete(candidate.id);
+    await usage.recoverInterruptedLifecycles();
+    await expect(usage.startSession(1, users[1], {})).rejects.toBeInstanceOf(ResourceInUseError);
+    expect(flow.runFlow).not.toHaveBeenCalled();
+    expect(await source.query('PRAGMA foreign_key_check')).toEqual([]);
+    expect(await source.query('PRAGMA integrity_check')).toEqual([{ integrity_check: 'ok' }]);
+  });
+
+  it('retains duplicate legacy real sessions and resolves them consistently without cancelling or charging them', async () => {
+    const first = await seedActiveSession();
+    const second = await seedActiveSession();
+    const before = await publishedState();
+    await migrateIntegrity();
+    await usage.recoverInterruptedLifecycles();
+    expect(await publishedState()).toEqual(before);
+    expect((await usage.getActiveSession(1))?.id).toBe(second.id);
+    expect((await usage.getActiveSessions([1])).get(1)?.id).toBe(second.id);
+    await expect(seedActiveSession()).rejects.toThrow('Resource already has an active usage session');
+    await usage.endSession(1, users[0], {});
+    expect((await usage.getActiveSession(1))?.id).toBe(first.id);
+    expect((await usage.getActiveSessions([1])).get(1)?.id).toBe(first.id);
+    expect(await source.query('SELECT * FROM resource_usage_recovery')).toEqual([]);
+  });
+
+  it('keeps valid in-flight start reservations protected and never quarantines them', async () => {
+    await migrateIntegrity();
+    let enteredFlow!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enteredFlow = resolve;
+    });
+    let releaseFlow!: () => void;
+    const released = new Promise<void>((resolve) => {
+      releaseFlow = resolve;
+    });
+    flow.runFlow.mockImplementation(async () => {
+      enteredFlow();
+      await released;
+    });
+    const start = usage.startSession(1, users[0], {});
+    await entered;
+    try {
+      expect(await usage.getActiveSession(1)).toBeNull();
+      expect((await usage.getActiveSessions([1])).get(1)).toBeNull();
+      expect((await usage.getResourceUsageHistory(1)).total).toBe(0);
+      await expect(usage.startSession(1, users[1], { forceTakeOver: true })).rejects.toThrow(
+        'A usage lifecycle operation is already in progress',
+      );
+      await expect(usage.endSession(1, users[0], {})).rejects.toThrow(
+        'A usage lifecycle operation is already in progress',
+      );
+      expect(await source.transaction((manager) => recoverOrphanedUsages(manager))).toBe(0);
+      expect(await source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(1);
+      expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(1);
+    } finally {
+      releaseFlow();
+    }
+    const session = await start;
+    expect((await usage.getActiveSession(1))?.id).toBe(session.id);
+    expect(flow.runFlow).toHaveBeenCalledTimes(1);
+    expect(billing.handleResourceUsageStart).toHaveBeenCalledTimes(1);
+    expect(await source.query('SELECT * FROM resource_usage_recovery')).toEqual([]);
+  });
+
+  it('never repairs history without its audit journal and retains evidence on downgrade', async () => {
+    const orphan = await source.getRepository(ResourceUsage).save({
+      resourceId: 1,
+      userId: 1,
+      startTime: new Date(),
+      isFinalized: false,
+      lifecyclePending: false,
+    });
+    await source.query(`CREATE TRIGGER reject_recovery_audit BEFORE INSERT ON resource_usage_recovery
+      BEGIN SELECT RAISE(ABORT, 'journal unavailable'); END`);
+    await expect(usage.recoverInterruptedLifecycles()).rejects.toThrow('journal unavailable');
+    expect(await source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toEqual(orphan);
+    await source.query('DROP TRIGGER reject_recovery_audit');
+    await migrateIntegrity();
+    const journal = await source.query('SELECT * FROM resource_usage_recovery');
+    const runner = source.createQueryRunner();
+    try {
+      await new ResourceUsageIntegrity1790100000000().down(runner);
+    } finally {
+      await runner.release();
+    }
+    expect(await source.query('SELECT * FROM resource_usage_recovery')).toEqual(journal);
+    expect(await source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toMatchObject({
+      endTime: orphan.startTime,
+      isFinalized: false,
+    });
+  });
+
   it.each([false, true])(
     'preserves the complete price contract through a start flow (takeover=%s)',
     async (takeover) => {
+      await migrateIntegrity();
       if (takeover) await seedActiveSession();
       const starter = users[1];
       await source.getRepository(User).update(starter.id, { billingFactor: 50 });
@@ -416,7 +683,7 @@ describe('Usage lifecycle persistence around external flows', () => {
         expect(
           await source.getRepository(ResourceUsage).findOneByOrFail({ id: attempt.candidateUsageId }),
         ).toMatchObject({ lifecyclePending: true, isFinalized: false });
-        expect((await usage.getActiveSession(resourceId, false))?.id ?? null).toBe(attempt.previousUsageId);
+        expect((await usage.getActiveSession(resourceId))?.id ?? null).toBe(attempt.previousUsageId);
       }
       await operating.transition(resourceId, 'operating', {
         flowNodeId: 'observed-operation',
@@ -448,6 +715,7 @@ describe('Usage lifecycle persistence around external flows', () => {
   }
 
   it('aborts a failed start without publishing its candidate, forms, or bill and keeps accepted operation', async () => {
+    await migrateIntegrity();
     const before = await publishedState();
     failAfterObservation();
 
@@ -473,6 +741,7 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('keeps the outgoing session intact and removes the candidate after a failed takeover', async () => {
+    await migrateIntegrity();
     await seedActiveSession();
     const before = await publishedState();
     failAfterObservation();
@@ -634,6 +903,7 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('aborts an abandoned takeover at startup without replaying flows or discarding accepted operation', async () => {
+    await migrateIntegrity();
     const previous = await seedActiveSession();
     const before = await publishedState();
     const candidate = await source.getRepository(ResourceUsage).save({
@@ -663,5 +933,8 @@ describe('Usage lifecycle persistence around external flows', () => {
     expect(await publishedState()).toEqual(before);
     expect(flow.runFlow).not.toHaveBeenCalled();
     await expectObservationAndNoAttempt();
+    await usage.recoverInterruptedLifecycles();
+    expect(await publishedState()).toEqual(before);
+    expect(await source.query('SELECT * FROM resource_usage_recovery')).toEqual([]);
   });
 });
