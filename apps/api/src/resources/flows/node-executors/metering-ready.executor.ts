@@ -23,7 +23,6 @@ export class MeteringReadyExecutor implements NodeExecutor {
       baseline: baselineValue
         ? {
             value: baselineValue,
-            legacyEnergyUnit: data.legacyEnergyUnit === undefined ? undefined : (render(data.legacyEnergyUnit) ?? ''),
           }
         : undefined,
       source: render(data.source),

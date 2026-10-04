@@ -18,6 +18,5 @@
   "loadError": "Unable to load meters.",
   "rate": "{{name}} — {{currency}} per measured value",
   "rateHint": "0 disables billing. The rate is captured when a session starts.",
-  "perValue": "{{name}} — per measured value",
-  "legacy": "This migrated flow still converts its original energy unit to kWh."
+  "perValue": "{{name}} — per measured value"
 }

@@ -153,6 +153,14 @@ Fehlende Werte, leerer Text, boolesche Werte, `null`, Objekte, Arrays und nicht 
 
 Die Arithmetik verwendet JavaScript-Gleitkommazahlen. Dezimalrechnungen können Rundungsartefakte zeigen, etwa `{{add 0.1 0.2}}` mit dem Ergebnis `0.30000000000000004`. Wenn möglich, den ursprünglichen Dezimalwert oder eine numerische Zeichenkette direkt an **Zähler melden** übergeben und den Preis für diese Werte konfigurieren. Messung und Abrechnung verwenden exakte Berechnungen mit neun Nachkommastellen.
 
+### Exakte Skalierung und Wertzuordnungen
+
+`{{scaleDecimal payload.count "1/1000"}}` skaliert Dezimalwerte ohne Gleitkomma-Zwischenschritte. Der Faktor kann eine Dezimalzahl oder ein Bruch wie `"5/18"` sein. Das Ergebnis ist Text mit neun Nachkommastellen; bei genau halben Werten wird von null weg gerundet. Mit `precision=2` werden zwei Nachkommastellen verwendet (erlaubter Bereich: 0–18); `min=0` lehnt negative Eingaben vor dem Runden ab.
+
+`{{mapValue payload.kind '{"box":"12","bag":"3"}'}}` sucht einen Wert in einem JSON-Objekt. Leerzeichen an den Schlüsselrändern werden entfernt; `foldCase=true` prüft zuerst den exakten Schlüssel, dann seine Kleinschreibung. Fehlende Zuordnungen führen zu einem Knotenfehler. `{{scaleDecimal payload.count (mapValue payload.kind '{"box":"12","bag":"3"}')}}` rechnet beispielsweise Kisten oder Beutel in einzelne Stücke um.
+
+`{{render "{{#if ready}}{{count}}{{else}}0{{/if}}"}}` wertet eine Vorlagenzeichenkette mit der aktuellen Payload aus. Damit kann eine vollständige Vorlage als Operand einer weiteren Hilfsfunktion dienen. Diese Hilfen funktionieren in allen Vorlagenfeldern und enthalten keine eingebauten Einheitendefinitionen.
+
 ## Die Payload ändern
 
 **Payload setzen** erhält vorhandene Felder und schreibt die konfigurierten Einträge **Schlüssel → Wert**. Schlüssel sind feste Pfade; Werte sind Vorlagen. Mit dem MQTT-Beispiel:

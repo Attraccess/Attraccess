@@ -44,8 +44,10 @@ A billed cumulative meter must have a complete start and collection definition b
 
 ## Existing electricity setups
 
-Existing energy settings become a meter named **Energy (kWh)**. Historical bills and metering evidence are preserved. Migrated flow nodes retain their original unit conversion as a compatibility setting, so an existing Wh or joule source continues to produce kWh values. New meters and nodes use the values exactly as supplied; prepare any conversion in your source or flow.
+Existing energy settings become a meter named **Energy (kWh)**. Historical bills and metering evidence are preserved. The migration rewrites existing flow values and counter baselines into ordinary template conversions, so an existing Wh or joule source continues to produce kWh values. Metering itself receives only numeric values and has no energy-specific runtime path. New meters and nodes use the values exactly as supplied; prepare any conversion in your source or flow.
 
 Lifetime totals migrated from the old implementation contain the recorded session consumption. Earlier idle consumption was never recorded and cannot be reconstructed.
 
 The generic model fully replaces energy billing: legacy rates and exact bill quantities are migrated into meter snapshots and bill items, and the energy-specific database columns are removed. Historical transaction amounts and audit references remain unchanged. Rollback to the preceding generic-meter version preserves converted evidence. Returning to the energy-only model is rejected once it cannot preserve meter history; restore a pre-migration backup instead.
+
+Flow conversion expressions require the generic template helpers in this version. Downgrading past that migration is refused when those expressions would stop working; restore a pre-migration backup instead.

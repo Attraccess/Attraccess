@@ -153,6 +153,14 @@ Missing values, empty text, booleans, `null`, objects, arrays and nonnumeric str
 
 Arithmetic uses JavaScript floating-point numbers. Decimal calculations can show rounding artifacts, such as `{{add 0.1 0.2}}` producing `0.30000000000000004`. When possible, pass the original decimal value or numeric string directly to **Report Meter** and configure its rate for those values. Meter tracking and billing use exact arithmetic with nine decimal places.
 
+### Exact Scaling and Value Mappings
+
+Use `{{scaleDecimal payload.count "1/1000"}}` to scale decimal values without floating-point intermediates. The factor can be a decimal or a fraction, such as `"5/18"`. The result is text, rounded to nine decimal places, with half values rounded away from zero. Set `precision=2` for two decimal places (supported range: 0–18), or `min=0` to reject negative input before rounding.
+
+Use `{{mapValue payload.kind '{"box":"12","bag":"3"}'}}` to look up a value in a JSON object. Keys are trimmed; `foldCase=true` tries the exact key first, then its lowercase form. Missing mappings cause a node error. For example, `{{scaleDecimal payload.count (mapValue payload.kind '{"box":"12","bag":"3"}')}}` converts counts of boxes or bags to individual pieces.
+
+`{{render "{{#if ready}}{{count}}{{else}}0{{/if}}"}}` evaluates a template string against the current payload. It lets an existing complete template become an operand inside another helper. These helpers work in all template-enabled node settings and contain no built-in unit definitions.
+
 ## Changing the Payload
 
 **Set Payload** preserves existing fields and writes each configured **Key → Value** entry. Keys are literal paths; values are templates. With the MQTT example:

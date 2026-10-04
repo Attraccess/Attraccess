@@ -18,6 +18,5 @@
   "loadError": "Zähler konnten nicht geladen werden.",
   "rate": "{{name}} — {{currency}} pro Messwert",
   "rateHint": "0 deaktiviert die Abrechnung. Der Preis wird beim Sitzungsstart gespeichert.",
-  "perValue": "{{name}} — pro Messwert",
-  "legacy": "Dieser migrierte Flow rechnet die ursprüngliche Energieeinheit weiterhin in kWh um."
+  "perValue": "{{name}} — pro Messwert"
 }

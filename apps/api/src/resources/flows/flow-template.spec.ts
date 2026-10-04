@@ -89,4 +89,37 @@ describe('flow templates', () => {
     expect(Handlebars.helpers.add).toBeUndefined();
     expect(Handlebars.helpers.divide).toBeUndefined();
   });
+
+  it.each([
+    ['{{scaleDecimal value "1/1000"}}', '9007199254740993.123456789', '9007199254740.993123457'],
+    ['{{scaleDecimal value "1/9"}}', '1', '0.111111111'],
+    ['{{scaleDecimal value "1" precision=2}}', '-1.235', '-1.24'],
+  ])('scales decimal strings exactly (%s)', (template, value, expected) => {
+    expect(compileFlowTemplate(template, { value })).toBe(expected);
+  });
+
+  it('renders nested templates and maps user-defined values without interpreting units', () => {
+    expect(
+      compileFlowTemplate(
+        '{{scaleDecimal (render "{{#if ready}}{{count}}{{else}}0{{/if}}") (mapValue kind \'{"box":"12","bag":"3"}\' foldCase=true)}}',
+        {
+          ready: true,
+          count: '2',
+          kind: ' BOX ',
+        },
+      ),
+    ).toBe('24');
+    expect(() => compileFlowTemplate('{{mapValue kind \'{"box":"12"}\'}}', { kind: 'missing' })).toThrow('no mapping');
+  });
+
+  it.each(['{{scaleDecimal value "1/0"}}', '{{scaleDecimal value "bad"}}', '{{scaleDecimal value "1" precision=99}}'])(
+    'rejects invalid scaling (%s)',
+    (template) => {
+      expect(() => compileFlowTemplate(template, { value: '1' })).toThrow(FlowExecutionError);
+    },
+  );
+
+  it.each(['scaleDecimal', 'render', 'mapValue'])('preserves a bare payload field named %s', (field) => {
+    expect(compileFlowTemplate(`{{${field}}}`, { [field]: 'value' })).toBe('value');
+  });
 });

@@ -349,7 +349,6 @@ export const MeteringReadyNodeDataSchema = z.object({
     .meta({
       helpText: 'Current cumulative counter value (template). Leave empty if the start branch resets the counter.',
     }),
-  legacyEnergyUnit: z.string().optional(),
   source: z.string().optional(),
 });
 export const MeteringReportNodeDataSchema = z.object({
@@ -365,7 +364,6 @@ export const MeteringReportNodeDataSchema = z.object({
     .string()
     .min(1, 'Value is required')
     .meta({ helpText: 'Non-negative measured value (template). No unit or conversion is applied.' }),
-  legacyEnergyUnit: z.string().optional(),
   observedAt: z.string().optional(),
   source: z.string().optional(),
 });

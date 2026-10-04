@@ -335,7 +335,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const report = createNode({
       id: 'report',
       type: ResourceFlowNodeType.OUTPUT_METERING_REPORT,
-      data: { meterId: 1, value: '{{reading.wh}}', legacyEnergyUnit: 'Wh' },
+      data: { meterId: 1, value: '{{scaleDecimal reading.wh "1/1000"}}' },
     });
     nodesById = { start, ready, collect, report };
     edgesBySourceAndHandle = {
@@ -357,8 +357,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(complete).toHaveBeenLastCalledWith({
       kind: 'reading',
       mode: 'total',
-      value: '1500',
-      legacyEnergyUnit: 'Wh',
+      value: '1.5',
       observedAt: undefined,
       source: undefined,
     });

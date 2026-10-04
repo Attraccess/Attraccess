@@ -2,8 +2,6 @@ export class MeteringValueError extends Error {
   constructor(
     public readonly code:
       | 'invalid_value'
-      | 'unsupported_unit'
-      | 'power_is_not_energy'
       | 'counter_decreased'
       | 'stale_reading'
       | 'invalid_observation_time',

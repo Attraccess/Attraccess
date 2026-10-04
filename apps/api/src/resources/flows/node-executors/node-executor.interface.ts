@@ -10,12 +10,11 @@ export type FlowFailureKind =
   'transport-dispatch' | 'acknowledgement-timeout' | 'controller-rejection' | 'node-failure';
 
 export type MeteringReport =
-  | { kind: 'ready'; baseline?: { value: string; legacyEnergyUnit?: string }; source?: string }
+  | { kind: 'ready'; baseline?: { value: string }; source?: string }
   | {
       kind: 'reading';
       value: string;
       mode?: 'total' | 'increment';
-      legacyEnergyUnit?: string;
       observedAt?: string;
       source?: string;
     };

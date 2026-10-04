@@ -170,10 +170,8 @@ export function NodeEditor(props: Props) {
             {resolvedSchema.type.includes('.resource.metering.') && (
               <MeterSelector
                 resourceId={resourceId}
-                legacyConversion={!!data.legacyEnergyUnit}
                 value={typeof data.meterId === 'number' ? data.meterId : undefined}
                 onChange={(id) => {
-                  if (id !== data.meterId) onInputChange('legacyEnergyUnit', undefined);
                   onInputChange('meterId', id);
                 }}
               />
@@ -181,7 +179,7 @@ export function NodeEditor(props: Props) {
             {Object.entries((resolvedSchema.configSchema.properties ?? {}) as Record<string, Property<unknown>>)
               .filter(([name]) =>
                 !resolvedSchema.type.includes('.resource.metering.') ||
-                (name !== 'meterId' && name !== 'legacyEnergyUnit'),
+                name !== 'meterId',
               )
               .map(([propertyName, property]) => (
                 <PropertyInput

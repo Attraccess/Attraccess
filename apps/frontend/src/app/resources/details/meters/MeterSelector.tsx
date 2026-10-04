@@ -1,4 +1,4 @@
-import { Description, Label, ListBox, Select } from '@heroui/react';
+import { Label, ListBox, Select } from '@heroui/react';
 import { useResourceMeteringServiceListResourceMeters } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -10,12 +10,10 @@ export function MeterSelector({
   resourceId,
   value,
   onChange,
-  legacyConversion,
 }: {
   resourceId: number;
   value?: number;
   onChange: (id: number) => void;
-  legacyConversion?: boolean;
 }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
@@ -46,7 +44,6 @@ export function MeterSelector({
           </ListBox>
         </Select.Popover>
       </Select>
-      {legacyConversion && <Description>{t('legacy')}</Description>}
       {isError && <p role="alert">{t('loadError')}</p>}
       {hasPermission('resources.update') && (
         <MeterNameEditor resourceId={resourceId} onSaved={(meter) => onChange(meter.id)} />

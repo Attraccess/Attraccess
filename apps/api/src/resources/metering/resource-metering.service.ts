@@ -34,7 +34,6 @@ import type { MeteringReport } from '../flows/node-executors';
 import { AuditService } from '../../audit/audit.service';
 import { LiveNotificationsService } from '../../billing/liveNotificationsService';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
-import { toLegacyMeterValue } from './legacy-energy-conversion';
 import { MeteringValueError, meterCharge, meterDiscount, formatMeterValue, toMeterValue } from './quantity';
 
 const CLOCK_SKEW_MS = 5_000;
@@ -771,7 +770,7 @@ export class ResourceMeteringService implements OnModuleInit {
       if (existing) {
         if (
           existing.meterId === meterId &&
-          existing.reportedValue === this.readingValue(report).toString() &&
+          existing.reportedValue === toMeterValue(report.value).toString() &&
           existing.readingMode === (report.mode ?? 'total')
         )
           return;
@@ -790,18 +789,12 @@ export class ResourceMeteringService implements OnModuleInit {
         totalValue: reading.total,
         observedAt: reading.observedAt,
         source: report.source ?? null,
-        reportedValue: this.readingValue(report).toString(),
+        reportedValue: toMeterValue(report.value).toString(),
         readingMode: report.mode ?? 'total',
       });
     };
     if (transactionManager) await work(transactionManager);
     else await runSerializedTransaction(this.sessions.manager, work);
-  }
-
-  private readingValue(report: { value: string; legacyEnergyUnit?: string }): bigint {
-    return report.legacyEnergyUnit !== undefined
-      ? toLegacyMeterValue(report.value, report.legacyEnergyUnit)
-      : toMeterValue(report.value);
   }
 
   private async acceptReading(
@@ -820,7 +813,7 @@ export class ResourceMeteringService implements OnModuleInit {
         'stale_reading',
         'The reading is older than the required boundary or a previously accepted reading',
       );
-    const value = this.readingValue(report);
+    const value = toMeterValue(report.value);
     const increment = report.mode === 'increment';
     const previous = meter.counterValue == null ? null : BigInt(meter.counterValue);
     if (!increment && previous !== null && value < previous)
@@ -874,7 +867,7 @@ export class ResourceMeteringService implements OnModuleInit {
       if ((operation.kind === 'start') !== (report.kind === 'ready'))
         throw new MeteringOperationError('The reply does not answer this request');
       if (report.kind === 'ready') {
-        const baseline = report.baseline ? this.readingValue(report.baseline).toString() : '0';
+        const baseline = report.baseline ? toMeterValue(report.baseline.value).toString() : '0';
         if (operation.status !== 'pending') {
           if (operation.status === 'completed' && session?.baselineValue === baseline) return;
           throw new MeteringOperationError('The start request was already answered or has expired');
@@ -905,7 +898,7 @@ export class ResourceMeteringService implements OnModuleInit {
       if (operation.status !== 'pending') {
         if (
           operation.status === 'completed' &&
-          operation.reportedValue === this.readingValue(report).toString() &&
+          operation.reportedValue === toMeterValue(report.value).toString() &&
           operation.readingMode === (report.mode ?? 'total')
         )
           return;
@@ -940,7 +933,7 @@ export class ResourceMeteringService implements OnModuleInit {
         totalValue: reading.total,
         observedAt: reading.observedAt,
         source: report.source ?? null,
-        reportedValue: this.readingValue(report).toString(),
+        reportedValue: toMeterValue(report.value).toString(),
         readingMode: report.mode ?? 'total',
       });
     });

@@ -30,6 +30,9 @@ import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import { closeResourceTransactionConnection } from '../../database/run-serialized-transaction';
 import { MeteringReport } from '../flows/node-executors';
+import { MeteringReadyExecutor, MeteringReportExecutor } from '../flows/node-executors';
+import { compileFlowTemplate } from '../flows/flow-template';
+import { MeterFlowConversions1790300000000 } from '../../database/migrations/1790300000000-meter-flow-conversions';
 import { ResourceMeteringService } from './resource-metering.service';
 
 const T = ResourceFlowNodeType;
@@ -266,7 +269,7 @@ const schemas = [
 
 type Handler = (options: { complete: (report: MeteringReport) => Promise<void>; kind: string }) => Promise<void>;
 
-describe('Flow-defined energy metering', () => {
+describe('Flow-defined metering', () => {
   let directory: string;
   let source: DataSource;
   let metering: ResourceMeteringService;
@@ -282,9 +285,9 @@ describe('Flow-defined energy metering', () => {
   let liveNotifications: { notifyTransactionUpdate: jest.Mock };
 
   const reading =
-    (value: string, unit = 'kWh', extra: Partial<Extract<MeteringReport, { kind: 'reading' }>> = {}): Handler =>
+    (value: string, extra: Partial<Extract<MeteringReport, { kind: 'reading' }>> = {}): Handler =>
     ({ complete }) =>
-      complete({ kind: 'reading', value, legacyEnergyUnit: unit, ...extra });
+      complete({ kind: 'reading', value, ...extra });
 
   const ready: Handler = ({ complete }) => complete({ kind: 'ready' });
 
@@ -298,7 +301,7 @@ describe('Flow-defined energy metering', () => {
         id: 'report',
         type: T.OUTPUT_METERING_REPORT,
         resourceId: 1,
-        data: { meterId: 1, value: '1', legacyEnergyUnit: 'kWh' },
+        data: { meterId: 1, value: '1' },
       },
     ]);
     await source.getRepository(ResourceFlowEdge).save([
@@ -669,11 +672,9 @@ describe('Flow-defined energy metering', () => {
     it.each([
       ['a non-numeric reading', reading('n/a')],
       ['an empty reading', reading('')],
-      ['a power sample', reading('2.4', 'kW')],
-      ['an unknown unit', reading('2', 'bananas')],
       ['a negative reading', reading('-1')],
-      ['a stale sample from before the stop', reading('1.5', 'kWh', { observedAt: '2020-01-01T00:00:00Z' })],
-      ['a sample from the future', reading('1.5', 'kWh', { observedAt: '2999-01-01T00:00:00Z' })],
+      ['a stale sample from before the stop', reading('1.5', { observedAt: '2020-01-01T00:00:00Z' })],
+      ['a sample from the future', reading('1.5', { observedAt: '2999-01-01T00:00:00Z' })],
     ])('never turns %s into a zero charge', async (_name, handler) => {
       await seedMeter({}, { finalAttempts: 1 });
       await start();
@@ -699,24 +700,60 @@ describe('Flow-defined energy metering', () => {
 
     it('counts a lifetime counter from its baseline and never mixes it with earlier consumption', async () => {
       await seedMeter();
-      onStart = ({ complete }) =>
-        complete({ kind: 'ready', baseline: { value: '1000', legacyEnergyUnit: 'kWh' }, source: 'grid-meter' });
+      onStart = ({ complete }) => complete({ kind: 'ready', baseline: { value: '1000' }, source: 'grid-meter' });
       await start();
       expect(
         (await source.getRepository(ResourceMeteringSession).findOneByOrFail({ resourceId: 1 })).baselineValue,
       ).toBe('1000000000000');
-      onCollect = reading('1001.5', 'kWh', { source: 'grid-meter' });
+      onCollect = reading('1001.5', { source: 'grid-meter' });
       const ended = await end();
       const { transaction } = await items(ended.id);
       expect(transaction.amount).toBe(-45);
       expect((await sessionOf(ended.id)).consumedValue).toBe('1500000000');
     });
 
+    it('bills migrated flow conversions from the converted counter baseline through ordinary completion nodes', async () => {
+      await seedMeter();
+      const nodes = source.getRepository(ResourceFlowNode);
+      await nodes.update('ready', { data: { meterId: 1, baselineValue: '{{reading}}', legacyEnergyUnit: 'Wh' } });
+      await nodes.update('report', { data: { meterId: 1, value: '{{reading}}', legacyEnergyUnit: '{{unit}}' } });
+      const runner = source.createQueryRunner();
+      try {
+        await new MeterFlowConversions1790300000000().up(runner);
+      } finally {
+        await runner.release();
+      }
+      const completion = (complete: (report: MeteringReport) => Promise<void>, kind: 'start' | 'final') => ({
+        compileTemplate: compileFlowTemplate,
+        metering: { meterId: 1, operationId: 'op', kind, complete },
+      });
+      onStart = async ({ complete }) => {
+        await new MeteringReadyExecutor().execute(
+          await nodes.findOneByOrFail({ id: 'ready' }),
+          { reading: '1000000' },
+          completion(complete, 'start') as never,
+        );
+      };
+      onCollect = async ({ complete }) => {
+        await new MeteringReportExecutor(metering).execute(
+          await nodes.findOneByOrFail({ id: 'report' }),
+          { reading: '1001500', unit: 'Wh' },
+          completion(complete, 'final') as never,
+        );
+      };
+      await start();
+      const ended = await end();
+      const { transaction, items: rows } = await items(ended.id);
+      expect(transaction.amount).toBe(-45);
+      expect(rows).toEqual([expect.objectContaining({ meterQuantity: '1.5', meterCreditsPerUnit: 30, unitPrice: 45 })]);
+      expect((await nodes.findOneByOrFail({ id: 'report' })).data).not.toHaveProperty('legacyEnergyUnit');
+    });
+
     it('rejects a lifetime counter that dropped below its baseline', async () => {
       await seedMeter({}, { finalAttempts: 1 });
-      onStart = ({ complete }) => complete({ kind: 'ready', baseline: { value: '1000', legacyEnergyUnit: 'kWh' } });
+      onStart = ({ complete }) => complete({ kind: 'ready', baseline: { value: '1000' } });
       await start();
-      onCollect = reading('12', 'kWh');
+      onCollect = reading('12');
       const ended = await end();
       expect((await sessionOf(ended.id)).status).toBe(ResourceMeteringSessionStatus.Pending);
       expect((await sessionOf(ended.id)).failureReason).toMatch(/cumulative counter decreased/);
@@ -826,7 +863,7 @@ describe('Flow-defined energy metering', () => {
           throw new Error('meter unreachable');
         };
         const ended = await end();
-        onCollect = reading('1.5', 'kWh', { observedAt: ended.endTime?.toISOString() });
+        onCollect = reading('1.5', { observedAt: ended.endTime?.toISOString() });
         return ended;
       }
 
@@ -892,7 +929,7 @@ describe('Flow-defined energy metering', () => {
       it.each([undefined, 'after-end'])('rejects a retry first observing idle consumption (%s)', async (timestamp) => {
         const ended = await endWithMissingFinal();
         const session = await sessionOf(ended.id);
-        onCollect = reading('5', 'kWh', {
+        onCollect = reading('5', {
           observedAt: timestamp ? new Date((ended.endTime as Date).getTime() + 1).toISOString() : undefined,
         });
         await expect(metering.retrySettlement(1, session.id, 1)).rejects.toThrow('session end boundary');
@@ -903,7 +940,7 @@ describe('Flow-defined energy metering', () => {
 
       it('keeps the charge pending with the reason when the retry is stale or invalid', async () => {
         const ended = await endWithMissingFinal();
-        onCollect = reading('1.5', 'kWh', { observedAt: '2020-01-01T00:00:00Z' });
+        onCollect = reading('1.5', { observedAt: '2020-01-01T00:00:00Z' });
         await expect(metering.retrySettlement(1, (await sessionOf(ended.id)).id, 1)).rejects.toThrow(
           expect.objectContaining({ message: expect.stringMatching(/^METER_SETTLEMENT_FAILED/) }),
         );
@@ -952,26 +989,13 @@ describe('Flow-defined energy metering', () => {
         ...(kind === 'final' ? { freshAfter: new Date(Date.now() - 1000) } : {}),
       });
 
-    it('converts every supported energy unit centrally', async () => {
-      const session = await activeSession();
-      for (const [value, unit] of [
-        ['1500', 'Wh'],
-        ['5400', 'kJ'],
-        ['0.0015', 'MWh'],
-        ['1500000', 'milliwatt-hour'],
-      ]) {
-        onCollect = reading(value, unit);
-        expect((await run(session)).totalValue).toBe('1500000000');
-      }
-    });
-
     it('rejects a reply that arrives after the operation timed out', async () => {
       const session = await activeSession();
       let lateReply: Promise<void> | undefined;
       onCollect = ({ complete }) =>
         new Promise<void>((resolve) => {
           setTimeout(() => {
-            lateReply = complete({ kind: 'reading', value: '9', legacyEnergyUnit: 'kWh' });
+            lateReply = complete({ kind: 'reading', value: '9' });
             lateReply.then(resolve, resolve);
           }, 1300);
         });
@@ -988,14 +1012,14 @@ describe('Flow-defined energy metering', () => {
     it('accepts an identical duplicate reply and rejects a conflicting one', async () => {
       const session = await activeSession();
       onCollect = async ({ complete }) => {
-        await complete({ kind: 'reading', value: '1', legacyEnergyUnit: 'kWh' });
-        await complete({ kind: 'reading', value: '1000', legacyEnergyUnit: 'Wh' });
+        await complete({ kind: 'reading', value: '1' });
+        await complete({ kind: 'reading', value: '1.000000000' });
       };
       expect((await run(session)).totalValue).toBe('1000000000');
 
       onCollect = async ({ complete }) => {
-        await complete({ kind: 'reading', value: '1.2', legacyEnergyUnit: 'kWh' });
-        await complete({ kind: 'reading', value: '1.3', legacyEnergyUnit: 'kWh' });
+        await complete({ kind: 'reading', value: '1.2' });
+        await complete({ kind: 'reading', value: '1.3' });
       };
       await expect(run(session)).rejects.toThrow(/already answered/);
     });
@@ -1008,7 +1032,7 @@ describe('Flow-defined energy metering', () => {
       const { MeteringReportExecutor } = await import('../flows/node-executors');
       await expect(
         new MeteringReportExecutor(metering).execute(
-          { resourceId: 99, data: { meterId: 1, value: '1', legacyEnergyUnit: 'kWh' } } as never,
+          { resourceId: 99, data: { meterId: 1, value: '1' } } as never,
           {},
           {
             compileTemplate: (t: string) => t,
@@ -1034,7 +1058,7 @@ describe('Flow-defined energy metering', () => {
         running++;
         peak = Math.max(peak, running);
         await new Promise((resolve) => setTimeout(resolve, 30));
-        await complete({ kind: 'reading', value: kind === 'final' ? '2' : '1', legacyEnergyUnit: 'kWh' });
+        await complete({ kind: 'reading', value: kind === 'final' ? '2' : '1' });
         running--;
       };
       const [interim, final] = await Promise.all([run(session, 'interim'), run(session, 'final')]);
@@ -1188,11 +1212,6 @@ describe('Flow-defined energy metering', () => {
         release();
         await collection;
       }
-    });
-
-    it.each(['', '   '])('rejects empty legacy units instead of treating Wh as generic values (%s)', async (unit) => {
-      await expect(metering.report(1, 1, { kind: 'reading', value: '1000', legacyEnergyUnit: unit })).rejects.toThrow();
-      expect((await metering.listMeters(1))[0].counterValue).toBeNull();
     });
 
     it('records increments without a session and keeps other meters independent', async () => {

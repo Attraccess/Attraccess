@@ -133,6 +133,10 @@ export class GenericMeters1790100000000 implements MigrationInterface {
     );
     for (const node of nodes) {
       const data = JSON.parse(node.data ?? '{}');
+      if ((data.value || data.baselineValue) && data.legacyEnergyUnit === undefined)
+        throw new Error(
+          'Cannot revert generic flow values to energy-only nodes. Restore a pre-migration backup instead.',
+        );
       if (data.legacyEnergyUnit) data[node.type.endsWith('.ready') ? 'baselineUnit' : 'unit'] = data.legacyEnergyUnit;
       delete data.legacyEnergyUnit;
       delete data.meterId;
