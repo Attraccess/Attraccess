@@ -37,7 +37,7 @@ import { ResourceFlowLogType } from './dto/flow-log.dto';
 import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { randomBytes } from 'crypto';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
-import Handlebars from 'handlebars';
+import { compileFlowTemplate } from './flow-template';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import z from 'zod';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
@@ -85,15 +85,6 @@ interface FlowExecutionOptions {
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;
 }
-
-// Handlebars helpers
-Handlebars.registerHelper('json', (value: unknown) => {
-  try {
-    return new Handlebars.SafeString(JSON.stringify(value));
-  } catch {
-    return 'null';
-  }
-});
 
 interface UsageEventData {
   resource: {
@@ -997,8 +988,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   private compileTemplate(template: string, data: object): string {
     const variables = this.templateVariables.get(data);
     const dataWithVariables = variables ? { ...data, variables } : data;
-    const compiledTemplate = Handlebars.compile(template);
-    return compiledTemplate(dataWithVariables);
+    return compileFlowTemplate(template, dataWithVariables);
   }
 
   @OnEvent('companion.idle')

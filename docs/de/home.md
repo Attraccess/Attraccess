@@ -26,7 +26,7 @@ Attraccess hilft Ihnen dabei, Maschinen, Werkzeuge und andere Ressourcen in Ihre
 
 - **Ressourcenverwaltung** – Maschinen, Werkzeuge und Geräte verwalten
 - **Zugangssteuerung** – Einweisungen und Berechtigungen pro Ressource
-- **NFC-Zugangskontrolle** – Physischer Zugang über Attractap NFC-Leser
+- **RFID-Zugangskontrolle** – Physischer Zugang über Attractap RFID-Leser
 - **Wartungsplanung** – Wartungen terminieren und nachverfolgen
 - **Flows & Automatisierung** – Visuelle Automatisierungen erstellen
 - **Projekte** – Projektbasierte Teamverwaltung

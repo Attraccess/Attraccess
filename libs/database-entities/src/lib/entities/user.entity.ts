@@ -14,7 +14,7 @@ import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { ResourceUsage } from './resourceUsage.entity';
 import { AuthenticationDetail } from './authenticationDetail.entity';
 import { ResourceIntroducer } from './resourceIntroducer.entity';
-import { NFCCard } from './nfcCard.entity';
+import { NFCCard } from './rfidCard.entity';
 import { Session } from './session.entity';
 import { BillingTransaction } from './billing-transaction.entity';
 import { Project } from './project';

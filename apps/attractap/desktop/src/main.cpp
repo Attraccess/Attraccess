@@ -8,7 +8,7 @@
 #include "sdl_display.hpp"
 #include "settings/settings.hpp"
 #include "state/state.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #ifdef __APPLE__
 #include "endpoint_prompt.hpp"
 #endif

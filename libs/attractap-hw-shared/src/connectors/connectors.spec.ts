@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_CONNECTORS, assertWiresAllSignals, countPinsByDirection } from './index';
 import { J_POE } from './j-poe';
-import { J_NFC } from './j-nfc';
+import { J_NFC } from './j-rfid';
 
 describe.each(ALL_CONNECTORS.map((c) => [c.name, c] as const))(
   'Connector %s',

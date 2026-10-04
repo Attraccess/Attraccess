@@ -108,7 +108,7 @@ it('passes flash settings and terminal callbacks, reporting completion at 100 pe
   );
   expect(state.success).toHaveBeenCalledWith({
     title: 'Installation successful',
-    description: 'You can now set up and use the NFC reader.',
+    description: 'You can now set up and use the RFID reader.',
   });
   fireEvent.click(screen.getByRole('button', { name: 'Terminal Output' }));
   expect(await screen.findByText('Writing image Verified')).toBeTruthy();

@@ -1,6 +1,6 @@
 #include "application/application.hpp"
 #include "profile_store.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstring>

@@ -1,217 +1,392 @@
 # Knotentypen
 
-Flows werden aus drei Kategorien von Knoten aufgebaut: **Eingabe** (Trigger), **Verarbeitung** (Logik) und **Ausgabe** (Aktionen). Diese Seite beschreibt jeden verfügbaren Knotentyp und seine Konfiguration.
+Diese Referenz beschreibt alle eingebauten Flow-Knoten. Der Editor gruppiert sie nach Zweck, etwa Abrechnung, Nachrichten und Flow-Steuerung, und zeigt die vom Ressourcentyp unterstützten Knoten. Nutzungs-, Aktivitäts- und Abrechnungsknoten sind für **Maschinen**; Tür-Trigger für **Türen**. Plugins können weitere Knoten mit eigenen Einstellungen ergänzen.
+
+Lesen Sie zuerst [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) für Pfade, Datentypen und Beispiele. **Vorlage** bezeichnet hier eine Handlebars-Vorlage, die den aktuellen Eingang verwendet. Andere Einstellungen sind wörtliche Werte, sofern nicht anders beschrieben. Objekt-Payloads erhalten Ressourcenkontext; Vorlagen können gespeicherte Variablen lesen.
+
+Felder mit Vorlagenunterstützung bieten auch `add`, `subtract`, `multiply` und `divide`. Syntax und Beispiele finden Sie unter [Arithmetik und Einheitenumrechnung](flows/payloads-variables-templates.md#arithmetik-und-einheitenumrechnung).
 
 ## Eingabe-Knoten (Trigger)
 
-Eingabe-Knoten starten einen Flow, wenn ein bestimmtes Ereignis eintritt. Jeder Flow benötigt mindestens einen Eingabe-Knoten.
+Trigger starten einen Durchlauf und geben ihre Ereignisdaten über **Ausgang** weiter.
 
 ### Button
 
-Ein manueller Auslöser. Fügt der Ressourcen-Detailseite einen Button hinzu, den Benutzer anklicken können, um den Flow auszuführen.
+Typ: `input.button` · Maschinen · Editor: **Taste**
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Beschriftung** | Text, der auf dem Button angezeigt wird |
+Ergänzt einen manuellen Button auf der Ressourcen-Detailseite. **Beschriftung** ist erforderlicher, wörtlicher Text. Die Payload beginnt mit Ressourcenkontext; sie enthält nicht den Benutzer, der den Button gedrückt hat. Der Button kann nur vom Besitzer einer aktiven Nutzungssitzung gedrückt werden.
 
-### Ressourcennutzung gestartet
+Beispiel: Button `Relais testen` mit **MQTT-Nachricht senden** verbinden.
 
-Löst aus, wenn ein Benutzer eine Nutzungssitzung an der Ressource startet.
+### Nutzung gestartet
 
-Keine zusätzlichen Einstellungen.
+Typ: `input.resource.usage.started` · Maschinen
 
-### Ressourcennutzung beendet
+Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält Felder der neuen Sitzung an der Wurzel (`id`, `startTime`, `user`, `formSubmissions` usw.). `{{user.username}}` liest den Sitzungsbesitzer. Ein Flow-Fehler kann den Start verhindern; wählen Sie das Fehlerverhalten externer Aktionen entsprechend.
 
-Löst aus, wenn ein Benutzer eine Nutzungssitzung an der Ressource beendet.
+### Nutzung beendet
 
-Keine zusätzlichen Einstellungen.
+Typ: `input.resource.usage.stopped` · Maschinen
 
-### Ressourcennutzung übernommen
+Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes`. Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen.
 
-Löst aus, wenn ein Benutzer eine aktive Nutzungssitzung eines anderen Benutzers übernimmt.
+### Nutzung übernommen
 
-Keine zusätzlichen Einstellungen.
+Typ: `input.resource.usage.takeover` · Maschinen
 
-### Tür entsperrt
+Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime`. `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**.
 
-Löst aus, wenn eine Tür-Ressource entsperrt wird.
+### Tür entriegelt
 
-Keine zusätzlichen Einstellungen.
+Typ: `input.resource.door.unlocked` · Türen
 
-### Tür gesperrt
+Läuft bei einer Entriegelungsaktion. Keine Einstellungen. Die Payload enthält `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`. Beispiel: Entriegelungsbefehl mit **MQTT-Nachricht senden** versenden.
 
-Löst aus, wenn eine Tür-Ressource gesperrt wird.
+### Tür verriegelt
 
-Keine zusätzlichen Einstellungen.
+Typ: `input.resource.door.locked` · Türen
 
-### Tür geöffnet (Unlatch)
+Läuft bei einer Verriegelungsaktion. Keine Einstellungen. Verwendet dieselbe Payload-Struktur wie **Tür entriegelt**. Beispiel: Verriegelungsbefehl an den Türcontroller senden.
 
-Löst aus, wenn eine Tür-Ressource kurzzeitig geöffnet wird (Unlatch).
+### Tür-Falle geöffnet
 
-Keine zusätzlichen Einstellungen.
+Typ: `input.resource.door.unlatched` · Türen
+
+Läuft beim kurzen Öffnen der Türfalle. Keine Einstellungen. Verwendet dieselbe Payload-Struktur wie **Tür entriegelt**. Beispiel: Impuls an einen elektrischen Türöffner senden.
 
 ### MQTT-Nachricht empfangen
 
-Löst aus, wenn eine Nachricht auf einem bestimmten MQTT-Topic empfangen wird.
+Typ: `input.mqtt.message.received`
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Topic** | Das MQTT-Topic, auf dem gelauscht wird (z.B. `workshop/laser/status`) |
+| Einstellung             | Beschreibung                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| **Server** (`serverId`) | Konfigurierter MQTT-Server                                                        |
+| **Topic**               | Fester Topic-Filter; `+` für eine Ebene und abschließendes `#` für mehrere Ebenen |
 
-> [!TIP]
-> Der empfangene MQTT-Nachrichten-Payload steht nachfolgenden Knoten als Eingabedaten zur Verfügung. Sie können **Payload setzen** oder **Wenn**-Knoten verwenden, um damit zu arbeiten.
+Die Payload ist `{ serverId, topic, payload }`. MQTT-Inhalt wird nach Möglichkeit als JSON gelesen, sonst als Text. Eine Nachricht `{"running":true}` wird mit `{{payload.running}}` gelesen, im **Wenn**-Knoten mit dem Pfad `payload.running`. Topic-Filter sind keine Vorlagen.
 
 ### Keine Aktivität
 
-Löst nach einer Inaktivitätsperiode an der Ressource aus. Nützlich für Sicherheits-Automatisierungen wie automatische Abschaltung.
+Typ: `input.resource.activity.no-activity` · Maschinen · Editor: **Inaktivitäts-Timeout erreicht**
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Timeout** | Dauer der Inaktivität vor dem Auslösen |
-| **Einheit** | Sekunden, Minuten oder Stunden |
+**Minimale Inaktivität (Minuten)** (`minInactivityMinutes`) ist eine positive ganze Zahl. Läuft nur bei einer aktiven, finalisierten Nutzungssitzung. Die Prüfung erfolgt einmal pro Minute und ist kein präziser Timer. Die Payload beginnt nur mit Ressourcenkontext.
 
-### Messung starten und Messwert abfragen
+**Aktivität verfolgen** setzt den Timer zurück. Nach dem Auslösen wird er ebenfalls zurückgesetzt und kann bei weiterhin aktiver Sitzung erneut auslösen. Aktivitätszeiten liegen im Arbeitsspeicher und werden nach Serverneustart neu initialisiert. Beispiel: mit **Nutzungssitzung beenden** für automatische Abschaltung verbinden.
 
-In jedem Knoten einen vordefinierten Zähler auswählen. **Messung starten** bereitet den Zähler beim Sitzungsstart vor und muss **Messung bereit** erreichen. **Messwert abfragen** liest regelmäßig, auch außerhalb von Sitzungen, und beim Sitzungsende; mit **Zähler melden** verbinden. Zeitlimit, Abfrageintervall (`0` deaktiviert regelmäßige Abfragen), finale Versuche und Verzögerung sind konfigurierbar.
+### Variable geändert
 
-Siehe [Zähler](flows/energy-metering.md).
+Typ: `input.variable.changed`
 
----
+| Einstellung                          | Beschreibung                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| **Überwachte Variablen** (`watches`) | Mindestens ein festes Paar aus Schlüssel und Geltungsbereich (`resource` oder `global`) |
+| **Trigger-Quelle** (`source`)        | `any` (Standard) oder `exclude-self`, das Änderungen aus dieser Ressource überspringt   |
+
+Die Payload enthält `change: { scope, key, previousValue, newValue, changedAt, sourceResourceId }` und einen Schnappschuss überwachter Variablen unter `variables.resource` / `variables.global`. Anlegen zählt als Änderung; identische Schreibvorgänge und Löschen lösen nicht aus. Ressourcenvariablen gelten für diese Ressource; globale können ressourcenübergreifend auslösen.
+
+Beispiel: globale Variable `workshopOpen` überwachen, mit **Variablen lesen** kopieren und mit **Wenn** verzweigen. Siehe [dauerhaft gespeicherte Variablen](flows/payloads-variables-templates.md#dauerhaft-gespeicherte-flow-variablen) für Vorlagenzugriff und das Vermeiden von Schleifen.
+
+### Companion: Gerät inaktiv
+
+Typ: `input.companion.idle`
+
+Wählen Sie ein **Companion-Gerät** (`deviceId`). Läuft, wenn es Inaktivität meldet; die Inaktivitätsschwelle gehört zur Companion-Konfiguration. Payload-Felder an der Wurzel: `idleSeconds` und optional `platform`. Beispiel: `idleSeconds` mit **Wenn** vergleichen.
+
+### Companion: Gerät aktiv
+
+Typ: `input.companion.active`
+
+Wählen Sie ein **Companion-Gerät**. Läuft bei Rückkehr aus der Inaktivität. Payload-Felder an der Wurzel: `idleSeconds` und optional `platform`. Beispiel: Aktivität für die Ressource aufzeichnen.
+
+### Companion: Vordergrund-App geändert
+
+Typ: `input.companion.foreground_app_changed`
+
+Wählen Sie ein **Companion-Gerät**. Läuft, wenn dessen fokussierte Anwendung wechselt. Payload-Felder an der Wurzel: `appName`, `pid`, optional unter macOS `bundleId`. Beispiel: Pfad `appName` mit einem Anwendungsnamen vergleichen.
+
+### Companion: USB-Gerät verbunden
+
+Typ: `input.companion.usb_device_connected`
+
+| Einstellung                      | Beschreibung                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------ |
+| **Companion-Gerät** (`deviceId`) | Zu überwachendes Gerät                                                         |
+| **Hersteller-ID / Produkt-ID**   | Optionale ganzzahlige Filter in Dezimaldarstellung; leer akzeptiert jeden Wert |
+
+Payload-Felder an der Wurzel: `vendorId`, `productId`, optional `manufacturer`, `product`, `serialNumber`. Sind beide Filter gesetzt, müssen beide passen. Beispiel: auf ein bestimmtes USB-Zubehör reagieren.
+
+### Companion: USB-Gerät getrennt
+
+Typ: `input.companion.usb_device_disconnected`
+
+Wählen Sie ein **Companion-Gerät** und optionale dezimale **Hersteller-ID / Produkt-ID** wie bei USB-Gerät verbunden. Läuft beim Entfernen mit denselben Payload-Feldern; optionale Beschreibungsfelder können fehlen.
+
+### Messung starten
+
+Typ: `input.resource.metering.start` · Maschinen
+
+Einen vordefinierten **Zähler** auswählen oder einen mit einem Namen erstellen. Bereitet diesen Zähler vor, bevor eine erfasste Sitzung startet oder übernommen wird. **Zeitlimit (Sekunden)**: 1–600, Standard **30**. Der Zweig muss **Messung bereit** erreichen. Kann ein kostenpflichtiger Zähler nicht initialisiert werden, startet die Sitzung nicht.
+
+Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, usageId, kind, requestedAt }` mit `kind: "start"`. Beispiel: Lifetime-Zähler per HTTP lesen und dessen Basiswert melden. Siehe [Zähler](flows/energy-metering.md).
+
+### Messwert abfragen
+
+Typ: `input.resource.metering.collect` · Maschinen
+
+| Einstellung | Bereich / Standard |
+| --- | --- |
+| **Zähler** | Vordefinierten Zähler auswählen oder einen erstellen |
+| **Zeitlimit (Sekunden)** | 1–600 / **30** |
+| **Zwischenintervall (Minuten)** | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
+| **Versuche für den Endwert** | 1–10 / **3** |
+| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5** |
+
+Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"` oder `"final"`. Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
 
 ## Verarbeitungs-Knoten
 
-Verarbeitungs-Knoten steuern den Datenfluss zwischen Eingabe- und Ausgabe-Knoten.
-
 ### Warten
 
-Pausiert den Flow für eine bestimmte Dauer, bevor er fortgesetzt wird.
+Typ: `processing.wait`
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Dauer** | Wie lange gewartet werden soll |
-| **Einheit** | Sekunden, Minuten oder Stunden |
+**Dauer** ist eine positive ganze Zahl; **Einheit** ist `seconds`, `minutes` oder `hours`. Pausiert diesen Zweig und gibt die unveränderte Payload über **Ausgang** weiter. Die Einstellungen sind feste Werte, keine Vorlagen.
 
 ### Wenn (If)
 
-Bedingte Verzweigung. Wertet einen Vergleich aus und leitet den Flow auf verschiedene Pfade.
+Typ: `processing.if`
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Linker Wert** | Erster Vergleichswert |
-| **Operator** | Vergleichsoperator (gleich, ungleich, größer als, kleiner als etc.) |
-| **Rechter Wert** | Zweiter Vergleichswert |
+| Einstellung                             | Beschreibung                                                   |
+| --------------------------------------- | -------------------------------------------------------------- |
+| **Payload-Pfad** (`path`)               | Fester Pfad im Eingang, etwa `payload.temperature`             |
+| **Operator** (`comparisonOperator`)     | `=`, `!=`, `>`, `<`, `>=`, `<=`                                |
+| **Vergleichswert**                      | Wörtlicher Text oder ein zweiter Pfad bei aktiviertem Schalter |
+| **Vergleichswert ist ein Payload-Pfad** | Standard **aus**                                               |
 
-Der Knoten hat zwei Ausgänge:
+Gibt die unveränderte Payload über **Wahr** (`output-true`) oder **Falsch** (`output-false`) weiter. Gleichheit vergleicht Zeichenketten; geordnete Vergleiche wandeln beide Werte in Zahlen um. Fehlende Pfade ergeben leeren Text; ungültige Zahleneingaben werden `NaN`, geordnete Vergleiche damit falsch. Diese Felder rendern keine Vorlagen.
 
-- **Wahr** -- Die Bedingung traf zu
-- **Falsch** -- Die Bedingung traf nicht zu
+Beispiel: Pfad `payload.temperature`, Operator `>`, fester Vergleichswert `40`. Gespeicherte Variablen vor dem Vergleich mit **Variablen lesen** in die Payload kopieren.
 
 ### Payload setzen
 
-Setzt oder ändert Variablen, die an nachfolgende Knoten weitergegeben werden.
+Typ: `processing.set-payload`
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Schlüssel** | Variablenname |
-| **Wert** | Variablenwert |
+Konfigurieren Sie **Einträge**, jeweils mit festem **Schlüssel (Pfad)** und **Wertvorlage**. Erhält vorhandene Felder und schreibt gerenderte **Zeichenketten** an die Pfade, dann Weitergabe über **Ausgang**.
 
-> [!NOTE]
-> Sie können mehrere Payload-setzen-Knoten verketten, um komplexe Daten für einen Ausgabe-Knoten aufzubauen.
+Beispiel: Schlüssel `reading.temperature`, Wert `{{payload.temperature}}`. Alle Einträge lesen die Eingangs-Payload; abhängige Zuweisungen benötigen getrennte Knoten. Dieser Knoten speichert keine dauerhaften Variablen und liest Werte nicht als JSON. Siehe [Die Payload ändern](flows/payloads-variables-templates.md#die-payload-ändern).
+
+### Variablen setzen
+
+Typ: `processing.variables.set`
+
+Konfigurieren Sie mindestens eine **Variable** mit **Schlüsselvorlage**, **Wertvorlage** und festem **Geltungsbereich** (`resource` oder `global`). Liest gültige gerenderte Werte als JSON, sonst speichert er Text. Die weitergegebene Payload bleibt unverändert; gespeicherte Werte sind für Vorlagen nachfolgender Knoten verfügbar.
+
+Beispiel: Ressourcenschlüssel `lastReading`, Wert `{{json payload}}` speichert den MQTT-Inhalt mit erhaltenem Typ. Änderungen können **Variable geändert** auslösen. Abhängige Schreibvorgänge auf mehrere Knoten verteilen. Siehe [Werte mit ihrem Typ speichern](flows/payloads-variables-templates.md#werte-mit-ihrem-typ-speichern).
+
+### Variablen lesen
+
+Typ: `processing.variables.get`
+
+Konfigurieren Sie mindestens eine **Variable** mit **Schlüsselvorlage**, festem **Geltungsbereich** und festem **Payload-Pfad**. Kopiert den gespeicherten Wert mit seinem ursprünglichen Typ an den Pfad. Erhält andere Felder und gibt über **Ausgang** weiter.
+
+Beispiel: Ressourcenschlüssel `targetTemperature` → `limits.temperature`. Eine fehlende Variable ergibt ein undefiniertes Feld und eine Serverwarnung; sie stoppt den Flow nicht.
 
 ### Auf MQTT-Nachricht warten
 
-Pausiert den Flow, bis eine bestimmte MQTT-Nachricht empfangen wird oder ein Timeout abläuft.
+Typ: `processing.mqtt.waitForMessage`
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Topic** | Das MQTT-Topic, auf dem gelauscht wird |
-| **Timeout** | Maximale Wartezeit |
-| **Einheit** | Sekunden, Minuten oder Stunden |
+| Einstellung             | Beschreibung                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| **Server** (`serverId`) | Konfigurierter MQTT-Server                                                           |
+| **Topic**               | Fester Filter mit `+` und abschließendem `#`; keine Vorlage                          |
+| **Timeout (Sekunden)**  | Positive ganze Zahl                                                                  |
+| **Subscribe-QoS**       | Optional `0`, `1`, `2`; effektives QoS ist das niedrigere von Publish-/Subscribe-QoS |
+| **Bei Fehler**          | Siehe [Fehlerverhalten](flows/node-types.md#fehlerverhalten)                         |
 
-Der Knoten hat zwei Ausgänge:
-
-- **Nachricht empfangen** -- Eine Nachricht kam vor dem Timeout an
-- **Timeout** -- Keine Nachricht wurde rechtzeitig empfangen
+Wartet nach dem Abonnieren auf die nächste passende Nachricht. Bei Erfolg erhält **Ausgang** `{ topic, payload }` und ersetzt die bisherigen Daten. MQTT-Inhalt wird nach Möglichkeit als JSON gelesen. Timeout oder Abonnementfehler folgen **Bei Fehler**; für einen Timeout-Zweig **Fehler** verbinden und `failure-output` wählen. Beispiel: vor der Energiemeldung auf die Geräteantwort warten.
 
 ### Fehler
 
-Löst die Fehlerbehandlung des Flows aus. Verwenden Sie diesen Knoten, um einen Flow zu stoppen und ein Problem zu signalisieren.
+Typ: `processing.error`
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Nachricht** | Anzuzeigende Fehlermeldung |
-
----
+**Fehlermeldungsvorlage** ist erforderlich. Rendert die Nachricht und löst einen Flow-Fehler aus. Kein Ausgang. Beispiel: `Zähler für {{resource.name}} nicht verfügbar` an einem **Wenn → Falsch**-Zweig.
 
 ## Ausgabe-Knoten (Aktionen)
 
-Ausgabe-Knoten führen Aktionen aus, wenn sie erreicht werden. Sie befinden sich typischerweise am Ende eines Flows.
+Aktionen mit **Ausgang** können nachfolgende Knoten ausführen. Abrechnungsposten, Aktivitätsaufzeichnung und Messabschluss haben im Core-Katalog keinen ausgehenden Anschluss.
+
+### Fehlerverhalten
+
+**HTTP-Anfrage**, **MQTT-Nachricht senden**, **Auf MQTT-Nachricht warten** und **Nutzungssitzung beenden** bieten **Bei Fehler** (`failureBehavior`):
+
+| Auswahl                                                          | Ergebnis                                                                                   |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Flow abbrechen** (`fail-flow`)                                 | Löst einen Fehler aus und stoppt diesen Pfad; kann die auslösende Nutzungsaktion abbrechen |
+| **Über Fehlerausgang fortfahren** (`failure-output`)             | Gibt den ursprünglichen Eingang plus `flowError: { kind, message }` über **Fehler** weiter |
+| **Protokollieren und fortfahren** (`log-and-continue`, Standard) | Protokolliert den Fehler und gibt den ursprünglichen Eingang über **Ausgang** weiter       |
+
+`flowError.kind` ist `transport-dispatch`, `acknowledgement-timeout`, `controller-rejection` oder `node-failure`. `{{flowError.message}}` liest die Meldung im Fehlerzweig. Ein angeschlossener Fehlerausgang allein aktiviert die Weiterleitung nicht.
+
+HTTP- und MQTT-Senden bieten außerdem **Abschlussverhalten**: **Bestätigt** (`acknowledged`, Standard) wartet auf Antwort/Publish-Callback; **Nur senden** (`dispatch`) fährt nach dem Anstoßen fort. Eine MQTT-Publish-Bestätigung bestätigt den Transport, nicht die Befehlsausführung im Gerät. Fehler nach dem Fortfahren einer HTTP-Dispatch-Anfrage können nur protokolliert werden, nicht den Flow abbrechen oder einen Fehlerzweig auslösen.
 
 ### HTTP-Anfrage
 
-Sendet eine HTTP-Anfrage an eine externe URL. Nützlich für Webhooks und API-Integrationen.
+Typ: `output.http.sendRequest` · Editor: **HTTP-Anfrage senden**
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Methode** | GET, POST, PUT, PATCH oder DELETE |
-| **URL** | Die Ziel-URL |
-| **Headers** | Optionale HTTP-Header (Schlüssel-Wert-Paare) |
-| **Body** | Optionaler Anfragekörper (für POST/PUT/PATCH) |
+| Einstellung                               | Beschreibung                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| **Methode**                               | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`              |
+| **URL**                                   | Erforderliche URL; Vorlagenunterstützung                                |
+| **Headers**                               | Feste Namen, Werte als Vorlagen                                         |
+| **Body**                                  | Optionale Textvorlage; für JSON `Content-Type: application/json` setzen |
+| **Timeout (Sekunden)** (`timeoutSeconds`) | Optionale positive ganze Zahl; begrenzt die HTTP-Anfrage                |
+| **Abschlussverhalten**                    | `acknowledged` oder `dispatch`                                          |
+| **Bei Fehler**                            | Gemeinsames Fehlerverhalten oben                                        |
+
+Bestätigter Erfolg ersetzt die Payload durch den Antwort-Body. JSON `{"energy_wh":1500}` ist als `{{energy_wh}}` verfügbar, ohne `response`-Präfix. Dispatch gibt den Eingang ohne Antwort weiter; sein Standard-Anfragetimeout ist 30 Sekunden. Bestätigte Anfragen haben ohne konfigurierte Grenze keinen Knoten-Timeout.
+
+Beispiel-Body: `{"resource": {{json resource.name}}, "reading": {{json payload}} }`. Benötigte frühere Ereignisfelder vor einer bestätigten Anfrage in Variablen speichern.
 
 ### MQTT-Nachricht senden
 
-Veröffentlicht eine Nachricht auf einem MQTT-Topic.
+Typ: `output.mqtt.sendMessage`
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Topic** | Das MQTT-Topic, auf dem veröffentlicht wird |
-| **Payload** | Der Nachrichteninhalt |
+| Einstellung                         | Beschreibung                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| **Server** (`serverId`)             | Konfigurierter MQTT-Server                                                       |
+| **Topic**                           | Erforderliche Vorlage, etwa `workshop/{{resource.id}}/command`                   |
+| **Payload**                         | Optionale Nachrichtenvorlage                                                     |
+| **QoS**                             | Optional `0`, `1`, `2`; leer verwendet den Serverstandard                        |
+| **Retain**                          | Optional; leer verwendet den Serverstandard                                      |
+| **Abschlussverhalten**              | `acknowledged` oder `dispatch`                                                   |
+| **Bestätigungs-Timeout (Sekunden)** | Optionale positive ganze Zahl; ohne Wert kein Knoten-Timeout für die Bestätigung |
+| **Bei Fehler**                      | Gemeinsames Fehlerverhalten oben                                                 |
+
+Gibt bei Erfolg die unveränderte Payload über **Ausgang** weiter. Beispiel: `{{json payload}}` sendet empfangenen MQTT-Inhalt als JSON weiter. Server, QoS, Retain und Zeiteinstellungen sind feste Werte.
 
 ### Abrechnungsposten setzen
 
-Setzt Abrechnungsposten für die aktuelle Nutzungssitzung. Wird für automatisierte Kostenerfassung verwendet.
+Typ: `output.resource.billing.calculation.set-additional-items` · Maschinen · Editor: **Abrechnungs Position hinzufügen**
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Posten** | Liste der Abrechnungsposten mit Name, Menge und Preis |
+Jeder Knoten ergänzt **einen Posten**, keine Liste.
 
-> [!NOTE]
-> Dieser Knoten funktioniert nur, wenn der Flow durch ein nutzungsbezogenes Ereignis ausgelöst wird (Nutzung gestartet, beendet oder übernommen).
+| Einstellung                   | Beschreibung                                                     |
+| ----------------------------- | ---------------------------------------------------------------- |
+| **Name**                      | Erforderlicher wörtlicher Text                                   |
+| **Einzelpreis** (`unitPrice`) | Ganzzahliger Abrechnungsbetrag; der Editor zeigt ihn als Währung |
+| **Menge**                     | Positive ganze Zahl; das Wurzelfeld `quantity` überschreibt sie  |
+| **Beschreibung**              | Optionaler wörtlicher Text                                       |
+| **Externe Referenz**          | Optional; Sonderregel unten beachten                             |
+
+Verwendet die Nutzungs-ID im Wurzelfeld `id`, falls vorhanden, sonst die aktive Sitzung dieser Ressource. Benötigt eine ausstehende Abrechnung oder eine Nutzungs-Lebenszyklusaktion; ohne passende Sitzung/Transaktion schlägt er fehl. Bei passenden vorhandenen Posten werden Mengen addiert. Die Ausgabedaten sind das Postenobjekt und ersetzen die ursprüngliche Payload; der Katalog bietet keinen ausgehenden Anschluss.
+
+Die externe Referenz verwendet ein Wurzelfeld `externalReference` vom Typ Text als Override, falls vorhanden. Ist dieses Feld vorhanden **und** eine nicht leere Referenz am Knoten konfiguriert, wird stattdessen die konfigurierte Referenz als Vorlage gerendert. Ohne das Payload-Feld bleibt die konfigurierte Referenz wörtlich. Name, Beschreibung und Einzelpreis rendern keine Vorlagen.
+
+Beispiel: Formularantwort mit **Payload setzen** nach `quantity` übertragen, dann bei **Nutzung beendet** einen Verbrauchsmaterialposten ergänzen.
 
 ### Nutzungssitzung beenden
 
-Beendet die aktuelle Nutzungssitzung an der Ressource. Nützlich für automatische Abschaltungs-Flows.
+Typ: `output.resource.usage.end-session` · Maschinen · Editor: **Aktive Sitzung beenden**
 
-Keine zusätzlichen Einstellungen.
+**Notizen** ist eine optionale Vorlage. **Bei Fehler** folgt dem gemeinsamen Verhalten. Beendet die aktuelle Sitzung dieser Ressource mit deren Besitzer; eine fehlende aktive Sitzung führt zum Fehler. Gibt bei Erfolg die unveränderte Payload weiter. Während eines ausstehenden Starts/einer Übernahme kann er die Kandidatensitzung dieser Lebenszyklusaktion beenden.
+
+Beispielnotiz: `Wegen Inaktivität an {{resource.name}} automatisch beendet`. Die Aktion überspringt erforderliche Endformulare und Notizbenachrichtigungen.
 
 ### Aktivität verfolgen
 
-Zeichnet ein Aktivitätsereignis an der Ressource auf. Setzt den Inaktivitäts-Timer für **Keine Aktivität**-Trigger-Knoten zurück.
+Typ: `output.resource.activity.track-activity` · Maschinen · Editor: **Aktivität aufzeichnen**
 
-Keine zusätzlichen Einstellungen.
+Keine Einstellungen. Zeichnet Aktivität zum Serverzeitpunkt auf und setzt den **Keine Aktivität**-Timer zurück. Die Payload bleibt unverändert; der Katalog bietet keinen ausgehenden Anschluss. Beispiel: MQTT-Trigger mit beobachteter Aktivität hier verbinden. Dies weist keinen Maschinenbetriebszustand zu.
 
 ### Maschinenbetriebszustand
 
-Aktionen zum Betriebszustand erfassen, ob eine Maschine tatsächlich arbeitet oder stillsteht. Verwenden Sie dafür ein beobachtetes Signal, das Ihr Flow auswertet. Ein gesendeter Befehl oder der Start einer Nutzungssitzung ist allein kein Nachweis für Maschinenbetrieb.
+Verwenden Sie ein beobachtetes Signal, das Ihr Flow auswertet. Ein gesendeter Befehl oder der Start einer Nutzungssitzung beweist allein keinen physischen Maschinenbetrieb.
 
-Wiederholte Zuweisungen desselben Zustands ändern nichts. Ein Betriebsintervall bleibt über Sitzungsgrenzen und Serverneustarts hinweg offen, bis ein Flow den Ruhezustand zuweist. Akzeptierte Änderungen speichern den Serverzeitpunkt sowie den auslösenden Flow-Knoten und Flow-Durchlauf. Liegt die Serverzeit vor der letzten akzeptierten Änderung, schlägt die Zuweisung fehl, statt ein ungültiges Intervall zu schreiben.
+Wiederholte Zuweisungen desselben Zustands ändern nichts. Ein Betriebsintervall bleibt über Sitzungsgrenzen und Neustarts hinweg offen, bis ein Flow den Ruhezustand zuweist. Änderungen speichern Serverzeit sowie Flow-Knoten/-Durchlauf. Eine Serverzeit vor der letzten akzeptierten Änderung führt zum Fehler.
 
-Eine akzeptierte Betriebsbeobachtung bleibt gespeichert, auch wenn ein späterer Knoten fehlschlägt. Ein fehlgeschlagener Nutzungsstart oder eine fehlgeschlagene Übernahme bricht die zugehörigen Sitzungs- und Abrechnungsänderungen weiterhin ab. Stoppt der Server während einer ausstehenden Nutzungsänderung, wird dieser Versuch beim Neustart verworfen; seine physischen Befehle werden nicht erneut ausgeführt. Aufgezeichneter Maschinenbetrieb bleibt für Auswertungen und Wartung erhalten.
+Akzeptierte Beobachtungen bleiben gespeichert, auch wenn ein späterer Knoten fehlschlägt. Ein fehlgeschlagener Nutzungsstart/eine Übernahme bricht Sitzungs- und Abrechnungsänderungen weiterhin ab. Bei Serverstopp ausstehende Nutzungsänderungen werden beim Neustart verworfen; physische Befehle werden nicht erneut ausgeführt.
+
+### Betriebsbeginn aufzeichnen
+
+Typ: `output.resource.activity.operating` · Maschinen
+
+Keine Einstellungen. Weist **Betrieb** zu und startet bei zuvor ruhender Maschine ein Intervall zum Serverzeitpunkt. Gibt die unveränderte Payload über **Ausgang** weiter. Beispiel: **Wenn → Wahr** nach Auswertung des tatsächlichen Betriebssignals verbinden.
+
+### Betriebsende aufzeichnen
+
+Typ: `output.resource.activity.idle` · Maschinen
+
+Keine Einstellungen. Weist **Ruhezustand** zu und schließt ein offenes Betriebsintervall zum Serverzeitpunkt. Gibt die unveränderte Payload über **Ausgang** weiter. Beispiel: **Wenn → Falsch** für dasselbe beobachtete Betriebssignal verbinden.
+
+### Gesundheits-Lebenszeichen senden
+
+Typ: `output.resource.health.heartbeat`
+
+| Einstellung                               | Beschreibung                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------------- |
+| **Kennung**                               | Optionale feste Teilsystembezeichnung; leer verwendet den Ressourcenstandard |
+| **Timeout (Sekunden)**                    | Positive ganze Zahl                                                          |
+| **Grund bei Timeout** (`unhealthyReason`) | Optionaler wörtlicher Text; Standard `Heartbeat timed out`                   |
+
+Markiert das Teilsystem als gesund und speichert den letzten Empfangszeitpunkt. Eine Prüfung pro Minute markiert es nach dem Timeout als ungesund. Timerdaten liegen im Arbeitsspeicher und werden nach Neustart neu initialisiert. Gibt die unveränderte Payload über **Ausgang** weiter. Keine Einstellung rendert Vorlagen. Beispiel: periodische MQTT-Statusnachricht hier verbinden.
+
+### Gesundheitszustand setzen
+
+Typ: `output.resource.health.set`
+
+| Einstellung | Beschreibung                                                            |
+| ----------- | ----------------------------------------------------------------------- |
+| **Kennung** | Optionale Vorlage; Pfad `health.identifier` kann sie überschreiben      |
+| **Status**  | Fest `healthy` oder `unhealthy`; `health.status` kann ihn überschreiben |
+| **Grund**   | Optionale Vorlage; `health.reason` kann ihn überschreiben               |
+
+Overrides müssen nicht leere Zeichenketten sein; ungültiger Status führt zum Fehler. Bei gesunden Meldungen wird der Grund gelöscht. Gibt die unveränderte Payload über **Ausgang** weiter. Beispiel: **Payload setzen** mit Schlüssel `health.status`, Wert `unhealthy`, und Schlüssel `health.reason`, Wert `Gerät meldet {{payload.error}}`, dann hier verbinden.
+
+### PC sperren
+
+Typ: `output.companion.lock-pc`
+
+Wählen Sie ein festes **Companion-Gerät** (`deviceId`). Sendet einen Bildschirmsperrbefehl. Gibt Eingangsfelder über **Ausgang** weiter und ersetzt ein vorhandenes `companion`-Feld durch `{ delivered }`. `companion.delivered` zeigt, ob der Befehl an ein verbundenes Gerät gesendet wurde, nicht ob das Betriebssystem die Sperre abgeschlossen hat. Ein Offline-Gerät ergibt `false`. Der gewünschte Sperrzustand wird auch für die nächste Authentifizierung gespeichert.
+
+### PC entsperren
+
+Typ: `output.companion.unlock-pc`
+
+Wählen Sie ein festes **Companion-Gerät**. Sendet einen Entsperrbefehl und speichert den gewünschten Zustand. Payload-Verhalten wie bei **PC sperren**: `companion.delivered` zeigt die Zustellung. Die tatsächliche Entsperrung hängt von der Companion-Plattformintegration ab.
 
 ### Messung bereit
 
-Den Zähler der Start-Anfrage auswählen. Bei einem Gesamtzähler den Basiswert angeben; nach einem Reset auf null leer lassen. Werte und Quellenbezeichnung können Vorlagen verwenden.
+Typ: `output.resource.metering.ready` · Maschinen
+
+| Einstellung | Beschreibung |
+| --- | --- |
+| **Zähler** | Den Zähler der Start-Anfrage auswählen |
+| **Basiswert** | Optionale Vorlage für den aktuellen Gesamtstand eines kumulierten Zählers |
+| **Quelle** | Optionale Vorlage mit dem Namen des physischen Zählers |
+
+Schließt eine **Messung starten**-Operation ab. Schlägt außerhalb eines Startzweigs fehl. Nach einem Reset auf null den Basiswert leer lassen; ein konfigurierter Basiswert, der leer gerendert wird, führt zum Fehler. Der Katalog bietet keinen ausgehenden Anschluss.
+
+Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Einheit ist nicht erforderlich. Siehe [Zähler](flows/energy-metering.md).
 
 ### Zähler melden
 
-Zähler, Modus **total** (kumulierter Zählerstand) oder **increment** (Zuwachs) und nichtnegativen Wert beziehungsweise Vorlage festlegen. Eine Einheit ist nicht erforderlich. Messzeit und Quelle sind optional. Funktioniert in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung.
+Typ: `output.resource.metering.report`
 
-Siehe [Zähler](flows/energy-metering.md).
+| Einstellung | Beschreibung |
+| --- | --- |
+| **Zähler** | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen |
+| **Modus** | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
+| **Wert** | Erforderlicher nichtnegativer Zahlenwert oder Vorlage |
+| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt |
+| **Quelle** | Optionale Vorlage mit dem Namen des Zählers |
+
+Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine Antwort im Abfragezweig muss zum angefragten Zähler passen. Eine Einheit ist nicht erforderlich. Der erste unaufgeforderte Gesamtstand legt einen Basiswert fest; spätere Zuwächse erhöhen den Gesamtverbrauch. Inkremente erhöhen den Verbrauch direkt. Während einer laufenden Sitzung aktualisieren akzeptierte Zuwächse auch deren Verbrauch. Eine konfigurierte Messzeit-Vorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
+
+Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **Heartbeats** auswählen, Modus **total**, Wert `{{payload.heartbeats}}`. Siehe [Zähler](flows/energy-metering.md) für Basiswerte und Wiederholungsversuche.
 
 ## Siehe auch
 
-- [Flow-Editor](flows/flow-editor.md) -- Knoten platzieren und verbinden
-- [Flows-Überblick](flows/overview.md) -- Was Flows sind und wie sie funktionieren
-- [MQTT & IoT](mqtt/overview.md) -- MQTT einrichten
-- [Zähler](flows/energy-metering.md) -- Beliebigen Verbrauch erfassen und abrechnen
-- [Abrechnung](billing/overview.md) -- Details zum Abrechnungssystem
+- [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) — Datenpfade und vollständige Beispiele
+- [Flow-Editor](flows/flow-editor.md) — Knoten hinzufügen und verbinden
+- [MQTT & IoT](mqtt/overview.md) — MQTT-Server konfigurieren
+- [Zähler](flows/energy-metering.md) — Beliebigen Verbrauch erfassen und abrechnen
+- [Abrechnung](billing/overview.md) — Details zum Abrechnungssystem

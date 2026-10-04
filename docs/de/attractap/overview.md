@@ -1,10 +1,10 @@
-# Attractap NFC-Leser
+# Attractap RFID-Leser
 
-Attractap ist ein ESP32-basierter NFC-Kartenleser, der physische Zugangskontrolle fuer Ihren Makerspace ermoeglicht. Er liest NFC-Karten, prueft Benutzerberechtigungen mit dem Attraccess-Backend und steuert den Zugang zu Maschinen und Tueren.
+Attractap ist ein ESP32-basierter RFID-Kartenleser, der physische Zugangskontrolle fuer Ihren Makerspace ermoeglicht. Er liest RFID-Karten, prueft Benutzerberechtigungen mit dem Attraccess-Backend und steuert den Zugang zu Maschinen und Tueren.
 
 ## Was ist Attractap?
 
-Attractap ist ein kompaktes Hardwaregeraet, das Sie neben einer Maschine oder Tuer montieren. Wenn ein Benutzer seine NFC-Karte an den Leser haelt, geschieht Folgendes:
+Attractap ist ein kompaktes Hardwaregeraet, das Sie neben einer Maschine oder Tuer montieren. Wenn ein Benutzer seine RFID-Karte an den Leser haelt, geschieht Folgendes:
 
 1. Die eindeutige ID der Karte wird gelesen
 2. Die ID wird ueber WebSocket an das Attraccess-Backend gesendet
@@ -18,7 +18,7 @@ Attractap ist ein kompaktes Hardwaregeraet, das Sie neben einer Maschine oder Tu
 
 | Funktion | Beschreibung |
 |----------|-------------|
-| **NFC-Kartenlesung** | Liest Standard-NFC-Karten (MIFARE, NTAG etc.) ueber PN532-Leser |
+| **RFID-Kartenlesung** | Liest Standard-RFID-Karten (MIFARE, NTAG etc.) ueber PN532-Leser |
 | **Echtzeitkommunikation** | Verbindet sich ueber WebSocket mit dem Attraccess-Backend fuer sofortige Zugangsentscheidungen |
 | **Display** | Zeigt Statusmeldungen auf integriertem E-Ink- oder LCD-Display |
 | **Audio-Feedback** | Buzzer gibt hoerbare Bestaetigung bei Zugang gewaehrt oder verweigert |
@@ -27,7 +27,7 @@ Attractap ist ein kompaktes Hardwaregeraet, das Sie neben einer Maschine oder Tu
 
 ## Funktionsweise
 
-Attractap dient als Bruecke zwischen physischen NFC-Karten und der Attraccess-Software. Der Leser haelt eine permanente WebSocket-Verbindung zu Ihrem Attraccess-Server aufrecht. Wenn eine Karte gescannt wird, prueft das Backend, ob die Karte mit einem Benutzerkonto verknuepft ist und ob dieser Benutzer die Berechtigung hat, die zugewiesene Ressource zu nutzen.
+Attractap dient als Bruecke zwischen physischen RFID-Karten und der Attraccess-Software. Der Leser haelt eine permanente WebSocket-Verbindung zu Ihrem Attraccess-Server aufrecht. Wenn eine Karte gescannt wird, prueft das Backend, ob die Karte mit einem Benutzerkonto verknuepft ist und ob dieser Benutzer die Berechtigung hat, die zugewiesene Ressource zu nutzen.
 
 > [!NOTE]
 > Attractap benoetigt einen laufenden Attraccess-Backend-Server. Der Leser kann nicht als eigenstaendiges Geraet funktionieren.
@@ -50,6 +50,6 @@ Siehe [Hardware](attractap/hardware.md) fuer detaillierte Spezifikationen jeder 
 - [Leser benutzen](attractap/using-the-reader.md) – Mit der Karte anmelden und Maschinen oder Türen nutzen
 - [Hardware](attractap/hardware.md) -- Hardware-Varianten und Komponenten
 - [Einrichtung](attractap/setup.md) -- Leser registrieren und konfigurieren
-- [NFC-Karten](attractap/nfc-cards.md) -- Benutzer-NFC-Karten verwalten
+- [RFID-Karten](attractap/rfid-cards.md) -- Benutzer-RFID-Karten verwalten
 - [Firmware-Updates](attractap/firmware-updates.md) -- Leser-Firmware aktualisieren
 - [Ressourcen](resources/overview.md) -- Maschinen und Tueren verwalten
