@@ -13,8 +13,13 @@
 </mj-section>
 <mj-section background-color="#FFFFFF" padding="0 20px 24px 20px">
   <mj-column>
-    <mj-table>
-      <tr><th align="left">{{t 'col_item' 'Item'}}</th><th align="right">{{t 'col_qty' 'Qty'}}</th><th align="right">{{t 'col_rate' 'Rate'}}</th><th align="right">{{t 'col_total' 'Total'}}</th></tr>
+    <mj-table table-layout="fixed">
+      <tr>
+        <th align="left" width="36%">{{t 'col_item' 'Item'}}</th>
+        <th align="right" width="24%">{{t 'col_qty' 'Qty'}}</th>
+        <th align="right" width="22%">{{t 'col_rate' 'Rate'}}</th>
+        <th align="right" width="18%" style="white-space:nowrap;">{{t 'col_total' 'Total'}}</th>
+      </tr>
       {{#each items}}
       <tr>
         <td>
@@ -31,16 +36,16 @@
         </td>
         <td align="right">{{this.quantity}}</td>
         <td align="right">{{#if this.isDuration}}{{t 'duration_rate' '{credits} credits/min' credits=this.unitPrice}}{{else}}{{this.unitPrice}}{{/if}}</td>
-        <td align="right">{{this.total}}</td>
+        <td align="right" style="white-space:nowrap;">{{this.total}}</td>
       </tr>
       {{/each}}
       <tr>
         <td colspan="3" align="right"><strong>{{t 'total_credits' 'Total Credits'}}</strong></td>
-        <td align="right"><strong>{{totalCredits}}</strong></td>
+        <td align="right" style="white-space:nowrap;"><strong>{{totalCredits}}</strong></td>
       </tr>
       <tr>
         <td colspan="3" align="right">{{t 'new_balance' 'New Balance'}}</td>
-        <td align="right">{{newBalance}}</td>
+        <td align="right" style="white-space:nowrap;">{{newBalance}}</td>
       </tr>
     </mj-table>
   </mj-column>

@@ -69,7 +69,7 @@
             "config": {
               "timeoutSeconds": {
                 "label": "Timeout (seconds)",
-                "helpText": "Maximum time to wait for Metering ready. A session that cannot start its meter does not start."
+                "helpText": "Maximum time to wait for Metering ready. Billed meters must acknowledge before the session starts. Failed zero-rate meters are skipped and the session can still start."
               },
               "meterId": {
                 "label": "Meter",
@@ -718,7 +718,7 @@
         "metering": {
           "ready": {
             "title": "Metering ready",
-            "description": "Confirms the meter is initialized. Sessions only start once this is reached.",
+            "description": "Confirms the meter is initialized. Billed meters require this acknowledgement before the session starts. Failed zero-rate meters are skipped and the session can still start.",
             "inputs": {
               "input": "Input"
             },

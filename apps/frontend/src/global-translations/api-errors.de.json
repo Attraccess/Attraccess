@@ -21,10 +21,10 @@
   },
   "METER_INITIALIZATION_FAILED": {
     "title": "Zähler nicht gestartet",
-    "description": "Die Sitzung wurde nicht gestartet, weil der Zähler nicht initialisiert werden konnte: {{error}}"
+    "description": "Die Sitzung wurde nicht gestartet, weil ein kostenpflichtiger Zähler nicht initialisiert werden konnte: {{error}}"
   },
   "METER_SETTLEMENT_FAILED": {
-    "title": "Energie weiterhin nicht verfügbar",
+    "title": "Zählerstand weiterhin nicht verfügbar",
     "description": "{{error}}"
   },
   "METER_SESSION_NOT_FOUND": {

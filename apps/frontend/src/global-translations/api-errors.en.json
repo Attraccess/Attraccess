@@ -21,7 +21,7 @@
   },
   "METER_INITIALIZATION_FAILED": {
     "title": "Meter did not start",
-    "description": "The session was not started because the energy meter could not be initialized: {{error}}"
+    "description": "The session was not started because a billed meter could not be initialized: {{error}}"
   },
   "METER_SETTLEMENT_FAILED": {
     "title": "Meter reading still unavailable",

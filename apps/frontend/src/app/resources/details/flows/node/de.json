@@ -69,7 +69,7 @@
             "config": {
               "timeoutSeconds": {
                 "label": "Zeitlimit (Sekunden)",
-                "helpText": "Maximale Wartezeit auf „Messung bereit“. Eine Sitzung, deren Zähler nicht startet, startet nicht."
+                "helpText": "Maximale Wartezeit auf „Messung bereit“. Kostenpflichtige Zähler müssen den Start bestätigen, bevor die Sitzung startet. Fehlgeschlagene Zähler mit einem Preis von null werden übersprungen; die Sitzung kann trotzdem starten."
               },
               "meterId": {
                 "label": "Zähler",
@@ -717,7 +717,7 @@
         "metering": {
           "ready": {
             "title": "Messung bereit",
-            "description": "Bestätigt, dass der Zähler initialisiert ist. Sitzungen starten erst, wenn dieser Knoten erreicht wird.",
+            "description": "Bestätigt, dass der Zähler initialisiert ist. Kostenpflichtige Zähler benötigen diese Bestätigung vor dem Sitzungsstart. Fehlgeschlagene Zähler mit einem Preis von null werden übersprungen; die Sitzung kann trotzdem starten.",
             "inputs": {
               "input": "Eingabe"
             },
