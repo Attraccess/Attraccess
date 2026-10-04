@@ -47,6 +47,8 @@ To connect two nodes:
 
 Click on any node to open its settings panel. Each node type has its own configuration options -- see [Node Types](flows/node-types.md) for details.
 
+For data paths, template syntax and the difference between payload fields and stored values, see [Payloads, Variables & Templates](flows/payloads-variables-templates.md). Use **Variables** in the editor to inspect or edit persistent resource and global variables.
+
 ## Auto-Layout
 
 Click the **Auto-Layout** button in the toolbar to automatically arrange all nodes in a clean, readable layout. This is useful after adding many nodes or when the canvas becomes cluttered.
@@ -55,9 +57,9 @@ Click the **Auto-Layout** button in the toolbar to automatically arrange all nod
 
 You can share flows between resources or back them up:
 
-| Action | How |
-|--------|-----|
-| **Export** | Click the **Export** button to download the flow as a JSON file |
+| Action     | How                                                                    |
+| ---------- | ---------------------------------------------------------------------- |
+| **Export** | Click the **Export** button to download the flow as a JSON file        |
 | **Import** | Click the **Import** button and select a previously exported JSON file |
 
 > [!NOTE]
@@ -65,14 +67,16 @@ You can share flows between resources or back them up:
 
 ## Execution Logs
 
-The execution log panel shows real-time status for each node as the flow runs. Node colors indicate their current state:
+Open **Flow logs**, choose a recording duration and click **Start recording** before triggering a flow. The logs show each node's input, output and failures. Logs are collected only while recording and remain visible until you leave or reload the page. See [Inspecting and Troubleshooting a Run](flows/payloads-variables-templates.md#inspecting-and-troubleshooting-a-run) for examples.
 
-| Color | Status |
-|-------|--------|
-| **Gray** | Idle -- not yet executed |
-| **Blue** | Processing -- currently running |
+Node colors indicate their current state:
+
+| Color     | Status                             |
+| --------- | ---------------------------------- |
+| **Gray**  | Idle -- not yet executed           |
+| **Blue**  | Processing -- currently running    |
 | **Green** | Completed -- finished successfully |
-| **Red** | Failed -- an error occurred |
+| **Red**   | Failed -- an error occurred        |
 
 <!-- TODO: Screenshot of execution logs with color indicators -->
 

@@ -6,11 +6,11 @@ Flows are visual automation workflows that you can attach to any resource. They 
 
 A flow is a chain of connected nodes on a visual canvas. Each flow belongs to a specific resource and is built from three types of nodes:
 
-| Node Category | Purpose | Examples |
-|---------------|---------|----------|
+| Node Category       | Purpose                              | Examples                                           |
+| ------------------- | ------------------------------------ | -------------------------------------------------- |
 | **Input (Trigger)** | Starts the flow when an event occurs | Button press, usage started, MQTT message received |
-| **Processing** | Transforms data or controls the flow | Wait, If (condition), Set Payload |
-| **Output (Action)** | Performs an action | HTTP request, MQTT message, Set Billing Items |
+| **Processing**      | Transforms data or controls the flow | Wait, If (condition), Set Payload                  |
+| **Output (Action)** | Performs an action                   | HTTP request, MQTT message, Set Billing Items      |
 
 > [!NOTE]
 > A flow always starts with at least one **Input** node and typically ends with one or more **Output** nodes.
@@ -46,6 +46,7 @@ Here are some common examples:
 ## See Also
 
 - [Flow Editor](flows/flow-editor.md) -- How to use the visual editor
+- [Payloads, Variables & Templates](flows/payloads-variables-templates.md) -- Work with node data and stored values
 - [Node Types](flows/node-types.md) -- All available node types
 - [MQTT & IoT](devices/mqtt/overview.md) -- Connect your hardware
 - [Billing](billing/overview.md) -- Automate cost tracking
