@@ -20,6 +20,8 @@ Heartbeat, readiness and rejection packets never enter feature callbacks.
 The six topics are `resource`, `flow-logs`, `billing`, `messaging`,
 `notifications` and `supervision`. The server validates positive, safe integer
 resource IDs and resource existence; flow logs require `resources.update`.
+Resource existence is checked in one query over unique IDs per set/lease renewal;
+session permissions are revalidated for every topic on each renewal.
 User topics always use the authenticated user, and supervision events are
 restricted to the user explicitly selected as supervisor. Connections bind to
 both user and a hash of the authenticated session credential. Controls cannot address another user's/session's
@@ -38,8 +40,13 @@ Resource subscriptions additionally receive their own initial in-use state.
 Nonpersisted notifications and supervision events have no durable replay.
 
 Messaging subscriptions retain online presence. Notification controls report
-current tab visibility, including after reconnect; the existing web-presence
-visibility listener remains in place. A rejected/expired session stops retries,
+current tab visibility immediately on visibility changes and after reconnect.
+The server tracks visible connections per user: any visible tab retains web
+presence, and unsubscribe/disconnect removes only that connection's contribution.
+Legacy web-presence reporting remains available for compatibility; the UI uses
+only bundled controls. Connection UUIDs also work on plain HTTP through the
+existing `uuid` library's `getRandomValues` fallback.
+A rejected/expired session stops retries,
 clears callbacks and clears cached authenticated state. Logout disposes the
 transport before its HTTP request. A subsequent user gets a new provider/client.
 On last unsubscribe or stream disconnect, RxJS subscriptions and unobserved

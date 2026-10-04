@@ -6,6 +6,7 @@ import { SystemNotificationLiveEventDto } from './dtos/system-notification-live-
 export class NotificationLiveService {
   private readonly subjects = new Map<number, Subject<{ data: SystemNotificationLiveEventDto }>>();
   private readonly userPresence = new Map<number, boolean>();
+  private readonly visibleConnections = new Map<number, Set<string>>();
 
   public getUserSubject(userId: number): Subject<{ data: SystemNotificationLiveEventDto }> {
     if (!this.subjects.has(userId)) {
@@ -28,10 +29,26 @@ export class NotificationLiveService {
   }
 
   public setUserPresent(userId: number, present: boolean): void {
-    this.userPresence.set(userId, present);
+    if (present) this.userPresence.set(userId, true);
+    else this.userPresence.delete(userId);
+  }
+
+  public setConnectionPresent(userId: number, connectionId: string, present: boolean): void {
+    if (present) {
+      let connections = this.visibleConnections.get(userId);
+      if (!connections) {
+        connections = new Set();
+        this.visibleConnections.set(userId, connections);
+      }
+      connections.add(connectionId);
+    } else {
+      const connections = this.visibleConnections.get(userId);
+      connections?.delete(connectionId);
+      if (connections?.size === 0) this.visibleConnections.delete(userId);
+    }
   }
 
   public isUserPresent(userId: number): boolean {
-    return this.userPresence.get(userId) ?? false;
+    return Boolean(this.userPresence.get(userId) || this.visibleConnections.get(userId)?.size);
   }
 }

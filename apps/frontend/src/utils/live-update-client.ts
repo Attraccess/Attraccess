@@ -1,5 +1,6 @@
 import { LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
 import { events } from 'fetch-event-stream';
+import { v4 as uuidv4 } from 'uuid';
 
 type Consumer = { update: (payload: unknown) => void; restore?: () => void };
 type Entry = { subscription: LiveSubscription; consumers: Set<Consumer> };
@@ -22,6 +23,12 @@ export class LiveUpdateClient {
   private failures = 0;
   private disposed = false;
   private connected = false;
+  private readonly visibilityChange = () => {
+    const transport = this.transport;
+    if (!transport || !this.topics.has('notifications:')) return;
+    transport.dirty = true;
+    void this.sync(transport);
+  };
 
   constructor(
     private readonly origin: string,
@@ -72,7 +79,8 @@ export class LiveUpdateClient {
   private start(): void {
     if (this.disposed || !this.topics.size || this.transport) return;
     const transport: Transport = {
-      id: crypto.randomUUID(),
+      // uuid falls back to getRandomValues on supported plain-HTTP deployments.
+      id: uuidv4(),
       abort: new AbortController(),
       ready: false,
       dirty: true,
@@ -81,6 +89,7 @@ export class LiveUpdateClient {
       lastPacket: Date.now(),
     };
     this.transport = transport;
+    document.addEventListener('visibilitychange', this.visibilityChange);
     this.timer = setInterval(() => {
       if (Date.now() - transport.lastPacket > 35_000) transport.abort.abort();
       else {
@@ -198,6 +207,7 @@ export class LiveUpdateClient {
     const transport = this.transport;
     this.transport = undefined;
     transport?.abort.abort();
+    document.removeEventListener('visibilitychange', this.visibilityChange);
     clearInterval(this.timer);
     this.timer = undefined;
   }

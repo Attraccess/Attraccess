@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Resource } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LiveSubscription } from '@attraccess/shared';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { defer, Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { ResourceEventsService } from '../resources/sse/resource-events.service';
@@ -25,8 +25,8 @@ export class LiveTopicsService {
     private readonly supervision: SupervisionLiveService,
   ) {}
 
-  setWebPresence(userId: number, present: boolean): void {
-    this.notifications.setUserPresent(userId, present);
+  setWebPresence(userId: number, connectionId: string, present: boolean): void {
+    this.notifications.setConnectionPresent(userId, connectionId, present);
   }
 
   parse(value: unknown): LiveSubscription {
@@ -50,13 +50,20 @@ export class LiveTopicsService {
     throw new BadRequestException('Unsupported topic');
   }
 
-  async authorize(subscription: LiveSubscription, user: AuthenticatedUser): Promise<void> {
+  async existingResourceIds(subscriptions: Iterable<LiveSubscription>): Promise<ReadonlySet<number>> {
+    const ids = [...new Set([...subscriptions].flatMap((s) => (s.resourceId === undefined ? [] : [s.resourceId])))];
+    if (!ids.length) return new Set();
+    const resources = await this.resources.find({ where: { id: In(ids) }, select: { id: true } });
+    return new Set(resources.map((resource) => resource.id));
+  }
+
+  authorize(subscription: LiveSubscription, user: AuthenticatedUser, resourceIds: ReadonlySet<number>): void {
     if (subscription.topic === 'flow-logs' && !user.effectivePermissions?.has('resources.update')) {
       throw new ForbiddenException('Resource update permission required');
     }
     // Supervision is scoped to this session's user, just like the legacy endpoint:
     // only requests explicitly addressed to this supervisor are ever emitted.
-    if (subscription.resourceId !== undefined && !(await this.resources.existsBy({ id: subscription.resourceId }))) {
+    if (subscription.resourceId !== undefined && !resourceIds.has(subscription.resourceId)) {
       throw new NotFoundException('Resource not found');
     }
   }

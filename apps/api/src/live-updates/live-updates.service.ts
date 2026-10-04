@@ -12,6 +12,7 @@ import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { LiveTopicsService } from './live-topics.service';
 
 interface Connection {
+  id: string;
   userId: number;
   tokenId: string;
   subscriber: Subscriber<{ data: LivePacket }>;
@@ -37,6 +38,7 @@ export class LiveUpdatesService implements OnModuleDestroy {
     if (this.connections.has(id)) throw new BadRequestException('Connection already open');
     return new Observable((subscriber) => {
       const connection: Connection = {
+        id,
         userId: user.id,
         tokenId: user.jwtTokenId,
         subscriber,
@@ -53,6 +55,7 @@ export class LiveUpdatesService implements OnModuleDestroy {
       }, 10_000);
       return () => {
         clearInterval(heartbeat);
+        this.topics.setWebPresence(connection.userId, connection.id, false);
         connection.topics.forEach((sub) => sub.unsubscribe());
         connection.topics.clear();
         if (this.connections.get(id) === connection) this.connections.delete(id);
@@ -105,13 +108,23 @@ export class LiveUpdatesService implements OnModuleDestroy {
     for (const value of values) {
       try {
         const subscription = this.topics.parse(value);
-        await this.topics.authorize(subscription, user);
         wanted.set(liveSubscriptionKey(subscription), subscription);
       } catch (error) {
         connection.subscriber.next({ data: { type: 'rejected', subscription: value, reason: error.message } });
       }
     }
+    // One lookup per set/renewal, including when resource and flow-log topics
+    // reference the same ID. Session permissions are still checked each time.
+    const resourceIds = await this.topics.existingResourceIds(wanted.values());
     if (connection.subscriber.closed) return;
+    for (const [key, subscription] of wanted) {
+      try {
+        this.topics.authorize(subscription, user, resourceIds);
+      } catch (error) {
+        wanted.delete(key);
+        connection.subscriber.next({ data: { type: 'rejected', subscription, reason: error.message } });
+      }
+    }
     for (const [key, sub] of connection.topics) {
       if (!wanted.has(key)) {
         sub.unsubscribe();
@@ -134,7 +147,12 @@ export class LiveUpdatesService implements OnModuleDestroy {
           },
           error: () => {
             connection.topics.delete(key);
+            if (subscription.topic === 'notifications') this.topics.setWebPresence(user.id, connection.id, false);
             connection.subscriber.next({ data: { type: 'rejected', subscription, reason: 'Topic unavailable' } });
+          },
+          complete: () => {
+            connection.topics.delete(key);
+            if (subscription.topic === 'notifications') this.topics.setWebPresence(user.id, connection.id, false);
           },
         });
         if (!sub.closed) connection.topics.set(key, sub);
@@ -142,7 +160,9 @@ export class LiveUpdatesService implements OnModuleDestroy {
         connection.subscriber.next({ data: { type: 'rejected', subscription, reason: error.message } });
       }
     }
-    if (wanted.has('notifications:') && present !== undefined) this.topics.setWebPresence(user.id, present);
+    const notifications = connection.topics.get('notifications:');
+    if (!notifications || notifications.closed) this.topics.setWebPresence(user.id, connection.id, false);
+    else if (present !== undefined) this.topics.setWebPresence(user.id, connection.id, present);
     connection.expiresAt = Date.now() + 30_000;
   }
 

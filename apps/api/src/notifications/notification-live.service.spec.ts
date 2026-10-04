@@ -17,4 +17,20 @@ describe('notification presence and subject lifecycle', () => {
     service.emitToUser(1, { category: NotificationCategory.MESSAGES, title: 'Offline', body: '', severity: 'info' });
     expect(service['subjects'].size).toBe(0);
   });
+
+  it('keeps a user present while any tab is visible and removes only the disconnected tab', () => {
+    const service = new NotificationLiveService();
+    service.setConnectionPresent(1, 'visible-tab', true);
+    service.setConnectionPresent(1, 'hidden-tab', false);
+    service.setUserPresent(1, false); // Legacy reports cannot suppress bundled presence.
+    expect(service.isUserPresent(1)).toBe(true);
+    service.setConnectionPresent(1, 'second-visible-tab', true);
+    service.setConnectionPresent(1, 'visible-tab', false);
+    expect(service.isUserPresent(1)).toBe(true);
+    expect(service.isUserPresent(2)).toBe(false);
+    service.setConnectionPresent(1, 'second-visible-tab', false);
+    service.setConnectionPresent(1, 'second-visible-tab', false);
+    expect(service.isUserPresent(1)).toBe(false);
+    expect(service['visibleConnections'].size).toBe(0);
+  });
 });

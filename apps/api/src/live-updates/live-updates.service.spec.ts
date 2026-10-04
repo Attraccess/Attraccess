@@ -10,7 +10,13 @@ const user = { id: 1, jwtTokenId: 'session-a', effectivePermissions: new Set() }
 
 describe('bundled server lifecycle', () => {
   let service: LiveUpdatesService;
-  let topics: { parse: jest.Mock; authorize: jest.Mock; source: jest.Mock; setWebPresence: jest.Mock };
+  let topics: {
+    parse: jest.Mock;
+    existingResourceIds: jest.Mock;
+    authorize: jest.Mock;
+    source: jest.Mock;
+    setWebPresence: jest.Mock;
+  };
   let source: Subject<{ data: object }>;
   let packets: LivePacket[];
   beforeEach(() => {
@@ -19,7 +25,8 @@ describe('bundled server lifecycle', () => {
     source = new Subject();
     topics = {
       parse: jest.fn((value) => value),
-      authorize: jest.fn(async (_subscription: LiveSubscription) => undefined),
+      existingResourceIds: jest.fn(async () => new Set<number>()),
+      authorize: jest.fn((_subscription: LiveSubscription) => undefined),
       source: jest.fn(async (_subscription: LiveSubscription) => source.asObservable()),
       setWebPresence: jest.fn(),
     };
@@ -61,7 +68,7 @@ describe('bundled server lifecycle', () => {
 
   it('retains authorized subscriptions in a mixed set and revokes forbidden ones on renewal', async () => {
     service.open(id, user).subscribe(({ data }) => packets.push(data));
-    topics.authorize.mockImplementation(async (s) => {
+    topics.authorize.mockImplementation((s) => {
       if (s.topic === 'flow-logs') throw new Error('Forbidden');
     });
     await service.update(id, user, body([{ topic: 'messaging' }, { topic: 'flow-logs', resourceId: 1 }]));
@@ -71,7 +78,9 @@ describe('bundled server lifecycle', () => {
       subscription: { topic: 'flow-logs', resourceId: 1 },
       reason: 'Forbidden',
     });
-    topics.authorize.mockRejectedValue(new Error('Revoked'));
+    topics.authorize.mockImplementation(() => {
+      throw new Error('Revoked');
+    });
     await service.update(id, user, body([{ topic: 'messaging' }]));
     expect(source.observed).toBe(false);
   });
@@ -86,10 +95,10 @@ describe('bundled server lifecycle', () => {
     expect(() => service.update(id, user, body([]))).toThrow('not found');
   });
 
-  it('does not subscribe after asynchronous authorization finishes on a disconnected tab', async () => {
-    let resolve!: () => void;
-    topics.authorize.mockReturnValue(
-      new Promise<void>((r) => {
+  it('does not subscribe after asynchronous resource validation finishes on a disconnected tab', async () => {
+    let resolve!: (ids: Set<number>) => void;
+    topics.existingResourceIds.mockReturnValue(
+      new Promise<Set<number>>((r) => {
         resolve = r;
       }),
     );
@@ -97,9 +106,30 @@ describe('bundled server lifecycle', () => {
     const pending = service.update(id, user, body([{ topic: 'resource', resourceId: 1 }]));
     await Promise.resolve();
     connection.unsubscribe();
-    resolve();
+    resolve(new Set([1]));
     await pending;
     expect(topics.source).not.toHaveBeenCalled();
     expect(source.observed).toBe(false);
+  });
+
+  it('tracks notification visibility by connection and clears it on topic removal, revocation and disconnect', async () => {
+    const otherId = '00000000-0000-4000-8000-000000000002';
+    const first = service.open(id, user).subscribe();
+    const second = service.open(otherId, user).subscribe();
+    await service.update(id, user, { ...body([{ topic: 'notifications' }]), present: true });
+    await service.update(otherId, user, { ...body([{ topic: 'notifications' }]), present: false });
+    expect(topics.setWebPresence).toHaveBeenCalledWith(user.id, id, true);
+    expect(topics.setWebPresence).toHaveBeenCalledWith(user.id, otherId, false);
+    await service.update(id, user, body([{ topic: 'messaging' }], 1));
+    expect(topics.setWebPresence).toHaveBeenLastCalledWith(user.id, id, false);
+    await service.update(id, user, { ...body([{ topic: 'notifications' }], 2), present: true });
+    topics.authorize.mockImplementation(() => {
+      throw new Error('Revoked');
+    });
+    await service.update(id, user, body([{ topic: 'notifications' }], 2));
+    expect(topics.setWebPresence).toHaveBeenLastCalledWith(user.id, id, false);
+    second.unsubscribe();
+    expect(topics.setWebPresence).toHaveBeenLastCalledWith(user.id, otherId, false);
+    first.unsubscribe();
   });
 });

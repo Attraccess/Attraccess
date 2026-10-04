@@ -30,7 +30,7 @@ const flush = async () => {
 describe('bundled live client', () => {
   let client: LiveUpdateClient;
   let streams: ReturnType<typeof stream>[];
-  let controls: { subscriptions: LiveSubscription[] }[];
+  let controls: { subscriptions: LiveSubscription[]; present: boolean }[];
   let expired: ReturnType<typeof vi.fn<() => void>>;
   let recovered: ReturnType<typeof vi.fn<() => void>>;
   beforeEach(() => {
@@ -94,6 +94,35 @@ describe('bundled live client', () => {
     await flush();
     expect(controls.at(-1)?.subscriptions).not.toContainEqual({ topic: 'resource', resourceId: 1 });
     expect(streams).toHaveLength(1);
+  });
+
+  it('opens a valid connection when plain HTTP provides getRandomValues but no randomUUID', async () => {
+    vi.stubGlobal('crypto', { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    expect(() => client.subscribe({ topic: 'billing' }, vi.fn())).not.toThrow();
+    await flush();
+    expect(streams).toHaveLength(1);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toMatch(
+      /\/live-updates\/[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}\/events$/,
+    );
+  });
+
+  it('reports visibility changes through the existing transport and removes the listener on final cleanup', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    const remove = client.subscribe({ topic: 'notifications' }, vi.fn());
+    await flush();
+    streams[0].send({ type: 'ready' });
+    await flush();
+    expect(controls.at(-1)?.present).toBe(true);
+    visibility.mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(controls.at(-1)?.present).toBe(false);
+    expect(streams).toHaveLength(1);
+    expect(controls).toHaveLength(2);
+    remove();
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(controls).toHaveLength(2);
   });
 
   it('isolates callbacks, routes by topic and resource, ignores controls and cancels final consumers', async () => {
