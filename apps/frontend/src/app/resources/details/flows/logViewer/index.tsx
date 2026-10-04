@@ -22,6 +22,7 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import {
   ResourceFlowLog,
   ResourceFlowNodeDto,
+  useResourceFlowsServiceGetNodeSchemas,
   useResourceFlowsServiceGetFlowLogRecordingStatus,
   useResourceFlowsServiceGetFlowLogRecordingStatusKey,
   useResourceFlowsServiceGetResourceFlow,
@@ -100,7 +101,7 @@ function useCountdown(until: Date | string | null | undefined) {
 export function LogViewer(props: Props) {
   const { isOpen, setOpen, open } = useOverlayState();
 
-  const { t } = useTranslations({
+  const { t, tExists } = useTranslations({
     de: {
       ...de,
       nodes: nodeTranslationsDe.nodes,
@@ -117,6 +118,20 @@ export function LogViewer(props: Props) {
   const queryClient = useQueryClient();
 
   const { data: flowData } = useResourceFlowsServiceGetResourceFlow({ resourceId: props.resourceId });
+  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId: props.resourceId });
+
+  const nodeTitle = useCallback(
+    (node?: ResourceFlowNodeDto) => {
+      const nodeType = node?.type ?? 'flow';
+      const titleKey = 'nodes.' + nodeType + '.title';
+      if (tExists(titleKey)) {
+        return t(titleKey);
+      }
+
+      return nodeSchemas?.find((schema) => schema.type === nodeType)?.label ?? nodeType;
+    },
+    [nodeSchemas, t, tExists],
+  );
 
   // Recording expires on its own; poll while the drawer is open to notice. Status only —
   // polling the logs endpoint would re-ship the whole buffer every tick.
@@ -179,10 +194,10 @@ export function LogViewer(props: Props) {
       return {
         ...log,
         node: nodeOfLog,
-        title: `${t('nodes.' + (nodeOfLog?.type ?? 'flow') + '.title')} -> ${log.type}`,
+        title: `${nodeTitle(nodeOfLog)} -> ${log.type}`,
       };
     });
-  }, [flowData, recordedLogs, sseLogs, t]);
+  }, [flowData, recordedLogs, sseLogs, nodeTitle]);
 
   const logsOrdered = useMemo(() => {
     return [...logsWithNodes].sort((a, b) => b.id - a.id);
@@ -205,11 +220,11 @@ export function LogViewer(props: Props) {
   const runHeader = useCallback(
     (logsOfRun: typeof logsOrdered) => {
       return {
-        title: t('nodes.' + (triggerNodeOfRun(logsOfRun)?.type ?? 'flow') + '.title'),
+        title: nodeTitle(triggerNodeOfRun(logsOfRun)),
         subtitle: formatDateTime(logsOfRun[logsOfRun.length - 1]?.createdAt),
       };
     },
-    [t, formatDateTime],
+    [nodeTitle, formatDateTime],
   );
 
   const durationItems = useMemo(
