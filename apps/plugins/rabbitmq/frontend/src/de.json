@@ -1,7 +1,4 @@
 {
-  "page": {
-    "description": "Plugin zur Verwaltung von RabbitMQ. RabbitMQ-MQTT-Server zeigen in den MQTT-Einstellungen eine Erkennungsmarkierung und ihren Verbindungsstatus. Broker-Benutzer können in der Detailansicht des MQTT-Servers angelegt, bearbeitet und gelöscht sowie ihre Berechtigungen verwaltet werden."
-  },
   "status": {
     "detected": "erkannt",
     "refresh": "RabbitMQ-Status aktualisieren",

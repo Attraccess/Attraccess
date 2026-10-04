@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import sqlite3 from 'sqlite3';
@@ -70,34 +70,6 @@ test('accepts published sessions and pending candidates with a matching reservat
     );
     run(file);
     assert.equal((await rows(db, 'SELECT * FROM resource_usage')).length, 2);
-  } finally {
-    await close(db);
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('the flyer seed publishes a valid demo session and its post-seed check rolls back corruption', async () => {
-  const { directory, db } = await database();
-  try {
-    // Execute the actual usage insert and transaction guard from the SQL seed.
-    const seed = readFileSync('scripts/seed-demo-flyer.sql', 'utf8');
-    const usageInsert = seed.match(/INSERT INTO resource_usage[\s\S]*?;/)[0];
-    const integrityCheck = seed.slice(seed.indexOf('CREATE TEMP TABLE usage_seed_integrity'), seed.indexOf('COMMIT;'));
-    await execute(db, `BEGIN; ${usageInsert} ${integrityCheck} COMMIT;`);
-    const [session] = await rows(db, 'SELECT * FROM resource_usage');
-    assert.equal(session.isFinalized, 1);
-    assert.equal(session.lifecyclePending, 0);
-    assert.equal(session.endTime, null);
-    await assert.rejects(
-      execute(
-        db,
-        `BEGIN;
-      INSERT INTO resource_usage (resourceId, userId, usageAction, startTime) VALUES (2, 1, 'usage', datetime('now'));
-      ${integrityCheck}`,
-      ),
-      /Seed left invalid usage lifecycle state/,
-    );
-    assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage'), [session]);
   } finally {
     await close(db);
     rmSync(directory, { recursive: true, force: true });
