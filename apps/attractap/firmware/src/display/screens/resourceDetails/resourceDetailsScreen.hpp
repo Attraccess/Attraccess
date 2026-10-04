@@ -231,8 +231,8 @@ private:
     void updateSelectButtonStyles(FormFieldWidget &widget);
     void updateSelectOptionLayout(FormFieldWidget &widget);
 
-    lv_obj_t *noIntroductionPanel;
-    lv_obj_t *introducersListLabel;
+    lv_obj_t *noIntroductionPanel = nullptr;
+    lv_obj_t *introducersListLabel = nullptr;
     lv_obj_t *maintenancePanel = nullptr;
     lv_obj_t *maintenanceIntroducersLabel = nullptr;
     lv_obj_t *healthPanel = nullptr;
