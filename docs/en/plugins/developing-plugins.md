@@ -483,6 +483,28 @@ unknown group ID stay at the root. Host groups keep their labels and icons when
 a plugin declares the same ID; for duplicate plugin group IDs, the first loaded
 plugin's declaration wins and entries share that group.
 
+#### Sharing a group between plugins
+
+Group IDs are shared across all installed plugins. One plugin declares the group;
+other plugins only need to reference its ID in their sidebar entries. For example:
+
+```tsx
+// In the 3D printer plugin:
+getSidebarGroups(): PluginSidebarGroup[] {
+  return [{ id: '3d-printer', label: '3D Printers' }];
+}
+
+// In the BambuLab plugin:
+getSidebarItems(): PluginSidebarItem[] {
+  return [{ label: 'BambuLab', path: '/printers/bambulab', group: '3d-printer' }];
+}
+```
+
+BambuLab does not need to redeclare the group. The host collects group declarations
+from all plugins before placing entries, so either plugin can load first. The group
+can also be declared by a plugin that contributes no sidebar entries itself. If the
+declaring plugin is absent, the BambuLab entry uses the existing root fallback.
+
 ### Slots (embedded extension points)
 
 Routes give a plugin its own pages. **Slots** let a plugin inject UI _into_ a

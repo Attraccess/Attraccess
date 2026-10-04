@@ -3,7 +3,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PluginSidebarGroup, PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
+import type { AttraccessFrontendPlugin, PluginSidebarGroup, PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
 import { PlugIcon } from 'lucide-react';
 import { Providers } from '@attraccess/ui';
 import { Sidebar } from './sidebar';
@@ -11,6 +11,11 @@ import { Sidebar } from './sidebar';
 const state = vi.hoisted(() => ({
   items: [] as PluginSidebarItem[],
   groups: [] as PluginSidebarGroup[],
+  plugins: null as
+    | {
+        plugin: Pick<AttraccessFrontendPlugin, 'getPluginName' | 'getSidebarGroups' | 'getSidebarItems'>;
+      }[]
+    | null,
   throwGroups: false,
   canManageWago: true,
 }));
@@ -25,7 +30,7 @@ vi.mock('../../hooks/useAuth', () => ({
 
 vi.mock('../plugins/plugin.state', () => ({
   default: () => ({
-    plugins: [
+    plugins: state.plugins ?? [
       {
         plugin: {
           getPluginName: () => 'test-plugin',
@@ -43,6 +48,7 @@ vi.mock('../plugins/plugin.state', () => ({
 vi.mock('../routes', () => ({
   useAllRoutes: () => [
     { path: '/wago', authRequired: 'resources.update' },
+    { path: '/printers/bambulab', authRequired: 'resources.update' },
     { path: '/devices/mqtt/servers', authRequired: 'system.settings.manage' },
     { path: '/devices/companion', authRequired: 'system.settings.manage' },
   ],
@@ -71,6 +77,7 @@ function renderSidebar(isCollapsed = false) {
 beforeEach(() => {
   state.items = [{ label: 'WAGO', path: '/wago', group: 'devices' }];
   state.groups = [];
+  state.plugins = null;
   state.throwGroups = false;
   state.canManageWago = true;
 });
@@ -164,6 +171,46 @@ describe('plugin sidebar placement', () => {
     expect(screen.queryByRole('button', { name: 'WAGO Tools' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Unused group' })).not.toBeInTheDocument();
   });
+
+  it.each([
+    { providerFirst: true, collapsed: false },
+    { providerFirst: false, collapsed: false },
+    { providerFirst: true, collapsed: true },
+    { providerFirst: false, collapsed: true },
+  ])(
+    'shares a group across plugins (provider first: $providerFirst, collapsed: $collapsed)',
+    async ({ providerFirst, collapsed }) => {
+      const provider = {
+        plugin: {
+          getPluginName: () => '3d-printer',
+          getSidebarGroups: () => [{ id: '3d-printer', label: '3D Printers' }],
+        },
+      };
+      const consumer = {
+        plugin: {
+          getPluginName: () => 'bambulab',
+          getSidebarItems: () => [{ label: 'BambuLab', path: '/printers/bambulab', group: '3d-printer' }],
+        },
+      };
+      state.plugins = providerFirst ? [provider, consumer] : [consumer, provider];
+      const user = userEvent.setup();
+      renderSidebar(collapsed);
+
+      expect(screen.queryByRole('link', { name: 'BambuLab' })).not.toBeInTheDocument();
+      const trigger = screen.getByRole('button', { name: '3D Printers' });
+      await user.click(trigger);
+
+      if (collapsed) {
+        const menu = screen.getByRole('menu', { name: '3D Printers' });
+        await user.click(within(menu).getByRole('menuitem', { name: 'BambuLab' }));
+        expect(screen.getByLabelText('Current path')).toHaveTextContent('/printers/bambulab');
+      } else {
+        const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+        if (!panel) throw new Error('Shared plugin group panel is missing');
+        expect(within(panel).getByRole('link', { name: 'BambuLab' })).toHaveAttribute('href', '/printers/bambulab');
+      }
+    },
+  );
 
   it('keeps host metadata and uses only the first declaration for duplicate custom IDs', async () => {
     state.groups = [
