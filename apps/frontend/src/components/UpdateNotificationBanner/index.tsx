@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
@@ -99,7 +99,9 @@ export function UpdateNotificationBanner() {
       <StandardModal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="md">
         {({ close }) => (
           <>
-            <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
+            <ModalHeader>
+              <ModalHeading>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeading>
+            </ModalHeader>
             <ModalBody>
               {release.body?.trim() ? (
                 <Markdown variant="compact">{release.body}</Markdown>

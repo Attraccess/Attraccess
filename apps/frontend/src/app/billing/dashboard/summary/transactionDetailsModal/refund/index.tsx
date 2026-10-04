@@ -3,6 +3,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   NumberField,
   NumberFieldDecrementButton,
@@ -106,7 +107,7 @@ export function RefundModal(props: Props) {
       {children && children(open)}
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
 
         <DrawerBody>

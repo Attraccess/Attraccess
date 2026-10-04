@@ -7,6 +7,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   TextArea,
 } from '@heroui/react';
 import { StandardDrawer } from '../../../../components/standardDrawer';
@@ -135,7 +136,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
       }}
     >
       <DrawerHeader className="flex flex-col gap-1">
-        <span>{modalTitle}</span>
+        <DrawerHeading>{modalTitle}</DrawerHeading>
         <span className="text-sm text-default-500">{t('modal.description')}</span>
       </DrawerHeader>
       <DrawerBody>

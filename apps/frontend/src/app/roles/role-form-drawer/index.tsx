@@ -5,6 +5,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Input,
   Label,
   TextArea,
@@ -140,9 +141,9 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   return (
     <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <h2 className="text-lg font-semibold" data-cy="role-form-drawer-title">
+        <DrawerHeading className="text-lg font-semibold" data-cy="role-form-drawer-title">
           {t(`title.${mode}`)}
-        </h2>
+        </DrawerHeading>
       </DrawerHeader>
       <DrawerBody>
         <div className="flex flex-col gap-4">

@@ -2,7 +2,7 @@ import {
   Button,
   DrawerBody,
   DrawerFooter,
-  DrawerHeader,
+  DrawerHeader, DrawerHeading, ModalHeading,
   ModalBody,
   ModalFooter,
   ModalHeader,
@@ -83,7 +83,7 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
       {({ close }) => (
         <>
           <ModalHeader>
-            <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
+            <ModalHeading>{t('nfcCardsTable.deleteModal.title')}</ModalHeading>
           </ModalHeader>
           <ModalBody>
             <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
@@ -241,7 +241,7 @@ const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
       >
         <DrawerHeader>
           <div className="flex w-full items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold">{t('enrollModal.title')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('enrollModal.title')}</DrawerHeading>
             <Button isIconOnly variant="ghost" aria-label={t('enrollModal.cancel')} onPress={close}>
               <XIcon size={16} />
             </Button>

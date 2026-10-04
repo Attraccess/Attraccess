@@ -4,7 +4,7 @@
 // The subnet field is optional but, in practice, required for the common
 // deployment: inside Docker the API cannot see LAN multicast and its own network
 // is the container bridge, so the operator names their LAN CIDR here.
-import { Button, Chip, DrawerBody, DrawerHeader, Form, Spinner } from '@heroui/react';
+import { Button, Chip, DrawerBody, DrawerHeader, DrawerHeading, Form, Spinner } from '@heroui/react';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { discoverDevices, type DiscoveryResult } from './api';
@@ -102,7 +102,7 @@ export function DiscoverDrawer({
       <DrawerHeader>
         <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
           <div className="sh:flex sh:flex-col sh:gap-1">
-            <h2 className="sh:text-lg sh:font-semibold">{t('discovery.title')}</h2>
+            <DrawerHeading className="sh:text-lg sh:font-semibold">{t('discovery.title')}</DrawerHeading>
             <p className="sh:text-sm sh:text-muted">{t('discovery.description')}</p>
           </div>
           <Button isIconOnly variant="ghost" aria-label={t('common.close')} onPress={close}>
