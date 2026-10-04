@@ -1,6 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import type { AuthenticatedUser, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { catchError, defer, exhaustMap, finalize, map, Observable, of, shareReplay, timer } from 'rxjs';
+import { createSharedLiveSampler, type AuthenticatedUser, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import { WagoDiagnosticsService } from './diagnostics.service';
@@ -9,12 +8,10 @@ import { WagoNetworkChangeService } from './wago-network-change.service';
 import { WagoController } from './wago-controller.entity';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 
-type Snapshot = { data: { eventType: 'snapshot'; value: unknown } | { eventType: 'unavailable' } };
-
 /** Sample authoritative services once per active topic, shared across tabs/users. */
 @Injectable()
 export class WagoLiveUpdatesService implements OnModuleInit {
-  private readonly sources = new Map<string, Observable<Snapshot>>();
+  private readonly sample = createSharedLiveSampler<string>();
 
   constructor(
     @Inject(Symbol.for('attraccess.plugin.context')) private readonly context: PluginContext,
@@ -52,12 +49,10 @@ export class WagoLiveUpdatesService implements OnModuleInit {
           if (!exists) throw new NotFoundException();
         },
         source: ({ identifier }) =>
-          defer(() =>
-            this.sample(`${topic}:${identifier ?? ''}`, interval, () => {
-              const [id = 0, offset = 0] = (identifier ?? '').split(':').map(Number);
-              return read(id, offset);
-            }),
-          ),
+          this.sample(`${topic}:${identifier ?? ''}`, interval, () => {
+            const [id = 0, offset = 0] = (identifier ?? '').split(':').map(Number);
+            return read(id, offset);
+          }),
       });
     };
     register('controllers', 10_000, 'resources.update', 'none', () => this.wago.list());
@@ -75,26 +70,5 @@ export class WagoLiveUpdatesService implements OnModuleInit {
     register('runtime-update', 5_000, 'system.settings.manage', 'controller', (id) => this.managed.status(id));
     register('managed-access', 5_000, 'system.settings.manage', 'session', (id) => this.managed.sessionStatus(id));
     register('network-change', 2_000, 'system.settings.manage', 'controller', (id) => this.network.status(id));
-  }
-
-  private sample(key: string, interval: number, read: () => Promise<unknown>): Observable<Snapshot> {
-    let source = this.sources.get(key);
-    if (!source) {
-      source = timer(0, interval).pipe(
-        // Do not overlap slow status reads. Errors retain the subscription and allow recovery.
-        exhaustMap(() =>
-          defer(read).pipe(
-            map((value): Snapshot => ({ data: { eventType: 'snapshot', value } })),
-            catchError(() => of<Snapshot>({ data: { eventType: 'unavailable' } })),
-          ),
-        ),
-        finalize(() => {
-          if (this.sources.get(key) === source) this.sources.delete(key);
-        }),
-        shareReplay({ bufferSize: 1, refCount: true }),
-      );
-      this.sources.set(key, source);
-    }
-    return source;
   }
 }

@@ -29,14 +29,45 @@ describe('live topic provider registry', () => {
     { topic: 'unknown' },
     { topic: 'resource' },
     { topic: 'resource', resourceId: -1 },
+    { topic: 'resource', resourceId: 0 },
     { topic: 'resource', resourceId: '1' },
     { topic: 'resource', resourceId: 1.1 },
     { topic: 'resource', resourceId: Number.MAX_SAFE_INTEGER + 1 },
+    { topic: 'resource', resourceId: 1, identifier: 'device' },
+    { topic: 'resource', resourceId: 1, extra: true },
     { topic: 'messaging', userId: 2 },
     { topic: 'billing', resourceId: 1 },
+    { topic: 'billing', identifier: undefined },
   ])('rejects invalid topic %j', (value) => {
     expect(() => setup().service.parse(value)).toThrow();
   });
+
+  it.each(['none', 'required', 'optional'] as const)(
+    'preserves plugin identifier mode %s and strict fields',
+    (mode) => {
+      const service = new LiveTopicsService();
+      const topic = `plugin:test:${mode}` as const;
+      service.register({ topics: [{ topic, scope: 'plugin', identifier: mode }], source: () => new Subject() });
+      if (mode === 'required') {
+        expect(() => service.parse({ topic })).toThrow();
+        expect(() => service.parse({ topic, identifier: undefined })).toThrow();
+      } else {
+        expect(service.parse({ topic })).toEqual({ topic });
+        expect(service.parse({ topic, identifier: undefined })).toEqual({ topic });
+      }
+      if (mode === 'none') {
+        expect(() => service.parse({ topic, identifier: 'device' })).toThrow();
+      } else {
+        expect(service.parse({ topic, identifier: 'device' })).toEqual({ topic, identifier: 'device' });
+        expect(service.parse({ topic, identifier: 'x'.repeat(128) })).toEqual({ topic, identifier: 'x'.repeat(128) });
+      }
+      for (const identifier of ['', null, 1, 'x'.repeat(129)]) {
+        expect(() => service.parse({ topic, identifier })).toThrow();
+      }
+      expect(() => service.parse({ topic, resourceId: 1 })).toThrow();
+      expect(() => service.parse({ topic, identifier: 'device', extra: true })).toThrow();
+    },
+  );
 
   it('routes only registered topics and can accept a provider after construction', async () => {
     const service = new LiveTopicsService();

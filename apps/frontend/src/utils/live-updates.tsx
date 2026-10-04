@@ -1,14 +1,6 @@
-import {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useSyncExternalStore,
-} from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { create } from 'zustand';
 import { LiveSubscription } from '@attraccess/shared';
 import { getBaseUrl } from '../api';
 import { UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
@@ -18,33 +10,24 @@ import { PluginLiveUpdatesProvider } from '@attraccess/plugins-frontend-sdk';
 
 const Context = createContext<LiveUpdateClient | null>(null);
 const clients = new Set<LiveUpdateClient>();
-const authListeners = new Set<() => void>();
-let stopped = false;
-const subscribeAuth = (listener: () => void) => {
-  authListeners.add(listener);
-  return () => {
-    authListeners.delete(listener);
-  };
-};
+const useLiveUpdatesAuth = create(() => ({ stopped: false }));
 
 /** A successful explicit login starts a new authentication context. */
 export function resumeLiveUpdates(): void {
-  stopped = false;
-  authListeners.forEach((listener) => listener());
+  useLiveUpdatesAuth.setState({ stopped: false });
 }
 
 /** Called before logout, so callbacks stop even while the logout request is pending. */
 export function stopLiveUpdates(): void {
-  stopped = true;
   clients.forEach((client) => client.dispose());
   clients.clear();
-  authListeners.forEach((listener) => listener());
+  useLiveUpdatesAuth.setState({ stopped: true });
 }
 
 export function LiveUpdatesProvider({ userId, children }: { userId?: number; children: ReactNode }) {
   const queryClient = useQueryClient();
   const origin = getBaseUrl();
-  const isStopped = useSyncExternalStore(subscribeAuth, () => stopped);
+  const isStopped = useLiveUpdatesAuth((state) => state.stopped);
   const client = useMemo(
     () =>
       userId && !isStopped
@@ -56,6 +39,7 @@ export function LiveUpdatesProvider({ userId, children }: { userId?: number; chi
               queryClient.clear();
             },
             () => {
+              // The host owns query recovery once per connection, including plugins.
               void queryClient.invalidateQueries();
             },
           )

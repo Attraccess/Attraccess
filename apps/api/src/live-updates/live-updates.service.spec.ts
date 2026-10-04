@@ -49,6 +49,67 @@ describe('bundled server lifecycle', () => {
   });
   const body = (subscriptions: LiveSubscription[], revision = 0) => ({ subscriptions, revision });
 
+  it.each([
+    null,
+    [],
+    {},
+    { subscriptions: [] },
+    { subscriptions: [], revision: -1 },
+    { subscriptions: [], revision: 1.1 },
+    { subscriptions: [], revision: '1' },
+    { subscriptions: [], revision: Number.MAX_SAFE_INTEGER + 1 },
+    { subscriptions: {}, revision: 0 },
+    { subscriptions: Array.from({ length: 257 }, () => ({ topic: 'messaging' })), revision: 0 },
+    { subscriptions: [], revision: 0, present: 1 },
+  ])('rejects an invalid subscription set %j before authorization', (value) => {
+    service.open(id, user).subscribe();
+    expect(() => service.update(id, user, value)).toThrow('Invalid subscription set');
+    expect(authorize).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed individual subscriptions while retaining the valid ones', async () => {
+    service.open(id, user).subscribe(({ data }) => packets.push(data));
+    const malformed = { topic: 'resource', resourceId: '1' };
+    await service.update(id, user, { revision: 0, subscriptions: [malformed, { topic: 'messaging' }] });
+    expect(sourceFor).toHaveBeenCalledTimes(1);
+    expect(sourceFor).toHaveBeenCalledWith({ topic: 'messaging' }, user);
+    expect(packets).toContainEqual({ type: 'rejected', subscription: malformed, reason: 'Invalid topic' });
+  });
+
+  it('serializes concurrent updates and still ignores stale revisions', async () => {
+    let resolve!: (rejected: Map<string, string>) => void;
+    let started!: () => void;
+    const authorizationStarted = new Promise<void>((r) => {
+      started = r;
+    });
+    authorize.mockImplementationOnce(() => {
+      started();
+      return new Promise<Map<string, string>>((r) => {
+        resolve = r;
+      });
+    });
+    service.open(id, user).subscribe();
+    const first = service.update(id, user, body([{ topic: 'resource', resourceId: 1 }], 1));
+    await authorizationStarted;
+    const next = service.update(id, user, body([{ topic: 'resource', resourceId: 2 }], 2));
+    const stale = service.update(id, user, body([], 1));
+    expect(authorize).toHaveBeenCalledTimes(1);
+    expect(sourceFor).not.toHaveBeenCalled();
+    resolve(new Map());
+    await Promise.all([first, next, stale]);
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(sourceFor.mock.calls.map(([subscription]) => subscription.resourceId)).toEqual([1, 2]);
+    expect(source.observed).toBe(true);
+  });
+
+  it('releases the update lock after a failed operation', async () => {
+    service.open(id, user).subscribe();
+    jest.spyOn(topics, 'authorize').mockRejectedValueOnce(new Error('Unexpected authorization failure'));
+    await expect(service.update(id, user, body([{ topic: 'messaging' }]))).rejects.toThrow('authorization failure');
+    await service.update(id, user, body([{ topic: 'messaging' }]));
+    expect(source.observed).toBe(true);
+  });
+
   it('deduplicates topics, changes sets in place, filters keepalives and releases on final disconnect', async () => {
     const connection = service.open(id, user).subscribe(({ data }) => packets.push(data));
     await service.update(id, user, body([{ topic: 'messaging' }, { topic: 'messaging' }]));

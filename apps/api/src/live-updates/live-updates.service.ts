@@ -9,8 +9,10 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
 import { Observable, Subscriber, Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
+import { Mutex } from 'async-mutex';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { LiveTopicsService } from './live-topics.service';
+import { LiveConnectionIdSchema, LiveSubscriptionSetSchema } from './live-updates.schemas';
 
 interface Connection {
   id: string;
@@ -20,7 +22,7 @@ interface Connection {
   topics: Map<string, { subscription: LiveSubscription; observer: Subscription }>;
   expiresAt: number;
   revision: number;
-  queue: Promise<unknown>;
+  mutex: Mutex;
 }
 
 @Injectable()
@@ -33,7 +35,7 @@ export class LiveUpdatesService implements OnModuleDestroy {
   ) {}
 
   open(id: string, user: AuthenticatedUser): Observable<{ data: LivePacket }> {
-    if (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(id)) {
+    if (!LiveConnectionIdSchema.safeParse(id).success) {
       throw new BadRequestException('Invalid connection identifier');
     }
     if (this.connections.has(id)) throw new BadRequestException('Connection already open');
@@ -46,7 +48,7 @@ export class LiveUpdatesService implements OnModuleDestroy {
         topics: new Map(),
         expiresAt: Date.now() + 30_000,
         revision: -1,
-        queue: Promise.resolve(),
+        mutex: new Mutex(),
       };
       this.connections.set(id, connection);
       subscriber.next({ data: { type: 'ready' } });
@@ -69,30 +71,12 @@ export class LiveUpdatesService implements OnModuleDestroy {
     if (connection.userId !== user.id || connection.tokenId !== user.jwtTokenId) {
       throw new ForbiddenException('Live connection belongs to another session');
     }
-    const value = body as { revision?: unknown; subscriptions?: unknown; present?: unknown };
-    if (
-      !value ||
-      !Number.isSafeInteger(value.revision) ||
-      (value.revision as number) < 0 ||
-      (value.present !== undefined && typeof value.present !== 'boolean') ||
-      !Array.isArray(value.subscriptions) ||
-      value.subscriptions.length > 256
-    ) {
-      throw new BadRequestException('Invalid subscription set');
-    }
+    const parsed = LiveSubscriptionSetSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Invalid subscription set');
+    const { revision, subscriptions, present } = parsed.data;
     // Serialize updates; revisions make stale requests harmless. Lease renewals
     // use the same revision and revalidate authorization, including revoked roles.
-    const update = connection.queue.then(() =>
-      this.apply(
-        connection,
-        user,
-        value.revision as number,
-        value.subscriptions as unknown[],
-        value.present as boolean | undefined,
-      ),
-    );
-    connection.queue = update.catch(() => undefined);
-    return update;
+    return connection.mutex.runExclusive(() => this.apply(connection, user, revision, subscriptions, present));
   }
 
   private async apply(

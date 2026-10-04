@@ -9,8 +9,9 @@
 //
 // Both are normalised into FirmwareStatus so the UI does not need to branch.
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { createSharedLiveSampler } from '@attraccess/plugins-backend-sdk';
 import { ShellyHttpClient, type DeviceCredentials } from './shelly-http.client';
-import { catchError, defer, exhaustMap, finalize, map, Observable, of, shareReplay, timer } from 'rxjs';
+import type { Observable } from 'rxjs';
 
 export type FirmwareStage = 'stable' | 'beta';
 
@@ -60,7 +61,7 @@ export class ShellyFirmwareService implements OnModuleDestroy {
     number,
     { target: DeviceTarget & DeviceCredentials; timer: ReturnType<typeof setTimeout> }
   >();
-  private readonly sources = new Map<number, Observable<{ data: object }>>();
+  private readonly sample = createSharedLiveSampler<number, FirmwareStatus>();
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor
   // types for injection — always inject by an explicit token.
   constructor(@Inject(ShellyHttpClient) private readonly http: ShellyHttpClient) {}
@@ -92,27 +93,10 @@ export class ShellyFirmwareService implements OnModuleDestroy {
   }
 
   observe(deviceId: number, resolveTarget: () => Promise<DeviceTarget>): Observable<{ data: object }> {
-    let source = this.sources.get(deviceId);
-    if (!source) {
-      source = timer(0, 5_000).pipe(
-        exhaustMap(() =>
-          defer(async () => {
-            const target = this.targets.get(deviceId)?.target ?? (await resolveTarget());
-            return this.getStatus(target);
-          }).pipe(
-            map((value) => ({ data: { eventType: 'snapshot', value } })),
-            // Offline during reboot is expected. No credential-bearing error crosses the stream.
-            catchError(() => of({ data: { eventType: 'unavailable' } })),
-          ),
-        ),
-        finalize(() => {
-          if (this.sources.get(deviceId) === source) this.sources.delete(deviceId);
-        }),
-        shareReplay({ bufferSize: 1, refCount: true }),
-      );
-      this.sources.set(deviceId, source);
-    }
-    return source;
+    return this.sample(deviceId, 5_000, async () => {
+      const target = this.targets.get(deviceId)?.target ?? (await resolveTarget());
+      return this.getStatus(target);
+    });
   }
 
   onModuleDestroy(): void {

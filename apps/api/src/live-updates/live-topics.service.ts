@@ -1,12 +1,16 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LiveSubscription, LiveTopic, liveSubscriptionKey } from '@attraccess/shared';
-import { LiveTopicDefinition, LiveTopicProvider } from './live-topic-provider';
+import { LiveTopicProvider } from './live-topic-provider';
+import { LiveTopicSchema, liveSubscriptionSchema } from './live-updates.schemas';
 
 @Injectable()
 export class LiveTopicsService {
   private readonly logger = new Logger(LiveTopicsService.name);
-  private readonly providers = new Map<LiveTopic, { definition: LiveTopicDefinition; provider: LiveTopicProvider }>();
+  private readonly providers = new Map<
+    string,
+    { schema: ReturnType<typeof liveSubscriptionSchema>; provider: LiveTopicProvider }
+  >();
 
   register(provider: LiveTopicProvider): () => void {
     const topics = new Set<LiveTopic>();
@@ -17,7 +21,9 @@ export class LiveTopicsService {
       }
       topics.add(definition.topic);
     }
-    for (const definition of provider.topics) this.providers.set(definition.topic, { definition, provider });
+    for (const definition of provider.topics) {
+      this.providers.set(definition.topic, { schema: liveSubscriptionSchema(definition), provider });
+    }
     return () => {
       for (const definition of provider.topics) {
         if (this.providers.get(definition.topic)?.provider === provider) this.providers.delete(definition.topic);
@@ -26,35 +32,13 @@ export class LiveTopicsService {
   }
 
   parse(value: unknown): LiveSubscription {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new BadRequestException('Invalid topic');
-    const { topic, resourceId, identifier } = value as Record<string, unknown>;
-    const registration = this.providers.get(topic as LiveTopic);
+    const topic = LiveTopicSchema.safeParse(value);
+    if (!topic.success) throw new BadRequestException('Invalid topic');
+    const registration = this.providers.get(topic.data.topic);
     if (!registration) throw new BadRequestException('Unsupported topic');
-    const field = registration.definition.scope === 'plugin' ? 'identifier' : 'resourceId';
-    if (Object.keys(value).some((key) => key !== 'topic' && key !== field)) {
-      throw new BadRequestException('Unexpected topic fields');
-    }
-    if (registration.definition.scope === 'plugin') {
-      const mode = registration.definition.identifier;
-      if ((mode === 'none' && identifier !== undefined) || (mode === 'required' && identifier === undefined)) {
-        throw new BadRequestException('Unexpected or missing plugin identifier');
-      }
-      if (
-        identifier !== undefined &&
-        (typeof identifier !== 'string' || !identifier.length || identifier.length > 128)
-      ) {
-        throw new BadRequestException('Invalid plugin identifier');
-      }
-      return { topic, ...(identifier !== undefined ? { identifier } : {}) } as LiveSubscription;
-    }
-    if (registration.definition.scope === 'resource') {
-      if (typeof resourceId !== 'number' || !Number.isSafeInteger(resourceId) || resourceId <= 0) {
-        throw new BadRequestException('Invalid resource identifier');
-      }
-      return { topic, resourceId } as LiveSubscription;
-    }
-    if (resourceId !== undefined) throw new BadRequestException('Unexpected resource identifier');
-    return { topic } as LiveSubscription;
+    const subscription = registration.schema.safeParse(value);
+    if (!subscription.success) throw new BadRequestException('Invalid topic');
+    return subscription.data;
   }
 
   async authorize(

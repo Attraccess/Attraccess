@@ -35,7 +35,9 @@ The client detects a stalled stream after 35 seconds and reconnects using
 exponential backoff with jitter, capped at thirty seconds. Retry delay resets
 only after a healthy heartbeat. Only the current topic set is restored;
 removed topics stay removed. After restoration, active React Query state is
-invalidated once to recover persisted updates missed during interruption.
+invalidated once by the host to recover persisted updates missed during interruption.
+Core and plugin consumers must not repeat this query invalidation in
+`onReconnect`; reserve that callback for state outside React Query.
 Resource subscriptions additionally receive their own initial in-use state.
 Nonpersisted notifications and supervision events have no durable replay.
 
@@ -72,6 +74,8 @@ changing the registry or transport's imports, constructors or routing code.
 
 A provider declares its topics and their `user` or `resource` scope. The registry
 rejects unregistered topics, unexpected fields and invalid resource identifiers.
+Zod schemas validate the control body and each registered subscription shape;
+individual invalid topics are rejected without interrupting the rest of the set.
 Duplicate topic ownership fails startup, with no partially applied registration.
 User identity always comes from the authenticated session passed to `source`.
 
@@ -139,7 +143,8 @@ usePluginLiveUpdates<DeviceStatus>({
   identifier: String(deviceId),
   enabled: isOpen,
   onUpdate: (status) => updateStatus(status),
-  onReconnect: () => refreshStatus(),
+  // Optional: refresh local state that is not stored in React Query.
+  onReconnect: () => refreshLocalStatus(),
 });
 ```
 
@@ -148,7 +153,16 @@ supports idempotent `abort`/unmount, and uses the latest callbacks without
 resubscribing. A realm-wide React context bridges independently bundled SDK
 copies in federation remotes; it contains no transport or global credential.
 Logout and session replacement use the same host lifecycle as core consumers.
-Reconnect also invalidates host React Query state to recover persisted changes.
+The host alone invalidates React Query state on reconnect, including plugin
+queries. Plugins do not need their own query invalidation callback.
+
+Plugins that sample status can import `createSharedLiveSampler` from the backend
+SDK. Create one sampler per service, then call it with a key, interval in
+milliseconds and an asynchronous read function. It shares reads for that key,
+replays the latest sample to new subscribers, skips overlapping reads and
+releases its source when the final subscriber leaves. Reads emit
+`{ data: { eventType: 'snapshot', value } }`; failures emit
+`{ data: { eventType: 'unavailable' } }` without exposing device errors.
 
 WAGO controller lists, commissioning sessions/verification, diagnostics,
 configuration baseline/revisions, runtime/managed-access and network-change
@@ -159,6 +173,9 @@ them at their existing intervals (diagnostics use the front panel's two seconds)
 sharing one sampler per active topic/identifier across tabs and stopping it when
 the last subscriber leaves. Slow reads do not overlap; transient failures allow
 later recovery. WAGO preserves the REST routes' permission requirements.
+Unavailable samples retain the last cached snapshot and mark its query as errored
+so the UI shows that status is unavailable. They do not trigger a REST read in
+each browser. A later shared snapshot clears the error and restores success.
 Shelly firmware credentials remain server-side for at most five minutes after an
 update command and are never serialized in events or subscription controls. Its
 frontend timeout still ends progress when the device or connection is offline.

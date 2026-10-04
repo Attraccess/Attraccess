@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext, PluginLiveTopic } from '@attraccess/plugins-backend-sdk';
 import plugin from './plugin';
 import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
 import { WagoCommissioningService } from './wago-commissioning.service';
@@ -21,12 +21,14 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
   const get = jest.fn(() => {
     throw new Error('RESOLVE_HOST_PROVIDERS not granted');
   });
+  const registerLiveTopic = jest.fn((_topic: PluginLiveTopic) => () => undefined);
   const context = {
     dataSource,
     getRepository: (entity) => dataSource.getRepository(entity),
     get,
     secrets: { encrypt: (value: string) => `fixture:${value}`, decrypt: (value: string) => value.slice(8) },
     mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }), publish: jest.fn() },
+    liveUpdates: { register: registerLiveTopic },
     logger: { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
   } as unknown as PluginContext;
   let module: TestingModule | undefined;
@@ -41,6 +43,17 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
     await dataSource.initialize();
     module = await Test.createTestingModule({ imports: [plugin.register(context)] }).compile();
     await module.init();
+    expect(registerLiveTopic.mock.calls.map(([topic]) => topic.topic)).toEqual([
+      'controllers',
+      'commissioning-sessions',
+      'diagnostics',
+      'configuration-baseline',
+      'configuration-revisions',
+      'commissioning-verification',
+      'runtime-update',
+      'managed-access',
+      'network-change',
+    ]);
     expect(await module.get(WagoRuntimeArtifactsService).current()).toBeNull();
     expect(await module.get(WagoCommissioningService).support()).toMatchObject({
       firmwareBaseline: '31',
