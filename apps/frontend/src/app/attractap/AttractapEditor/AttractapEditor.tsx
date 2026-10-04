@@ -5,6 +5,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   Slider,
   SliderTrack,
@@ -103,7 +104,7 @@ export function AttractapEditor(props: Readonly<Props>) {
     <StandardDrawer isOpen={props.isOpen} onOpenChange={(open) => !open && props.onCancel()}>
       <div data-cy="attractap-editor-form" className="contents">
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <Form onSubmit={onSubmit} className="flex flex-col gap-4">

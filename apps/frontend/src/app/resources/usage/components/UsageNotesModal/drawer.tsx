@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Alert, DrawerBody, DrawerHeader, Button, Spinner } from '@heroui/react';
+import { Alert, DrawerBody, DrawerHeader, DrawerHeading, Button, Spinner } from '@heroui/react';
 import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
@@ -75,7 +75,7 @@ export const UsageNotesDrawer = memo(
         <DrawerHeader>
           <div className="flex w-full items-start justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-semibold">{t('sessionNotes')}</h2>
+              <DrawerHeading className="text-lg font-semibold">{t('sessionNotes')}</DrawerHeading>
               {session && (
                 <div className="text-xs text-default-500 space-y-0.5">
                   <p>

@@ -1,4 +1,4 @@
-import { DrawerBody, DrawerFooter, DrawerHeader, Label, TextArea, TextField } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Label, TextArea, TextField } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { Button } from '../../../components/button';
 import { TFunction, UserIdentity, UserSearch } from '@attraccess/plugins-frontend-ui';
@@ -45,13 +45,13 @@ export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
       }}
     >
       <DrawerHeader>
-        <h2 className="text-lg font-semibold">
+        <DrawerHeading className="text-lg font-semibold">
           {mode === 'introducer'
             ? t('addModal.title.introducer')
             : mode === 'maintainer'
             ? t('addModal.title.maintainer')
             : t('addModal.title.introduction')}
-        </h2>
+        </DrawerHeading>
       </DrawerHeader>
       <DrawerBody className="flex flex-col gap-4">
         {mode === 'introduction' && (

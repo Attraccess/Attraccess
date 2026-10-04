@@ -27,6 +27,8 @@ const DEFAULT_DIALOG_CLASSNAME = 'bg-overlay';
  * Per-modal overrides pass through: `size` and `containerProps` reach the
  * ModalContainer, `dialogProps` reach the ModalDialog, and any remaining props
  * (isOpen, onOpenChange, data-cy, …) reach the Modal root.
+ * Render ModalHeading for the accessible title, or provide dialogProps['aria-label']
+ * when the content has no title heading. ModalHeader alone does not name the dialog.
  */
 export function StandardModal(props: Props) {
   const { children, size, backdropProps, containerProps, dialogProps, ...modalProps } = props;

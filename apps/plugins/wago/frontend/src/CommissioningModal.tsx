@@ -4,6 +4,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   Input,
   Label,
@@ -273,7 +274,7 @@ export function CommissioningModal(props: CommissioningModalProps) {
       onOpenChange={(open) => !open && model.close()}
     >
       <DrawerHeader>
-        <h2 className="wg:text-xl wg:font-semibold">{t('commissioningUI.title')}</h2>
+        <DrawerHeading className="wg:text-xl wg:font-semibold">{t('commissioningUI.title')}</DrawerHeading>
       </DrawerHeader>
       <CommissioningContent model={model} />
       <CommissioningActions model={model} />

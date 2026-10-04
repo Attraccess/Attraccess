@@ -13,6 +13,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Label,
   Spinner,
 } from '@heroui/react';
@@ -258,7 +259,7 @@ export function SupervisedStartModal({
     >
       <DrawerHeader>
         <div className="flex w-full items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
           <Button
             isIconOnly
             variant="ghost"

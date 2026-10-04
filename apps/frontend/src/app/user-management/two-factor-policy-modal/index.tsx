@@ -13,6 +13,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   useOverlayState,
 } from '@heroui/react';
 import { Button } from '../../../components/button';
@@ -114,7 +115,7 @@ export function TwoFactorPolicyModal(props: Props) {
         <DrawerHeader>
           <div className="flex items-center gap-2">
             <Settings2Icon className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">{t('title')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
           </div>
           <p className="text-sm text-muted">{t('subtitle')}</p>
         </DrawerHeader>
