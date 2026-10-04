@@ -115,7 +115,7 @@ importers:
         version: 6.1.3(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)
       '@nestjs/schematics':
         specifier: 11.1.0
-        version: 11.1.0(chokidar@3.6.0)(prettier@3.9.6)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+        version: 11.1.0(chokidar@3.6.0)(prettier@3.9.9)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@nestjs/serve-static':
         specifier: ^5.0.5
         version: 5.0.5(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(express@4.22.2)
@@ -488,7 +488,7 @@ importers:
         version: 22.7.8(@babel/traverse@7.29.8)(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23))(nx@22.7.8(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23)))(verdaccio@6.9.2(encoding@0.1.13)(typanion@3.14.0))
       '@nx/nest':
         specifier: 22.7.8
-        version: 22.7.8(fd3b98d187dd27d42751e73cb7f8d5c6)
+        version: 22.7.8(539574a76db6fe4f273fd0c1d3982189)
       '@nx/node':
         specifier: 22.7.8
         version: 22.7.8(123895ecb343cc7745b805cde5577ed3)
@@ -722,7 +722,7 @@ importers:
         version: 22.7.8(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23))
       prettier:
         specifier: ^3.9.5
-        version: 3.9.6
+        version: 3.9.9
       rollup:
         specifier: ^4.62.2
         version: 4.62.4
@@ -14774,8 +14774,8 @@ packages:
     resolution: {integrity: sha512-ravE6m9Atw9Z/jjttRUZ+clIXogdghyZAuWJ3qEzjT+jI/dL1ifAqhZeC5VHzQp1MSt1+jxKkFNemj/iO7tVUA==}
     engines: {node: '>=4'}
 
-  prettier@3.9.6:
-    resolution: {integrity: sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==}
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -21670,7 +21670,7 @@ snapshots:
   '@fig/complete-commander@3.2.0(commander@11.1.0)':
     dependencies:
       commander: 11.1.0
-      prettier: 3.9.6
+      prettier: 3.9.9
 
   '@fmvilas/pseudo-yaml-ast@0.3.1':
     dependencies:
@@ -23113,7 +23113,7 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@nestjs/schematics@11.1.0(chokidar@3.6.0)(prettier@3.9.6)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@nestjs/schematics@11.1.0(chokidar@3.6.0)(prettier@3.9.9)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       '@angular-devkit/core': 19.2.24(chokidar@3.6.0)
       '@angular-devkit/schematics': 19.2.24(chokidar@3.6.0)
@@ -23122,7 +23122,7 @@ snapshots:
       pluralize: 8.0.0
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
     optionalDependencies:
-      prettier: 3.9.6
+      prettier: 3.9.9
     transitivePeerDependencies:
       - chokidar
 
@@ -23633,9 +23633,9 @@ snapshots:
       - vue-tsc
       - webpack-cli
 
-  '@nx/nest@22.7.8(fd3b98d187dd27d42751e73cb7f8d5c6)':
+  '@nx/nest@22.7.8(539574a76db6fe4f273fd0c1d3982189)':
     dependencies:
-      '@nestjs/schematics': 11.1.0(chokidar@3.6.0)(prettier@3.9.6)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@nestjs/schematics': 11.1.0(chokidar@3.6.0)(prettier@3.9.9)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@nx/devkit': 22.7.8(nx@22.7.8(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23)))
       '@nx/eslint': 22.7.8(@babel/traverse@7.29.8)(@nx/jest@22.7.8(d4ff4782cf3cd70b127c999d2dfc79be))(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23))(@zkochan/js-yaml@0.0.7)(eslint@9.39.5(jiti@2.7.0))(nx@22.7.8(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23)))(verdaccio@6.9.2(encoding@0.1.13)(typanion@3.14.0))
       '@nx/js': 22.7.8(@babel/traverse@7.29.8)(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23))(nx@22.7.8(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23)))(verdaccio@6.9.2(encoding@0.1.13)(typanion@3.14.0))
@@ -36936,7 +36936,7 @@ snapshots:
 
   prepend-http@2.0.0: {}
 
-  prettier@3.9.6: {}
+  prettier@3.9.9: {}
 
   pretty-bytes@5.6.0: {}
 
