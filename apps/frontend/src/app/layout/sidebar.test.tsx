@@ -48,6 +48,7 @@ vi.mock('../plugins/plugin.state', () => ({
 vi.mock('../routes', () => ({
   useAllRoutes: () => [
     { path: '/wago', authRequired: 'resources.update' },
+    { path: '/printers', authRequired: true },
     { path: '/printers/bambulab', authRequired: 'resources.update' },
     { path: '/devices/mqtt/servers', authRequired: 'system.settings.manage' },
     { path: '/devices/companion', authRequired: 'system.settings.manage' },
@@ -208,6 +209,62 @@ describe('plugin sidebar placement', () => {
         const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
         if (!panel) throw new Error('Shared plugin group panel is missing');
         expect(within(panel).getByRole('link', { name: 'BambuLab' })).toHaveAttribute('href', '/printers/bambulab');
+      }
+    },
+  );
+
+  it.each([
+    { configuration: 'BambuLab only', collapsed: false },
+    { configuration: 'BambuLab only', collapsed: true },
+    { configuration: '3D printer first', collapsed: false },
+    { configuration: '3D printer first', collapsed: true },
+    { configuration: 'BambuLab first', collapsed: false },
+    { configuration: 'BambuLab first', collapsed: true },
+  ])(
+    'keeps an independently declared shared group ($configuration, collapsed: $collapsed)',
+    async ({ configuration, collapsed }) => {
+      const printer = {
+        plugin: {
+          getPluginName: () => '3d-printer',
+          getSidebarGroups: () => [{ id: '3d-printer', label: '3D Printers' }],
+          getSidebarItems: () => [{ label: 'All printers', path: '/printers', group: '3d-printer' }],
+        },
+      };
+      const bambulab = {
+        plugin: {
+          getPluginName: () => 'bambulab',
+          getSidebarGroups: () => [{ id: '3d-printer', label: '3D Printers' }],
+          getSidebarItems: () => [{ label: 'BambuLab', path: '/printers/bambulab', group: '3d-printer' }],
+        },
+      };
+      const standalone = configuration === 'BambuLab only';
+      state.plugins = standalone
+        ? [bambulab]
+        : configuration === '3D printer first'
+          ? [printer, bambulab]
+          : [bambulab, printer];
+      const user = userEvent.setup();
+      renderSidebar(collapsed);
+
+      expect(screen.getAllByRole('button', { name: '3D Printers' })).toHaveLength(1);
+      expect(screen.queryByRole('link', { name: 'BambuLab' })).not.toBeInTheDocument();
+      const trigger = screen.getByRole('button', { name: '3D Printers' });
+      await user.click(trigger);
+
+      const panel = collapsed
+        ? screen.getByRole('menu', { name: '3D Printers' })
+        : document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+      if (!panel) throw new Error('Shared printer group is missing');
+      const role = collapsed ? 'menuitem' : 'link';
+      expect(within(panel).getAllByRole(role)).toHaveLength(standalone ? 1 : 2);
+      if (!standalone) expect(within(panel).getByRole(role, { name: 'All printers' })).toBeVisible();
+
+      const entry = within(panel).getByRole(role, { name: 'BambuLab' });
+      if (collapsed) {
+        await user.click(entry);
+        expect(screen.getByLabelText('Current path')).toHaveTextContent('/printers/bambulab');
+      } else {
+        expect(entry).toHaveAttribute('href', '/printers/bambulab');
       }
     },
   );

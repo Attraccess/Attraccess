@@ -25,9 +25,9 @@ export interface PluginSidebarItem {
   group?: string;
 }
 
-/** A group declared by a plugin. Empty groups are hidden after route permission filtering. */
+/** A group declared by a plugin. Matching IDs share one group; empty groups are hidden. */
 export interface PluginSidebarGroup {
-  /** Stable, nonempty ID. Prefix with the plugin name to avoid collisions. */
+  /** Stable, nonempty ID. Use a plugin prefix for private groups or an agreed ID for shared groups. */
   id: string;
   label: string;
   icon?: ReactNode;
@@ -49,7 +49,8 @@ export interface AttraccessFrontendPlugin extends IPlugin {
   getRoutes?(): RouteConfig[];
   // Optional. Return the sidebar navigation entries this plugin contributes.
   getSidebarItems?(): PluginSidebarItem[];
-  // Optional. Declare groups that sidebar entries can target by ID.
+  // Optional. Declare groups your entries need, including shared groups.
+  // Each plugin can declare the same shared ID to work independently.
   // Host groups take precedence; the first plugin declaration wins duplicate IDs.
   getSidebarGroups?(): PluginSidebarGroup[];
   // Optional. Return the contributions this plugin renders into host slots

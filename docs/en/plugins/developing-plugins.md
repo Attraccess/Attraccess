@@ -471,7 +471,8 @@ getSidebarItems(): PluginSidebarItem[] {
 }
 ```
 
-Use stable, nonempty group IDs prefixed with your plugin's name. A group has a
+Use stable, nonempty group IDs. Prefix private groups with your plugin's name;
+use an agreed ID for groups shared with other plugins. A group has a
 `label` and an optional React node `icon`; the host supplies a puzzle icon when
 none is provided. Plugin labels are rendered as supplied, so your plugin is
 responsible for their translations.
@@ -485,8 +486,9 @@ plugin's declaration wins and entries share that group.
 
 #### Sharing a group between plugins
 
-Group IDs are shared across all installed plugins. One plugin declares the group;
-other plugins only need to reference its ID in their sidebar entries. For example:
+Each plugin that needs a shared group should declare it through
+`getSidebarGroups()` and reference the same ID in its entries. Declarations with
+matching IDs merge into one group, so plugins work alone or together. For example:
 
 ```tsx
 // In the 3D printer plugin:
@@ -495,15 +497,24 @@ getSidebarGroups(): PluginSidebarGroup[] {
 }
 
 // In the BambuLab plugin:
+getSidebarGroups(): PluginSidebarGroup[] {
+  return [{ id: '3d-printer', label: '3D Printers' }];
+}
+
 getSidebarItems(): PluginSidebarItem[] {
   return [{ label: 'BambuLab', path: '/printers/bambulab', group: '3d-printer' }];
 }
 ```
 
-BambuLab does not need to redeclare the group. The host collects group declarations
-from all plugins before placing entries, so either plugin can load first. The group
-can also be declared by a plugin that contributes no sidebar entries itself. If the
-declaring plugin is absent, the BambuLab entry uses the existing root fallback.
+BambuLab creates **3D Printers** when installed on its own. When the 3D printer
+plugin or another printer plugin also declares `3d-printer`, their entries share
+the same group. Use consistent labels and icons for shared IDs: the first loaded
+declaration supplies the group's metadata.
+
+The host collects all group declarations before placing entries. A plugin may
+also reference a group declared only by another plugin, but should declare the
+group itself if it needs to work independently. Without any declaration, the
+existing root fallback applies.
 
 ### Slots (embedded extension points)
 
