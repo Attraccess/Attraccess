@@ -8,6 +8,7 @@ import {
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
 import { Observable, Subscriber, Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { LiveTopicsService } from './live-topics.service';
 
@@ -16,7 +17,7 @@ interface Connection {
   userId: number;
   tokenId: string;
   subscriber: Subscriber<{ data: LivePacket }>;
-  topics: Map<string, Subscription>;
+  topics: Map<string, { subscription: LiveSubscription; observer: Subscription }>;
   expiresAt: number;
   revision: number;
   queue: Promise<unknown>;
@@ -55,8 +56,7 @@ export class LiveUpdatesService implements OnModuleDestroy {
       }, 10_000);
       return () => {
         clearInterval(heartbeat);
-        this.topics.setWebPresence(connection.userId, connection.id, false);
-        connection.topics.forEach((sub) => sub.unsubscribe());
+        connection.topics.forEach(({ observer }) => observer.unsubscribe());
         connection.topics.clear();
         if (this.connections.get(id) === connection) this.connections.delete(id);
       };
@@ -113,21 +113,18 @@ export class LiveUpdatesService implements OnModuleDestroy {
         connection.subscriber.next({ data: { type: 'rejected', subscription: value, reason: error.message } });
       }
     }
-    // One lookup per set/renewal, including when resource and flow-log topics
-    // reference the same ID. Session permissions are still checked each time.
-    const resourceIds = await this.topics.existingResourceIds(wanted.values());
+    // Providers validate their whole set per renewal, retaining domain-owned batching.
+    const rejected = await this.topics.authorize(wanted.values(), user);
     if (connection.subscriber.closed) return;
     for (const [key, subscription] of wanted) {
-      try {
-        this.topics.authorize(subscription, user, resourceIds);
-      } catch (error) {
+      if (rejected.has(key)) {
         wanted.delete(key);
-        connection.subscriber.next({ data: { type: 'rejected', subscription, reason: error.message } });
+        connection.subscriber.next({ data: { type: 'rejected', subscription, reason: rejected.get(key) } });
       }
     }
-    for (const [key, sub] of connection.topics) {
+    for (const [key, { observer }] of connection.topics) {
       if (!wanted.has(key)) {
-        sub.unsubscribe();
+        observer.unsubscribe();
         connection.topics.delete(key);
       }
     }
@@ -136,33 +133,36 @@ export class LiveUpdatesService implements OnModuleDestroy {
       try {
         const source = await this.topics.source(subscription, user);
         if (connection.subscriber.closed) return;
-        const sub = this.metrics.wrapTopic(subscription.topic, source).subscribe({
-          next: ({ data }) => {
-            if ('keepalive' in data) return;
-            const eventType =
-              'eventType' in data ? String(data.eventType) : 'type' in data ? String(data.type) : 'update';
-            connection.subscriber.next({
-              data: { type: 'event', event: { ...subscription, eventType, payload: data } },
-            });
-          },
-          error: () => {
-            connection.topics.delete(key);
-            if (subscription.topic === 'notifications') this.topics.setWebPresence(user.id, connection.id, false);
-            connection.subscriber.next({ data: { type: 'rejected', subscription, reason: 'Topic unavailable' } });
-          },
-          complete: () => {
-            connection.topics.delete(key);
-            if (subscription.topic === 'notifications') this.topics.setWebPresence(user.id, connection.id, false);
-          },
-        });
-        if (!sub.closed) connection.topics.set(key, sub);
+        const sub = this.metrics
+          .wrapTopic(subscription.topic, source)
+          .pipe(finalize(() => this.topics.setPresence(subscription, user.id, connection.id, false)))
+          .subscribe({
+            next: ({ data }) => {
+              if ('keepalive' in data) return;
+              const eventType =
+                'eventType' in data ? String(data.eventType) : 'type' in data ? String(data.type) : 'update';
+              connection.subscriber.next({
+                data: { type: 'event', event: { ...subscription, eventType, payload: data } },
+              });
+            },
+            error: () => {
+              connection.topics.delete(key);
+              connection.subscriber.next({ data: { type: 'rejected', subscription, reason: 'Topic unavailable' } });
+            },
+            complete: () => {
+              connection.topics.delete(key);
+            },
+          });
+        if (!sub.closed) connection.topics.set(key, { subscription, observer: sub });
       } catch (error) {
         connection.subscriber.next({ data: { type: 'rejected', subscription, reason: error.message } });
       }
     }
-    const notifications = connection.topics.get('notifications:');
-    if (!notifications || notifications.closed) this.topics.setWebPresence(user.id, connection.id, false);
-    else if (present !== undefined) this.topics.setWebPresence(user.id, connection.id, present);
+    if (present !== undefined) {
+      for (const { subscription } of connection.topics.values()) {
+        this.topics.setPresence(subscription, user.id, connection.id, present);
+      }
+    }
     connection.expiresAt = Date.now() + 30_000;
   }
 

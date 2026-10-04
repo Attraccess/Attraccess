@@ -60,3 +60,39 @@ uses them. `attraccess_sse_active_connections{stream="live_updates"}` measures
 physical bundled streams, while `attraccess_live_update_active_topics{topic=...}`
 measures logical server subscriptions separately. Legacy connection metrics
 retain their existing meanings.
+
+## Registering a backend topic provider
+
+`LiveTopicsModule` exports a shared `LiveTopicsService` registry and has no
+feature dependencies. Each feature module imports it and declares its own
+injectable adapter implementing `LiveTopicProvider`. The adapter injects its
+existing producers and calls `registry.register(this)` in `onModuleInit`.
+`LiveUpdatesModule` imports only the registry; adding a producer does not require
+changing the registry or transport's imports, constructors or routing code.
+
+A provider declares its topics and their `user` or `resource` scope. The registry
+rejects unregistered topics, unexpected fields and invalid resource identifiers.
+Duplicate topic ownership fails startup, with no partially applied registration.
+User identity always comes from the authenticated session passed to `source`.
+
+Providers own domain authorization and sources. The optional `authorize` hook
+receives all subscriptions owned by that provider once per set/lease renewal and
+returns rejection reasons keyed by `liveSubscriptionKey`. An omitted hook uses
+the endpoint's session authentication. A failed provider rejects its own topics
+while other providers continue. `ResourceLiveTopicsProvider` owns both resource
+and flow-log topics, keeping resource existence validation in one shared query
+and rechecking flow-log permissions on every renewal.
+
+`source` returns an Observable (or a promise of one) wrapping the existing
+producer. Allocate subjects lazily and release them on RxJS finalization.
+The optional `setPresence` hook receives visibility controls for active topics
+and `false` when a topic ends, is removed/revoked, or its connection disconnects.
+`NotificationLiveTopicsProvider` owns web presence; `MessagingLiveTopicsProvider`
+retains the producer's subscription-based online presence.
+
+See the adapters in `billing`, `messaging`, `notifications`, `resources` and
+`resources/supervision` for examples. Registration happens during Nest module
+initialization; runtime plugin unloading is outside this contract. New protocol
+topics still require updating the shared `LiveSubscription` type and frontend
+payload types. This keeps client/server type checking without a hard-coded
+producer list in the transport.

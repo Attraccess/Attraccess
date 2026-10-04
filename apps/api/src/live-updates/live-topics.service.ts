@@ -1,32 +1,23 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Resource } from '@attraccess/database-entities';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import { LiveSubscription } from '@attraccess/shared';
-import { In, Repository } from 'typeorm';
-import { defer, Observable } from 'rxjs';
-import { finalize } from 'rxjs/operators';
-import { ResourceEventsService } from '../resources/sse/resource-events.service';
-import { FlowLogRecorderService } from '../resources/flows/flow-log-recorder.service';
-import { LiveNotificationsService } from '../billing/liveNotificationsService';
-import { MessagingLiveService } from '../messaging/messaging-live.service';
-import { NotificationLiveService } from '../notifications/notification-live.service';
-import { SupervisionLiveService } from '../resources/supervision/supervision-live.service';
+import { LiveSubscription, LiveTopic, liveSubscriptionKey } from '@attraccess/shared';
+import { LiveTopicDefinition, LiveTopicProvider } from './live-topic-provider';
 
 @Injectable()
 export class LiveTopicsService {
-  constructor(
-    @InjectRepository(Resource) private readonly resources: Repository<Resource>,
-    private readonly resourceEvents: ResourceEventsService,
-    private readonly flowLogs: FlowLogRecorderService,
-    private readonly billing: LiveNotificationsService,
-    private readonly messaging: MessagingLiveService,
-    private readonly notifications: NotificationLiveService,
-    private readonly supervision: SupervisionLiveService,
-  ) {}
+  private readonly logger = new Logger(LiveTopicsService.name);
+  private readonly providers = new Map<LiveTopic, { definition: LiveTopicDefinition; provider: LiveTopicProvider }>();
 
-  setWebPresence(userId: number, connectionId: string, present: boolean): void {
-    this.notifications.setConnectionPresent(userId, connectionId, present);
+  register(provider: LiveTopicProvider): void {
+    const topics = new Set<LiveTopic>();
+    // Check the entire registration first, so a conflict cannot partially install a provider.
+    for (const definition of provider.topics) {
+      if (topics.has(definition.topic) || this.providers.has(definition.topic)) {
+        throw new Error(`Live topic already registered: ${definition.topic}`);
+      }
+      topics.add(definition.topic);
+    }
+    for (const definition of provider.topics) this.providers.set(definition.topic, { definition, provider });
   }
 
   parse(value: unknown): LiveSubscription {
@@ -35,65 +26,60 @@ export class LiveTopicsService {
     if (Object.keys(value).some((key) => key !== 'topic' && key !== 'resourceId')) {
       throw new BadRequestException('Unexpected topic fields');
     }
-    if (topic === 'resource' || topic === 'flow-logs') {
+    const registration = this.providers.get(topic as LiveTopic);
+    if (!registration) throw new BadRequestException('Unsupported topic');
+    if (registration.definition.scope === 'resource') {
       if (typeof resourceId !== 'number' || !Number.isSafeInteger(resourceId) || resourceId <= 0) {
         throw new BadRequestException('Invalid resource identifier');
       }
-      return { topic, resourceId };
+      return { topic, resourceId } as LiveSubscription;
     }
-    if (
-      ['billing', 'messaging', 'notifications', 'supervision'].includes(topic as string) &&
-      resourceId === undefined
-    ) {
-      return { topic } as LiveSubscription;
-    }
-    throw new BadRequestException('Unsupported topic');
+    if (resourceId !== undefined) throw new BadRequestException('Unexpected resource identifier');
+    return { topic } as LiveSubscription;
   }
 
-  async existingResourceIds(subscriptions: Iterable<LiveSubscription>): Promise<ReadonlySet<number>> {
-    const ids = [...new Set([...subscriptions].flatMap((s) => (s.resourceId === undefined ? [] : [s.resourceId])))];
-    if (!ids.length) return new Set();
-    const resources = await this.resources.find({ where: { id: In(ids) }, select: { id: true } });
-    return new Set(resources.map((resource) => resource.id));
+  async authorize(
+    subscriptions: Iterable<LiveSubscription>,
+    user: AuthenticatedUser,
+  ): Promise<ReadonlyMap<string, string>> {
+    const groups = new Map<LiveTopicProvider, LiveSubscription[]>();
+    for (const subscription of subscriptions) {
+      const provider = this.providerFor(subscription);
+      const group = groups.get(provider) ?? [];
+      group.push(subscription);
+      groups.set(provider, group);
+    }
+    const rejected = new Map<string, string>();
+    for (const [provider, group] of groups) {
+      try {
+        const reasons = await provider.authorize?.(group, user);
+        for (const subscription of group) {
+          const key = liveSubscriptionKey(subscription);
+          if (reasons?.has(key)) rejected.set(key, reasons.get(key));
+        }
+      } catch (error) {
+        // An unavailable provider must not interrupt authorized topics from another feature.
+        for (const subscription of group) rejected.set(liveSubscriptionKey(subscription), error.message);
+      }
+    }
+    return rejected;
   }
 
-  authorize(subscription: LiveSubscription, user: AuthenticatedUser, resourceIds: ReadonlySet<number>): void {
-    if (subscription.topic === 'flow-logs' && !user.effectivePermissions?.has('resources.update')) {
-      throw new ForbiddenException('Resource update permission required');
-    }
-    // Supervision is scoped to this session's user, just like the legacy endpoint:
-    // only requests explicitly addressed to this supervisor are ever emitted.
-    if (subscription.resourceId !== undefined && !resourceIds.has(subscription.resourceId)) {
-      throw new NotFoundException('Resource not found');
+  source(subscription: LiveSubscription, user: AuthenticatedUser) {
+    return this.providerFor(subscription).source(subscription, user);
+  }
+
+  setPresence(subscription: LiveSubscription, userId: number, connectionId: string, present: boolean): void {
+    try {
+      this.providerFor(subscription).setPresence?.(subscription, userId, connectionId, present);
+    } catch (error) {
+      this.logger.error(`Live topic presence failed: ${subscription.topic}`, error);
     }
   }
 
-  async source(subscription: LiveSubscription, user: AuthenticatedUser): Promise<Observable<{ data: object }>> {
-    const userId = user.id;
-    switch (subscription.topic) {
-      case 'resource':
-        return this.resourceEvents.subscribeResource(subscription.resourceId);
-      case 'flow-logs':
-        return defer(() => this.flowLogs.subjectFor(subscription.resourceId).asObservable()).pipe(
-          finalize(() => this.flowLogs.releaseSubject(subscription.resourceId)),
-        );
-      case 'billing':
-        return defer(() => this.billing.getTransactionSubject(userId).asObservable()).pipe(
-          finalize(() => this.billing.deleteSubjectIfUnobserved(userId)),
-        );
-      case 'messaging':
-        return this.messaging.trackPresence(
-          userId,
-          defer(() => this.messaging.getUserMessageSubject(userId).asObservable()),
-        );
-      case 'notifications':
-        return defer(() => this.notifications.getUserSubject(userId).asObservable()).pipe(
-          finalize(() => this.notifications.deleteSubjectIfUnobserved(userId)),
-        );
-      case 'supervision':
-        return defer(() => this.supervision.getSupervisorSubject(userId).asObservable()).pipe(
-          finalize(() => this.supervision.deleteSubjectIfUnobserved(userId)),
-        );
-    }
+  private providerFor(subscription: LiveSubscription): LiveTopicProvider {
+    const registration = this.providers.get(subscription.topic);
+    if (!registration) throw new BadRequestException('Unsupported topic');
+    return registration.provider;
   }
 }

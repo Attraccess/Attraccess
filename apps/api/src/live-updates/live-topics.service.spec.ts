@@ -1,95 +1,126 @@
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LiveSubscription } from '@attraccess/shared';
-import { Resource } from '@attraccess/database-entities';
-import { In, Repository } from 'typeorm';
 import { Subject } from 'rxjs';
 import { LiveTopicsService } from './live-topics.service';
-import { ResourceEventsService } from '../resources/sse/resource-events.service';
-import { FlowLogRecorderService } from '../resources/flows/flow-log-recorder.service';
-import { LiveNotificationsService } from '../billing/liveNotificationsService';
-import { MessagingLiveService } from '../messaging/messaging-live.service';
-import { NotificationLiveService } from '../notifications/notification-live.service';
-import { SupervisionLiveService } from '../resources/supervision/supervision-live.service';
+import { LiveTopicProvider } from './live-topic-provider';
 
-describe('live topic validation and user routing', () => {
+const user = { id: 1 } as AuthenticatedUser;
+
+describe('live topic provider registry', () => {
   function setup() {
-    const users = new Map<number, Subject<{ data: object }>>();
-    const billing = {
-      getTransactionSubject: jest.fn((userId: number) => {
-        if (!users.has(userId)) users.set(userId, new Subject());
-        return users.get(userId);
-      }),
-      deleteSubjectIfUnobserved: jest.fn(),
-    };
-    const resources = { find: jest.fn(async () => [{ id: 1 }]) };
-    const service = new LiveTopicsService(
-      resources as unknown as Repository<Resource>,
-      {} as ResourceEventsService,
-      {} as FlowLogRecorderService,
-      billing as unknown as LiveNotificationsService,
-      {} as MessagingLiveService,
-      {} as NotificationLiveService,
-      {} as SupervisionLiveService,
-    );
-    return { service, billing, users, resources };
+    const service = new LiveTopicsService();
+    const source = jest.fn(() => new Subject<{ data: object }>());
+    service.register({
+      topics: [
+        { topic: 'resource', scope: 'resource' },
+        { topic: 'flow-logs', scope: 'resource' },
+        { topic: 'messaging', scope: 'user' },
+        { topic: 'billing', scope: 'user' },
+      ],
+      source,
+    });
+    return { service, source };
   }
+
   it.each([
     null,
+    [],
     {},
     { topic: 'unknown' },
     { topic: 'resource' },
     { topic: 'resource', resourceId: -1 },
     { topic: 'resource', resourceId: '1' },
     { topic: 'resource', resourceId: 1.1 },
+    { topic: 'resource', resourceId: Number.MAX_SAFE_INTEGER + 1 },
     { topic: 'messaging', userId: 2 },
     { topic: 'billing', resourceId: 1 },
   ])('rejects invalid topic %j', (value) => {
     expect(() => setup().service.parse(value)).toThrow();
   });
-  it('checks resource existence and flow-log permission independently', async () => {
-    const { service, resources } = setup();
-    const user = { id: 1, effectivePermissions: new Set() } as AuthenticatedUser;
+
+  it('routes only registered topics and can accept a provider after construction', async () => {
+    const service = new LiveTopicsService();
+    expect(() => service.parse({ topic: 'billing' })).toThrow('Unsupported');
+    const source = jest.fn(() => new Subject<{ data: object }>());
+    service.register({ topics: [{ topic: 'billing', scope: 'user' }], source });
+    const subscription = service.parse({ topic: 'billing' });
+    await service.source(subscription, user);
+    expect(source).toHaveBeenCalledWith(subscription, user);
+    expect(() => service.parse({ topic: 'messaging' })).toThrow('Unsupported');
+  });
+
+  it('rejects conflicting registrations atomically and retains the original provider', () => {
+    const { service, source } = setup();
+    const replacement = jest.fn();
+    expect(() =>
+      service.register({
+        topics: [
+          { topic: 'notifications', scope: 'user' },
+          { topic: 'billing', scope: 'user' },
+        ],
+        source: replacement,
+      }),
+    ).toThrow('already registered');
+    expect(() => service.parse({ topic: 'notifications' })).toThrow('Unsupported');
+    service.source({ topic: 'billing' }, user);
+    expect(source).toHaveBeenCalledTimes(1);
+    expect(replacement).not.toHaveBeenCalled();
+    expect(() =>
+      service.register({
+        topics: [
+          { topic: 'notifications', scope: 'user' },
+          { topic: 'notifications', scope: 'user' },
+        ],
+        source: replacement,
+      }),
+    ).toThrow('already registered');
+    expect(() => service.parse({ topic: 'notifications' })).toThrow('Unsupported');
+  });
+
+  it('batches validation by provider and isolates a provider failure from other topics', async () => {
+    const service = new LiveTopicsService();
+    const resourceAuthorization = jest.fn(async () => new Map([['flow-logs:1', 'Forbidden']]));
+    const billingAuthorization = jest.fn(async () => {
+      throw new Error('Unavailable');
+    });
+    const source = () => new Subject<{ data: object }>();
+    service.register({
+      topics: [
+        { topic: 'resource', scope: 'resource' },
+        { topic: 'flow-logs', scope: 'resource' },
+      ],
+      authorize: resourceAuthorization,
+      source,
+    });
+    service.register({ topics: [{ topic: 'billing', scope: 'user' }], authorize: billingAuthorization, source });
+    service.register({ topics: [{ topic: 'messaging', scope: 'user' }], source });
     const subscriptions: LiveSubscription[] = [
       { topic: 'resource', resourceId: 1 },
       { topic: 'flow-logs', resourceId: 1 },
-      { topic: 'resource', resourceId: 2 },
-      { topic: 'resource', resourceId: 1 },
+      { topic: 'billing' },
+      { topic: 'messaging' },
     ];
-    const ids = await service.existingResourceIds(subscriptions);
-    expect(resources.find).toHaveBeenCalledTimes(1);
-    expect(resources.find).toHaveBeenCalledWith({ where: { id: In([1, 2]) }, select: { id: true } });
-    expect(() => service.authorize({ topic: 'resource', resourceId: 1 }, user, ids)).not.toThrow();
-    expect(() => service.authorize({ topic: 'resource', resourceId: 2 }, user, ids)).toThrow('not found');
-    expect(() => service.authorize({ topic: 'flow-logs', resourceId: 1 }, user, ids)).toThrow('permission');
-    user.effectivePermissions.add('resources.update');
-    expect(() => service.authorize({ topic: 'flow-logs', resourceId: 1 }, user, ids)).not.toThrow();
-    user.effectivePermissions.clear();
-    const renewed = await service.existingResourceIds(subscriptions);
-    expect(resources.find).toHaveBeenCalledTimes(2);
-    expect(() => service.authorize({ topic: 'flow-logs', resourceId: 1 }, user, renewed)).toThrow('permission');
+    await expect(service.authorize(subscriptions, user)).resolves.toEqual(
+      new Map([
+        ['flow-logs:1', 'Forbidden'],
+        ['billing:', 'Unavailable'],
+      ]),
+    );
+    expect(resourceAuthorization).toHaveBeenCalledTimes(1);
+    expect(resourceAuthorization).toHaveBeenCalledWith(subscriptions.slice(0, 2), user);
+    await service.authorize(subscriptions, user);
+    expect(resourceAuthorization).toHaveBeenCalledTimes(2);
   });
-  it('does not query resources when renewing only user topics', async () => {
-    const { service, resources } = setup();
-    await expect(service.existingResourceIds([{ topic: 'notifications' }, { topic: 'messaging' }])).resolves.toEqual(
-      new Set(),
-    );
-    expect(resources.find).not.toHaveBeenCalled();
-  });
-  it('uses session user identity and isolates events between users', async () => {
-    const { service, billing, users } = setup();
-    const first: unknown[] = [],
-      second: unknown[] = [];
-    const a = (await service.source({ topic: 'billing' }, { id: 1 } as AuthenticatedUser)).subscribe((v) =>
-      first.push(v),
-    );
-    const b = (await service.source({ topic: 'billing' }, { id: 2 } as AuthenticatedUser)).subscribe((v) =>
-      second.push(v),
-    );
-    users.get(1).next({ data: { id: 5 } });
-    expect(first).toEqual([{ data: { id: 5 } }]);
-    expect(second).toEqual([]);
-    a.unsubscribe();
-    b.unsubscribe();
-    expect(billing.deleteSubjectIfUnobserved.mock.calls).toEqual([[1], [2]]);
+
+  it('dispatches presence to whichever provider owns the topic', () => {
+    const service = new LiveTopicsService();
+    const provider: LiveTopicProvider = {
+      topics: [{ topic: 'billing', scope: 'user' }],
+      source: () => new Subject(),
+      setPresence: jest.fn(),
+    };
+    service.register(provider);
+    service.setPresence({ topic: 'billing' }, user.id, 'connection', true);
+    expect(provider.setPresence).toHaveBeenCalledWith({ topic: 'billing' }, user.id, 'connection', true);
   });
 });
