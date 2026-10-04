@@ -1,4 +1,8 @@
 export default {
+  unassignedProject: 'Unassigned',
+  loadError: 'Unable to load usage details.',
+  retry: 'Try again',
+
   openBilling: 'Open billing overview',
   sessionNotes: 'Session Notes',
   startNotes: 'Start Notes',

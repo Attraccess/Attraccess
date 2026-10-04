@@ -144,14 +144,16 @@ export class BillingService {
   async getTransaction(transactionId: number, userId?: number): Promise<BillingTransaction> {
     return await this.billingTransactionRepository.findOne({
       where: { id: transactionId, userId },
-      relations: [
-        ...this.DEFAULT_RELATIONS,
-        'resourceUsage.project',
-        'resourceUsage.supervisorUser',
-        'resourceUsage.formSubmissions',
-        'resourceUsage.formSubmissions.form',
-      ],
+      relations: this.DEFAULT_RELATIONS,
     });
+  }
+
+  async getTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
+    const transaction = await this.billingTransactionRepository.findOne({
+      where: { resourceUsageId: usageId, userId },
+      select: ['id'],
+    });
+    return transaction?.id ?? null;
   }
 
   async createManualTransaction(

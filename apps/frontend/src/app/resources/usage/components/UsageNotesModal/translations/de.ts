@@ -1,4 +1,8 @@
 export default {
+  unassignedProject: 'Nicht zugeordnet',
+  loadError: 'Nutzungsdetails konnten nicht geladen werden.',
+  retry: 'Erneut versuchen',
+
   openBilling: 'Abrechnungsübersicht öffnen',
   sessionNotes: 'Sitzungsnotizen',
   startNotes: 'Startnotizen',

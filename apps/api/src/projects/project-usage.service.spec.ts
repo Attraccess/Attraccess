@@ -125,12 +125,6 @@ describe('ProjectUsageService', () => {
       } as GetProjectUsageHistoryQueryDto);
 
       expect(resourceUsageRepository.createQueryBuilder).toHaveBeenCalledWith('usage');
-      expect(qb.leftJoinAndSelect).toHaveBeenCalledWith(
-        'usage.billingTransaction',
-        'billingTransaction',
-        'billingTransaction.userId = :billingUserId',
-        { billingUserId: 1 },
-      );
       expect(qb.andWhere).toHaveBeenCalledWith('usage.lifecyclePending = FALSE');
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(3);

@@ -242,7 +242,6 @@ export class ResourceUsageController {
 
     const { data, total } = await this.resourceUsageService.getResourceUsageHistory(
       resourceId,
-      req.user.id,
       query.page,
       query.limit,
       query.userId,
@@ -292,5 +291,18 @@ export class ResourceUsageController {
     return {
       canControl: await this.resourceUsageService.canControllResource(resourceId, req.user),
     } as CanControlResponseDto;
+  }
+
+  @Get(':usageId')
+  @Auth()
+  @ApiOperation({ summary: 'Get a resource usage session', operationId: 'resourceUsageGetSession' })
+  @ApiResponse({ status: 200, description: 'The usage session details.', type: ResourceUsage })
+  @ApiResponse({ status: 404, description: 'Usage session not found or not accessible.' })
+  async getSession(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('usageId', ParseIntPipe) usageId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceUsage> {
+    return this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
   }
 }

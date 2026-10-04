@@ -29,7 +29,7 @@ import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { StandardModal } from '../../../../../components/standardModal';
 import { RefundModal } from './refund';
-import { UsageNotesDrawer } from '../../../../resources/usage/components/UsageNotesModal/drawer';
+import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 
 export interface TransactionDetailsModalProps {
   children?: (onOpen: () => void) => React.ReactNode;
@@ -74,8 +74,12 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
     }
   }, [isOpenProp, open, close]);
 
-  const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const {
+    data: transaction,
+    error,
+    refetch,
+  } = useBillingServiceGetBillingTransaction({ transactionId }, undefined, { enabled: isOpen });
+  const { data: configuration } = useBillingServiceGetBillingConfiguration(undefined, { enabled: isOpen });
 
   const [isUsageOpen, setUsageOpen] = useState(false);
 
@@ -123,7 +127,14 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
               </div>
             </ModalHeader>
             <ModalBody>
-              {!transaction ? (
+              {error ? (
+                <div role="alert">
+                  <p>{t('loadError')}</p>
+                  <Button variant="secondary" onPress={() => refetch()}>
+                    {t('retry')}
+                  </Button>
+                </div>
+              ) : !transaction ? (
                 <div className="py-6 text-center text-default-500">{t('loading')}</div>
               ) : (
                 <div className="space-y-4">
@@ -289,12 +300,11 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
         )}
       </StandardModal>
       {isOpen && isUsageOpen && transaction?.resourceUsage && (
-        <UsageNotesDrawer
+        <UsageNotesModal
           isOpen
-          session={transaction.resourceUsage}
+          resourceId={transaction.resourceUsage.resourceId}
+          usageId={transaction.resourceUsage.id}
           onClose={() => setUsageOpen(false)}
-          projectLabel={t('meta.project')}
-          projectPlaceholder={t('meta.unassignedProject')}
           onOpenBilling={() => setUsageOpen(false)}
         />
       )}

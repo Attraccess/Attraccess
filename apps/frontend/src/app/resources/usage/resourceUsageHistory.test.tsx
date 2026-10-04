@@ -34,6 +34,8 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   useResourcesServiceGetOneResourceById: () => ({ data: { id: 7, type: state.type } }),
   UseResourcesServiceResourceUsageGetHistoryKeyFn: (input: unknown) => ['history', input],
+  UseResourcesServiceResourceUsageGetSessionKeyFn: (input: unknown) => ['session', input],
+  useProjectsServiceGetProjectUsageHistoryKey: 'project-history',
   useResourcesServiceResourceUsageUpdateSessionProject: (callbacks: typeof state.callbacks) => {
     state.callbacks = callbacks;
     return { mutate: state.update };
@@ -74,20 +76,10 @@ vi.mock('../../../components/projectsSelect', () => ({
   ),
 }));
 vi.mock('./components/UsageNotesModal', () => ({
-  UsageNotesModal: ({
-    isOpen,
-    onClose,
-    session,
-    operatingDurationMs,
-  }: {
-    isOpen: boolean;
-    onClose: () => void;
-    session: { id: number } | null;
-    operatingDurationMs: number;
-  }) =>
+  UsageNotesModal: ({ isOpen, onClose, usageId }: { isOpen: boolean; onClose: () => void; usageId: number | null }) =>
     isOpen ? (
       <div role="dialog">
-        Session {session?.id}, operating {operatingDurationMs}
+        Session {usageId}
         <button onClick={onClose}>Close notes</button>
       </div>
     ) : null,
@@ -147,8 +139,9 @@ it('optimistically updates projects, rolls back failures and refreshes matching 
   expect(state.toastError).toHaveBeenCalledWith({ title: 'Project update failed' });
   fireEvent.change(project, { target: { value: '' } });
   expect(state.update).toHaveBeenLastCalledWith({ resourceId: 7, usageId: 11, requestBody: { projectId: null } });
-  act(() => {
-    state.callbacks?.onSuccess({ id: 11, project: null });
+  await act(async () => {
+    state.rows[0] = { ...(state.rows[0] as Record<string, unknown>), project: null };
+    await state.callbacks?.onSuccess({ id: 11, project: null });
     state.callbacks?.onSettled(undefined, undefined, { usageId: 11 });
   });
   expect(project).toHaveValue('');
@@ -181,7 +174,7 @@ it('filters users, paginates and opens session notes from the real history table
   expect(screen.getByText('Other project')).toBeInTheDocument();
   const row = screen.getByRole('combobox').closest('tr')!;
   fireEvent.click(row);
-  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Session 11, operating 60000'));
+  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Session 11'));
   fireEvent.click(screen.getByText('Close notes'));
   expect(screen.queryByRole('dialog')).toBeNull();
 });

@@ -16,9 +16,7 @@
     "refundOf": "Refund of",
     "correctionOf": "Correction of",
     "externalReference": "External reference",
-    "type": "Type",
-    "project": "Project",
-    "unassignedProject": "Unassigned"
+    "type": "Type"
   },
   "type": {
     "refund": "Refund",
@@ -51,5 +49,7 @@
   "actions": {
     "refund": "Refund",
     "openUsage": "Open usage details"
-  }
+  },
+  "loadError": "Unable to load billing details.",
+  "retry": "Try again"
 }

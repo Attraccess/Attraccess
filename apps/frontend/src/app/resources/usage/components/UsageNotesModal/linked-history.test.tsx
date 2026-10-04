@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ResourceUsage } from '@attraccess/react-query-client';
 import { UsageNotesModal } from './index';
 import { TransactionDetailsModal } from '../../../../billing/dashboard/summary/transactionDetailsModal';
@@ -17,29 +17,56 @@ const session = {
   startNotes: 'Loaded oak boards',
   endNotes: 'Cleaned the machine',
   project: { id: 3, name: 'Workshop shelves' },
-  billingTransaction: { id: 7 },
 } as ResourceUsage;
+const state = vi.hoisted(() => ({
+  session: undefined as ResourceUsage | undefined,
+  transactionId: 7 as number | null,
+  fetchSession: vi.fn(),
+  fetchBilling: vi.fn(),
+  error: undefined as Error | undefined,
+  retry: vi.fn(),
+}));
+vi.mock('../../hooks/useUsageSessionProject', () => ({ useUsageSessionProject: () => ({ updatingSessionIds: {} }) }));
+vi.mock('../../../operatingDuration', () => ({
+  useCanViewOperatingDuration: () => false,
+  useOperatingDuration: () => ({}),
+  attributedOperatingDurationForUsage: () => undefined,
+}));
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
+  useResourcesServiceResourceUsageGetSession: (...args: unknown[]) => {
+    state.fetchSession(...args);
+    return { data: state.session, error: state.error, refetch: state.retry };
+  },
+  useBillingServiceGetUsageBillingTransaction: (...args: unknown[]) => {
+    state.fetchBilling(...args);
+    return { data: { transactionId: state.transactionId } };
+  },
   useBillingServiceGetBillingTransaction: () => ({
-    data: { id: 7, createdAt: '2026-09-01', status: 'completed', amount: -500, items: [], resourceUsage: session },
+    data: {
+      id: 7,
+      createdAt: '2026-09-01',
+      status: 'completed',
+      amount: -500,
+      items: [],
+      resourceUsageId: 8,
+      resourceUsage: { id: 8, resourceId: 2 },
+    },
   }),
   useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
 }));
 vi.mock('../../../../billing/dashboard/summary/transactionDetailsModal/refund', () => ({ RefundModal: () => null }));
+beforeEach(() => {
+  vi.clearAllMocks();
+  state.session = session;
+  state.transactionId = 7;
+  state.error = undefined;
+});
 afterEach(cleanup);
 
 it('opens the billing modal from usage and returns to the original usage drawer without navigating', async () => {
-  render(
-    <UsageNotesModal
-      isOpen
-      session={session}
-      onClose={vi.fn()}
-      projectLabel="Project"
-      projectPlaceholder="Unassigned"
-    />,
-  );
+  render(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
   const originalDrawer = screen.getByRole('dialog');
   const url = window.location.href;
   fireEvent.click(screen.getByRole('button', { name: 'Open billing overview' }));
@@ -69,8 +96,26 @@ it('opens existing usage details from billing, then closes back to billing', asy
 });
 
 it('omits billing actions for sessions without a transaction or owned by another user', () => {
-  const view = render(<UsageNotesModal isOpen session={{ ...session, billingTransaction: null }} onClose={vi.fn()} />);
+  state.transactionId = null;
+  const view = render(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
   expect(screen.queryByRole('button', { name: 'Open billing overview' })).toBeNull();
-  view.rerender(<UsageNotesModal isOpen session={{ ...session, userId: 2 }} onClose={vi.fn()} />);
+  state.session = { ...session, userId: 2 };
+  state.transactionId = 7;
+  view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
   expect(screen.queryByRole('button', { name: 'Open billing overview' })).toBeNull();
+  expect(state.fetchBilling).toHaveBeenLastCalledWith({ usageId: 8 }, undefined, { enabled: false });
+});
+
+it('fetches usage details by ID only while open and shows a retryable error', () => {
+  const view = render(<UsageNotesModal isOpen={false} resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(state.fetchSession).not.toHaveBeenCalled();
+  state.session = undefined;
+  view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(state.fetchSession).toHaveBeenCalledWith({ resourceId: 2, usageId: 8 });
+  expect(document.querySelector('.spinner')).toBeTruthy();
+  state.error = new Error('Unavailable');
+  view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(screen.getByRole('alert')).toHaveTextContent('Unable to load usage details.');
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(state.retry).toHaveBeenCalled();
 });

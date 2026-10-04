@@ -171,7 +171,6 @@ export class ResourceUsage {
     onDelete: 'CASCADE',
     nullable: true,
   })
-  @ApiProperty({ type: () => BillingTransaction, nullable: true, required: false })
   billingTransaction!: BillingTransaction | null;
 
   @Column({ nullable: true, type: 'integer' })

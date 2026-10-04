@@ -32,6 +32,7 @@ describe('BillingController', () => {
     getBalance: jest.Mock;
     getHistory: jest.Mock;
     getTransaction: jest.Mock;
+    getTransactionIdForUsage: jest.Mock;
     createManualTransaction: jest.Mock;
     getResourceBillingConfiguration: jest.Mock;
     updateResourceBillingConfiguration: jest.Mock;
@@ -58,6 +59,7 @@ describe('BillingController', () => {
       getBalance: jest.fn(),
       getHistory: jest.fn(),
       getTransaction: jest.fn(),
+      getTransactionIdForUsage: jest.fn(),
       createManualTransaction: jest.fn(),
       getResourceBillingConfiguration: jest.fn(),
       updateResourceBillingConfiguration: jest.fn(),
@@ -148,6 +150,17 @@ describe('BillingController', () => {
       expect(service.getTransaction).toHaveBeenCalledWith(123, 2);
       expect(result).toBeNull();
     });
+  });
+
+  it('scopes the usage-to-billing lookup to the requester, including billing managers', async () => {
+    service.getTransactionIdForUsage.mockResolvedValue(null);
+    expect(
+      await controller.getUsageBillingTransaction(
+        8,
+        baseReq({ id: 2, effectivePermissions: new Set(['billing.manage']) }),
+      ),
+    ).toEqual({ transactionId: null });
+    expect(service.getTransactionIdForUsage).toHaveBeenCalledWith(8, 2);
   });
 
   describe('getBillingTransactions', () => {

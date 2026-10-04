@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsageService } from './resourceUsage.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
+  Project,
   Resource,
   ResourceUsage,
-  BillingTransaction,
   ResourceUsageLifecycleAttempt,
   ResourceType,
   ResourceUsageAction,
@@ -468,36 +469,45 @@ describe('ResourceUsageService', () => {
     expect(resourceUsageRepository.save).not.toHaveBeenCalled();
   });
 
-  describe('getResourceUsageHistory', () => {
-    it('keeps every usage row but only exposes billing belonging to the requester', async () => {
-      const ownTransaction = { id: 10, userId: 1, amount: -500 } as BillingTransaction;
-      const usages = [
-        { id: 1, userId: 1, billingTransaction: ownTransaction },
-        { id: 2, userId: 2, billingTransaction: { id: 11, userId: 2, externalReference: 'private' } },
-        { id: 3, userId: 1, billingTransaction: { id: 12, userId: 2 } },
-        { id: 4, userId: 1, billingTransaction: null },
-      ] as ResourceUsage[];
-      resourceUsageRepository.findAndCount = jest.fn().mockResolvedValue([usages, 4]);
+  describe('getSessionDetails', () => {
+    const requester = { id: 1, effectivePermissions: new Set<string>() } as AuthenticatedUser;
 
-      const result = await service.getResourceUsageHistory(5, 1);
-
-      expect(result.total).toBe(4);
-      expect(result.data.map((usage) => usage.id)).toEqual([1, 2, 3, 4]);
-      expect(result.data.map((usage) => usage.billingTransaction)).toEqual([ownTransaction, null, null, null]);
+    it('loads the requested visible session and its usage details for the owner', async () => {
+      const usage = { id: 8, userId: 1, resourceId: 5 } as ResourceUsage;
+      resourceUsageRepository.findOne.mockResolvedValue(usage);
+      expect(await service.getSessionDetails(5, 8, requester)).toBe(usage);
+      expect(resourceUsageRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 8, resourceId: 5, lifecyclePending: false },
+        relations: expect.arrayContaining(['project', 'supervisorUser', 'formSubmissions.form']),
+      });
+      expect(projectsService.findOneById).not.toHaveBeenCalled();
     });
 
-    it('does not grant billing access when filtering another user’s usage', async () => {
-      resourceUsageRepository.findAndCount = jest
-        .fn()
-        .mockResolvedValue([[{ id: 2, userId: 2, billingTransaction: { id: 11, userId: 2 } }], 1]);
-
-      const result = await service.getResourceUsageHistory(5, 1, 1, 10, 2);
-
-      expect(result.data[0].billingTransaction).toBeNull();
-      expect(resourceUsageRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { resourceId: 5, lifecyclePending: false, userId: 2 } }),
-      );
+    it('allows resource managers to view another user’s session', async () => {
+      resourceUsageRepository.findOne.mockResolvedValue({ id: 8, userId: 2 } as ResourceUsage);
+      expect(
+        await service.getSessionDetails(5, 8, { ...requester, effectivePermissions: new Set(['resources.update']) }),
+      ).toEqual({ id: 8, userId: 2 });
+      expect(projectsService.findOneById).not.toHaveBeenCalled();
     });
+
+    it('requires project access before returning another member’s usage', async () => {
+      const usage = { id: 8, userId: 2, projectId: 3 } as ResourceUsage;
+      resourceUsageRepository.findOne.mockResolvedValue(usage);
+      projectsService.findOneById.mockResolvedValue({ id: 3 } as Project);
+      expect(await service.getSessionDetails(5, 8, requester)).toBe(usage);
+      expect(projectsService.findOneById).toHaveBeenCalledWith(1, 3);
+      projectsService.findOneById.mockRejectedValue(new NotFoundException('Project not found'));
+      await expect(service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+    });
+
+    it.each([null, { id: 8, userId: 2, projectId: null }])(
+      'rejects missing or inaccessible sessions (%s)',
+      async (usage) => {
+        resourceUsageRepository.findOne.mockResolvedValue(usage as ResourceUsage);
+        await expect(service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+      },
+    );
   });
 
   describe('startSession', () => {
@@ -1419,7 +1429,7 @@ describe('ResourceUsageService', () => {
         { notes: configuredEndNotes },
         { skipFormSubmissions: true, skipNoteNotification: true },
       );
-      const history = await service.getResourceUsageHistory(usage.resourceId, usage.userId, 1, 10, usage.userId);
+      const history = await service.getResourceUsageHistory(usage.resourceId, 1, 10, usage.userId);
 
       expect(history.data).toEqual([expect.objectContaining({ id: usage.id, endNotes: configuredEndNotes })]);
     });

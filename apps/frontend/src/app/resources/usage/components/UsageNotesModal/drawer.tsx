@@ -11,7 +11,7 @@ import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useAuth } from '../../../../../hooks/useAuth';
 
-export interface UsageNotesModalProps {
+export interface UsageNotesDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   session: ResourceUsage | null;
@@ -22,6 +22,8 @@ export interface UsageNotesModalProps {
   onProjectChange?: (session: ResourceUsage, projectId: number | undefined) => void;
   operatingDurationMs?: number;
   onOpenBilling?: () => void;
+  error?: boolean;
+  onRetry?: () => void;
 }
 
 export const UsageNotesDrawer = memo(
@@ -36,7 +38,9 @@ export const UsageNotesDrawer = memo(
     onProjectChange,
     operatingDurationMs,
     onOpenBilling,
-  }: UsageNotesModalProps) => {
+    error,
+    onRetry,
+  }: UsageNotesDrawerProps) => {
     const { t } = useTranslations({ en, de });
     const { user } = useAuth();
 
@@ -79,7 +83,14 @@ export const UsageNotesDrawer = memo(
           </div>
         </DrawerHeader>
         <DrawerBody>
-          {session ? (
+          {error ? (
+            <div role="alert">
+              <p>{t('loadError')}</p>
+              <Button variant="secondary" onPress={onRetry}>
+                {t('retry')}
+              </Button>
+            </div>
+          ) : session ? (
             <div className="space-y-6">
               {onOpenBilling && (
                 <Button variant="secondary" onPress={onOpenBilling}>
