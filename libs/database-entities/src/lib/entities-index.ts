@@ -1,3 +1,4 @@
+import { ResourceMeter } from './entities/resource-meter.entity';
 // Import entities
 import { AuditLog } from './entities/audit-log.entity';
 import { EmailTemplate } from './entities/email-template.entity';
@@ -122,6 +123,7 @@ export type {
 
 // Export all entities individually
 export {
+  ResourceMeter,
   AuditLog,
   AuthenticationDetail,
   MqttServer,
@@ -248,6 +250,7 @@ export {
 
 // Export the entities object
 export const entities = {
+  ResourceMeter,
   AuditLog,
   User,
   AuthenticationDetail,

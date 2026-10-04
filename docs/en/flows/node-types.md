@@ -70,26 +70,11 @@ Triggers after a period of inactivity on the resource. Useful for safety automat
 | **Timeout** | Duration of inactivity before triggering |
 | **Unit** | Seconds, Minutes, or Hours |
 
-### Metering Start
+### Metering Start and Collection
 
-Triggers when a billed usage session begins (or is taken over) so the energy meter can be prepared. The branch must end in **Metering Ready**; otherwise the session does not start. Part of the **Billing** group.
+Select a predefined meter in each node. **Metering Start** prepares the counter at session start and must reach **Metering Ready**. **Metering Collection** reads it periodically, including outside sessions, and at session end; connect it to **Report Meter**. Configure a timeout, periodic interval (`0` disables polling), final attempts and retry delay.
 
-| Setting | Description |
-|---------|-------------|
-| **Timeout (seconds)** | How long to wait for **Metering Ready** (default 30) |
-
-### Metering Collection
-
-Triggers for interim energy readings while a session runs and for the final reading when it ends. The branch must end in **Report Energy**. Part of the **Billing** group.
-
-| Setting | Description |
-|---------|-------------|
-| **Timeout (seconds)** | How long to wait for **Report Energy** (default 30) |
-| **Interim interval (minutes)** | Time between interim readings, shown live and never billed (default 1, `0` disables) |
-| **Final attempts** | Tries to get a fresh final reading (default 3) |
-| **Final retry delay (seconds)** | Pause between final attempts (default 5) |
-
-See [Energy Metering](flows/energy-metering.md).
+See [Meters](flows/energy-metering.md).
 
 ---
 
@@ -215,30 +200,18 @@ An accepted operating observation remains recorded even if a later node fails. A
 
 ### Metering Ready
 
-Confirms that the energy meter is prepared. Only valid in a branch started by **Metering Start**. Part of the **Billing** group. All settings are optional templates.
+Select the meter matching the start request. Supply a baseline value for a lifetime counter, or leave it empty after resetting the source to zero. Values and the optional source label can use templates.
 
-| Setting | Description |
-|---------|-------------|
-| **Baseline value** / **Baseline unit** | Only for lifetime counters that cannot be reset: the current counter reading; later totals are counted from it |
-| **Source** | Label of the physical meter |
+### Report Meter
 
-### Report Energy
+Select a meter, a **total** (cumulative counter) or **increment** mode, and a non-negative value or template. No unit is required. Optional observation time and source label are supported. Works in collection branches and ordinary flows, including outside sessions.
 
-Reports the **total** energy consumed since the metering start. Only valid in a branch started by **Metering Collection**. Part of the **Billing** group. All settings are templates.
-
-| Setting | Description |
-|---------|-------------|
-| **Value** | Total energy since the metering start (not an increment, not power) |
-| **Unit** | An energy unit such as `Wh`, `kWh`, `MWh`, `J`, `kJ` or `MJ`; power units (`W`, `kW`) are rejected |
-| **Observed at** | Optional ISO time of the reading |
-| **Source** | Optional label of the physical meter |
-
-See [Energy Metering](flows/energy-metering.md).
+See [Meters](flows/energy-metering.md).
 
 ## See Also
 
 - [Flow Editor](flows/flow-editor.md) -- How to place and connect nodes
 - [Flows Overview](flows/overview.md) -- What flows are and how they work
 - [MQTT & IoT](devices/mqtt/overview.md) -- Setting up MQTT
-- [Energy Metering](flows/energy-metering.md) -- Bill electricity per kWh
+- [Meters](flows/energy-metering.md) -- Record and bill arbitrary consumption
 - [Billing](billing/overview.md) -- Billing system details

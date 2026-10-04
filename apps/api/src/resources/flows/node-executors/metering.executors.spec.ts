@@ -12,22 +12,22 @@ const context = (metering?: Partial<MeteringRunContext>): NodeExecutionContext &
   const complete = jest.fn().mockResolvedValue(undefined);
   return {
     compileTemplate: render,
-    metering: metering ? { operationId: 'op', kind: 'final', complete, ...metering } : undefined,
+    metering: metering ? { meterId: 1, operationId: 'op', kind: 'final', complete, ...metering } : undefined,
     complete,
   } as never;
 };
 
-const node = (data: object) => ({ data }) as ResourceFlowNode;
+const node = (data: object) => ({ resourceId: 1, data: { meterId: 1, ...data } }) as unknown as ResourceFlowNode;
 
 describe('metering completion nodes', () => {
   it('report renders value, unit, time and source from the flow payload and replies once', async () => {
     const ctx = context();
-    ctx.metering = { operationId: 'op', kind: 'final', complete: ctx.complete };
+    ctx.metering = { meterId: 1, operationId: 'op', kind: 'final', complete: ctx.complete };
     const input = { wago: { measurement: { value: 1500, unit: 'watt-hour', at: '2026-09-28T10:00:00Z' } } };
-    const result = await new MeteringReportExecutor().execute(
+    const result = await new MeteringReportExecutor({ report: jest.fn() } as never).execute(
       node({
         value: '{{wago.measurement.value}}',
-        unit: '{{wago.measurement.unit}}',
+        legacyEnergyUnit: '{{wago.measurement.unit}}',
         observedAt: '{{wago.measurement.at}}',
         source: 'cc100',
       }),
@@ -37,22 +37,29 @@ describe('metering completion nodes', () => {
     expect(result.payload).toBe(input);
     expect(ctx.complete).toHaveBeenCalledWith({
       kind: 'reading',
+      mode: 'total',
       value: '1500',
-      unit: 'watt-hour',
+      legacyEnergyUnit: 'watt-hour',
       observedAt: '2026-09-28T10:00:00Z',
       source: 'cc100',
     });
   });
 
-  it('report refuses to run outside a collection branch', async () => {
-    await expect(
-      new MeteringReportExecutor().execute(node({ value: '1', unit: 'kWh' }), {}, context()),
-    ).rejects.toThrow(/Metering collection/);
-    const start = context({ kind: 'start' });
-    await expect(new MeteringReportExecutor().execute(node({ value: '1', unit: 'kWh' }), {}, start)).rejects.toThrow(
-      /Metering collection/,
+  it('reports increments outside a collection branch', async () => {
+    const report = jest.fn().mockResolvedValue(undefined);
+    await new MeteringReportExecutor({ report } as never).execute(
+      node({ value: '3', mode: 'increment' }),
+      {},
+      context(),
     );
-    expect(start.complete).not.toHaveBeenCalled();
+    expect(report).toHaveBeenCalledWith(
+      1,
+      1,
+      expect.objectContaining({ kind: 'reading', mode: 'increment', value: '3' }),
+      undefined,
+      undefined,
+      undefined,
+    );
   });
 
   it('ready acknowledges a resettable source without a baseline', async () => {
@@ -64,13 +71,13 @@ describe('metering completion nodes', () => {
   it('ready records the baseline of a lifetime counter', async () => {
     const ctx = context({ kind: 'start' });
     await new MeteringReadyExecutor().execute(
-      node({ baselineValue: '{{meter.total}}', baselineUnit: 'kWh', source: 'grid' }),
+      node({ baselineValue: '{{meter.total}}', legacyEnergyUnit: 'kWh', source: 'grid' }),
       { meter: { total: 1000.25 } },
       ctx,
     );
     expect(ctx.complete).toHaveBeenCalledWith({
       kind: 'ready',
-      baseline: { value: '1000.25', unit: 'kWh' },
+      baseline: { value: '1000.25', legacyEnergyUnit: 'kWh' },
       source: 'grid',
     });
   });
@@ -78,7 +85,7 @@ describe('metering completion nodes', () => {
   it('ready refuses a configured baseline that renders empty instead of billing the whole counter', async () => {
     const ctx = context({ kind: 'start' });
     await expect(
-      new MeteringReadyExecutor().execute(node({ baselineValue: '{{meter.missing}}', baselineUnit: 'kWh' }), {}, {
+      new MeteringReadyExecutor().execute(node({ baselineValue: '{{meter.missing}}', legacyEnergyUnit: 'kWh' }), {}, {
         ...ctx,
         compileTemplate: () => '',
       } as never),
@@ -89,10 +96,14 @@ describe('metering completion nodes', () => {
   it('report refuses a configured observed-at time that renders empty', async () => {
     const ctx = context({ kind: 'final' });
     await expect(
-      new MeteringReportExecutor().execute(node({ value: '1', unit: 'kWh', observedAt: '{{at}}' }), {}, {
-        ...ctx,
-        compileTemplate: (template: string) => (template === '{{at}}' ? '' : template),
-      } as never),
+      new MeteringReportExecutor({ report: jest.fn() } as never).execute(
+        node({ value: '1', legacyEnergyUnit: 'kWh', observedAt: '{{at}}' }),
+        {},
+        {
+          ...ctx,
+          compileTemplate: (template: string) => (template === '{{at}}' ? '' : template),
+        } as never,
+      ),
     ).rejects.toThrow(/observed-at time rendered empty/);
     expect(ctx.complete).not.toHaveBeenCalled();
   });

@@ -191,7 +191,8 @@
     "plugin.zip_uploaded": "Plugin-Archiv hochgeladen",
     "plugin.zip_deleted": "Plugin-Archiv gelöscht",
     "plugin.retry_requested": "Erneuter Plugin-Versuch angefordert",
-    "billing.transaction.updated": "Abrechnung geändert"
+    "billing.transaction.updated": "Abrechnung geändert",
+    "meter_charge.waived": "Zählerkosten erlassen"
   },
   "targets": {
     "resource": "Ressource",

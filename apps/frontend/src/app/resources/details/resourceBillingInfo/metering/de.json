@@ -3,47 +3,47 @@
     "title": "Laufende Sitzung",
     "sessionTime": "Sitzungsdauer",
     "meter": "Zählerstand",
-    "meterValue": "{{value}} kWh",
+    "meterValue": "{{value}} ",
     "meterWaiting": "Warte auf die erste Messung",
     "meterAsOf": "Stand {{time}}",
-    "energyCost": "Energiekosten bisher",
+    "meterCost": "{{name}}: Kosten bisher",
     "estimate": "Voraussichtliche Kosten bisher",
     "estimateNote": "Schätzung ohne zugeordnete Betriebsminuten und zusätzliche Flow-Positionen.",
     "billingValue": "{{credits}} {{currency}}"
   },
   "setup": {
     "title": "Zähler nicht eingerichtet",
-    "description": "Die Energieabrechnung ist aktiv, aber es kann keine Sitzung starten, bis der Flow dieser Ressource ihren Zähler definiert.",
+    "description": "Die Verbrauchabrechnung ist aktiv, aber es kann keine Sitzung starten, bis der Flow dieser Ressource ihren Zähler definiert.",
     "problems": {
       "start-trigger-missing": "Fügen Sie einen Auslöser „Messung starten“ hinzu.",
       "ready-unreachable": "Verbinden Sie „Messung starten“ mit einem Knoten „Messung bereit“.",
       "collect-trigger-missing": "Fügen Sie einen Auslöser „Messwert abfragen“ hinzu.",
-      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Energie melden“."
+      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Verbrauch melden“."
     },
     "action": "Flows öffnen"
   },
   "unsettled": {
     "pending": {
-      "title": "Energieabrechnung ausstehend",
-      "description": "Nutzung #{{usageId}} ist beendet und die Grundgebühr ist abgerechnet. Der Energieverbrauch fehlt aber noch, weil beim Beenden kein gültiger Zählerstand vorlag."
+      "title": "Verbrauchabrechnung ausstehend",
+      "description": "Nutzung #{{usageId}} ist beendet und die Grundgebühr ist abgerechnet. Der Verbrauchverbrauch fehlt aber noch, weil beim Beenden kein gültiger Zählerstand vorlag."
     },
     "failed": {
-      "title": "Energieabrechnung fehlgeschlagen",
-      "description": "Der Zähler wurde inzwischen von einer späteren Sitzung genutzt, deshalb lässt sich der Verbrauch von Nutzung #{{usageId}} nicht mehr nachmessen."
+      "title": "Verbrauchabrechnung fehlgeschlagen",
+      "description": "Der endgültige Verbrauch von Nutzung #{{usageId}} lässt sich nicht mehr sicher bestimmen."
     },
     "reason": "Grund: {{reason}}",
-    "lastReading": "Letzter akzeptierter Zählerstand: {{value}} kWh (nicht abgerechnet)",
+    "lastReading": "Letzter akzeptierter Zählerstand: {{value}} (nicht abgerechnet)",
     "retry": "Zähler erneut abfragen",
     "retryHint": "Liest den Zähler noch einmal aus. Bei Erfolg wird der Verbrauch als zusätzliche Korrekturbuchung abgerechnet; die bestehende Abrechnung bleibt unverändert.",
-    "waive": "Energiekosten erlassen",
+    "waive": "Zählerkosten erlassen",
     "waiveHint": "Der Verbrauch wird nicht berechnet und es wird keine Buchung erstellt. Der Hinweis verschwindet.",
     "retried": {
-      "title": "Energie abgerechnet",
+      "title": "Verbrauch abgerechnet",
       "description": "Der Zählerstand wurde abgefragt und der Verbrauch als Korrekturbuchung abgerechnet."
     },
     "waived": {
-      "title": "Energiekosten erlassen",
-      "description": "Für diese Nutzung wird keine Energie abgerechnet."
+      "title": "Zählerkosten erlassen",
+      "description": "Der Verbrauch dieses Zählers wird für diese Nutzung nicht abgerechnet."
     }
   }
 }

@@ -20,7 +20,7 @@
   },
   "type": {
     "refund": "Refund",
-    "correction": "Energy correction",
+    "correction": "Meter correction",
     "resourceUsage": "Resource usage",
     "manual": "Manual",
     "sumupTopup": "SumUp top-up",
@@ -44,7 +44,8 @@
     },
     "energyDescription": "{{kwh}} kWh at {{rate}} per kWh",
     "empty": "No items",
-    "total": "Items total"
+    "total": "Items total",
+    "meterDescription": "{{value}} at {{rate}} per measured value"
   },
   "actions": {
     "refund": "Refund"

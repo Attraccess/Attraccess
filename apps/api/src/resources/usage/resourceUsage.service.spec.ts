@@ -554,6 +554,7 @@ describe('ResourceUsageService', () => {
         sessionDurationCreditsPerMinute: 0,
         operatingDurationCreditsPerMinute: 0,
         creditsPerUsage: 0,
+        meterRates: [],
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();

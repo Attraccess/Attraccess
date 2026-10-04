@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useMeterValueFormatter } from '../../meters/useMeterValueFormatter';
+import { Fragment, useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
 import {
   useResourceMeteringServiceGetResourceMeteringLive,
@@ -9,8 +10,6 @@ import { dbCurrencyToUserCurrency, formatDurationMs } from '@attraccess/shared';
 import de from './de.json';
 import en from './en.json';
 
-const KWH_FORMAT = { maximumFractionDigits: 3 } as const;
-
 interface Props {
   resourceId: number;
   currency: string;
@@ -19,17 +18,16 @@ interface Props {
   valueClass: string;
 }
 
-/** Running session: meter value, energy cost so far, and an estimate of the whole bill. */
+/** Running session: meter value, meter cost so far, and an estimate of the whole bill. */
 export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, valueClass }: Props) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
-  const formatKwh = useNumberFormatter(KWH_FORMAT);
+  const formatValue = useMeterValueFormatter();
 
   const { data: active } = useResourcesServiceResourceUsageGetActiveSession({ resourceId }, undefined);
   const usage = active?.usage ?? null;
-  const metered = (usage?.energyCreditsPerKwh ?? 0) > 0;
   const { data: live } = useResourceMeteringServiceGetResourceMeteringLive({ resourceId }, undefined, {
-    enabled: metered,
+    enabled: !!usage,
     refetchInterval: 10_000,
   });
 
@@ -46,14 +44,14 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
     t('live.billingValue', { credits: formatNumber(dbCurrencyToUserCurrency(credits, minorUnit)), currency });
 
   const elapsedMs = Math.max(0, now - new Date(usage.startTime).getTime());
-  const energyCredits = live?.session?.energyCredits ?? 0;
+  const meters = live?.meters.filter((meter) => meter.session != null) ?? [];
+  const meterCredits = meters.reduce((sum, meter) => sum + (meter.session?.chargeCredits ?? 0), 0);
   const gross =
     (usage.creditsPerUsage ?? 0) +
     (usage.sessionDurationCreditsPerMinute ?? 0) * Math.ceil(elapsedMs / 60_000) +
-    energyCredits;
+    meterCredits;
   const estimate = Math.round((gross * (usage.billingFactor ?? 100)) / 100);
-  const hasBillableRates = gross > 0 || metered;
-  const reading = live?.session?.latestKwh;
+  const hasBillableRates = gross > 0 || meters.some((meter) => (meter.session?.creditsPerUnit ?? 0) > 0);
 
   return (
     <div className="flex flex-col gap-2" data-cy="live-session-billing">
@@ -64,30 +62,22 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
       <dl className={dlClass}>
         <dt>{t('live.sessionTime')}</dt>
         <dd className={valueClass}>{formatDurationMs(elapsedMs)}</dd>
-        {metered && (
-          <>
-            <dt>{t('live.meter')}</dt>
+        {meters.map((meter) => (
+          <Fragment key={meter.id}>
+            <dt>{meter.name}</dt>
             <dd className={valueClass} data-cy="live-meter-value">
-              {reading == null ? (
-                <span className="text-foreground-500">{t('live.meterWaiting')}</span>
-              ) : (
-                <>
-                  {t('live.meterValue', { value: formatKwh(Number(reading)) })}
-                  {live?.session?.latestObservedAt && (
-                    <>
-                      <br />
-                      <small className="text-foreground-500">
-                        {t('live.meterAsOf', { time: new Date(live.session.latestObservedAt).toLocaleTimeString() })}
-                      </small>
-                    </>
-                  )}
-                </>
-              )}
+              {meter.session?.latestValue == null ? t('live.meterWaiting') : formatValue(meter.session.latestValue)}
             </dd>
-            <dt>{t('live.energyCost')}</dt>
-            <dd className={valueClass}>{reading == null ? '-' : money(energyCredits)}</dd>
-          </>
-        )}
+            {(meter.session?.creditsPerUnit ?? 0) > 0 && (
+              <>
+                <dt>{t('live.meterCost', { name: meter.name })}</dt>
+                <dd className={valueClass}>
+                  {meter.session?.chargeCredits == null ? '-' : money(meter.session.chargeCredits)}
+                </dd>
+              </>
+            )}
+          </Fragment>
+        ))}
         {hasBillableRates && (
           <>
             <dt>{t('live.estimate')}</dt>

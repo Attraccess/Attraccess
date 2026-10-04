@@ -191,7 +191,8 @@
     "plugin.zip_uploaded": "Plugin archive uploaded",
     "plugin.zip_deleted": "Plugin archive deleted",
     "plugin.retry_requested": "Plugin retry requested",
-    "billing.transaction.updated": "Billing transaction updated"
+    "billing.transaction.updated": "Billing transaction updated",
+    "meter_charge.waived": "Meter charge waived"
   },
   "targets": {
     "resource": "Resource",

@@ -7,10 +7,11 @@ import {
   BillingTransactionItem,
   ResourceUsage,
   ResourceFlowNodeType,
+  ResourceMeter,
 } from '@attraccess/database-entities';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, MoreThan, Repository } from 'typeorm';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { PaginationOptions } from '../types/request';
 import { TransactionsDto } from './dto/transactions.dto';
@@ -277,19 +278,6 @@ export class BillingService {
       );
     }
 
-    if (data.creditsPerKwh === null) {
-      data.creditsPerKwh = 0;
-    }
-    if (data.creditsPerKwh !== undefined) {
-      if (data.creditsPerKwh < 0) {
-        throw new BadRequestException('Credits per kWh cannot be negative');
-      }
-      if (data.creditsPerKwh % 1 !== 0) {
-        throw new BadRequestException('Credits per kWh must be an integer (multiply by currency minor unit)');
-      }
-      configuration.creditsPerKwh = data.creditsPerKwh;
-    }
-
     const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
     this.eventEmitter.emit(
       ResourceBillingConfigurationChangedEvent.EVENT_NAME,
@@ -523,7 +511,13 @@ export class BillingService {
       (usage?.creditsPerUsage ?? configuration.creditsPerUsage) > 0 ||
       (usage?.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute) > 0 ||
       (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0 ||
-      (usage?.energyCreditsPerKwh ?? configuration.creditsPerKwh) > 0
+      (usage?.energyCreditsPerKwh ?? 0) > 0 ||
+      (usage?.meterRates
+        ? usage.meterRates.some((meter) => meter.creditsPerUnit > 0)
+        : (await (transactionalEntityManager ?? this.resourceBillingConfigurationRepository.manager).count(
+            ResourceMeter,
+            { where: { resourceId, creditsPerUnit: MoreThan(0) } },
+          )) > 0)
     ) {
       return true;
     }

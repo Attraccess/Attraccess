@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
+  ResourceMeter,
   ResourceFlowEdge,
   ResourceFlowNode,
   ResourceMeteringOperation,
@@ -15,7 +16,13 @@ import { ResourceMeteringService } from './resource-metering.service';
 @Module({
   imports: [
     ResourceTransactionsModule,
-    TypeOrmModule.forFeature([ResourceMeteringSession, ResourceMeteringOperation, ResourceFlowNode, ResourceFlowEdge]),
+    TypeOrmModule.forFeature([
+      ResourceMeter,
+      ResourceMeteringSession,
+      ResourceMeteringOperation,
+      ResourceFlowNode,
+      ResourceFlowEdge,
+    ]),
     forwardRef(() => ResourceFlowsModule),
     forwardRef(() => BillingModule),
   ],

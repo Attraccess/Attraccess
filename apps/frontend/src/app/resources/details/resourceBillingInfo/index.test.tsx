@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  useResourceMeteringServiceListResourceMeters,
   useBillingServiceGetBillingBalance,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
@@ -13,6 +14,7 @@ import { ResourceBillingInfo } from './index';
 import en from './en.json';
 
 vi.mock('@attraccess/react-query-client', () => ({
+  useResourceMeteringServiceListResourceMeters: vi.fn(),
   useBillingServiceGetBillingBalance: vi.fn(),
   useBillingServiceGetBillingConfiguration: vi.fn(),
   useBillingServiceGetResourceBillingConfiguration: vi.fn(),
@@ -60,6 +62,9 @@ vi.mock('./editor', () => ({
 }));
 
 function mockData() {
+  vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+    data: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 30 }],
+  } as never);
   vi.mocked(useBillingServiceGetBillingConfiguration).mockReturnValue({
     data: { currency: 'credits', minorUnit: 2 },
   } as ReturnType<typeof useBillingServiceGetBillingConfiguration>);
@@ -94,10 +99,10 @@ describe('ResourceBillingInfo operating-minute billing', () => {
     expect(screen.getByText('3 credits')).toBeInTheDocument();
   });
 
-  it('displays the configured per-kWh energy rate', async () => {
+  it('displays a configured meter rate', async () => {
     render(<ResourceBillingInfo resourceId={205} />);
 
-    expect(await screen.findByText(en.perKwh.label)).toBeInTheDocument();
+    expect(await screen.findByText('Heartbeats')).toBeInTheDocument();
     // 30 minor units at minorUnit 2 => 0.3 credits per kWh
     expect(screen.getByText('0.3 credits')).toBeInTheDocument();
   });

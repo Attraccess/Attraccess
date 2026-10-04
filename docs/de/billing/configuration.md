@@ -20,7 +20,7 @@ Sie können die folgenden Optionen pro Ressource kombinieren:
 | **Credits pro Nutzung**        | Eine pauschale Anzahl von Credits, die pro Nutzungssitzung berechnet wird. Die Dauer spielt keine Rolle.                          |
 | **Credits pro Minute**         | Credits für jede angefangene Minute der Nutzungssitzung.                                                                          |
 | **Credits pro Betriebsminute** | Credits für jede angefangene Minute des aufgezeichneten Maschinenbetriebs, die der Sitzung zugeordnet ist. Standardwert ist null. |
-| **Credits pro kWh**            | Credits pro Kilowattstunde gemessenen Stroms. Erfordert einen Zähler im Ressourcen-Flow (siehe unten). Standardwert ist null.     |
+| **Preis pro Messwert**            | Optionaler Preis für jeden benannten Zähler. Standardwert ist null.     |
 
 > [!TIP]
 > Die Gebühren werden addiert. Beispiel: 10 Credits pro Nutzung + 2 Credits pro Sitzungsminute für eine 30-minütige Sitzung + 3 Credits pro Betriebsminute für 10 Minuten Maschinenbetrieb = 10 + 60 + 30 = 100 Credits, vor Anwendung des Abrechnungsfaktors des Benutzers.
@@ -29,16 +29,11 @@ Sitzungsdauer und Betriebsdauer werden unabhängig voneinander auf volle Minuten
 
 Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers werden beim Sitzungsstart gespeichert. Spätere Konfigurationsänderungen gelten für neue Sitzungen. Der gespeicherte Faktor wird auf die Summe aller Sitzungsposten angewendet, einschließlich zusätzlicher Abrechnungsposten aus Flows.
 
-## Energie (pro kWh)
+## Zählerverbrauch
 
-Strom kann pro Kilowattstunde abgerechnet werden. Legen Sie den **Preis pro kWh** im Bereich **Abrechnung** der Ressource fest (zum Beispiel 0,30 EUR/kWh) und definieren Sie den Zähler im Flow der Ressource mit den Mess-Knoten. Ohne vollständigen Zähler können auf dieser Ressource keine Sitzungen starten, solange ein Preis gesetzt ist.
+Jeder benannte Zähler kann in den Abrechnungseinstellungen einen Preis pro Messwert erhalten. Mehrere Zähler können gemeinsam abgerechnet werden. Namen und Preise werden beim Sitzungsstart gespeichert. Nur Sitzungsverbrauch wird berechnet; Leerlaufverbrauch erhöht den Gesamtverbrauch. Ein Preis von null deaktiviert nur die Abrechnung.
 
-- Der Preis wird beim Sitzungsstart gespeichert; spätere Änderungen gelten nur für neue Sitzungen.
-- Betrag = kWh x Preis, einmalig kaufmännisch auf die kleinste Währungseinheit gerundet (1,5 kWh bei 0,30 EUR/kWh = 0,45 EUR).
-- Die Energiekosten erscheinen als eigener **Energie**-Posten auf der Abrechnung; der Abrechnungsfaktor des Benutzers wird darauf angewendet.
-- Kann der finale Zählerstand nicht ermittelt werden, wird die Grundgebühr abgerechnet und die Energiekosten bleiben in der Abrechnungskarte der Ressource **ausstehend**, bis Sie erneut versuchen oder sie erlassen.
-
-Einrichtung, Ablauf und Beispiele finden Sie unter [Energiemessung und Abrechnung pro kWh](flows/energy-metering.md).
+Siehe [Zähler und verbrauchsbasierte Abrechnung](flows/energy-metering.md) für Einrichtung, Meldemodi, Migration und Abrechnung.
 
 ## Beispielkonfigurationen
 
@@ -62,7 +57,7 @@ Die Konfiguration der Abrechnungseinstellungen erfordert die Berechtigung **Abre
 ## Siehe auch
 
 - [Abrechnung Ueberblick](billing/overview.md) -- Wie die Abrechnung funktioniert
-- [Energiemessung](flows/energy-metering.md) -- Zähler-Einrichtung für die Abrechnung pro kWh
+- [Zähler](flows/energy-metering.md) -- Zählereinrichtung und Verbrauchsabrechnung
 - [Transaktionen](billing/transactions.md) -- Transaktionshistorie einsehen
 - [Ressourcen-Detailseite](resources/resource-details.md) -- Ressourcenkonfiguration
 - [Berechtigungen](user-management/permissions.md) -- Systemberechtigungen

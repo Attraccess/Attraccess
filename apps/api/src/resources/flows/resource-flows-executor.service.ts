@@ -1,3 +1,4 @@
+import { ResourceMeteringService } from '../metering/resource-metering.service';
 import {
   ForbiddenException,
   forwardRef,
@@ -164,6 +165,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     private readonly flowTimer: FlowTimer,
     private readonly companionGatewayService: CompanionGatewayService,
     private readonly operatingIntervals: ResourceOperatingIntervalService,
+    @Inject(forwardRef(() => ResourceMeteringService)) private readonly metering: ResourceMeteringService,
   ) {
     this.nodeExecutors = this.buildNodeExecutorRegistry();
   }
@@ -232,7 +234,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       [ResourceFlowNodeType.INPUT_METERING_START]: passthrough,
       [ResourceFlowNodeType.INPUT_METERING_COLLECT]: passthrough,
       [ResourceFlowNodeType.OUTPUT_METERING_READY]: new MeteringReadyExecutor(),
-      [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: new MeteringReportExecutor(),
+      [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: new MeteringReportExecutor(this.metering),
     };
   }
 
@@ -478,13 +480,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   ): Promise<object[]> {
     const repository = this.getRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
 
-    const nodes = await repository.find({
+    const allNodes = await repository.find({
       where: {
         resourceId,
         type: triggerNodeType,
       },
     });
 
+    const nodes = options.metering
+      ? allNodes.filter((node) => node.data?.meterId === options.metering?.meterId)
+      : allNodes;
     if (nodes.length === 0) {
       this.logger.debug(
         `No flow nodes found for trigger node type '${triggerNodeType}' and resource ID: ${resourceId}`,

@@ -29,6 +29,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
           resolve(key) ?? key,
         ),
     }),
+    useTranslationState: () => ({ language: 'en' }),
     useNumberFormatter: () => (value: number) => String(value),
   };
 });
@@ -40,7 +41,7 @@ function mock(usage: object | null, live: object | null) {
     data: { usage },
   } as ReturnType<typeof useResourcesServiceResourceUsageGetActiveSession>);
   vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({
-    data: { session: live },
+    data: { meters: live ? [{ id: 1, name: 'Heartbeats', session: { creditsPerUnit: 30, ...live } }] : [] },
   } as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringLive>);
 }
 
@@ -66,11 +67,11 @@ describe('LiveSessionBilling', () => {
         energyCreditsPerKwh: 30,
         billingFactor: 100,
       },
-      { latestKwh: '1.5', energyCredits: 45, latestObservedAt: '2026-09-28T10:03:00Z' },
+      { latestValue: '1.5', chargeCredits: 45, latestObservedAt: '2026-09-28T10:03:00Z' },
     );
     render(<LiveSessionBilling {...props} />);
 
-    expect(screen.getByText('1.5 kWh')).toBeInTheDocument();
+    expect(screen.getByText('1.5')).toBeInTheDocument();
     // energy 45 minor units => 0.45
     expect(screen.getByText('0.45 EUR')).toBeInTheDocument();
     // 100 + 10 * ceil(3.5 min) + 45 = 185 minor units => 1.85
@@ -87,7 +88,7 @@ describe('LiveSessionBilling', () => {
         energyCreditsPerKwh: 30,
         billingFactor: 50,
       },
-      { latestKwh: '1.5', energyCredits: 45, latestObservedAt: null },
+      { latestValue: '1.5', chargeCredits: 45, latestObservedAt: null },
     );
     render(<LiveSessionBilling {...props} />);
     // round(45 * 50 / 100) = 23 minor units
@@ -103,14 +104,14 @@ describe('LiveSessionBilling', () => {
         energyCreditsPerKwh: 30,
         billingFactor: 100,
       },
-      { latestKwh: null, energyCredits: null, latestObservedAt: null },
+      { latestValue: null, chargeCredits: null, latestObservedAt: null },
     );
     render(<LiveSessionBilling {...props} />);
     expect(screen.getByText(en.live.meterWaiting)).toBeInTheDocument();
-    expect(screen.queryByText('0 kWh')).not.toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
-  it('does not query the meter for sessions without an energy rate', () => {
+  it('queries tracking-only meters during a session', () => {
     mock(
       {
         startTime: '2026-09-28T10:00:00Z',
@@ -124,7 +125,7 @@ describe('LiveSessionBilling', () => {
     expect(useResourceMeteringServiceGetResourceMeteringLive).toHaveBeenCalledWith(
       { resourceId: 7 },
       undefined,
-      expect.objectContaining({ enabled: false }),
+      expect.objectContaining({ enabled: true }),
     );
     expect(screen.queryByText(en.live.meter)).not.toBeInTheDocument();
   });

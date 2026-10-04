@@ -1,3 +1,4 @@
+import { useMeterValueFormatter } from '../../../../resources/details/meters/useMeterValueFormatter';
 import {
   Button,
   Chip,
@@ -77,6 +78,7 @@ export function TransactionDetailsModal(props: Props) {
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
 
   const formatNumber = useNumberFormatter();
+  const formatMeterValue = useMeterValueFormatter();
 
   const statusColor = (status: BillingTransaction['status']) => {
     switch (status) {
@@ -215,36 +217,52 @@ export function TransactionDetailsModal(props: Props) {
                               <TableRow key={item.id} id={item.id}>
                                 <TableCell>
                                   <div className="font-medium">
-                                    {tExists('items.system.' + item.name) ? t('items.system.' + item.name) : item.name}
+                                    {item.meterQuantity == null && tExists('items.system.' + item.name)
+                                      ? t('items.system.' + item.name)
+                                      : item.name}
                                   </div>
-                                  {item.externalReference && (
+                                  {item.externalReference && item.meterQuantity == null && (
                                     <div className="text-tiny text-default-400">{item.externalReference}</div>
                                   )}
                                 </TableCell>
                                 <TableCell className="max-w-[28ch] truncate">
-                                  {item.name === 'ENERGY' && item.energyMicroWh != null
-                                    ? t('items.energyDescription', {
-                                        kwh: formatNumber(microWhToKwh(item.energyMicroWh)),
+                                  {item.meterQuantity != null
+                                    ? t('items.meterDescription', {
+                                        value: formatMeterValue(item.meterQuantity),
                                         rate: formatNumber(
                                           dbCurrencyToUserCurrency(
-                                            item.energyCreditsPerKwh ?? 0,
+                                            item.meterCreditsPerUnit ?? 0,
                                             configuration?.minorUnit ?? 2,
                                           ),
                                         ),
                                       })
-                                    : item.description}
+                                    : item.name === 'ENERGY' && item.energyMicroWh != null
+                                      ? t('items.energyDescription', {
+                                          kwh: formatNumber(microWhToKwh(item.energyMicroWh)),
+                                          rate: formatNumber(
+                                            dbCurrencyToUserCurrency(
+                                              item.energyCreditsPerKwh ?? 0,
+                                              configuration?.minorUnit ?? 2,
+                                            ),
+                                          ),
+                                        })
+                                      : item.description}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {item.name === 'ENERGY' && item.energyMicroWh != null
-                                    ? formatNumber(microWhToKwh(item.energyMicroWh))
-                                    : item.quantity}
+                                  {item.meterQuantity != null
+                                    ? formatMeterValue(item.meterQuantity)
+                                    : item.name === 'ENERGY' && item.energyMicroWh != null
+                                      ? formatNumber(microWhToKwh(item.energyMicroWh))
+                                      : item.quantity}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   {formatNumber(
                                     dbCurrencyToUserCurrency(
-                                      item.name === 'ENERGY' && item.energyCreditsPerKwh != null
-                                        ? item.energyCreditsPerKwh
-                                        : item.unitPrice,
+                                      item.meterCreditsPerUnit != null
+                                        ? item.meterCreditsPerUnit
+                                        : item.name === 'ENERGY' && item.energyCreditsPerKwh != null
+                                          ? item.energyCreditsPerKwh
+                                          : item.unitPrice,
                                       configuration?.minorUnit ?? 2,
                                     ),
                                   )}

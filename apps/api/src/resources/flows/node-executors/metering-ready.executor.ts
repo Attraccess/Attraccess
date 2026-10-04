@@ -8,6 +8,8 @@ export class MeteringReadyExecutor implements NodeExecutor {
       throw new FlowExecutionError('"Metering ready" can only run in a branch started by "Metering start"');
     }
     const data = MeteringReadyNodeDataSchema.parse(node.data ?? {});
+    if (data.meterId !== ctx.metering.meterId)
+      throw new FlowExecutionError('The selected meter does not match the metering request');
     const render = (template?: string) =>
       template ? ctx.compileTemplate(template, input).trim() || undefined : undefined;
     const baselineValue = render(data.baselineValue);
@@ -18,7 +20,9 @@ export class MeteringReadyExecutor implements NodeExecutor {
     }
     await ctx.metering.complete({
       kind: 'ready',
-      baseline: baselineValue ? { value: baselineValue, unit: render(data.baselineUnit) ?? '' } : undefined,
+      baseline: baselineValue
+        ? { value: baselineValue, legacyEnergyUnit: render(data.legacyEnergyUnit) ?? '' }
+        : undefined,
       source: render(data.source),
     });
     return { payload: input };

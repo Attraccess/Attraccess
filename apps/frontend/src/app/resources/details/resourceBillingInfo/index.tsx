@@ -12,6 +12,7 @@ import {
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
+  useResourceMeteringServiceListResourceMeters,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
   useLicenseServiceGetLicenseInformation,
@@ -93,26 +94,18 @@ export function ResourceBillingInfo(props: Props) {
     );
   }, [resourceBillingConfiguration, configuration]);
 
-  const creditsPerKwh = useMemo(() => {
-    if (!configuration) {
-      return 0;
-    }
-
-    return dbCurrencyToUserCurrency(
-      resourceBillingConfiguration?.configuration.creditsPerKwh ?? 0,
-      configuration.minorUnit,
-    );
-  }, [resourceBillingConfiguration, configuration]);
+  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId });
+  const hasMeterRates = meters.some((meter) => meter.creditsPerUnit > 0);
 
   const isFree = useMemo(() => {
     return (
       creditsPerUsage === 0 &&
       creditsPerMinute === 0 &&
       creditsPerOperatingMinute === 0 &&
-      creditsPerKwh === 0 &&
+      !hasMeterRates &&
       resourceBillingConfiguration?.additionalItems.length === 0
     );
-  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, creditsPerKwh, resourceBillingConfiguration]);
+  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, hasMeterRates, resourceBillingConfiguration]);
 
   const [exampleSessionMinutes, setExampleSessionMinutes] = useState(10);
   const [exampleOperatingMinutes, setExampleOperatingMinutes] = useState(10);
@@ -219,10 +212,23 @@ export function ResourceBillingInfo(props: Props) {
             currency: configuration.currency,
           })}
         </dd>
-        <dt>{t('perKwh.label')}</dt>
-        <dd className={cn(valueClass, 'text-warning')}>
-          {t('billingValue', { credits: formatNumber(creditsPerKwh), currency: configuration.currency })}
-        </dd>
+        {meters
+          .filter((meter) => meter.creditsPerUnit > 0)
+          .map((meter) => (
+            <Fragment key={meter.id}>
+              <dt>
+                {meter.name}
+                <br />
+                <small>{t('perUnit')}</small>
+              </dt>
+              <dd className={cn(valueClass, 'text-warning')}>
+                {t('billingValue', {
+                  credits: formatNumber(dbCurrencyToUserCurrency(meter.creditsPerUnit, configuration.minorUnit)),
+                  currency: configuration.currency,
+                })}
+              </dd>
+            </Fragment>
+          ))}
         {resourceBillingConfiguration.additionalItems.map((item) => (
           <Fragment key={JSON.stringify(item)}>
             <dt>{item.name}</dt>
@@ -240,7 +246,7 @@ export function ResourceBillingInfo(props: Props) {
         ))}
       </dl>
 
-      <MeterSetupNotice resourceId={resourceId} energyBillingEnabled={creditsPerKwh > 0} />
+      <MeterSetupNotice resourceId={resourceId} />
       <EnergySettlementNotices resourceId={resourceId} />
 
       <div className="border-t border-divider pt-3 empty:hidden">

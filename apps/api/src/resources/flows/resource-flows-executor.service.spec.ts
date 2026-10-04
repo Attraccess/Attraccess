@@ -179,6 +179,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
       operatingIntervals as never,
+      { report: jest.fn() } as never,
     );
   });
 
@@ -320,17 +321,21 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('routes a metering start and collection branch to the reply channel of its operation', async () => {
-    const start = createNode({ id: 'start', type: ResourceFlowNodeType.INPUT_METERING_START });
+    const start = createNode({ id: 'start', type: ResourceFlowNodeType.INPUT_METERING_START, data: { meterId: 1 } });
     const ready = createNode({
       id: 'ready',
       type: ResourceFlowNodeType.OUTPUT_METERING_READY,
-      data: { source: 'shelly' },
+      data: { meterId: 1, source: 'shelly' },
     });
-    const collect = createNode({ id: 'collect', type: ResourceFlowNodeType.INPUT_METERING_COLLECT });
+    const collect = createNode({
+      id: 'collect',
+      type: ResourceFlowNodeType.INPUT_METERING_COLLECT,
+      data: { meterId: 1 },
+    });
     const report = createNode({
       id: 'report',
       type: ResourceFlowNodeType.OUTPUT_METERING_REPORT,
-      data: { value: '{{reading.wh}}', unit: 'Wh' },
+      data: { meterId: 1, value: '{{reading.wh}}', legacyEnergyUnit: 'Wh' },
     });
     nodesById = { start, ready, collect, report };
     edgesBySourceAndHandle = {
@@ -341,18 +346,19 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     initialNodes = [start];
     await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_START, {}, undefined, {
-      metering: { operationId: 'op-1', kind: 'start', complete },
+      metering: { meterId: 1, operationId: 'op-1', kind: 'start', complete },
     });
     expect(complete).toHaveBeenLastCalledWith({ kind: 'ready', baseline: undefined, source: 'shelly' });
 
     initialNodes = [collect];
     await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_COLLECT, { reading: { wh: 1500 } }, undefined, {
-      metering: { operationId: 'op-2', kind: 'final', complete },
+      metering: { meterId: 1, operationId: 'op-2', kind: 'final', complete },
     });
     expect(complete).toHaveBeenLastCalledWith({
       kind: 'reading',
+      mode: 'total',
       value: '1500',
-      unit: 'Wh',
+      legacyEnergyUnit: 'Wh',
       observedAt: undefined,
       source: undefined,
     });
@@ -1703,6 +1709,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
       { transition: jest.fn() } as never,
+      { report: jest.fn() } as never,
     );
   });
 

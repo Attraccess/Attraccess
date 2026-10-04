@@ -24,17 +24,12 @@ function useMeteringStatus(resourceId: number, enabled: boolean) {
   });
 }
 
-export function MeterSetupNotice({
-  resourceId,
-  energyBillingEnabled,
-}: {
-  resourceId: number;
-  energyBillingEnabled: boolean;
-}) {
+export function MeterSetupNotice({ resourceId }: { resourceId: number }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const { data: status } = useMeteringStatus(resourceId, energyBillingEnabled);
-  if (!energyBillingEnabled || !status || status.configured) return null;
+  const { data: status } = useMeteringStatus(resourceId, true);
+  const incomplete = status?.meters.filter((meter) => meter.creditsPerUnit > 0 && !meter.configured) ?? [];
+  if (!incomplete.length) return null;
 
   return (
     <Alert status="warning" data-cy="meter-setup-notice">
@@ -42,9 +37,13 @@ export function MeterSetupNotice({
         <AlertTitle>{t('setup.title')}</AlertTitle>
         <AlertDescription>{t('setup.description')}</AlertDescription>
         <ul className="list-disc pl-4 text-sm">
-          {status.problems.map((problem) => (
-            <li key={problem}>{t(`setup.problems.${problem}`)}</li>
-          ))}
+          {incomplete.flatMap((meter) =>
+            meter.problems.map((problem) => (
+              <li key={`${meter.meterId}:${problem}`}>
+                {meter.name}: {t(`setup.problems.${problem}`)}
+              </li>
+            )),
+          )}
         </ul>
         {hasPermission('resources.update') && <Link href={`/resources/${resourceId}/flows`}>{t('setup.action')}</Link>}
       </AlertContent>
@@ -94,13 +93,15 @@ export function EnergySettlementNotices({ resourceId }: { resourceId: number }) 
         return (
           <Alert key={session.sessionId} status={kind === 'pending' ? 'warning' : 'danger'}>
             <AlertContent>
-              <AlertTitle>{t(`unsettled.${kind}.title`)}</AlertTitle>
+              <AlertTitle>
+                {session.meterName}: {t(`unsettled.${kind}.title`)}
+              </AlertTitle>
               <AlertDescription>{t(`unsettled.${kind}.description`, { usageId: session.usageId })}</AlertDescription>
               {session.reason && (
                 <AlertDescription>{t('unsettled.reason', { reason: session.reason })}</AlertDescription>
               )}
-              {session.latestKwh !== null && (
-                <AlertDescription>{t('unsettled.lastReading', { value: session.latestKwh })}</AlertDescription>
+              {session.latestValue !== null && (
+                <AlertDescription>{t('unsettled.lastReading', { value: session.latestValue })}</AlertDescription>
               )}
               {session.retryable && <AlertDescription>{t('unsettled.retryHint')}</AlertDescription>}
               <AlertDescription>{t('unsettled.waiveHint')}</AlertDescription>

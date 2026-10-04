@@ -1,0 +1,23 @@
+{
+  "title": "Zähler",
+  "description": "Beliebige Messwerte erfassen — während Sitzungen und im Leerlauf.",
+  "empty": "Noch keine Zähler. Erstelle einen Zähler und melde Werte über die Flows dieser Ressource.",
+  "name": "Zählername",
+  "create": "Zähler erstellen",
+  "rename": "Umbenennen",
+  "save": "Speichern",
+  "cancel": "Abbrechen",
+  "choose": "Zähler auswählen",
+  "meter": "Zähler",
+  "lifetime": "Gesamtverbrauch",
+  "session": "Aktuelle Sitzung",
+  "waiting": "Warte auf einen Messwert",
+  "idle": "Keine aktive Sitzung",
+  "asOf": "Letzter Messwert: {{time}}",
+  "error": "Zähler konnte nicht gespeichert werden. Prüfe, ob der Name eindeutig ist, und versuche es erneut.",
+  "loadError": "Zähler konnten nicht geladen werden.",
+  "rate": "{{name}} — {{currency}} pro Messwert",
+  "rateHint": "0 deaktiviert die Abrechnung. Der Preis wird beim Sitzungsstart gespeichert.",
+  "perValue": "{{name}} — pro Messwert",
+  "legacy": "Dieser migrierte Flow rechnet die ursprüngliche Energieeinheit weiterhin in kWh um."
+}

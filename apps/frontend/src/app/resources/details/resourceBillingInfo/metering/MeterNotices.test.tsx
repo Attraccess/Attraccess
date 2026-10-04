@@ -52,7 +52,7 @@ const waive = vi.fn();
 
 function mockStatus(status: object) {
   vi.mocked(useResourceMeteringServiceGetResourceMeteringStatus).mockReturnValue({
-    data: { activeSession: null, interimIntervalMinutes: 1, ...status },
+    data: { meters: [], ...status },
   } as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringStatus>);
 }
 
@@ -70,19 +70,35 @@ describe('meter notices', () => {
   });
 
   it('tells what is missing from the meter and links to the flows when energy billing is on', () => {
-    mockStatus({ configured: false, problems: ['ready-unreachable', 'collect-trigger-missing'], unsettled: [] });
-    render(<MeterSetupNotice resourceId={7} energyBillingEnabled />);
-    expect(screen.getByText(en.setup.problems['ready-unreachable'])).toBeInTheDocument();
-    expect(screen.getByText(en.setup.problems['collect-trigger-missing'])).toBeInTheDocument();
+    mockStatus({
+      meters: [
+        {
+          meterId: 1,
+          name: 'Heartbeats',
+          creditsPerUnit: 30,
+          configured: false,
+          problems: ['ready-unreachable', 'collect-trigger-missing'],
+        },
+      ],
+      unsettled: [],
+    });
+    render(<MeterSetupNotice resourceId={7} />);
+    expect(screen.getByText('Heartbeats: ' + en.setup.problems['ready-unreachable'])).toBeInTheDocument();
+    expect(screen.getByText('Heartbeats: ' + en.setup.problems['collect-trigger-missing'])).toBeInTheDocument();
     expect(screen.getByRole('link', { name: en.setup.action })).toHaveAttribute('href', '/resources/7/flows');
   });
 
   it('stays silent for a complete meter or when energy billing is off', () => {
     mockStatus({ configured: true, problems: [], unsettled: [] });
-    const { container } = render(<MeterSetupNotice resourceId={7} energyBillingEnabled />);
+    const { container } = render(<MeterSetupNotice resourceId={7} />);
     expect(container).toBeEmptyDOMElement();
-    mockStatus({ configured: false, problems: ['start-trigger-missing'], unsettled: [] });
-    const off = render(<MeterSetupNotice resourceId={7} energyBillingEnabled={false} />);
+    mockStatus({
+      meters: [
+        { meterId: 1, name: 'Heartbeats', creditsPerUnit: 0, configured: false, problems: ['start-trigger-missing'] },
+      ],
+      unsettled: [],
+    });
+    const off = render(<MeterSetupNotice resourceId={7} />);
     expect(off.container).toBeEmptyDOMElement();
   });
 
@@ -96,19 +112,17 @@ describe('meter notices', () => {
           usageId: 11,
           status: 'pending',
           reason: 'meter unreachable',
-          latestKwh: '1.2',
+          latestValue: '1.2',
           retryable: true,
         },
-        { sessionId: 'b', usageId: 12, status: 'failed', reason: 'later session', latestKwh: null, retryable: false },
+        { sessionId: 'b', usageId: 12, status: 'failed', reason: 'later session', latestValue: null, retryable: false },
       ],
     });
     render(<EnergySettlementNotices resourceId={7} />);
 
-    expect(
-      screen.getByText(en.unsettled.pending.description.replace('{{usageId}}', '11')),
-    ).toBeInTheDocument();
+    expect(screen.getByText(en.unsettled.pending.description.replace('{{usageId}}', '11'))).toBeInTheDocument();
     expect(screen.getByText('Reason: meter unreachable')).toBeInTheDocument();
-    expect(screen.getByText('Last accepted reading: 1.2 kWh (not billed)')).toBeInTheDocument();
+    expect(screen.getByText('Last accepted reading: 1.2 (not billed)')).toBeInTheDocument();
     expect(screen.getAllByText(en.unsettled.retry)).toHaveLength(1);
     expect(screen.getAllByText(en.unsettled.waive)).toHaveLength(2);
 

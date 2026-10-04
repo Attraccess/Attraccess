@@ -70,26 +70,11 @@ Löst nach einer Inaktivitätsperiode an der Ressource aus. Nützlich für Siche
 | **Timeout** | Dauer der Inaktivität vor dem Auslösen |
 | **Einheit** | Sekunden, Minuten oder Stunden |
 
-### Messung starten
+### Messung starten und Messwert abfragen
 
-Löst aus, wenn eine abgerechnete Nutzungssitzung beginnt (oder übernommen wird), damit der Energiezähler vorbereitet werden kann. Der Zweig muss in **Messung bereit** enden, sonst startet die Sitzung nicht. Gehört zur Gruppe **Billing**.
+In jedem Knoten einen vordefinierten Zähler auswählen. **Messung starten** bereitet den Zähler beim Sitzungsstart vor und muss **Messung bereit** erreichen. **Messwert abfragen** liest regelmäßig, auch außerhalb von Sitzungen, und beim Sitzungsende; mit **Zähler melden** verbinden. Zeitlimit, Abfrageintervall (`0` deaktiviert regelmäßige Abfragen), finale Versuche und Verzögerung sind konfigurierbar.
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Zeitlimit (Sekunden)** | Wartezeit auf **Messung bereit** (Standard 30) |
-
-### Messwert abfragen
-
-Löst für Zwischenwerte während einer laufenden Sitzung und für den Endwert beim Sitzungsende aus. Der Zweig muss in **Energie melden** enden. Gehört zur Gruppe **Billing**.
-
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Zeitlimit (Sekunden)** | Wartezeit auf **Energie melden** (Standard 30) |
-| **Zwischenintervall (Minuten)** | Abstand der Zwischenwerte, live angezeigt und nie abgerechnet (Standard 1, `0` deaktiviert) |
-| **Versuche für den Endwert** | Versuche für einen frischen Endwert (Standard 3) |
-| **Pause zwischen Endwert-Versuchen (Sekunden)** | Pause zwischen den Versuchen (Standard 5) |
-
-Siehe [Energiemessung](flows/energy-metering.md).
+Siehe [Zähler](flows/energy-metering.md).
 
 ---
 
@@ -215,30 +200,18 @@ Eine akzeptierte Betriebsbeobachtung bleibt gespeichert, auch wenn ein späterer
 
 ### Messung bereit
 
-Bestätigt, dass der Energiezähler vorbereitet ist. Nur in einem Zweig gültig, der von **Messung starten** ausgelöst wurde. Gehört zur Gruppe **Billing**. Alle Einstellungen sind optionale Vorlagen.
+Den Zähler der Start-Anfrage auswählen. Bei einem Gesamtzähler den Basiswert angeben; nach einem Reset auf null leer lassen. Werte und Quellenbezeichnung können Vorlagen verwenden.
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Baseline-Wert** / **Baseline-Einheit** | Nur für Lifetime-Zähler, die sich nicht zurücksetzen lassen: der aktuelle Zählerstand; spätere Summen werden ab diesem Wert gezählt |
-| **Quelle** | Bezeichnung des physischen Zählers |
+### Zähler melden
 
-### Energie melden
+Zähler, Modus **total** (kumulierter Zählerstand) oder **increment** (Zuwachs) und nichtnegativen Wert beziehungsweise Vorlage festlegen. Eine Einheit ist nicht erforderlich. Messzeit und Quelle sind optional. Funktioniert in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung.
 
-Meldet die **Gesamtenergie** seit dem Messstart. Nur in einem Zweig gültig, der von **Messwert abfragen** ausgelöst wurde. Gehört zur Gruppe **Billing**. Alle Einstellungen sind Vorlagen.
-
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Wert** | Gesamtenergie seit dem Messstart (kein Zuwachs, keine Leistung) |
-| **Einheit** | Eine Energieeinheit wie `Wh`, `kWh`, `MWh`, `J`, `kJ` oder `MJ`; Leistungseinheiten (`W`, `kW`) werden abgelehnt |
-| **Gemessen am** | Optionale ISO-Zeit der Erfassung |
-| **Quelle** | Optionale Bezeichnung des physischen Zählers |
-
-Siehe [Energiemessung](flows/energy-metering.md).
+Siehe [Zähler](flows/energy-metering.md).
 
 ## Siehe auch
 
 - [Flow-Editor](flows/flow-editor.md) -- Knoten platzieren und verbinden
 - [Flows-Überblick](flows/overview.md) -- Was Flows sind und wie sie funktionieren
 - [MQTT & IoT](mqtt/overview.md) -- MQTT einrichten
-- [Energiemessung](flows/energy-metering.md) -- Strom pro kWh abrechnen
+- [Zähler](flows/energy-metering.md) -- Beliebigen Verbrauch erfassen und abrechnen
 - [Abrechnung](billing/overview.md) -- Details zum Abrechnungssystem

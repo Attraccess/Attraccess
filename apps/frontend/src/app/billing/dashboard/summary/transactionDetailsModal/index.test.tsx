@@ -13,6 +13,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useBillingServiceGetBillingConfiguration: () => ({ data: state.configuration }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
+  useTranslationState: () => ({ language: 'de' }),
   useTranslations: () => ({ t: (key: string) => key, tExists: (key: string) => key === 'items.system.usage' }),
   useNumberFormatter: () => (value: number) => value.toFixed(2),
   DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
@@ -151,4 +152,27 @@ it('falls back to usage ID and closes when the controlled open flag changes', as
   expect(await screen.findByText('Usage #8')).toBeTruthy();
   view.rerender(<TransactionDetailsModal transactionId={7} isOpen={false} onClose={closed} />);
   expect(closed).toHaveBeenCalled();
+});
+
+it('preserves generic meter precision and user names that match system labels', async () => {
+  state.transaction = {
+    id: 7,
+    status: 'completed',
+    amount: -45,
+    items: [
+      {
+        id: 1,
+        name: 'usage',
+        quantity: 1,
+        unitPrice: 45,
+        meterQuantity: '9007199254740993.123456789',
+        meterCreditsPerUnit: 30,
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={7} isOpen />);
+  expect(await screen.findByText('9.007.199.254.740.993,123456789')).toBeTruthy();
+  expect(screen.getByText('usage')).toBeTruthy();
+  expect(screen.queryByText('items.system.usage')).toBeNull();
+  expect(screen.getByText('0.30')).toBeTruthy();
 });

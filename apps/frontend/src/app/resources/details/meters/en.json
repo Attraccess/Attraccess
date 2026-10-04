@@ -1,0 +1,23 @@
+{
+  "title": "Meters",
+  "description": "Track any measured value, during sessions and while idle.",
+  "empty": "No meters yet. Create one, then report values through this resource's flows.",
+  "name": "Meter name",
+  "create": "Create meter",
+  "rename": "Rename",
+  "save": "Save",
+  "cancel": "Cancel",
+  "choose": "Choose a meter",
+  "meter": "Meter",
+  "lifetime": "Lifetime consumption",
+  "session": "Current session",
+  "waiting": "Waiting for a reading",
+  "idle": "No active session",
+  "asOf": "Last reading: {{time}}",
+  "error": "Unable to save the meter. Check the name is unique and try again.",
+  "loadError": "Unable to load meters.",
+  "rate": "{{name}} — {{currency}} per measured value",
+  "rateHint": "0 disables billing. The rate is captured when a session starts.",
+  "perValue": "{{name}} — per measured value",
+  "legacy": "This migrated flow still converts its original energy unit to kWh."
+}

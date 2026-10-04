@@ -20,7 +20,7 @@
   },
   "type": {
     "refund": "Erstattung",
-    "correction": "Energiekorrektur",
+    "correction": "Zählerkorrektur",
     "resourceUsage": "Ressourcen-Nutzung",
     "manual": "Manuelle Transaktion",
     "sumupTopup": "SumUp-Aufladung",
@@ -44,7 +44,8 @@
     },
     "energyDescription": "{{kwh}} kWh zu {{rate}} pro kWh",
     "empty": "Keine Positionen",
-    "total": "Summe Positionen"
+    "total": "Summe Positionen",
+    "meterDescription": "{{value}} zu {{rate}} pro Messwert"
   },
   "actions": {
     "refund": "Erstattung"

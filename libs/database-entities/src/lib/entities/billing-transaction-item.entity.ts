@@ -70,4 +70,11 @@ export class BillingTransactionItem {
     required: false,
   })
   energyCreditsPerKwh!: number | null;
+  @Column({ type: 'varchar', nullable: true })
+  @ApiProperty({ nullable: true, required: false, description: 'Exact metered quantity, without a unit' })
+  meterQuantity!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ nullable: true, required: false, description: 'Captured price per measured value' })
+  meterCreditsPerUnit!: number | null;
 }

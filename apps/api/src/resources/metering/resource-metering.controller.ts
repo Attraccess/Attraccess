@@ -1,9 +1,12 @@
-import { Controller, Get, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceMeteringSession } from '@attraccess/database-entities';
 import { ResourceMeteringService } from './resource-metering.service';
 import {
+  MeterNameDto,
+  MeterRateDto,
+  ResourceMeterDto,
   ResourceMeteringLiveDto,
   ResourceMeteringSettlementDto,
   ResourceMeteringStatusDto,
@@ -15,9 +18,51 @@ import {
 export class ResourceMeteringController {
   constructor(private readonly metering: ResourceMeteringService) {}
 
+  @Get('meters')
+  @Auth()
+  @ApiOperation({
+    summary: 'List the resource meters, lifetime totals and session consumption',
+    operationId: 'listResourceMeters',
+  })
+  @ApiResponse({ status: 200, type: [ResourceMeterDto] })
+  list(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceMeterDto[]> {
+    return this.metering.listMeters(resourceId);
+  }
+
+  @Post('meters')
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'Create a named meter', operationId: 'createResourceMeter' })
+  @ApiResponse({ status: 201, type: ResourceMeterDto })
+  create(@Param('resourceId', ParseIntPipe) resourceId: number, @Body() body: MeterNameDto): Promise<ResourceMeterDto> {
+    return this.metering.createMeter(resourceId, body.name);
+  }
+
+  @Patch('meters/:meterId')
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'Rename a meter', operationId: 'updateResourceMeter' })
+  @ApiResponse({ status: 200, type: ResourceMeterDto })
+  update(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('meterId', ParseIntPipe) meterId: number,
+    @Body() body: MeterNameDto,
+  ): Promise<ResourceMeterDto> {
+    return this.metering.updateMeter(resourceId, meterId, body.name);
+  }
+
+  @Patch('meters/:meterId/rate')
+  @ApiOperation({ summary: 'Configure the meter billing rate', operationId: 'setResourceMeterRate' })
+  @ApiResponse({ status: 200, type: ResourceMeterDto })
+  setRate(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('meterId', ParseIntPipe) meterId: number,
+    @Body() body: MeterRateDto,
+  ): Promise<ResourceMeterDto> {
+    return this.metering.setRate(resourceId, meterId, body.creditsPerUnit);
+  }
+
   @Get()
   @ApiOperation({
-    summary: 'Get the meter definition and energy settlement status',
+    summary: 'Get the meter definition and meter settlement status',
     operationId: 'getResourceMeteringStatus',
   })
   @ApiResponse({ status: 200, type: ResourceMeteringStatusDto })
@@ -28,7 +73,7 @@ export class ResourceMeteringController {
   @Get('live')
   @Auth()
   @ApiOperation({
-    summary: 'Get the live meter value and energy cost of the running session',
+    summary: 'Get the live meter value and meter cost of the running session',
     operationId: 'getResourceMeteringLive',
   })
   @ApiResponse({ status: 200, type: ResourceMeteringLiveDto })
@@ -38,7 +83,7 @@ export class ResourceMeteringController {
 
   @Post('sessions/:sessionId/retry')
   @ApiOperation({
-    summary: 'Collect the final energy total again and bill a pending energy charge as a correction transaction',
+    summary: 'Collect the final meter total again and bill a pending meter charge as a correction transaction',
     operationId: 'retryResourceMeteringSettlement',
   })
   @ApiResponse({ status: 201, type: ResourceMeteringSettlementDto })
@@ -51,7 +96,7 @@ export class ResourceMeteringController {
   }
 
   @Post('sessions/:sessionId/waive')
-  @ApiOperation({ summary: 'Give up the energy charge of a usage', operationId: 'waiveResourceMeteringSettlement' })
+  @ApiOperation({ summary: 'Give up the meter charge of a usage', operationId: 'waiveResourceMeteringSettlement' })
   @ApiResponse({ status: 201, type: ResourceMeteringSettlementDto })
   async waive(
     @Param('resourceId', ParseIntPipe) resourceId: number,
