@@ -41,10 +41,27 @@ describe('flow templates', () => {
   });
 
   it.each(['add', 'subtract', 'multiply', 'divide'])('requires exactly two operands for %s', (helper) => {
-    for (const operands of ['', '1', '1 2 3']) {
+    for (const operands of ['1', '1 2 3']) {
       expect(() => compileFlowTemplate(`{{${helper} ${operands}}}`, {})).toThrow(
         `Template helper "${helper}" expects exactly two operands`,
       );
+    }
+  });
+
+  it.each(['add', 'subtract', 'multiply', 'divide'])('preserves field lookup for a bare %s expression', (field) => {
+    for (const value of ['A & B', 0, false, null, undefined, () => 'computed']) {
+      const data = { [field]: value };
+      const template = `{{${field}}}`;
+      expect(compileFlowTemplate(template, data)).toBe(Handlebars.compile(template)(data));
+    }
+    expect(compileFlowTemplate(`{{${field}}}`, {})).toBe('');
+    expect(compileFlowTemplate(`{{#with payload}}{{${field}}}{{/with}}`, { payload: { [field]: 'nested' } })).toBe(
+      'nested',
+    );
+    for (const value of [true, false, 'text', ['one', 'two'], { name: 'value' }]) {
+      const data = { [field]: value };
+      const template = `{{#${field}}}{{this}}{{else}}missing{{/${field}}}`;
+      expect(compileFlowTemplate(template, data)).toBe(Handlebars.compile(template)(data));
     }
   });
 

@@ -31,9 +31,18 @@ const arithmetic: Record<string, (left: number, right: number) => number> = {
 };
 
 for (const [helper, operation] of Object.entries(arithmetic)) {
-  handlebars.registerHelper(helper, (...args: unknown[]) => {
+  handlebars.registerHelper(helper, function (this: object, ...args: unknown[]) {
     // Handlebars appends its options object to every helper invocation.
     const operands = args.slice(0, -1);
+    const options = args[args.length - 1] as Handlebars.HelperOptions & {
+      lookupProperty: (context: object, property: string) => unknown;
+    };
+    if (operands.length === 0 && Object.keys(options.hash).length === 0) {
+      // Bare expressions must still resolve fields whose names match a helper.
+      const value = options.lookupProperty(this, helper);
+      const resolved = typeof value === 'function' ? value.call(this) : value;
+      return options.fn ? handlebars.helpers.blockHelperMissing.call(this, resolved, options) : resolved;
+    }
     if (operands.length !== 2) {
       throw new FlowExecutionError(`Template helper "${helper}" expects exactly two operands`);
     }
