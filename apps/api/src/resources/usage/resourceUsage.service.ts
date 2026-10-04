@@ -1492,6 +1492,30 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
+  private readonly DETAIL_RELATIONS = [
+    'user',
+    'project',
+    'supervisorUser',
+    'formSubmissions',
+    'formSubmissions.form',
+    'formSubmissions.user',
+  ];
+
+  async getSessionDetails(resourceId: number, usageId: number, user: AuthenticatedUser): Promise<ResourceUsage> {
+    const usage = await this.resourceUsageRepository.findOne({
+      where: { id: usageId, resourceId, lifecyclePending: false },
+      relations: this.DETAIL_RELATIONS,
+    });
+    if (!usage) throw new NotFoundException('Usage session not found');
+
+    if (usage.userId !== user.id && !user.effectivePermissions?.has('resources.update')) {
+      if (!usage.projectId) throw new NotFoundException('Usage session not found');
+      await this.projectsService.findOneById(user.id, usage.projectId);
+    }
+
+    return usage;
+  }
+
   async getResourceUsageHistory(
     resourceId: number,
     page = 1,
@@ -1511,14 +1535,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: [
-        'user',
-        'project',
-        'supervisorUser',
-        'formSubmissions',
-        'formSubmissions.form',
-        'formSubmissions.user',
-      ],
+      relations: this.DETAIL_RELATIONS,
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);
