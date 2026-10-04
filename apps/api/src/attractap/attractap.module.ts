@@ -39,6 +39,8 @@ import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
 import { SupervisionModule } from '../resources/supervision/supervision.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
+import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -61,6 +63,8 @@ import { AuditModule } from '../audit/audit.module';
     SupervisionModule,
     NotificationsModule,
     AuditModule,
+    ResourceMeteringModule,
+    ResourceOperatingAttributionModule,
   ],
   providers: [
     AttractapService,

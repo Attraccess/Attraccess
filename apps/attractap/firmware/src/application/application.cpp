@@ -94,6 +94,16 @@ void Application::setup() {
   this->api.onDeviceName(
       [this](std::string deviceName) { Display::setDeviceName(deviceName); });
 #endif
+#ifdef HAS_LVGL_DISPLAY
+  this->api.setUsageStatsCallback([this](const API::UsageStats &stats) {
+    lv_lock();
+    if (this->unlocked && this->resourceIsSelected && stats.resourceId == this->selectedResourceId &&
+        this->cardAuthenticationData.username == this->resourceList.authenticatedUsername)
+      Display::resourceDetailsScreen.setUsageStats(stats);
+    lv_unlock();
+  });
+#endif
+
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
 #ifdef HAS_LVGL_DISPLAY
@@ -683,6 +693,7 @@ void Application::loop() {
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
+  this->pollUsageStats();
   lv_unlock();
 #else
   this->processState();

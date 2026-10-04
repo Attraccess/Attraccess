@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceMeteringService } from '../../../resources/metering/resource-metering.service';
+import { ResourceOperatingAttributionService } from '../../../resources/operating-intervals/resource-operating-attribution.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceFlowsExecutorService } from '../../../resources/flows/resource-flows-executor.service';
@@ -45,6 +47,59 @@ export class AttractapSessionHandler {
 
   @Inject(SupervisionService)
   private supervisionService: SupervisionService;
+
+  @Inject(ResourceMeteringService)
+  private meteringService: ResourceMeteringService;
+
+  @Inject(ResourceOperatingAttributionService)
+  private operatingAttributionService: ResourceOperatingAttributionService;
+
+  public async handleResourceUsageStats(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { resourceId } = data.payload ?? {};
+    const userId = socket.state.lastAuthenticatedUserId;
+    if (
+      !(await this.resourceActionGuard.validateResourceAction(
+        socket,
+        resourceId,
+        AttractapEventType.RESOURCE_USAGE_STATS,
+        data.payload?.requestId,
+      ))
+    )
+      return;
+
+    try {
+      const usage = await this.resourceUsageService.getActiveSession(resourceId, false);
+      // Live session readings belong to the current user, just like the active-session web UI.
+      if (!usage || usage.userId !== userId) {
+        await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
+        return;
+      }
+      const asOf = new Date();
+      const [meter, operating] = await Promise.all([
+        this.meteringService.getLive(resourceId),
+        this.operatingAttributionService.getForResource(resourceId, asOf, usage.startTime),
+      ]);
+      if (socket.state.lastAuthenticatedUserId !== userId) return;
+      await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, {
+        resourceId,
+        usage: {
+          id: usage.id,
+          operatingDurationMs: operating.operatingDataAvailable
+            ? operating.attributions.reduce(
+                (total, entry) => total + (entry.usageId === usage.id ? entry.durationMs : 0),
+                0,
+              )
+            : null,
+          isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
+          // Never attach a new session's meter reading to an earlier usage snapshot.
+          energyKwh: meter.session?.usageId === usage.id ? meter.session.latestKwh : null,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to load live usage stats: ${error.message}`);
+      await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
+    }
+  }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId, projectId, forceTakeOver } = data.payload as {
