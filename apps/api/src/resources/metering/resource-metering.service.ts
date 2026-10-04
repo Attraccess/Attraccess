@@ -128,6 +128,8 @@ export class ResourceMeteringService implements OnModuleInit {
             continue;
           }
         }
+        // Increment-only starts have no ready reply to invalidate older pending charges.
+        // For requested starts this is an idempotent safeguard after atomic acceptance.
         await this.sessions.update(
           { meterId: meter.meterId, status: ResourceMeteringSessionStatus.Pending },
           {

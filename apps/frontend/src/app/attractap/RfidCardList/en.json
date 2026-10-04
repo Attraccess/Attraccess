@@ -32,5 +32,8 @@
     "readerPlaceholder": "Select a Attractap",
     "cancel": "Cancel",
     "enroll": "Enroll"
-  }
+  },
+  "userCards": "RFID Cards — {{username}}",
+  "errorFetchCards": "Could not load RFID cards",
+  "errorOperation": "Could not start the card operation"
 }

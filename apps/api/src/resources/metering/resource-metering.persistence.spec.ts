@@ -867,6 +867,125 @@ describe('Flow-defined metering', () => {
         return ended;
       }
 
+      it.each([
+        ['advancing', '105', '12000000000'],
+        ['reset', '4', '7000000000'],
+      ])(
+        'invalidates pending charges after an accepted %s free baseline even if another branch fails',
+        async (_kind, baseline, lifetimeValue) => {
+          await source.getRepository(ResourceMeter).update(1, {
+            counterValue: '100000000000',
+            lifetimeValue: '7000000000',
+          });
+          onStart = ({ complete }) => complete({ kind: 'ready', baseline: { value: '100' } });
+          const ended = await endWithMissingFinal();
+          const session = await sessionOf(ended.id);
+          const before = await items(ended.id);
+          const priorMeter = await source.getRepository(ResourceMeter).findOneByOrFail({ id: 1 });
+          const unrelatedMeter = await source.getRepository(ResourceMeter).save({
+            resourceId: 1,
+            name: 'Water',
+            creditsPerUnit: 0,
+          });
+          const unrelatedSession = await source.getRepository(ResourceMeteringSession).save({
+            ...session,
+            id: 'unrelated-pending',
+            meterId: unrelatedMeter.id,
+            meterName: unrelatedMeter.name,
+          });
+          await metering.setRate(1, 1, 0);
+          onStart = async ({ complete }) => {
+            await complete({ kind: 'ready', baseline: { value: baseline }, source: 'reinitialized-meter' });
+            throw new Error('another start branch failed');
+          };
+
+          const started = await start(users[1]);
+          expect((await usage.getActiveSession(1, true))?.id).toBe(started.id);
+          expect(await source.getRepository(ResourceMeteringSession).countBy({ usageId: started.id })).toBe(0);
+          const acceptedMeter = await source.getRepository(ResourceMeter).findOneByOrFail({ id: 1 });
+          expect(acceptedMeter).toEqual(
+            expect.objectContaining({
+              counterValue: `${baseline}000000000`,
+              lifetimeValue,
+              latestObservedAt: expect.any(Date),
+            }),
+          );
+          expect(acceptedMeter.latestObservedAt?.getTime()).toBeGreaterThanOrEqual(
+            priorMeter.latestObservedAt?.getTime() ?? 0,
+          );
+          expect(await sessionOf(ended.id)).toEqual(
+            expect.objectContaining({
+              status: ResourceMeteringSessionStatus.Failed,
+              failureReason: 'The meter was re-initialized for a later session',
+            }),
+          );
+          expect((await metering.getStatus(1)).unsettled).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ sessionId: session.id, retryable: false, status: 'failed' }),
+              expect.objectContaining({ sessionId: unrelatedSession.id, retryable: true, status: 'pending' }),
+            ]),
+          );
+          expect(
+            await source.getRepository(ResourceMeteringSession).findOneByOrFail({ id: unrelatedSession.id }),
+          ).toEqual(unrelatedSession);
+
+          // Even valid historical end-boundary evidence cannot charge an invalidated session.
+          onCollect = jest.fn(reading('101.5', { observedAt: ended.endTime?.toISOString() }));
+          await expect(metering.retrySettlement(1, session.id, 1)).rejects.toThrow('METER_SESSION_NOT_PENDING');
+          expect(onCollect).not.toHaveBeenCalled();
+          expect((await correctionsOf(ended.id)).corrections).toEqual([]);
+          expect(await items(ended.id)).toEqual(before);
+          expect(audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+          expect(liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
+        },
+      );
+
+      it('keeps an older charge pending when a free start fails before acknowledging', async () => {
+        const ended = await endWithMissingFinal();
+        const session = await sessionOf(ended.id);
+        const before = await items(ended.id);
+        await metering.setRate(1, 1, 0);
+        const priorMeter = await source.getRepository(ResourceMeter).findOneByOrFail({ id: 1 });
+        onStart = async () => {
+          throw new Error('offline before acknowledgement');
+        };
+
+        const started = await start(users[1]);
+        expect((await usage.getActiveSession(1, true))?.id).toBe(started.id);
+        expect(await source.getRepository(ResourceMeteringSession).countBy({ usageId: started.id })).toBe(0);
+        expect(await source.getRepository(ResourceMeter).findOneByOrFail({ id: 1 })).toEqual(priorMeter);
+        expect(await sessionOf(ended.id)).toEqual(session);
+        expect((await metering.getStatus(1)).unsettled).toEqual([
+          expect.objectContaining({ sessionId: session.id, retryable: true, status: 'pending' }),
+        ]);
+        expect(await items(ended.id)).toEqual(before);
+        expect((await correctionsOf(ended.id)).corrections).toEqual([]);
+        expect(audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+        expect(liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
+      });
+
+      it('invalidates an older pending charge when the next start uses only increments', async () => {
+        const ended = await endWithMissingFinal();
+        const session = await sessionOf(ended.id);
+        await source.getRepository(ResourceFlowNode).delete({ resourceId: 1 });
+        await source.getRepository(ResourceFlowNode).save({
+          id: 'increment-report',
+          type: T.OUTPUT_METERING_REPORT,
+          resourceId: 1,
+          data: { meterId: 1, mode: 'increment', value: '1' },
+        });
+        const startFlow = jest.fn(ready);
+        onStart = startFlow;
+
+        const started = await start(users[1]);
+        expect((await sessionOf(started.id)).collectionMode).toBe('increment');
+        expect(startFlow).not.toHaveBeenCalled();
+        expect((await sessionOf(ended.id)).status).toBe(ResourceMeteringSessionStatus.Failed);
+        expect((await metering.getStatus(1)).unsettled).toEqual([
+          expect.objectContaining({ sessionId: session.id, retryable: false }),
+        ]);
+      });
+
       it('retrying bills the pending energy as a separate correction exactly once and leaves the bill untouched', async () => {
         const ended = await endWithMissingFinal();
         const session = await sessionOf(ended.id);

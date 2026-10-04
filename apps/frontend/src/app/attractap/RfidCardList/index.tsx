@@ -39,7 +39,8 @@ import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { NotFound } from '../../not-found';
 
 interface DeleteModalProps {
   show: boolean;
@@ -55,7 +56,11 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
 
   const [readerId, setReaderId] = useState<number | null>(null);
 
-  const { mutate: resetNfcCard } = useAttractapServiceResetNfcCard();
+  const toast = useToastMessage();
+  const { mutate: resetNfcCard, isPending } = useAttractapServiceResetNfcCard({
+    onSuccess: props.close,
+    onError: (error) => toast.error({ title: t('errorOperation'), description: (error as Error).message }),
+  });
 
   const deleteCard = useCallback(() => {
     if (!props.cardId || !readerId) {
@@ -94,8 +99,14 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
             <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
               {t('nfcCardsTable.deleteModal.cancel')}
             </Button>
-            <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
-              {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
+            <Button
+              variant="danger"
+              isDisabled={!readerId || isPending}
+              isPending={isPending}
+              onPress={deleteCard}
+              data-cy="nfc-card-delete-modal-delete-button"
+            >
+              {t('nfcCardsTable.deleteModal.delete')}
             </Button>
           </ModalFooter>
         </>
@@ -191,9 +202,10 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
 
 interface EnrollNfcCardProps {
   children: (onOpen: () => void) => React.ReactNode;
+  userId?: number;
 }
 
-const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
+const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
   const { t } = useTranslations({
     de,
     en,
@@ -202,18 +214,20 @@ const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
   const [show, setShow] = useState(false);
   const [readerId, setReaderId] = useState<number | null>(null);
 
-  const { mutate: enrollNfcCardMutation } = useAttractapServiceEnrollNfcCard();
-
   const close = useCallback(() => setShow(false), []);
+  const toast = useToastMessage();
+  const { mutate: enrollNfcCardMutation, isPending } = useAttractapServiceEnrollNfcCard({
+    onSuccess: close,
+    onError: (error) => toast.error({ title: t('errorOperation'), description: (error as Error).message }),
+  });
 
   const enrollNfcCard = useCallback(() => {
     if (!readerId) {
       return;
     }
 
-    enrollNfcCardMutation({ requestBody: { readerId } });
-    close();
-  }, [readerId, enrollNfcCardMutation, close]);
+    enrollNfcCardMutation({ requestBody: { readerId, ...(userId !== undefined ? { userId } : {}) } });
+  }, [readerId, enrollNfcCardMutation, userId]);
 
   return (
     <>
@@ -250,7 +264,8 @@ const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
           </Button>
           <Button
             variant="primary"
-            isDisabled={!readerId}
+            isDisabled={!readerId || isPending}
+            isPending={isPending}
             onPress={enrollNfcCard}
             data-cy="enroll-nfc-card-modal-enroll-button"
           >
@@ -262,16 +277,30 @@ const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
   );
 };
 
-export function RfidCardList() {
+export function UserRfidCardsPage() {
+  const { id } = useParams<{ id: string }>();
+  if (!/^\d+$/.test(id ?? '') || Number(id) <= 0) return <NotFound />;
+  return <RfidCardList key={id} userId={Number(id)} />;
+}
+
+export function RfidCardList({ userId }: { userId?: number }) {
   const { t } = useTranslations({
     de,
     en,
   });
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { hasPermission } = useAuth();
+  const canReadUser = hasPermission('users.read');
+  const { data: owner } = useUsersServiceGetOneUserById({ id: userId }, undefined, {
+    enabled: userId !== undefined && canReadUser,
+  });
 
-  const { data: cards, error: cardsError } = useAttractapServiceGetAllCards(undefined, {
+  const { data: cards, error: cardsError } = useAttractapServiceGetAllCards({ userId }, undefined, {
     refetchInterval: 5000,
+    enabled:
+      (!license || license.modules.includes('attractap')) &&
+      (userId === undefined || hasPermission('users.rfid-cards.manage')),
   });
 
   const toast = useToastMessage();
@@ -293,7 +322,6 @@ export function RfidCardList() {
 
   const [cardToDeleteId, setCardToDeleteId] = useState<number | null>(null);
 
-  const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
   if (license && !license.modules.includes('attractap')) {
@@ -303,7 +331,8 @@ export function RfidCardList() {
   return (
     <>
       <PageHeader
-        title={t('nfcCards')}
+        title={userId === undefined ? t('nfcCards') : t('userCards', { username: owner?.username ?? `#${userId}` })}
+        backTo={userId === undefined ? undefined : canReadUser ? `/users/${userId}` : '/attractap/nfc-cards'}
         actions={
           [
             {
@@ -313,7 +342,9 @@ export function RfidCardList() {
               variant: 'primary',
               dataCy: 'enroll-nfc-card-button-trigger',
               renderTrigger: (triggerProps) => (
-                <EnrollNfcCard>{(onOpen) => <Button {...triggerProps} onPress={onOpen} />}</EnrollNfcCard>
+                <EnrollNfcCard userId={userId}>
+                  {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+                </EnrollNfcCard>
               ),
             },
             {

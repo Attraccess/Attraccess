@@ -136,6 +136,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
     } | null;
     enrollNewCardData: {
+      userId: number;
       key: string;
       keyNo: number;
       cardUID: string;

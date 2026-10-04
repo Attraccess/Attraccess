@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { EntityManager, MoreThan } from 'typeorm';
+import { EntityManager, LessThan, MoreThan } from 'typeorm';
 import {
   ResourceMeter,
   ResourceMeteringOperation,
@@ -175,6 +175,21 @@ export class MeteringReadings {
           report.baseline && previous !== null && BigInt(baseline) >= previous
             ? BigInt(baseline) - previous
             : BigInt(0);
+        // Accepting a new boundary makes older pending charges unrecoverable, even if
+        // another start branch later fails and the tracking-only session is removed.
+        await manager.update(
+          ResourceMeteringSession,
+          {
+            resourceId: session.resourceId,
+            meterId: meter.id,
+            usageId: LessThan(session.usageId),
+            status: ResourceMeteringSessionStatus.Pending,
+          },
+          {
+            status: ResourceMeteringSessionStatus.Failed,
+            failureReason: 'The meter was re-initialized for a later session',
+          },
+        );
         await manager.update(ResourceMeter, meter.id, {
           counterValue: baseline,
           lifetimeValue: (BigInt(meter.lifetimeValue) + delta).toString(),

@@ -307,7 +307,9 @@ void API::onUsageStats(JsonObject data)
         const char *name = meter["name"].as<const char *>();
         const char *value = meter["value"].as<const char *>();
         if (name) {
-            UsageStats::MeterValue reading{name, value ? value : ""};
+            UsageStats::MeterValue reading{};
+            reading.name = name;
+            reading.value = value ? value : "";
             if (meter["creditsPerUnit"].is<int64_t>() && meter["creditsPerUnit"].as<int64_t>() >= 0)
                 reading.creditsPerUnit = meter["creditsPerUnit"].as<int64_t>();
             reading.formattedRate = meter["formattedRate"] | "";

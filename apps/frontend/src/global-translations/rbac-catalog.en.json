@@ -32,6 +32,12 @@
       "create": { "label": "Create Users", "description": "Allows creating new users" },
       "update": { "label": "Update Users", "description": "Allows updating existing users" },
       "delete": { "label": "Delete Users", "description": "Allows deleting users" },
+      "rfid-cards": {
+        "manage": {
+          "label": "Manage User RFID Cards",
+          "description": "Allows viewing, enrolling, activating, deactivating, and deleting RFID cards for any user"
+        }
+      },
       "roles": {
         "manage": { "label": "Manage User Roles", "description": "Allows assigning and revoking roles for users" }
       }

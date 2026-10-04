@@ -29,6 +29,7 @@ import { UpdateReaderDto } from './dtos/update-reader.dto';
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { LicenseModuleType } from '../license/license.service';
+import { CardAccessService } from './card-access.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
@@ -44,6 +45,7 @@ export class AttractapController {
     private readonly websocketService: WebsocketService,
     @Inject(AttractapService)
     private readonly attractapService: AttractapService,
+    private readonly cardAccess: CardAccessService,
   ) {}
 
   @Post('enroll-nfc-card')
@@ -59,9 +61,11 @@ export class AttractapController {
     @Body() enrollData: EnrollNfcCardDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<EnrollNfcCardResponseDto> {
+    const userId = await this.cardAccess.resolveUserId(req.user, enrollData.userId);
     await this.attractapGateway.startEnrollOfNewNfcCard({
       readerId: enrollData.readerId,
-      userId: req.user.id,
+      userId,
+      actorId: req.user.id,
       authenticationMethod: req.user.authenticationMethod ?? 'session',
       ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
     });
@@ -84,6 +88,7 @@ export class AttractapController {
     @Body() resetData: ResetNfcCardDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResetNfcCardResponseDto> {
+    await this.cardAccess.getCardForManagement(resetData.cardId, req.user);
     await this.attractapGateway.startResetOfNfcCard({
       readerId: resetData.readerId,
       cardId: resetData.cardId,
@@ -202,7 +207,10 @@ export class AttractapController {
   @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
   @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
-  async deleteReader(@Param('readerId', ParseIntPipe) readerId: number, @Req() req: AuthenticatedRequest): Promise<void> {
+  async deleteReader(
+    @Param('readerId', ParseIntPipe) readerId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<void> {
     const deleted = await this.attractapService.deleteReader(readerId);
     if (deleted) {
       await this.attractapService.recordReaderDeregistration(readerId, {
