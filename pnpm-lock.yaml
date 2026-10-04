@@ -253,7 +253,7 @@ importers:
         version: 13.0.6
       grapesjs:
         specifier: ^0.23.2
-        version: 0.23.4
+        version: 0.23.6
       grapesjs-mjml:
         specifier: ^1.0.8
         version: 1.0.8
@@ -11300,8 +11300,8 @@ packages:
   grapesjs-mjml@1.0.8:
     resolution: {integrity: sha512-cgaKwuGcBVgFCyqqK39kraPfw5DiA8qIyHKsDoMpOUqPY+ubMznx6U2M1NC9UKwD+gDCy/VVctyhb/aJAgyPNw==}
 
-  grapesjs@0.23.4:
-    resolution: {integrity: sha512-fe3+ZRU1YsR8cFqdjl0TFlNywgBPjlQjDLevyavP8UmT9dfVla5JnfQrFc66gzMBdN1ftNPA23YRdTQJRFTKQA==}
+  grapesjs@0.23.6:
+    resolution: {integrity: sha512-I8M/sPWjHm6MLIdUtRFNOKsQ3PtDgIDsc2S8ANkJsfHj3ZoH98oNMMWr64Kx22XgjHCQ4xpUx7nvXyQSKV1mrQ==}
 
   grapheme-splitter@1.0.4:
     resolution: {integrity: sha512-bzh50DW9kTPM00T8y4o8vQg89Di9oLJVLW/KaOGIXJWP/iqCN6WKYkbNOF04vFLJhwcpYUh9ydh/+5vpOqV4YQ==}
@@ -25982,7 +25982,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/path': 1.3.2
       '@stoplight/spectral-parsers': 1.0.5
       '@stoplight/spectral-ref-resolver': 1.0.5(encoding@0.1.13)
@@ -26009,7 +26009,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/path': 1.3.2
       '@stoplight/spectral-parsers': 1.0.5
       '@stoplight/spectral-ref-resolver': 1.0.5(encoding@0.1.13)
@@ -26044,8 +26044,8 @@ snapshots:
   '@stoplight/spectral-formats@1.8.5(encoding@0.1.13)':
     dependencies:
       '@scarf/scarf': 1.4.0
-      '@stoplight/json': 3.21.7
-      '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
+      '@stoplight/json': 3.21.0
+      '@stoplight/spectral-core': 1.23.1(encoding@0.1.13)
       '@types/json-schema': 7.0.15
       tslib: 2.8.1
     transitivePeerDependencies:
@@ -26054,7 +26054,7 @@ snapshots:
   '@stoplight/spectral-formats@1.9.0(encoding@0.1.13)':
     dependencies:
       '@scarf/scarf': 1.4.0
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
       '@types/json-schema': 7.0.15
       tslib: 2.8.1
@@ -26081,8 +26081,8 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
-      '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
+      '@stoplight/json': 3.21.0
+      '@stoplight/spectral-core': 1.23.1(encoding@0.1.13)
       '@stoplight/spectral-formats': 1.8.5(encoding@0.1.13)
       '@stoplight/spectral-runtime': 1.1.6(encoding@0.1.13)
       ajv: 8.20.0
@@ -26098,7 +26098,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
       '@stoplight/spectral-formats': 1.9.0(encoding@0.1.13)
       '@stoplight/spectral-runtime': 1.1.6(encoding@0.1.13)
@@ -32467,7 +32467,7 @@ snapshots:
       '@types/mjml': 4.7.4
       mjml-browser: 4.18.0
 
-  grapesjs@0.23.4:
+  grapesjs@0.23.6:
     dependencies:
       '@types/backbone': 1.4.15
       backbone: 1.4.1
