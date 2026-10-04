@@ -1,5 +1,5 @@
 import { ResourceFlowLog } from '@attraccess/react-query-client';
-import { useSSE } from '../../../../utils/sse';
+import { useLiveUpdates } from '../../../../utils/live-updates';
 import { useState } from 'react';
 
 interface Props {
@@ -11,8 +11,9 @@ export function useLiveLogs(props: Props) {
   const { resourceId, onUpdate } = props;
   const [liveLogs, setLiveLogs] = useState<ResourceFlowLog[]>([]);
 
-  const { abort } = useSSE<ResourceFlowLog>({
-    path: `/api/resources/${resourceId}/flow/logs/live`,
+  const { abort } = useLiveUpdates({
+    topic: 'flow-logs',
+    resourceId,
     onUpdate: (data) => {
       setLiveLogs((prev) => [...prev, data]);
       onUpdate(data);

@@ -6,6 +6,8 @@ import { App } from './app';
 const state = vi.hoisted(() => ({
   authenticated: false,
   setup: false,
+  twoFactorLoading: false,
+  liveUserId: undefined as number | undefined,
   initialized: false,
   touch: false,
   ptr: true,
@@ -19,9 +21,16 @@ vi.mock('../hooks/useAuth', () => ({
     isInitialized: state.initialized,
     isAuthenticated: state.authenticated,
     needsTwoFactorSetup: state.setup,
+    isTwoFactorStatusLoading: state.twoFactorLoading,
     user: state.authenticated ? { id: 1 } : null,
     hasPermission: () => true,
   }),
+}));
+vi.mock('../utils/live-updates', () => ({
+  LiveUpdatesProvider: ({ userId, children }: PropsWithChildren<{ userId?: number }>) => {
+    state.liveUserId = userId;
+    return children;
+  },
 }));
 vi.mock('../hooks/useLocaleSync', () => ({ useLocaleSync: state.sync }));
 vi.mock('../stores/ptr.store', () => ({ usePtrStore: () => ({ pullToRefreshIsEnabled: state.ptr }) }));
@@ -60,6 +69,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.authenticated = false;
   state.setup = false;
+  state.twoFactorLoading = false;
+  state.liveUserId = undefined;
   state.initialized = false;
   state.touch = false;
   state.ptr = true;
@@ -127,4 +138,32 @@ it('respects a disabled pull-to-refresh preference on touch devices', () => {
     </MemoryRouter>,
   );
   expect(screen.queryByRole('button', { name: 'Refresh gesture' })).toBeNull();
+});
+
+it('waits for two-factor status and required setup before enabling the live transport', () => {
+  state.authenticated = true;
+  state.initialized = true;
+  state.twoFactorLoading = true;
+  const app = (
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>
+  );
+  const view = render(app);
+  expect(state.liveUserId).toBeUndefined();
+  state.twoFactorLoading = false;
+  state.setup = true;
+  view.rerender(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(state.liveUserId).toBeUndefined();
+  state.setup = false;
+  view.rerender(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(state.liveUserId).toBe(1);
 });

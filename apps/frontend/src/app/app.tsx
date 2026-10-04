@@ -1,3 +1,4 @@
+import { LiveUpdatesProvider } from '../utils/live-updates';
 import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
@@ -207,12 +208,16 @@ function AppContent() {
 }
 
 export function App() {
-  const { isInitialized } = useAuth();
+  const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
   useLocaleSync();
 
   configureApiClient();
 
-  return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
+  return (
+    <LiveUpdatesProvider userId={!isTwoFactorStatusLoading && !needsTwoFactorSetup ? user?.id : undefined}>
+      <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>
+    </LiveUpdatesProvider>
+  );
 }
 
 export default App;

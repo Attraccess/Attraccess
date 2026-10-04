@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useResourceMaintenancesServiceCanManageMaintenance } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
-import { useSSE } from '../../utils/sse';
+import { useLiveUpdates } from '../../utils/live-updates';
 
 export interface OperatingDurationSummary {
   sessionDurationMs: number;
@@ -62,8 +62,9 @@ export function useOperatingDuration(resourceId: number, enabled: boolean, range
   });
 
   const shouldSubscribe = enabled && !range;
-  useSSE({
-    path: `/api/resources/${resourceId}/events`,
+  useLiveUpdates({
+    topic: 'resource',
+    resourceId,
     onUpdate: () => query.refetch(),
     enabled: shouldSubscribe,
   });

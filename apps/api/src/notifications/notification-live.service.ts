@@ -15,8 +15,16 @@ export class NotificationLiveService {
     return this.subjects.get(userId);
   }
 
+  public deleteSubjectIfUnobserved(userId: number): void {
+    const subject = this.subjects.get(userId);
+    if (subject && !subject.observed) {
+      this.subjects.delete(userId);
+      this.userPresence.delete(userId);
+    }
+  }
+
   public emitToUser(userId: number, event: SystemNotificationLiveEventDto): void {
-    this.getUserSubject(userId).next({ data: event });
+    this.subjects.get(userId)?.next({ data: event });
   }
 
   public setUserPresent(userId: number, present: boolean): void {

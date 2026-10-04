@@ -1,3 +1,4 @@
+import { LiveUpdatesModule } from '../live-updates/live-updates.module';
 import { AppController } from './app.controller';
 import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
@@ -133,6 +134,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     MessagingModule,
     PushModule,
     NotificationsModule,
+    LiveUpdatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

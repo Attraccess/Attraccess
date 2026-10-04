@@ -79,7 +79,7 @@ export class MessagingLiveService {
       if (participant.userId === message.senderId) {
         continue;
       }
-      this.getUserMessageSubject(participant.userId).next({ data: messageWithSender });
+      this.messageSubjects.get(participant.userId)?.next({ data: messageWithSender });
     }
   }
 }

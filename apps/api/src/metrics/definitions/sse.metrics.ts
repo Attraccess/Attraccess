@@ -4,12 +4,19 @@ import { Counter, Gauge, Histogram, Registry } from 'prom-client';
 
 export interface SseMetrics {
   activeConnections: Gauge<'stream'>;
+  activeTopics: Gauge<'topic'>;
   connectionDuration: Histogram<'stream'>;
   messagesSentTotal: Counter<'stream'>;
 }
 
 export function createSseMetrics(registry: Registry): SseMetrics {
   return {
+    activeTopics: new Gauge({
+      name: 'attraccess_live_update_active_topics',
+      help: 'Logical topic subscriptions on bundled live-update connections',
+      labelNames: ['topic'],
+      registers: [registry],
+    }),
     activeConnections: new Gauge({
       name: 'attraccess_sse_active_connections',
       help: 'Number of active SSE connections per stream',

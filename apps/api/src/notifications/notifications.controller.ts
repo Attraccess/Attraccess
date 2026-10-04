@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Req, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { finalize } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationPreferencesDto } from './dtos/notification-preferences.dto';
@@ -24,12 +25,18 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Subscribe to live system notifications', operationId: 'notificationsLive' })
   streamNotifications(@Req() req: AuthenticatedRequest): Observable<{ data: SystemNotificationLiveEventDto }> {
     const subject = this.liveService.getUserSubject(req.user.id);
-    return this.sse.wrap('notifications', subject.asObservable());
+    return this.sse.wrap(
+      'notifications',
+      subject.asObservable().pipe(finalize(() => this.liveService.deleteSubjectIfUnobserved(req.user.id))),
+    );
   }
 
   @Get('preferences')
   @Auth()
-  @ApiOperation({ summary: 'Get the authenticated user notification preferences', operationId: 'notificationsGetPreferences' })
+  @ApiOperation({
+    summary: 'Get the authenticated user notification preferences',
+    operationId: 'notificationsGetPreferences',
+  })
   @ApiResponse({ status: 200, type: NotificationPreferencesDto })
   async getPreferences(@Req() req: AuthenticatedRequest): Promise<NotificationPreferencesDto> {
     return this.preferenceService.getPreferences(req.user.id);
@@ -37,7 +44,10 @@ export class NotificationsController {
 
   @Patch('preferences')
   @Auth()
-  @ApiOperation({ summary: 'Update one notification category preference', operationId: 'notificationsUpdatePreferences' })
+  @ApiOperation({
+    summary: 'Update one notification category preference',
+    operationId: 'notificationsUpdatePreferences',
+  })
   @ApiResponse({ status: 200, type: NotificationPreferencesDto })
   async updatePreferences(
     @Req() req: AuthenticatedRequest,
@@ -51,7 +61,8 @@ export class NotificationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Report whether the user is actively viewing the website',
-    description: 'Call with present=true when the tab is visible and present=false when hidden. The backend uses this to decide whether to deliver in-app toasts or fall back to push/email.',
+    description:
+      'Call with present=true when the tab is visible and present=false when hidden. The backend uses this to decide whether to deliver in-app toasts or fall back to push/email.',
     operationId: 'notificationsUpdateWebPresence',
   })
   @ApiResponse({ status: 204 })

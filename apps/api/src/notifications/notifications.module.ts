@@ -13,6 +13,6 @@ import { EmailModule } from '../email/email.module';
   imports: [TypeOrmModule.forFeature([NotificationPreference]), PushModule, MetricsModule, EmailModule],
   controllers: [NotificationsController],
   providers: [NotificationPreferenceService, NotificationLiveService, NotificationDispatchService],
-  exports: [NotificationPreferenceService, NotificationDispatchService],
+  exports: [NotificationPreferenceService, NotificationDispatchService, NotificationLiveService],
 })
 export class NotificationsModule {}
