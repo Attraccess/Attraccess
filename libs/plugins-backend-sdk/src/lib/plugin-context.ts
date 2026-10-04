@@ -99,6 +99,11 @@ export interface PluginMqttClient {
     payload: string | Buffer,
     options?: { qos?: 0 | 1 | 2; retain?: boolean },
   ): Promise<void>;
+
+  /** Reconnect using current configured settings and restore shared topic
+   * registrations. Optional for compatibility with older host runtimes.
+   */
+  refreshConnection?(serverId: number): Promise<void>;
 }
 
 /** Host flow functionality available to plugins with the TRIGGER_FLOWS permission. */

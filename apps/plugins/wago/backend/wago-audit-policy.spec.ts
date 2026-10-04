@@ -18,6 +18,8 @@ describe('WAGO audit domain declaration', () => {
       'wago.claim',
       'wago.unclaim',
       'wago.credential_rotation',
+      'wago.network_change',
+      'wago.network_credential_retirement',
       'wago.manual_credential_fallback',
       'wago.publication',
       'wago.forced_publication',
@@ -31,7 +33,7 @@ describe('WAGO audit domain declaration', () => {
       'wago.runtime_update',
     ])
       expect(actions).toContain(action);
-    expect(actions).toHaveLength(24);
+    expect(actions).toHaveLength(26);
   });
 
   it('declares every commissioning action with the commissioning subject', () => {

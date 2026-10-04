@@ -709,6 +709,22 @@ so they share the workspace toolchain, caching and CI.
   `vite-federation.config.mjs`, `verify-packed-plugin.mjs`). Each plugin's `project.json`
   wires them into nx targets:
 
+  For local development, build and install a plugin into the dev API's plugin
+  directory:
+
+  ```bash
+  pnpm nx install-dev plugin-shelly
+  ```
+
+  This target is available for Shelly, RabbitMQ and WAGO. `install-dev`
+  depends on `build` and always copies the resulting `package/` contents into
+  `storage/plugins/<manifest-name>/`, replacing the previous local installation
+  and removing stale files. It honors `PLUGIN_DIR`, then `STORAGE_ROOT` from the
+  environment or workspace `.env`; relative paths resolve from the workspace
+  root. Other plugins are preserved. Restart a running API to load the updated
+  plugin. Plugin source changes require running `install-dev` again; this target
+  does not watch plugin sources.
+
   | Target           | Produces                                                                |
   | ---------------- | ----------------------------------------------------------------------- |
   | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |

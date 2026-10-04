@@ -42,7 +42,7 @@ case "$bytes" in ''|*[!0-9]*) exit 1 ;; esac
 test "\${#bytes}" -le 7 && test "$bytes" -gt 0 && test "$bytes" -le 2097152 || exit 1
 case "$image" in ''|*[!A-Za-z0-9+/=]*) exit 1 ;; esac
 test "\${#image}" = 512 || exit 1
-${wagoShellFilesystemGuard()}
+${wagoShellFilesystemGuard({ waitForLock: true })}
 base=${quote(testRoot + '/etc/attraccess-wago-management')}
 test -d "$base" && test ! -L "$base" && test "$(stat -c '%u:%g:%a' "$base")" = 0:0:700 || exit 1
 test "$(cat "$base/token")" = "$token" || exit 1

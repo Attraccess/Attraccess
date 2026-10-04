@@ -10,6 +10,7 @@ export function useCommissioningVerification(session: Pick<CommissioningSession,
     queryFn: () => getCommissioningVerification(session.id),
     enabled,
     refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
   const [now, setNow] = useState(Date.now);
   useEffect(() => {

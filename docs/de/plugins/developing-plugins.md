@@ -218,6 +218,22 @@ pnpm nx show projects --projects=tag:type:plugin
 PR-Builds laden die ZIPs als Artefakte hoch (mit Sticky-PR-Kommentar); Releases
 hängen sie als Release-Assets an.
 
+Für die lokale Entwicklung steht bei Shelly, RabbitMQ und WAGO zusätzlich
+`install-dev` zur Verfügung:
+
+```bash
+pnpm nx install-dev plugin-shelly
+```
+
+`install-dev` baut das Plugin und kopiert den Inhalt von `package/` nach
+`storage/plugins/<Manifest-Name>/`. Die bisherige lokale Installation wird
+ersetzt und veraltete Dateien werden entfernt; andere Plugins bleiben erhalten.
+`PLUGIN_DIR` hat Vorrang vor `STORAGE_ROOT`, jeweils aus der Umgebung oder der
+Workspace-`.env`. Relative Pfade beziehen sich auf das Workspace-Verzeichnis.
+Eine bereits laufende API muss nach `install-dev` neu gestartet werden.
+Nach Änderungen am Plugin erneut `install-dev` ausführen; das Target überwacht
+die Plugin-Quellen nicht.
+
 ## Siehe auch
 
 - [Plugins Überblick](plugins/overview.md) -- Was sind Plugins?

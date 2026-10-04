@@ -281,15 +281,17 @@ export class WagoDiagnosticsService {
         .getMany(),
     ]);
     const runtime = this.wago.diagnostics.read(controllerId);
+    const runtimeUpdate = this.wago.isRuntimeUpdateRequired?.(controllerId) ?? false;
     const snapshot = latest ? (JSON.parse(latest.snapshot) as WagoConfigurationSnapshot) : null;
     const appliedSnapshot = applied ? (JSON.parse(applied.snapshot) as WagoConfigurationSnapshot) : null;
     const heartbeatAt = runtime.heartbeatAt ?? controller.lastHeartbeatAt;
     const heartbeatFreshness = freshness(heartbeatAt);
+    const expected = latest?.state === 'rejected' ? applied : latest;
     const revisionMismatch =
-      !!latest &&
-      (applied?.revision !== latest.revision ||
-        runtime.revision !== latest.revision ||
-        (runtime.activeStream !== undefined && runtime.contentHash !== latest.contentHash));
+      !!expected &&
+      (applied?.revision !== expected.revision ||
+        runtime.revision !== expected.revision ||
+        (runtime.activeStream !== undefined && runtime.contentHash !== expected.contentHash));
     const connected =
       runtime.connected === false
         ? false
@@ -307,11 +309,13 @@ export class WagoDiagnosticsService {
       connectivity:
         controller.trustState !== 'claimed'
           ? 'untrusted'
-          : runtime.connected === false
-            ? 'disconnected'
-            : connected
-              ? 'online'
-              : 'stale',
+          : runtimeUpdate
+            ? 'runtime_update'
+            : runtime.connected === false
+              ? 'disconnected'
+              : connected
+                ? 'online'
+                : 'stale',
       heartbeatAt,
       heartbeatFreshness,
       runtimeVersion: controller.runtimeVersion,
@@ -321,7 +325,7 @@ export class WagoDiagnosticsService {
       ...runtimeStreamSummary(runtime),
       configuration: configurationSummary(draft, latest, applied, runtime, revisionMismatch),
       manualOutputChannelIds:
-        connected && !revisionMismatch && freshness(runtime.stateSourceAt) === 'fresh'
+        !runtimeUpdate && connected && !revisionMismatch && freshness(runtime.stateSourceAt) === 'fresh'
           ? (runtime.manualOutputChannelIds ?? []).filter((id) =>
               appliedSnapshot?.logicalChannels.some(
                 (channel) => channel.id === id && channel.capabilities.includes('output'),
@@ -343,25 +347,27 @@ export class WagoDiagnosticsService {
           const availabilityReason =
             controller.trustState !== 'claimed'
               ? 'untrusted'
-              : controller.compatibilityError
-                ? 'incompatible-runtime'
-                : runtime.trackingExhausted
-                  ? 'stream-tracking-exhausted'
-                  : runtime.connected !== true || !connected
-                    ? 'disconnected-or-unknown'
-                    : runtime.hardwareAvailable === false
-                      ? 'hardware-unavailable'
-                      : revisionMismatch || !applied
-                        ? 'configuration-mismatch'
-                        : own(runtime.faults, channel.id)
-                          ? 'recent-fault'
-                          : freshness(runtime.stateSourceAt) !== 'fresh'
-                            ? 'state-source-unavailable-or-stale'
-                            : value.streamId !== runtime.activeStream
-                              ? 'old-or-legacy-stream'
-                              : sourceFreshness !== 'fresh'
-                                ? `source-${sourceFreshness}`
-                                : 'current';
+              : runtimeUpdate
+                ? 'runtime-update'
+                : controller.compatibilityError
+                  ? 'incompatible-runtime'
+                  : runtime.trackingExhausted
+                    ? 'stream-tracking-exhausted'
+                    : runtime.connected !== true || !connected
+                      ? 'disconnected-or-unknown'
+                      : runtime.hardwareAvailable === false
+                        ? 'hardware-unavailable'
+                        : revisionMismatch || !applied
+                          ? 'configuration-mismatch'
+                          : own(runtime.faults, channel.id)
+                            ? 'recent-fault'
+                            : freshness(runtime.stateSourceAt) !== 'fresh'
+                              ? 'state-source-unavailable-or-stale'
+                              : value.streamId !== runtime.activeStream
+                                ? 'old-or-legacy-stream'
+                                : sourceFreshness !== 'fresh'
+                                  ? `source-${sourceFreshness}`
+                                  : 'current';
           return { ...value, sourceFreshness, current: availabilityReason === 'current', availabilityReason };
         });
         return {
@@ -369,7 +375,7 @@ export class WagoDiagnosticsService {
           profile: channel.profile,
           capabilities: channel.capabilities,
           disconnectPolicy: channel.disconnectPolicy,
-          safeState: channel.capabilities.includes('output') ? 'off (runtime default)' : 'not applicable',
+          safeState: channel.capabilities.includes('output') ? 'not specified' : 'not applicable',
           samples,
           current: samples.length > 0 && samples.every((value) => value.current),
           fault: own(runtime.faults, channel.id) ?? null,

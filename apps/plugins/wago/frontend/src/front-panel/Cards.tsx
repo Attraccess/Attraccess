@@ -1,11 +1,12 @@
 // Displays physical terminals and Modbus registers with current controller telemetry.
 // FEATURE: WAGO front panel controls always use the applied configuration.
-import { Button, Card, Switch } from '@heroui/react';
+import { Accordion, Button, Card, Switch } from '@heroui/react';
 import { Cable, Settings2, Zap } from 'lucide-react';
 import { DIGITAL_TERMINALS } from '../../../backend/configuration-digital';
 import { outputBehavior } from '../../../channel-behavior';
 import type { WagoDiagnostics } from '../../../diagnostics-types';
-import { BUILTIN_MODBUS_PROFILES, type ModbusDevice } from '../../../modbus/model';
+import { BUILTIN_MODBUS_PROFILES, type ModbusDevice, type ModbusMeasurement } from '../../../modbus/model';
+import { formatMeterMeasurement } from './measurement-display';
 import { useWagoTranslations } from '../i18n';
 import {
   busConnection,
@@ -215,10 +216,38 @@ export function DeviceCard({
   )?.fault;
   const online =
     live.diagnostics?.connectivity === 'online' &&
-    !fault &&
     channels.some((channel) => live.diagnostics?.channels.find((item) => item.id === channel.id)?.current);
+  const renderMeasurement = (register: ModbusMeasurement) => {
+    const channel =
+      live.applied && appliedProfile?.measurements.some((item) => item.id === register.id)
+        ? registerChannel(live.applied.snapshot, device.id, register.id, 'measurementId')
+        : undefined;
+    const sample = channelSample(live, channel?.id, 'measurement');
+    return (
+      <div key={register.id} className="wg:flex wg:items-baseline wg:justify-between wg:gap-3">
+        <span className="wg:min-w-0 wg:break-words wg:text-sm wg:text-muted">
+          {shownBuiltin ? tBackendMessage(register.name) : register.name}
+        </span>
+        <span className="wg:shrink-0 wg:text-lg wg:font-semibold wg:tabular-nums">
+          {formatMeterMeasurement(
+            register,
+            typeof sample?.value === 'number' ? { value: sample.value, unit: sample.unit ?? register.unit } : undefined,
+            language,
+            shownBuiltin ? tBackendMessage : undefined,
+          )}
+        </span>
+      </div>
+    );
+  };
+  const sections = new Map<string, ModbusMeasurement[]>();
+  for (const register of shownProfile?.measurements ?? []) {
+    const key = register.section ?? 'electrical';
+    const entries = sections.get(key) ?? [];
+    entries.push(register);
+    sections.set(key, entries);
+  }
   return (
-    <Card className="wg:min-w-0">
+    <Card className={`wg:min-w-0 ${sections.size > 1 ? 'wg:md:col-span-2 wg:xl:col-span-3' : ''}`}>
       <Card.Header className="wg:flex wg:flex-row wg:items-start wg:justify-between wg:gap-2">
         <div className="wg:min-w-0 wg:flex-1">
           <Card.Title className="wg:flex wg:items-center wg:gap-2">
@@ -248,45 +277,39 @@ export function DeviceCard({
         </Button>
       </Card.Header>
       <Card.Content className="wg:flex wg:flex-col wg:gap-3">
-        {appliedDevice && (!online || fault) && (
+        {appliedDevice && !online && (
           <p role="alert" className="wg:text-sm wg:text-danger">
             {t('panel.noResponse', { address: appliedDevice?.unitId ?? device.unitId })}
           </p>
         )}
+        {appliedDevice && online && fault && (
+          <p role="status" className="wg:text-sm wg:text-muted">
+            {t('panel.partialReadings')}
+          </p>
+        )}
         {appliedDevice && deviceChanged && <p className="wg:text-sm wg:text-muted">{t('panel.appliedValues')}</p>}
         {!appliedDevice && <p className="wg:text-sm wg:text-muted">{t('panel.applyFirst')}</p>}
-        {shownProfile?.measurements.map((register) => {
-          const channel =
-            live.applied && appliedProfile?.measurements.some((item) => item.id === register.id)
-              ? registerChannel(live.applied.snapshot, device.id, register.id, 'measurementId')
-              : undefined;
-          const sample = channelSample(live, channel?.id, 'measurement');
-          const value = typeof sample?.value === 'number' ? sample.value : undefined;
-          const unit = sample?.unit ?? register.unit;
-          const milli = unit.startsWith('milli');
-          const canonical = milli ? unit.slice(5) : unit;
-          const number = value === undefined ? undefined : value / (milli ? 1000 : 1);
-          const kilo = number !== undefined && ['watt', 'watt-hour'].includes(canonical) && Math.abs(number) >= 1000;
-          const symbols: Record<string, string> = {
-            watt: 'W',
-            'watt-hour': 'Wh',
-            volt: 'V',
-            ampere: 'A',
-            percent: '%',
-          };
-          return (
-            <div key={register.id} className="wg:flex wg:items-baseline wg:justify-between wg:gap-3">
-              <span className="wg:min-w-0 wg:break-words wg:text-sm wg:text-muted">
-                {shownBuiltin ? tBackendMessage(register.name) : register.name}
-              </span>
-              <span className="wg:shrink-0 wg:text-lg wg:font-semibold wg:tabular-nums">
-                {number === undefined
-                  ? '—'
-                  : `${new Intl.NumberFormat(language, { maximumFractionDigits: 2 }).format(number / (kilo ? 1000 : 1))} ${kilo ? 'k' : ''}${symbols[canonical] ?? canonical}`}
-              </span>
-            </div>
-          );
-        })}
+        {sections.size > 1 ? (
+          <Accordion allowsMultipleExpanded defaultExpandedKeys={['electrical']}>
+            {[...sections].map(([section, registers]) => (
+              <Accordion.Item key={section} id={section}>
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    {t(`panel.sections.${section}`)}
+                    <Accordion.Indicator />
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body className="wg:grid wg:grid-cols-1 wg:gap-x-8 wg:gap-y-3 wg:md:grid-cols-2 wg:xl:grid-cols-3">
+                    {registers.map(renderMeasurement)}
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            ))}
+          </Accordion>
+        ) : (
+          shownProfile?.measurements.map(renderMeasurement)
+        )}
         {shownProfile?.actions.map((register) => {
           const channel =
             live.applied && appliedProfile?.actions.some((item) => item.id === register.id)

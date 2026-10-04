@@ -25,6 +25,9 @@ const state = vi.hoisted(() => ({
   imported: vi.fn(),
   exported: vi.fn(),
   confetti: vi.fn(),
+  createConfetti: vi.fn(),
+  clearConfetti: vi.fn(),
+  destroyConfetti: vi.fn(),
   nodes: [] as Node[],
   edges: [] as Edge[],
   setNodes: undefined as unknown as Dispatch<SetStateAction<Node[]>>,
@@ -60,7 +63,12 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 vi.mock('js-confetti', () => ({
   default: class {
+    constructor() {
+      state.createConfetti();
+    }
     addConfetti = state.confetti;
+    clearCanvas = state.clearConfetti;
+    destroyCanvas = state.destroyConfetti;
   },
 }));
 vi.mock('@xyflow/react', () => ({
@@ -112,7 +120,25 @@ vi.mock('./nodeCatalog', () => ({
 vi.mock('./edgeWithDeleteButton', () => ({ EdgeWithDeleteButton: () => null }));
 vi.mock('./FlowNodeQuerySelection', () => ({ FlowNodeQuerySelection: () => null }));
 vi.mock('./logViewer', () => ({
-  LogViewer: ({ children }: { children: (open: () => void) => ReactNode }) => children(vi.fn()),
+  LogViewer: ({
+    children,
+    confettiEnabled,
+    onConfettiEnabledChange,
+  }: {
+    children: (open: () => void) => ReactNode;
+    confettiEnabled: boolean;
+    onConfettiEnabledChange: (enabled: boolean) => void;
+  }) => (
+    <>
+      {children(vi.fn())}
+      <input
+        type="checkbox"
+        aria-label="Confetti"
+        checked={confettiEnabled}
+        onChange={(event) => onConfettiEnabledChange(event.target.checked)}
+      />
+    </>
+  ),
 }));
 vi.mock('./variablesModal', () => ({
   VariablesModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(vi.fn()),
@@ -291,12 +317,24 @@ it('auto-aligns using measured handles and preserves positions, data and connect
   expect(saveButton()).toBeDisabled();
 });
 
-it('animates running flows and distinguishes failed completion feedback', () => {
-  show();
+it('keeps confetti off until enabled, distinguishes failures and clears animations when disabled', () => {
+  const view = show();
+  expect(screen.getByRole('checkbox', { name: 'Confetti' })).not.toBeChecked();
+  expect(state.createConfetti).not.toHaveBeenCalled();
   act(() => state.live?.({ type: 'flow.start' }));
   expect(state.flowProps.edges[0].animated).toBe(true);
   act(() => state.live?.({ type: 'flow.completed' }));
   expect(state.flowProps.edges[0].animated).toBe(false);
+  expect(state.confetti).not.toHaveBeenCalled();
+  act(() => {
+    state.live?.({ type: 'node.processing.failed' });
+    state.live?.({ type: 'flow.completed' });
+  });
+  expect(state.confetti).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Confetti' }));
+  expect(state.createConfetti).toHaveBeenCalledOnce();
+  act(() => state.live?.({ type: 'flow.completed' }));
   expect(state.confetti).toHaveBeenCalledWith();
   act(() => {
     state.live?.({ type: 'flow.start' });
@@ -304,6 +342,20 @@ it('animates running flows and distinguishes failed completion feedback', () => 
   });
   act(() => state.live?.({ type: 'flow.completed' }));
   expect(state.confetti).toHaveBeenLastCalledWith(expect.objectContaining({ confettiNumber: 2 }));
+
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Confetti' }));
+  expect(state.clearConfetti).toHaveBeenCalledOnce();
+  expect(state.destroyConfetti).toHaveBeenCalledOnce();
+  state.confetti.mockClear();
+  act(() => state.live?.({ type: 'flow.completed' }));
+  expect(state.confetti).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Confetti' }));
+  view.unmount();
+  expect(state.clearConfetti).toHaveBeenCalledTimes(2);
+  expect(state.destroyConfetti).toHaveBeenCalledTimes(2);
+  show();
+  expect(screen.getByRole('checkbox', { name: 'Confetti' })).not.toBeChecked();
 });
 it('shows loading and errors and routes import/export actions', () => {
   state.original = undefined;

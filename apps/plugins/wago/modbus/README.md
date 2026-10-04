@@ -1,11 +1,10 @@
 # Modbus integration (ATT-1059)
 
 This implementation provides configurable Modbus TCP and POSIX RTU acquisition and
-binary named actions. The 879-3000 read-only profile has documented registers and
-has been read-tested on a CC100 FW31 over two-wire RS-485. See
-[setup and evidence](../../../../docs/en/devices/wago-879-3000-modbus-rtu.md).
-Other built-in candidates retain their unverified labels; communication evidence
-does not qualify loaded energy accuracy or every physical assembly.
+binary named actions. WAGO 879-3020 (4PS) is the only predefined device profile.
+Its complete read-only register map follows the WAGO meter manual. See
+[setup and evidence](../../../../docs/en/devices/wago-879-3020-modbus-rtu.md).
+Communication evidence does not qualify loaded energy accuracy or every physical assembly.
 
 ## Configuration and shared editor integration
 
@@ -62,9 +61,10 @@ FC03 (holding registers) or FC04 (input registers) explicitly. `uint16`, `int16`
 `raw * scale + offset`, yielding persisted engineering units A/V/W/Wh/percent.
 Non-finite values fault instead of becoming fabricated samples. An optional
 measurement `decimalPlaces` (0-3) explicitly rounds engineering values before MQTT
-encoding. Without it, values retain their exact semantics. The new 879-3000 profile
+encoding. Without it, values retain their exact semantics. The 879-3020 profile
 uses three places to handle IEEE float32 approximation while emitting integer
-milli-units; the old `-unverified` profile IDs/maps remain unchanged.
+milli-units. Other predefined profiles have been removed; published configurations
+referencing them must be moved to the exact meter profile or an explicit custom map.
 
 Actions map runtime boolean commands to explicit `onValue`/`offValue` in physical
 units. FC05 requires 0/1, identity scaling and uint16; FC06 writes one 16-bit
@@ -108,10 +108,15 @@ Configuration routing is prepared without mutation, then I/O is suspended and
 queued transactions are invalidated while the candidate snapshot is persisted.
 The snapshot and routing table are installed synchronously only after save
 succeeds. Save failure resumes the old pair. Commands received during persistence
-are rejected. Pending commands, active pulses and energized outputs prevent a
-production routing change; finish commands and switch outputs off first so a
-timed OFF cannot lose its old route. No implicit actuator writes are performed
-to make a configuration apply succeed.
+are rejected. Already admitted writes finish before routing is installed. Output
+levels and uncertain output states do not prevent configuration changes. The
+front panel always asks for confirmation and shows current reported HIGH/LOW
+levels, or unavailable states, without inferring what the connected machine does.
+Applying does not write outputs. Active pulses retain their duration and captured
+physical route; their original shutdown route is persisted in `pendingPulseRoutes`
+so completion and restart recovery still reach the original device after removal
+or rebinding. A new explicit command on that same physical route supersedes its
+pending pulse.
 
 For adapters with `prepareConfiguration` (the production router), every output
 write first marks its logical channel ID uncertain in memory using the optional
@@ -123,16 +128,11 @@ Previously durable energized/uncertain state remains conservative across restart
 until an OFF confirmation is successfully persisted. Command reservation
 persistence for explicit commands is unchanged.
 A write failure leaves uncertainty intact without changing the last-confirmed
-`outputs` value or acknowledging success. New desired revisions are rejected with
-the structured `outputs_busy` error while any output is uncertain, including
-after restart, so removal or rebinding cannot discard a possibly energized route.
-A confirmed write clears that channel's uncertainty; if saving the confirmation
-fails, the runtime conservatively restores uncertainty in memory. Successful ON
-still blocks configuration through the energized-output guard. A successful,
-persisted explicit OFF on the old route allows reconfiguration once no other
-outputs or commands are busy. Restart performs no output replay, and this change
-adds no write retry or implicit OFF. Legacy adapters without the production
-configuration-preparation seam retain their existing write/persistence behavior.
+`outputs` value or acknowledging success. A confirmed write clears that channel's
+uncertainty; if saving the confirmation fails, the runtime conservatively restores
+uncertainty in memory. These diagnostic states do not block configuration changes.
+Restart performs no switched-output replay. Scheduled pulse completion and the
+configured disconnect behavior remain explicit output actions.
 
 ## Transports and deployment
 
@@ -161,7 +161,8 @@ Recovery depends on what failed:
 
 - **A failed read self-heals.** Reads are idempotent. After a quiet period
   (`max(2 * timeoutMs, reconnectMs)`, so any late reply has already arrived) the
-  runtime sends the failed read once more as a probe; the serial exchange flushes
+  runtime sends a current read as a probe, using the latest configured framing,
+  unit and register map; the serial exchange flushes
   stale input and waits 3.5 character times first. Only a reply that passes
   unit/CRC/length and function/byte-count validation lifts the quarantine. A failed
   probe doubles the wait (capped at 60 s). Meanwhile requests keep failing fast
@@ -197,19 +198,30 @@ Modbus classes in `adapters.ts` are not used by production routing.
 
 ## Built-in evidence and qualification gates
 
-The user's ATT-979 evidence identifies official documents:
+The sole built-in is `wago-879-3020`, version 1, for the WAGO 879-3020 (4PS):
+https://www.wago.com/de/energiemesstechnik/energiezaehler-mid/p/879-3020
 
-- 879-3000: https://www.wago.com/us/d/5937710
-- 879-1300: https://www.wago.com/us/d/18838796
+The WAGO 4PU/4PS/2PU CT product manual V1.6, appendix A3.2, pages 34–38,
+documents the 131 non-reserved readable values. `wago-879-3020.ts` supplies the
+complete map: all phase/total electrical quantities, frequency, line voltages,
+active/reactive and Q1–Q4 energy by phase/tariff, resettable day counters, and
+meter information/settings. The original five IDs and engineering transforms
+remain compatible with existing version 1 snapshots.
 
-The initial implementation could not load either manual. Its legacy candidate maps use the
-supplied RTU FC03 wire addresses: `0x5012` float kW active power, `0x600C` imported
-energy, `0x6018` exported energy. Energy is float kWh for 879-3000 and uint32 Wh
-for 879-1300. Those legacy IDs remain frozen and read-only. The new `wago-879-3000`
-profile is based on the retrieved manual V1.8, pages 35-38, which confirms FC03,
-ABCD float order, and the listed units. It also exposes L1 voltage and current.
-The 879-1300 candidate still needs independent verification. Neither meter profile
-has outputs or assumes rollover.
+The shared measurement contract carries Hz, var, VA, varh, ratios, numbers/codes,
+seconds and imp/kWh alongside the original units. Canonical MQTT values remain
+integer milli-units (or exact whole units on safe milli-range overflow). Metadata
+codes include read-only display hints; every register can be bound to a channel.
+The adapter batches adjacent values in bounded 120-word requests, preserves each
+block's actual completion time, and isolates valid illegal-register exceptions.
+No timeout/CRC retry or measurement cache is introduced by batching.
+
+The meter must use standard float data format (`0x4026 = 1`). The profile has
+no write actions and declares no rollover. Resettable/net energy uses live
+measurements; dedicated import/export energy remains cumulative.
+Appendix A3.1 specifies unit 1, 9600 baud and 8E1 as the factory settings;
+always match the actual meter. The previous 879-3000 and unverified
+879-3000/879-1300 catalog entries have been removed. Custom profiles remain available.
 
 Remaining acceptance includes loaded power/energy accuracy, physical disconnect
 and fault scenarios, other meter models, and TCP hardware. Development-device

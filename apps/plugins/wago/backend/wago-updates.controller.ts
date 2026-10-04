@@ -13,11 +13,36 @@ import {
 } from '@nestjs/common';
 import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
 import { wagoAuditPrincipal } from './wago-audit';
+import { WagoNetworkChangeService } from './wago-network-change.service';
 
 @Controller('wago')
 @Auth('system.settings.manage')
 export class WagoUpdatesController {
-  constructor(@Inject(WagoManagedRuntimeService) private readonly managed: WagoManagedRuntimeService) {}
+  constructor(
+    @Inject(WagoManagedRuntimeService) private readonly managed: WagoManagedRuntimeService,
+    @Inject(WagoNetworkChangeService) private readonly network: WagoNetworkChangeService,
+  ) {}
+
+  @Get('controllers/:id/network-change')
+  networkStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.network.status(id);
+  }
+
+  @Post('controllers/:id/network-change')
+  @Header('Cache-Control', 'no-store')
+  changeNetwork(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
+    return this.network.apply(id, body, wagoAuditPrincipal(request));
+  }
+
+  @Post('controllers/:id/network-change/retry')
+  retryNetwork(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest) {
+    return this.network.apply(id, null, wagoAuditPrincipal(request), true);
+  }
+
+  @Post('controllers/:id/network-change/retire-credentials')
+  retirePreviousCredentials(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest) {
+    return this.network.retirePreviousCredentials(id, wagoAuditPrincipal(request));
+  }
 
   @Get('controllers/:id/runtime-update')
   status(@Param('id', ParseIntPipe) id: number) {

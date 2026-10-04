@@ -95,6 +95,65 @@ describe('durable managed runtime reconciliation', () => {
   });
   afterEach(() => coordinator.stop());
 
+  it('updates immediately when a fresh heartbeat contradicts a current checkpoint', async () => {
+    await coordinator.reconcile(1);
+    host.inspect.mockClear();
+    await coordinator.reconcile(1, false, release('a').imageId);
+    expect(host.inspect).toHaveBeenCalledTimes(1);
+    expect(host.activate).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains before/after versions across completion, an inspection failure and current-image rechecks', async () => {
+    desired = { ...desired, manifest: { ...desired.manifest, runtimeVersion: '0.2.0' } };
+    host.inspect.mockResolvedValue({
+      imageId: release('a').imageId,
+      runtimeVersion: '0.1.0',
+      managed: true,
+      claimed: true,
+      compatible: true,
+      online: true,
+    });
+    await coordinator.reconcile(1);
+    expect(rows.get(1)).toMatchObject({
+      phase: 'current',
+      previousRuntimeVersion: '0.1.0',
+      desiredRuntimeVersion: '0.2.0',
+      previousImageId: release('a').imageId,
+    });
+    host.inspect.mockRejectedValueOnce(new RuntimeUpdateError('offline'));
+    now = rows.get(1)?.retryAt ?? now;
+    await coordinator.reconcile(1);
+    expect(rows.get(1)).toMatchObject({
+      phase: 'blocked',
+      previousRuntimeVersion: '0.1.0',
+      previousImageId: release('a').imageId,
+    });
+    host.inspect.mockResolvedValue({
+      imageId: desired.imageId,
+      runtimeVersion: '0.2.0',
+      managed: true,
+      claimed: true,
+      compatible: true,
+      online: true,
+    });
+    await coordinator.reconcile(1, true);
+    expect(rows.get(1)).toMatchObject({
+      phase: 'current',
+      previousRuntimeVersion: '0.1.0',
+      desiredRuntimeVersion: '0.2.0',
+      previousImageId: release('a').imageId,
+    });
+    desired = release('c');
+    desired = { ...desired, manifest: { ...desired.manifest, runtimeVersion: '0.3.0' } };
+    await coordinator.reconcile(1);
+    expect(rows.get(1)).toMatchObject({
+      phase: 'current',
+      previousRuntimeVersion: '0.2.0',
+      desiredRuntimeVersion: '0.3.0',
+      previousImageId: release('b').imageId,
+    });
+  });
+
   it.each([false, true])(
     'defers settled current SSH work durably (already-current=%s) but checks a new build immediately',
     async (alreadyCurrent) => {
@@ -164,6 +223,8 @@ describe('durable managed runtime reconciliation', () => {
       expect(rows.get(id)?.phase).toBe('recovering');
     });
     expect(await coordinator.reconcile(1, true)).toBe('settled');
+    expect(rows.get(1)).toMatchObject({ phase: 'failed', failure: 'interrupted', token: null });
+    await coordinator.reconcile(1);
     expect(rows.get(1)).toMatchObject({ phase: 'current', token: null });
     expect(host.recover).toHaveBeenCalledTimes(2);
   });
@@ -311,6 +372,16 @@ describe('durable managed runtime reconciliation', () => {
     },
   );
 
+  it('retains actionable storage figures after recovery and clears them on a successful retry', async () => {
+    const storageDiagnostics = [{ path: '/var/lib', requiredKiB: 180397, availableKiB: 176652 }];
+    host.stage.mockRejectedValueOnce(new RuntimeUpdateError('storage', storageDiagnostics));
+    await coordinator.reconcile(1);
+    expect(rows.get(1)).toMatchObject({ phase: 'failed', failure: 'storage', storageDiagnostics, token: null });
+    await coordinator.reconcile(1, true);
+    expect(rows.get(1)).toMatchObject({ phase: 'current', failure: null });
+    expect(rows.get(1)?.storageDiagnostics).toBeUndefined();
+  });
+
   it.each([{ permanent: false }, { ready: false }, { imageId: release('a').imageId }, { observedAt: 1_000_000 }])(
     'rejects incomplete, retained, or wrong-image readiness %j',
     async (overrides) => {
@@ -347,7 +418,25 @@ describe('durable managed runtime reconciliation', () => {
     now = rows.get(1)?.retryAt ?? now + 60_000;
     await coordinator.reconcile(1);
     expect(host.recover.mock.calls[1][1]).toBe(token);
+    expect(rows.get(1)).toMatchObject({ phase: 'failed', failure: 'interrupted', token: null });
+    await coordinator.reconcile(1);
     expect(rows.get(1)?.phase).toBe('current');
+  });
+
+  it('gives a new rollout its own deadline after slow crash recovery and acknowledgement', async () => {
+    host.stage.mockRejectedValueOnce(new RuntimeUpdateError('transfer'));
+    host.recover.mockRejectedValueOnce(new RuntimeUpdateError('recovery'));
+    await coordinator.reconcile(1);
+    host.stage.mockClear();
+    host.recover.mockImplementation(async () => { now += 20 * 60_000; });
+    host.acknowledge.mockImplementation(async () => { now += 4 * 60_000; });
+    host.stage.mockImplementation(async () => { now += 2 * 60_000; });
+    expect(await coordinator.reconcile(1, true)).toBe('settled');
+    expect(rows.get(1)).toMatchObject({ phase: 'failed', failure: 'interrupted', token: null });
+    expect(host.stage).not.toHaveBeenCalled();
+    expect(owners.size).toBe(0);
+    await coordinator.reconcile(1);
+    expect(rows.get(1)).toMatchObject({ phase: 'current', token: null });
   });
 
   it('resumes acknowledgement after interruption without rolling back an accepted rollout', async () => {
@@ -402,11 +491,40 @@ describe('durable managed runtime reconciliation', () => {
   });
 
   it('stops mutation after cancellation and leaves durable recovery intent', async () => {
-    host.stage.mockImplementation(async () => coordinator.stop());
+    host.stage.mockImplementation(async () => { void coordinator.stop(); });
     await expect(coordinator.reconcile(1)).rejects.toThrow('interrupted');
     expect(rows.get(1)?.phase).toBe('staging');
     expect(host.activate).not.toHaveBeenCalled();
     expect(host.recover).not.toHaveBeenCalled();
     expect(owners.size).toBe(0);
+  });
+
+  it('waits for cancelled transport and conditional lease release before shutdown resolves', async () => {
+    let entered!: () => void;
+    const staging = new Promise<void>((resolve) => { entered = resolve; });
+    host.stage.mockImplementation(async (_id, _token, _desired, signal) => {
+      entered();
+      await new Promise<void>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new RuntimeUpdateError('interrupted')), { once: true });
+      });
+    });
+    let release!: () => void, releasing!: () => void;
+    const leaseRelease = new Promise<void>((resolve) => { release = resolve; });
+    const releaseStarted = new Promise<void>((resolve) => { releasing = resolve; });
+    const originalRelease = store.release;
+    store.release = async (id, owner) => { releasing(); await leaseRelease; await originalRelease(id, owner); };
+    const update = expect(coordinator.reconcile(1)).rejects.toThrow('interrupted');
+    await staging;
+    let stopped = false;
+    const shutdown = Promise.resolve(coordinator.stop()).then(() => { stopped = true; });
+    await releaseStarted;
+    await Promise.resolve();
+    expect(stopped).toBe(false);
+    expect(owners.size).toBe(1);
+    release();
+    await Promise.all([shutdown, update]);
+    expect(owners.size).toBe(0);
+    expect(rows.get(1)?.phase).toBe('staging');
+    expect(host.recover).not.toHaveBeenCalled();
   });
 });

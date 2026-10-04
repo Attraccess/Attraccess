@@ -151,7 +151,7 @@ describe('controller diagnostics', () => {
     try {
       let stored = { id: 1, hardwareId: 'cc100', trustState: 'claimed', lastSequence: 0, lastHeartbeatAt: null };
       const save = jest.fn(async (value) => {
-        stored = { ...value };
+        stored = { ...stored, ...value };
       });
       const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
       Reflect.set(service, 'controllers', { findOneBy: async () => ({ ...stored }), save });
@@ -195,7 +195,7 @@ describe('controller diagnostics', () => {
         lastHeartbeatAt: null,
       };
       const save = jest.fn(async (value) => {
-        stored = { ...value };
+        stored = { ...stored, ...value };
       });
       const context = { logger: { warn: jest.fn() } } as unknown as PluginContext;
       const service = new WagoService(context);
@@ -347,8 +347,23 @@ describe('controller diagnostics', () => {
     expect((await service.get(1)).configuration.draftChanged).toBe(false);
   });
 
-  it('validates flows against applied mapping while reporting publication divergence', async () => {
-    const { service, latest, query } = setup();
+  it('keeps the applied mapping current after a rejected publication', async () => {
+    const { service, latest, query, diagnostics } = setup();
+    diagnostics.ingest(
+      1,
+      'state',
+      Buffer.from(
+        JSON.stringify({
+          streamId: '00000000-0000-4000-8000-000000000001',
+          sequence: 1,
+          timestamp: new Date().toISOString(),
+          connected: true,
+          revision: 2,
+          contentHash: 'a'.repeat(64),
+          outputs: { io: true },
+        }),
+      ),
+    );
     latest.revision = 3;
     latest.state = 'rejected';
     latest.snapshot = JSON.stringify({ version: 1, physicalPoints: [], logicalChannels: [] });
@@ -363,7 +378,9 @@ describe('controller diagnostics', () => {
     const result = await service.get(1);
     expect(result.references[0].invalid).toBe(false);
     expect(result.channels.map((channel) => channel.id)).toEqual(['io']);
-    expect(result.configuration.revisionMismatch).toBe(true);
+    expect(result.configuration.revisionMismatch).toBe(false);
+    expect(result.channels[0].samples[0].current).toBe(true);
+    expect(result.channels[0].safeState).toBe('not specified');
   });
   it('only projects rejection summaries matching both latest revision and hash', async () => {
     const { service, diagnostics } = setup();

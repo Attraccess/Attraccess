@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Input, Label, TextField } from '@heroui/react';
+import { Alert, Button, Input, Label, TextField } from '@heroui/react';
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
@@ -7,7 +7,13 @@ import type { WagoCommissioningPreflightReport } from '../../shared/commissionin
 import { useWagoTranslations } from './i18n';
 
 const api = createPluginApiClient('/api/wago/commissioning/sessions');
-export function CommissioningPlatformPreflight({ session }: { session: CommissioningSession }) {
+export function CommissioningPlatformPreflight({
+  session,
+  showFailure = true,
+}: {
+  session: CommissioningSession;
+  showFailure?: boolean;
+}) {
   const { t, tBackendMessage, language } = useWagoTranslations();
   const formatUtc = (value: string) => {
     const date = new Date(value);
@@ -18,7 +24,6 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
   const client = useQueryClient();
   const [updated, setUpdated] = useState<CommissioningSession | null>(null);
   const [busy, setBusy] = useState(false);
-  const [approved, setApproved] = useState(false);
   const [customSsh, setCustomSsh] = useState(false);
   const [error, setError] = useState('');
   const form = useRef<HTMLFormElement>(null);
@@ -41,7 +46,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
   const codesysDisabled = current.codesysState === 'disabled';
 
   async function run(action: 'inspect' | 'recover') {
-    if (busy || !form.current?.reportValidity() || (action !== 'inspect' && !approved)) return;
+    if (busy || !form.current?.reportValidity()) return;
     const values = new FormData(form.current);
     const temporarySsh = {
       username: customSsh ? String(values.get('preflightUsername') ?? '') : 'root',
@@ -49,7 +54,6 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
     };
     form.current.reset();
     setCustomSsh(false);
-    setApproved(false);
     setBusy(true);
     setError('');
     const request = generation.current;
@@ -143,21 +147,16 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
       {current.dockerProvisionState && (
         <p role="status">{t('security.savedPreparation', { state: tBackendMessage(current.dockerProvisionState) })}</p>
       )}
-      {current.failureReason && <p role="alert">{tBackendMessage(current.failureReason)}</p>}
+      {showFailure && current.failureReason && <p role="alert">{tBackendMessage(current.failureReason)}</p>}
       <form ref={form} onSubmit={(event) => event.preventDefault()}>
         <p>
           {t('commissioningUI.sshLogin', {
             account: t(customSsh ? 'commissioningUI.custom' : 'commissioningUI.defaultAccount'),
           })}
         </p>
-        <Checkbox isSelected={customSsh} onChange={setCustomSsh} isDisabled={busy}>
-          <Checkbox.Content className="wg:items-start">
-            <Checkbox.Control className="wg:mt-0.5">
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            {t('commissioningUI.advanced')}
-          </Checkbox.Content>
-        </Checkbox>
+        <Button variant="tertiary" size="sm" onPress={() => setCustomSsh(!customSsh)} isDisabled={busy}>
+          {t(customSsh ? 'commissioningUI.useDefaultLogin' : 'commissioningUI.advanced')}
+        </Button>
         {customSsh && (
           <>
             <TextField name="preflightUsername" isRequired isDisabled={busy}>
@@ -175,15 +174,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
         </Button>
         {recovery && (
           <>
-            <Checkbox isSelected={approved} onChange={setApproved} isDisabled={busy}>
-              <Checkbox.Content className="wg:items-start">
-                <Checkbox.Control className="wg:mt-0.5">
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                {t('security.approveCleanup')}
-              </Checkbox.Content>
-            </Checkbox>
-            <Button type="button" isDisabled={busy || !approved} onPress={() => void run('recover')}>
+            <Button type="button" isDisabled={busy} onPress={() => void run('recover')}>
               {t('security.cleanup')}
             </Button>
           </>

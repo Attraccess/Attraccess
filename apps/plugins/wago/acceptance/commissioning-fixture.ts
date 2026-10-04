@@ -4,8 +4,9 @@ import { WagoManagementEntity } from '../backend/wago-management.entity';
 import { managementKeyCommand } from '../backend/wago-management-shell';
 import type { ManagementRecord } from '../backend/wago-management.types';
 import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 import * as processes from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DataSource } from 'typeorm';
@@ -64,6 +65,7 @@ export async function commissioningFixture() {
   }
   try {
     await database.initialize();
+    await catalog.import({ bundle: Readable.from([first.bundle]), checksum: Readable.from([first.checksum]) });
     const fingerprint = `SHA256:${'A'.repeat(43)}`;
     const processesSeen: string[] = [];
     // Fail closed before any OS process can reach SSH, hardware, or a shared broker.
@@ -238,6 +240,7 @@ export async function commissioningFixture() {
         if (req.path === '/reset') {
           await catalog.onModuleDestroy();
           await rm(join(directory, 'catalog'), { recursive: true, force: true });
+          await catalog.import({ bundle: Readable.from([first.bundle]), checksum: Readable.from([first.checksum]) });
           await database.synchronize(true);
           transport.failDelivery = true;
           transport.failRecovery = true;
@@ -255,15 +258,6 @@ export async function commissioningFixture() {
       }
     });
     await app.listen(0, '127.0.0.1');
-    for (const [name, release] of [
-      ['first', first],
-      ['second', second],
-    ] as const)
-      for (const [extension, data] of [
-        ['tar', release.bundle],
-        ['sha256', release.checksum],
-      ] as const)
-        await writeFile(join(directory, `${name}.${extension}`), data);
     return {
       app,
       url: await app.getUrl(),
