@@ -179,8 +179,8 @@ export function ResourceBillingInfo(props: Props) {
     return null;
   }
 
-  const dlClass = 'grid grid-cols-[1fr_max-content] gap-x-4 gap-y-2 text-sm items-center';
-  const valueClass = 'text-right whitespace-nowrap';
+  const dlClass = 'grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-center [&>dt]:wrap-anywhere';
+  const valueClass = 'text-right min-w-0 wrap-anywhere';
 
   const billingContent = (
     <div className="flex flex-col gap-3">
