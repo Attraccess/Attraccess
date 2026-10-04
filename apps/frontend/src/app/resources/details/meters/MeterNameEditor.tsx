@@ -8,6 +8,7 @@ import {
   UseResourceMeteringServiceListResourceMetersKeyFn,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useAuth } from '../../../../hooks/useAuth';
 import en from './en.json';
 import de from './de.json';
 
@@ -21,6 +22,8 @@ export function MeterNameEditor({
   onSaved?: (meter: ResourceMeterDto) => void;
 }) {
   const { t } = useTranslations({ en, de });
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('resources.update');
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(meter?.name ?? '');
@@ -29,7 +32,7 @@ export function MeterNameEditor({
   const update = useResourceMeteringServiceUpdateResourceMeter();
   const pending = create.isPending || update.isPending;
   const save = async () => {
-    if (!name.trim()) return;
+    if (!canEdit || !name.trim()) return;
     setError(false);
     try {
       const saved = meter
@@ -45,6 +48,7 @@ export function MeterNameEditor({
       setError(true);
     }
   };
+  if (!canEdit) return null;
   if (!editing)
     return (
       <Button

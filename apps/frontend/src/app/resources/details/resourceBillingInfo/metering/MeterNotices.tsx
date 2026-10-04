@@ -29,7 +29,7 @@ export function MeterSetupNotice({ resourceId }: { resourceId: number }) {
   const { hasPermission } = useAuth();
   const { data: status } = useMeteringStatus(resourceId, true);
   const incomplete = status?.meters.filter((meter) => meter.creditsPerUnit > 0 && !meter.configured) ?? [];
-  if (!incomplete.length) return null;
+  if (!hasPermission('billing.manage') || !incomplete.length) return null;
 
   return (
     <Alert status="warning" data-cy="meter-setup-notice">
@@ -52,6 +52,7 @@ export function MeterSetupNotice({ resourceId }: { resourceId: number }) {
 }
 
 export function EnergySettlementNotices({ resourceId }: { resourceId: number }) {
+  const { hasPermission } = useAuth();
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -84,7 +85,7 @@ export function EnergySettlementNotices({ resourceId }: { resourceId: number }) 
     onError,
   });
 
-  if (!status?.unsettled.length) return null;
+  if (!hasPermission('billing.manage') || !status?.unsettled.length) return null;
 
   return (
     <div className="flex flex-col gap-2" data-cy="energy-settlement-notices">

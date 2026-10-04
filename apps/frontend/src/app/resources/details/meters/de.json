@@ -1,6 +1,6 @@
 {
   "title": "Zähler",
-  "description": "Beliebige Messwerte erfassen — während Sitzungen und im Leerlauf.",
+  "description": "Sieh die Gesamtwerte aller Zähler und die Werte der aktuellen Sitzung. Die Gesamtwerte enthalten auch Messungen außerhalb von Sitzungen.",
   "empty": "Noch keine Zähler. Erstelle einen Zähler und melde Werte über die Flows dieser Ressource.",
   "name": "Zählername",
   "create": "Zähler erstellen",
@@ -9,7 +9,7 @@
   "cancel": "Abbrechen",
   "choose": "Zähler auswählen",
   "meter": "Zähler",
-  "lifetime": "Gesamtverbrauch",
+  "lifetime": "Gesamtwert",
   "session": "Aktuelle Sitzung",
   "waiting": "Warte auf einen Messwert",
   "idle": "Keine aktive Sitzung",

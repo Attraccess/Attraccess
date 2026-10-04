@@ -10,6 +10,8 @@ import {
 import { EnergySettlementNotices, MeterSetupNotice } from './MeterNotices';
 import en from './en.json';
 
+const auth = vi.hoisted(() => ({ permissions: new Set<string>() }));
+
 vi.mock('@attraccess/react-query-client', () => ({
   useResourceMeteringServiceGetResourceMeteringStatus: vi.fn(),
   UseResourceMeteringServiceGetResourceMeteringStatusKeyFn: () => ['status'],
@@ -37,7 +39,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
     }),
   };
 });
-vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+vi.mock('../../../../../hooks/useAuth', () => ({
+  useAuth: () => ({ hasPermission: (permission: string) => auth.permissions.has(permission) }),
+}));
 vi.mock('../../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn() }),
 }));
@@ -59,6 +63,7 @@ function mockStatus(status: object) {
 describe('meter notices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    auth.permissions = new Set(['billing.manage', 'resources.update']);
     vi.mocked(useResourceMeteringServiceRetryResourceMeteringSettlement).mockReturnValue({
       mutate: retry,
       isPending: false,
@@ -136,5 +141,50 @@ describe('meter notices', () => {
     mockStatus({ configured: true, problems: [], unsettled: [] });
     const { container } = render(<EnergySettlementNotices resourceId={7} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('hides cached setup and settlement actions after billing permission is revoked', () => {
+    mockStatus({
+      meters: [
+        { meterId: 1, name: 'Heartbeats', creditsPerUnit: 30, configured: false, problems: ['start-trigger-missing'] },
+      ],
+      unsettled: [{ sessionId: 'a', usageId: 11, status: 'pending', latestValue: null, retryable: true }],
+    });
+    const notices = (
+      <>
+        <MeterSetupNotice resourceId={7} />
+        <EnergySettlementNotices resourceId={7} />
+      </>
+    );
+    const { container, rerender } = render(notices);
+    expect(screen.getByRole('button', { name: en.unsettled.retry })).toBeInTheDocument();
+
+    auth.permissions.delete('billing.manage');
+    rerender(
+      <>
+        <MeterSetupNotice resourceId={7} />
+        <EnergySettlementNotices resourceId={7} />
+      </>,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(useResourceMeteringServiceGetResourceMeteringStatus).toHaveBeenLastCalledWith(
+      { resourceId: 7 },
+      undefined,
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it('shows billing setup information without a flow-editing link to a billing-only manager', () => {
+    auth.permissions.delete('resources.update');
+    mockStatus({
+      meters: [
+        { meterId: 1, name: 'Heartbeats', creditsPerUnit: 30, configured: false, problems: ['start-trigger-missing'] },
+      ],
+      unsettled: [],
+    });
+    render(<MeterSetupNotice resourceId={7} />);
+    expect(screen.getByText(en.setup.title)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: en.setup.action })).not.toBeInTheDocument();
   });
 });
