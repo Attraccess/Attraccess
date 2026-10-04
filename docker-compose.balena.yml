@@ -251,6 +251,21 @@ services:
     depends_on:
       - monitoring-init
 
+  grafana-contactpoints-cleanup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
+    entrypoint: ['node', '/app/share/monitoring/grafana/cleanup-legacy-pushover.mjs']
+    environment:
+      - GRAFANA_URL=http://grafana:3001
+      # Keep defaults/overrides consistent with the grafana service above.
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=attraccess
+      # PUSHOVER_* are auto-injected from device/fleet variables (ATT-593).
+    depends_on:
+      - grafana
+
   duplicati:
     image: duplicati/duplicati:2.4.0.0-stable
     expose:
