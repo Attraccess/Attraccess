@@ -147,7 +147,7 @@ importers:
         version: 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-socket.io@11.0.20)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@node-saml/passport-saml':
         specifier: ^5.1.0
-        version: 5.1.0
+        version: 5.1.1
       '@nx/devkit':
         specifier: 22.7.8
         version: 22.7.8(nx@22.7.8(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@swc/core@1.15.47(@swc/helpers@0.5.23))(@swc/types@0.1.27)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@swc/core@1.15.47(@swc/helpers@0.5.23)))
@@ -4885,8 +4885,8 @@ packages:
     resolution: {integrity: sha512-t3cJnZ4aC7HhPZ6MGylGZULvUtBOZ6FzuUndaHGXjmIZHXnLfC/7L8a57O9Q9V7AxJGKAiRM5zu2wNm9EsvQpw==}
     engines: {node: '>= 18'}
 
-  '@node-saml/passport-saml@5.1.0':
-    resolution: {integrity: sha512-pBm+iFjv9eihcgeJuSUs4c0AuX1QEFdHwP8w1iaWCfDzXdeWZxUBU5HT2bY2S4dvNutcy+A9hYsH7ZLBGtgwDg==}
+  '@node-saml/passport-saml@5.1.1':
+    resolution: {integrity: sha512-eXa/mmGAwXpaWbfRdbJGU1UCGsL5PMfQ7lzjNvsMdRVmNuWVh7ZEvWStNhD6ZxOnE9BAfJA5srKvp7/RYA/U0Q==}
     engines: {node: '>= 18'}
 
   '@nodelib/fs.scandir@2.1.5':
@@ -7547,6 +7547,9 @@ packages:
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
 
+  '@types/debug@4.1.13':
+    resolution: {integrity: sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==}
+
   '@types/decompress@4.2.7':
     resolution: {integrity: sha512-9z+8yjKr5Wn73Pt17/ldnmQToaFHZxK0N1GHysuk/JIPT8RIdQeoInM01wWPgypRcvb6VH1drjuFpQ4zmY437g==}
 
@@ -8535,15 +8538,13 @@ packages:
     resolution: {integrity: sha512-CJDxIgE5I0FH+ttq/Fxy6nRpxP70+e2O048EPe85J2use3XKdatVM7dDVvFNjQudd9B49NPoZ+8PG49zj4Er8Q==}
     engines: {node: '>= 16'}
 
-  '@xmldom/xmldom@0.8.11':
-    resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
+  '@xmldom/xmldom@0.8.15':
+    resolution: {integrity: sha512-/5NV/vDALVFDXgLmfsy9TRCBlKwO2LNBFzpzvb9iIj+jR+eSc6DLYYvVOdivT/jm7MtU6TebYuRmzEOI7w40UA==}
     engines: {node: '>=10.0.0'}
-    deprecated: this version has critical issues, please update to the latest version
 
-  '@xmldom/xmldom@0.9.10':
-    resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
+  '@xmldom/xmldom@0.9.12':
+    resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
     engines: {node: '>=14.6'}
-    deprecated: this version has critical issues, please update to the latest version
 
   '@xstate/fsm@1.6.5':
     resolution: {integrity: sha512-b5o1I6aLNeYlU/3CPlj/Z91ybk1gUsKT+5NAJI+2W4UjvS5KLG28K9v5UvNoFVjHV8PajVZ00RH3vnjyQO7ZAw==}
@@ -19554,8 +19555,8 @@ packages:
     resolution: {integrity: sha512-PSNhEJDejZYV7h50BohL09Er9VaIefr2LMAf3OEmpCkjOi34eYyQYAXUTjEQtZJTKcF0E2UKTh+osDLsgNim9Q==}
     engines: {node: '>=8'}
 
-  xml-crypto@6.1.2:
-    resolution: {integrity: sha512-leBOVQdVi8FvPJrMYoum7Ici9qyxfE4kVi+AkpUoYCSXaQF4IlBm1cneTK9oAxR61LpYxTx7lNcsnBIeRpGW2w==}
+  xml-crypto@6.3.2:
+    resolution: {integrity: sha512-XoUdpErePlpyFdNYVzG2Sfw5ghvqUCQMT3dQ0tAxs0JKzk9gLzwALFkvHZ/D0OyfD/OyxoXsCcYZzbDzgY18RA==}
     engines: {node: '>=16'}
 
   xml-encryption@3.1.0:
@@ -24929,14 +24930,14 @@ snapshots:
 
   '@node-saml/node-saml@5.1.0':
     dependencies:
-      '@types/debug': 4.1.12
-      '@types/qs': 6.9.18
+      '@types/debug': 4.1.13
+      '@types/qs': 6.15.1
       '@types/xml-encryption': 1.2.4
       '@types/xml2js': 0.4.14
       '@xmldom/is-dom-node': 1.0.1
-      '@xmldom/xmldom': 0.8.11
+      '@xmldom/xmldom': 0.8.15
       debug: 4.4.3(supports-color@7.2.0)
-      xml-crypto: 6.1.2
+      xml-crypto: 6.3.2
       xml-encryption: 3.1.0
       xml2js: 0.6.2
       xmlbuilder: 15.1.1
@@ -24944,7 +24945,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@node-saml/passport-saml@5.1.0':
+  '@node-saml/passport-saml@5.1.1':
     dependencies:
       '@node-saml/node-saml': 5.1.0
       '@types/express': 4.17.25
@@ -28372,6 +28373,10 @@ snapshots:
     dependencies:
       '@types/ms': 2.1.0
 
+  '@types/debug@4.1.13':
+    dependencies:
+      '@types/ms': 2.1.0
+
   '@types/decompress@4.2.7':
     dependencies:
       '@types/node': 25.9.5
@@ -28618,7 +28623,7 @@ snapshots:
 
   '@types/passport@1.0.17':
     dependencies:
-      '@types/express': 5.0.6
+      '@types/express': 4.17.25
 
   '@types/plist@3.0.5':
     dependencies:
@@ -29591,9 +29596,9 @@ snapshots:
 
   '@xmldom/is-dom-node@1.0.1': {}
 
-  '@xmldom/xmldom@0.8.11': {}
+  '@xmldom/xmldom@0.8.15': {}
 
-  '@xmldom/xmldom@0.9.10': {}
+  '@xmldom/xmldom@0.9.12': {}
 
   '@xstate/fsm@1.6.5': {}
 
@@ -37065,7 +37070,7 @@ snapshots:
 
   micromark@4.0.2:
     dependencies:
-      '@types/debug': 4.1.12
+      '@types/debug': 4.1.13
       debug: 4.4.3(supports-color@7.2.0)
       decode-named-character-reference: 1.1.0
       devlop: 1.1.0
@@ -39403,7 +39408,7 @@ snapshots:
 
   plist@3.1.1:
     dependencies:
-      '@xmldom/xmldom': 0.9.10
+      '@xmldom/xmldom': 0.9.12
       base64-js: 1.5.1
       xmlbuilder: 15.1.1
 
@@ -44220,15 +44225,15 @@ snapshots:
 
   xdg-basedir@4.0.0: {}
 
-  xml-crypto@6.1.2:
+  xml-crypto@6.3.2:
     dependencies:
       '@xmldom/is-dom-node': 1.0.1
-      '@xmldom/xmldom': 0.8.11
+      '@xmldom/xmldom': 0.8.15
       xpath: 0.0.33
 
   xml-encryption@3.1.0:
     dependencies:
-      '@xmldom/xmldom': 0.8.11
+      '@xmldom/xmldom': 0.8.15
       escape-html: 1.0.3
       xpath: 0.0.32
 
