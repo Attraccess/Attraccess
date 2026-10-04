@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PluginLiveUpdatesProvider, type PluginLiveUpdatesClient } from '@attraccess/plugins-frontend-sdk';
 import { FirmwareCell, FirmwareDetails, FirmwareDrawer, UpdateAvailableIndicator } from './FirmwareDrawer';
 import {
   getFirmware,
@@ -128,7 +129,7 @@ describe('FirmwareDetails', () => {
   });
 });
 
-describe('FirmwareDrawer install polling', () => {
+describe('FirmwareDrawer live install progress', () => {
   const device: ShellyDevice = {
     id: 1,
     name: 'Workshop Dimmer',
@@ -141,6 +142,62 @@ describe('FirmwareDrawer install polling', () => {
     createdAt: '2026-07-28T10:00:00.000Z',
     updatedAt: '2026-07-28T10:00:00.000Z',
   };
+
+  it('receives completion through the host stream without recurring firmware HTTP requests', async () => {
+    vi.mocked(getFirmware).mockClear();
+    vi.mocked(getFirmware).mockResolvedValue({
+      generation: 2,
+      currentVersion: '1.4.4',
+      available: { stable: '1.5.1', beta: null },
+      hasUpdate: true,
+      state: 'idle',
+      fetchedAt: 'now',
+    });
+    vi.mocked(startFirmwareUpdate).mockResolvedValue(undefined as never);
+    const callbacks = new Set<(payload: unknown) => void>();
+    const client: PluginLiveUpdatesClient = {
+      subscribe: vi.fn((_subscription, callback) => {
+        callbacks.add(callback);
+        return () => {
+          callbacks.delete(callback);
+        };
+      }),
+    };
+    const onUpdated = vi.fn();
+    render(
+      <PluginLiveUpdatesProvider client={client}>
+        <FirmwareDrawer device={device} onOpenChange={() => undefined} onUpdated={onUpdated} />
+      </PluginLiveUpdatesProvider>,
+    );
+    const install = await screen.findByRole('button', { name: 'Install stable firmware 1.5.1' });
+    await act(async () => {
+      fireEvent.click(install);
+    });
+    expect(client.subscribe).toHaveBeenCalledWith(
+      { topic: 'plugin:shelly:firmware', identifier: '1' },
+      expect.any(Function),
+      expect.any(Function),
+    );
+    await act(async () => {
+      callbacks.forEach((callback) =>
+        callback({
+          eventType: 'snapshot',
+          value: {
+            generation: 2,
+            currentVersion: '1.5.1',
+            available: { stable: null, beta: null },
+            hasUpdate: false,
+            state: 'idle',
+            fetchedAt: 'now',
+          },
+        }),
+      );
+    });
+    expect(onUpdated).toHaveBeenCalledTimes(1);
+    expect(getFirmware).toHaveBeenCalledTimes(1);
+    expect(callbacks.size).toBe(0);
+    expect(screen.queryByText(/Installing the stable firmware/)).not.toBeInTheDocument();
+  });
 
   // Regression: the 5-minute deadline used to be checked only in the poll's
   // catch branch. A device that stays reachable but never reports the target

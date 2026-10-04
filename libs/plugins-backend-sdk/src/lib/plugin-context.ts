@@ -7,6 +7,7 @@ import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 import type { PluginAuditContext, PluginAuditDomainDeclaration } from './plugin-audit';
+import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -112,7 +113,11 @@ export interface PluginFlowsContext {
    * Starts a flow from every persisted trigger node of nodeType whose saved
    * configuration matches the supplied external event.
    */
-  trigger(nodeType: string, matches: (config: Record<string, unknown>, nodeId: string) => boolean, payload: object): Promise<void>;
+  trigger(
+    nodeType: string,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
+    payload: object,
+  ): Promise<void>;
 }
 
 /** Host-managed encryption for secret material owned by this plugin. */
@@ -127,6 +132,8 @@ export interface PluginSecretsContext {
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
+  /** Shared authenticated UI transport. Optional for hosts predating this capability. */
+  readonly liveUpdates?: PluginLiveUpdatesContext;
   /** Optional for compatibility with hosts predating generic plugin audit support. */
   readonly audit?: PluginAuditContext;
   /** This plugin's own manifest (name, version, directory, id). */

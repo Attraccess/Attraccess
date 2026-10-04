@@ -26,6 +26,7 @@ import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
 import { WagoUpdatesController } from './wago-updates.controller';
 import { WagoNetworkChange, WagoMqttCredentialRetirement } from './wago-network-change.entity';
 import { WagoNetworkChangeService } from './wago-network-change.service';
+import { WagoLiveUpdatesService } from './wago-live-updates.service';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -88,6 +89,7 @@ const plugin: PluginBackendModule = {
         WagoCommissioningService,
         WagoCredentialRotationService,
         WagoNetworkChangeService,
+        WagoLiveUpdatesService,
       ],
     };
   },

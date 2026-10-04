@@ -8,7 +8,7 @@ export class LiveTopicsService {
   private readonly logger = new Logger(LiveTopicsService.name);
   private readonly providers = new Map<LiveTopic, { definition: LiveTopicDefinition; provider: LiveTopicProvider }>();
 
-  register(provider: LiveTopicProvider): void {
+  register(provider: LiveTopicProvider): () => void {
     const topics = new Set<LiveTopic>();
     // Check the entire registration first, so a conflict cannot partially install a provider.
     for (const definition of provider.topics) {
@@ -18,16 +18,35 @@ export class LiveTopicsService {
       topics.add(definition.topic);
     }
     for (const definition of provider.topics) this.providers.set(definition.topic, { definition, provider });
+    return () => {
+      for (const definition of provider.topics) {
+        if (this.providers.get(definition.topic)?.provider === provider) this.providers.delete(definition.topic);
+      }
+    };
   }
 
   parse(value: unknown): LiveSubscription {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new BadRequestException('Invalid topic');
-    const { topic, resourceId } = value as Record<string, unknown>;
-    if (Object.keys(value).some((key) => key !== 'topic' && key !== 'resourceId')) {
-      throw new BadRequestException('Unexpected topic fields');
-    }
+    const { topic, resourceId, identifier } = value as Record<string, unknown>;
     const registration = this.providers.get(topic as LiveTopic);
     if (!registration) throw new BadRequestException('Unsupported topic');
+    const field = registration.definition.scope === 'plugin' ? 'identifier' : 'resourceId';
+    if (Object.keys(value).some((key) => key !== 'topic' && key !== field)) {
+      throw new BadRequestException('Unexpected topic fields');
+    }
+    if (registration.definition.scope === 'plugin') {
+      const mode = registration.definition.identifier;
+      if ((mode === 'none' && identifier !== undefined) || (mode === 'required' && identifier === undefined)) {
+        throw new BadRequestException('Unexpected or missing plugin identifier');
+      }
+      if (
+        identifier !== undefined &&
+        (typeof identifier !== 'string' || !identifier.length || identifier.length > 128)
+      ) {
+        throw new BadRequestException('Invalid plugin identifier');
+      }
+      return { topic, ...(identifier !== undefined ? { identifier } : {}) } as LiveSubscription;
+    }
     if (registration.definition.scope === 'resource') {
       if (typeof resourceId !== 'number' || !Number.isSafeInteger(resourceId) || resourceId <= 0) {
         throw new BadRequestException('Invalid resource identifier');

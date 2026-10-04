@@ -4,7 +4,8 @@ import { Observable } from 'rxjs';
 
 export type LiveTopicDefinition =
   | { topic: Extract<LiveSubscription, { resourceId: number }>['topic']; scope: 'resource' }
-  | { topic: Exclude<LiveSubscription, { resourceId: number }>['topic']; scope: 'user' };
+  | { topic: 'billing' | 'messaging' | 'notifications' | 'supervision'; scope: 'user' }
+  | { topic: `plugin:${string}:${string}`; scope: 'plugin'; identifier: 'none' | 'required' | 'optional' };
 
 /** Feature-owned adapter, registered during module initialization. */
 export interface LiveTopicProvider {

@@ -91,8 +91,74 @@ and `false` when a topic ends, is removed/revoked, or its connection disconnects
 retains the producer's subscription-based online presence.
 
 See the adapters in `billing`, `messaging`, `notifications`, `resources` and
-`resources/supervision` for examples. Registration happens during Nest module
-initialization; runtime plugin unloading is outside this contract. New protocol
-topics still require updating the shared `LiveSubscription` type and frontend
-payload types. This keeps client/server type checking without a hard-coded
-producer list in the transport.
+`resources/supervision` for examples. New core topics still require updating the
+shared `LiveSubscription` type and frontend payload types.
+
+## Plugin live updates
+
+Backend plugins register during `onModuleInit` through the SDK's
+`context.liveUpdates.register` facade. This capability is optional in the SDK
+type for older hosts. Plugins that require it must declare a compatible host
+version and check for it during initialization. No host-provider resolution
+permission is needed: registration can only claim this plugin's namespace.
+
+```ts
+context.liveUpdates.register({
+  topic: 'status',
+  identifier: 'required', // 'none' and 'optional' are also supported
+  authorize: async ({ identifier }, user) => {
+    // Required; throw for invalid identifiers, missing entities or denied access.
+    // Revalidated on every subscription set and lease renewal.
+    if (!user.effectivePermissions?.has('resources.update')) throw new Error('Forbidden');
+    await validateDevice(identifier);
+  },
+  source: ({ identifier }, user) => deviceUpdates(identifier, user.id),
+});
+```
+
+The source is an RxJS `Observable<{ data: object }>`; `data.eventType` (or
+`data.type`) supplies the envelope's event type. It should allocate lazily and
+stop work when unsubscribed. Registration returns an idempotent unregister
+function that completes active sources. The host also removes a plugin's
+registrations at module teardown. Duplicate ownership fails; other plugins and
+core subscriptions continue independently. Authorization errors are redacted.
+User-specific sources must derive identity from the supplied authenticated user.
+
+The wire topic is `plugin:<encoded manifest name>:<local topic>`, with an optional
+string `identifier` (1–128 characters), never a caller-supplied user ID. Local
+topic names match `[a-z][a-z0-9-]{0,63}`. Plugins validate the meaning of their
+identifiers in `authorize`. Resource fields and unexpected fields are rejected.
+Plugins do not need changes to the core topic/payload types.
+
+Frontend plugins import `usePluginLiveUpdates<T>` from the frontend SDK:
+
+```tsx
+usePluginLiveUpdates<DeviceStatus>({
+  plugin: 'my-plugin', // backend manifest name
+  topic: 'status',
+  identifier: String(deviceId),
+  enabled: isOpen,
+  onUpdate: (status) => updateStatus(status),
+  onReconnect: () => refreshStatus(),
+});
+```
+
+The hook shares the authenticated host client, reference counts identical topics,
+supports idempotent `abort`/unmount, and uses the latest callbacks without
+resubscribing. A realm-wide React context bridges independently bundled SDK
+copies in federation remotes; it contains no transport or global credential.
+Logout and session replacement use the same host lifecycle as core consumers.
+Reconnect also invalidates host React Query state to recover persisted changes.
+
+WAGO controller lists, commissioning sessions/verification, diagnostics,
+configuration baseline/revisions, runtime/managed-access and network-change
+status now receive snapshots through these topics. Shelly firmware progress also
+uses the shared stream. Initial reads and mutations remain REST. Since these
+device/status services have no push completion signal, backend adapters sample
+them at their existing intervals (diagnostics use the front panel's two seconds),
+sharing one sampler per active topic/identifier across tabs and stopping it when
+the last subscriber leaves. Slow reads do not overlap; transient failures allow
+later recovery. WAGO preserves the REST routes' permission requirements.
+Shelly firmware credentials remain server-side for at most five minutes after an
+update command and are never serialized in events or subscription controls. Its
+frontend timeout still ends progress when the device or connection is offline.

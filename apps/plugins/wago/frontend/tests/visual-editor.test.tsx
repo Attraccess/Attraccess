@@ -10,6 +10,7 @@ import { validateEditorSnapshot } from '../../backend/configuration-editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import type { WagoDiagnostics } from '../src/diagnostics';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
+import { PluginLiveUpdatesProvider, type PluginLiveUpdatesClient } from '@attraccess/plugins-frontend-sdk';
 
 const state = vi.hoisted(() => ({
   snapshot: {
@@ -177,11 +178,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function mount() {
+function mount(liveClient: PluginLiveUpdatesClient | null = null) {
   const close = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <ConfigurationEditor controllerId={1} onOpenChange={close} />
+      <PluginLiveUpdatesProvider client={liveClient}>
+        <ConfigurationEditor controllerId={1} onOpenChange={close} />
+      </PluginLiveUpdatesProvider>
     </QueryClientProvider>,
   );
   return close;
@@ -303,8 +306,16 @@ describe('visual configuration workflow', () => {
     expect(state.diagnostics).toHaveBeenCalledTimes(1);
   });
 
-  it('embeds real diagnostics polling without saving local edits or duplicating configuration controls', async () => {
-    mount();
+  it('receives live diagnostic snapshots without HTTP polling, saving local edits or duplicating controls', async () => {
+    const callbacks = new Set<(payload: unknown) => void>();
+    mount({
+      subscribe: (subscription, callback) => {
+        if (subscription.topic === 'plugin:wago:diagnostics') callbacks.add(callback);
+        return () => {
+          callbacks.delete(callback);
+        };
+      },
+    });
     const user = userEvent.setup();
     expect(await screen.findByText('Fixture controller 1: online')).toBeInTheDocument();
     expect(screen.getAllByText(/Hardware readiness: unknown/)).toHaveLength(1);
@@ -315,21 +326,15 @@ describe('visual configuration workflow', () => {
     );
     const name = await screen.findByRole('textbox', { name: 'Channel name' });
     await user.clear(name);
-    await user.type(name, 'Unsaved diagnostic session');
-    // Pause the 5 s refetchInterval for the exact-count window: an interval
-    // tick only refetches while focusManager.isFocused(), which reads
-    // document.visibilityState at tick time. Without this, a slow runner can
-    // let a background poll land between the clear and the manual refresh.
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
-    try {
-      state.diagnostics.mockClear();
-      await section(user, 'Diagnostics');
-      await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
-      await waitFor(() => expect(state.diagnostics).toHaveBeenCalledTimes(1));
-    } finally {
-      Reflect.deleteProperty(document, 'visibilityState');
-    }
-    expect(name).toHaveValue('Unsaved diagnostic session');
+    await user.type(name, 'Live draft');
+    act(() =>
+      callbacks.forEach((callback) =>
+        callback({ eventType: 'snapshot', value: { ...diagnosticsFixture(), name: 'Streamed controller' } }),
+      ),
+    );
+    expect(await screen.findByText('Streamed controller: online')).toBeInTheDocument();
+    expect(state.diagnostics).toHaveBeenCalledTimes(1);
+    expect(name).toHaveValue('Live draft');
     expect(screen.getByText(/Unsaved local edits/)).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
     expect(state.publish).not.toHaveBeenCalled();

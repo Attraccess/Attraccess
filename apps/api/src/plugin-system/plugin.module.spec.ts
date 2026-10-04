@@ -17,6 +17,8 @@ import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
 import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
+import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
@@ -92,15 +94,16 @@ describe('PluginModule', () => {
         PluginMqttService,
         NpmPluginService,
         PluginClassificationService,
+        PluginLiveUpdatesService,
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
-      expect(module.imports).toEqual([SettingsModule, MqttModule]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
     });
 
     it('builds an empty import list when no plugins are present', () => {
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, MqttModule]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
       expect(module.controllers).toEqual([PluginController]);
     });
 
@@ -120,7 +123,7 @@ describe('PluginModule', () => {
       expect(discovered).toHaveLength(1);
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, MqttModule]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
     });
 
@@ -139,7 +142,7 @@ describe('PluginModule', () => {
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
 
-      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule]);
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
       expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({ status: 'error', error: 'prior crash' });
     });
 
@@ -164,7 +167,7 @@ describe('PluginModule', () => {
       );
       const register = jest.spyOn(MqttCredentialProvisioningService, 'register');
 
-      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule]);
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
       expect(register).not.toHaveBeenCalled();
     });
 
@@ -195,7 +198,7 @@ describe('PluginModule', () => {
       );
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, MqttModule, expect.any(Object)]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule, expect.any(Object)]);
     });
   });
 

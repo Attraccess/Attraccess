@@ -9,11 +9,12 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { LiveSubscription, LiveTopic } from '@attraccess/shared';
+import { LiveSubscription } from '@attraccess/shared';
 import { getBaseUrl } from '../api';
 import { UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
 import { LivePayloads } from './live-update-types';
 import { LiveUpdateClient } from './live-update-client';
+import { PluginLiveUpdatesProvider } from '@attraccess/plugins-frontend-sdk';
 
 const Context = createContext<LiveUpdateClient | null>(null);
 const clients = new Set<LiveUpdateClient>();
@@ -72,14 +73,19 @@ export function LiveUpdatesProvider({ userId, children }: { userId?: number; chi
       });
     };
   }, [client]);
-  return <Context.Provider value={client}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={client}>
+      <PluginLiveUpdatesProvider client={client}>{children}</PluginLiveUpdatesProvider>
+    </Context.Provider>
+  );
 }
 
-type TopicSubscription<T extends LiveTopic> = T extends 'resource' | 'flow-logs'
+type CoreLiveTopic = keyof LivePayloads;
+type TopicSubscription<T extends CoreLiveTopic> = T extends 'resource' | 'flow-logs'
   ? { topic: T; resourceId: number }
   : { topic: T; resourceId?: never };
 
-export function useLiveUpdates<T extends LiveTopic>(
+export function useLiveUpdates<T extends CoreLiveTopic>(
   props: { topic: T } & TopicSubscription<T> & {
       onUpdate: (payload: LivePayloads[T]) => void;
       onReconnect?: () => void;

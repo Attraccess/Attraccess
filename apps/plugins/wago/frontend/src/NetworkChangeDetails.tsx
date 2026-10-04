@@ -21,6 +21,7 @@ import {
 } from './api';
 import { useWagoTranslations } from './i18n';
 import messages from './network-change.en.json';
+import { useWagoLiveQuery } from './live-updates';
 
 export function NetworkChangeDetails({ controllerId }: { controllerId: number }) {
   const { t } = useWagoTranslations();
@@ -48,10 +49,10 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
   const { t } = useWagoTranslations(),
     client = useQueryClient();
   const queryKey = ['wago', 'network-change', controllerId];
+  useWagoLiveQuery(queryKey, 'network-change', String(controllerId));
   const statusQuery = useQuery({
     queryKey,
     queryFn: () => getNetworkChangeStatus(controllerId),
-    refetchInterval: 2000,
     retry: false,
   });
   const servers = useQuery({ queryKey: ['mqtt', 'servers'], queryFn: listMqttServers, retry: false });

@@ -61,6 +61,44 @@ describe('bundled live client', () => {
     vi.restoreAllMocks();
   });
 
+  it('shares plugin topics with core, reference-counts duplicates and routes namespaces/identifiers independently', async () => {
+    const first = vi.fn(),
+      second = vi.fn(),
+      otherDevice = vi.fn(),
+      otherPlugin = vi.fn();
+    const subscription = { topic: 'plugin:wago:diagnostics', identifier: '1' } as const;
+    const remove = client.subscribe(subscription, first);
+    const removeSecond = client.subscribe(subscription, second);
+    client.subscribe({ ...subscription, identifier: '2' }, otherDevice);
+    client.subscribe({ topic: 'plugin:shelly:diagnostics', identifier: '1' }, otherPlugin);
+    client.subscribe({ topic: 'billing' }, vi.fn());
+    await flush();
+    streams[0].send({ type: 'ready' });
+    await flush();
+    expect(streams).toHaveLength(1);
+    expect(controls.at(-1)?.subscriptions).toHaveLength(4);
+    const event: LivePacket = {
+      type: 'event',
+      event: { ...subscription, eventType: 'snapshot', payload: { value: 7 } },
+    };
+    streams[0].send(event);
+    await flush();
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(otherDevice).not.toHaveBeenCalled();
+    expect(otherPlugin).not.toHaveBeenCalled();
+    remove();
+    remove();
+    streams[0].send(event);
+    await flush();
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(2);
+    removeSecond();
+    await flush();
+    expect(controls.at(-1)?.subscriptions).not.toContainEqual(subscription);
+    expect(streams).toHaveLength(1);
+  });
+
   it('uses one stream for all six types and ten resources; references duplicates and keeps unrelated topics alive', async () => {
     const first = vi.fn(),
       second = vi.fn();

@@ -273,3 +273,13 @@ würde einen separaten Sprachzustand erzeugen. Die gemeinsame Konfiguration
 Bibliothek als Peer-Abhängigkeit und setze `attraccess.host` beziehungsweise
 `attraccessVersion.min` auf mindestens Version **1.11.0**, da ältere Hosts diese
 Bibliothek noch nicht teilen.
+
+## Live-Updates
+
+Mit `context.liveUpdates.register` im Backend-SDK und `usePluginLiveUpdates<T>`
+im Frontend-SDK nutzen Plugins dieselbe authentifizierte Live-Verbindung wie der
+Host. Themen werden pro Plugin registriert; Kennungen und Berechtigungen müssen
+im Backend bei jeder Anmeldung und Erneuerung geprüft werden. Für UI-Updates ist
+keine eigene SSE- oder WebSocket-Verbindung nötig.
+Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
+beschreibt auch Wiederverbindung und Freigabe von Abonnements.
