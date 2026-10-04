@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   Resource,
   ResourceUsage,
+  BillingTransaction,
   ResourceUsageLifecycleAttempt,
   ResourceType,
   ResourceUsageAction,
@@ -465,6 +466,38 @@ describe('ResourceUsageService', () => {
     usage.userId = 7;
     await expect(service.updateSessionProject(1, 8, user, {} as never)).rejects.toThrow('required');
     expect(resourceUsageRepository.save).not.toHaveBeenCalled();
+  });
+
+  describe('getResourceUsageHistory', () => {
+    it('keeps every usage row but only exposes billing belonging to the requester', async () => {
+      const ownTransaction = { id: 10, userId: 1, amount: -500 } as BillingTransaction;
+      const usages = [
+        { id: 1, userId: 1, billingTransaction: ownTransaction },
+        { id: 2, userId: 2, billingTransaction: { id: 11, userId: 2, externalReference: 'private' } },
+        { id: 3, userId: 1, billingTransaction: { id: 12, userId: 2 } },
+        { id: 4, userId: 1, billingTransaction: null },
+      ] as ResourceUsage[];
+      resourceUsageRepository.findAndCount = jest.fn().mockResolvedValue([usages, 4]);
+
+      const result = await service.getResourceUsageHistory(5, 1);
+
+      expect(result.total).toBe(4);
+      expect(result.data.map((usage) => usage.id)).toEqual([1, 2, 3, 4]);
+      expect(result.data.map((usage) => usage.billingTransaction)).toEqual([ownTransaction, null, null, null]);
+    });
+
+    it('does not grant billing access when filtering another user’s usage', async () => {
+      resourceUsageRepository.findAndCount = jest
+        .fn()
+        .mockResolvedValue([[{ id: 2, userId: 2, billingTransaction: { id: 11, userId: 2 } }], 1]);
+
+      const result = await service.getResourceUsageHistory(5, 1, 1, 10, 2);
+
+      expect(result.data[0].billingTransaction).toBeNull();
+      expect(resourceUsageRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { resourceId: 5, lifecyclePending: false, userId: 2 } }),
+      );
+    });
   });
 
   describe('startSession', () => {
@@ -1386,7 +1419,7 @@ describe('ResourceUsageService', () => {
         { notes: configuredEndNotes },
         { skipFormSubmissions: true, skipNoteNotification: true },
       );
-      const history = await service.getResourceUsageHistory(usage.resourceId, 1, 10, usage.userId);
+      const history = await service.getResourceUsageHistory(usage.resourceId, usage.userId, 1, 10, usage.userId);
 
       expect(history.data).toEqual([expect.objectContaining({ id: usage.id, endNotes: configuredEndNotes })]);
     });

@@ -1493,6 +1493,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
 
   async getResourceUsageHistory(
     resourceId: number,
+    requestingUserId: number,
     page = 1,
     limit = 10,
     userId?: number,
@@ -1520,6 +1521,12 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         'formSubmissions.user',
       ],
     });
+
+    for (const usage of data) {
+      if (usage.billingTransaction?.userId !== requestingUserId) {
+        usage.billingTransaction = null;
+      }
+    }
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);
 

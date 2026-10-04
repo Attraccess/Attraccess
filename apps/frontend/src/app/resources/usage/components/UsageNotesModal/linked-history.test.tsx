@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { ResourceUsage } from '@attraccess/react-query-client';
 import { UsageNotesModal } from './index';
@@ -31,7 +31,16 @@ vi.mock('../../../../billing/dashboard/summary/transactionDetailsModal/refund', 
 afterEach(cleanup);
 
 it('opens the billing modal from usage and returns to the original usage drawer without navigating', async () => {
-  render(<UsageNotesModal isOpen session={session} onClose={vi.fn()} />);
+  render(
+    <UsageNotesModal
+      isOpen
+      session={session}
+      onClose={vi.fn()}
+      projectLabel="Project"
+      projectPlaceholder="Unassigned"
+    />,
+  );
+  const originalDrawer = screen.getByRole('dialog');
   const url = window.location.href;
   fireEvent.click(screen.getByRole('button', { name: 'Open billing overview' }));
   expect(await screen.findByText('Transaction details')).toBeTruthy();
@@ -41,6 +50,12 @@ it('opens the billing modal from usage and returns to the original usage drawer 
   expect(within(dialogs[dialogs.length - 1]).getByText('Workshop shelves')).toBeTruthy();
   fireEvent.click(within(dialogs[dialogs.length - 1]).getByRole('button', { name: 'Open billing overview' }));
   expect(screen.getByText('Transaction details')).toBeTruthy();
+  fireEvent.keyDown(screen.getByText('Transaction details'), { key: 'Escape', code: 'Escape' });
+  await waitFor(() => expect(screen.queryByText('Transaction details')).toBeNull());
+  expect(screen.getByRole('dialog')).toBe(originalDrawer);
+  expect(within(originalDrawer).getByText('Loaded oak boards')).toBeTruthy();
+  expect(within(originalDrawer).getByText('Cleaned the machine')).toBeTruthy();
+  expect(within(originalDrawer).getByText('Workshop shelves')).toBeTruthy();
   expect(window.location.href).toBe(url);
 });
 

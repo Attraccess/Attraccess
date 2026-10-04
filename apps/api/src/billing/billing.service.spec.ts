@@ -134,6 +134,17 @@ describe('BillingService', () => {
     auditService = module.get(AuditService);
   });
 
+  describe('getTransaction', () => {
+    it('restricts transaction lookup to its owner', async () => {
+      billingTransactionRepository.findOne.mockResolvedValue(null);
+
+      expect(await service.getTransaction(123, 2)).toBeNull();
+      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 123, userId: 2 } }),
+      );
+    });
+  });
+
   it.each([100, -100])('creates an opposite-sign refund for transaction amount %s', async (amount) => {
     const original = { id: 4, userId: 7, amount } as BillingTransaction;
     const refund = {

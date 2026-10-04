@@ -31,6 +31,7 @@ describe('BillingController', () => {
   let service: {
     getBalance: jest.Mock;
     getHistory: jest.Mock;
+    getTransaction: jest.Mock;
     createManualTransaction: jest.Mock;
     getResourceBillingConfiguration: jest.Mock;
     updateResourceBillingConfiguration: jest.Mock;
@@ -56,6 +57,7 @@ describe('BillingController', () => {
     service = {
       getBalance: jest.fn(),
       getHistory: jest.fn(),
+      getTransaction: jest.fn(),
       createManualTransaction: jest.fn(),
       getResourceBillingConfiguration: jest.fn(),
       updateResourceBillingConfiguration: jest.fn(),
@@ -98,7 +100,7 @@ describe('BillingController', () => {
         },
         {
           provide: SseInstrumentation,
-          useValue: { wrap: <T,>(_s: string, source: Observable<T>) => source },
+          useValue: { wrap: <T>(_s: string, source: Observable<T>) => source },
         },
         {
           provide: LicenseService,
@@ -131,6 +133,20 @@ describe('BillingController', () => {
       const req = baseReq({ effectivePermissions: new Set(['billing.manage']) });
       const res = await controller.getBillingBalance(2, req);
       expect(res).toEqual({ value: 12 });
+    });
+  });
+
+  describe('getBillingTransaction', () => {
+    it('always scopes transaction details to the authenticated user', async () => {
+      service.getTransaction.mockResolvedValue(null);
+
+      const result = await controller.getBillingTransaction(
+        123,
+        baseReq({ id: 2, effectivePermissions: new Set(['billing.manage']) }),
+      );
+
+      expect(service.getTransaction).toHaveBeenCalledWith(123, 2);
+      expect(result).toBeNull();
     });
   });
 

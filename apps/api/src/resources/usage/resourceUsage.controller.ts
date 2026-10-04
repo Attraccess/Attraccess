@@ -242,6 +242,7 @@ export class ResourceUsageController {
 
     const { data, total } = await this.resourceUsageService.getResourceUsageHistory(
       resourceId,
+      req.user.id,
       query.page,
       query.limit,
       query.userId,
