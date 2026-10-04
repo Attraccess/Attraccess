@@ -6,6 +6,7 @@ import { dirname, join } from 'path';
 import type { PluginMigrationClass } from '@attraccess/plugins-backend-sdk';
 import { dataSourceConfig } from '../database/datasource';
 import { loadPluginEntryExports } from './plugin-loader';
+import { pluginActivationPlan } from './plugin-dependencies';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { PluginService } from './plugin.service';
 
@@ -231,19 +232,31 @@ export class PluginMigrationService {
           'not-applicable',
         );
     }
-    const plugins = PluginService.getPlugins().filter(
-      (manifest) => PluginMigrationService.hasMigrations(manifest) && !PluginService.isPluginQuarantined(manifest),
-    );
-
-    if (plugins.length === 0) {
-      return;
+    const { ordered: plugins, failures } = pluginActivationPlan(PluginService.getPlugins());
+    for (const [name, error] of failures) {
+      const manifest = PluginService.getPlugins().find((plugin) => plugin.name === name);
+      PluginService.setPluginLoadError(`${name}@${manifest.version}`, error);
     }
-
-    PluginMigrationService.logger.log(`Running plugin migrations for ${plugins.length} plugin(s)...`);
-
+    const ready = new Set<string>();
     for (const manifest of plugins) {
+      if (PluginService.isPluginQuarantined(manifest)) continue;
+      const failedDependency = manifest.dependencies?.find(
+        (dependency) => dependency.required && !ready.has(dependency.name),
+      );
+      if (failedDependency) {
+        PluginService.setPluginLoadError(
+          `${manifest.name}@${manifest.version}`,
+          new Error(`Required plugin ${failedDependency.name} failed migrations; ${manifest.name} is inactive.`),
+        );
+        continue;
+      }
+      if (!PluginMigrationService.hasMigrations(manifest)) {
+        ready.add(manifest.name);
+        continue;
+      }
       try {
         await PluginMigrationService.runUpMigrations(manifest);
+        ready.add(manifest.name);
         await recordNpmBootMigrationOutcome(PluginService.PLUGIN_PATH, manifest.name, manifest.version, 'succeeded');
       } catch (error) {
         PluginMigrationService.logger.error(

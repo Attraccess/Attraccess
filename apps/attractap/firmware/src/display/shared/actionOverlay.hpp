@@ -11,7 +11,9 @@ public:
         if (!root) {
             root = lv_obj_create(screen);
             lv_obj_remove_style_all(root);
+            // Keep the input mask anchored to the viewport of scrollable screens.
             lv_obj_add_flag(root, LV_OBJ_FLAG_IGNORE_LAYOUT);
+            lv_obj_add_flag(root, LV_OBJ_FLAG_FLOATING);
             lv_obj_set_size(root, lv_display_get_horizontal_resolution(lv_obj_get_display(screen)),
                             lv_display_get_vertical_resolution(lv_obj_get_display(screen)));
             lv_obj_align(root, LV_ALIGN_CENTER, 0, 0);

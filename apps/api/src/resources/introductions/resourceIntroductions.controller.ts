@@ -1,15 +1,19 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req, ForbiddenException } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
 import { IsResourceIntroducer } from './isIntroducer.decorator';
+import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 
 @ApiTags('Access Control')
 @Controller('resources/:resourceId/introductions')
 export class ResourceIntroductionsController {
-  constructor(private readonly resourceIntroductionsService: ResourceIntroductionsService) {}
+  constructor(
+    private readonly resourceIntroductionsService: ResourceIntroductionsService,
+    private readonly resourceIntroducersService: ResourceIntroducersService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all introductions for a resource', operationId: 'resourceIntroductionsGetMany' })
@@ -20,6 +24,29 @@ export class ResourceIntroductionsController {
   })
   async getManyByResource(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceIntroduction[]> {
     return await this.resourceIntroductionsService.getMany(resourceId);
+  }
+
+  @Get('people')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get direct and inherited introductions for the People tab',
+    operationId: 'resourceIntroductionsGetPeople',
+  })
+  @ApiResponse({ status: 200, type: [ResourceIntroduction] })
+  @ApiResponse({ status: 403, description: 'User cannot view this resource’s People tab' })
+  async getPeople(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceIntroduction[]> {
+    const permissions = req.user.effectivePermissions;
+    if (
+      !permissions?.has('resources.update') &&
+      !permissions?.has('resources.access.manage') &&
+      !(await this.resourceIntroducersService.isIntroducer(resourceId, req.user.id, true))
+    ) {
+      throw new ForbiddenException('User cannot view this resource’s People tab');
+    }
+    return this.resourceIntroductionsService.getMany(resourceId, true);
   }
 
   @Post('/:userId/grant')

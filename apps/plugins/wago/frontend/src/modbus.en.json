@@ -51,13 +51,13 @@
   "editProfiles": "Edit profile",
   "emptyConnections": "Add a TCP network or RTU serial connection to get started.",
   "emptyDevices": "Add a device and select its connection and profile.",
-  "builtinHint": "WAGO 879-3000 uses its documented read-only register map. Profiles marked unverified are retained for existing configurations.",
+  "builtinHint": "WAGO 879-3020 (4PS) uses its documented read-only register map and standard float data format.",
   "connectionTitle": "Connection {{index}}: {{address}}",
   "connectionId": "Connection ID",
   "transport": "Transport",
   "host": "Host",
   "port": "Port",
-  "serialHint": "CC100 two-wire RS-485: /dev/serial. WAGO 879-3000 factory settings: unit 1, 9600 baud, 8N1.",
+  "serialHint": "CC100 two-wire RS-485: /dev/serial. WAGO 879-3020 (4PS) factory settings: unit 1, 9600 baud, 8E1. Match the meter's actual settings.",
   "path": "Serial device path",
   "baud": "Baud rate",
   "parity": "Parity",
@@ -94,6 +94,17 @@
     "volt": "volt",
     "watt": "watt",
     "watt-hour": "watt-hour",
-    "percent": "percent"
-  }
+    "percent": "percent",
+    "hertz": "hertz",
+    "var": "reactive volt-ampere",
+    "var-hour": "reactive volt-ampere-hour",
+    "volt-ampere": "volt-ampere",
+    "ratio": "ratio",
+    "number": "number / code",
+    "second": "second",
+    "pulse-per-kilowatt-hour": "pulses per kilowatt-hour",
+    "binary": "binary integer",
+    "bcd": "packed decimal (BCD)"
+  },
+  "numericEncoding": "Number encoding"
 }

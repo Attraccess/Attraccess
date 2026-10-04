@@ -180,7 +180,31 @@ try {
     );
     // CI and local dev use the same fixed directory. Never replace assets in place
     // while a server is running; a deployed build owns them for its lifetime.
-    await rename(stage, join(output, 'cc100-build'));
+    const target = join(output, 'cc100-build');
+    const backup = await mkdtemp(join(output, '.previous-build-'));
+    const previous = join(backup, 'assets');
+    let replaced = false;
+    let published = false;
+    try {
+      try {
+        await rename(target, previous);
+        replaced = true;
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      try {
+        await rename(stage, target);
+        published = true;
+      } catch (error) {
+        if (replaced) {
+          await rename(previous, target);
+          replaced = false;
+        }
+        throw error;
+      }
+    } finally {
+      if (published || !replaced) await rm(backup, { recursive: true, force: true });
+    }
   } else {
     await rename(stage, join(output, `cc100-${values.version}-${Date.now()}`));
   }

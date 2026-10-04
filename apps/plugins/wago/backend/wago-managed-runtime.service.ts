@@ -18,8 +18,11 @@ import {
   MANAGED_HELPER_PROTOCOL,
   signInstaller,
 } from './wago-managed-installer';
-import { managedProvisionScript } from './wago-managed-provision';
+import { managedProvisionScript, managedWatchdogScript } from './wago-managed-provision';
+import type { CommissioningManagementRefresh } from './wago-commissioning-accept';
+import { WagoManagedProvisioningError, type ManagedProvisioningStage } from './wago-managed-provisioning-error';
 import { managedSsh } from './wago-managed-ssh';
+import { managedSetupFailure, type ManagedSetupStage } from './wago-managed-setup-error';
 import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
 import type { BuildRuntimeArtifact } from './wago-build-runtime';
 import {
@@ -28,6 +31,7 @@ import {
   type RuntimeUpdateRecord,
   type RuntimeUpdateStore,
   type ManagedRuntimeUpdateHost,
+  type RuntimeUpdateFailure,
 } from './wago-runtime-update';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoController } from './wago-controller.entity';
@@ -35,6 +39,7 @@ import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import { WagoService } from './wago.service';
 import { commissioningVerification } from './wago-commissioning-verification';
 import { admitEnvelope, emptyStream, type DiagnosticStream } from './diagnostics-envelope';
+import { WagoNetworkChange, WagoMqttCredentialRetirement } from './wago-network-change.entity';
 
 type Credentials = {
   sessionId: number;
@@ -46,8 +51,33 @@ type Credentials = {
   recoveryPassword: string;
   installerPrivateKey: string;
 };
+type RootAcceptance = (
+  host: string,
+  fingerprint: string,
+  password: string,
+  token: string,
+  guard: import('./wago-operation-guard').CommissioningOperationGuard,
+  management: CommissioningManagementRefresh,
+) => Promise<void>;
 type RootProbe = (host: string, fingerprint: string, password: string) => Promise<boolean>;
-type LiveHeartbeat = { imageId: string; streamId: string; timestamp: number; receivedAt: number };
+type LiveHeartbeat = {
+  imageId: string;
+  streamId: string;
+  timestamp: number;
+  receivedAt: number;
+  runtimePolicyToken?: string;
+};
+type ManagementSetupReason =
+  | 'session'
+  | 'server_setup'
+  | 'connection'
+  | 'runtime_state'
+  | 'enrollment_credentials'
+  | 'configuration'
+  | 'readiness';
+type ManagementSetup =
+  | { state: 'waiting'; reason: ManagementSetupReason | 'scheduled' }
+  | { state: 'running'; reason: 'preparation' | 'ssh_cutover' | 'reboot' | 'confirmation' };
 
 /** Production wiring for new enrolments. Legacy registrations are never silently
  * adopted; delete/re-enrol to obtain the managed identity and helper contract.
@@ -64,12 +94,15 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   private readonly heartbeatStreams = new Map<number, DiagnosticStream>();
   private readonly previousBoots = new Map<string, string>();
   private readonly verifyingControllers = new Set<number>();
+  private readonly connectingControllers = new Set<number>();
+  private readonly reconciliationFailures = new Map<number, RuntimeUpdateFailure>();
+  private readonly enrolmentProgress = new Map<number, ManagementSetup>();
   private timer?: ReturnType<typeof setInterval>;
   private destroyed = false;
   private scanning = false;
   private nextScanAt = 0;
-  private readonly enabled = process.env.WAGO_MANAGED_RUNTIME_ENABLED === 'true';
   private rootProbe?: RootProbe;
+  private rootAcceptance?: RootAcceptance;
   private retirementProbe?: RootProbe;
   private readonly connections = new Set<AbortController>();
 
@@ -104,6 +137,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       )
         return;
       this.heartbeatStreams.set(id, stream);
+      const previous = this.heartbeats.get(id);
       this.heartbeats.delete(id);
       this.heartbeats.set(id, heartbeat);
       if (this.heartbeats.size > 200) {
@@ -113,19 +147,42 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
           this.heartbeatStreams.delete(oldest);
         }
       }
+      if (
+        !previous ||
+        previous.runtimePolicyToken !== heartbeat.runtimePolicyToken ||
+        previous.streamId !== heartbeat.streamId ||
+        previous.imageId !== heartbeat.imageId ||
+        heartbeat.receivedAt - previous.receivedAt > 90_000
+      ) {
+        this.wago.blockRuntime?.(id);
+        if (!this.connectingControllers.has(id) && this.connectingControllers.size < 200) {
+          this.connectingControllers.add(id);
+          void this.reconcileConnection(id)
+            .catch((error) => {
+              this.reconciliationFailures.set(id, error instanceof RuntimeUpdateError ? error.failure : 'interrupted');
+              this.context.logger.warn(`CC100 ${id} runtime update requires attention.`);
+            })
+            .finally(() => this.connectingControllers.delete(id));
+        } else {
+          // The new boot needs policy confirmation while its updater is waiting
+          // for readiness. Never queue that confirmation behind the update itself.
+          void this.refreshRuntimePolicy(id).catch((error) => {
+            this.reconciliationFailures.set(id, error instanceof RuntimeUpdateError ? error.failure : 'interrupted');
+          });
+        }
+      }
       this.wake();
     });
     this.timer = setInterval(() => this.wake(), 30_000).unref();
     this.wake();
   }
 
-  assertEnabled(): void {
-    if (!this.enabled)
-      throw new ConflictException('Managed CC100 enrolment and updates are disabled pending FW31 qualification');
-  }
-
   registerRootProbe(probe: RootProbe): void {
     this.rootProbe = probe;
+  }
+
+  registerPreparationAcceptance(accept: RootAcceptance): void {
+    this.rootAcceptance = accept;
   }
 
   registerRetirementProbe(probe: RootProbe): void {
@@ -149,7 +206,6 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     execute: (script: string) => Promise<string>,
     signal: AbortSignal,
   ): Promise<void> {
-    this.assertEnabled();
     const desired = await this.desired();
     let access = await this.loadSession(session.id);
     if (
@@ -200,6 +256,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     const credentials = this.credentials(access);
     if (credentials.hardwareId !== session.hardwareId)
       throw new ConflictException('Managed credentials belong to another controller identity');
+    let stage: ManagedProvisioningStage = 'filesystem';
     try {
       if (access.state !== 'verified' && access.state !== 'managed') {
         const key = restoreManagementKey(credentials.privateKey, access.keyFingerprint);
@@ -217,30 +274,31 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         )
           throw new Error();
       }
+      stage = 'proof';
       await this.prove(access, signal);
+      stage = 'root';
       if (!this.rootProbe || !(await this.rootProbe(access.host, access.fingerprint, credentials.recoveryPassword)))
         throw new Error();
       await this.setActiveState(access.sessionId, 'verified');
+      stage = 'commit';
       if ((await this.connection(access, `access-key-commit ${access.token}`, signal)) !== 'OK\n') throw new Error();
       await this.prove(access, signal);
-    } catch {
+    } catch (error) {
       await this.setActiveState(access.sessionId, 'recovery_required');
-      throw new ConflictException(
-        'Managed SSH provisioning requires recovery. Generated recovery credentials remain encrypted; use the administrator recovery action.',
-      );
+      throw error instanceof WagoManagedProvisioningError ? error : new WagoManagedProvisioningError(stage);
     }
   }
 
   async status(controllerId: number) {
     const access = await this.access.findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
-    return this.publicStatus(access);
+    return this.publicStatus(access, controllerId);
   }
 
   async sessionStatus(sessionId: number) {
     return this.publicStatus(await this.access.findOneBy({ sessionId }));
   }
 
-  private async publicStatus(access: WagoManagedAccess | null) {
+  private async publicStatus(access: WagoManagedAccess | null, requestedControllerId?: number) {
     if (access && !['retiring', 'retired'].includes(access.state)) {
       try {
         const stored = await this.loadSession(access.sessionId);
@@ -252,13 +310,49 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       }
     }
     const row = access?.controllerId ? await this.updates.findOneBy({ controllerId: access.controllerId }) : null;
+    const controllerId = requestedControllerId ?? access?.controllerId;
+    const controller = controllerId ? await this.controllers.findOneBy({ id: controllerId }) : null;
+    const desired = controller ? await this.artifacts.current().catch(() => null) : null;
+    const managementSetup =
+      access?.state === 'verified'
+        ? (this.enrolmentProgress.get(controllerId ?? 0) ?? {
+            state: 'waiting' as const,
+            reason: controller
+              ? ((await this.enrolmentWaitReason(
+                  controller,
+                  await this.sessions.findOneBy({ id: access.sessionId }),
+                )) ?? 'scheduled')
+              : 'connection',
+          })
+        : undefined;
+    const managementFailure =
+      access && ['verified', 'recovery_required'].includes(access.state)
+        ? (await this.sessions.findOneBy({ id: access.sessionId }))?.failureReason
+        : null;
     return {
+      ...(managementFailure ? { managementFailure } : {}),
       sessionId: access?.sessionId ?? null,
       management: access?.state ?? 'reenrol_required',
       keyFingerprint: access?.keyFingerprint ?? null,
       update: row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null,
+      ...(managementSetup ? { managementSetup } : {}),
+      ...(controller
+        ? {
+            runtime: {
+              runningVersion: controller.runtimeVersion,
+              runningImageId: this.heartbeats.get(controller.id)?.imageId || null,
+              desiredVersion: desired?.manifest.runtimeVersion ?? null,
+              desiredImageId: desired && 'imageId' in desired ? desired.imageId : null,
+            },
+          }
+        : {}),
+      ...(access?.controllerId && this.wago.isRuntimeUpdateRequired
+        ? { runtimeUpdateRequired: this.wago.isRuntimeUpdateRequired(access.controllerId) }
+        : {}),
+      ...(access?.controllerId && this.reconciliationFailures.has(access.controllerId)
+        ? { blocker: this.reconciliationFailures.get(access.controllerId) }
+        : {}),
       physicalQualification: 'unverified' as const,
-      rolloutEnabled: this.enabled,
     };
   }
 
@@ -286,19 +380,117 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
 
   async assertRemovable(controllerId: number): Promise<void> {
     await this.assertUpdateSettled(controllerId);
+    if (await this.context.getRepository(WagoMqttCredentialRetirement).countBy({ controllerId }))
+      throw new ConflictException('Retire previous broker credentials before removing this controller.');
     const access = await this.access.findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
     if (access && access.state !== 'retired')
       throw new ConflictException('Restore bootstrap SSH and retire managed access before removing this controller');
   }
 
   private async assertUpdateSettled(controllerId: number): Promise<void> {
+    await this.assertNetworkSettled(controllerId);
     const row = await this.updates.findOneBy({ controllerId });
     const update = row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null;
     if (update?.token) throw new ConflictException('Finish runtime update recovery before removing this controller');
   }
 
+  async assertNetworkSettled(controllerId: number | null, fingerprint?: string): Promise<void> {
+    if (controllerId === null && !fingerprint) return;
+    const change = await this.context
+      .getRepository(WagoNetworkChange)
+      .findOneBy(controllerId === null ? { fingerprint } : { controllerId });
+    if (change && change.phase !== 'completed')
+      throw new ConflictException('Finish the pending MQTT/address change before another controller operation.');
+  }
+
+  /** Uses the replacement address on the FIRST SSH connection. The stored
+   * credential binding is validated at its original address; only the transport
+   * destination changes, with the same pinned host identity and managed key.
+   */
+  async networkManagement(controllerId: number, targetHost: string, signal: AbortSignal) {
+    const access = await this.required(controllerId);
+    const credentials = this.credentials(access);
+    const session = await this.sessions.findOneBy({ id: access.sessionId });
+    if (
+      !session ||
+      session.state !== 'completed' ||
+      session.targetHost !== access.host ||
+      session.hostKeyFingerprint !== access.fingerprint ||
+      session.hardwareId !== credentials.hardwareId
+    )
+      throw new RuntimeUpdateError('management_required');
+    const command = (header: string, payload?: Buffer) => this.connection(access, header, signal, payload, targetHost);
+    const nonce = randomBytes(16).toString('hex');
+    if ((await command(`proof ${nonce}`)) !== `OK ${nonce}\n`) throw new RuntimeUpdateError('authentication');
+    const plaintext = JSON.stringify({ ...credentials, host: targetHost });
+    const encryptedCredentials = this.context.secrets.encrypt(plaintext);
+    if (
+      !encryptedCredentials ||
+      encryptedCredentials === plaintext ||
+      this.context.secrets.decrypt(encryptedCredentials) !== plaintext
+    )
+      throw new RuntimeUpdateError('management_required');
+    return {
+      sessionId: access.sessionId,
+      fingerprint: access.fingerprint,
+      hardwareId: credentials.hardwareId,
+      managementToken: access.token,
+      encryptedCredentials,
+      command,
+      prepare: async () => {
+        const desired = await this.desired();
+        const helper = managedHostHelper(desired);
+        const digest = createHash('sha256').update(helper).digest('hex');
+        const inspect = () => command(`inspect ${access.token}`);
+        const pattern = new RegExp(
+          `^${MANAGED_HELPER_PROTOCOL}\\n([a-f0-9]{64})\\n(sha256:[a-f0-9]{64}) (true|false)\\n$`,
+        );
+        let match = pattern.exec(await inspect());
+        if (!match) throw new RuntimeUpdateError('incompatible');
+        if (match[1] !== digest) {
+          const signature = signInstaller(credentials.installerPrivateKey, access.token, helper);
+          if (
+            (await command(
+              `installer-publish ${access.token} ${digest} ${Buffer.byteLength(helper)} ${signature}`,
+              Buffer.from(helper),
+            )) !== 'OK\n'
+          )
+            throw new RuntimeUpdateError('incompatible');
+          match = pattern.exec(await inspect());
+        }
+        if (match?.[1] !== digest) throw new RuntimeUpdateError('incompatible');
+      },
+    };
+  }
+
+  networkChanged(controllerId: number): void {
+    this.heartbeats.delete(controllerId);
+    this.heartbeatStreams.delete(controllerId);
+    this.wago.blockRuntime?.(controllerId);
+    this.wake();
+  }
+
   async hasAccess(sessionId: number): Promise<boolean> {
     return !!(await this.access.findOneBy({ sessionId }));
+  }
+
+  /** Used only inside an audited commissioning recovery and its device lock.
+   * A failed FW31 preflight may leave the factory password unchanged, so prove
+   * the encrypted recovery login before selecting it. Never disclose it to UI.
+   */
+  async commissioningRecoveryPassword(session: WagoCommissioningSession): Promise<string | null> {
+    const access = await this.loadSession(session.id);
+    if (!access || !this.rootProbe || !['pending', 'verified', 'recovery_required'].includes(access.state)) return null;
+    const credentials = this.credentials(access);
+    if (
+      access.host !== session.targetHost ||
+      access.fingerprint !== session.hostKeyFingerprint ||
+      credentials.hardwareId !== session.hardwareId
+    )
+      throw new ConflictException('Managed recovery identity changed; check the saved controller identity.');
+    return (await this.rootProbe(access.host, access.fingerprint, credentials.recoveryPassword))
+      ? credentials.recoveryPassword
+      : null;
   }
 
   async restoreAccess(sessionId: number, principal: PluginAuditPrincipal): Promise<void> {
@@ -359,7 +551,6 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   async retryAccess(sessionId: number): Promise<void> {
-    this.assertEnabled();
     let access = await this.loadSession(sessionId);
     if (!access || ['retiring', 'retired'].includes(access.state))
       throw new ConflictException('Managed access cannot be retried');
@@ -373,6 +564,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       access = await this.loadSession(sessionId);
       if (!access || ['retiring', 'retired'].includes(access.state))
         throw new ConflictException('Managed access cannot be retried');
+      if (access.controllerId) await this.assertNetworkSettled(access.controllerId);
       await this.prove(access, operation.signal);
       const status = await this.connection(access, `access-status ${access.token}`, operation.signal);
       await this.operations.assertOwned(access.fingerprint, owner);
@@ -411,7 +603,6 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   async retryRuntime(controllerId: number): Promise<void> {
-    this.assertEnabled();
     await this.required(controllerId);
     if ((await this.coordinator.reconcile(controllerId, true)) === 'busy')
       throw new ConflictException('Controller is busy; retry after its current operation finishes');
@@ -426,9 +617,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       typeof value.imageId !== 'string' ||
       typeof value.buildId !== 'string'
     )
-      throw new ConflictException(
-        'This server must supply build-owned CC100 runtime assets before enrolment or automatic updates.',
-      );
+      throw new RuntimeUpdateError('runtime_assets');
     return {
       ...value,
       installerSha256: createHash('sha256')
@@ -477,7 +666,13 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     }
   }
 
-  private async connection(access: WagoManagedAccess, header: string, signal?: AbortSignal, file?: string | Buffer) {
+  private async connection(
+    access: WagoManagedAccess,
+    header: string,
+    signal?: AbortSignal,
+    file?: string | Buffer,
+    targetHost = access.host,
+  ) {
     const operation = new AbortController();
     this.connections.add(operation);
     const abort = () => operation.abort();
@@ -491,7 +686,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       } catch {
         throw new RuntimeUpdateError('management_required');
       }
-      return await managedSsh(access, credentials.privateKey, header, operation.signal, file);
+      return await managedSsh({ ...access, host: targetHost }, credentials.privateKey, header, operation.signal, file);
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
@@ -507,7 +702,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   }
 
   private wake() {
-    if (!this.enabled || this.destroyed || this.scanning || !this.coordinator || Date.now() < this.nextScanAt) return;
+    if (this.destroyed || this.scanning || !this.coordinator || Date.now() < this.nextScanAt) return;
     this.nextScanAt = Date.now() + 30_000;
     this.scanning = true;
     void this.scan()
@@ -515,6 +710,41 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
       .finally(() => {
         this.scanning = false;
       });
+  }
+
+  private async refreshRuntimePolicy(id: number): Promise<LiveHeartbeat | undefined> {
+    await this.assertNetworkSettled(id);
+    let desired: BuildRuntimeArtifact;
+    try {
+      desired = await this.desired();
+    } catch {
+      throw new RuntimeUpdateError('runtime_assets');
+    }
+    const heartbeat = this.heartbeats.get(id);
+    if (!heartbeat || this.destroyed) return;
+    const access = await this.access.findOne({ where: { controllerId: id }, order: { sessionId: 'DESC' } });
+    // Verified enrollment needs a ready runtime before management can be hardened.
+    // Confirm its running image during bootstrap; the server still blocks commands
+    // until management is complete and the bundled image policy can be enforced.
+    const enrolling = access?.state === 'verified' || access?.state === 'recovery_required';
+    await this.wago.setRuntimePolicy?.(
+      id,
+      enrolling ? heartbeat.imageId : desired.imageId,
+      heartbeat.imageId,
+      heartbeat.runtimePolicyToken,
+    );
+    if (enrolling) this.wago.blockRuntime?.(id);
+    this.reconciliationFailures.delete(id);
+    return heartbeat;
+  }
+
+  private async reconcileConnection(id: number): Promise<void> {
+    await this.assertNetworkSettled(id);
+    const heartbeat = await this.refreshRuntimePolicy(id);
+    if (!heartbeat) return;
+    const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
+    if (controller && (await this.completeEnrolment(controller)))
+      await this.coordinator.reconcile(id, true, heartbeat.imageId);
   }
 
   private async scan() {
@@ -530,10 +760,17 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         await Promise.all(
           controllers.slice(index, index + 2).map(async (controller) => {
             try {
+              await this.assertNetworkSettled(controller.id);
+              if (this.heartbeats.has(controller.id)) await this.refreshRuntimePolicy(controller.id);
               if (!(await this.completeEnrolment(controller))) return;
               this.verifyingControllers.add(controller.id);
-              await this.coordinator.reconcile(controller.id);
-            } catch {
+              await this.coordinator.reconcile(controller.id, false, this.heartbeats.get(controller.id)?.imageId);
+              this.reconciliationFailures.delete(controller.id);
+            } catch (error) {
+              this.reconciliationFailures.set(
+                controller.id,
+                error instanceof RuntimeUpdateError ? error.failure : 'interrupted',
+              );
               this.context.logger.warn(`CC100 ${controller.id} managed reconciliation is deferred.`);
             } finally {
               this.verifyingControllers.delete(controller.id);
@@ -542,6 +779,35 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         );
       if (controllers.length < 50) break;
     }
+  }
+
+  private async enrolmentWaitReason(
+    controller: WagoController,
+    session: WagoCommissioningSession | null,
+  ): Promise<ManagementSetupReason | null> {
+    if (
+      !controller.mqttServerId ||
+      !session ||
+      !['awaiting_verification', 'completed'].includes(session.state) ||
+      session.hardwareId !== controller.hardwareId ||
+      session.mqttServerId !== controller.mqttServerId
+    )
+      return 'session';
+    if (!this.rootProbe) return 'server_setup';
+    const proof = this.heartbeats.get(controller.id);
+    if (!proof || Date.now() - proof.receivedAt > 90_000) return 'connection';
+    const state = this.readiness.observe(
+      controller.mqttServerId,
+      controller.hardwareId,
+      (await this.wago.getSettings()).operationalPrefix,
+    );
+    if (!state || state.streamId !== proof.streamId || Date.now() - state.timestamp > 90_000) return 'runtime_state';
+    const verification = await commissioningVerification(this.context, session, state);
+    if (!verification.permanentConnection) return 'connection';
+    if (!verification.enrollmentRevoked) return 'enrollment_credentials';
+    if (!verification.configurationApplied) return 'configuration';
+    if (!state.ready || verification.hardwareReadiness !== 'ready') return 'readiness';
+    return null;
   }
 
   private async completeEnrolment(controller: WagoController): Promise<boolean> {
@@ -564,69 +830,102 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         await this.finishSession(session.id);
       return true;
     }
-    if (!this.rootProbe) return false;
-    const proof = this.heartbeats.get(controller.id);
-    const state = this.readiness.observe(
-      controller.mqttServerId,
-      controller.hardwareId,
-      (await this.wago.getSettings()).operationalPrefix,
-    );
-    const verification = await commissioningVerification(this.context, session, state);
-    if (
-      !proof ||
-      Date.now() - proof.receivedAt > 90_000 ||
-      !state?.ready ||
-      state.streamId !== proof.streamId ||
-      Date.now() - state.timestamp > 90_000 ||
-      !verification.permanentConnection ||
-      !verification.enrollmentRevoked ||
-      !verification.configurationApplied ||
-      verification.hardwareReadiness !== 'ready'
-    )
-      return false;
+    if (!this.rootProbe || (await this.enrolmentWaitReason(controller, session))) return false;
     const owner = randomBytes(16).toString('hex');
-    if (!(await this.operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 5 * 60_000))) return false;
+    if (!(await this.operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 22 * 60_000))) return false;
     const operation = new AbortController();
-    const timer = setTimeout(() => operation.abort(), 180_000).unref();
+    // Key confirmation, acceptance and cutover can each wait 310s for a
+    // supervisor gate. The rollback window starts only once SSH actually changes.
+    let timer = setTimeout(() => operation.abort(), 18 * 60_000).unref();
+    let stage: ManagedSetupStage = 'status';
     const operationId = randomUUID();
     let principal: PluginAuditPrincipal | null = null;
     let attempted = false;
+    this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'preparation' });
     try {
       await this.operations.assertOwned(access.fingerprint, owner);
       access = await this.loadSession(session.id);
       if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return false;
       const remoteStatus = await this.connection(access, `access-status ${access.token}`, operation.signal);
-      if (remoteStatus === 'cutover\n') return false; // an independent watchdog still owns this decision
-      if (remoteStatus !== 'open\n' && remoteStatus !== 'committed\n') throw new Error('Unknown management receipt');
+      if (remoteStatus === 'cutover\n' && access.state !== 'recovery_required') return false;
+      if (!['open\n', 'committed\n', 'cutover\n'].includes(remoteStatus)) throw new Error('Unknown management receipt');
       const committed = remoteStatus === 'committed\n';
+      if (committed) {
+        clearTimeout(timer);
+        timer = setTimeout(() => operation.abort(), 180_000).unref();
+      }
+      stage = 'audit';
       principal = JSON.parse(session.initiatingPrincipal ?? 'null') as PluginAuditPrincipal | null;
       if (!principal) throw new Error('Management audit initiator unavailable');
       await this.securityAudit(session.id, 'security_apply', principal, operationId, 'attempted');
       attempted = true;
+      await this.sessions.update(session.id, { updatedAt: new Date().toISOString() });
       await this.access.update(access.sessionId, { controllerId: controller.id });
+      if (remoteStatus === 'cutover\n') {
+        // A previous attempt already failed. Request the same safe rollback as
+        // the watchdog, without retiring the key or confirming an unknown policy.
+        stage = 'rollback';
+        clearTimeout(timer);
+        timer = setTimeout(() => operation.abort(), 50_000).unref();
+        await this.connection(access, `access-restore ${access.token}`, operation.signal);
+        await this.securityAudit(session.id, 'security_apply', principal, operationId, 'failed');
+        return false;
+      }
       if (!committed) {
+        stage = 'ownership';
         if (!session.deliveryToken || !session.dockerProvisionToken)
           throw new Error('Commissioning ownership unavailable');
+        stage = 'proof';
         await this.prove(access, operation.signal);
+        stage = 'recovery_login';
         if (!(await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword)))
           throw new Error('Root recovery path is unverified');
         await this.setActiveState(access.sessionId, 'verified');
+        stage = 'key_commit';
         await this.connection(access, `access-key-commit ${access.token}`, operation.signal);
+        stage = 'proof';
         await this.prove(access, operation.signal);
-        await this.connection(access, `commissioning-accept ${session.deliveryToken}`, operation.signal);
+        stage = 'acceptance';
+        if (this.rootAcceptance) {
+          // Older initial helpers reject a busy supervisor lock immediately and
+          // cannot be replaced while their installation journals are outstanding.
+          // Finish only these owned journals through the still-verified bootstrap
+          // login; all runtime updates after cutover continue to use the scoped key.
+          await this.rootAcceptance(
+            access.host,
+            access.fingerprint,
+            this.credentials(access).recoveryPassword,
+            session.deliveryToken,
+            {
+              assertOwned: () => this.operations.assertOwned(access.fingerprint, owner),
+              signal: operation.signal,
+              deadline: Date.now() + 12 * 60_000,
+            },
+            { token: access.token, helper: managedHostHelper(await this.desired()), watchdog: managedWatchdogScript() },
+          );
+        } else await this.connection(access, `commissioning-accept ${session.deliveryToken}`, operation.signal);
+        stage = 'cutover';
+        this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'ssh_cutover' });
         await this.connection(access, `access-cutover ${access.token}`, operation.signal);
+        clearTimeout(timer);
+        timer = setTimeout(() => operation.abort(), 180_000).unref();
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
+      stage = 'policy';
       await this.prove(access, operation.signal);
       if ((await this.connection(access, `access-policy ${access.token}`, operation.signal)) !== 'OK\n')
         throw new Error('Managed SSH policy is unverified');
+      stage = 'root_login';
       if (await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword))
         throw new Error('Root SSH remains enabled');
       await this.prove(access, operation.signal);
       if (!committed) {
+        this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'reboot' });
+        stage = 'boot';
         const boot = await this.connection(access, `access-boot ${access.token}`, operation.signal);
         if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\n$/.test(boot))
           throw new Error('Controller boot identity unavailable');
+        stage = 'reboot';
         await this.connection(access, `access-reboot ${access.token}`, operation.signal).catch(() => undefined);
         let rebootVerified = false;
         for (let attempt = 0; attempt < 60; attempt++) {
@@ -652,12 +951,14 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         if (!rebootVerified) throw new Error('Managed reboot verification failed');
       }
       await this.operations.assertOwned(access.fingerprint, owner);
+      stage = 'confirmation';
+      this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'confirmation' });
       if (!committed) await this.connection(access, `access-commit ${access.token}`, operation.signal);
       await this.setActiveState(access.sessionId, 'managed');
       await this.finishSession(session.id);
       await this.securityAudit(session.id, 'security_apply', principal, operationId, 'succeeded');
       return true;
-    } catch {
+    } catch (error) {
       if (attempted && principal)
         await this.securityAudit(session.id, 'security_apply', principal, operationId, 'failed').catch(() => undefined);
       await this.access
@@ -669,12 +970,18 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
           retired: ['retiring', 'retired'],
         })
         .execute();
-      await this.sessions.update(session.id, {
-        failureReason:
-          'Managed SSH cutover needs recovery. The independent watchdog restores prior SSH policy unless commit was verified.',
-      });
+      // Keep the last audited attempt's diagnosis through transient offline
+      // probes while the controller reboots or its rollback is still running.
+      const transientOfflineProbe =
+        stage === 'status' && error instanceof RuntimeUpdateError && error.failure === 'offline';
+      if (attempted || !session.failureReason || !transientOfflineProbe)
+        await this.sessions.update(session.id, {
+          failureReason: managedSetupFailure(stage, error, operation.signal.aborted),
+          updatedAt: new Date().toISOString(),
+        });
       return false;
     } finally {
+      this.enrolmentProgress.delete(controller.id);
       clearTimeout(timer);
       operation.abort();
       await this.operations.release(bound.fingerprint, owner);
@@ -719,6 +1026,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         const access = await this.required(controllerId);
         if (!(await this.operations.acquire(access.fingerprint, owner, now, until))) return false;
         try {
+          await this.assertNetworkSettled(controllerId);
           await this.required(controllerId);
         } catch (error) {
           await this.operations.release(access.fingerprint, owner);
@@ -768,6 +1076,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         if (!match) throw new RuntimeUpdateError('incompatible');
         return {
           imageId: match[2],
+          runtimeVersion: controller?.runtimeVersion,
           claimed: !!controller,
           managed: true,
           compatible: true,
@@ -875,7 +1184,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     const session = await this.sessions.findOneByOrFail({ id: access.sessionId });
     const principal = JSON.parse(session.initiatingPrincipal ?? 'null') as PluginAuditPrincipal | null;
     if (!principal || !Number.isSafeInteger(principal.userId) || principal.userId <= 0)
-      throw new Error('Update audit initiator unavailable');
+      throw new RuntimeUpdateError('audit');
     const receipt = await this.context.audit.record({
       action: 'wago.runtime_update',
       operationId: randomUUID(),
@@ -890,17 +1199,19 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         ...(record.failure ? { failure: record.failure } : {}),
       },
     });
-    if (receipt.status !== 'recorded') throw new Error('Update audit unavailable');
+    if (receipt.status !== 'recorded') throw new RuntimeUpdateError('audit');
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
     this.destroyed = true;
     if (this.timer) clearInterval(this.timer);
-    this.coordinator?.stop();
+    const stopped = this.coordinator?.stop();
     for (const operation of this.connections) operation.abort();
+    await stopped;
     this.heartbeats.clear();
     this.heartbeatStreams.clear();
     this.previousBoots.clear();
     this.verifyingControllers.clear();
+    this.enrolmentProgress.clear();
   }
 }

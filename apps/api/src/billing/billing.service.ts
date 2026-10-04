@@ -156,6 +156,14 @@ export class BillingService {
     });
   }
 
+  async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransaction | null> {
+    return this.billingTransactionRepository.findOneBy({
+      resourceUsageId,
+      userId,
+      status: BillingTransactionStatus.Completed,
+    });
+  }
+
   async createManualTransaction(
     userId: number,
     initiatorId: number,
@@ -564,7 +572,7 @@ export class BillingService {
       refundOfId: transaction.id,
     } as Partial<BillingTransaction>);
 
-    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    this.liveNotificationsService.notifyTransactionUpdate(refundTransaction);
     void this.auditService.recordBillingTransaction({
       transactionId: refundTransaction.id,
       userId: refundTransaction.userId,

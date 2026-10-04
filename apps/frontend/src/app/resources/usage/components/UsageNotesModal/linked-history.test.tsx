@@ -25,11 +25,16 @@ const state = vi.hoisted(() => ({
   fetchBilling: vi.fn(),
   error: undefined as Error | undefined,
   retry: vi.fn(),
+  billingError: undefined as Error | undefined,
+  retryBilling: vi.fn(),
+  operatingDurationError: undefined as Error | undefined,
+  retryOperatingDuration: vi.fn(),
+  canViewOperatingDuration: false,
 }));
 vi.mock('../../hooks/useUsageSessionProject', () => ({ useUsageSessionProject: () => ({ updatingSessionIds: {} }) }));
 vi.mock('../../../operatingDuration', () => ({
-  useCanViewOperatingDuration: () => false,
-  useOperatingDuration: () => ({}),
+  useCanViewOperatingDuration: () => state.canViewOperatingDuration,
+  useOperatingDuration: () => ({ error: state.operatingDurationError, refetch: state.retryOperatingDuration }),
   attributedOperatingDurationForUsage: () => undefined,
 }));
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
@@ -41,7 +46,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   },
   useBillingServiceGetUsageBillingTransaction: (...args: unknown[]) => {
     state.fetchBilling(...args);
-    return { data: { transactionId: state.transactionId } };
+    return { data: { transactionId: state.transactionId }, error: state.billingError, refetch: state.retryBilling };
   },
   useBillingServiceGetBillingTransaction: () => ({
     data: {
@@ -62,6 +67,9 @@ beforeEach(() => {
   state.session = session;
   state.transactionId = 7;
   state.error = undefined;
+  state.billingError = undefined;
+  state.operatingDurationError = undefined;
+  state.canViewOperatingDuration = false;
 });
 afterEach(cleanup);
 
@@ -118,4 +126,34 @@ it('fetches usage details by ID only while open and shows a retryable error', ()
   expect(screen.getByRole('alert')).toHaveTextContent('Unable to load usage details.');
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(state.retry).toHaveBeenCalled();
+});
+
+it('keeps usage details visible while independently retrying a failed billing lookup', () => {
+  state.transactionId = null;
+  state.billingError = new Error('Unavailable');
+  const view = render(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(screen.getByText('Loaded oak boards')).toBeTruthy();
+  expect(screen.getByRole('alert')).toHaveTextContent('Unable to load the related billing overview.');
+  fireEvent.click(screen.getByRole('button', { name: 'Retry billing lookup' }));
+  expect(state.retryBilling).toHaveBeenCalledOnce();
+  expect(state.retry).not.toHaveBeenCalled();
+  state.billingError = undefined;
+  state.transactionId = 7;
+  view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(screen.queryByText('Unable to load the related billing overview.')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Open billing overview' })).toBeTruthy();
+});
+
+it('keeps usage details visible while independently retrying failed operating duration', () => {
+  state.canViewOperatingDuration = true;
+  state.operatingDurationError = new Error('Unavailable');
+  const view = render(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(screen.getByText('Cleaned the machine')).toBeTruthy();
+  expect(screen.getByRole('alert')).toHaveTextContent('Unable to load machine running time.');
+  fireEvent.click(screen.getByRole('button', { name: 'Retry machine running time' }));
+  expect(state.retryOperatingDuration).toHaveBeenCalledOnce();
+  expect(state.retry).not.toHaveBeenCalled();
+  state.operatingDurationError = undefined;
+  view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(screen.queryByText('Unable to load machine running time.')).toBeNull();
 });

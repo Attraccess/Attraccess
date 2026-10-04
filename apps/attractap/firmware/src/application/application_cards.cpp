@@ -15,7 +15,7 @@ void Application::processCardAuthenticationData() {
     this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
     this->finishCardAuthentication(false);
-    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige NFC-Karte auflegen.");
+    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige RFID-Karte auflegen.");
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
 #endif
@@ -35,7 +35,7 @@ void Application::processCardAuthenticationData() {
     this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
     this->finishCardAuthentication(false);
-    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige NFC-Karte auflegen.");
+    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige RFID-Karte auflegen.");
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
 #endif

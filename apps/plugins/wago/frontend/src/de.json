@@ -1,54 +1,71 @@
 {
   "controllers": {
     "title": "WAGO-Steuerungen",
-    "description": "Nimm eine Steuerung über eine SSH-Sitzung mit festgelegtem Host-Schlüssel in Betrieb. Die Zugangsdaten der Steuerung werden hier niemals angezeigt.",
+    "description": "Verwalte deine CC100-Steuerungen, ihre Konfiguration und Software-Updates.",
     "loadError": "WAGO-Steuerungen konnten nicht geladen werden",
     "commission": "Steuerung in Betrieb nehmen",
     "table": "WAGO-Steuerungen und Inbetriebnahmen",
-    "controller": "Steuerung",
-    "trust": "Vertrauen",
-    "connection": "Verbindung",
-    "runtime": "Laufzeitumgebung",
-    "heartbeat": "Letztes Lebenszeichen",
+    "controller": "Gerät",
+    "runtime": "Software",
+    "heartbeat": "Zuletzt gesehen",
     "actions": "Aktionen",
-    "claim": "Übernehmen",
+    "claim": "Registrieren",
     "configure": "Konfigurieren",
-    "updateRuntime": "Laufzeitumgebung aktualisieren",
-    "progress": "Fortschritt anzeigen",
-    "resume": "Fortsetzen",
+    "progress": "Einrichtung ansehen",
+    "resume": "Einrichtung fortsetzen",
     "empty": "Noch keine Steuerungen oder Inbetriebnahmen vorhanden.",
-    "never": "Nie",
-    "enrollment": "CC100-Registrierung",
-    "enrolling": "Wird registriert",
+    "never": "Noch nicht verbunden",
+    "enrollment": "CC100 einrichten",
+    "enrolling": "Wird eingerichtet",
     "inProgress": "In Bearbeitung",
     "updated": "Aktualisiert {{date}}",
-    "verified": "Registrierung abgeschlossen · Laufzeitumgebung verifiziert",
-    "pending": "Registrierung abgeschlossen · Einrichtung der Laufzeitumgebung ausstehend",
-    "unavailable": "Verifizierungsstatus nicht verfügbar"
+    "verified": "Einrichtung abgeschlossen",
+    "pending": "Konfiguration ausstehend",
+    "unavailable": "Status nicht verfügbar",
+    "runtimeUpdatePending": "Software-Update ausstehend",
+    "status": "Status",
+    "registration": "Registrierung",
+    "setupPending": "Einrichtung ausstehend",
+    "attention": "Prüfung erforderlich",
+    "details": "Details",
+    "detailsFor": "Details zu {{name}}",
+    "hardwareId": "Geräte-ID",
+    "address": "IP-Adresse",
+    "systemFirmware": "WAGO-Firmware",
+    "search": "Nach Name, Geräte-ID oder IP-Adresse suchen",
+    "noResults": "Keine passenden Steuerungen gefunden.",
+    "pagination": "Steuerungen durchblättern",
+    "previousPage": "Zurück",
+    "nextPage": "Weiter",
+    "pageSummary": "{{from}}–{{to}} von {{total}} Geräten",
+    "pageNumber": "Seite {{page}} von {{total}}"
   },
-  "trust": { "claimed": "Übernommen", "untrusted": "Nicht vertrauenswürdig" },
-  "connectivity": { "online": "Online", "offline": "Offline", "stale": "Veraltet", "unknown": "Unbekannt" },
+  "trust": {
+    "claimed": "Registriert",
+    "untrusted": "Nicht registriert"
+  },
+  "connectivity": {
+    "untrusted": "Nicht registriert",
+    "online": "Online",
+    "offline": "Offline",
+    "stale": "Keine Rückmeldung",
+    "unknown": "Status unbekannt",
+    "runtime_check": "Software wird geprüft",
+    "runtime_update": "Software-Update"
+  },
   "commissioning": {
-    "awaiting_delivery": "Automatische Bereitstellung wird vorbereitet",
-    "delivering": "Inbetriebnahme-Laufzeitumgebung wird bereitgestellt",
-    "awaiting_identity_confirmation": "Bereit zur Prüfung der physischen Steuerung",
-    "awaiting_codesys_confirmation": "Warten auf Freigabe der destruktiven Installation",
-    "delivery_failed": "Bereitstellung erfordert Aufmerksamkeit",
-    "awaiting_discovery": "Warten auf Verbindung der Steuerung",
-    "awaiting_claim": "Wird automatisch übernommen",
-    "completed": "Übernommen",
-    "awaiting_verification": "Verifizierung erforderlich",
-    "claim_interrupted": "Wiederherstellung der Übernahme erforderlich",
-    "recovery_revocation_pending": "Wiederhergestellt; Widerruf ausstehend",
-    "revoked": "Widerrufen"
-  },
-  "runtimeUpdate": {
-    "title": "Aktualisierung der Laufzeitumgebung",
-    "running": "Aktuelle Laufzeitumgebung:",
-    "protocol": "Protokoll",
-    "unavailable": "Noch keine direkte Aktualisierung verfügbar",
-    "description": "Attraccess kann die Laufzeitumgebung dieser Steuerung nur durch eine vollständige Neuinstallation aktualisieren. Dazu muss die Inbetriebnahme erneut durchgeführt werden. Dabei werden Anwendungen, Daten und Konfiguration auf dem CC100 gelöscht und neu installiert. Deshalb wird dies hier nicht als Ein-Klick-Aktion angeboten. Automatische Aktualisierungen ohne Datenverlust werden in ATT-1099 verfolgt.",
-    "understood": "Verstanden"
+    "awaiting_delivery": "Installation ausstehend",
+    "delivering": "Software wird installiert",
+    "awaiting_identity_confirmation": "Geräteidentität bestätigen",
+    "awaiting_codesys_confirmation": "Installation freigeben",
+    "delivery_failed": "Installation fehlgeschlagen",
+    "awaiting_discovery": "Warten auf Verbindung",
+    "awaiting_claim": "Registrierung wird abgeschlossen",
+    "completed": "Registriert",
+    "awaiting_verification": "Einrichtung wird geprüft",
+    "claim_interrupted": "Registrierung unterbrochen",
+    "recovery_revocation_pending": "Wiederherstellung wird abgeschlossen",
+    "revoked": "Registrierung abgebrochen"
   },
   "settings": {
     "title": "WAGO-Einstellungen",
@@ -59,11 +76,11 @@
     "save": "Einstellungen speichern"
   },
   "claim": {
-    "title": "Steuerung übernehmen",
+    "title": "Steuerung registrieren",
     "description": "Bestätige den physischen Zugriff auf diese Steuerung, bevor sie Befehle empfangen kann.",
     "name": "Name der Steuerung",
     "verifier": "Physischer Kopplungscode oder Fingerabdruck",
-    "submit": "Prüfen und übernehmen"
+    "submit": "Prüfen und registrieren"
   },
   "remove": {
     "title": "Steuerung entfernen",
@@ -86,6 +103,7 @@
     "refresh": "Aktualisieren",
     "cancel": "Abbrechen",
     "remove": "Entfernen",
-    "retry": "Bitte versuche es erneut."
+    "retry": "Bitte versuche es erneut.",
+    "close": "Schließen"
   }
 }

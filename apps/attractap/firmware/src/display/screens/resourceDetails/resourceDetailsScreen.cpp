@@ -16,7 +16,10 @@ void ResourceDetailsScreen::init()
       return;
    }
    this->screen = lv_obj_create(NULL);
-   lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
+   // Detail panels can exceed the display height, especially with many tutors.
+   lv_obj_add_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_scroll_dir(this->screen, LV_DIR_VER);
+   lv_obj_set_scrollbar_mode(this->screen, LV_SCROLLBAR_MODE_AUTO);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    DisplayTheme::applyScreen(this->screen);
@@ -351,7 +354,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_text_opa(noIntroductionInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->introducersListLabel = lv_label_create(this->noIntroductionPanel);
-   lv_obj_set_width(this->introducersListLabel, LV_SIZE_CONTENT);
+   lv_obj_set_width(this->introducersListLabel, lv_pct(100));
+   lv_label_set_long_mode(this->introducersListLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_height(this->introducersListLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
     lv_label_set_text(this->introducersListLabel, "???");

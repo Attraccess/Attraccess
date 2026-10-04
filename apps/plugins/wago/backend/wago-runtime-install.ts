@@ -126,7 +126,7 @@ echo 'Runtime container started; readiness unverified; recovery journal retained
 /** Stop and remove the failed owned runtime without restoring previous workloads. */
 export function runtimeBundleRecoveryScript(testRoot = '', token?: string): string {
   if (token && !/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid delivery token');
-  return `${preamble(testRoot)}
+  return `${preamble(testRoot, false, true)}
 test ! -e "$acceptedCleanup" || fail 'Acceptance cleanup is pending; recovery is unavailable'
 ${
   token
@@ -179,7 +179,7 @@ rm -rf "$config/delivery"
 /** Remove a restored receipt only after the coordinator saved the restoration outcome. */
 export function runtimeBundleRecoveryAcknowledgementScript(testRoot: string, token: string): string {
   if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid delivery token');
-  return `${preamble(testRoot)}
+  return `${preamble(testRoot, false, true)}
 test ! -d "$tx" || fail 'Recovery is not complete'
 acknowledged="$receipt.acknowledged-${token}"
 if test -e "$acknowledged" || test -L "$acknowledged"; then
@@ -406,6 +406,8 @@ function bundleCapacityPreflightScript(
   testRoot: string,
   includeDocker: boolean,
   helperParameters = false,
+  reportOnly = false,
+  update = false,
 ): string {
   if (!Number.isSafeInteger(bytes) || bytes <= 0 || bytes > 512 * 1024 * 1024) throw new Error('Invalid bundle size');
   if (testRoot && (!testRoot.startsWith('/') || testRoot === '/' || testRoot.includes('\n')))
@@ -429,7 +431,7 @@ case "$docker_root" in /*) ;; *) fail 'Invalid Docker storage root' ;; esac`
 storage_rows=
 storage_config=${quote(testRoot + '/etc/attraccess-wago')}
 if test ! -e "$storage_config"; then storage_config=${quote(testRoot + '/etc')}; fi
-for storage_path in "$storage_config" ${['/tmp', '/var/lib'].map((path) => quote(testRoot + path)).join(' ')}${includeDocker ? ' "$docker_root"' : ''}; do
+for storage_path in ${update ? quote(testRoot + '/var/lib') : `"$storage_config" ${['/tmp', '/var/lib'].map((path) => quote(testRoot + path)).join(' ')}`}${includeDocker ? ' "$docker_root"' : ''}; do
   test -d "$storage_path" || fail "Missing storage directory: $storage_path"
   storage_identity=$(stat -Lc '%d:%i' "$storage_path") || fail 'Cannot identify storage filesystem'
   storage_device=\${storage_identity%%:*}
@@ -442,17 +444,22 @@ for storage_path in "$storage_config" ${['/tmp', '/var/lib'].map((path) => quote
     { bad=1 }
     END { if (bad || NR != 2) exit 1; print free }
   ') || fail "Invalid df output: $storage_path"
-  storage_rows="$storage_rows$storage_device $storage_free $storage_path
+  storage_mount=$(printf '%s\n' "$storage_df" | awk 'NR==2 {print $1, $6}')
+  storage_rows="$storage_rows$storage_device $storage_free $storage_path $storage_mount
 "
 done
-printf '%s' "$storage_rows" | awk -v b=${helperParameters ? '"$kib"' : Math.ceil(bytes / 1024)} '
-  { dev[NR]=$1; available[NR]=$2; path[NR]=$3 }
+printf '%s' "$storage_rows" | awk -v update=${update ? 1 : 0} -v report=${reportOnly ? 1 : 0} -v b=${helperParameters ? '"$kib"' : Math.ceil(bytes / 1024)} '
+  { dev[NR]=$1; available[NR]=$2; path[NR]=$3; filesystem[NR]=$4; mount[NR]=$5 }
   END {
     for (i=1; i<=NR; i++) {
       # Equal st_dev does not rule out EXDEV between distinct bind mounts.
       move=(dev[i]==dev[1] ? b : 0)+(dev[i]==dev[2] ? b : 0)
       load=(dev[i]==dev[2] ? b : 0)+(dev[i]==dev[3] ? b : 0)+(NR==4 && dev[i]==dev[4] ? 3*b : 0)
       required=(move>load ? move : load)+16384
+      # Direct updates retain one verified bundle and stream its inner archive.
+      # Docker keeps the same 3B admission reserve; sum on shared filesystems.
+      if (update) required=(dev[i]==dev[1] ? b : 0)+(dev[i]==dev[2] ? 3*b : 0)+16384
+      if (report) { printf "%s %.0f %.0f %s %s\\n", path[i], available[i], required, filesystem[i], mount[i]; continue }
       if (available[i]<required) {
         printf "Insufficient runtime storage: %s requires %.0f KiB, available %.0f KiB\\n", path[i], required, available[i]
         bad=1
@@ -460,7 +467,7 @@ printf '%s' "$storage_rows" | awk -v b=${helperParameters ? '"$kib"' : Math.ceil
     }
     exit bad
   }
-' >&2
+' ${reportOnly ? '' : '>&2'}
 `;
 }
 
@@ -472,6 +479,11 @@ export function runtimeBundleStagingCapacityPreflightScript(bytes: number, testR
 /** After activation: recheck staging and the discovered Docker root together. */
 export function runtimeBundleCapacityPreflightScript(bytes: number, testRoot = '', helperParameters = false): string {
   return bundleCapacityPreflightScript(bytes, testRoot, true, helperParameters);
+}
+
+/** Same read-only calculation powers update admission and the management probe. */
+export function runtimeUpdateCapacityPreflightScript(bytes: number, testRoot = '', helperParameters = false, reportOnly = false): string {
+  return bundleCapacityPreflightScript(bytes, testRoot, true, helperParameters, reportOnly, true);
 }
 
 /** Delivery still requires the exclusive hardware gate after preparation. */

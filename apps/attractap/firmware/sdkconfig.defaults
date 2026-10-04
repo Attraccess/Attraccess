@@ -59,7 +59,7 @@ CONFIG_MBEDTLS_PEM_WRITE_C=y
 # tx stays 4096 (ASYMMETRIC_CONTENT_LEN=y): our client flight is tiny.
 CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
-# AES-CMAC for NTAG424 authentication (nfc/mbedtlscmac.c)
+# AES-CMAC for NTAG424 authentication (rfid/mbedtlscmac.c)
 CONFIG_MBEDTLS_CMAC_C=y
 
 # Disable legacy/unused ones

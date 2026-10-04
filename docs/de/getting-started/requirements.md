@@ -42,7 +42,7 @@ Die Anwendung ist als Progressive Web App (PWA) konzipiert und funktioniert auch
 | **SMTP-Server** | E-Mail-Versand (Registrierung, Benachrichtigungen) |
 | **Reverse Proxy** | SSL-Terminierung, z.B. Nginx Proxy Manager oder Traefik |
 | **MQTT-Broker** | IoT-Integration (z.B. RabbitMQ, Mosquitto) |
-| **Attractap NFC-Leser** | Physische NFC-Zugangskontrolle |
+| **Attractap RFID-Leser** | Physische RFID-Zugangskontrolle |
 
 ## Nächste Schritte
 

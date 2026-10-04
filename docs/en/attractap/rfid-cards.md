@@ -1,0 +1,86 @@
+# RFID Cards
+
+RFID cards are the physical keys that let users access machines and doors via Attractap readers. Each card is linked to a user account in Attraccess.
+
+## How RFID Cards Work
+
+When a user holds an RFID card to an Attractap reader, the reader sends the card's unique ID to the Attraccess backend. The backend checks:
+
+1. Is this card registered in the system?
+2. Which user account is the card linked to?
+3. Does that user have permission to use the assigned resource?
+
+If all checks pass, access is granted.
+
+## Managing RFID Cards
+
+### Viewing All Cards
+
+1. Navigate to **RFID-Cards** in the sidebar
+2. You see a list of all registered RFID cards with their assigned users
+
+<!-- TODO: Screenshot of the RFID Cards list -->
+
+### Registering a New Card
+
+To register a new RFID card:
+
+1. Navigate to **RFID-Cards** in the sidebar
+2. Click **Add RFID Card**
+3. Select the user who should receive the card
+4. Hold the new RFID card to any connected Attractap reader
+5. The card ID is automatically detected and registered
+
+> [!TIP]
+> You can also register a card directly from the user's profile page.
+
+<!-- TODO: Screenshot of the Add RFID Card dialog -->
+
+### Removing a Card
+
+1. Navigate to **RFID-Cards** in the sidebar
+2. Find the card you want to remove
+3. Click the **Delete** button
+4. Confirm the removal
+
+> [!NOTE]
+> Removing a card immediately revokes access. The card can no longer be used at any reader.
+
+## Multiple Cards Per User
+
+Each user can have multiple RFID cards linked to their account. This is useful when:
+
+- A user needs a backup card
+- A user has different cards for different locations
+- A lost card needs to be replaced while keeping the old one disabled
+
+## Card Types
+
+Attractap readers use AES-encrypted authentication, which requires cards with hardware crypto support:
+
+| Card Type | Supported |
+|-----------|-----------|
+| NTAG424 DNA | Yes |
+| MIFARE DESFire EV2/EV3 | Yes |
+| MIFARE DESFire EV1 | No (lacks the required authentication mode) |
+| MIFARE Classic / Ultralight / NTAG213-216 | No (no AES authentication) |
+
+> [!NOTE]
+> On MIFARE DESFire cards, Attractap stores its keys in a dedicated DESFire application (AID `0xACCE55`), which is created automatically during enrollment. Other applications on the card (e.g. existing access systems) are not touched.
+
+## Administrator Features
+
+Administrators can:
+
+- View all registered cards across all users
+- Register cards on behalf of users
+- Remove cards from user accounts
+- See which reader last scanned a card
+
+## See Also
+
+- [Using the Reader](attractap/using-the-reader.md) – Sign in with your card and use machines or doors
+- [Overview](attractap/overview.md) -- What is Attractap?
+- [Setup](attractap/setup.md) -- Register and configure readers
+- [User Management](user-management/overview.md) -- Manage user accounts
+- [Introductions](resources/introductions.md) -- Manage resource access permissions

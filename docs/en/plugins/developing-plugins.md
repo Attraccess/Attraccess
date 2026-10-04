@@ -80,6 +80,28 @@ keyword and an `attraccess` object:
 | `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
 | `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
 
+## Dependencies on other Attraccess plugins
+
+Declare plugin dependencies in `package.json` under `attraccess.dependencies`:
+
+```json
+{
+  "attraccess": {
+    "dependencies": [
+      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
+    ]
+  }
+}
+```
+
+`name` is the immutable npm package identity, `version` is a semver range (not a dist-tag or URL), and `required` defaults to `true`. Duplicate identities are rejected. These entries represent installed Attraccess plugins with their own modules, permissions, migrations, and state. Keep ordinary JavaScript runtime dependencies in npm's top-level `dependencies`.
+
+The marketplace resolves the entire required dependency graph before installation and displays the resolved versions, sources, classifications, and permissions for confirmation. Compatible installed plugins are reused; missing plugins are installed together. Conflicting installed versions are not automatically replaced. Cycles and incompatible ranges block the operation with an explanation. Dependencies resolve from the selected registry, so publish dependencies there too; an already-installed compatible dependency may come from another registry.
+
+Optional dependencies (`required: false`) are not installed automatically and do not gate activation. If present, their versions must satisfy the declared range. Required dependencies load and migrate before their dependants. A missing, incompatible, quarantined, or failed required dependency keeps its dependants inactive; the Plugins settings page shows the failure. Repair the dependency and restart to reactivate its dependants.
+
+Updates and downgrades must satisfy both the target version's dependencies and installed dependants' requirements. Removing a required dependency requires explicit confirmation of every direct and transitive dependant to remove in the same operation. Automatically installed dependencies remain ordinary plugins and are not automatically removed when their last dependant is removed. Package changes commit together; migrations and runtime activation run on restart, using the existing plugin lifecycle. Removing npm plugins retains their data and secrets.
+
 ## Backend plugins
 
 A backend plugin runs **inside** the Attraccess server process. It exports a
@@ -686,6 +708,22 @@ so they share the workspace toolchain, caching and CI.
   plugin apps via `apps/plugins/scripts/` (`esbuild-backend.mjs`,
   `vite-federation.config.mjs`, `verify-packed-plugin.mjs`). Each plugin's `project.json`
   wires them into nx targets:
+
+  For local development, build and install a plugin into the dev API's plugin
+  directory:
+
+  ```bash
+  pnpm nx install-dev plugin-shelly
+  ```
+
+  This target is available for Shelly, RabbitMQ and WAGO. `install-dev`
+  depends on `build` and always copies the resulting `package/` contents into
+  `storage/plugins/<manifest-name>/`, replacing the previous local installation
+  and removing stale files. It honors `PLUGIN_DIR`, then `STORAGE_ROOT` from the
+  environment or workspace `.env`; relative paths resolve from the workspace
+  root. Other plugins are preserved. Restart a running API to load the updated
+  plugin. Plugin source changes require running `install-dev` again; this target
+  does not watch plugin sources.
 
   | Target           | Produces                                                                |
   | ---------------- | ----------------------------------------------------------------------- |

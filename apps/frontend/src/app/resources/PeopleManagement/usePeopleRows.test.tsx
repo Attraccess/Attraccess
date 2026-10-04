@@ -14,7 +14,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     state.calls('resourceIntroducers', ...args);
     return state.resourceIntroducers;
   },
-  useAccessControlServiceResourceIntroductionsGetMany: (...args: unknown[]) => {
+  useAccessControlServiceResourceIntroductionsGetPeople: (...args: unknown[]) => {
     state.calls('resourceIntroductions', ...args);
     return state.resourceIntroductions;
   },
@@ -100,4 +100,69 @@ it('returns an empty list while the active queries load', () => {
   state.resourceIntroducers = { isLoading: true };
   const { result } = renderHook(() => usePeopleRows({ target: { type: 'resource', id: 8 } }));
   expect(result.current).toEqual({ rows: [], isLoading: true, hasError: false });
+});
+
+function introduction(userId: number, groupId?: number, action = 'grant') {
+  return {
+    id: groupId ?? 100,
+    receiverUser: { id: userId, username: `User ${userId}` },
+    receiverUserId: userId,
+    resourceGroupId: groupId ?? null,
+    resourceGroup: groupId ? { id: groupId, name: `Group ${groupId}` } : undefined,
+    createdAt: '2024-01-01',
+    // Deliberately unsorted: the latest event defines validity.
+    history: [
+      { action, createdAt: '2024-03-01' },
+      { action: 'grant', createdAt: '2024-02-01' },
+    ],
+  };
+}
+
+it('includes group-only people once and preserves all valid sources independently of direct status', () => {
+  state.resourceIntroductions = {
+    data: [
+      introduction(1, 10),
+      introduction(1, 11),
+      introduction(2),
+      introduction(2, 10),
+      introduction(3, 10, 'revoke'),
+    ],
+  };
+  const { result, rerender } = renderHook(() => usePeopleRows({ target: { type: 'resource', id: 8 } }));
+  expect(result.current.rows).toHaveLength(2);
+  const groupOnly = result.current.rows.find((row) => row.user.id === 1);
+  expect(groupOnly).toMatchObject({
+    introduction: null,
+    hasValidIntroduction: true,
+    hasValidDirectIntroduction: false,
+  });
+  expect(groupOnly?.inheritedIntroductions.map((intro) => intro.resourceGroupId)).toEqual([10, 11]);
+  const direct = result.current.rows.find((row) => row.user.id === 2);
+  expect(direct).toMatchObject({ hasValidIntroduction: true, hasValidDirectIntroduction: true });
+  expect(direct?.inheritedIntroductions).toHaveLength(1);
+
+  // Direct revocation must leave the group grant visible.
+  state.resourceIntroductions = { data: [introduction(2, undefined, 'revoke'), introduction(2, 10)] };
+  rerender();
+  expect(result.current.rows[0]).toMatchObject({ hasValidIntroduction: true, hasValidDirectIntroduction: false });
+  expect(result.current.rows[0].introduction).not.toBeNull();
+  expect(result.current.rows[0].inheritedIntroductions).toHaveLength(1);
+});
+
+it('refreshes after one or all group sources are revoked or removed', () => {
+  state.resourceIntroductions = { data: [introduction(1, 10), introduction(1, 11)] };
+  const { result, rerender } = renderHook(() => usePeopleRows({ target: { type: 'resource', id: 8 } }));
+  state.resourceIntroductions = { data: [introduction(1, 10, 'revoke'), introduction(1, 11)] };
+  rerender();
+  expect(result.current.rows).toHaveLength(1);
+  expect(result.current.rows[0].inheritedIntroductions.map((intro) => intro.resourceGroupId)).toEqual([11]);
+  state.resourceIntroductions = { data: [introduction(1, 10, 'revoke'), introduction(1, 11, 'revoke')] };
+  rerender();
+  expect(result.current.rows).toEqual([]);
+  state.resourceIntroductions = { data: [introduction(1, 11)] };
+  rerender();
+  expect(result.current.rows[0].hasValidIntroduction).toBe(true);
+  state.resourceIntroductions = { data: [] };
+  rerender();
+  expect(result.current.rows).toEqual([]);
 });

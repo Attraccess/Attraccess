@@ -10,7 +10,7 @@ Attraccess/
 │   ├── api/                  # NestJS backend
 │   ├── frontend/             # React frontend
 │   └── attractap/
-│       └── firmware/         # Attractap NFC reader firmware
+│       └── firmware/         # Attractap RFID reader firmware
 ├── libs/
 │   ├── api-client/           # Generated OpenAPI client
 │   ├── react-query-client/   # Generated TanStack Query hooks
@@ -34,7 +34,7 @@ The backend is a NestJS application that provides the REST API. It is organized 
 | **resources** | Resource management (machines, doors) |
 | **users-and-auth** | User accounts, authentication, SSO |
 | **settings** | System configuration |
-| **attractap** | NFC reader communication |
+| **attractap** | RFID reader communication |
 | **billing** | Usage-based billing |
 | **mqtt** | MQTT broker integration |
 | **projects** | Project management |
@@ -53,7 +53,7 @@ The Vite development server proxies all `/api` requests to the backend, so the f
 
 ### Attractap Firmware (`apps/attractap/firmware`)
 
-Firmware for the ESP32-based Attractap NFC card reader hardware. This is a separate embedded project.
+Firmware for the ESP32-based Attractap RFID card reader hardware. This is a separate embedded project.
 
 ## Libraries
 

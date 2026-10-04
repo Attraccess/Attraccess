@@ -172,7 +172,7 @@ describe('BillingService', () => {
       status: BillingTransactionStatus.Completed,
       refundOfId: 4,
     });
-    expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(original);
+    expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(refund);
     expect(auditService.recordBillingTransaction).toHaveBeenCalledWith(
       expect.objectContaining({ transactionId: 5, source: 'refund', amount: refund.amount }),
     );

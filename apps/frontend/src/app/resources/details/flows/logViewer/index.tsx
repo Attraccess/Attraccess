@@ -11,6 +11,7 @@ import {
   DrawerBody,
   DrawerHeader,
   TextArea,
+  ToggleButton,
   useOverlayState,
 } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -29,7 +30,7 @@ import {
   useResourceFlowsServiceStopFlowLogRecording,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { CircleStopIcon, CircleDotIcon } from 'lucide-react';
+import { CircleStopIcon, CircleDotIcon, PartyPopperIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import de from './de.json';
@@ -42,6 +43,8 @@ import { useFlowContext } from '../flowContext';
 interface Props {
   children: (open: () => void) => React.ReactNode;
   resourceId: number;
+  confettiEnabled: boolean;
+  onConfettiEnabledChange: (enabled: boolean) => void;
 }
 
 const DURATION_OPTIONS = [
@@ -150,17 +153,24 @@ export function LogViewer(props: Props) {
 
   const countdown = useCountdown(isRecording ? recording?.expiresAt : null);
 
-  const logsWithNodes = useMemo(() => {
-    if (!isRecording) {
-      return [];
-    }
+  const [recordedLogs, setRecordedLogs] = useState<ResourceFlowLog[]>([]);
+  const fetchedLogs = logs?.logs;
+  const recordingStartedAt = recording?.startedAt;
 
-    // The SSE stream accumulates for the lifetime of the page, so drop anything
-    // that predates the running recording — those logs are already deleted.
-    const recordingStart = new Date(recording?.startedAt ?? 0).getTime();
-    const allLogs = [...(logs?.logs ?? []), ...(sseLogs ?? [])].filter(
-      (log) => new Date(log.createdAt).getTime() >= recordingStart,
-    );
+  // The server discards its buffer on stop. Keep downloaded entries for this page visit;
+  // the SSE buffer already lasts for the lifetime of the flow page.
+  useEffect(() => {
+    if (!isRecording || !recordingStartedAt || !fetchedLogs?.length) return;
+
+    const recordingStart = new Date(recordingStartedAt).getTime();
+    const currentLogs = fetchedLogs.filter((log) => new Date(log.createdAt).getTime() >= recordingStart);
+    if (!currentLogs.length) return;
+
+    setRecordedLogs((previous) => [...new Map([...previous, ...currentLogs].map((log) => [log.id, log])).values()]);
+  }, [fetchedLogs, isRecording, recordingStartedAt]);
+
+  const logsWithNodes = useMemo(() => {
+    const allLogs = [...recordedLogs, ...(sseLogs ?? [])];
     const uniqueLogs = [...new Map(allLogs.map((log) => [log.id, log])).values()];
 
     return uniqueLogs.map((log) => {
@@ -172,7 +182,7 @@ export function LogViewer(props: Props) {
         title: `${t('nodes.' + (nodeOfLog?.type ?? 'flow') + '.title')} -> ${log.type}`,
       };
     });
-  }, [flowData, logs, recording, sseLogs, t, isRecording]);
+  }, [flowData, recordedLogs, sseLogs, t]);
 
   const logsOrdered = useMemo(() => {
     return [...logsWithNodes].sort((a, b) => b.id - a.id);
@@ -262,7 +272,16 @@ export function LogViewer(props: Props) {
               )}
             </div>
 
-            {!isRecording && <EmptyState message={t('recording.hint')} />}
+            <ToggleButton
+              className="self-start"
+              isSelected={props.confettiEnabled}
+              onChange={props.onConfettiEnabledChange}
+            >
+              <PartyPopperIcon />
+              {t('confetti')}
+            </ToggleButton>
+
+            {!isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.hint')} />}
             {isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.waiting')} />}
 
             {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (

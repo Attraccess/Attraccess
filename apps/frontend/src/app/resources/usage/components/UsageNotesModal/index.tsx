@@ -40,7 +40,12 @@ function OpenUsageNotesModal({
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
   const { data: session, error, refetch } = useResourcesServiceResourceUsageGetSession({ resourceId, usageId });
-  const { data: billing } = useBillingServiceGetUsageBillingTransaction({ usageId }, undefined, {
+  const {
+    data: billing,
+    error: billingError,
+    refetch: refetchBilling,
+    isFetching: isFetchingBilling,
+  } = useBillingServiceGetUsageBillingTransaction({ usageId }, undefined, {
     enabled: !!user && session?.userId === user.id,
   });
   const { resolveProjectId, updatingSessionIds, handleProjectChange } = useUsageSessionProject(resourceId);
@@ -49,7 +54,12 @@ function OpenUsageNotesModal({
     () => (session?.endTime ? { start: new Date(session.startTime), end: new Date(session.endTime) } : undefined),
     [session],
   );
-  const { data: operatingDuration } = useOperatingDuration(resourceId, canViewOperatingDuration && !!session, range);
+  const {
+    data: operatingDuration,
+    error: operatingDurationError,
+    refetch: refetchOperatingDuration,
+    isFetching: isFetchingOperatingDuration,
+  } = useOperatingDuration(resourceId, canViewOperatingDuration && !!session, range);
   const relatedTransactionId = session?.userId === user?.id ? billing?.transactionId : null;
 
   return (
@@ -60,6 +70,12 @@ function OpenUsageNotesModal({
         session={session ?? null}
         error={!!error}
         onRetry={() => refetch()}
+        billingError={session?.userId === user?.id && !!billingError}
+        onRetryBilling={() => refetchBilling()}
+        isRetryingBilling={isFetchingBilling}
+        operatingDurationError={canViewOperatingDuration && !!operatingDurationError}
+        onRetryOperatingDuration={() => refetchOperatingDuration()}
+        isRetryingOperatingDuration={isFetchingOperatingDuration}
         projectLabel={t('projectSelectLabel')}
         projectPlaceholder={t('unassignedProject')}
         resolveProjectId={resolveProjectId}

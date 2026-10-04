@@ -1,5 +1,6 @@
 import { assertManagementPublicKey } from './wago-management-key';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
+import { wagoShellStat } from './wago-shell-stat';
 import { randomBytes } from 'node:crypto';
 import { createPublicKey } from 'node:crypto';
 
@@ -18,14 +19,52 @@ function isolated(source: string, testRoot: string): string {
 export const MANAGEMENT_USERNAME = 'attraccess';
 export const MANAGEMENT_HELPER = '/usr/sbin/attraccess-wago-management';
 
+// CC100 FW31 ships shadow's passwd, but omits chpasswd, getent and visudo.
+// Keep passwords on stdin and validate the installed, fixed sudo rule using sudo.
+const managedAccountPreflight = String.raw`
+wago_management_stage=tools
+for tool in groupadd useradd passwd sudo cut flock timeout nohup openssl awk; do command -v "$tool" >/dev/null; done
+wago_management_stage=accounts
+awk '/^[[:space:]]*(passwd|group):/ { if ($2 != "files" || NF != 2) exit 1; seen[$1]++ }
+  END { if (seen["passwd:"] != 1 || seen["group:"] != 1) exit 1 }' /etc/nsswitch.conf
+test -r /etc/passwd && test -r /etc/group
+wago_management_stage=policy
+grep -Eq '^[#@]includedir[[:space:]]+/etc/sudoers.d[[:space:]]*$' /etc/sudoers
+test -d /etc/sudoers.d && test ! -L /etc/sudoers.d
+wago_management_stage=peer
+test "$(/usr/sbin/dropbear -V 2>&1)" = 'Dropbear v2025.88'
+`;
+
+const managedFailureTrap = String.raw`
+trap 'result=$?; if test "$result" != 0; then printf "WAGO_MANAGEMENT_FAILURE=%s\n" "$wago_management_stage"; fi' EXIT
+`;
+
+/** Read-only check before CODESYS, runtime installation or passwords are changed. */
+export function managedProvisionPreflightScript(testRoot = ''): string {
+  return isolated(
+    `set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+wago_management_stage=tools
+${managedFailureTrap}
+${managedAccountPreflight}
+printf 'OK\\n'
+`,
+    testRoot,
+  );
+}
+
 /** A reboot or lost server during cutover restores the known-working SSH policy.
  * The root password stays rotated, and its encrypted recovery copy stays in DB.
  * This watchdog is root-owned, not dependent on a live SSH session or server timer.
  */
 export const managedAccessWatchdog = `#!/bin/sh
 set -eu
+umask 077
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
+root=''
+${wagoShellStat()}
 base=/etc/attraccess-wago-management
 test -d "$base" && test ! -L "$base" && test "$(stat -c '%u:%g:%a' "$base")" = 0:0:700 || exit 1
 restore_access() {
@@ -45,7 +84,7 @@ if test "\${1:-}" = boot; then
     nohup "$base/watchdog" </dev/null >/dev/null 2>&1 &
   fi
 elif test "\${1:-}" = restore; then
-  exec 7>"$base/access.lock"; flock -w 30 7
+  exec 7>"$base/access.lock"; timeout -k 5 30 flock 7
   restore_access
 elif test "\${1:-}" = runtime-boot; then
   tx=/var/lib/attraccess-wago-update-transaction
@@ -60,7 +99,7 @@ elif test "\${1:-}" = runtime-boot; then
   fi
 else
   sleep 180
-  exec 7>"$base/access.lock"; flock -w 30 7
+  exec 7>"$base/access.lock"; timeout -k 5 30 flock 7
   restore_access
 fi
 `;
@@ -98,35 +137,43 @@ PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 root=''; config=/etc/attraccess-wago
 fail() { exit 1; }
-${wagoShellFilesystemGuard({ acquireLock: true })}
+wago_management_stage=filesystem
+${managedFailureTrap}
+${wagoShellFilesystemGuard({ waitForLock: true })}
 test "$(id -u)" = 0
-for tool in groupadd useradd chpasswd sudo visudo getent cut flock timeout nohup openssl; do command -v "$tool" >/dev/null; done
+${managedAccountPreflight}
+wago_management_stage=filesystem
 wago_require_root_directory_or_alias /usr/sbin
 wago_require_root_directory /etc/init.d
 wago_require_root_directory /etc/rc.d
-test "$(/usr/sbin/dropbear -V 2>&1)" = 'Dropbear v2025.88'
 base=/etc/attraccess-wago-management
 if test ! -e "$base"; then mkdir -m 0700 "$base"; fi
 test -d "$base" && test ! -L "$base" && test "$(stat -c '%u:%g:%a' "$base")" = 0:0:700 || exit 1
 test ! -e "$base/cutover" || test -e "$base/committed" || exit 1
+wago_management_stage=account
 if id attraccess >/dev/null 2>&1; then
   test -f "$base/owned-account" && test ! -L "$base/owned-account" || exit 1
   test "$(id -u attraccess)" -gt 0
   test "$(id -u attraccess)" != 10001
   test "$(id -g attraccess)" -gt 0
-  test "$(getent passwd attraccess | cut -d: -f6)" = /home/attraccess
+  test "$(awk -F: '$1 == "attraccess" {print $6}' /etc/passwd)" = /home/attraccess
 else
-  if ! getent group attraccess >/dev/null; then groupadd attraccess; fi
+  if ! awk -F: '$1 == "attraccess" {found=1} END {exit !found}' /etc/group; then groupadd attraccess; fi
   useradd -m -d /home/attraccess -s /bin/sh -g attraccess attraccess
   : > "$base/owned-account"; sync
 fi
 managed_gid=$(id -g attraccess)
 test "$managed_gid" != 10001
-test "$(getent group attraccess | cut -d: -f4)" = ''
-getent passwd | awk -F: -v gid="$managed_gid" '$4 == gid && $1 != "attraccess" {bad=1} END {exit bad}'
+test "$(awk -F: '$1 == "attraccess" {print $4}' /etc/group)" = ''
+awk -F: -v gid="$managed_gid" '$4 == gid && $1 != "attraccess" {bad=1} END {exit bad}' /etc/passwd
 # Keep the dedicated account usable for key authentication, but its random
 # password is never issued and Dropbear password authentication is disabled later.
-printf 'attraccess:%s\\n' ${quote(randomBytes(32).toString('base64url'))} | chpasswd
+wago_set_password() {
+  printf '%s\\n%s\\n' "$2" "$2" | passwd "$1" >/dev/null 2>&1
+}
+wago_management_stage=password
+wago_set_password attraccess ${quote(randomBytes(32).toString('base64url'))}
+wago_management_stage=key
 test -d /home/attraccess && test ! -L /home/attraccess || exit 1
 mkdir -p /home/attraccess/.ssh
 test -d /home/attraccess/.ssh && test ! -L /home/attraccess/.ssh || exit 1
@@ -151,10 +198,12 @@ chown root:root /home/attraccess /home/attraccess/.ssh
 chmod 0755 /home/attraccess /home/attraccess/.ssh
 test -d /etc/sudoers.d && test ! -L /etc/sudoers.d || exit 1
 test ! -L /etc/sudoers.d/attraccess-wago
+wago_management_stage=policy
 printf '%s\\n' 'attraccess ALL=(root) NOPASSWD: ${MANAGEMENT_HELPER} ""' > "$base/sudoers.next"
 chmod 0440 "$base/sudoers.next"
-visudo -c -f "$base/sudoers.next" >/dev/null
+if command -v visudo >/dev/null; then visudo -c -f "$base/sudoers.next" >/dev/null; fi
 mv "$base/sudoers.next" /etc/sudoers.d/attraccess-wago
+wago_management_stage=helper
 test ! -L ${MANAGEMENT_HELPER}
 ${installerAuthority ? `test ! -L "$base/installer-public.pem"\nprintf '%s' ${quote(Buffer.from(installerAuthority).toString('base64'))} | base64 -d > "$base/installer-public.next"\nchmod 0600 "$base/installer-public.next"\nsync; mv "$base/installer-public.next" "$base/installer-public.pem"; sync` : ''}
 printf '%s' ${quote(Buffer.from(helper).toString('base64'))} | base64 -d > "$base/helper.next"
@@ -170,17 +219,21 @@ publish_recovery_hook() {
     test -f "$hook" && test ! -L "$hook" && test "$(stat -c '%u:%g:%a:%h' "$hook")" = 0:0:700:1 || fail 'Unsafe existing recovery boot hook'
   fi
   stage=$(mktemp "$root/etc/rc.d/.attraccess-recovery.XXXXXX")
-  trap 'rm -f "$stage"' EXIT
+  trap 'result=$?; rm -f "$stage"; if test "$result" != 0; then printf "WAGO_MANAGEMENT_FAILURE=%s\\n" "$wago_management_stage"; fi' EXIT
   printf '#!/bin/sh\\nexec /etc/attraccess-wago-management/watchdog %s\\n' "$2" > "$stage"
   chmod 0700 "$stage"
   sync; mv "$stage" "$hook"; sync
-  trap - EXIT
+  ${managedFailureTrap}
 }
 publish_recovery_hook S01_attraccess_recovery boot
 publish_recovery_hook S99_zy_attraccess_recovery runtime-boot
+# sudo parses the actual policy, including the include directory. No helper is executed.
+wago_management_stage=policy
+sudo -n -l -U attraccess -- ${MANAGEMENT_HELPER} >/dev/null 2>&1
 printf '%s\\n' ${quote(token)} > "$base/token"
 rm -f "$base/committed"
-printf 'root:%s\\n' ${quote(password)} | chpasswd
+wago_management_stage=password
+wago_set_password root ${quote(password)}
 sync
 printf 'OK\\n'
 `,
@@ -198,7 +251,7 @@ export function managedKeyCommitScript(token: string, testRoot = '', helperParam
 umask 077
 root=''; config=/etc/attraccess-wago
 fail() { exit 1; }
-${wagoShellFilesystemGuard()}
+${wagoShellFilesystemGuard({ waitForLock: true })}
 base=/etc/attraccess-wago-management
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
 test -f "$base/key.pending" && test ! -L "$base/key.pending" && test "$(stat -c '%u:%g:%a:%h' "$base/key.pending")" = 0:0:600:1 || exit 1
@@ -226,7 +279,7 @@ umask 077
 base=/etc/attraccess-wago-management
 root=''; config=/etc/attraccess-wago
 fail() { exit 1; }
-${wagoShellFilesystemGuard()}
+${wagoShellFilesystemGuard({ waitForLock: true })}
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
 test ! -e "$base/cutover" && test ! -e "$base/committed" || exit 1
 test -f /etc/init.d/dropbear && test ! -L /etc/init.d/dropbear || exit 1
@@ -252,7 +305,7 @@ export function managedCommitScript(token: string, testRoot = '', helperParamete
     `set -eu
 umask 077
 base=/etc/attraccess-wago-management
-exec 7>"$base/access.lock"; flock -w 30 7
+exec 7>"$base/access.lock"; timeout -k 5 30 flock 7
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
 test -f "$base/cutover"
 printf '%s\\n' ${helperParameters ? '"${token}"' : quote(token)} > "$base/committed.next"
@@ -270,7 +323,7 @@ export function managedRestoreScript(token: string, testRoot = '', helperParamet
     `set -eu
 umask 077
 base=/etc/attraccess-wago-management
-exec 7>"$base/access.lock"; flock -w 30 7
+exec 7>"$base/access.lock"; timeout -k 5 30 flock 7
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
 if test -f "$base/cutover"; then
   test -f "$base/dropbear.previous" && test ! -L "$base/dropbear.previous" || exit 1
@@ -294,7 +347,7 @@ export function managedRetireScript(token: string, testRoot = '', helperParamete
 umask 077
 root=''; config=/etc/attraccess-wago
 fail() { exit 1; }
-${wagoShellFilesystemGuard()}
+${wagoShellFilesystemGuard({ waitForLock: true })}
 base=/etc/attraccess-wago-management
 test "$(cat "$base/token")" = ${helperParameters ? '"${token}"' : quote(token)}
 test ! -e "$base/cutover" && test ! -e "$base/committed" || exit 1

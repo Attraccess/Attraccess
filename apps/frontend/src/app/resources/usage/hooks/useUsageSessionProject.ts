@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -18,7 +18,6 @@ export function useUsageSessionProject(resourceId: number) {
   const toast = useToastMessage();
   const [projectOverrides, setProjectOverrides] = useState<Record<number, number | null>>({});
   const [updatingSessionIds, setUpdatingSessionIds] = useState<Record<number, boolean>>({});
-  const previousProjectAssignmentsRef = useRef<Record<number, number | null>>({});
   const invalidateHistory = useCallback(() => {
     return queryClient.invalidateQueries({
       predicate: (query) => {
@@ -60,11 +59,11 @@ export function useUsageSessionProject(resourceId: number) {
       toast.success({ title: tHistoryTable('rows.machine.project.updateSuccess') });
     },
     onError: (_error, variables) => {
-      const previousProjectId = previousProjectAssignmentsRef.current[variables.usageId] ?? null;
-      setProjectOverrides((prev) => ({
-        ...prev,
-        [variables.usageId]: previousProjectId,
-      }));
+      setProjectOverrides((prev) => {
+        const next = { ...prev };
+        delete next[variables.usageId];
+        return next;
+      });
       toast.error({ title: tHistoryTable('rows.machine.project.updateError') });
     },
     onSettled: (_data, _error, variables) => {
@@ -77,7 +76,6 @@ export function useUsageSessionProject(resourceId: number) {
         delete next[variables.usageId];
         return next;
       });
-      delete previousProjectAssignmentsRef.current[variables.usageId];
     },
   });
 
@@ -90,7 +88,6 @@ export function useUsageSessionProject(resourceId: number) {
         return;
       }
 
-      previousProjectAssignmentsRef.current[session.id] = currentProjectId;
       setProjectOverrides((prev) => ({
         ...prev,
         [session.id]: normalizedProjectId,

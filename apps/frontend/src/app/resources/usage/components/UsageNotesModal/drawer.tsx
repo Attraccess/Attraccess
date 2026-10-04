@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { DrawerBody, DrawerHeader, Button, Spinner } from '@heroui/react';
+import { Alert, DrawerBody, DrawerHeader, Button, Spinner } from '@heroui/react';
 import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
@@ -24,6 +24,12 @@ export interface UsageNotesDrawerProps {
   onOpenBilling?: () => void;
   error?: boolean;
   onRetry?: () => void;
+  billingError?: boolean;
+  onRetryBilling?: () => void;
+  isRetryingBilling?: boolean;
+  operatingDurationError?: boolean;
+  onRetryOperatingDuration?: () => void;
+  isRetryingOperatingDuration?: boolean;
 }
 
 export const UsageNotesDrawer = memo(
@@ -40,6 +46,12 @@ export const UsageNotesDrawer = memo(
     onOpenBilling,
     error,
     onRetry,
+    billingError,
+    onRetryBilling,
+    isRetryingBilling,
+    operatingDurationError,
+    onRetryOperatingDuration,
+    isRetryingOperatingDuration,
   }: UsageNotesDrawerProps) => {
     const { t } = useTranslations({ en, de });
     const { user } = useAuth();
@@ -97,6 +109,23 @@ export const UsageNotesDrawer = memo(
                   {t('openBilling')}
                 </Button>
               )}
+              {billingError && (
+                <Alert status="warning" role="alert">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>{t('billingLoadError')}</Alert.Title>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-2"
+                      onPress={onRetryBilling}
+                      isPending={isRetryingBilling}
+                    >
+                      {t('retryBilling')}
+                    </Button>
+                  </Alert.Content>
+                </Alert>
+              )}
               {showProjectSection && (
                 <section className="space-y-2">
                   {canEditProject && resolveProjectId && onProjectChange ? (
@@ -127,10 +156,27 @@ export const UsageNotesDrawer = memo(
                 </section>
               )}
 
-              {operatingDurationMs !== undefined && (
+              {(operatingDurationMs !== undefined || operatingDurationError) && (
                 <section className="space-y-2 border-t border-divider pt-4">
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('machineRunningTime')}</p>
-                  <DurationDisplay minutes={operatingDurationMs / 60_000} />
+                  {operatingDurationMs !== undefined && <DurationDisplay minutes={operatingDurationMs / 60_000} />}
+                  {operatingDurationError && (
+                    <Alert status="warning" role="alert">
+                      <Alert.Indicator />
+                      <Alert.Content>
+                        <Alert.Title>{t('operatingDurationLoadError')}</Alert.Title>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="mt-2"
+                          onPress={onRetryOperatingDuration}
+                          isPending={isRetryingOperatingDuration}
+                        >
+                          {t('retryOperatingDuration')}
+                        </Button>
+                      </Alert.Content>
+                    </Alert>
+                  )}
                 </section>
               )}
 

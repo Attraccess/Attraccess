@@ -49,6 +49,7 @@ import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
+import { FlowExecutionError } from '../flows/errors/flow-execution.error';
 import { AuditService } from '../../audit/audit.service';
 
 const mockRbacService = {
@@ -1340,7 +1341,20 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('leaves the session active when an acknowledgement timeout is propagated', async () => {
+    it.each([
+      {
+        failure: 'an acknowledgement timeout',
+        error: new ExternalEffectFailureError(
+          'MQTT acknowledgement timed out',
+          new Error('MQTT acknowledgement timed out'),
+          'acknowledgement-timeout',
+        ),
+      },
+      {
+        failure: 'an error node failure',
+        error: new FlowExecutionError('Bitte die Tür schließen'),
+      },
+    ])('leaves the session active when $failure is propagated', async ({ error }) => {
       const mockActiveSession = {
         id: 1,
         resourceId: 1,
@@ -1354,13 +1368,7 @@ describe('ResourceUsageService', () => {
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession);
-      flowExecutorService.runFlow.mockRejectedValueOnce(
-        new ExternalEffectFailureError(
-          'MQTT acknowledgement timed out',
-          new Error('MQTT acknowledgement timed out'),
-          'acknowledgement-timeout',
-        ),
-      );
+      flowExecutorService.runFlow.mockRejectedValueOnce(error);
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       let sessionEnded = false;
       (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
@@ -1375,16 +1383,16 @@ describe('ResourceUsageService', () => {
         return result;
       });
 
-      await expect(service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' })).rejects.toThrow(
-        'MQTT acknowledgement timed out',
-      );
+      await expect(service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' })).rejects.toBe(error);
 
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalledWith(ResourceUsageSessionEndedEvent.EVENT_NAME, expect.any(Object));
       expect(mockMetricsService.resourceUsageSessionsTotal.inc).not.toHaveBeenCalled();
       expect(usageTransactionCommitted).toBe(true);
       expect(sessionEnded).toBe(false);
+      expect(transactionalEntityManager.update).not.toHaveBeenCalled();
       expect(billingService.chargeForResourceUsage).not.toHaveBeenCalled();
+      expect(mockAuditService.recordResource).not.toHaveBeenCalled();
       expect(lifecycleAttempts.size).toBe(0);
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         1,

@@ -27,7 +27,7 @@ Klicken Sie auf einen Benutzer, um seine Details zu sehen und zu bearbeiten:
 - Kontoinformationen (Benutzername, E-Mail)
 - Anmeldemethoden (lokales Passwort, SSO-Verknüpfungen)
 - Systemberechtigungen
-- Verknüpfte NFC-Karten
+- Verknüpfte RFID-Karten
 
 ### Anmeldemethoden
 

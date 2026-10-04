@@ -2,6 +2,10 @@ export default {
   unassignedProject: 'Nicht zugeordnet',
   loadError: 'Nutzungsdetails konnten nicht geladen werden.',
   retry: 'Erneut versuchen',
+  billingLoadError: 'Die zugehörige Abrechnungsübersicht konnte nicht geladen werden.',
+  retryBilling: 'Abrechnung erneut laden',
+  operatingDurationLoadError: 'Die Maschinenlaufzeit konnte nicht geladen werden.',
+  retryOperatingDuration: 'Maschinenlaufzeit erneut laden',
 
   openBilling: 'Abrechnungsübersicht öffnen',
   sessionNotes: 'Sitzungsnotizen',

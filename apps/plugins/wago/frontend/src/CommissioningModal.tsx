@@ -1,13 +1,14 @@
 import {
   Alert,
   Button,
-  Checkbox,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  Form,
   Input,
   Label,
   ListBox,
+  ProgressBar,
   Select,
   Spinner,
   TextField,
@@ -16,14 +17,12 @@ import type { Key } from '@heroui/react';
 import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CommissioningSession } from './api';
-import { getCommissioningSupport } from './api';
 import { useCommissioningVerification } from './useCommissioningVerification';
-import { RuntimeArtifactImport } from './RuntimeArtifactImport';
-import type { RuntimeArtifactInfo } from './RuntimeArtifactImport';
+import { BundledRuntime } from './BundledRuntime';
+import type { RuntimeArtifactInfo } from './BundledRuntime';
 import { CommissioningSecurityPanel } from './CommissioningSecurityPanel';
 import { CommissioningPlatformPreflight } from './CommissioningPlatformPreflight';
-import { useQuery } from '@tanstack/react-query';
-import { commissioningLabel } from './ControllersTable';
+import { commissioningLabel, RuntimeUpdateDetails } from './ControllersTable';
 import { StandardDrawer } from './drawer';
 import { useWagoTranslations } from './i18n';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -60,30 +59,18 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
   const [createdSession, setCreatedSession] = useState<CommissioningSession | null>(null);
   const [artifactBusy, setArtifactBusy] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<RuntimeArtifactInfo | null>(null);
-  const supportQuery = useQuery({
-    queryKey: ['wago', 'commissioning-support'],
-    queryFn: getCommissioningSupport,
-    enabled: isOpen && !resumedSession,
-  });
-  const artifactAvailable = selectedArtifact !== null || supportQuery.data?.ready === true;
+  const artifactAvailable = selectedArtifact !== null;
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [controllerIp, setControllerIp] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
   const [hostKeyFingerprint, setHostKeyFingerprint] = useState('');
-  const [isolatedIdentity, setIsolatedIdentity] = useState(false);
-  useEffect(() => {
-    setIsolatedIdentity(false);
-    setHostKeyFingerprint('');
-  }, [resumedSession?.id, isOpen]);
   const [sshUsername, setSshUsername] = useState(DEFAULT_SSH.username);
   const [sshPassword, setSshPassword] = useState(DEFAULT_SSH.password);
   const [customSsh, setCustomSsh] = useState(false);
-  const [confirmInstall, setConfirmInstall] = useState(false);
   const [recoveryUsername, setRecoveryUsername] = useState(DEFAULT_SSH.username);
   const [recoveryPassword, setRecoveryPassword] = useState(DEFAULT_SSH.password);
   const [customRecoverySsh, setCustomRecoverySsh] = useState(false);
-  const [confirmRecovery, setConfirmRecovery] = useState(false);
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
   const attemptSession =
@@ -95,7 +82,10 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     resumedSession ??
     createdSession;
   const session = mutationSession
-    ? (commissioningSessionsQuery.data?.find((candidate) => candidate.id === mutationSession.id) ?? mutationSession)
+    ? latestCommissioningSession(
+        commissioningSessionsQuery.data?.find((candidate) => candidate.id === mutationSession.id),
+        mutationSession,
+      )
     : null;
   const selectedMqttServerId = mqttServerId === null ? null : Number(mqttServerId);
   const isLoading =
@@ -118,24 +108,27 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     setSshUsername(DEFAULT_SSH.username);
     setSshPassword(DEFAULT_SSH.password);
     setCustomSsh(false);
-    setConfirmInstall(false);
     setRecoveryUsername(DEFAULT_SSH.username);
     setRecoveryPassword(DEFAULT_SSH.password);
     setCustomRecoverySsh(false);
-    setConfirmRecovery(false);
     setHostKeyFingerprint('');
-    setIsolatedIdentity(false);
   }, [isOpen, resumedSession?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
-    setMqttServerId(
-      resumedSession?.mqttServerId.toString() ?? settingsQuery.data?.defaultMqttServerId?.toString() ?? null,
-    );
+    setMqttServerId(resumedSession?.mqttServerId.toString() ?? null);
     setName(resumedSession?.controllerName ?? '');
     setControllerIp(resumedSession?.targetHost ?? '');
     setStep(sessionStep(resumedSession));
-  }, [isOpen, resumedSession, settingsQuery.data?.defaultMqttServerId]);
+  }, [isOpen, resumedSession]);
+
+  useEffect(() => {
+    if (!isOpen || mqttServerId !== null) return;
+    const servers = mqttServersQuery.data ?? [];
+    const defaultServer = servers.find((server) => server.id === settingsQuery.data?.defaultMqttServerId);
+    const selected = defaultServer ?? (servers.length === 1 ? servers[0] : null);
+    if (selected) setMqttServerId(selected.id.toString());
+  }, [isOpen, mqttServerId, mqttServersQuery.data, settingsQuery.data?.defaultMqttServerId]);
 
   function close() {
     setCreatedSession(null);
@@ -147,12 +140,10 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     setSshUsername(DEFAULT_SSH.username);
     setSshPassword(DEFAULT_SSH.password);
     setCustomSsh(false);
-    setConfirmInstall(false);
     setCancelConfirmationOpen(false);
     setRecoveryUsername(DEFAULT_SSH.username);
     setRecoveryPassword(DEFAULT_SSH.password);
     setCustomRecoverySsh(false);
-    setConfirmRecovery(false);
     createSessionMutation.reset();
     confirmHostKeyMutation.reset();
     deliverSessionMutation.reset();
@@ -162,63 +153,51 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
   }
 
   function createSession() {
-    if (artifactBusy || !artifactAvailable) return;
+    if (isLoading || artifactBusy || !artifactAvailable || !name.trim() || !controllerIp.trim()) return;
     if (selectedMqttServerId === null) return;
     createSessionMutation.mutate(
       {
-        name,
-        targetHost: controllerIp,
+        name: name.trim(),
+        targetHost: controllerIp.trim(),
         mqttServerId: selectedMqttServerId,
       },
       {
         onSuccess: (created) => {
           setCreatedSession(created);
-          setStep(3);
+          setStep(2);
         },
       },
     );
   }
 
   function deliverSession() {
-    if (!session || isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword || !canInstall(session)) return;
+    if (!session || isLoading || !sshUsername.trim() || !sshPassword || !canInstall(session)) return;
     deliverSessionMutation.mutate({
       id: session.id,
       confirmInstall: true,
       temporarySsh: { username: sshUsername.trim(), password: sshPassword },
     });
     if (customSsh) setSshPassword('');
-    setConfirmInstall(false);
     if (customRecoverySsh) setRecoveryPassword('');
-    setConfirmRecovery(false);
   }
 
   function recoverSession() {
-    if (
-      !session ||
-      isLoading ||
-      !canRecover(session) ||
-      !confirmRecovery ||
-      !recoveryUsername.trim() ||
-      !recoveryPassword
-    )
-      return;
+    if (!session || isLoading || !canRecover(session) || !recoveryUsername.trim() || !recoveryPassword) return;
     recoverSessionMutation.mutate({
       id: session.id,
       confirmInstall: true,
       temporarySsh: { username: recoveryUsername.trim(), password: recoveryPassword },
     });
     if (customRecoverySsh) setRecoveryPassword('');
-    setConfirmRecovery(false);
     if (customSsh) setSshPassword('');
-    setConfirmInstall(false);
   }
 
-  function confirmHostKey() {
+  function confirmHostKey(physicalIdentityConfirmed = false) {
     if (!session) return;
     confirmHostKeyMutation.mutate({
       id: session.id,
-      hostKeyFingerprint: isolatedIdentity ? session.hostKeyFingerprint : hostKeyFingerprint,
-      physicalIdentityConfirmed: isolatedIdentity,
+      hostKeyFingerprint: physicalIdentityConfirmed ? session.hostKeyFingerprint : hostKeyFingerprint,
+      physicalIdentityConfirmed,
     });
   }
 
@@ -234,6 +213,7 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     isOpen,
     onConfigure,
     session,
+    commissioningSessionsQuery,
     isLoading,
     activeStep,
     title,
@@ -252,8 +232,6 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     setSelectedArtifact,
     hostKeyFingerprint,
     setHostKeyFingerprint,
-    isolatedIdentity,
-    setIsolatedIdentity,
     deliverSessionMutation,
     sshUsername,
     sshPassword,
@@ -261,16 +239,12 @@ function useCommissioning({ isOpen, session: resumedSession, onOpenChange, onCon
     setSshPassword,
     customSsh,
     setCustomSsh,
-    confirmInstall,
-    setConfirmInstall,
     recoveryUsername,
     recoveryPassword,
     setRecoveryUsername,
     setRecoveryPassword,
     customRecoverySsh,
     setCustomRecoverySsh,
-    confirmRecovery,
-    setConfirmRecovery,
     createSessionMutation,
     confirmHostKeyMutation,
     removeSessionMutation,
@@ -317,8 +291,6 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
     loadingStatus,
     hostKeyFingerprint,
     setHostKeyFingerprint,
-    isolatedIdentity,
-    setIsolatedIdentity,
     deliverSessionMutation,
     sshUsername,
     sshPassword,
@@ -326,8 +298,6 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
     setSshPassword,
     customSsh,
     setCustomSsh,
-    confirmInstall,
-    setConfirmInstall,
     isCancelConfirmationOpen,
     configureController,
   } = model;
@@ -336,10 +306,7 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
   const isFullyDone = !!session && verification.runtimeVerified === true;
   return (
     <DrawerBody>
-      <div className={`wg:grid wg:min-w-0 wg:gap-5 ${isFullyDone ? '' : 'wg:md:grid-cols-[13rem_minmax(0,1fr)]'}`}>
-        {/* The step passport only makes sense while a step is still active; the summary below already
-            repeats identity/runtime/claim once commissioning is done. */}
-        {!isFullyDone && <DevicePassport className="wg:hidden wg:md:block" name={title} step={activeStep} />}
+      <div>
         <div className="wg:min-w-0 wg:space-y-5">
           {session && isFullyDone ? (
             <CompletedSessionSummary
@@ -349,7 +316,12 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
             />
           ) : (
             <>
-              <StepHeading step={activeStep} />
+              <StepHeading
+                step={activeStep}
+                identity={session?.state === 'awaiting_identity_confirmation'}
+                failed={Boolean(session?.failureReason)}
+              />
+              {session && <CommissioningLiveStatus model={model} />}
               {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
               <ConnectionFields model={model} />
               {session?.state === 'awaiting_identity_confirmation' && (
@@ -357,17 +329,10 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
                   fingerprint={hostKeyFingerprint}
                   expectedFingerprint={session.hostKeyFingerprint}
                   onFingerprintChange={setHostKeyFingerprint}
+                  onConfirm={() => model.confirmHostKey()}
                 />
               )}
-              {session?.state === 'awaiting_identity_confirmation' && (
-                <Checkbox isSelected={isolatedIdentity} onChange={setIsolatedIdentity}>
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Checkbox.Content>{t('commissioningUI.isolatedIdentity')}</Checkbox.Content>
-                </Checkbox>
-              )}
-              {session && activeStep === 4 && session.state !== 'awaiting_identity_confirmation' && (
+              {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && (
                 <DeliveryStep
                   isDelivering={deliverSessionMutation.isPending}
                   session={session}
@@ -381,19 +346,25 @@ function CommissioningContent({ model }: { model: CommissioningModel }) {
                     setSshUsername(custom ? '' : DEFAULT_SSH.username);
                     setSshPassword(custom ? '' : DEFAULT_SSH.password);
                   }}
-                  confirmInstall={confirmInstall}
-                  onConfirmInstallChange={setConfirmInstall}
                 />
               )}
-              {session && activeStep === 5 && <ProgressStep name={title} session={session} />}
-              {session && canInstall(session) && (
+              {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
+              {session && (session.platformReport || session.dockerProvisionState || canInstall(session)) && (
                 <details>
-                  <summary className="wg:cursor-pointer">{t('commissioningUI.inspect')}</summary>
-                  <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
+                  <summary>{t('commissioningUI.diagnostics')}</summary>
+                  <CommissioningPlatformPreflight
+                    key={`preflight-${session.id}`}
+                    session={session}
+                    showFailure={false}
+                  />
+                  <ActivityLog auditLog={session.auditLog} />
                 </details>
               )}
-              {session && !canInstall(session) && session.dockerProvisionState && (
-                <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
+              {session?.managedAccessAvailable && session.failureReason && (
+                <details>
+                  <summary>{t('runtimeManagement.recoveryTitle')}</summary>
+                  <RuntimeUpdateDetails target={{ session }} />
+                </details>
               )}
               {session &&
                 (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
@@ -473,14 +444,10 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
   const {
     session,
     isLoading,
-    hostKeyFingerprint,
-    isolatedIdentity,
     sshUsername,
     sshPassword,
-    confirmInstall,
     recoveryUsername,
     recoveryPassword,
-    confirmRecovery,
     recoverSessionMutation,
     isCancelConfirmationOpen,
     setCancelConfirmationOpen,
@@ -506,7 +473,7 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
         <Button
           variant="danger"
           isPending={recoverSessionMutation.isPending}
-          isDisabled={isLoading || !confirmRecovery || !recoveryUsername.trim() || !recoveryPassword}
+          isDisabled={isLoading || !recoveryUsername.trim() || !recoveryPassword}
           onPress={recoverSession}
         >
           {t('commissioningUI.cleanup')}
@@ -517,19 +484,15 @@ function CommissioningActions({ model }: { model: CommissioningModel }) {
       </Button>
       <CreateSessionActions model={model} />
       {session?.state === 'awaiting_identity_confirmation' && (
-        <Button
-          isPending={isLoading}
-          isDisabled={!isolatedIdentity && (!hostKeyFingerprint || hostKeyFingerprint !== session.hostKeyFingerprint)}
-          onPress={confirmHostKey}
-        >
-          {t(isLoading ? 'commissioningUI.confirmingIdentity' : 'commissioningUI.confirmKey')}
+        <Button isPending={isLoading} onPress={() => confirmHostKey(true)}>
+          {t('commissioningUI.useController')}
         </Button>
       )}
       {session && canInstall(session) && (
         <Button
           variant="danger"
           isPending={isLoading}
-          isDisabled={isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword}
+          isDisabled={isLoading || !sshUsername.trim() || !sshPassword}
           onPress={deliverSession}
         >
           {t(
@@ -557,8 +520,6 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
     setRecoveryPassword,
     customRecoverySsh,
     setCustomRecoverySsh,
-    confirmRecovery,
-    setConfirmRecovery,
   } = model;
   return (
     <>
@@ -573,6 +534,7 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
           </Alert>
           <CredentialFields
             intent="recovery"
+            managed={session.managedAccessAvailable}
             isDisabled={isLoading}
             username={recoveryUsername}
             password={recoveryPassword}
@@ -585,18 +547,6 @@ function RecoveryFields({ model }: { model: CommissioningModel }) {
               setRecoveryPassword(custom ? '' : DEFAULT_SSH.password);
             }}
           />
-          <Checkbox
-            isRequired
-            isDisabled={isLoading}
-            isSelected={confirmRecovery}
-            onChange={setConfirmRecovery}
-            name="confirm-recovery"
-          >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>{t('commissioningUI.approveCleanup')}</Checkbox.Content>
-          </Checkbox>
         </div>
       )}
     </>
@@ -619,25 +569,36 @@ function ConnectionFields({ model }: { model: CommissioningModel }) {
     setSelectedArtifact,
   } = model;
   return (
-    <>
+    <Form
+      id="wago-commissioning-connection"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (activeStep === 0 && name.trim()) {
+          setArtifactBusy(true);
+          model.setStep(1);
+        } else if (activeStep === 1 && !isLoading) model.createSession();
+      }}
+    >
       {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
       {!session && activeStep === 1 && (
         <ConnectionStep
           controllerIp={controllerIp}
           mqttServerId={mqttServerId}
           mqttServersQuery={mqttServersQuery}
+          selectedMqttServerId={model.selectedMqttServerId}
           onControllerIpChange={setControllerIp}
           onMqttServerIdChange={setMqttServerId}
         />
       )}
-      {!session && activeStep === 2 && (
-        <RuntimeArtifactImport
+      {!session && activeStep === 1 && (
+        <BundledRuntime
+          compact
           disabled={isLoading}
           onBusyChange={setArtifactBusy}
           onSelectionChange={setSelectedArtifact}
         />
       )}
-    </>
+    </Form>
   );
 }
 
@@ -650,59 +611,39 @@ function CreateSessionActions({ model }: { model: CommissioningModel }) {
     name,
     controllerIp,
     mqttServersQuery,
-    setArtifactBusy,
     artifactBusy,
     artifactAvailable,
     selectedMqttServerId,
     setStep,
-    createSession,
   } = model;
   return (
     <>
       {!session && activeStep === 0 && (
-        <Button
-          isDisabled={!name.trim()}
-          onPress={() => {
-            setArtifactBusy(true);
-            setStep(1);
-          }}
-        >
+        <Button isDisabled={!name.trim()} type="submit" form="wago-commissioning-connection">
           {t('commissioningUI.continue')}
         </Button>
       )}
       {!session && activeStep === 1 && (
-        <Button
-          isDisabled={
-            !controllerIp.trim() ||
-            selectedMqttServerId === null ||
-            mqttServersQuery.isPending ||
-            mqttServersQuery.isError
-          }
-          onPress={() => setStep(2)}
-        >
-          {t('commissioningUI.continue')}
-        </Button>
-      )}
-      {!session && activeStep === 2 && (
-        <Button variant="secondary" onPress={() => setStep(1)}>
-          {t('commissioningUI.back')}
-        </Button>
-      )}
-      {!session && activeStep === 2 && (
-        <Button
-          isPending={isLoading}
-          isDisabled={
-            artifactBusy ||
-            !artifactAvailable ||
-            !controllerIp.trim() ||
-            selectedMqttServerId === null ||
-            mqttServersQuery.isPending ||
-            mqttServersQuery.isError
-          }
-          onPress={createSession}
-        >
-          {t(isLoading ? 'commissioningUI.preparing' : 'commissioningUI.scan')}
-        </Button>
+        <>
+          <Button variant="secondary" onPress={() => setStep(0)}>
+            {t('commissioningUI.back')}
+          </Button>
+          <Button
+            isPending={isLoading}
+            type="submit"
+            form="wago-commissioning-connection"
+            isDisabled={
+              artifactBusy ||
+              !artifactAvailable ||
+              !controllerIp.trim() ||
+              selectedMqttServerId === null ||
+              mqttServersQuery.isPending ||
+              mqttServersQuery.isError
+            }
+          >
+            {t(isLoading ? 'commissioningUI.preparing' : 'commissioningUI.continue')}
+          </Button>
+        </>
       )}
     </>
   );
@@ -775,57 +716,29 @@ function CommissioningErrors({ model }: { model: CommissioningModel }) {
   );
 }
 
-function DevicePassport({ className, name, step }: { className?: string; name: string; step: number }) {
-  const { t } = useWagoTranslations();
-  return (
-    <aside className={`wg:min-w-0 wg:rounded-large wg:bg-default-100 wg:p-5 ${className ?? ''}`}>
-      <CpuIcon className="wg:h-10 wg:w-10 wg:text-primary" />
-      <p className="wg:mt-4 wg:text-xs wg:font-semibold wg:uppercase wg:tracking-wider wg:text-muted">
-        {t('commissioningUI.passport')}
-      </p>
-      <p className="wg:mt-1 wg:truncate wg:text-lg wg:font-semibold">{name}</p>
-      <div className="wg:mt-5 wg:space-y-3">
-        <PassportRow
-          label={t('commissioningUI.identity')}
-          value={t(step >= 3 ? 'commissioningUI.sessionStatus' : 'commissioningUI.notScanned')}
-        />
-        <PassportRow
-          label={t('commissioningUI.runtime')}
-          value={t(step >= 4 ? 'commissioningUI.sessionStatus' : 'commissioningUI.notInstalled')}
-        />
-        <PassportRow
-          label={t('commissioningUI.claim')}
-          value={t(step >= 5 ? 'commissioningUI.sessionStatus' : 'commissioningUI.pending')}
-        />
-      </div>
-      <div className="wg:mt-6 wg:flex wg:gap-1">
-        {[0, 1, 2, 3, 4, 5].map((index) => (
-          <span
-            key={index}
-            className={`wg:h-1.5 wg:flex-1 wg:rounded-full ${index <= step ? 'wg:bg-primary' : 'wg:bg-default-300'}`}
-          />
-        ))}
-      </div>
-    </aside>
-  );
-}
-
-function PassportRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="wg:text-xs wg:text-muted">{label}</p>
-      <p className="wg:truncate wg:text-sm wg:font-medium">{value}</p>
-    </div>
-  );
-}
-
-function StepHeading({ step }: { step: number }) {
+function StepHeading({ step, identity, failed }: { step: number; identity: boolean; failed: boolean }) {
   const { t } = useWagoTranslations();
   return (
     <div>
       <p className="wg:text-sm wg:font-medium">{t('commissioningUI.step', { step: step + 1 })}</p>
-      <h2 className="wg:mt-1 wg:text-xl wg:font-semibold">{t(`commissioningUI.steps.${step}.title`)}</h2>
-      <p className="wg:mt-1 wg:text-sm wg:text-muted">{t(`commissioningUI.steps.${step}.description`)}</p>
+      <h2 className="wg:mt-1 wg:text-xl wg:font-semibold">
+        {t(
+          failed
+            ? 'commissioningUI.setupFailed'
+            : identity
+              ? 'commissioningUI.verifyController'
+              : `commissioningUI.steps.${step}.title`,
+        )}
+      </h2>
+      <p className="wg:mt-1 wg:text-sm wg:text-muted">
+        {t(
+          failed
+            ? 'commissioningUI.failureIntro'
+            : identity
+              ? 'commissioningUI.isolatedConnectionHint'
+              : `commissioningUI.steps.${step}.description`,
+        )}
+      </p>
     </div>
   );
 }
@@ -838,9 +751,11 @@ function OperationStatus({ title, description }: { title: string; description: s
         <p className="wg:text-sm wg:font-medium">{title}</p>
       </div>
       <p className="wg:mt-1 wg:text-xs wg:text-muted">{description}</p>
-      <div className="wg:mt-3 wg:h-1 wg:overflow-hidden wg:rounded-full wg:bg-default-200">
-        <div className="wg:h-full wg:w-2/5 wg:animate-pulse wg:rounded-full wg:bg-primary" />
-      </div>
+      <ProgressBar className="wg:mt-3" aria-label={title} isIndeterminate size="sm">
+        <ProgressBar.Track>
+          <ProgressBar.Fill />
+        </ProgressBar.Track>
+      </ProgressBar>
     </div>
   );
 }
@@ -864,12 +779,14 @@ function ConnectionStep({
   controllerIp,
   mqttServerId,
   mqttServersQuery,
+  selectedMqttServerId,
   onControllerIpChange,
   onMqttServerIdChange,
 }: {
   controllerIp: string;
   mqttServerId: Key | null;
   mqttServersQuery: ReturnType<typeof useMqttServersQuery>;
+  selectedMqttServerId: number | null;
   onControllerIpChange: (value: string) => void;
   onMqttServerIdChange: (value: Key | null) => void;
 }) {
@@ -897,7 +814,7 @@ function ConnectionStep({
         </div>
       ) : mqttServersQuery.isError ? (
         <ErrorAlert error={mqttServersQuery.error} />
-      ) : (
+      ) : (mqttServersQuery.data?.length ?? 0) > 1 ? (
         <Select
           className="wg:w-full"
           name="mqttServerId"
@@ -925,7 +842,9 @@ function ConnectionStep({
             </ListBox>
           </Select.Popover>
         </Select>
-      )}
+      ) : !selectedMqttServerId ? (
+        <p role="alert">{t('settings.empty')}</p>
+      ) : null}
     </div>
   );
 }
@@ -934,32 +853,35 @@ function HostKeyConfirmationStep({
   fingerprint,
   expectedFingerprint,
   onFingerprintChange,
+  onConfirm,
 }: {
   fingerprint: string;
   expectedFingerprint: string;
   onFingerprintChange: (value: string) => void;
+  onConfirm: () => void;
 }) {
   const { t } = useWagoTranslations();
   return (
-    <div className="wg:space-y-4">
-      <Alert status="warning">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>{t('commissioningUI.reviewKey')}</Alert.Title>
-          <Alert.Description>{t('commissioningUI.reviewKeyDescription')}</Alert.Description>
-        </Alert.Content>
-      </Alert>
+    <details>
+      <summary>{t('commissioningUI.trustedFingerprint')}</summary>
       <p className="wg:break-all wg:text-sm">{t('commissioningUI.scannedKey', { fingerprint: expectedFingerprint })}</p>
       <TextField isRequired name="host-key-fingerprint">
         <Label>{t('commissioningUI.reviewedKey')}</Label>
         <Input value={fingerprint} onChange={(event) => onFingerprintChange(event.target.value)} />
       </TextField>
-    </div>
+      <Button variant="secondary" isDisabled={!fingerprint || fingerprint !== expectedFingerprint} onPress={onConfirm}>
+        {t('commissioningUI.confirmKey')}
+      </Button>
+    </details>
   );
 }
 
 function canInstall(session: CommissioningSession) {
-  return ['awaiting_delivery', 'delivery_failed', 'awaiting_codesys_confirmation'].includes(session.state);
+  return (
+    !session.runtimeRecoveryAvailable &&
+    !['starting', 'started', 'recovery_required', 'recovering'].includes(session.dockerProvisionState ?? '') &&
+    ['awaiting_delivery', 'delivery_failed', 'awaiting_codesys_confirmation'].includes(session.state)
+  );
 }
 
 function canRecover(session: CommissioningSession) {
@@ -968,6 +890,7 @@ function canRecover(session: CommissioningSession) {
 
 function CredentialFields({
   intent = 'installation',
+  managed = false,
   isDisabled,
   username,
   password,
@@ -977,6 +900,7 @@ function CredentialFields({
   onCustomChange,
 }: {
   intent?: 'installation' | 'recovery';
+  managed?: boolean;
   isDisabled: boolean;
   username: string;
   password: string;
@@ -990,15 +914,18 @@ function CredentialFields({
     <div className="wg:space-y-3">
       <p className="wg:text-sm">
         {t('commissioningUI.sshLogin', {
-          account: t(custom ? 'commissioningUI.custom' : 'commissioningUI.defaultAccount'),
+          account: t(
+            custom
+              ? 'commissioningUI.custom'
+              : managed
+                ? 'commissioningUI.managedAccount'
+                : 'commissioningUI.defaultAccount',
+          ),
         })}
       </p>
-      <Checkbox isSelected={custom} isDisabled={isDisabled} onChange={onCustomChange}>
-        <Checkbox.Control>
-          <Checkbox.Indicator />
-        </Checkbox.Control>
-        <Checkbox.Content>{t('commissioningUI.advanced')}</Checkbox.Content>
-      </Checkbox>
+      <Button variant="tertiary" size="sm" isDisabled={isDisabled} onPress={() => onCustomChange(!custom)}>
+        {t(custom ? 'commissioningUI.useDefaultLogin' : 'commissioningUI.advanced')}
+      </Button>
       {custom && (
         <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
           <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-username`}>
@@ -1029,8 +956,6 @@ function DeliveryStep({
   onSshPasswordChange,
   customSsh,
   onCustomSshChange,
-  confirmInstall,
-  onConfirmInstallChange,
 }: {
   isDelivering: boolean;
   session: CommissioningSession;
@@ -1040,8 +965,6 @@ function DeliveryStep({
   onSshPasswordChange: (value: string) => void;
   customSsh: boolean;
   onCustomSshChange: (value: boolean) => void;
-  confirmInstall: boolean;
-  onConfirmInstallChange: (value: boolean) => void;
 }) {
   const { t } = useWagoTranslations();
   return (
@@ -1067,26 +990,13 @@ function DeliveryStep({
             custom={customSsh}
             onCustomChange={onCustomSshChange}
           />
-          <Checkbox
-            isRequired
-            isDisabled={isDelivering}
-            isSelected={confirmInstall}
-            onChange={onConfirmInstallChange}
-            name="confirm-install"
-          >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>{t('commissioningUI.approveInstall')}</Checkbox.Content>
-          </Checkbox>
-          <p className="wg:text-sm wg:text-muted">{t('commissioningUI.attemptApproval')}</p>
         </>
       )}
     </div>
   );
 }
 
-function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
+function ProgressStep({ session }: { name: string; session: CommissioningSession }) {
   const { t, tBackendMessage } = useWagoTranslations();
   const verification = useCommissioningVerification(session);
   const complete =
@@ -1103,7 +1013,6 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
     : session;
   return (
     <div className="wg:space-y-4">
-      <DevicePassport className="wg:md:hidden" name={name} step={5} />
       <CommissioningStatusPanel isActive={!complete} session={progress} />
       <div className="wg:rounded-large wg:border wg:border-default-200 wg:p-4 wg:text-sm">
         <p className="wg:font-medium">{t('commissioningUI.safeToClose')}</p>
@@ -1113,6 +1022,7 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
+            <Alert.Title>{t('runtimeManagement.lastSetupFailure')}</Alert.Title>
             <Alert.Description>{tBackendMessage(session.failureReason)}</Alert.Description>
           </Alert.Content>
         </Alert>
@@ -1210,12 +1120,42 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
   const percent = session.progressPercent ?? 0;
   const isQueued = session.state === 'awaiting_delivery';
   const hasFailure = !isActive && Boolean(session.failureReason);
+  const failedCheckpoint = hasFailure
+    ? parseActivityLog(session.auditLog)
+        .filter(({ event }) => event.startsWith('progress: '))
+        .at(-1)
+        ?.event.slice('progress: '.length)
+    : null;
   const title = isQueued
     ? t('commissioningUI.approvalRequired')
     : (session.progressStep ?? (isActive ? t('commissioningUI.preparing') : commissioningLabel(session.state, t)));
   const detail = isQueued
     ? t('commissioningUI.approvalDescription')
     : (session.progressDetail ?? t('commissioningUI.waiting'));
+  if (hasFailure) {
+    return (
+      <Alert status="danger">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>{t('commissioningUI.deliveryError')}</Alert.Title>
+          <Alert.Description>
+            <p>{tBackendMessage(session.failureReason)}</p>
+            {failedCheckpoint && (
+              <p>{t('commissioningUI.failedDuring', { step: tBackendMessage(failedCheckpoint) })}</p>
+            )}
+            <p>{t('commissioningUI.failedHost', { host: session.targetHost })}</p>
+            <p>
+              {t(
+                canRecover(session) || session.dockerProvisionState
+                  ? 'commissioningUI.cleanupNext'
+                  : 'commissioningUI.retryNext',
+              )}
+            </p>
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
+    );
+  }
   return (
     <div aria-live="polite" className="wg:rounded-large wg:border wg:border-primary/30 wg:bg-primary/5 wg:p-4">
       <div className="wg:flex wg:items-start wg:gap-3">
@@ -1234,24 +1174,82 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
             <span className="wg:text-sm wg:text-muted">{percent}%</span>
           </div>
           <p className="wg:mt-1 wg:text-sm wg:text-muted">{tBackendMessage(detail)}</p>
-          <div className="wg:mt-3 wg:h-1.5 wg:overflow-hidden wg:rounded-full wg:bg-default-200">
-            <div
-              className={`wg:h-full wg:rounded-full wg:transition-[width] wg:duration-500 ${hasFailure ? 'wg:bg-danger' : 'wg:bg-primary'}`}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
+          <ProgressBar
+            className="wg:mt-3"
+            aria-label={tBackendMessage(title)}
+            value={percent}
+            color={hasFailure ? 'danger' : 'accent'}
+            size="sm"
+          >
+            <ProgressBar.Track>
+              <ProgressBar.Fill />
+            </ProgressBar.Track>
+          </ProgressBar>
         </div>
       </div>
-      {hasFailure && (
-        <Alert className="wg:mt-4" status="danger">
+    </div>
+  );
+}
+
+function latestCommissioningSession(...candidates: Array<CommissioningSession | null | undefined>) {
+  return candidates.reduce<CommissioningSession | null>((latest, candidate) => {
+    if (!candidate) return latest;
+    if (!latest || (Date.parse(candidate.updatedAt) || 0) > (Date.parse(latest.updatedAt) || 0)) return candidate;
+    return latest;
+  }, null);
+}
+
+function CommissioningLiveStatus({ model }: { model: CommissioningModel }) {
+  const { t } = useWagoTranslations();
+  const { session, commissioningSessionsQuery: query } = model;
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  if (!session) return null;
+  const checkedAt = query.dataUpdatedAt || Date.parse(session.updatedAt);
+  const checkedSeconds = Math.max(0, Math.floor((now - checkedAt) / 1000));
+  const stale = !Number.isFinite(checkedAt) || checkedSeconds > 15;
+  const phaseSeconds = Math.max(0, Math.floor((now - Date.parse(session.updatedAt)) / 1000));
+  const active =
+    session.state === 'delivering' || model.deliverSessionMutation.isPending || model.recoverSessionMutation.isPending;
+  const remaining = session.operationDeadlineAt
+    ? Math.ceil((Date.parse(session.operationDeadlineAt) - now) / 1000)
+    : null;
+  const expiredLogin = query.error && 'status' in query.error && query.error.status === 401;
+  return (
+    <div className="wg:space-y-2">
+      {query.isError || stale ? (
+        <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>{t('commissioningUI.deliveryError')}</Alert.Title>
-            <Alert.Description>{tBackendMessage(session.failureReason)}</Alert.Description>
+            <Alert.Title>{t('commissioningUI.statusUnavailable')}</Alert.Title>
+            <Alert.Description>
+              {t(expiredLogin ? 'commissioningUI.statusLoginExpired' : 'commissioningUI.statusStale')}
+            </Alert.Description>
+            <Button variant="secondary" size="sm" onPress={() => void query.refetch()}>
+              {t('commissioningUI.refreshStatus')}
+            </Button>
           </Alert.Content>
         </Alert>
+      ) : (
+        <p className="wg:text-sm wg:text-muted">{t('commissioningUI.statusChecked', { seconds: checkedSeconds })}</p>
       )}
-      <ActivityLog auditLog={session.auditLog} />
+      {active && remaining !== null && Number.isFinite(remaining) && (
+        <p className="wg:text-sm wg:text-muted">
+          {t(remaining > 0 ? 'commissioningUI.operationRemaining' : 'commissioningUI.operationOverdue', {
+            minutes: Math.floor(Math.max(0, remaining) / 60),
+            seconds: Math.max(0, remaining) % 60,
+          })}
+        </p>
+      )}
+      {active && Number.isFinite(phaseSeconds) && (
+        <p className="wg:text-sm wg:text-muted">
+          {t('commissioningUI.phaseElapsed', { minutes: Math.floor(phaseSeconds / 60), seconds: phaseSeconds % 60 })}{' '}
+          {t('commissioningUI.phaseWaitHint')}
+        </p>
+      )}
     </div>
   );
 }
@@ -1297,10 +1295,10 @@ function parseActivityLog(auditLog: string): Array<{ at: string; event: string }
 
 function sessionStep(session: CommissioningSession | null): number {
   if (!session) return 0;
-  if (session.state === 'awaiting_identity_confirmation') return 3;
+  if (session.state === 'awaiting_identity_confirmation') return 2;
   return ['awaiting_delivery', 'delivering', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state)
-    ? 4
-    : 5;
+    ? 2
+    : 3;
 }
 
 function ErrorAlert({ error }: { error: unknown }) {

@@ -288,6 +288,7 @@ void Application::resetSessionOnDisconnect() {
   }
 
   this->logger.info("Connectivity lost; resetting session state");
+  Display::hidePopup();
 
   // Ensure any in-progress UI overlays are dismissed
   Display::resourceDetailsScreen.hideActionProgress();
@@ -399,6 +400,7 @@ void Application::finishReaderAction(bool success) {
 }
 
 void Application::logoutReader() {
+  Display::hidePopup();
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;

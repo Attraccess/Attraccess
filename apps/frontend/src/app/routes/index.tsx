@@ -17,7 +17,7 @@ import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
 import { AttractapList } from '../attractap/AttractapList';
 import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage';
-import { NfcCardList } from '../attractap/NfcCardList';
+import { RfidCardList } from '../attractap/RfidCardList';
 import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
@@ -251,7 +251,7 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/attractap/nfc-cards',
-    element: <NfcCardList />,
+    element: <RfidCardList />,
     authRequired: true,
   },
   {

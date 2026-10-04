@@ -2,6 +2,7 @@ import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoController } from './wago-controller.entity';
+import { WagoService } from './wago.service';
 import type { WagoConfigurationSnapshot } from './configuration';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 import { wagoFlowPreview } from './wago-flow-preview';
@@ -81,7 +82,10 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private messageQueue: Promise<void> = Promise.resolve();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
+  constructor(
+    @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
+    @Inject(WagoService) private readonly wago?: WagoService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     try {
@@ -172,7 +176,9 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     validationContext = new Map<string, unknown>(),
     previewOnly = false,
   ): Promise<Record<string, unknown>> {
-    const controllerCacheKey = previewOnly ? `wago-flow-controllers:preview:${config.controllerId}` : 'wago-flow-controllers';
+    const controllerCacheKey = previewOnly
+      ? `wago-flow-controllers:preview:${config.controllerId}`
+      : 'wago-flow-controllers';
     const controllers = await this.cached(validationContext, controllerCacheKey, () =>
       previewOnly && typeof config.controllerId !== 'number'
         ? Promise.resolve([])
@@ -203,12 +209,13 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     } catch {
       // Older configurations may not have visual editor labels.
     }
-    if (previewOnly) return {
-      dynamic: true,
-      type: 'object',
-      properties: {},
-      preview: wagoFlowPreview(config, kind, selected, snapshot, names),
-    };
+    if (previewOnly)
+      return {
+        dynamic: true,
+        type: 'object',
+        properties: {},
+        preview: wagoFlowPreview(config, kind, selected, snapshot, names),
+      };
     const channel = channels.find((item) => item.id === config.channelId);
     const properties: Record<string, unknown> = {
       controllerId: {
@@ -606,6 +613,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     state: CachedState,
     previous?: CachedState,
   ): boolean {
+    if (this.wago?.isRuntimeUpdateRequired(state.controllerId)) return false;
     if (
       config.controllerId !== state.controllerId ||
       config.channelId !== state.channelId ||
@@ -653,6 +661,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       offline,
       connectionStale,
       available:
+        !this.wago?.isRuntimeUpdateRequired(state.controllerId) &&
         !stale &&
         !offline &&
         !connectionStale &&

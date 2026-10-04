@@ -1,7 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceUsageHistory } from './resourceUsageHistory';
+import type { ResourceUsage } from '@attraccess/react-query-client';
+import { useUsageSessionProject } from './hooks/useUsageSessionProject';
 const state = vi.hoisted(() => ({
   permitted: true,
   type: 'machine',
@@ -116,6 +118,20 @@ beforeEach(() => {
   ];
 });
 afterEach(cleanup);
+it('accepts refreshed project assignments after a failed table edit', () => {
+  const { result } = renderHook(() => useUsageSessionProject(7));
+  const session = state.rows[0] as ResourceUsage;
+  act(() => result.current.handleProjectChange(session, 5));
+  expect(result.current.resolveProjectId(session)).toBe(5);
+  act(() => {
+    state.callbacks?.onError(new Error('Offline'), { usageId: 11 });
+    state.callbacks?.onSettled(undefined, undefined, { usageId: 11 });
+  });
+  expect(result.current.resolveProjectId(session)).toBe(4);
+  // A successful edit from the independently loaded drawer refreshes the history data.
+  const refreshedSession = { ...session, project: { id: 5, name: 'New project' } } as ResourceUsage;
+  expect(result.current.resolveProjectId(refreshedSession)).toBe(5);
+});
 it('optimistically updates projects, rolls back failures and refreshes matching history queries', async () => {
   render(
     <MemoryRouter>

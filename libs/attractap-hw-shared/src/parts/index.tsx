@@ -3,7 +3,7 @@ export * from './passives';
 export * from './power';
 export * from './connectors';
 export * from './mcu';
-export * from './nfc';
+export * from './rfid';
 export * from './touch';
 export * from './discrete';
 export * from './buzzer';

@@ -10,7 +10,10 @@ vi.mock('./drawer', () => ({
   StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: ReactNode }) =>
     isOpen ? <div>{children}</div> : null,
 }));
-vi.mock('./ControllersTable', () => ({ commissioningLabel: (state: string) => state }));
+vi.mock('./ControllersTable', () => ({
+  commissioningLabel: (state: string) => state,
+  RuntimeUpdateDetails: () => <div>Managed recovery controls</div>,
+}));
 
 const session: CommissioningSession = {
   id: 7,
@@ -101,6 +104,131 @@ function mount() {
   return { ...render(view(true)), view, onOpenChange };
 }
 
+it('keeps a freshly resumed session instead of regressing to an older cached response', async () => {
+  const old = { ...session, state: 'delivering' as const, progressPercent: 20, updatedAt: '2026-01-01T00:00:00Z' };
+  client.setQueryData(['wago', 'commissioning-sessions'], [old]);
+  activeSession = {
+    ...old,
+    progressPercent: 55,
+    progressStep: 'Transferring runtime',
+    updatedAt: '2026-01-01T00:05:00Z',
+  };
+  const originalFetch = vi.mocked(fetch).getMockImplementation();
+  if (!originalFetch) throw new Error('Fetch fixture is missing');
+  vi.mocked(fetch).mockImplementation((url, options) =>
+    String(url).includes('/commissioning/sessions?')
+      ? Promise.resolve({ ok: true, text: async () => JSON.stringify([old]) } as Response)
+      : originalFetch(url, options),
+  );
+  mount();
+  await waitFor(() => expect(screen.getByText('Transferring runtime')).toBeTruthy());
+  expect(screen.getByText('55%')).toBeTruthy();
+});
+
+it('explains lost authentication without losing the last known controller progress', async () => {
+  activeSession = { ...session, state: 'delivering', progressPercent: 20, updatedAt: new Date().toISOString() };
+  const originalFetch = vi.mocked(fetch).getMockImplementation();
+  if (!originalFetch) throw new Error('Fetch fixture is missing');
+  vi.mocked(fetch).mockImplementation((url, options) =>
+    String(url).includes('/commissioning/sessions?')
+      ? Promise.resolve({ ok: false, status: 401, json: async () => ({ message: 'Unauthorized' }) } as Response)
+      : originalFetch(url, options),
+  );
+  mount();
+  await waitFor(() => expect(screen.getByText(/Your login has expired/)).toBeTruthy());
+  expect(screen.getByRole('button', { name: 'Refresh status' })).toBeTruthy();
+  expect(screen.getByText('20%')).toBeTruthy();
+});
+
+it('shows when the controller last updated and the remaining operation time', async () => {
+  const now = Date.now();
+  activeSession = {
+    ...session,
+    state: 'delivering',
+    progressPercent: 22,
+    updatedAt: new Date(now - 125_000).toISOString(),
+    operationDeadlineAt: new Date(now + 600_000).toISOString(),
+  };
+  mount();
+  await waitFor(() => expect(screen.getByText(/Status checked \d+s ago/)).toBeTruthy());
+  expect(screen.getByText(/Last controller update 2m/)).toBeTruthy();
+  expect(screen.getByText(/Installation time limit/)).toBeTruthy();
+});
+
+it('shows the last controller checkpoint on the failure screen', async () => {
+  activeSession = {
+    ...session,
+    state: 'delivery_failed',
+    failureReason: 'Controller operation timed out.',
+    progressStep: 'Delivery failed',
+    auditLog: JSON.stringify([{ at: new Date().toISOString(), event: 'progress: Checking controller hardware' }]),
+  };
+  mount();
+  await waitFor(() => expect(screen.getByText('Stopped while: Checking controller hardware')).toBeTruthy());
+});
+
+it('collects only name and IP when one broker is available, selects runtime automatically and supports form submission', async () => {
+  vi.mocked(fetch).mockImplementation(async (url, options) => {
+    const address = String(url);
+    requests.push({ url: address, body: options?.body as string | undefined });
+    const data = address.endsWith('/settings')
+      ? { defaultMqttServerId: 1 }
+      : address.endsWith('/mqtt/servers')
+        ? [{ id: 1, name: 'Default broker' }]
+        : address.endsWith('/runtime-artifacts/current')
+          ? {
+              image: 'bundled-image',
+              bytes: 1024,
+              digest: 'digest',
+              manifest: { runtimeVersion: '0.1.0', hardware: { model: '751-9301', firmwareBaseline: '31' } },
+            }
+          : options?.method === 'POST'
+            ? { ...activeSession, state: 'awaiting_identity_confirmation' }
+            : address.includes('/commissioning/sessions')
+              ? []
+              : [];
+    return { ok: true, text: async () => JSON.stringify(data) } as Response;
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <CommissioningModal isOpen session={null} onOpenChange={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  fireEvent.change(screen.getByLabelText('Controller name'), { target: { value: ' Workshop ' } });
+  const nameForm = screen.getByLabelText('Controller name').closest('form');
+  if (!nameForm) throw new Error('Name step must be a form');
+  fireEvent.submit(nameForm);
+  fireEvent.change(screen.getByLabelText('Controller IP address'), { target: { value: '10.77.0.7' } });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Continue' }).hasAttribute('disabled')).toBe(false));
+  expect(screen.queryByRole('combobox')).toBeNull();
+  expect(screen.queryByRole('checkbox')).toBeNull();
+  expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
+  const connectionForm = screen.getByLabelText('Controller IP address').closest('form');
+  if (!connectionForm) throw new Error('Connection step must be a form');
+  fireEvent.submit(connectionForm);
+  await screen.findByRole('button', { name: 'Use this controller' });
+  const request = requests.find(({ body }) => body?.includes('targetHost'));
+  expect(JSON.parse(request?.body ?? '{}')).toEqual({ name: 'Workshop', targetHost: '10.77.0.7', mqttServerId: 1 });
+});
+
+it('shows a specific failure and only cleanup when an installation needs recovery', () => {
+  activeSession = {
+    ...session,
+    state: 'delivery_failed',
+    runtimeRecoveryAvailable: true,
+    failureReason:
+      'Managed SSH setup failed (proof). The new management SSH key could not be verified. Check SSH access on port 22 and the scoped sudo policy.',
+  };
+  mount();
+  expect(screen.getByText(/Check SSH access on port 22/)).toBeTruthy();
+  expect(screen.getByText('Controller: 192.0.2.7')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(false);
+  expect(screen.queryByRole('button', { name: 'Retry installation' })).toBeNull();
+  expect(screen.queryByRole('checkbox')).toBeNull();
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(screen.getByText(/Prüfe den SSH-Zugriff auf Port 22/)).toBeTruthy();
+});
+
 it('shows verified enrollment separately from unfinished configuration and management', async () => {
   activeSession.state = 'awaiting_verification';
   activeSession.progressStep = 'Verifying commissioned controller';
@@ -117,7 +245,7 @@ it('shows verified enrollment separately from unfinished configuration and manag
   expect(screen.queryByText('Commissioning is not yet verified')).toBeNull();
   expect(screen.queryByText(activeSession.progressDetail)).toBeNull();
   expect(screen.getByText('Desired/reported configuration: pending')).toBeTruthy();
-  expect(screen.getByText('Management hardening: unverified')).toBeTruthy();
+  expect(screen.getByText('Secure update access: unverified')).toBeTruthy();
 });
 
 it.each([false, true])(
@@ -134,14 +262,14 @@ it.each([false, true])(
       hardwareReadiness: 'ready',
     };
     mount();
-    await screen.findByText(complete ? 'supported' : 'Management hardening: supported');
+    await screen.findByText(complete ? 'supported' : 'Secure update access: supported');
     act(() => useTranslationState.getState().setLanguage('de'));
     expect(
-      screen.getByText(complete ? 'Unterstützt' : 'Absicherung des Verwaltungszugriffs: Unterstützt'),
+      screen.getByText(complete ? 'Unterstützt' : 'Sicherer Update-Zugang: Unterstützt'),
     ).toBeTruthy();
     if (!complete) expect(screen.getByText('Hardware-Prüfung der Laufzeitumgebung: Bereit')).toBeTruthy();
     act(() => useTranslationState.getState().setLanguage('en'));
-    expect(screen.getByText(complete ? 'supported' : 'Management hardening: supported')).toBeTruthy();
+    expect(screen.getByText(complete ? 'supported' : 'Secure update access: supported')).toBeTruthy();
   },
 );
 
@@ -159,14 +287,14 @@ it.each(['permanentConnection', 'enrollmentRevoked'] as const)(
 
 function fillCredentials() {
   if (!screen.queryByLabelText('Temporary SSH username'))
-    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Advanced: use different SSH credentials' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Use a different SSH login' })[0]);
   fireEvent.change(screen.getByLabelText('Temporary SSH username'), { target: { value: 'operator' } });
   fireEvent.change(screen.getByLabelText('Temporary SSH password'), { target: { value: 'test-only-password' } });
 }
 
 function fillRecoveryCredentials() {
   if (!screen.queryByLabelText('Recovery SSH username')) {
-    const switches = screen.getAllByRole('checkbox', { name: 'Advanced: use different SSH credentials' });
+    const switches = screen.getAllByRole('button', { name: 'Use a different SSH login' });
     fireEvent.click(switches[switches.length - 1]);
   }
   fireEvent.change(screen.getByLabelText('Recovery SSH username'), { target: { value: 'recovery-operator' } });
@@ -217,11 +345,7 @@ describe('FW31 software support boundary', () => {
     expect(screen.getByText('Unterstützt / Synchronisieren')).toBeTruthy();
     expect(screen.getByText(/^Nach der Aktion; Unsicherheit 1 Sekunden\./)).toBeTruthy();
     act(() => useTranslationState.getState().setLanguage('en'));
-    expect(
-      screen.getByRole('checkbox', {
-        name: /synchronization of controller system and hardware clocks to application UTC/,
-      }),
-    ).toBeTruthy();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     expect(requests.some(({ url }) => url.endsWith('/deliver') || url.endsWith('/inspect'))).toBe(false);
   });
   it.each([null, 'starting'] as const)(
@@ -320,7 +444,7 @@ describe('FW31 software support boundary', () => {
   });
 });
 
-describe('explicit recovery approval', () => {
+describe('explicit recovery action', () => {
   beforeEach(() => {
     activeSession.runtimeRecoveryAvailable = true;
   });
@@ -329,7 +453,6 @@ describe('explicit recovery approval', () => {
     activeSession.state = 'delivery_failed';
     mount();
     expect(screen.queryByLabelText('Recovery SSH password')).toBeNull();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Clean up failed installation' }));
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(1));
     expect(JSON.parse(requests.find(({ url }) => url.endsWith('/recover'))?.body ?? '{}').temporarySsh).toEqual({
@@ -391,25 +514,22 @@ describe('explicit recovery approval', () => {
     (state) => {
       activeSession.state = state;
       mount();
-      expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(true);
-      expect(screen.getByText(/cannot restore previous applications/)).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(false);
+      expect(screen.getByText(/Previous applications and CODESYS are not restored/)).toBeTruthy();
       expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
     },
   );
 
   it.each([false, true])(
-    'requires separate consent, scrubs credentials, and never retries (failure=%s)',
+    'uses a single cleanup action, scrubs credentials, and never retries (failure=%s)',
     async (failure) => {
       activeSession.state = 'delivery_failed';
       failRecovery = failure;
       mount();
       const recover = screen.getByRole('button', { name: 'Clean up failed installation' });
-      fillCredentials();
-      fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
       expect(screen.queryByLabelText('Recovery SSH password')).toBeNull();
       fillRecoveryCredentials();
-      expect(recover.hasAttribute('disabled')).toBe(true);
-      fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
+      expect(recover.hasAttribute('disabled')).toBe(false);
       fireEvent.click(recover);
       expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
       await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(1));
@@ -426,8 +546,8 @@ describe('explicit recovery approval', () => {
       expect(variables).not.toContain('"confirmInstall":true');
       if (failure) expect(screen.getByText('Runtime snapshot unavailable')).toBeTruthy();
       fillRecoveryCredentials();
-      expect(recover.hasAttribute('disabled')).toBe(true);
-      expect(screen.getByRole('button', { name: 'Retry installation' }).hasAttribute('disabled')).toBe(true);
+      expect(recover.hasAttribute('disabled')).toBe(false);
+      expect(screen.queryByRole('button', { name: 'Retry installation' })).toBeNull();
       expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(0);
     },
   );
@@ -436,7 +556,6 @@ describe('explicit recovery approval', () => {
     activeSession.state = 'awaiting_discovery';
     const { rerender, view } = mount();
     fillRecoveryCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
     if (mode === 'button') fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     if (mode === 'session') activeSession = { ...activeSession, id: 8 };
     else rerender(view(false));
@@ -444,7 +563,7 @@ describe('explicit recovery approval', () => {
     expect(screen.queryByLabelText('Recovery SSH password')).toBeNull();
     expect(screen.queryByLabelText('Recovery SSH username')).toBeNull();
     fillRecoveryCredentials();
-    expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(false);
     expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
   });
 
@@ -452,20 +571,18 @@ describe('explicit recovery approval', () => {
     activeSession.state = 'awaiting_discovery';
     const { rerender, view } = mount();
     fillRecoveryCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Clean up failed installation' }));
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/7/recover'))).toHaveLength(1));
     await waitFor(() => expect(client.isMutating()).toBe(0));
     activeSession = { ...activeSession, id: 8 };
     rerender(view(true));
     fillRecoveryCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Clean up failed installation' }));
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/8/recover'))).toHaveLength(1));
   });
 });
 
-describe('explicit install approval', () => {
+describe('explicit install action', () => {
   it('does not query coordinator recovery or show an interrupted-operation gate', () => {
     mount();
     expect(requests.some(({ url }) => url.endsWith('/operation'))).toBe(false);
@@ -475,7 +592,6 @@ describe('explicit install approval', () => {
     mount();
     expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
     expect(screen.getAllByText('SSH login: Default root account').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Install runtime' }));
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(1));
     expect(JSON.parse(requests.find(({ url }) => url.endsWith('/deliver'))?.body ?? '{}').temporarySsh).toEqual({
@@ -484,7 +600,7 @@ describe('explicit install approval', () => {
     });
   });
   it.each(['codesys-active', 'codesys-boot-enabled'])(
-    'uses one consequence confirmation for %s without preservation or WBM gates',
+    'uses the install button as the consequence confirmation for %s without preservation or WBM gates',
     (exclusivity) => {
       activeSession.platformReport = JSON.stringify({
         version: '1',
@@ -497,30 +613,28 @@ describe('explicit install approval', () => {
         qualification: 'software-supported',
       });
       mount();
-      expect(screen.getByText('Destructive installation')).toBeTruthy();
-      expect(screen.getByText(/Existing applications and data may be lost/)).toBeTruthy();
-      expect(screen.getByText(/Make connected equipment safe/)).toBeTruthy();
+      expect(screen.getByText('Before installing')).toBeTruthy();
+      expect(screen.getByText(/Back up existing applications/)).toBeTruthy();
+      expect(screen.getByText(/make connected equipment safe/)).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Recover saved runtime' })).toBeNull();
       fillCredentials();
       const install = screen.getByRole('button', { name: 'Install runtime' });
-      expect(install.hasAttribute('disabled')).toBe(true);
-      fireEvent.click(screen.getByRole('checkbox', { name: /permanent CODESYS disablement and possible loss/ }));
+      expect(install.hasAttribute('disabled')).toBe(false);
       expect(install.hasAttribute('disabled')).toBe(false);
       expect(requests.filter(({ body }) => body)).toHaveLength(0);
     },
   );
 
-  it.each([false, true])('requires fresh consent and clears secrets after submission (failure=%s)', async (failure) => {
+  it.each([false, true])('submits once and clears secrets after submission (failure=%s)', async (failure) => {
     failInstall = failure;
     if (failure) activeSession.state = 'delivery_failed';
     mount();
     const install = screen.getByRole('button', { name: failure ? 'Retry installation' : 'Install runtime' });
     expect(screen.queryByLabelText('Temporary SSH username')).toBeNull();
     expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
-    expect(install.hasAttribute('disabled')).toBe(true);
+    expect(install.hasAttribute('disabled')).toBe(false);
     fillCredentials();
-    expect(install.hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
+    expect(install.hasAttribute('disabled')).toBe(false);
     fireEvent.click(install);
     expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(1));
@@ -547,35 +661,33 @@ describe('explicit install approval', () => {
       ),
     ).not.toContain('"confirmInstall":true');
     expect(install.hasAttribute('disabled')).toBe(true);
-    // A new password alone cannot reuse the previous approval.
+    // Re-entering credentials enables a new explicit action; it never submits automatically.
     fillCredentials();
-    expect(install.hasAttribute('disabled')).toBe(true);
+    expect(install.hasAttribute('disabled')).toBe(false);
     expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(1);
   });
 
-  it('clears the password and consent when closed externally and reopened', () => {
+  it('clears the password when closed externally and reopened', () => {
     const { rerender, view } = mount();
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     rerender(view(false));
     rerender(view(true));
     expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
     fillCredentials();
-    expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(false);
     expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(0);
   });
 
-  it('clears the password and consent on the Close button', () => {
+  it('clears the password on the Close button', () => {
     const { rerender, view, onOpenChange } = mount();
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     rerender(view(false));
     rerender(view(true));
     expect(screen.queryByLabelText('Temporary SSH password')).toBeNull();
     fillCredentials();
-    expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(false);
   });
 });
 
@@ -586,12 +698,13 @@ it.each([false, true])('requires reviewed identity before confirming a host key 
   expect(button.disabled).toBe(true);
   fireEvent.change(screen.getByLabelText('Reviewed SSH host-key fingerprint'), { target: { value: 'SHA256:wrong' } });
   expect(button.disabled).toBe(true);
-  if (isolated)
-    fireEvent.click(screen.getByRole('checkbox', { name: /Alternatively, I verified the physical 751-9301 label/ }));
-  else
+  if (isolated) {
+    fireEvent.click(screen.getByRole('button', { name: 'Use this controller' }));
+  } else {
     fireEvent.change(screen.getByLabelText('Reviewed SSH host-key fingerprint'), { target: { value: 'SHA256:test' } });
-  expect(button.disabled).toBe(false);
-  fireEvent.click(button);
+    expect(button.disabled).toBe(false);
+    fireEvent.click(button);
+  }
   await waitFor(() => expect(requests.some(({ url }) => url.endsWith('/confirm-host-key'))).toBe(true));
   expect(JSON.parse(requests.find(({ url }) => url.endsWith('/confirm-host-key'))?.body ?? '{}')).toEqual({
     hostKeyFingerprint: 'SHA256:test',

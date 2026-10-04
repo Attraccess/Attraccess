@@ -57,18 +57,18 @@ Diese Seite listet häufig auftretende Probleme und deren Lösungen auf.
 
 Wenn Sie die E-Mail zum Zurücksetzen nicht erhalten, wenden Sie sich an Ihren Werkstattadministrator. Dieser kann Ihr Passwort für Sie zurücksetzen.
 
-## NFC-Karte wird nicht erkannt
+## RFID-Karte wird nicht erkannt
 
-**Symptom:** Das Halten Ihrer NFC-Karte an den Attractap-Leser funktioniert nicht.
+**Symptom:** Das Halten Ihrer RFID-Karte an den Attractap-Leser funktioniert nicht.
 
 **Mögliche Ursachen und Lösungen:**
 
 | Ursache | Lösung |
 |---------|--------|
-| Karte nicht registriert | Stellen Sie sicher, dass Ihre NFC-Karte in Attraccess registriert ist. Prüfen Sie unter **Mein Konto > NFC-Karten** oder fragen Sie Ihren Administrator. |
+| Karte nicht registriert | Stellen Sie sicher, dass Ihre RFID-Karte in Attraccess registriert ist. Prüfen Sie unter **Mein Konto > RFID-Karten** oder fragen Sie Ihren Administrator. |
 | Leser offline | Der Attractap-Leser ist möglicherweise getrennt oder offline. Prüfen Sie, ob die Status-LED eine Verbindung anzeigt. |
-| Falscher Kartentyp | Nur kompatible NFC-Karten funktionieren mit dem Attractap-Leser. Wenden Sie sich an Ihren Administrator für eine kompatible Karte. |
-| Karte beschädigt | Der NFC-Chip in der Karte könnte beschädigt sein. Versuchen Sie eine andere Karte oder bitten Sie um Ersatz. |
+| Falscher Kartentyp | Nur kompatible RFID-Karten funktionieren mit dem Attractap-Leser. Wenden Sie sich an Ihren Administrator für eine kompatible Karte. |
+| Karte beschädigt | Der RFID-Chip in der Karte könnte beschädigt sein. Versuchen Sie eine andere Karte oder bitten Sie um Ersatz. |
 
 ## Datenbankprobleme
 

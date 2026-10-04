@@ -6,7 +6,7 @@
 #include "freertos/task.h"
 
 #include "application/application.hpp"
-#include "nfc/nfc.hpp"
+#include "rfid/rfid.hpp"
 #include "websocket/websocket.hpp"
 #ifdef DEMO_MODE
 #include "api/demo_websocket.hpp"

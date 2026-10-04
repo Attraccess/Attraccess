@@ -1,6 +1,6 @@
 #include "application/application.hpp"
 #include "profile_store.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstring>
@@ -294,11 +294,16 @@ int main(int argc, char **argv) {
     assert(server.count("RESOURCE_USAGE_FORM_SUBMIT_PAGE") == 1);
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":true})"); pump();
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeForm + 2);
-    server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
+    server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"billingSummary":{"amount":1250,"total":"12,50 EUR"}})"); pump();
+    assert(label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
+    assert(label(lv_layer_top(), "12,50 EUR"));
     active = false; list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Start"));
     display.capture(output, "06c-form-completed-stop");
+    display.capture(output, "06d-session-billing-summary");
+    click("OK", true);
+    assert(!label(lv_layer_top(), "12,50 EUR"));
     // A separately running usage is unaffected by reader logout.
     active = true; list();
     const auto stopsBeforeLogout = server.count("STOP_RESOURCE_USAGE_SESSION");
@@ -349,7 +354,8 @@ int main(int argc, char **argv) {
     server.push("RESOURCE_LIST", R"({"revision":1,"authenticatedUsername":"Alex","resources":[]})"); pump();
     assert(label(lv_screen_active(), "Stop"));
     // A newer broadcast can overtake the matching refresh without trapping input.
-    click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
+    click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"billingSummary":{"amount":0,"total":"0,00 EUR"}})"); pump();
+    assert(!label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
     active = false; list(true, false, false);
     const auto refreshId = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
     server.push("RESOURCE_LIST", "{\"revision\":" + std::to_string(listVersion - 1) + ",\"requestId\":" + std::to_string(refreshId) + ",\"resources\":[]}"); pump();

@@ -57,7 +57,7 @@ Die API verwendet **Session-Cookies** zur Authentifizierung. Wenn Sie sich über
 | **Resources** | `/api/resources` | Ressourcen-CRUD, Nutzungssitzungen |
 | **Projects** | `/api/projects` | Projektverwaltung |
 | **Settings** | `/api/settings` | Systemkonfiguration |
-| **Attractap** | `/api/attractap` | NFC-Leser-Verwaltung |
+| **Attractap** | `/api/attractap` | RFID-Leser-Verwaltung |
 | **MQTT** | `/api/mqtt` | MQTT-Server-Konfiguration |
 | **Billing** | `/api/billing` | Abrechnung und Transaktionen |
 | **Plugins** | `/api/plugins` | Plugin-Verwaltung |
