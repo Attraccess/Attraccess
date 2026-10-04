@@ -280,26 +280,7 @@
       "@typescript-eslint/typescript-estree>typescript": "npm:@typescript/typescript6@^6.0.0",
       "@internationalized/date": "3.12.3",
       "react": "19.2.8",
-      "react-dom": "19.2.8",
-      "tscircuit>zod": "3.25.76",
-      "@tscircuit/cli>zod": "3.25.76",
-      "@tscircuit/core>zod": "3.25.76",
-      "@tscircuit/eval>zod": "3.25.76",
-      "@tscircuit/props>zod": "3.25.76",
-      "@tscircuit/runframe>zod": "3.25.76",
-      "@tscircuit/circuit-json-util>zod": "3.25.76",
-      "@tscircuit/soup-util>zod": "3.25.76",
-      "@tscircuit/ngspice-spice-engine>zod": "3.25.76",
-      "calculate-packing>zod": "3.25.76",
-      "circuit-json-to-gltf>zod": "3.25.76",
-      "circuit-json-to-spice>zod": "3.25.76"
-    },
-    "packageExtensions": {
-      "circuit-json@0.0.425": {
-        "dependencies": {
-          "zod": "3.25.76"
-        }
-      }
+      "react-dom": "19.2.8"
     },
     "onlyBuiltDependencies": [
       "@balena/compose-parser",
