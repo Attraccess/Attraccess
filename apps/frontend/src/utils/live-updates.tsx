@@ -10,41 +10,48 @@ import { PluginLiveUpdatesProvider } from '@attraccess/plugins-frontend-sdk';
 
 const Context = createContext<LiveUpdateClient | null>(null);
 const clients = new Set<LiveUpdateClient>();
-const useLiveUpdatesAuth = create(() => ({ stopped: false }));
+const useLiveUpdatesAuth = create(() => ({ stopped: false, generation: 0 }));
+
+function disposeClients(): void {
+  clients.forEach((client) => client.dispose());
+  clients.clear();
+}
 
 /** A successful explicit login starts a new authentication context. */
 export function resumeLiveUpdates(): void {
-  useLiveUpdatesAuth.setState({ stopped: false });
+  disposeClients();
+  useLiveUpdatesAuth.setState((state) => ({ stopped: false, generation: state.generation + 1 }));
 }
 
 /** Called before logout, so callbacks stop even while the logout request is pending. */
 export function stopLiveUpdates(): void {
-  clients.forEach((client) => client.dispose());
-  clients.clear();
+  disposeClients();
   useLiveUpdatesAuth.setState({ stopped: true });
 }
 
 export function LiveUpdatesProvider({ userId, children }: { userId?: number; children: ReactNode }) {
   const queryClient = useQueryClient();
   const origin = getBaseUrl();
-  const isStopped = useLiveUpdatesAuth((state) => state.stopped);
+  const { stopped: isStopped, generation } = useLiveUpdatesAuth();
   const client = useMemo(
     () =>
       userId && !isStopped
         ? new LiveUpdateClient(
             origin,
             () => {
+              if (useLiveUpdatesAuth.getState().generation !== generation) return;
               stopLiveUpdates();
               queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), null);
               queryClient.clear();
             },
             () => {
+              if (useLiveUpdatesAuth.getState().generation !== generation) return;
               // The host owns query recovery once per connection, including plugins.
               void queryClient.invalidateQueries();
             },
           )
         : null,
-    [userId, origin, queryClient, isStopped],
+    [userId, origin, queryClient, isStopped, generation],
   );
   useEffect(() => {
     if (!client) return;

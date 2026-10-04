@@ -50,7 +50,9 @@ only bundled controls. Connection UUIDs also work on plain HTTP through the
 existing `uuid` library's `getRandomValues` fallback.
 A rejected/expired session stops retries,
 clears callbacks and clears cached authenticated state. Logout disposes the
-transport before its HTTP request. A subsequent user gets a new provider/client.
+transport before its HTTP request. Every successful explicit login creates a new
+provider/client authentication context, including another login by the same user.
+The former client's expiry and recovery callbacks cannot affect its replacement.
 On last unsubscribe or stream disconnect, RxJS subscriptions and unobserved
 subjects are released. A disconnected tab whose TCP close is delayed expires
 when its lease stops renewing. Deployments with multiple API workers must route

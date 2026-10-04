@@ -23,7 +23,7 @@ vi.mock('./live-update-client', () => ({
 }));
 beforeEach(() => resumeLiveUpdates());
 afterEach(() => {
-  stopLiveUpdates();
+  act(() => stopLiveUpdates());
   state.clients.length = 0;
 });
 
@@ -104,11 +104,13 @@ describe('live topic React lifecycle', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    const active = state.clients.at(-1);
-    if (!active) throw new Error('Missing provider client');
-    expect(active.callbacks.size).toBe(0);
-    expect(active.dispose).not.toHaveBeenCalled();
+    expect(state.clients.every((client) => client.callbacks.size === 0)).toBe(true);
     hook.rerender({ enabled: true });
+    // StrictMode may construct a discarded memo value; inspect the subscribed owner.
+    const active = state.clients.find((client) => client.callbacks.size > 0);
+    if (!active) throw new Error('Missing subscribed provider client');
+    expect(state.clients.reduce((count, client) => count + client.callbacks.size, 0)).toBe(1);
+    expect(active.dispose).not.toHaveBeenCalled();
     active.callbacks.forEach((cb) => cb({ id: 1 }));
     expect(callback).toHaveBeenCalledTimes(1);
     hook.result.current.abort();
