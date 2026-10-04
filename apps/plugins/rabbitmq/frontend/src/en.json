@@ -1,7 +1,4 @@
 {
-  "page": {
-    "description": "RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT server detail view."
-  },
   "status": {
     "detected": "detected",
     "refresh": "Refresh RabbitMQ status",

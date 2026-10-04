@@ -35,7 +35,7 @@ import { AuditService } from '../../audit/audit.service';
 import { LiveNotificationsService } from '../../billing/liveNotificationsService';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 import { toLegacyMeterValue } from './legacy-energy-conversion';
-import { MeteringValueError, meterCharge, formatMeterValue, toMeterValue } from './quantity';
+import { MeteringValueError, meterCharge, meterDiscount, formatMeterValue, toMeterValue } from './quantity';
 
 const CLOCK_SKEW_MS = 5_000;
 const INTERIM_MAX_AGE_MS = 5 * 60_000;
@@ -82,10 +82,28 @@ export class ResourceMeteringService implements OnModuleInit {
 
   /** The meter is defined by its flow branches: trigger → acknowledgement, trigger → report. */
   async getDefinition(resourceId: number, meterId: number) {
+    const flow = await this.getDefinitionFlow(resourceId);
+    return this.definitionFromFlow(meterId, flow);
+  }
+
+  private async getDefinitionFlow(resourceId: number) {
     const [allNodes, edges] = await Promise.all([
       this.nodes.find({ where: { resourceId } }),
       this.edges.find({ where: { resourceId } }),
     ]);
+    return { allNodes, edges };
+  }
+
+  private definitionFromFlow(
+    meterId: number,
+    {
+      allNodes,
+      edges,
+    }: {
+      allNodes: ResourceFlowNode[];
+      edges: ResourceFlowEdge[];
+    },
+  ) {
     const nodes = allNodes.filter((n) => !String(n.type).includes('.metering.') || n.data?.meterId === meterId);
     const reachable = (triggerType: ResourceFlowNodeType, sinkType: ResourceFlowNodeType): boolean => {
       const types = new Map(nodes.map((node) => [node.id, node.type]));
@@ -165,11 +183,19 @@ export class ResourceMeteringService implements OnModuleInit {
           collectionMode: definition.incrementOnly ? 'increment' : 'requested',
           latestValue: definition.incrementOnly ? '0' : null,
         });
-        if (!definition.incrementOnly)
-          await this.runOperation(session, 'start', {
-            trigger: ResourceFlowNodeType.INPUT_METERING_START,
-            timeoutSeconds: definition.start.timeoutSeconds,
-          });
+        if (!definition.incrementOnly) {
+          try {
+            await this.runOperation(session, 'start', {
+              trigger: ResourceFlowNodeType.INPUT_METERING_START,
+              timeoutSeconds: definition.start.timeoutSeconds,
+            });
+          } catch (error) {
+            if (meter.creditsPerUnit > 0) throw error;
+            await this.sessions.delete(session.id);
+            this.logger.warn(`Skipping tracking-only meter ${meter.meterId}: ${this.reason(error)}`);
+            continue;
+          }
+        }
         await this.sessions.update(
           { meterId: meter.meterId, status: ResourceMeteringSessionStatus.Pending },
           {
@@ -366,9 +392,12 @@ export class ResourceMeteringService implements OnModuleInit {
     return this.sessions.findOneByOrFail({ id: session.id });
   }
 
-  private async assertMeterStillOwned(session: ResourceMeteringSession): Promise<void> {
+  private async assertMeterStillOwned(
+    session: ResourceMeteringSession,
+    manager = this.sessions.manager,
+  ): Promise<void> {
     if (session.compromisedReason) throw new MeteringOperationError(session.compromisedReason);
-    const newer = await this.sessions.count({
+    const newer = await manager.count(ResourceMeteringSession, {
       where: { resourceId: session.resourceId, meterId: session.meterId, usageId: MoreThan(session.usageId) },
     });
     if (newer > 0) throw new MeteringOperationError('A later session already uses the meter');
@@ -397,7 +426,7 @@ export class ResourceMeteringService implements OnModuleInit {
       });
       const charge = meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit);
       const factor = usage.billingFactor ?? usage.user.billingFactor;
-      const discount = Math.round(charge - charge * (factor / 100));
+      const discount = meterDiscount(charge, factor);
       const correction = await manager.save(BillingTransaction, {
         userId: original.userId,
         initiatorId,
@@ -513,9 +542,8 @@ export class ResourceMeteringService implements OnModuleInit {
 
   async updateMeter(resourceId: number, meterId: number, name: string) {
     const meter = await this.requireMeter(resourceId, meterId);
-    meter.name = name.trim();
     try {
-      await this.meters.save(meter);
+      await this.meters.update({ id: meter.id, resourceId }, { name: name.trim() });
     } catch (error) {
       if (String(error).includes('UNIQUE')) throw new ConflictException('METER_NAME_EXISTS');
       throw error;
@@ -558,19 +586,18 @@ export class ResourceMeteringService implements OnModuleInit {
 
   async getStatus(resourceId: number) {
     const meters = await this.meters.find({ where: { resourceId } });
-    const definitions = await Promise.all(
-      meters.map(async (meter) => {
-        const definition = await this.getDefinition(resourceId, meter.id);
-        return {
-          meterId: meter.id,
-          name: meter.name,
-          creditsPerUnit: meter.creditsPerUnit,
-          configured: definition.configured,
-          problems: definition.problems,
-          interimIntervalMinutes: definition.hasCollection ? definition.collect.interimIntervalMinutes : 0,
-        };
-      }),
-    );
+    const flow = await this.getDefinitionFlow(resourceId);
+    const definitions = meters.map((meter) => {
+      const definition = this.definitionFromFlow(meter.id, flow);
+      return {
+        meterId: meter.id,
+        name: meter.name,
+        creditsPerUnit: meter.creditsPerUnit,
+        configured: definition.configured,
+        problems: definition.problems,
+        interimIntervalMinutes: definition.hasCollection ? definition.collect.interimIntervalMinutes : 0,
+      };
+    });
     const unsettled = await this.sessions.find({
       where: { resourceId, status: In([ResourceMeteringSessionStatus.Pending, ResourceMeteringSessionStatus.Failed]) },
       order: { createdAt: 'DESC' },
@@ -772,7 +799,9 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   private readingValue(report: { value: string; legacyEnergyUnit?: string }): bigint {
-    return report.legacyEnergyUnit ? toLegacyMeterValue(report.value, report.legacyEnergyUnit) : toMeterValue(report.value);
+    return report.legacyEnergyUnit !== undefined
+      ? toLegacyMeterValue(report.value, report.legacyEnergyUnit)
+      : toMeterValue(report.value);
   }
 
   private async acceptReading(
@@ -881,6 +910,24 @@ export class ResourceMeteringService implements OnModuleInit {
         )
           return;
         throw new MeteringOperationError('The collection was already answered or has expired');
+      }
+      if (!session) {
+        const attempt = await manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: operation.resourceId });
+        const crossedSession = await manager
+          .createQueryBuilder(ResourceMeteringSession, 's')
+          .innerJoin(ResourceUsage, 'u', 'u.id = s.usageId')
+          .where('s.meterId = :meterId', { meterId: meter.id })
+          .andWhere('(u.endTime IS NULL OR u.endTime >= :requestedAt)', { requestedAt: operation.requestedAt })
+          .getExists();
+        if (attempt || crossedSession)
+          throw new MeteringOperationError('The idle collection crossed a session boundary');
+      } else if (session.status === ResourceMeteringSessionStatus.Pending) {
+        const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId } });
+        // A current counter cannot distinguish consumption at session end from later idle use.
+        // Only a device reading explicitly captured at the persisted end boundary may reconcile it.
+        if (!report.observedAt || !usage.endTime || new Date(report.observedAt).getTime() !== usage.endTime.getTime())
+          throw new MeteringOperationError('A retry requires a reading captured at the session end boundary');
+        await this.assertMeterStillOwned(session, manager);
       }
       const freshAfter =
         operation.kind === 'final'

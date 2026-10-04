@@ -32,7 +32,7 @@ Select the same meter in all four nodes. In **Metering ready**, supply the count
 
 **Metering collection** runs at its configured interval, even outside sessions. `0` disables periodic collection. It also obtains a fresh final reading when a session ends. Timeout, final attempts and retry delay control collection failures.
 
-An increment-only meter can use **Report meter** in ordinary flows without start or collection branches. The stored increments are attributed and settled when the session ends; no device reading is requested.
+An increment-only meter can use **Report meter** in ordinary flows without start or collection branches. The stored increments are attributed and settled when the session ends; no device reading is requested. Cumulative reports without those branches track lifetime consumption only: a pushed total can include idle use since the previous report, so it cannot safely establish a session boundary.
 
 ## Optional billing
 
@@ -40,7 +40,7 @@ Configure a price **per measured value** for each meter in the resource's billin
 
 Each meter's name and rate are captured when a session starts. Later name or rate changes do not change its bill. Amount = session consumption × captured rate, rounded half-up once to the currency minor unit. The user's billing factor applies as usual. Consumption outside a session increases lifetime consumption without charging a user.
 
-A billed cumulative meter must have a complete start and collection definition before a session can begin. An unavailable final reading allows the session and base bill to finish, leaving that meter's charge **pending**. Operators can retry collection or waive the charge. A later session, reset, or an accepted idle increase makes the old charge unrecoverable; it can then only be waived. Successful retries create correction transactions without changing the original bill.
+A billed cumulative meter must have a complete start and collection definition before a session can begin. A tracking-only meter's start failure does not block resource usage; that meter is skipped for the session. An unavailable final reading allows the session and base bill to finish, leaving that meter's charge **pending**. Operators can retry collection or waive the charge. A retry must return a stored reading with **Observed at** equal to the session's end timestamp; a current counter could include idle use and is rejected. A later session, reset, or an accepted idle increase makes the old charge unrecoverable; it can then only be waived. Successful retries create correction transactions without changing the original bill.
 
 ## Existing electricity setups
 

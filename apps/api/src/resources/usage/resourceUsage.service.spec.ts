@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsageService } from './resourceUsage.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
+  Project,
   Resource,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
@@ -466,6 +468,47 @@ describe('ResourceUsageService', () => {
     usage.userId = 7;
     await expect(service.updateSessionProject(1, 8, user, {} as never)).rejects.toThrow('required');
     expect(resourceUsageRepository.save).not.toHaveBeenCalled();
+  });
+
+  describe('getSessionDetails', () => {
+    const requester = { id: 1, effectivePermissions: new Set<string>() } as AuthenticatedUser;
+
+    it('loads the requested visible session and its usage details for the owner', async () => {
+      const usage = { id: 8, userId: 1, resourceId: 5 } as ResourceUsage;
+      resourceUsageRepository.findOne.mockResolvedValue(usage);
+      expect(await service.getSessionDetails(5, 8, requester)).toBe(usage);
+      expect(resourceUsageRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 8, resourceId: 5, lifecyclePending: false },
+        relations: expect.arrayContaining(['project', 'supervisorUser', 'formSubmissions.form']),
+      });
+      expect(projectsService.findOneById).not.toHaveBeenCalled();
+    });
+
+    it('allows resource managers to view another user’s session', async () => {
+      resourceUsageRepository.findOne.mockResolvedValue({ id: 8, userId: 2 } as ResourceUsage);
+      expect(
+        await service.getSessionDetails(5, 8, { ...requester, effectivePermissions: new Set(['resources.update']) }),
+      ).toEqual({ id: 8, userId: 2 });
+      expect(projectsService.findOneById).not.toHaveBeenCalled();
+    });
+
+    it('requires project access before returning another member’s usage', async () => {
+      const usage = { id: 8, userId: 2, projectId: 3 } as ResourceUsage;
+      resourceUsageRepository.findOne.mockResolvedValue(usage);
+      projectsService.findOneById.mockResolvedValue({ id: 3 } as Project);
+      expect(await service.getSessionDetails(5, 8, requester)).toBe(usage);
+      expect(projectsService.findOneById).toHaveBeenCalledWith(1, 3);
+      projectsService.findOneById.mockRejectedValue(new NotFoundException('Project not found'));
+      await expect(service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+    });
+
+    it.each([null, { id: 8, userId: 2, projectId: null }])(
+      'rejects missing or inaccessible sessions (%s)',
+      async (usage) => {
+        resourceUsageRepository.findOne.mockResolvedValue(usage as ResourceUsage);
+        await expect(service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+      },
+    );
   });
 
   describe('startSession', () => {

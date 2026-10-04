@@ -21,7 +21,10 @@ export class MeteringReadyExecutor implements NodeExecutor {
     await ctx.metering.complete({
       kind: 'ready',
       baseline: baselineValue
-        ? { value: baselineValue, legacyEnergyUnit: render(data.legacyEnergyUnit) ?? '' }
+        ? {
+            value: baselineValue,
+            legacyEnergyUnit: data.legacyEnergyUnit === undefined ? undefined : (render(data.legacyEnergyUnit) ?? ''),
+          }
         : undefined,
       source: render(data.source),
     });

@@ -17,12 +17,14 @@ const state = vi.hoisted(() => ({
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({
     t: (key: string, params?: { countdown?: string }) => (params?.countdown ? `${key}:${params.countdown}` : key),
+    tExists: () => true,
   }),
   useDateTimeFormatter: () => (date: string) => date,
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../flowContext', () => ({ useFlowContext: () => ({ liveLogs: state.live }) }));
 vi.mock('@attraccess/react-query-client', () => ({
+  useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
   useResourceFlowsServiceGetFlowLogRecordingStatusKey: 'recording',
   useResourceFlowsServiceGetResourceFlow: () => ({
     data: {

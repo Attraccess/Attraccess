@@ -42,6 +42,23 @@ export function meterCharge(value: bigint, creditsPerUnit: number): number {
   return Number(result);
 }
 
+/** Match Math.round's half-towards-positive-infinity policy without floating-point intermediates. */
+export function meterDiscount(charge: number, factor: number): number {
+  if (!Number.isSafeInteger(charge) || charge < 0 || !Number.isSafeInteger(factor) || factor < 0)
+    throw new RangeError('Invalid meter billing factor');
+  const numerator = BigInt(charge) * (BigInt(100) - BigInt(factor));
+  const rounded = numerator + BigInt(50);
+  const discount = rounded >= BigInt(0) ? rounded / BigInt(100) : (rounded - BigInt(99)) / BigInt(100);
+  const amount = BigInt(charge) - discount;
+  if (
+    amount > BigInt(Number.MAX_SAFE_INTEGER) ||
+    discount > BigInt(Number.MAX_SAFE_INTEGER) ||
+    discount < -BigInt(Number.MAX_SAFE_INTEGER)
+  )
+    throw new RangeError('Meter charge exceeds the supported billing range');
+  return Number(discount);
+}
+
 export function formatMeterValue(value: bigint): string {
   const fraction = (value % SCALE).toString().padStart(9, '0').replace(/0+$/, '');
   return fraction ? `${value / SCALE}.${fraction}` : `${value / SCALE}`;

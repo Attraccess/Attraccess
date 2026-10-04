@@ -20,6 +20,8 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './we
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { WS_METRICS } from '../../metrics/definitions/tokens';
+import { ResourceMeteringService } from '../../resources/metering/resource-metering.service';
+import { ResourceOperatingAttributionService } from '../../resources/operating-intervals/resource-operating-attribution.service';
 import { ResourceListService } from './handlers/resource-list.service';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { AttractapAuthHandler } from './handlers/auth.handler';
@@ -121,6 +123,8 @@ describe('AttractapGateway', () => {
         AttractapCardHandler,
         AttractapFormsHandler,
         AttractapSessionHandler,
+        { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
+        { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
         AttractapBillingHandler,
         AttractapProjectsHandler,
         AttractapSupervisionHandler,

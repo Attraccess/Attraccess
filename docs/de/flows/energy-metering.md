@@ -32,7 +32,7 @@ In allen vier Knoten denselben Zähler auswählen. Bei einem Gesamtzähler muss 
 
 **Messwert abfragen** läuft regelmäßig, auch außerhalb von Sitzungen, und liest beim Sitzungsende den finalen Wert. Das Intervall `0` deaktiviert regelmäßige Abfragen. Zeitlimit, finale Versuche und Wiederholungsverzögerung steuern Fehlerfälle.
 
-Ein Zähler mit ausschließlich **increment**-Meldungen benötigt keine Start- oder Abfragezweige. Die gespeicherten Zuwächse werden beim Sitzungsende abgerechnet.
+Ein Zähler mit ausschließlich **increment**-Meldungen benötigt keine Start- oder Abfragezweige. Die gespeicherten Zuwächse werden beim Sitzungsende abgerechnet. Kumulative Meldungen ohne diese Zweige erfassen nur den Gesamtverbrauch: Ein übermittelter Zählerstand kann Leerlaufverbrauch seit der letzten Meldung enthalten und legt deshalb keine sichere Sitzungsgrenze fest.
 
 ## Optionale Abrechnung
 
@@ -40,7 +40,7 @@ In den Abrechnungseinstellungen pro Zähler einen Preis **pro Messwert** festleg
 
 Name und Preis werden beim Sitzungsstart gespeichert. Spätere Änderungen beeinflussen die laufende Sitzung nicht. Betrag = Sitzungsverbrauch × gespeicherter Preis; einmalig kaufmännisch auf die kleinste Währungseinheit gerundet. Der Abrechnungsfaktor gilt wie üblich. Verbrauch außerhalb einer Sitzung wird keinem Benutzer berechnet.
 
-Bei kostenpflichtigen kumulativen Zählern müssen Start- und Abfragezweige vollständig sein. Fehlt die finale Messung, endet die Sitzung mit abgerechneter Grundgebühr und ausstehender Zählerabrechnung. Erneut abfragen oder erlassen bleibt möglich, bis eine spätere Sitzung, ein Reset oder ein gemeldeter Zuwachs außerhalb der Sitzung die Zuordnung unmöglich macht. Danach kann der Betrag nur erlassen werden. Erfolgreiche Wiederholungen erzeugen Korrekturbuchungen; die ursprüngliche Abrechnung bleibt unverändert.
+Bei kostenpflichtigen kumulativen Zählern müssen Start- und Abfragezweige vollständig sein. Ein fehlgeschlagener Start eines kostenlosen Zählers blockiert die Ressourcennutzung nicht; dieser Zähler wird für die Sitzung übersprungen. Fehlt die finale Messung, endet die Sitzung mit abgerechneter Grundgebühr und ausstehender Zählerabrechnung. Eine Wiederholung muss eine gespeicherte Messung liefern, deren **Gemessen am** exakt dem Endzeitstempel der Sitzung entspricht. Ein aktueller Zählerstand könnte Leerlaufverbrauch enthalten und wird abgelehnt. Erneut abfragen oder erlassen bleibt möglich, bis eine spätere Sitzung, ein Reset oder ein gemeldeter Zuwachs außerhalb der Sitzung die Zuordnung unmöglich macht. Danach kann der Betrag nur erlassen werden. Erfolgreiche Wiederholungen erzeugen Korrekturbuchungen; die ursprüngliche Abrechnung bleibt unverändert.
 
 ## Bestehende Strommessung
 

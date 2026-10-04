@@ -4,6 +4,7 @@ import { AttractapEventType, AttractapEvent } from '../websocket.types';
 import { ResourceInUseError } from '../../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceActionGuard } from './resource-action.guard';
 
 describe('AttractapSessionHandler – session + flow button', () => {
   let handler: AttractapSessionHandler;
@@ -15,7 +16,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
     sendBinaryData: jest.Mock;
   };
   let mockUsersService: { findOne: jest.Mock };
-  let mockResourceUsageService: { startSession: jest.Mock; endSession: jest.Mock };
+  let mockResourceUsageService: { startSession: jest.Mock; endSession: jest.Mock; getActiveSession: jest.Mock };
   let mockResourceFlowsExecutorService: { pressButton: jest.Mock };
   let mockSumUpService: { getIsEnabled: jest.Mock };
   let mockResourceActionGuard: { validateResourceAction: jest.Mock };
@@ -24,6 +25,8 @@ describe('AttractapSessionHandler – session + flow button', () => {
   let mockSupervisionService: { settleByCard: jest.Mock };
   let mockBillingService: { getResourceUsageCharge: jest.Mock; getConfiguration: jest.Mock };
 
+  const metering = { getLive: jest.fn() };
+  const operating = { getForResource: jest.fn() };
   const mockUser = { id: 1, username: 'testuser' };
 
   beforeEach(() => {
@@ -48,6 +51,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
     };
 
     mockResourceUsageService = {
+      getActiveSession: jest.fn().mockResolvedValue(null),
       startSession: jest.fn().mockResolvedValue({}),
       endSession: jest.fn().mockResolvedValue({ id: 99, userId: 1 }),
     };
@@ -77,6 +81,10 @@ describe('AttractapSessionHandler – session + flow button', () => {
       settleByCard: jest.fn(),
     };
 
+    (handler as any).meteringService = metering;
+    (handler as any).operatingAttributionService = operating;
+    metering.getLive.mockReset();
+    operating.getForResource.mockReset();
     (handler as any).usersService = mockUsersService;
     (handler as any).resourceUsageService = mockResourceUsageService;
     (handler as any).resourceFlowsExecutorService = mockResourceFlowsExecutorService;
@@ -500,6 +508,130 @@ describe('AttractapSessionHandler – session + flow button', () => {
           }),
         }),
       );
+    });
+  });
+  describe('live usage stats', () => {
+    const request = { payload: { resourceId: 10, requestId: 7 } } as any;
+    const startTime = new Date('2026-10-03T10:00:00Z');
+    beforeEach(() => {
+      mockResourceUsageService.getActiveSession.mockResolvedValue({ id: 99, userId: 1, startTime });
+      metering.getLive.mockResolvedValue({
+        meters: [{ id: 1, name: 'Heartbeats', session: { usageId: 99, latestValue: '0.125' } }],
+      });
+      operating.getForResource.mockResolvedValue({
+        operatingDataAvailable: true,
+        isOperating: true,
+        attributions: [
+          { usageId: 99, durationMs: 120000 },
+          { usageId: 98, durationMs: 80000 },
+        ],
+      });
+    });
+    it('returns named meter values and operating time attributed to the current usage', async () => {
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(operating.getForResource).toHaveBeenCalledWith(10, expect.any(Date), startTime);
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        new AttractapEvent(AttractapEventType.RESOURCE_USAGE_STATS, {
+          resourceId: 10,
+          requestId: 7,
+          usage: {
+            id: 99,
+            meters: [{ id: 1, name: 'Heartbeats', value: '0.125' }],
+            operatingDurationMs: 120000,
+            isOperating: true,
+          },
+        }),
+      );
+    });
+    it('keeps unavailable readings distinct from zero and discards a different meter session', async () => {
+      metering.getLive.mockResolvedValue({
+        meters: [{ id: 1, name: 'Heartbeats', session: { usageId: 100, latestValue: '9' } }],
+      });
+      operating.getForResource.mockResolvedValue({ operatingDataAvailable: false, attributions: [] });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toEqual({
+        id: 99,
+        meters: [],
+        operatingDurationMs: null,
+        isOperating: null,
+      });
+    });
+    it('returns multiple named meters, preserving zero and unavailable values', async () => {
+      metering.getLive.mockResolvedValue({
+        meters: [
+          { id: 1, name: 'Energy (kWh)', session: { usageId: 99, latestValue: '0' } },
+          { id: 2, name: 'Heartbeats', session: { usageId: 99, latestValue: '9007199254740993.125' } },
+          { id: 3, name: 'Water', session: { usageId: 99, latestValue: null } },
+          { id: 4, name: 'Other usage', session: { usageId: 100, latestValue: '9' } },
+          { id: 5, name: 'Idle meter', session: null },
+        ],
+      });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage.meters).toEqual([
+        { id: 1, name: 'Energy (kWh)', value: '0' },
+        { id: 2, name: 'Heartbeats', value: '9007199254740993.125' },
+        { id: 3, name: 'Water', value: null },
+      ]);
+    });
+    it.each([null, { id: 99, userId: 2, startTime }])(
+      'does not expose readings without an owned session (%p)',
+      async (usage) => {
+        mockResourceUsageService.getActiveSession.mockResolvedValue(usage);
+        await handler.handleResourceUsageStats(mockSocket as any, request);
+        expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toBeNull();
+        expect(metering.getLive).not.toHaveBeenCalled();
+      },
+    );
+    it('does not query when the reader/card guard rejects the request', async () => {
+      mockResourceActionGuard.validateResourceAction.mockResolvedValue(false);
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    });
+    describe('reader access with the actual resource guard', () => {
+      let reader: { id: number; resources: { id: number }[] };
+      beforeEach(() => {
+        reader = { id: 42, resources: [{ id: 10 }] };
+        (handler as any).resourceActionGuard = Object.assign(new ResourceActionGuard(), {
+          attractapService: { findReaderById: jest.fn(async () => reader) },
+          usersService: mockUsersService,
+        });
+      });
+      it.each(['USER_NOT_AUTHENTICATED', 'RESOURCE_NOT_ASSOCIATED_WITH_READER'])(
+        'rejects %s without looking up or disclosing readings',
+        async (error) => {
+          if (error === 'USER_NOT_AUTHENTICATED') (mockSocket.state as any).lastAuthenticatedUserId = null;
+          else reader.resources = [];
+          await handler.handleResourceUsageStats(mockSocket as any, request);
+          expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+            new AttractapEvent(AttractapEventType.RESOURCE_USAGE_STATS, { requestId: 7, error }),
+          );
+          expect(mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+          expect(metering.getLive).not.toHaveBeenCalled();
+          expect(operating.getForResource).not.toHaveBeenCalled();
+        },
+      );
+      it('allows an authenticated session owner on a mapped resource', async () => {
+        await handler.handleResourceUsageStats(mockSocket as any, request);
+        expect(metering.getLive).toHaveBeenCalledWith(10);
+        expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toMatchObject({
+          id: 99,
+          meters: [{ id: 1, name: 'Heartbeats', value: '0.125' }],
+          operatingDurationMs: 120000,
+        });
+      });
+    });
+    it('discards results when the card changes during the lookup', async () => {
+      metering.getLive.mockImplementation(async () => {
+        mockSocket.state.lastAuthenticatedUserId = 2;
+        return { meters: [] };
+      });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+    });
+    it('clears readings when the data service fails without failing the reader session', async () => {
+      metering.getLive.mockRejectedValue(new Error('database unavailable'));
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toBeNull();
     });
   });
 });

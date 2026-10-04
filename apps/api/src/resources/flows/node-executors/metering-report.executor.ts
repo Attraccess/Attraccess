@@ -19,7 +19,7 @@ export class MeteringReportExecutor implements NodeExecutor {
       mode: data.mode,
       kind: 'reading' as const,
       value: render(data.value) ?? '',
-      legacyEnergyUnit: render(data.legacyEnergyUnit),
+      legacyEnergyUnit: data.legacyEnergyUnit === undefined ? undefined : (render(data.legacyEnergyUnit) ?? ''),
       observedAt,
       source: render(data.source),
     };

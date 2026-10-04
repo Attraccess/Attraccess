@@ -1,4 +1,13 @@
 export default {
+  unassignedProject: 'Unassigned',
+  loadError: 'Unable to load usage details.',
+  retry: 'Try again',
+  billingLoadError: 'Unable to load the related billing overview.',
+  retryBilling: 'Retry billing lookup',
+  operatingDurationLoadError: 'Unable to load machine running time.',
+  retryOperatingDuration: 'Retry machine running time',
+
+  openBilling: 'Open billing overview',
   sessionNotes: 'Session Notes',
   startNotes: 'Start Notes',
   endNotes: 'End Notes',

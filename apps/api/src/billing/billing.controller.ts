@@ -27,6 +27,7 @@ import { BillingService } from './billing.service';
 import { PaginationOptionsDto } from '../types/request';
 import { ModifyBalanceDto } from './dto/modify-balance.dto';
 import { TransactionsDto } from './dto/transactions.dto';
+import { UsageTransactionDto } from './dto/usage-transaction.dto';
 import { BalanceDto } from './dto/balance.dto';
 import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
 import { SetSumUpApiKeyDto } from './dto/sumup/set-sumup-apiKey.dto';
@@ -94,6 +95,24 @@ export class BillingController {
     }
 
     return await this.billingService.getHistory(userId, query);
+  }
+
+  @Get('/billing/transactions/for-usage/:usageId')
+  @Auth()
+  @ApiOperation({
+    summary: 'Find the current user’s billing transaction for a usage session',
+    operationId: 'getUsageBillingTransaction',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The related transaction ID, or null when no owned transaction exists.',
+    type: UsageTransactionDto,
+  })
+  async getUsageBillingTransaction(
+    @Param('usageId', ParseIntPipe) usageId: number,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<UsageTransactionDto> {
+    return { transactionId: await this.billingService.getTransactionIdForUsage(usageId, request.user.id) };
   }
 
   @Get('/users/:userId/billing/transactions/:transactionId')
@@ -285,9 +304,7 @@ export class BillingController {
     const subject = this.liveNotificationsService.getTransactionSubject(userId);
     return this.sse.wrap(
       'billing',
-      subject.asObservable().pipe(
-        finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId)),
-      ),
+      subject.asObservable().pipe(finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId))),
     );
   }
 

@@ -804,25 +804,31 @@ describe('WagoRuntime', () => {
   });
 
   it('keeps active pulses until their deadline after applying a replacement configuration', async () => {
-    const snapshot = pulsedSnapshot;
-    const replacement: Snapshot = {
-      ...snapshot,
-      physicalPoints: [{ id: 'output-2', hardwareProfile: '751-9301', channel: 1 }],
-      logicalChannels: [{ ...snapshot.logicalChannels[0], physicalPointId: 'output-2' }],
-    };
-    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
-    await transport.send(commands, validCommand({ action: 'pulse' }));
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    try {
+      const snapshot = pulsedSnapshot;
+      const replacement: Snapshot = {
+        ...snapshot,
+        physicalPoints: [{ id: 'output-2', hardwareProfile: '751-9301', channel: 1 }],
+        logicalChannels: [{ ...snapshot.logicalChannels[0], physicalPointId: 'output-2' }],
+      };
+      await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+      await transport.send(commands, validCommand({ action: 'pulse' }));
 
-    await transport.send(desired, {
-      protocolVersion: 1,
-      revision: 2,
-      contentHash: hash(replacement),
-      snapshot: replacement,
-    });
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 2,
+        contentHash: hash(replacement),
+        snapshot: replacement,
+      });
 
-    expect(device.values.get('751-9301:0')).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(device.values.get('751-9301:0')).toBe(false);
+      await jest.advanceTimersByTimeAsync(9);
+      expect(device.values.get('751-9301:0')).toBe(true);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(device.values.get('751-9301:0')).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('applies configuration while a scheduled pulse shutdown keeps retrying', async () => {

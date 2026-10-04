@@ -75,6 +75,7 @@ public:
         char name[MAX_RESOURCE_NAME_LEN];
         std::string description;
         bool hasActiveUsage;
+        uint32_t activeUsageId = 0;
         bool isUnderMaintenance;
         bool isHealthy;
         char healthReason[MAX_HEALTH_REASON_LEN];
@@ -227,6 +228,21 @@ public:
 
     void setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback);
     uint32_t requestResourceList();
+    struct UsageStats
+    {
+        uint32_t resourceId = 0;
+        uint32_t usageId = 0;
+        int64_t operatingDurationMs = -1; // -1 means no operating data
+        int8_t isOperating = -1; // -1 unknown, 0 idle, 1 running
+        struct MeterValue {
+            std::string name;
+            std::string value;
+        };
+        std::vector<MeterValue> meters;
+    };
+    void requestUsageStats(uint32_t resourceId);
+    void setUsageStatsCallback(std::function<void(const UsageStats &)> callback);
+
     void cancelResourceAction() { activeActionRequestId = 0; }
     bool isCurrentResourceAction(uint32_t requestId) const { return !requestId || requestId == activeActionRequestId.load(); }
     struct ActionResult {
@@ -395,6 +411,10 @@ private:
     uint32_t resourceListMessageCounter = 0;
     uint32_t resourceListRevision = 0;
     uint32_t nextRequestId = 0;
+    std::atomic<uint32_t> usageStatsRequestId{0};
+    std::function<void(const UsageStats &)> usageStatsCallback;
+    void onUsageStats(JsonObject data);
+
     std::atomic<uint32_t> activeActionRequestId{0};
     void sendResourceAction(const char *type, JsonObject payload);
 

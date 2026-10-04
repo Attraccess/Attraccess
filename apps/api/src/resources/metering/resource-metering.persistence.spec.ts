@@ -826,7 +826,7 @@ describe('Flow-defined energy metering', () => {
           throw new Error('meter unreachable');
         };
         const ended = await end();
-        onCollect = reading('1.5');
+        onCollect = reading('1.5', 'kWh', { observedAt: ended.endTime?.toISOString() });
         return ended;
       }
 
@@ -872,6 +872,35 @@ describe('Flow-defined energy metering', () => {
         expect(rows.find((item) => item.name === 'BILLING_FACTOR')?.unitPrice).toBe(-23);
       });
 
+      it('rounds a large late correction exactly at the half-credit boundary', async () => {
+        const ended = await endWithMissingFinal();
+        const session = await sessionOf(ended.id);
+        await source.getRepository(ResourceUsage).update(ended.id, { billingFactor: 50 });
+        await source.getRepository(ResourceMeteringSession).update(session.id, { creditsPerUnit: 1 });
+        onCollect = ({ complete }) =>
+          complete({
+            kind: 'reading',
+            value: '9007199254740991',
+            observedAt: ended.endTime?.toISOString(),
+          });
+        await metering.retrySettlement(1, session.id, 1);
+        const { corrections, items: rows } = await correctionsOf(ended.id);
+        expect(corrections[0].amount).toBe(-4503599627370495);
+        expect(rows.find((item) => item.name === 'BILLING_FACTOR')?.unitPrice).toBe(-4503599627370496);
+      });
+
+      it.each([undefined, 'after-end'])('rejects a retry first observing idle consumption (%s)', async (timestamp) => {
+        const ended = await endWithMissingFinal();
+        const session = await sessionOf(ended.id);
+        onCollect = reading('5', 'kWh', {
+          observedAt: timestamp ? new Date((ended.endTime as Date).getTime() + 1).toISOString() : undefined,
+        });
+        await expect(metering.retrySettlement(1, session.id, 1)).rejects.toThrow('session end boundary');
+        expect((await correctionsOf(ended.id)).corrections).toEqual([]);
+        expect((await source.getRepository(ResourceMeter).findOneByOrFail({ id: 1 })).counterValue).toBe('0');
+        expect((await sessionOf(ended.id)).status).toBe(ResourceMeteringSessionStatus.Pending);
+      });
+
       it('keeps the charge pending with the reason when the retry is stale or invalid', async () => {
         const ended = await endWithMissingFinal();
         onCollect = reading('1.5', 'kWh', { observedAt: '2020-01-01T00:00:00Z' });
@@ -879,7 +908,7 @@ describe('Flow-defined energy metering', () => {
           expect.objectContaining({ message: expect.stringMatching(/^METER_SETTLEMENT_FAILED/) }),
         );
         expect(await sessionOf(ended.id)).toEqual(
-          expect.objectContaining({ status: 'pending', failureReason: expect.stringMatching(/older than/) }),
+          expect.objectContaining({ status: 'pending', failureReason: expect.stringMatching(/session end boundary/) }),
         );
         expect((await items(ended.id)).transaction.amount).toBe(0);
         expect((await correctionsOf(ended.id)).corrections).toEqual([]);
@@ -1078,6 +1107,94 @@ describe('Flow-defined energy metering', () => {
     });
   });
   describe('generic meters', () => {
+    it('preserves concurrent consumption and pricing when renaming a meter', async () => {
+      const manager = source.manager;
+      const findOne = manager.findOne.bind(manager);
+      jest.spyOn(manager, 'findOne').mockImplementationOnce(async (...args) => {
+        const snapshot = await findOne(...args);
+        await manager.update(ResourceMeter, 1, {
+          lifetimeValue: '3000000000',
+          counterValue: '3000000000',
+          creditsPerUnit: 99,
+        });
+        return snapshot;
+      });
+      await metering.updateMeter(1, 1, 'Renamed');
+      expect((await metering.listMeters(1))[0]).toEqual(
+        expect.objectContaining({
+          name: 'Renamed',
+          lifetimeValue: '3',
+          counterValue: '3',
+          creditsPerUnit: 99,
+        }),
+      );
+    });
+
+    it('loads one flow snapshot for all meters in a status poll', async () => {
+      await seedMeter();
+      await metering.createMeter(1, 'Heartbeats');
+      const nodes = jest.spyOn(source.getRepository(ResourceFlowNode), 'find');
+      const edges = jest.spyOn(source.getRepository(ResourceFlowEdge), 'find');
+      expect((await metering.getStatus(1)).meters).toHaveLength(2);
+      expect(nodes).toHaveBeenCalledTimes(1);
+      expect(edges).toHaveBeenCalledTimes(1);
+    });
+
+    it('allows resource usage when a tracking-only start fails', async () => {
+      await seedMeter();
+      await metering.setRate(1, 1, 0);
+      onStart = async () => {
+        throw new Error('offline');
+      };
+      const started = await usage.startSession(1, users[0], {} as never);
+      expect(started.endTime).toBeNull();
+      expect(await source.getRepository(ResourceMeteringSession).count()).toBe(0);
+      await usage.endSession(1, users[0], {} as never);
+      expect((await items(started.id)).transaction.amount).toBe(0);
+    });
+
+    it('rejects an idle collection reply after an increment session starts', async () => {
+      await seedMeter();
+      await source.getRepository(ResourceMeter).update(1, { counterValue: '100000000000' });
+      let reply!: () => Promise<void>;
+      let signal!: () => void;
+      const waiting = new Promise<void>((resolve) => {
+        signal = resolve;
+      });
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      onCollect = async ({ complete }) => {
+        reply = () => complete({ kind: 'reading', value: '105' });
+        signal();
+        await gate;
+      };
+      const collection = metering.collectInterimReadings();
+      await waiting;
+      await source.getRepository(ResourceFlowNode).delete({ resourceId: 1 });
+      await source.getRepository(ResourceFlowNode).save({
+        id: 'increment-report',
+        resourceId: 1,
+        type: T.OUTPUT_METERING_REPORT,
+        data: { meterId: 1, mode: 'increment', value: '1' },
+      });
+      const started = await usage.startSession(1, users[0], {} as never);
+      try {
+        await expect(reply()).rejects.toThrow('session boundary');
+        expect((await metering.listMeters(1))[0].counterValue).toBe('100');
+        expect((await sessionOf(started.id)).latestValue).toBe('0');
+      } finally {
+        release();
+        await collection;
+      }
+    });
+
+    it.each(['', '   '])('rejects empty legacy units instead of treating Wh as generic values (%s)', async (unit) => {
+      await expect(metering.report(1, 1, { kind: 'reading', value: '1000', legacyEnergyUnit: unit })).rejects.toThrow();
+      expect((await metering.listMeters(1))[0].counterValue).toBeNull();
+    });
+
     it('records increments without a session and keeps other meters independent', async () => {
       const other = await metering.createMeter(1, 'Heartbeats');
       await metering.report(1, other.id, { kind: 'reading', mode: 'increment', value: '2.5' });

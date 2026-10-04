@@ -123,6 +123,14 @@ export class BillingService {
 
   private DEFAULT_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
 
+  async getTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
+    const transaction = await this.billingTransactionRepository.findOne({
+      where: { resourceUsageId: usageId, userId },
+      select: ['id'],
+    });
+    return transaction?.id ?? null;
+  }
+
   async getHistory(userId: number, options: PaginationOptions): Promise<TransactionsDto> {
     const { page, limit } = options;
 

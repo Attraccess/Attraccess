@@ -27,18 +27,19 @@ import {
 } from '@attraccess/react-query-client';
 import { DateTimeDisplay, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StandardModal } from '../../../../../components/standardModal';
 import { RefundModal } from './refund';
+import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 
-interface Props {
+export interface TransactionDetailsModalProps {
   children?: (onOpen: () => void) => React.ReactNode;
   transactionId: number;
   isOpen?: boolean;
   onClose?: () => unknown;
 }
 
-export function TransactionDetailsModal(props: Props) {
+export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
   const { children, transactionId, isOpen: isOpenProp, onClose: onCloseProp } = props;
 
   const { t, tExists } = useTranslations({ en, de });
@@ -61,8 +62,18 @@ export function TransactionDetailsModal(props: Props) {
     }
   }, [isOpenProp, open, close]);
 
-  const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const {
+    data: transaction,
+    error,
+    refetch,
+  } = useBillingServiceGetBillingTransaction({ transactionId }, undefined, { enabled: isOpen });
+  const { data: configuration } = useBillingServiceGetBillingConfiguration(undefined, { enabled: isOpen });
+
+  const [isUsageOpen, setUsageOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) setUsageOpen(false);
+  }, [isOpen]);
 
   const formatNumber = useNumberFormatter();
   const formatMeterValue = useMeterValueFormatter();
@@ -105,7 +116,14 @@ export function TransactionDetailsModal(props: Props) {
               </div>
             </ModalHeader>
             <ModalBody>
-              {!transaction ? (
+              {error ? (
+                <div role="alert">
+                  <p>{t('loadError')}</p>
+                  <Button variant="secondary" onPress={() => refetch()}>
+                    {t('retry')}
+                  </Button>
+                </div>
+              ) : !transaction ? (
                 <div className="py-6 text-center text-default-500">{t('loading')}</div>
               ) : (
                 <div className="space-y-4">
@@ -160,8 +178,11 @@ export function TransactionDetailsModal(props: Props) {
                     {transaction.resourceUsage && (
                       <div className="sm:col-span-2">
                         <div className="text-small text-default-500">{t('meta.resourceUsage')}</div>
-                        <div className="font-medium">
+                        <div className="flex flex-wrap items-center gap-2 font-medium">
                           {transaction.resourceUsage.resource?.name ?? `Usage #${transaction.resourceUsage.id}`}
+                          <Button variant="secondary" onPress={() => setUsageOpen(true)}>
+                            {t('actions.openUsage')}
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -265,6 +286,15 @@ export function TransactionDetailsModal(props: Props) {
           </>
         )}
       </StandardModal>
+      {isOpen && isUsageOpen && transaction?.resourceUsage && (
+        <UsageNotesModal
+          isOpen
+          resourceId={transaction.resourceUsage.resourceId}
+          usageId={transaction.resourceUsage.id}
+          onClose={() => setUsageOpen(false)}
+          onOpenBilling={() => setUsageOpen(false)}
+        />
+      )}
     </>
   );
 }

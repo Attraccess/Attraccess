@@ -113,4 +113,39 @@ describe('metering completion nodes', () => {
       /Metering start/,
     );
   });
+
+  it.each(['', '{{missing}}'])('preserves an empty migrated unit for validation (%s)', async (unit) => {
+    const ctx = context({ kind: 'final' });
+    const emptyUnitContext = {
+      ...ctx,
+      compileTemplate: (template: string) => (template === '{{missing}}' ? '' : template),
+    };
+    await new MeteringReportExecutor({ report: jest.fn() } as never).execute(
+      node({ value: '1000', legacyEnergyUnit: unit }),
+      {},
+      emptyUnitContext,
+    );
+    expect(ctx.complete).toHaveBeenCalledWith(expect.objectContaining({ value: '1000', legacyEnergyUnit: '' }));
+    const readyContext = context({ kind: 'start' });
+    await new MeteringReadyExecutor().execute(
+      node({ baselineValue: '1000', legacyEnergyUnit: unit }),
+      {},
+      { ...readyContext, compileTemplate: emptyUnitContext.compileTemplate },
+    );
+    expect(readyContext.complete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseline: { value: '1000', legacyEnergyUnit: '' },
+      }),
+    );
+  });
+
+  it('keeps a generic baseline free of legacy conversion', async () => {
+    const ctx = context({ kind: 'start' });
+    await new MeteringReadyExecutor().execute(node({ baselineValue: '1000' }), {}, ctx);
+    expect(ctx.complete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseline: { value: '1000', legacyEnergyUnit: undefined },
+      }),
+    );
+  });
 });

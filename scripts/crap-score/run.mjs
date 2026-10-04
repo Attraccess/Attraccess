@@ -301,7 +301,6 @@ const vitestSuites = {
   'apps/plugins/shelly': [{ cwd: path.join(workspace, 'apps/plugins/shelly'), args: ['--root', 'frontend'] }],
   ...Object.fromEntries(
     [
-      'libs/attractap-hw-shared',
       'libs/plugins-frontend-sdk',
       'libs/plugins-frontend-ui',
       'libs/companion-ws-client',

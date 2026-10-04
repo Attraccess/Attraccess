@@ -332,6 +332,39 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_SCROLLABLE);
 
+   this->usageStatsContainer = lv_obj_create(this->screen);
+   DisplayTheme::applySurface(this->usageStatsContainer);
+   lv_obj_set_width(this->usageStatsContainer, lv_pct(100));
+   lv_obj_set_height(this->usageStatsContainer, LV_SIZE_CONTENT);
+   lv_obj_set_flex_flow(this->usageStatsContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_remove_flag(this->usageStatsContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_all(this->usageStatsContainer, 12, LV_PART_MAIN);
+   lv_obj_set_style_pad_row(this->usageStatsContainer, 8, LV_PART_MAIN);
+   auto *statsTitle = lv_label_create(this->usageStatsContainer);
+   lv_label_set_text(statsTitle, "Aktuelle Nutzung");
+   lv_obj_set_style_text_font(statsTitle, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
+   auto createStat = [this](const char *title) {
+      auto *row = lv_obj_create(this->usageStatsContainer);
+      lv_obj_remove_style_all(row);
+      lv_obj_set_width(row, lv_pct(100));
+      lv_obj_set_height(row, LV_SIZE_CONTENT);
+      lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+      lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+      auto *label = lv_label_create(row);
+      lv_label_set_text(label, title);
+      lv_obj_set_style_text_color(label, DisplayTheme::muted(), LV_PART_MAIN);
+      lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
+      auto *value = lv_label_create(row);
+      lv_obj_set_width(value, lv_pct(62));
+      lv_label_set_long_mode(value, LV_LABEL_LONG_WRAP);
+      lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+      lv_obj_set_style_text_font(value, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
+      return value;
+   };
+   this->meterValue = createStat("Zähler");
+   this->operatingValue = createStat("Betriebszeit");
+   lv_obj_add_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN);
+
    this->noIntroductionPanel = lv_obj_create(this->screen);
    lv_obj_set_width(this->noIntroductionPanel, lv_pct(100));
    lv_obj_set_height(this->noIntroductionPanel, LV_SIZE_CONTENT);
@@ -426,6 +459,9 @@ void ResourceDetailsScreen::init()
 }
 void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief &resource)
 {
+   if (!this->resourceCacheValid || this->resourceCache.id != resource.id ||
+       this->resourceCache.activeUsageId != resource.activeUsageId || !resource.hasActiveUsage)
+      this->usageStatsValid = false;
    this->resourceCache = resource;
    this->resourceCacheValid = true;
 
@@ -522,6 +558,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    }
 
    this->updateElapsedTimeDisplay();
+   this->updateUsageStatsDisplay();
    this->refreshAccessState();
 }
 std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
@@ -667,6 +704,7 @@ void ResourceDetailsScreen::refreshAccessState()
 }
 void ResourceDetailsScreen::loop()
 {
+   this->updateUsageStatsDisplay();
    this->updateElapsedTimeDisplay();
    this->updateSessionTimeoutIndicator();
 }
@@ -721,6 +759,9 @@ void ResourceDetailsScreen::destroy()
    this->formsNextLabel = nullptr;
    this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
+   this->usageStatsContainer = nullptr;
+   this->meterValue = nullptr;
+   this->operatingValue = nullptr;
 
    this->noIntroductionPanel = nullptr;
    this->introducersListLabel = nullptr;
@@ -816,6 +857,7 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
    sessionHeader.setUser(userDetails.username);
 
    this->refreshAccessState();
+   this->updateUsageStatsDisplay();
 }
 void ResourceDetailsScreen::onScreenLeave()
 {
