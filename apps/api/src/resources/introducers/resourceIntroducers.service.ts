@@ -87,6 +87,7 @@ export class ResourceIntroducersService {
     // A user can have both roles; prefer a direct grant over an inherited grant of the same role.
     const byUserAndType = new Map<string, ResourceIntroducer>();
     for (const introducer of [...directIntroducers, ...groupIntroducers]) {
+      if (!introducer.user) continue;
       const key = `${introducer.userId}:${introducer.type}`;
       if (!byUserAndType.has(key)) {
         byUserAndType.set(key, introducer);
@@ -114,7 +115,7 @@ export class ResourceIntroducersService {
       relations: ['user'],
     });
     for (const introducer of directIntroducers) {
-      introducersByResourceId.get(introducer.resourceId)?.set(introducer.userId, introducer);
+      if (introducer.user) introducersByResourceId.get(introducer.resourceId)?.set(introducer.userId, introducer);
     }
 
     const groupQuery = this.resourceIntroducerRepository
@@ -123,18 +124,18 @@ export class ResourceIntroducersService {
       .innerJoin('introducer.resourceGroup', 'group')
       .innerJoin('group.resources', 'resource')
       .where('resource.id IN (:...resourceIds)', { resourceIds: uniqueResourceIds })
-      .addSelect('introducer.id', 'introducerId')
       .addSelect('resource.id', 'resourceId');
 
     if (type) {
       groupQuery.andWhere('introducer.type = :type', { type });
     }
 
+    // Preserve TypeORM's introducer_id alias: entity hydration needs the primary key.
     const { raw, entities: groupIntroducers } = await groupQuery.getRawAndEntities();
     const groupIntroducersById = new Map(groupIntroducers.map((introducer) => [introducer.id, introducer]));
-    for (const { introducerId, resourceId } of raw) {
+    for (const { introducer_id: introducerId, resourceId } of raw) {
       const introducer = groupIntroducersById.get(Number(introducerId));
-      if (introducer) {
+      if (introducer?.user) {
         introducersByResourceId.get(Number(resourceId))?.set(introducer.userId, introducer);
       }
     }

@@ -1,9 +1,10 @@
+import { Readable } from 'node:stream';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import request from 'supertest';
 import { commissioningFixture } from './commissioning-fixture';
 
-describe('runtime import to commissioning through real controllers and services (fixture transports only)', () => {
+describe('bundled runtime commissioning through real controllers and services (fixture transports only)', () => {
   let fixture: Awaited<ReturnType<typeof commissioningFixture>>;
   beforeEach(async () => {
     fixture = await commissioningFixture();
@@ -12,14 +13,13 @@ describe('runtime import to commissioning through real controllers and services 
     await fixture?.close();
   });
 
-  function upload(release = fixture.first, checksum = release.checksum) {
-    return request(fixture.app.getHttpServer())
-      .post('/api/wago/runtime-artifacts/import')
-      .attach('bundle', release.bundle, 'runtime.tar')
-      .attach('checksum', checksum, 'runtime.tar.sha256');
+  async function deployFixtureRelease(release = fixture.first) {
+    return fixture.catalog.import({
+      bundle: Readable.from([release.bundle]),
+      checksum: Readable.from([release.checksum]),
+    });
   }
   async function create() {
-    await upload().expect(201);
     return (
       await request(fixture.app.getHttpServer())
         .post('/api/wago/commissioning/sessions')
@@ -50,23 +50,20 @@ describe('runtime import to commissioning through real controllers and services 
     expect(fixture.transport.failRecovery).toBe(true);
     expect(fixture.transport.failManagementRecovery).toBe(true);
     expect(fixture.transport.copies).toEqual([]);
-    expect(await fixture.catalog.list()).toEqual([]);
+    expect((await fixture.catalog.current())?.digest).toBe(fixture.first.digest);
   });
 
-  it('verifies actual multipart bytes and rejects a mismatched checksum without changing the catalog', async () => {
-    const original = (await upload().expect(201)).body;
-    await upload(fixture.second, fixture.first.checksum).expect(400);
-    expect(
-      (await request(fixture.app.getHttpServer()).get('/api/wago/runtime-artifacts/current').expect(200)).body,
-    ).toEqual(original);
-    expect((await request(fixture.app.getHttpServer()).get('/api/wago/runtime-artifacts').expect(200)).body).toEqual([
-      original,
-    ]);
-    expect(await readdir(join(await fixture.catalog.root(), 'staging'))).toEqual([]);
+  it('exposes the bundled release and rejects custom runtime uploads', async () => {
+    const server = fixture.app.getHttpServer();
+    const original = (await request(server).get('/api/wago/runtime-artifacts/current').expect(200)).body;
+    expect(original.digest).toBe(fixture.first.digest);
+    await request(server)
+      .post('/api/wago/runtime-artifacts/import')
+      .attach('bundle', fixture.second.bundle, 'runtime.tar')
+      .attach('checksum', fixture.second.checksum, 'runtime.tar.sha256')
+      .expect(404);
+    expect((await request(server).get('/api/wago/runtime-artifacts/current').expect(200)).body).toEqual(original);
     expect(JSON.stringify(original)).not.toContain(fixture.directory);
-    const imported = (await upload(fixture.second).expect(201)).body;
-    expect(imported.digest).toBe(fixture.second.digest);
-    expect(await fixture.catalog.list()).toHaveLength(2);
   });
 
   it('uses the current release after session creation through failed delivery and retry', async () => {
@@ -76,7 +73,7 @@ describe('runtime import to commissioning through real controllers and services 
       state: 'awaiting_identity_confirmation',
     });
     expect(session).not.toHaveProperty('pairingCode');
-    await upload(fixture.second).expect(201);
+    await deployFixtureRelease(fixture.second);
     const endpoint = `/api/wago/commissioning/sessions/${session.id}`;
     await request(fixture.app.getHttpServer())
       .post(`${endpoint}/confirm-host-key`)
@@ -126,7 +123,7 @@ describe('runtime import to commissioning through real controllers and services 
       progressStep: 'Runtime installation cleaned up',
       runtimeArtifactDigest: fixture.second.digest,
     });
-    await upload(fixture.first).expect(201);
+    await deployFixtureRelease(fixture.first);
     fixture.transport.failDelivery = false;
     const delivered = (await request(fixture.app.getHttpServer()).post(`${endpoint}/deliver`).send(attempt).expect(201))
       .body;

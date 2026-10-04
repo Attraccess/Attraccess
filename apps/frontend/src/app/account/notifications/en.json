@@ -46,8 +46,8 @@
       "description": "When someone else or the system ends your active resource session (not when you end it yourself)."
     },
     "nfc_cards": {
-      "label": "NFC cards",
-      "description": "When one of your NFC cards is registered, activated, deactivated, or deleted."
+      "label": "RFID cards",
+      "description": "When one of your RFID cards is registered, activated, deactivated, or deleted."
     },
     "project_invitations": {
       "label": "Project invitations",

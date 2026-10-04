@@ -252,9 +252,14 @@ describe('Modbus protocol fixtures (no hardware)', () => {
     expect(() => unknown.update(1)).toThrow('without documented');
   });
   it('validates profiles and routes named measurements/actions, bounded duplicate acquisition', async () => {
-    const meter = BUILTIN_MODBUS_PROFILES.find((profile) => profile.id === 'wago-879-1300-unverified');
-    if (!meter) throw new Error('Missing 879-1300 profile');
+    const meter = BUILTIN_MODBUS_PROFILES.find((profile) => profile.id === 'wago-879-3020');
+    if (!meter) throw new Error('Missing 879-3020 profile');
     const profile = duplicateProfile(meter, 'custom');
+    // Custom integer counter fixture, independent of the meter's float kWh map.
+    const energy = profile.measurements.find((measurement) => measurement.id === 'import-energy');
+    if (!energy) throw new Error('Missing imported energy fixture');
+    energy.dataType = 'uint32';
+    energy.scale = 1;
     const config: ModbusConfiguration = {
       connections: [serial],
       profiles: [profile],

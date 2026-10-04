@@ -4,6 +4,8 @@ import { UsersService } from '../../../users-and-auth/users/users.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceFlowsExecutorService } from '../../../resources/flows/resource-flows-executor.service';
 import { SumUpService } from '../../../billing/sumup.service';
+import { BillingService } from '../../../billing/billing.service';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { ResourceInUseError } from '../../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { FlowExecutionError } from '../../../resources/flows/errors/flow-execution.error';
@@ -28,6 +30,9 @@ export class AttractapSessionHandler {
 
   @Inject(SumUpService)
   private sumUpService: SumUpService;
+
+  @Inject(BillingService)
+  private billingService: BillingService;
 
   @Inject(ResourceActionGuard)
   private resourceActionGuard: ResourceActionGuard;
@@ -152,7 +157,7 @@ export class AttractapSessionHandler {
     }
 
     try {
-      await this.resourceUsageService.endSession(
+      const usage = await this.resourceUsageService.endSession(
         resourceId,
         user,
         { formSubmissions },
@@ -161,7 +166,28 @@ export class AttractapSessionHandler {
         },
       );
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
-      await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true });
+      // Billing lookup failures must not turn an already-ended session into a failed action.
+      let billingSummary: { amount: number; total: string } | undefined;
+      try {
+        if (usage?.userId === user.id) {
+          const charge = await this.billingService.getResourceUsageCharge(usage.id, user.id);
+          if (charge && charge.amount !== 0) {
+            const configuration = await this.billingService.getConfiguration();
+            const amount = -charge.amount;
+            const total = new Intl.NumberFormat('de-DE', {
+              minimumFractionDigits: configuration.minorUnit,
+              maximumFractionDigits: configuration.minorUnit,
+            }).format(dbCurrencyToUserCurrency(amount, configuration.minorUnit));
+            billingSummary = { amount, total: `${total} ${configuration.currency}` };
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to load session billing summary: ${error.message}`);
+      }
+      await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, {
+        success: true,
+        ...(billingSummary ? { billingSummary } : {}),
+      });
     } catch (error) {
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });

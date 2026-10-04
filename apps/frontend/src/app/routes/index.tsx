@@ -17,7 +17,7 @@ import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
 import { AttractapList } from '../attractap/AttractapList';
 import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage';
-import { NfcCardList } from '../attractap/NfcCardList';
+import { RfidCardList } from '../attractap/RfidCardList';
 import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
@@ -251,7 +251,7 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/attractap/nfc-cards',
-    element: <NfcCardList />,
+    element: <RfidCardList />,
     authRequired: true,
   },
   {
@@ -323,7 +323,8 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'system.settings.manage',
   },
   // Templates and the shared layout are sub-routes of Email rather than sections of their own: both
-  // are full-screen editors, and neither is redesigned here.
+  // are full-screen editors. Keep the editors outside SettingsLayout so their h-full canvases
+  // inherit the app content area's height instead of collapsing inside a content-sized wrapper.
   {
     path: '/settings/email/templates',
     element: (
@@ -336,22 +337,18 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/settings/email/templates/:type',
     element: (
-      <SettingsLayout>
-        <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-          <EditEmailTemplatePage />
-        </Suspense>
-      </SettingsLayout>
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <EditEmailTemplatePage />
+      </Suspense>
     ),
     authRequired: 'system.settings.manage',
   },
   {
     path: '/settings/email/layout',
     element: (
-      <SettingsLayout>
-        <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-          <EmailLayoutPage />
-        </Suspense>
-      </SettingsLayout>
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <EmailLayoutPage />
+      </Suspense>
     ),
     authRequired: 'system.settings.manage',
   },

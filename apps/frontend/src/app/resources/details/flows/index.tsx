@@ -71,8 +71,6 @@ function areEdgesEqual(edge1: ResourceFlowEdgeDto | Edge, edge2: ResourceFlowEdg
   return edge1.id === edge2.id && edge1.source === edge2.source && edge1.target === edge2.target;
 }
 
-const jsConfetti = new JSConfetti();
-
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { resolvedTheme } = useAppTheme();
@@ -299,7 +297,21 @@ function FlowsPageInner() {
   }, [nodes, setNodes]);
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);
-  const [, setFlowExecutionHadError] = useState(false);
+  const flowExecutionHadError = useRef(false);
+  const [confettiEnabled, setConfettiEnabled] = useState(false);
+  const confettiRef = useRef<JSConfetti | null>(null);
+
+  useEffect(() => {
+    if (!confettiEnabled) return;
+
+    const confetti = new JSConfetti();
+    confettiRef.current = confetti;
+    return () => {
+      confettiRef.current = null;
+      confetti.clearCanvas();
+      confetti.destroyCanvas();
+    };
+  }, [confettiEnabled]);
 
   const isCoarsePointer = useMemo(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -315,7 +327,7 @@ function FlowsPageInner() {
   const onLiveLog = useCallback(
     (log: ResourceFlowLog) => {
       if (log.type === 'node.processing.failed') {
-        setFlowExecutionHadError(true);
+        flowExecutionHadError.current = true;
         return;
       }
 
@@ -327,24 +339,20 @@ function FlowsPageInner() {
       if (log.type === 'flow.completed') {
         setFlowIsRunning(false);
 
-        // Use functional state update to get current error state
-        setFlowExecutionHadError((currentErrorState) => {
-          if (!currentErrorState) {
-            jsConfetti.addConfetti();
-          } else {
-            jsConfetti.addConfetti({
-              emojis: ['❌', '😢', '💔', '😭', '🚫', '⚠️', '💥', '👎'],
-              emojiSize: 100,
-              confettiNumber: 2,
-            });
-          }
+        if (!flowExecutionHadError.current) {
+          confettiRef.current?.addConfetti();
+        } else {
+          confettiRef.current?.addConfetti({
+            emojis: ['❌', '😢', '💔', '😭', '🚫', '⚠️', '💥', '👎'],
+            emojiSize: 100,
+            confettiNumber: 2,
+          });
+        }
 
-          // Reset error state for next execution
-          return false;
-        });
+        flowExecutionHadError.current = false;
       }
     },
-    [setFlowIsRunning, setFlowExecutionHadError],
+    [setFlowIsRunning],
   );
 
   useEffect(() => {
@@ -484,7 +492,11 @@ function FlowsPageInner() {
               <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>
                 <DownloadIcon />
               </Button>
-              <LogViewer resourceId={Number(resourceId)}>
+              <LogViewer
+                resourceId={Number(resourceId)}
+                confettiEnabled={confettiEnabled}
+                onConfettiEnabledChange={setConfettiEnabled}
+              >
                 {(open) => (
                   <Button isIconOnly onPress={open} aria-label={t('actions.logs')}>
                     <LogsIcon />
@@ -540,7 +552,7 @@ export default function FlowsPage() {
   const { id: resourceId } = useParams();
 
   return (
-    <FlowProvider resourceId={Number(resourceId)}>
+    <FlowProvider key={resourceId} resourceId={Number(resourceId)}>
       <FlowsPageInner />
     </FlowProvider>
   );

@@ -4,12 +4,11 @@ export type Acquisition = {
   channels: Snapshot['logicalChannels'];
 } & ({ ok: true; raw: boolean | number; timestamp: string } | { ok: false; error: unknown });
 
+type Source = { point: Snapshot['physicalPoints'][number]; channels: Snapshot['logicalChannels'] };
+
 /** Sweep-local fanout, never a cache of past samples. Encoders receive actual read completion time. */
 export async function* acquireMeasurements(snapshot: Snapshot, device: DeviceAdapter): AsyncGenerator<Acquisition> {
-  const sources = new Map<
-    string,
-    { point: Snapshot['physicalPoints'][number]; channels: Snapshot['logicalChannels'] }
-  >();
+  const sources = new Map<string, Source>();
   for (const channel of snapshot.logicalChannels.filter((c) => c.capabilities.includes('measurement'))) {
     const point = snapshot.physicalPoints.find((p) => p.id === channel.physicalPointId);
     if (!point) continue;
@@ -23,6 +22,27 @@ export async function* acquireMeasurements(snapshot: Snapshot, device: DeviceAda
     const source = sources.get(key);
     if (source) source.channels.push(channel);
     else sources.set(key, { point, channels: [channel] });
+  }
+  if (device.readMeasurements) {
+    const pending = new Map<string, Source>();
+    for (const source of sources.values()) {
+      try {
+        if (!device.shouldPoll || device.shouldPoll(source.point, Date.now())) pending.set(source.point.id, source);
+      } catch (error) {
+        yield { ok: false, channels: source.channels, error };
+      }
+    }
+    try {
+      for await (const reading of device.readMeasurements([...pending.values()].map((source) => source.point))) {
+        const source = pending.get(reading.pointId);
+        if (!source) continue;
+        pending.delete(reading.pointId);
+        yield { ...reading, channels: source.channels };
+      }
+    } catch (error) {
+      for (const source of pending.values()) yield { ok: false, channels: source.channels, error };
+    }
+    return;
   }
   for (const { point, channels } of sources.values()) {
     let result: Acquisition;

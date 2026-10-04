@@ -50,6 +50,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     dd: '/bin/dd',
     mkdir: '/bin/mkdir',
     mktemp: '/usr/bin/mktemp',
+    mkfifo: '/usr/bin/mkfifo',
     mv: '/bin/mv',
     chmod: '/bin/chmod',
     rm: '/bin/rm',
@@ -150,9 +151,9 @@ if(terse&&!['-t','-Lt'].includes(args[0]))process.exit(1);
 if(observedPath!==root&&!observedPath.startsWith(root+'/'))process.exit(99);
 const s=args[0].includes('L')?fs.statSync(observedPath):fs.lstatSync(observedPath),owners=JSON.parse(fs.readFileSync(root+'/owners.json','utf8'));
 const owner=(owners[observedPath.slice(root.length)]||'0:0').split(':'),mode=(s.mode&0o7777).toString(8);
-const values={'%u':owner[0],'%g':owner[1],'%a':mode,'%h':s.nlink,'%d':s.dev,'%i':s.ino};
+const values={'%s':s.size,'%u':owner[0],'%g':owner[1],'%a':mode,'%h':s.nlink,'%d':s.dev,'%i':s.ino};
 if(terse){console.log(p+' '+[s.size,s.blocks,s.mode.toString(16),...owner,s.dev.toString(16),s.ino,s.nlink,0,0,1,1,1,s.blksize].join(' '));process.exit(0);}
-console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
+console.log(args[1].replace(/%[sugahdi]/g,v=>values[v]));`,
   );
   executable(
     'etc/config-tools/get_filesystem_data',
@@ -164,6 +165,7 @@ console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
 const args=process.argv.slice(2);
 if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300','310'].includes(args[2]))process.exit(99);
 if(process.env.FAULT==='gate-timeout'&&args[3].endsWith('/S99_zz_attraccess_wago'))process.exit(124);
+if(process.env.FAULT==='lock-wait-expired'&&args[3]==='flock')process.exit(124);
 const root=process.env.FIXTURE_ROOT;
 // Model image-import duration without a minute-long sleep in each shell test.
 const fs=require('node:fs'),loadDuration=root+'/docker-load-seconds';
@@ -172,7 +174,11 @@ const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(pro
 // Match the generated command's deadline. Shorter wall-clock caps measure host
 // process scheduling, except for the explicit isolated privilege lifecycle test.
 const installerStall=args[3]==='dd'&&(process.env.FAULT==='installer-stalled'||(process.env.FAULT==='installer-eof-stalled'&&args.includes('count=1')));
-const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:installerStall?200:privilegeLifecycle?1000:Number(args[2])*1000});
+// timeout preserves inherited flock descriptors on FW31. Node's default stdio
+// would close them before the child and incorrectly report lock contention.
+const stdio=['inherit','inherit','inherit','ignore','ignore','ignore','ignore','ignore'];
+for(const fd of [8,9]){try{stdio[fd]=fs.fstatSync(fd).isFile()?fd:'ignore';}catch{stdio[fd]='ignore';}}
+const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio,timeout:installerStall?200:privilegeLifecycle?1000:Number(args[2])*1000});
 if(privilegeLifecycle)require('node:fs').appendFileSync(root+'/privilege-lifecycle.log',JSON.stringify({event:'reaped',tool:args[3].split('/').at(-1),pid:r.pid,status:r.status,error:r.error?.code})+'\\n');
 process.exit(r.status ?? 124);`,
   );
@@ -253,6 +259,8 @@ fs.writeFileSync(root+'/owners.json',JSON.stringify(owners));`,
     'bin/flock',
     `
 const fs=require('node:fs'),root=process.env.FIXTURE_ROOT;
+// Actual FW31 BusyBox flock supports [-sxun], but no -w timeout option.
+if(process.argv.includes('-w')){console.error("flock: invalid option -- 'w'");process.exit(1);}
 if(process.argv[2]==='-u')process.exit(0);
 if(process.env.FAULT==='supervisor-lock-held'){
   if(process.argv[2]==='-n')process.exit(1);
@@ -365,6 +373,7 @@ if(args[0]==='container'&&args[1]==='ls'){
   const c=find(args.at(-1));if(!c||fault==='docker-inspect-failed')process.exit(1);
   if(args[2]==='{{.Id}}'){console.log(fullId(c));process.exit(0);}
   if(args[2]==='{{.Image}}'){console.log(c.imageId);process.exit(0);}
+  if(args[2]==='{{.Image}} {{.State.Running}}'){console.log(c.imageId+' '+String(c.running));process.exit(0);}
   if(args[2].includes('update-token')){console.log(c.updateToken||'');process.exit(0);}
  console.log(args[2].includes('.State.Pid')?fullId(c)+' '+(c.running?(c.pid||42):0)+' '+String(c.running)+' ':args[2]==='{{.Name}}'?'/'+c.name:args[2].includes('.Mounts')?(c.mounts||[]).join('\\n'):args[2].includes('.Privileged')?String(c.privileged===true):args[2].includes('.State.Running')&&args[2].includes('.RestartPolicy')?String(c.running)+' '+(c.restart||'no'):args[2].includes('.RestartPolicy')?(c.restart||'no'):String(c.running));
 }else if(args[0]==='update'){
@@ -380,6 +389,7 @@ if(args[0]==='container'&&args[1]==='ls'){
  if(fault==='remove')process.exit(1);
  const c=find(args.at(-1));if(!c)process.exit(1);if(fault!=='remove-stuck')state=state.filter(v=>v!==c);save();
 }else if(args[0]==='load'){
+  if(!args.includes('-i'))fs.readFileSync(0);
   console.log('Loaded image ID: '+(fs.existsSync(root+'/loaded-image-id')?fs.readFileSync(root+'/loaded-image-id','utf8'):'sha256:fixture'));if(fault==='load')process.exit(1);
 }else if(args[0]==='image'&&args[1]==='inspect'){
   if(fault==='inspect-image')process.exit(1);

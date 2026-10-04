@@ -1,13 +1,51 @@
-import { WriteAdmissionError, type DeviceAdapter, type RuntimeState, type Snapshot } from './runtime-types';
+import { findProfile } from '../../modbus/model';
+import {
+  WriteAdmissionError,
+  type DeviceAdapter,
+  type PulseRoute,
+  type RuntimeState,
+  type Snapshot,
+} from './runtime-types';
 
 type LogicalChannel = Snapshot['logicalChannels'][number];
 type PhysicalPoint = Snapshot['physicalPoints'][number];
-type Pulse = { timer: ReturnType<typeof setTimeout>; channel: LogicalChannel; point: PhysicalPoint };
+type Pulse = PulseRoute & { timer: ReturnType<typeof setTimeout>; write: (value: boolean) => Promise<void> };
+
+function routeKey(route: PulseRoute): string {
+  const { point, snapshot } = route;
+  if (!point.modbus) return JSON.stringify([point.hardwareProfile, point.channel]);
+  const config = snapshot.modbus;
+  const device = config?.devices.find((item) => item.id === point.modbus?.deviceId);
+  const connection = config?.connections.find((item) => item.id === device?.connectionId);
+  const action =
+    config && device && findProfile(config, device)?.actions.find((item) => item.id === point.modbus?.actionId);
+  const endpoint =
+    connection?.transport === 'rtu'
+      ? [connection.transport, connection.path, connection.baudRate, connection.parity, connection.stopBits]
+      : connection && [connection.transport, connection.host, connection.port];
+  return JSON.stringify([
+    endpoint,
+    device?.unitId,
+    action && [
+      action.functionCode,
+      action.address - action.addressBase,
+      action.dataType,
+      action.byteOrder,
+      action.wordOrder,
+      action.scale,
+      action.offset,
+      action.onValue,
+      action.offValue,
+    ],
+  ]);
+}
 
 const INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS = 100;
 const MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS = 5_000;
 
 export const MAX_PENDING_CHANNEL_WRITES = 100;
+
+export class OutputRoutingBusyError extends Error {}
 
 export class OutputController {
   private readonly uncertainWrites = new Set<string>();
@@ -21,6 +59,29 @@ export class OutputController {
 
   isWriteUncertain(channelId: string): boolean {
     return this.uncertainWrites.has(channelId);
+  }
+
+  assertConfigurationSafe(next: Snapshot): void {
+    const snapshot = this.options.getSnapshot();
+    const state = this.options.getState();
+    for (const channel of snapshot?.logicalChannels ?? []) {
+      if (!channel.capabilities.includes('output')) continue;
+      if (!state.outputs[channel.id] && !state.uncertainOutputChannelIds?.includes(channel.id)) continue;
+      const point = snapshot?.physicalPoints.find((item) => item.id === channel.physicalPointId);
+      if (!snapshot || !point) throw new OutputRoutingBusyError('switch outputs off before changing their routing');
+      const key = routeKey({ channel, point, snapshot });
+      if (state.pendingPulseRoutes?.some((route) => routeKey(route) === key)) continue;
+      const replacement = next.logicalChannels.find(
+        (item) => item.id === channel.id && item.capabilities.includes('output'),
+      );
+      const replacementPoint = next.physicalPoints.find((item) => item.id === replacement?.physicalPointId);
+      if (
+        !replacement ||
+        !replacementPoint ||
+        routeKey({ channel: replacement, point: replacementPoint, snapshot: next }) !== key
+      )
+        throw new OutputRoutingBusyError('switch outputs off before changing their routing');
+    }
   }
   private readonly pulses = new Map<string, Pulse>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
@@ -40,6 +101,7 @@ export class OutputController {
       saveState: () => Promise<void>;
       publishState: () => void;
       publishFault: (channelId: string, error: unknown) => Promise<void>;
+      feedbackEnabled?: () => boolean;
     },
   ) {}
 
@@ -52,28 +114,6 @@ export class OutputController {
     try {
       await Promise.all(this.commandOperations);
       await Promise.all([...this.channelWrites.values()]);
-      const pulses = [...this.pulses.entries()];
-      let shutdownFailed = false;
-      await Promise.all(
-        pulses.map(async ([channelId, pulse]) => {
-          clearTimeout(pulse.timer);
-          try {
-            const stopped = await this.runForChannel(channelId, () =>
-              this.writePulseShutdown(pulse.channel, pulse.point),
-            );
-            if (stopped && this.pulses.get(channelId) === pulse) this.pulses.delete(channelId);
-            else shutdownFailed = true;
-          } catch {
-            shutdownFailed = true;
-          }
-        }),
-      );
-      if (shutdownFailed) {
-        pulses.forEach(([channelId, pulse]) => {
-          if (this.pulses.get(channelId) === pulse) this.retryPulseShutdown(channelId, pulse, 1);
-        });
-        throw new Error('failed to de-energize active pulse');
-      }
       this.configurationGeneration += 1;
       this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
       this.feedbackChecks.clear();
@@ -167,7 +207,13 @@ export class OutputController {
     this.uncertainWrites.delete(channel.id);
     const state = this.options.getState();
     const wasUncertain = state.uncertainOutputChannelIds?.includes(channel.id);
+    const snapshot = this.options.getSnapshot();
+    const route = snapshot && { channel, point, snapshot };
+    const key = route && routeKey(route);
+    const pendingRoutes = state.pendingPulseRoutes;
     const hadPulse = state.pendingPulseChannelIds?.includes(channel.id);
+    if (pulseDuration && route)
+      state.pendingPulseRoutes = [...(pendingRoutes ?? []).filter((item) => routeKey(item) !== key), route];
     if (pulseDuration)
       state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channel.id])];
     if (this.options.device.prepareConfiguration) {
@@ -183,6 +229,7 @@ export class OutputController {
       if (error instanceof WriteAdmissionError) {
         if (!wasUncertain)
           state.uncertainOutputChannelIds = (state.uncertainOutputChannelIds ?? []).filter((id) => id !== channel.id);
+        this.restorePulseRoute(key, pendingRoutes);
         if (!hadPulse)
           state.pendingPulseChannelIds = (state.pendingPulseChannelIds ?? []).filter((id) => id !== channel.id);
         await this.options.saveState();
@@ -214,10 +261,14 @@ export class OutputController {
         this.options.getState().uncertainOutputChannelIds ?? []
       ).filter((id) => id !== channel.id);
     const pendingPulses = state.pendingPulseChannelIds;
-    if (!pulseDuration && pendingPulses) state.pendingPulseChannelIds = pendingPulses.filter((id) => id !== channel.id);
+    if (!pulseDuration) {
+      state.pendingPulseRoutes = state.pendingPulseRoutes?.filter((item) => routeKey(item) !== key);
+      state.pendingPulseChannelIds = [...new Set(state.pendingPulseRoutes?.map((route) => route.channel.id) ?? [])];
+    }
     try {
       await this.options.saveState();
     } catch {
+      if (!pulseDuration) this.restorePulseRoute(key, pendingRoutes);
       if (pendingPulses?.includes(channel.id))
         state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channel.id])];
       if (this.options.device.prepareConfiguration)
@@ -248,42 +299,49 @@ export class OutputController {
     }
   }
 
-  schedulePulse(channel: LogicalChannel, duration: number): void {
-    const point = this.options.getSnapshot()?.physicalPoints.find((item) => item.id === channel.physicalPointId);
-    if (!point) return;
-    const existingPulse = this.pulses.get(channel.id);
+  schedulePulse(channel: LogicalChannel, duration: number, captured?: PulseRoute): void {
+    const snapshot = captured?.snapshot ?? this.options.getSnapshot();
+    const point = captured?.point ?? snapshot?.physicalPoints.find((item) => item.id === channel.physicalPointId);
+    if (!point || !snapshot) return;
+    const route = captured ?? { channel, point, snapshot };
+    const key = routeKey(route);
+    const existingPulse = this.pulses.get(key);
     if (existingPulse) clearTimeout(existingPulse.timer);
     const pulse: Pulse = {
-      channel,
-      point,
-      timer: setTimeout(
-        () =>
-          void this.ignoreRejection(() =>
-            this.runForChannel(channel.id, async () => {
-              if (this.pulses.get(channel.id) !== pulse) return;
-              if (await this.writePulseShutdown(channel, point)) this.pulses.delete(channel.id);
-              else this.retryPulseShutdown(channel.id, pulse, 1);
-            }),
-          ),
-        duration,
-      ),
+      ...route,
+      write:
+        this.options.device.captureWrite?.(point, snapshot) ?? ((value) => this.options.device.write(point, value)),
+      timer: setTimeout(() => this.completePulse(key, pulse, 1), duration),
     };
-    this.pulses.set(channel.id, pulse);
+    this.pulses.set(key, pulse);
   }
 
   recoverPulses(): void {
-    for (const id of this.options.getState().pendingPulseChannelIds ?? []) {
-      const channel = this.options.getSnapshot()?.logicalChannels.find((item) => item.id === id);
-      if (!channel?.capabilities.includes('output')) throw new Error('persisted pulse has no output route');
-      this.schedulePulse(channel, 0);
+    const state = this.options.getState();
+    const routes = [...(state.pendingPulseRoutes ?? [])];
+    for (const id of state.pendingPulseChannelIds ?? []) {
+      if (routes.some((route) => route.channel.id === id)) continue;
+      const snapshot = this.options.getSnapshot();
+      const channel = snapshot?.logicalChannels.find((item) => item.id === id);
+      const point = snapshot?.physicalPoints.find((item) => item.id === channel?.physicalPointId);
+      if (!snapshot || !channel?.capabilities.includes('output') || !point)
+        throw new Error('persisted pulse has no output route');
+      routes.push({ channel, point, snapshot });
     }
+    state.pendingPulseRoutes = routes;
+    for (const route of routes) this.schedulePulse(route.channel, 0, route);
   }
 
   clearPulse(channelId: string): void {
-    const pulse = this.pulses.get(channelId);
+    const snapshot = this.options.getSnapshot();
+    const channel = snapshot?.logicalChannels.find((item) => item.id === channelId);
+    const point = snapshot?.physicalPoints.find((item) => item.id === channel?.physicalPointId);
+    if (!snapshot || !channel || !point) return;
+    const key = routeKey({ channel, point, snapshot });
+    const pulse = this.pulses.get(key);
     if (!pulse) return;
     clearTimeout(pulse.timer);
-    this.pulses.delete(channelId);
+    this.pulses.delete(key);
   }
 
   async applyDisconnectPolicies(connected: boolean): Promise<void> {
@@ -328,41 +386,103 @@ export class OutputController {
     if (stateSaveFailed) await this.options.saveState();
   }
 
+  /** Runtime updates override hold/watchdog policies and manual ownership. */
+  async applyRuntimeUpdateFailsafe(): Promise<void> {
+    this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
+    this.feedbackChecks.clear();
+    this.feedbackGenerations.clear();
+    this.watchdogs.forEach(clearTimeout);
+    this.watchdogs.clear();
+    this.options.getState().manualOutputChannelIds = [];
+    let failed = false;
+    for (const channel of this.options.getSnapshot()?.logicalChannels ?? []) {
+      if (!channel.capabilities.includes('output')) continue;
+      try {
+        if (await this.write(channel, false)) this.clearPulse(channel.id);
+        else failed = true;
+      } catch {
+        failed = true;
+      }
+    }
+    for (const [key, pulse] of this.pulses) {
+      await this.runForChannel(pulse.channel.id, async () => {
+        if (this.pulses.get(key) !== pulse) return;
+        if (await this.writePulseShutdown(pulse)) {
+          clearTimeout(pulse.timer);
+          this.pulses.delete(key);
+        } else failed = true;
+      });
+    }
+    if (failed) throw new Error('Runtime update could not switch every output off');
+  }
+
   private ignoreRejection(callback: () => Promise<unknown>): void {
     void callback().catch(() => undefined);
   }
 
-  private async writePulseShutdown(channel: LogicalChannel, point: PhysicalPoint): Promise<boolean> {
+  private completePulse(key: string, pulse: Pulse, attempt: number): void {
+    this.ignoreRejection(() =>
+      this.runForChannel(pulse.channel.id, async () => {
+        if (this.pulses.get(key) !== pulse) return;
+        if (await this.writePulseShutdown(pulse)) this.pulses.delete(key);
+        else {
+          const delayMs = Math.min(
+            INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS * 2 ** (attempt - 1),
+            MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS,
+          );
+          pulse.timer = setTimeout(() => this.completePulse(key, pulse, attempt + 1), delayMs);
+        }
+      }),
+    );
+  }
+
+  private async writePulseShutdown(pulse: Pulse): Promise<boolean> {
+    const key = routeKey(pulse);
+    const state = this.options.getState();
+    const route = state.pendingPulseRoutes?.find((route) => routeKey(route) === key) ?? {
+      channel: pulse.channel,
+      point: pulse.point,
+      snapshot: pulse.snapshot,
+    };
     try {
-      return await this.writePointWhileQueued(channel, point, false);
-    } catch {
-      // A confirmed OFF whose durable commit failed still needs a retry/recovery obligation.
+      await pulse.write(false);
+      const snapshot = this.options.getSnapshot();
+      const channel = snapshot?.logicalChannels.find((item) => {
+        const point = snapshot.physicalPoints.find((point) => point.id === item.physicalPointId);
+        return point && item.capabilities.includes('output') && routeKey({ channel: item, point, snapshot }) === key;
+      });
+      if (channel) {
+        state.outputs = { ...state.outputs, [channel.id]: false };
+        state.uncertainOutputChannelIds = state.uncertainOutputChannelIds?.filter((id) => id !== channel.id);
+        this.scheduleFeedbackCheck(channel, false);
+      }
+      state.pendingPulseRoutes = state.pendingPulseRoutes?.filter((route) => routeKey(route) !== key);
+      state.pendingPulseChannelIds = [...new Set(state.pendingPulseRoutes?.map((route) => route.channel.id) ?? [])];
+      await this.options.saveState();
+      this.options.publishState();
+      return true;
+    } catch (error) {
+      if (!state.pendingPulseRoutes?.some((route) => routeKey(route) === key))
+        state.pendingPulseRoutes = [...(state.pendingPulseRoutes ?? []), route];
+      state.pendingPulseChannelIds = [...new Set(state.pendingPulseRoutes.map((route) => route.channel.id))];
+      void this.options.publishFault(pulse.channel.id, error).catch(() => undefined);
       return false;
     }
   }
 
-  private retryPulseShutdown(channelId: string, pulse: Pulse, attempt: number): void {
-    // Keep the pulse so a subsequent configuration replacement cannot activate
-    // a new snapshot until this captured physical point has been shut down.
-    const delayMs = Math.min(
-      INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS * 2 ** (attempt - 1),
-      MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS,
-    );
-    pulse.timer = setTimeout(
-      () =>
-        void this.ignoreRejection(() =>
-          this.runForChannel(channelId, async () => {
-            if (this.pulses.get(channelId) !== pulse) return;
-            if (await this.writePulseShutdown(pulse.channel, pulse.point)) this.pulses.delete(channelId);
-            else this.retryPulseShutdown(channelId, pulse, attempt + 1);
-          }),
-        ),
-      delayMs,
-    );
+  private restorePulseRoute(key: string | undefined, previous: PulseRoute[] | undefined): void {
+    if (!key) return;
+    const state = this.options.getState();
+    const route = previous?.find((route) => routeKey(route) === key);
+    state.pendingPulseRoutes = [
+      ...(state.pendingPulseRoutes ?? []).filter((route) => routeKey(route) !== key),
+      ...(route ? [route] : []),
+    ];
+    state.pendingPulseChannelIds = [...new Set(state.pendingPulseRoutes.map((route) => route.channel.id))];
   }
 
   private scheduleFeedbackCheck(channel: LogicalChannel, value: boolean): void {
-    if (!channel.feedback) return;
+    if (!channel.feedback || this.options.feedbackEnabled?.() === false) return;
     const generation = ++this.feedbackGenerationSequence;
     this.feedbackGenerations.set(channel.id, generation);
     const existing = this.feedbackChecks.get(channel.id);
@@ -381,7 +501,11 @@ export class OutputController {
     generation: number,
     configurationGeneration: number,
   ): Promise<void> {
-    if (!this.isCurrentFeedback(channel.id, generation, configurationGeneration)) return;
+    if (
+      this.options.feedbackEnabled?.() === false ||
+      !this.isCurrentFeedback(channel.id, generation, configurationGeneration)
+    )
+      return;
     const feedbackChannel = this.options
       .getSnapshot()
       ?.logicalChannels.find((item) => item.id === channel.feedback?.channelId);

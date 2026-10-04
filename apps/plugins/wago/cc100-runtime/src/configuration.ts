@@ -1,3 +1,4 @@
+import { ENGINEERING_UNITS } from '../../measurement-contract';
 import { createHash } from 'node:crypto';
 
 // Keep persisted runtime snapshots subject to the same Modbus contract as API acceptance.
@@ -277,7 +278,7 @@ function validateChannelMeasurements(
   if (
     channel.measurement &&
     (!capabilities.includes('measurement') ||
-      !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
+      !ENGINEERING_UNITS.some((unit) => unit === channel.measurement?.unit) ||
       !Number.isFinite(channel.measurement.scale) ||
       !Number.isFinite(channel.measurement.offset) ||
       !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))

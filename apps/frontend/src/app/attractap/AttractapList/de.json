@@ -3,7 +3,7 @@
     "title": "Attractap",
     "actions": {
       "menu": "Geräte-Einrichtung",
-      "openHardwareSetup": "NFC-Leser Einrichten",
+      "openHardwareSetup": "RFID-Leser Einrichten",
       "openSerialConsole": "Serielle Konsole"
     }
   },

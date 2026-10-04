@@ -237,6 +237,37 @@ test('production entrypoint drains connection states during startup and handles 
   expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
 });
 
+test('boots after an SSH MQTT refresh using permanent state credentials and the recreated broker environment', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
+  delete process.env.WAGO_IO_PATHS;
+  process.env.WAGO_MQTT_URL = 'mqtts://new-broker.test:8883';
+  process.env.WAGO_MQTT_USE_ENV_CREDENTIALS = 'false';
+  process.env.WAGO_MQTT_USERNAME = 'old-environment-username';
+  process.env.WAGO_MQTT_PASSWORD = 'old-environment-password';
+  mockState = {
+    credentials: {
+      username: 'wago-controller-test-device',
+      password: 'refreshed-device-password',
+      prefix: 'attraccess/wago',
+      credentialEpoch: '22222222-2222-4222-8222-222222222222',
+    },
+    credentialRotation: { revision: 1, token: 'fresh-ssh-operation-token' },
+  };
+  await import('./main');
+  await flush();
+  const { connect } = await import('mqtt');
+  expect(connect).toHaveBeenCalledWith(
+    'mqtts://new-broker.test:8883',
+    expect.objectContaining({
+      username: 'wago-controller-test-device',
+      password: 'refreshed-device-password',
+    }),
+  );
+  mockClients[0].emit('connect');
+  await flush();
+  expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
+});
+
 test('production RTU profile routes Modbus devices and schedules their configured polling intervals', async () => {
   process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-rtu-v1';
   delete process.env.WAGO_IO_PATHS;

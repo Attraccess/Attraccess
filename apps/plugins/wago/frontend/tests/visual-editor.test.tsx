@@ -726,7 +726,7 @@ describe('mounted Modbus configuration', () => {
     expect(validateEditorSnapshot(first)).toEqual([]);
     expect(first.modbus.devices[0]).toMatchObject({
       name: 'Workshop meter',
-      profileId: 'wago-879-3000',
+      profileId: 'wago-879-3020',
       profileVersion: 1,
     });
     expect(first.physicalPoints[1]).toMatchObject({
@@ -740,7 +740,7 @@ describe('mounted Modbus configuration', () => {
       measurement: { unit: 'watt', kind: 'live', scale: 1, offset: 0 },
     });
     await user.click(screen.getByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
+    await user.click(await screen.findByRole('option', { name: /^Imported energy \(watt-hour\)$/ }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
     const [, second] = state.save.mock.calls[1];
@@ -905,7 +905,7 @@ describe('Modbus output and serial composition', () => {
       transport: 'rtu',
       path: '/dev/serial',
       baudRate: 9600,
-      parity: 'none',
+      parity: 'even',
       stopBits: 1,
     });
     expect(saved.modbus.connections[0]).not.toHaveProperty('host');
@@ -1041,7 +1041,7 @@ describe('Modbus review regressions', () => {
   it('retains the customized input disconnect policy when selecting another measurement', async () => {
     const user = start(fixture());
     await user.click(await screen.findByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
+    await user.click(await screen.findByRole('option', { name: /^Imported energy \(watt-hour\)$/ }));
     expect(screen.getByRole('spinbutton', { name: 'Watchdog timeout (ms)' })).toHaveValue(2345);
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
@@ -1062,7 +1062,7 @@ describe('Modbus review regressions', () => {
     await section(user, 'Channels');
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
+    await user.click(await screen.findByRole('option', { name: /^Imported energy \(watt-hour\)$/ }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     expect(state.save.mock.calls[0][1].physicalPoints[0]).toMatchObject({

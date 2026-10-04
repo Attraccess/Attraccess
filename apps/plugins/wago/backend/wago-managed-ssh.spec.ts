@@ -4,14 +4,37 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { generateManagementKey } from './wago-management-key';
 import { WagoManagedAccess } from './wago-managed-access.entity';
-import { managedSsh } from './wago-managed-ssh';
+import { managedSsh, managedSshFailure, managedSshStorageDiagnostics } from './wago-managed-ssh';
+
+it.each([
+  ['head: invalid option -- c', 'receiver_tools'],
+  ['Runtime transfer receiver failed', 'receiver_tools'],
+  ['Runtime transfer receiver timed out', 'transfer_timeout'],
+  ['Incomplete or oversized runtime transfer', 'transfer_size'],
+  ['Runtime checksum mismatch', 'transfer_checksum'],
+] as const)('keeps the specific transfer failure %s', (stderr, failure) => {
+  expect(managedSshFailure(stderr, 'transfer')).toBe(failure);
+});
+
+it('preserves only bounded numeric storage diagnostics from SSH stderr', () => {
+  expect(managedSshStorageDiagnostics('fixture-secret\nInsufficient runtime storage: /var/lib requires 180397 KiB, available 176652 KiB\n')).toEqual([
+    { path: '/var/lib', requiredKiB: 180397, availableKiB: 176652 },
+  ]);
+  for (const line of [
+    'Insufficient runtime storage: /var/lib requires nope KiB, available 1 KiB',
+    'Insufficient runtime storage: /var/../secret requires 2 KiB, available 1 KiB',
+    'Insufficient runtime storage: /var/lib requires 9999999999999 KiB, available 1 KiB',
+    'Insufficient runtime storage: /var/lib requires 1 KiB, available 2 KiB',
+    'Insufficient runtime storage: /var/lib requires 2 KiB, available 1 KiB fixture-secret',
+  ]) expect(managedSshStorageDiagnostics(line)).toEqual([]);
+});
 
 describe('production managed SSH transport', () => {
   afterEach(() => jest.restoreAllMocks());
   const host = '10.77.0.7',
     token = 'a'.repeat(32);
 
-  function fixture(mode: 'ok' | 'host-change' | 'wait' | 'noisy') {
+  function fixture(mode: 'ok' | 'host-change' | 'wait' | 'noisy' | 'storage', selectedHost = host) {
     const hostKey = generateManagementKey(),
       identity = generateManagementKey();
     const actualSpawn = jest.requireActual<typeof processes>('node:child_process').spawn;
@@ -35,7 +58,7 @@ describe('production managed SSH transport', () => {
           [
             '-e',
             'process.stdout.write(process.argv[1])',
-            `${host} ${mode === 'host-change' ? identity.publicKey : hostKey.publicKey}\n`,
+            `${selectedHost} ${mode === 'host-change' ? identity.publicKey : hostKey.publicKey}\n`,
           ],
           options,
         );
@@ -46,6 +69,8 @@ describe('production managed SSH transport', () => {
             ? 'process.stdin.resume(); setInterval(()=>{},1000)'
             : mode === 'noisy'
               ? 'process.stderr.write("fixture-secret".repeat(2000)); setInterval(()=>{},1000)'
+              : mode === 'storage'
+                ? 'process.stdin.resume(); process.stdin.on("end",()=>{process.stderr.write("Insufficient runtime storage: /var/lib requires 180396 KiB, available 179724 KiB\\nfixture-secret\\n");process.exitCode=1})'
               : 'const chunks=[];process.stdin.on("data",c=>chunks.push(c));process.stdin.on("end",()=>process.stdout.write(Buffer.concat(chunks).toString("base64")))';
         child = actualSpawn(process.execPath, ['-e', script], options);
         releaseStarted();
@@ -54,7 +79,7 @@ describe('production managed SSH transport', () => {
       return child;
     }) as typeof processes.spawn);
     const target = Object.assign(new WagoManagedAccess(), {
-      host,
+      host: selectedHost,
       fingerprint: hostKey.fingerprint,
       keyFingerprint: identity.fingerprint,
     });
@@ -72,8 +97,26 @@ describe('production managed SSH transport', () => {
     const test = fixture('host-change');
     await expect(
       managedSsh(test.target, test.identity.privateKey, `proof ${token}`, new AbortController().signal),
-    ).rejects.toThrow('identity changed');
+    ).rejects.toMatchObject({ failure: 'host_identity' });
     expect(test.calls.map((call) => call.command)).toEqual(['ssh-keyscan']);
+    expectReaped(test.children);
+  });
+
+  it('scans and authenticates only the new IP with the existing pinned fingerprint', async () => {
+    const newHost = '192.168.2.50', test = fixture('ok', newHost);
+    const output = await managedSsh(test.target, test.identity.privateKey, `proof ${token}`, new AbortController().signal);
+    expect(Buffer.from(output, 'base64').toString()).toBe(`proof ${token}\n`);
+    expect(test.calls.find(call => call.command === 'ssh-keyscan')?.args).toContain(newHost);
+    expect(test.calls.find(call => call.command === 'ssh')?.args).toContain(`attraccess@${newHost}`);
+    expect(test.calls.some(call => call.args.includes(host) || call.args.includes(`attraccess@${host}`))).toBe(false);
+    expectReaped(test.children);
+  });
+
+  it('returns actionable capacity figures from a failed SSH operation without returning raw stderr', async () => {
+    const test = fixture('storage');
+    const failure = await managedSsh(test.target, test.identity.privateKey, `storage-status ${token}`, new AbortController().signal).catch(error => error);
+    expect(failure).toMatchObject({ failure: 'storage', storageDiagnostics: [{ path: '/var/lib', requiredKiB: 180396, availableKiB: 179724 }] });
+    expect(failure.message).not.toContain('fixture-secret');
     expectReaped(test.children);
   });
 

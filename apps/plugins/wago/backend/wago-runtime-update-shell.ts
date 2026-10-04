@@ -4,13 +4,45 @@ import {
   wagoHardwareDeploymentPreflightScript,
   wagoRuntimeBootScript,
 } from './wago-hardware-deployment';
-import { runtimeBundleCapacityPreflightScript } from './wago-runtime-install';
+import { runtimeUpdateCapacityPreflightScript } from './wago-runtime-install';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
 import { wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 import { isCc100HardwareProfile, type Cc100HardwareProfile } from '../shared/hardware-profile';
 
 const quote = (text: string) => `'${text.replaceAll("'", "'\\''")}'`;
 const imageIdPattern = /^sha256:[a-f0-9]{64}$/;
+
+// Minimal FW31 head may lack -c. One dd input block can be short on a pipe;
+// account for its actual output before choosing the next bounded read. No fancy
+// dd flags, pipefail, byte-at-a-time archive copy, or unbounded disk writes.
+export const boundedReceiver = String.raw`file=$1
+limit=$2
+mode=$3
+case "$mode" in native|terse) ;; *) exit 1 ;; esac
+received=0
+: > "$file"
+while test "$received" -lt "$limit"; do
+  chunk=$((limit - received))
+  if test "$chunk" -gt 65536; then chunk=65536; fi
+  dd bs="$chunk" count=1 >> "$file" 2>/dev/null || exit 1
+  # The outer filesystem guard already positively identified this stat ABI.
+  # One metadata process per input block avoids the guarded capture pipeline
+  # (and its byte-at-a-time dd) on every short SSH pipe read. This is our own
+  # private upload file; the full guard still validates its final size below.
+  if test "$mode" = native; then
+    next=$(command stat -c '%s' "$file") || exit 1
+  else
+    next=$(command stat -t "$file") || exit 1
+    case "$next" in "$file "*) next=${'$'}{next#"$file "}; next=${'$'}{next%% *} ;; *) exit 1 ;; esac
+  fi
+  case "$next" in ''|*[!0-9]*) exit 1 ;; esac
+  test "${'$'}{next#0}" = "$next" || test "$next" = 0 || exit 1
+  test "${'$'}{#next}" -le 9 || exit 1
+  test "$next" -ge "$received" || exit 1
+  test "$next" -le "$limit" || exit 1
+  if test "$next" = "$received"; then break; fi
+  received=$next
+done`;
 
 /** These server-generated scripts are a separate state-preserving transaction.
  * They are not the destructive commissioning delivery/recovery scripts. A future
@@ -34,7 +66,7 @@ cleanup="$root/var/lib/attraccess-wago-update-cleanup-${tokenValue}"
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 docker() { timeout -k 5 45 docker --host unix:///var/run/docker.sock "$@"; }
 fail() { echo "$*" >&2; exit 1; }
-${wagoShellFilesystemGuard()}
+${wagoShellFilesystemGuard({ waitForLock: true })}
 wago_require_root_directory_or_alias "$root/var/lib" || fail 'Unsafe state parent'
 for path in "$config/delivery" "$config/docker-provision" "$config/runtime.env.next" "$config/runtime-ca.pem.next" "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup"; do
   test ! -e "$path" && test ! -L "$path" || fail 'Commissioning recovery or acceptance required'
@@ -90,19 +122,10 @@ export function runtimeUpdateStageScript(
   const imageWord = helperParameters ? '"${image}"' : quote(artifact.imageId);
   const referenceWord = helperParameters ? '"${reference}"' : quote(artifact.image);
   return `${preamble(token, profile, testRoot, helperParameters)}
-${runtimeBundleCapacityPreflightScript(artifact.bytes, testRoot, helperParameters)}
-# Update peaks differ from commissioning: both retained archives are on the
-# journal filesystem. Add the Docker reserve there only when it shares st_dev.
-journal_identity=$(stat -Lc '%d:%i' "$root/var/lib")
-docker_identity=$(stat -Lc '%d:%i' "$docker_root")
-journal_free=$(df -Pk "$root/var/lib" | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print $4}')
-case "$journal_free" in ''|*[!0-9]*) fail 'Invalid journal storage capacity' ;; esac
-journal_required=${helperParameters ? '$((2 * kib + 16384))' : 2 * Math.ceil(artifact.bytes / 1024) + 16384}
-if test "\${journal_identity%%:*}" = "\${docker_identity%%:*}"; then journal_required=$((journal_required + ${helperParameters ? '3 * kib' : 3 * Math.ceil(artifact.bytes / 1024)})); fi
-test "$journal_free" -ge "$journal_required" || fail 'Insufficient update journal storage'
+${runtimeUpdateCapacityPreflightScript(artifact.bytes, testRoot, helperParameters)}
 ${wagoHardwareDeploymentPreflightScript(testRoot, true, profile)}
 docker() { timeout -k 5 45 docker --host unix:///var/run/docker.sock "$@"; }
-command -v head >/dev/null && command -v sync >/dev/null || fail 'Bounded update tools unavailable'
+command -v sync >/dev/null && command -v mkfifo >/dev/null || fail 'Bounded update tools unavailable'
 test ! -e "$tx" && test ! -L "$tx" || fail 'Update recovery or acknowledgement required'
 for pending in "$root/var/lib"/attraccess-wago-update-cleanup-*; do test ! -e "$pending" && test ! -L "$pending" || fail 'Update cleanup acknowledgement required'; done
 test -f "$config/runtime.env" && test ! -L "$config/runtime.env" && test "$(stat -c '%u:%g:%a:%h' "$config/runtime.env")" = 0:0:600:1 || fail 'Unsafe enrolled runtime environment'
@@ -138,17 +161,32 @@ mv "$stage" "$tx"
 sync
 trap - EXIT
 # At most B+1 bytes may reach disk, even if a trusted server stream malfunctions.
-timeout -k 5 300 head -c ${helperParameters ? '"$((bytes + 1))"' : artifact.bytes + 1} > "$tx/bundle.tar"
-test "$(wc -c < "$tx/bundle.tar" | tr -d ' ')" = ${helperParameters ? '"$bytes"' : artifact.bytes} || fail 'Incomplete or oversized runtime transfer'
+if timeout -k 5 300 sh -c ${quote(boundedReceiver)} sh "$tx/bundle.tar" ${helperParameters ? '"$((bytes + 1))"' : artifact.bytes + 1} "$wago_stat_mode"; then :;
+else
+  case "$?" in 124|137|143) fail 'Runtime transfer receiver timed out' ;; *) fail 'Runtime transfer receiver failed' ;; esac
+fi
+test "$(stat -c '%s' "$tx/bundle.tar")" = ${helperParameters ? '"$bytes"' : artifact.bytes} || fail 'Incomplete or oversized runtime transfer'
 printf '%s  %s\\n' ${digestWord} "$tx/bundle.tar" | sha256sum -c - >/dev/null || fail 'Runtime checksum mismatch'
 tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$tx/bundle.tar" image-reference > "$tx/reference"
 test "$(cat "$tx/reference")" = ${referenceWord} || fail 'Runtime reference mismatch'
-tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$tx/bundle.tar" image.tar > "$tx/image.tar"
-timeout -k 5 300 docker --host unix:///var/run/docker.sock load -i "$tx/image.tar" > "$tx/load-output" || fail 'Runtime load failed'
+# A FIFO avoids retaining a second full archive. Check both processes: a failed
+# tar must never be hidden by Docker successfully consuming a partial stream.
+mkfifo -m 0600 "$tx/image.pipe"
+timeout -k 5 300 tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$tx/bundle.tar" image.tar > "$tx/image.pipe" &
+extractor=$!
+trap 'kill "$extractor" 2>/dev/null || :; wait "$extractor" 2>/dev/null || :; rm -f "$tx/image.pipe"' EXIT
+if timeout -k 5 300 docker --host unix:///var/run/docker.sock load < "$tx/image.pipe" > "$tx/load-output"; then loaded=1; else loaded=0; fi
+if wait "$extractor"; then extracted=1; else extracted=0; fi
+trap - EXIT
+rm -f "$tx/image.pipe"
+test "$loaded:$extracted" = 1:1 || fail 'Runtime load failed'
 sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p' "$tx/load-output" > "$tx/loaded-image"
 test "$(wc -l < "$tx/loaded-image" | tr -d ' ')" = 1 || fail 'Expected one runtime image'
 test "$(docker image inspect --format '{{.Id}}' "$(cat "$tx/loaded-image")")" = ${imageWord} || fail 'Loaded image identity mismatch'
 test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}/{{.Variant}}' ${imageWord})" = linux/arm/v7 || fail 'Incompatible runtime platform'
+# Neither archive is needed for rollback, which retains the previous container,
+# hook and stopped-state checkpoint. Reclaim only this token-owned upload.
+rm -f "$tx/bundle.tar"
 phase staged
 `;
 }

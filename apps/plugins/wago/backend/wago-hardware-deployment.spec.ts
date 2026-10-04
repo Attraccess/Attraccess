@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
 import { wagoCodesysClassificationShell } from './wago-codesys-classification';
 import { fw31Model, fw31Revisions } from './fixtures/fw31-identity';
+import { CommissioningProgressReader, commissioningCheckpoints } from './wago-commissioning-progress';
 import {
   WAGO_DIN,
   WAGO_DOUT,
@@ -68,6 +69,9 @@ fi
   it('waits for an active supervisor gate before starting the owned preparation journal', () => {
     const result = prepare('supervisor-lock-held');
     expect(result.status).toBe(0);
+    const progress = jest.fn();
+    new CommissioningProgressReader(progress).write(result.stdout);
+    expect(progress.mock.calls.map(([checkpoint]) => checkpoint)).toEqual(Object.keys(commissioningCheckpoints));
     expect(existsSync(join(fixture.root, journal, 'started'))).toBe(true);
     expect(result.stderr).not.toContain('Another runtime transaction holds the controller lock');
   });

@@ -17,14 +17,29 @@ export class AddPluginRegistryDto {
   token?: string | null;
 }
 
-export class InstallPluginDto {
+export class DependencyConfirmationDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  planToken?: string;
+}
+
+export class RemoveInstalledPluginDto {
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  approvedDependants?: string[];
+}
+
+export class InstallPluginDto extends DependencyConfirmationDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   registryId?: string;
 }
 
-export class ReplaceInstalledPluginDto {
+export class ReplaceInstalledPluginDto extends DependencyConfirmationDto {
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()

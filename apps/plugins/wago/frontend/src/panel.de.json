@@ -84,6 +84,11 @@
   "done": "Fertig",
   "closeSettings": "Einstellungen schließen",
   "cancel": "Abbrechen",
+  "applyTitle": "Konfiguration anwenden?",
+  "applyHint": "Unten stehen die aktuell gemeldeten Ausgangspegel. HIGH oder LOW sagt nicht aus, ob die angeschlossene Maschine läuft. Möchtest du diese Änderungen anwenden?",
+  "high": "HIGH (ein)",
+  "low": "LOW (aus)",
+  "noAppliedOutputs": "In der angewendeten Konfiguration sind keine Ausgänge konfiguriert.",
   "flowImpactTitle": "Bestehende Flows können betroffen sein",
   "flowImpactHint": "Diese Änderungen betreffen {{count}} konfigurierte Kanäle. Zum Anwenden müssen die Auswirkungen auf bestehende Flows bestätigt werden.",
   "flowReferences": "{{count}} Flow-Verknüpfungen",
@@ -95,5 +100,13 @@
     "timeout": "Der Controller hat den Befehl nicht rechtzeitig bestätigt. Vor einem erneuten Versuch die Verbindung prüfen.",
     "transport_failure": "Der Controller-Befehl konnte nicht gesendet werden."
   },
-  "discardError": "Änderungen konnten nicht verworfen werden. Aktuelle Konfiguration laden und erneut versuchen."
+  "discardError": "Änderungen konnten nicht verworfen werden. Aktuelle Konfiguration laden und erneut versuchen.",
+  "sections": {
+    "electrical": "Elektrische Messwerte",
+    "active-energy": "Wirkenergie und Tarife",
+    "reactive-energy": "Blindenergie und Tarife",
+    "quadrant-energy": "Quadrantenenergie und Tarife",
+    "information": "Zählerdaten und Einstellungen"
+  },
+  "partialReadings": "Einige Register konnten nicht gelesen werden. Verfügbare Messwerte bleiben aktuell."
 }

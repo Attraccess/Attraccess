@@ -26,10 +26,21 @@ import fieldsDe from './fields.de.json';
 import serverMessagesDe from './server-messages.de.json';
 import panelEn from './panel.en.json';
 import panelDe from './panel.de.json';
+import networkChangeEn from './network-change.en.json';
+import networkChangeDe from './network-change.de.json';
 
 // Legacy API message IDs are English strings. Translate known IDs without
 // changing persisted diagnostics or the wire contract. Unknown text stays literal.
 const serverMessagesEn = Object.fromEntries(Object.keys(serverMessagesDe).map((message) => [message, message]));
+
+serverMessagesEn[
+  'Managed SSH provisioning failed. Use the audited recovery action for the generated root credential before retrying cleanup.'
+] = 'Managed SSH access could not be set up. The previous attempt did not save the underlying cause.';
+
+serverMessagesEn[
+  'Managed SSH cutover needs recovery. The independent watchdog restores prior SSH policy unless commit was verified.'
+] =
+  'Secure update access could not be confirmed. Automatic rollback on the CC100 restores the previous SSH access settings if the server has not confirmed the change.';
 
 // Recognize only templates emitted by our legacy API. Captured identifiers and
 // values remain data; the surrounding message follows the core language.
@@ -39,6 +50,29 @@ const serverMessagePatterns: {
   parameters: string[];
   referenceParameter?: string;
 }[] = [
+  {
+    pattern: /^Automatic SSH setup failed \((status|audit|ownership|proof|recovery_login|key_commit|acceptance|cutover|policy|root_login|boot|reboot|confirmation|rollback)\)\. (.+)$/,
+    key: 'Automatic SSH setup failed ({{stage}}). {{reason}}',
+    parameters: ['stage', 'reason'],
+  },
+  {
+    pattern:
+      /^Installation cleanup failed \((busy|authentication|identity|ownership|filesystem|runtime|timeout|transport)\)\. (.+) Runtime cleanup completed; retry cleanup to finish controller preparation and credential revocation\.$/,
+    key: 'Installation cleanup failed ({{stage}}). {{reason}} Runtime cleanup completed; retry cleanup to finish controller preparation and credential revocation.',
+    parameters: ['stage', 'reason'],
+  },
+  {
+    pattern:
+      /^Installation cleanup failed \((busy|authentication|identity|ownership|filesystem|runtime|timeout|transport)\)\. (.+)$/,
+    key: 'Installation cleanup failed ({{stage}}). {{reason}}',
+    parameters: ['stage', 'reason'],
+  },
+  {
+    pattern:
+      /^Managed SSH setup failed \((tools|accounts|policy|peer|filesystem|account|key|helper|password|proof|root|commit)\)\. (.+)$/,
+    key: 'Managed SSH setup failed ({{stage}}). {{reason}}',
+    parameters: ['stage', 'reason'],
+  },
   {
     pattern: /^Uploading runtime bundle: (\d+(?:\.\d+)?)%\.$/,
     key: 'Uploading runtime bundle: {{percent}}%.',
@@ -109,6 +143,7 @@ export const wagoTranslations = {
     presets: presetsEn,
     fields: fieldsEn,
     panel: panelEn,
+    networkChange: networkChangeEn,
   },
   de: {
     ...serverMessagesDe,
@@ -125,6 +160,7 @@ export const wagoTranslations = {
     presets: presetsDe,
     fields: fieldsDe,
     panel: panelDe,
+    networkChange: networkChangeDe,
   },
 };
 

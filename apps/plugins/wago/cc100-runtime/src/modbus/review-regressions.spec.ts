@@ -154,10 +154,36 @@ const command = (id: string, value = true, revision = 1) =>
   );
 
 describe('ATT-1059 independent review regressions', () => {
-  it('publishes an actual 879-3000 float register as integer millivolts', async () => {
+  it.each([true, false, undefined])(
+    'preserves routing during replacement when the previous output state is %s',
+    async (value) => {
+      const s = snapshot();
+      const request = jest.fn(async (_unit: number, pdu: Buffer) => pdu);
+      const { runtime, store, published } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
+      if (value !== undefined) store.saved.outputs.output = value;
+      else store.saved.uncertainOutputChannelIds = ['output'];
+      await runtime.start();
+      const next = structuredClone(s);
+      next.modbus.connections[0].parity = 'none';
+      await runtime.receiveDesired(desired(next));
+      expect(store.saved.accepted?.revision).toBe(value === false ? 2 : 1);
+      expect(request).not.toHaveBeenCalled();
+      expect(published).toContainEqual(
+        expect.objectContaining({
+          payload: {
+            revision: 2,
+            contentHash: hash(next),
+            errors: value === false ? [] : [expect.objectContaining({ code: 'outputs_busy' })],
+          },
+        }),
+      );
+    },
+  );
+
+  it('publishes an actual 879-3020 float register as integer millivolts', async () => {
     const s: Snapshot = snapshot();
     if (!s.modbus) throw new Error('Missing fixture configuration');
-    s.modbus.devices[0].profileId = 'wago-879-3000';
+    s.modbus.devices[0].profileId = 'wago-879-3020';
     s.modbus.profiles = [];
     s.physicalPoints[0].modbus = { deviceId: 'device', measurementId: 'voltage-l1' };
     s.logicalChannels = [
@@ -183,72 +209,31 @@ describe('ATT-1059 independent review regressions', () => {
     expect(published.some(({ topic }) => topic.endsWith('/faults'))).toBe(false);
   });
 
-  it.each(['remove', 'rebind'])(
-    'blocks route %s after an ambiguous ON, including after restart, until explicit OFF',
-    async (mode) => {
-      const s = snapshot();
-      let energized = false;
-      const request = jest.fn(async (_unit: number, pdu: Buffer) => {
-        energized = pdu.readUInt16BE(3) === 1;
-        if (energized) throw new Error('timeout after actuator applied ON');
-        return pdu;
-      });
-      const store = new MemoryStore(s);
-      // Exercise both old persisted states with no output and a last-confirmed OFF.
-      if (mode === 'rebind') store.saved.outputs.output = false;
-      const first = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })), store);
-      await first.runtime.start();
-      await first.runtime.receiveCommand(command('ambiguous-on'));
-      expect(energized).toBe(true);
-      expect(store.saved.uncertainOutputChannelIds).toEqual(['output']);
-      expect(store.saved.outputs.output).not.toBe(true);
-      expect(first.published).toContainEqual(
-        expect.objectContaining({
-          payload: expect.objectContaining({ id: 'ambiguous-on', status: 'rejected' }),
-        }),
-      );
-      await first.runtime.receiveCommand(command('ambiguous-on'));
-      expect(request).toHaveBeenCalledTimes(1);
-      const next: Snapshot = structuredClone(s);
-      if (mode === 'remove') {
-        next.logicalChannels = [];
-        next.physicalPoints = [];
-        next.modbus.devices = [];
-      } else next.modbus.profiles[0].actions[0].address = 22;
-      expect(validateRuntime(next)).toEqual([]);
-      const expectBlocked = async (h: ReturnType<typeof harness>) => {
-        await h.runtime.receiveDesired(desired(next));
-        expect(h.published.at(-1)?.payload).toEqual({
-          revision: 2,
-          contentHash: hash(next),
-          errors: [expect.objectContaining({ path: 'snapshot', code: 'outputs_busy' })],
-        });
-        expect(store.saved.accepted?.revision).toBe(1);
-      };
-      await expectBlocked(first);
-      const restarted = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })), store);
-      await restarted.runtime.start();
-      await expectBlocked(restarted);
-      expect(request).toHaveBeenCalledTimes(1);
-      request.mockRejectedValueOnce(new Error('OFF acknowledgement missing'));
-      await restarted.runtime.receiveCommand(command('failed-off', false));
-      expect(store.saved.uncertainOutputChannelIds).toEqual(['output']);
-      await expectBlocked(restarted);
-      await restarted.runtime.receiveCommand(command('explicit-off', false));
-      expect(energized).toBe(false);
-      expect(store.saved.uncertainOutputChannelIds).toEqual([]);
-      expect(request).toHaveBeenCalledTimes(3);
-      expect(request.mock.calls[2][1].readUInt16BE(1)).toBe(12);
-      await restarted.runtime.receiveDesired(desired(next));
-      expect(store.saved.accepted?.revision).toBe(2);
-      expect(restarted.published).toContainEqual(
-        expect.objectContaining({
-          payload: { revision: 2, contentHash: hash(next), errors: [] },
-        }),
-      );
-    },
-  );
-  it('persists uncertainty before transmission and blocks a fresh runtime before the write settles', async () => {
+  it.each(['remove', 'rebind'])('rejects route %s with an uncertain output, including after restart', async (mode) => {
+    const s = snapshot();
+    const request = jest.fn(async () => {
+      throw new Error('timeout after actuator applied ON');
+    });
+    const { runtime, store } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
+    await runtime.start();
+    await runtime.receiveCommand(command('ambiguous-on'));
+    expect(store.saved.uncertainOutputChannelIds).toEqual(['output']);
+    const next: Snapshot = structuredClone(s);
+    if (mode === 'remove') {
+      next.logicalChannels = [];
+      next.physicalPoints = [];
+      next.modbus.devices = [];
+    } else next.modbus.profiles[0].actions[0].address = 22;
+    await runtime.receiveDesired(desired(next));
+    expect(store.saved.accepted?.revision).toBe(1);
+    const restarted = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })), store);
+    await restarted.runtime.start();
+    await restarted.runtime.receiveDesired(desired(next, 3));
+    expect(store.saved.accepted?.revision).toBe(1);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(store.saved.uncertainOutputChannelIds).toEqual(['output']);
+  });
+  it('persists uncertainty before transmission and preserves the route after restart', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'wago-uncertain-output-'));
     const pending = deferred<Buffer>();
     const entered = deferred<void>();
@@ -285,7 +270,7 @@ describe('ATT-1059 independent review regressions', () => {
       const next = structuredClone(s);
       next.modbus.devices[0].unitId = 2;
       await restarted.receiveDesired(desired(next));
-      expect(publish).toHaveBeenLastCalledWith(
+      expect(publish).toHaveBeenCalledWith(
         expect.stringContaining('/configuration/reported'),
         {
           revision: 2,
@@ -339,7 +324,7 @@ describe('ATT-1059 independent review regressions', () => {
     expect(request).toHaveBeenCalledTimes(2);
   });
   it.each(['disconnect', 'pulse'])(
-    'attempts automatic %s OFF despite storage failure and keeps routing conservative',
+    'attempts scheduled %s LOW despite storage failure and reports configuration persistence failure',
     async (mode) => {
       jest.useFakeTimers();
       const s = snapshot();
@@ -377,12 +362,23 @@ describe('ATT-1059 independent review regressions', () => {
       const next = structuredClone(s);
       next.modbus.profiles[0].actions[0].address = 22;
       await runtime.receiveDesired(desired(next));
-      expect(published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
+      expect(published.at(-1)?.payload.errors).toEqual([
+        expect.objectContaining({ code: mode === 'pulse' ? 'configuration_commit_failed' : 'outputs_busy' }),
+      ]);
+      jest.restoreAllMocks();
       const restarted = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })), store);
       await restarted.runtime.start();
       await restarted.runtime.receiveDesired(desired(next));
-      expect(restarted.published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
-      expect(store.saved.accepted?.revision).toBe(1);
+      expect(store.saved.accepted?.revision).toBe(mode === 'pulse' ? 2 : 1);
+      expect(restarted.published).toContainEqual(
+        expect.objectContaining({
+          payload: {
+            revision: 2,
+            contentHash: hash(next),
+            errors: mode === 'pulse' ? [] : [expect.objectContaining({ code: 'outputs_busy' })],
+          },
+        }),
+      );
       await jest.advanceTimersByTimeAsync(100);
       expect(values[0]).toBe(1);
       expect(values.slice(1).every((value) => value === 0)).toBe(true);
@@ -390,17 +386,12 @@ describe('ATT-1059 independent review regressions', () => {
       else expect(values).toEqual([1, 0]);
     },
   );
-  it('clears uncertainty on confirmed ON but keeps the energized guard, and retains uncertainty on failed OFF persistence', async () => {
+  it('retains write uncertainty on failed LOW persistence and blocks route changes', async () => {
     const s = snapshot();
     const request = jest.fn(async (_unit: number, pdu: Buffer) => pdu);
-    const { runtime, store, published } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
+    const { runtime, store } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
     await runtime.start();
     await runtime.receiveCommand(command('confirmed-on'));
-    expect(store.saved).toMatchObject({ outputs: { output: true }, uncertainOutputChannelIds: [] });
-    const next = structuredClone(s);
-    next.modbus.devices[0].unitId = 2;
-    await runtime.receiveDesired(desired(next));
-    expect(published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
     const save = store.save.bind(store);
     const saving = jest.spyOn(store, 'save').mockImplementation(async (state) => {
       if (state.outputs.output === false && !state.uncertainOutputChannelIds?.length) throw new Error('disk failure');
@@ -409,18 +400,18 @@ describe('ATT-1059 independent review regressions', () => {
     await expect(runtime.receiveCommand(command('off-save-fails', false))).rejects.toThrow(
       'failed to persist channel state',
     );
-    expect(store.saved).toMatchObject({ outputs: { output: true }, uncertainOutputChannelIds: [] });
-    await runtime.receiveDesired(desired(next));
-    expect(published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(store.saved.outputs.output).toBe(true);
     saving.mockRestore();
-    await runtime.receiveCommand(command('confirmed-off', false));
+    const next = structuredClone(s);
+    next.modbus.devices[0].unitId = 2;
     await runtime.receiveDesired(desired(next));
-    expect(store.saved).toMatchObject({
-      outputs: { output: false },
-      uncertainOutputChannelIds: [],
-      accepted: { revision: 2 },
-    });
+    expect(store.saved.accepted?.revision).toBe(1);
+    expect(store.saved.outputs.output).toBe(true);
+    expect(request).toHaveBeenCalledTimes(2);
+    await runtime.receiveCommand(command('retry-off', false));
+    await runtime.receiveDesired(desired(next));
+    expect(store.saved.accepted?.revision).toBe(2);
+    expect(store.saved.uncertainOutputChannelIds).toEqual([]);
   });
   it.each(['/dev/ttyS0', '/dev/serial/by-id/fixture.0'])('accepts canonical RTU path %s at both boundaries', (path) => {
     const s = snapshot();
@@ -689,45 +680,63 @@ describe('ATT-1059 independent review regressions', () => {
     ]);
     expect(published.some((p) => p.topic.endsWith('/measurements'))).toBe(false);
   });
-  it('does not suspend the route of an active pulse to persist a new configuration', async () => {
-    jest.useFakeTimers();
-    const s = snapshot();
-    s.logicalChannels[1].capabilities.push('pulse');
-    Object.assign(s.logicalChannels[1], { pulse: { durationMs: 10 } });
-    const values: number[] = [];
-    const router = new ModbusDeviceRouter(onboard, () => ({
-      request: async (_unit, pdu) => {
-        values.push(pdu.readUInt16BE(3));
-        return pdu;
-      },
-    }));
-    const { runtime, store, published } = harness(s, router);
-    await runtime.start();
-    await runtime.receiveCommand(
-      Buffer.from(
-        JSON.stringify({
-          id: 'pulse',
-          channelId: 'output',
-          action: 'pulse',
-          expectedConfigurationRevision: 1,
-          expiresAt: '2099-01-01T00:00:00.000Z',
-        }),
-      ),
-    );
-    const next = structuredClone(s);
-    next.modbus.profiles[0].actions[0].address = 22;
-    await runtime.receiveDesired(desired(next));
-    expect(store.saved.accepted?.revision).toBe(1);
-    expect(published).toContainEqual(
-      expect.objectContaining({
-        payload: expect.objectContaining({
-          errors: expect.arrayContaining([expect.objectContaining({ code: 'outputs_busy' })]),
-        }),
-      }),
-    );
-    await jest.advanceTimersByTimeAsync(10);
-    expect(values).toEqual([1, 0]);
-  });
+  it.each(['rebind', 'remove', 'restart'])(
+    'keeps an active pulse duration and original route across configuration %s',
+    async (mode) => {
+      jest.useFakeTimers();
+      const s = snapshot();
+      s.logicalChannels[1].capabilities.push('pulse');
+      Object.assign(s.logicalChannels[1], { pulse: { durationMs: 10 } });
+      const writes: Array<{ address: number; value: number }> = [];
+      const router = () =>
+        new ModbusDeviceRouter(onboard, () => ({
+          request: async (_unit, pdu) => {
+            writes.push({ address: pdu.readUInt16BE(1), value: pdu.readUInt16BE(3) });
+            return pdu;
+          },
+        }));
+      const { runtime, store, published } = harness(s, router());
+      await runtime.start();
+      await runtime.receiveCommand(
+        Buffer.from(
+          JSON.stringify({
+            id: 'pulse',
+            channelId: 'output',
+            action: 'pulse',
+            expectedConfigurationRevision: 1,
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          }),
+        ),
+      );
+      const next = structuredClone(s);
+      if (mode === 'remove') {
+        next.logicalChannels = [];
+        next.physicalPoints = [];
+        next.modbus.devices = [];
+      } else next.modbus.profiles[0].actions[0].address = 22;
+      await runtime.receiveDesired(desired(next));
+      expect(store.saved.accepted?.revision).toBe(2);
+      expect(published).toContainEqual(
+        expect.objectContaining({ payload: { revision: 2, contentHash: hash(next), errors: [] } }),
+      );
+      expect(writes).toEqual([{ address: 12, value: 1 }]);
+      if (mode === 'restart') {
+        jest.clearAllTimers();
+        const restarted = harness(next, router(), store);
+        await restarted.runtime.start();
+        await jest.advanceTimersByTimeAsync(1);
+      } else {
+        await jest.advanceTimersByTimeAsync(9);
+        expect(writes).toEqual([{ address: 12, value: 1 }]);
+        await jest.advanceTimersByTimeAsync(1);
+      }
+      expect(writes).toEqual([
+        { address: 12, value: 1 },
+        { address: 12, value: 0 },
+      ]);
+      expect(store.saved.pendingPulseRoutes).toEqual([]);
+    },
+  );
 });
 
 describe('ATT-973 runtime independent findings', () => {

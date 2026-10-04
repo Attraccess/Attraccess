@@ -3,7 +3,7 @@
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
 #include "settings/settings.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #include "utils.hpp"
 
 #include <cassert>

@@ -62,7 +62,7 @@ After registering the reader, you need to assign which resource(s) it controls:
 
 ## Step 4: Test the Setup
 
-1. Hold a registered NFC card to the reader
+1. Hold a registered RFID card to the reader
 2. The reader should communicate with the backend and show an access decision on its display
 3. If the card is linked to a user with permission for the assigned resource, access is granted
 
@@ -85,11 +85,11 @@ The reader communicates with the Attraccess backend via WebSocket. The connectio
 |---------|----------|
 | Reader display shows "No connection" | Check network connectivity and verify the Attraccess server URL |
 | Reader not appearing in Attraccess | Ensure the reader is on the same network and can reach the backend |
-| Card scan has no response | Verify the NFC card is registered and the reader has an assigned resource |
+| Card scan has no response | Verify the RFID card is registered and the reader has an assigned resource |
 
 ## See Also
 
 - [Overview](attractap/overview.md) -- What is Attractap?
 - [Hardware](attractap/hardware.md) -- Hardware variants and components
-- [NFC Cards](attractap/nfc-cards.md) -- Register and manage NFC cards
+- [RFID Cards](attractap/rfid-cards.md) -- Register and manage RFID cards
 - [Resources](resources/overview.md) -- Manage machines and doors

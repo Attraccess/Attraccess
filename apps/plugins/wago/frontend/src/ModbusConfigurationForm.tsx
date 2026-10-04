@@ -1,3 +1,4 @@
+import { ENGINEERING_UNITS } from '../../measurement-contract';
 import { randomUUID } from './configuration-id';
 import { Button, Description, Input, Label, ListBox, Select, TextField } from '@heroui/react';
 import { useState, type ReactNode } from 'react';
@@ -234,6 +235,27 @@ function FormatFields({
     </div>
   );
 }
+function SignalDisclosure({
+  label,
+  defaultExpanded,
+  children,
+}: {
+  label: string;
+  defaultExpanded: boolean;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  return (
+    <details
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+      className="wg:rounded-lg wg:border wg:border-border wg:p-3"
+    >
+      <summary className="wg:cursor-pointer wg:font-medium">{label}</summary>
+      {expanded && children}
+    </details>
+  );
+}
 export function ModbusProfileForm({
   value,
   onChange,
@@ -284,10 +306,11 @@ export function ModbusProfileForm({
               measurements: value.measurements.map((item, i) => (i === index ? { ...item, ...patch } : item)),
             });
           return (
-            <details key={index} open={!collapseSignals} className="wg:rounded-lg wg:border wg:border-border wg:p-3">
-              <summary className="wg:cursor-pointer wg:font-medium">
-                {t('modbus.measurementTitle', { name: modbusDisplayName(value, m.name, tBackendMessage) })}
-              </summary>
+            <SignalDisclosure
+              key={index}
+              defaultExpanded={!collapseSignals && (value.measurements.length <= 16 || index < 5)}
+              label={t('modbus.measurementTitle', { name: modbusDisplayName(value, m.name, tBackendMessage) })}
+            >
               <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
                 {showIdentifiers && (
                   <Field
@@ -312,9 +335,16 @@ export function ModbusProfileForm({
                 />
                 <FormatFields value={m} disabled={readonly} onChange={update} />
                 <Choice
+                  label={t('modbus.numericEncoding')}
+                  value={m.encoding ?? 'binary'}
+                  options={['binary', 'bcd']}
+                  disabled={readonly}
+                  onChange={(v) => update({ encoding: v === 'bcd' ? 'bcd' : undefined })}
+                />
+                <Choice
                   label={t('modbus.unit')}
                   value={m.unit}
-                  options={['ampere', 'volt', 'watt', 'watt-hour', 'percent']}
+                  options={ENGINEERING_UNITS}
                   disabled={readonly}
                   onChange={(v) => update({ unit: v as typeof m.unit })}
                 />
@@ -366,7 +396,7 @@ export function ModbusProfileForm({
                   {t('modbus.removeMeasurement')}
                 </Button>
               </div>
-            </details>
+            </SignalDisclosure>
           );
         })}
         <Button
@@ -621,7 +651,7 @@ export function ModbusConfigurationForm({
                                   transport: 'rtu' as const,
                                   path: '/dev/serial',
                                   baudRate: 9600,
-                                  parity: 'none' as const,
+                                  parity: 'even' as const,
                                   stopBits: 1 as const,
                                 }),
                           }

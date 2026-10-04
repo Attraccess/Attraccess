@@ -139,6 +139,192 @@ describe('WagoService', () => {
     };
   }
 
+  it('lists an offline controller as stale after restarting runtime monitoring', async () => {
+    const claimed = {
+      ...controller(),
+      trustState: 'claimed' as const,
+      lastHeartbeatAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+    };
+    const { service } = createService([claimed]);
+    service.registerRuntimeStatusHandler(() => undefined);
+
+    expect(service.isRuntimeUpdateRequired(claimed.id)).toBe(true);
+    expect((await service.list())[0].connectivity).toBe('stale');
+
+    await service.setRuntimePolicy(
+      claimed.id,
+      `sha256:${'a'.repeat(64)}`,
+      `sha256:${'b'.repeat(64)}`,
+      'connection-token',
+    );
+    expect(service.isRuntimeUpdateRequired(claimed.id)).toBe(true);
+    expect((await service.list())[0].connectivity).toBe('stale');
+  });
+
+  it('subscribes a migrated controller directly without contacting its unreachable previous broker', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
+    const { service, context } = createService([claimed], [], 2);
+    const handlers = new Map<
+      string,
+      (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>
+    >();
+    jest.mocked(context.mqtt.subscribe).mockImplementation(async (serverId, topic, handler) => {
+      if (serverId === 2) throw new Error('old-broker-unreachable');
+      handlers.set(topic, handler as (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>);
+      return { unsubscribe: jest.fn() };
+    });
+    const heartbeat = jest
+      .spyOn(service as unknown as { onHeartbeat(id: string, payload: Buffer): Promise<void> }, 'onHeartbeat')
+      .mockResolvedValue(undefined);
+    await service.refreshNetworkConnection(1);
+    expect(context.mqtt.subscribe).toHaveBeenCalledTimes(6);
+    expect(jest.mocked(context.mqtt.subscribe).mock.calls.every(([serverId]) => serverId === 3)).toBe(true);
+    const topic = 'attraccess/wago/v1/controllers/cc100-01/heartbeat',
+      payload = Buffer.from('device-heartbeat');
+    await handlers.get(topic)?.({ serverId: 2, topic, payload });
+    expect(heartbeat).not.toHaveBeenCalled();
+    await handlers.get(topic)?.({ serverId: 3, topic, payload });
+    expect(heartbeat).toHaveBeenCalledWith('cc100-01', payload);
+  });
+
+  it('checks software after restarting runtime monitoring until the running image is confirmed', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: new Date().toISOString() };
+    const { service } = createService([claimed]);
+    service.registerRuntimeStatusHandler(() => undefined);
+
+    expect(service.isRuntimeUpdateRequired(claimed.id)).toBe(true);
+    expect((await service.list())[0].connectivity).toBe('runtime_check');
+
+    const image = `sha256:${'a'.repeat(64)}`;
+    await service.setRuntimePolicy(claimed.id, image, image, 'connection-token');
+    expect(service.isRuntimeUpdateRequired(claimed.id)).toBe(false);
+    expect((await service.list())[0].connectivity).toBe('online');
+  });
+
+  it('restores migrated controller subscriptions after API restart while the previous default broker is unreachable', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
+    const { service, context } = createService([claimed], [], 2);
+    const handlers = new Map<
+      string,
+      (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>
+    >();
+    jest.mocked(context.mqtt.subscribe).mockImplementation(async (serverId, topic, handler) => {
+      if (serverId === 2) throw new Error('previous broker unreachable');
+      handlers.set(topic, handler as (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>);
+      return { unsubscribe: jest.fn() };
+    });
+    const heartbeat = jest
+      .spyOn(service as unknown as { onHeartbeat(id: string, payload: Buffer): Promise<void> }, 'onHeartbeat')
+      .mockResolvedValue(undefined);
+
+    await service.onApplicationBootstrap();
+    const topic = 'attraccess/wago/v1/controllers/cc100-01/heartbeat';
+    await handlers.get(topic)?.({ serverId: 3, topic, payload: Buffer.from('fresh heartbeat') });
+
+    expect(heartbeat).toHaveBeenCalledWith('cc100-01', Buffer.from('fresh heartbeat'));
+    expect(handlers.size).toBe(6);
+    expect(context.logger.warn).toHaveBeenCalledWith(expect.stringContaining('during startup'));
+  });
+
+  it('keeps the migrated broker active when an overlapping rebuild captured its previous association', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed], [], 2);
+    const rebuild = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(service);
+    await rebuild();
+    let finish!: () => void;
+    const stale = { unsubscribe: jest.fn() },
+      migrated = { unsubscribe: jest.fn() };
+    jest.mocked(context.mqtt.subscribe).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve(stale);
+        }),
+    );
+    const overlapping = rebuild();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    let heartbeatHandler!: (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>;
+    jest.mocked(context.mqtt.subscribe).mockImplementation(async (serverId, topic, handler) => {
+      if (serverId === 3 && topic.endsWith('/heartbeat')) heartbeatHandler = handler as typeof heartbeatHandler;
+      return serverId === 3 ? migrated : { unsubscribe: jest.fn() };
+    });
+    const heartbeat = jest
+      .spyOn(service as unknown as { onHeartbeat(id: string, payload: Buffer): Promise<void> }, 'onHeartbeat')
+      .mockResolvedValue(undefined);
+    claimed.mqttServerId = 3;
+    await service.refreshNetworkConnection(1);
+    finish();
+    await overlapping;
+    await heartbeatHandler({
+      serverId: 3,
+      topic: 'attraccess/wago/v1/controllers/cc100-01/heartbeat',
+      payload: Buffer.from('new connection'),
+    });
+    expect(stale.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(migrated.unsubscribe).not.toHaveBeenCalled();
+    expect(heartbeat).toHaveBeenCalledWith('cc100-01', Buffer.from('new connection'));
+  });
+
+  it('lists a connected mismatched runtime in a dedicated update status and publishes a connection-bound policy', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: new Date().toISOString() };
+    const { service, context, revisionRepository } = createService([claimed]);
+    service.registerRuntimeStatusHandler(() => undefined);
+    expect((await service.list())[0].connectivity).toBe('runtime_check');
+    revisionRepository.find.mockResolvedValueOnce([
+      { revision: 1, snapshot: JSON.stringify({ logicalChannels: [{ id: 'load', capabilities: ['output'] }] }) },
+    ]);
+    await expect(
+      service.executeCommand({
+        controllerId: 1,
+        channelId: 'load',
+        action: 'set',
+        value: true,
+        expectedConfigurationRevision: 1,
+      }),
+    ).rejects.toThrow('Runtime update required');
+    expect(context.mqtt.publish).not.toHaveBeenCalled();
+    const desired = `sha256:${'a'.repeat(64)}`;
+    await service.setRuntimePolicy(1, desired, `sha256:${'b'.repeat(64)}`, 'connection-token');
+    expect((await service.list())[0].connectivity).toBe('runtime_update');
+    expect(context.mqtt.publish).toHaveBeenCalledWith(
+      2,
+      expect.stringContaining('configuration/desired'),
+      JSON.stringify({ runtimeImageId: desired, runtimePolicyToken: 'connection-token' }),
+      { qos: 1, retain: false },
+    );
+    await service.setRuntimePolicy(1, desired, desired, 'connection-token');
+    expect((await service.list())[0].connectivity).toBe('online');
+  });
+
+  it.each([1, 2])(
+    'retries runtime policy after publication %s fails without unblocking commands',
+    async (failedPublication) => {
+      const { service, context, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+      service.registerRuntimeStatusHandler(() => undefined);
+      revisionRepository.find.mockResolvedValue([{ revision: 1, state: 'published', snapshot: '{}' }]);
+      const publish = jest.mocked(context.mqtt.publish);
+      if (failedPublication === 2) publish.mockResolvedValueOnce(undefined);
+      publish.mockRejectedValueOnce(new Error('broker unavailable'));
+      const image = `sha256:${'a'.repeat(64)}`;
+      await expect(service.setRuntimePolicy(1, image, image, 'boot-token')).rejects.toThrow('broker unavailable');
+      expect(service.isRuntimeUpdateRequired(1)).toBe(true);
+      publish.mockClear();
+      await service.setRuntimePolicy(1, image, image, 'boot-token');
+      expect(publish).toHaveBeenCalledTimes(2);
+      expect(service.isRuntimeUpdateRequired(1)).toBe(false);
+    },
+  );
+
+  it.each(['pending', 'rejected', 'published', 'applied'])(
+    'replays only published configuration when the latest revision is %s',
+    async (state) => {
+      const { service, context, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+      revisionRepository.find.mockResolvedValue([{ revision: 1, state, snapshot: '{}' }]);
+      const image = `sha256:${'a'.repeat(64)}`;
+      await service.setRuntimePolicy(1, image, image, 'boot-token');
+      expect(context.mqtt.publish).toHaveBeenCalledTimes(['published', 'applied'].includes(state) ? 2 : 1);
+    },
+  );
+
   it('revokes a claimed controller before deleting its local records', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, enrollmentId: null };
     const { service, context, controllerRepository, draftRepository, revisionRepository } = createService([claimed]);
@@ -487,6 +673,36 @@ describe('WagoService', () => {
     );
 
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
+  });
+
+  it('does not overwrite newly committed broker or credential bindings with an in-flight old heartbeat', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, credentialEpoch: 'old-epoch' };
+    const { service, controllerRepository } = createService([claimed]);
+    controllerRepository.findOneBy.mockResolvedValue({ ...claimed });
+    controllerRepository.save.mockImplementation(async (snapshot) => {
+      // The SSH transaction commits after the heartbeat read and before its save.
+      claimed.mqttServerId = 3;
+      claimed.credentialEpoch = 'new-epoch';
+      Object.assign(claimed, snapshot);
+      return claimed;
+    });
+    const onHeartbeat = (Reflect.get(service, 'onHeartbeat') as (id: string, payload: Buffer) => Promise<void>).bind(
+      service,
+    );
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          protocolVersion: '1.0.0',
+          runtimeVersion: '1.0.0',
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+        }),
+      ),
+    );
+    expect(claimed.mqttServerId).toBe(3);
+    expect(claimed.credentialEpoch).toBe('new-epoch');
+    expect(claimed.lastHeartbeatAt).toBeTruthy();
   });
 
   it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {

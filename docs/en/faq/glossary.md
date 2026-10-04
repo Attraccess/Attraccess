@@ -20,8 +20,8 @@ This glossary explains key terms used throughout the Attraccess documentation.
 
 | Term | Description |
 |------|-------------|
-| **Attractap** | The NFC card reader hardware used with Attraccess. It is based on the ESP32 microcontroller and reads NFC cards to identify users at machines. |
-| **NFC** | Near Field Communication – a short-range wireless technology used for contactless identification, such as tapping a card on a reader. |
+| **Attractap** | The RFID card reader hardware used with Attraccess. It is based on the ESP32 microcontroller and reads RFID cards to identify users at machines. |
+| **RFID** | Radio Frequency Identification – a technology that uses radio waves to identify contactless cards and tags, such as the cards used with Attractap. |
 
 ## Protocols & Standards
 
