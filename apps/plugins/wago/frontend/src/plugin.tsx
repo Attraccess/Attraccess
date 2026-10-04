@@ -86,6 +86,6 @@ export default class WagoPlugin implements AttraccessFrontendPlugin {
   }
 
   getSidebarItems(): PluginSidebarItem[] {
-    return [{ label: 'WAGO', path: '/wago', icon: <CpuIcon className="wg:w-5 wg:h-5" /> }];
+    return [{ label: 'WAGO', path: '/wago', group: 'devices', icon: <CpuIcon className="wg:w-5 wg:h-5" /> }];
   }
 }

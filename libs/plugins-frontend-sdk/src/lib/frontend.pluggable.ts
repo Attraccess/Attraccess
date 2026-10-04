@@ -20,6 +20,8 @@ export interface PluginSidebarItem {
   label: string;
   path: string;
   icon?: ReactNode;
+  /** Host sidebar group ID, e.g. `devices`. Omitted or unknown groups render at the root. */
+  group?: string;
 }
 
 export const getPluginFunctionName = (pluginName: string, func: FRONTEND_FUNCTION) => {
