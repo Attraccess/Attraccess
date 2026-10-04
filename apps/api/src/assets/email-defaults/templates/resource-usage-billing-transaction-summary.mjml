@@ -22,10 +22,8 @@
           {{else if this.isOperatingDuration}}{{t 'item_operating_duration' 'Attributable operating time'}}
           {{else if this.isFixedFee}}{{t 'item_fixed_fee' 'Fixed session fee'}}
           {{else if this.isBillingFactor}}{{t 'item_billing_factor' 'Billing factor adjustment'}}
-          {{else if this.isEnergy}}{{t 'item_energy' 'Energy'}}
           {{else}}{{this.name}}{{/if}}
           {{#if this.description}}<br/>{{this.description}}{{/if}}
-          {{#if this.energyKwh}}<br/>{{t 'energy_amount' '{kwh} kWh' kwh=this.energyKwh}}{{/if}}
           {{#if this.isDuration}}<br/>
             {{#if this.hasDuration}}{{t 'duration_measured' 'Measured: {seconds} s' seconds=this.durationSeconds}}<br/>{{/if}}
             {{t 'duration_billed' 'Billed: {minutes} min' minutes=this.quantity}}

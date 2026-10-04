@@ -791,7 +791,6 @@ describe('BillingService', () => {
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-        creditsPerKwh: 0,
       });
       expect(resourceBillingConfigurationRepository.save).toHaveBeenCalledWith(created);
       expect(result).toBe(created);

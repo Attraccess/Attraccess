@@ -473,6 +473,8 @@ const seedDatabase = async (dataSource: DataSource) => {
     resourceId: resource.id,
     name: 'Energy (kWh)',
     creditsPerUnit: 30,
+    lifetimeValue: '500000000',
+    counterValue: '1500000000',
   }));
   const meteringSession = await ensureEntity(dataSource.getRepository(ResourceMeteringSession), () => ({
     id: `seed-metering-session-${seedTag}`,

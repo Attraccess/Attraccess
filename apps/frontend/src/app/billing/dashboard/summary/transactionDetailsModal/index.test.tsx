@@ -71,7 +71,7 @@ it('shows usage charges, item totals and refund action using minor currency unit
   fireEvent.click(screen.getByRole('button', { name: 'actions.refund' }));
   expect(state.refund).toHaveBeenCalledOnce();
 });
-it('describes an energy item from its kWh and captured rate instead of a stored text', async () => {
+it('renders a migrated energy item through generic quantity and rate fields', async () => {
   state.transaction = {
     id: 7,
     resourceUsageId: 8,
@@ -81,47 +81,24 @@ it('describes an energy item from its kWh and captured rate instead of a stored 
     items: [
       {
         id: 1,
-        name: 'ENERGY',
+        name: 'Energy (kWh)',
         description: null,
         quantity: 1,
         unitPrice: 45,
-        energyMicroWh: '1500000000',
-        energyCreditsPerKwh: 30,
+        meterQuantity: '1.5',
+        meterCreditsPerUnit: 30,
         externalReference: 'metering:s:o',
       },
     ],
   };
   render(<TransactionDetailsModal transactionId={7} isOpen />);
-  expect(await screen.findByText('items.energyDescription')).toBeTruthy();
-  expect(screen.getByText('metering:s:o')).toBeTruthy();
+  expect(await screen.findByText('items.meterDescription')).toBeTruthy();
+  expect(screen.getByText('Energy (kWh)')).toBeTruthy();
+  expect(screen.queryByText('metering:s:o')).toBeNull();
   // quantity/unit price columns show the real kWh consumed and per-kWh rate,
   // not the raw quantity=1 / unitPrice=total-charge fields (ATT-1103).
-  expect(screen.getByText('1.50')).toBeTruthy();
+  expect(screen.getByText('1,5')).toBeTruthy();
   expect(screen.getByText('0.30')).toBeTruthy();
-});
-it('keeps kWh precision for energy readings beyond Number.MAX_SAFE_INTEGER', async () => {
-  state.transaction = {
-    id: 7,
-    resourceUsageId: 8,
-    resourceUsage: { id: 8 },
-    status: 'completed',
-    amount: -45,
-    items: [
-      {
-        id: 1,
-        name: 'ENERGY',
-        description: null,
-        quantity: 1,
-        unitPrice: 45,
-        // 24-digit microWh: Number(str)/1e9 rounds this to ...00.02 kWh; the BigInt-based
-        // split keeps the exact ...00.00 kWh (ATT-1103 Sourcery finding).
-        energyMicroWh: '100000000000000000000009',
-        energyCreditsPerKwh: 30,
-      },
-    ],
-  };
-  render(<TransactionDetailsModal transactionId={7} isOpen />);
-  expect(await screen.findByText('100000000000000.00')).toBeTruthy();
 });
 it.each([
   ['refund', { refundOfId: 4, amount: 100, status: 'pending' }, 'type.refund'],

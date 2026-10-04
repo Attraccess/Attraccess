@@ -219,7 +219,6 @@ export class BillingService {
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-        creditsPerKwh: 0,
       });
       configuration = await repository.save(configuration);
     }
@@ -511,7 +510,6 @@ export class BillingService {
       (usage?.creditsPerUsage ?? configuration.creditsPerUsage) > 0 ||
       (usage?.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute) > 0 ||
       (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0 ||
-      (usage?.energyCreditsPerKwh ?? 0) > 0 ||
       (usage?.meterRates
         ? usage.meterRates.some((meter) => meter.creditsPerUnit > 0)
         : (await (transactionalEntityManager ?? this.resourceBillingConfigurationRepository.manager).count(

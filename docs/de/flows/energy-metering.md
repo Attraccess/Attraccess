@@ -47,3 +47,5 @@ Bei kostenpflichtigen kumulativen Zählern müssen Start- und Abfragezweige voll
 Bestehende Konfigurationen werden zum Zähler **Energy (kWh)**. Alte Abrechnungen und Nachweise bleiben erhalten. Migrierte Flow-Knoten behalten die bisherige Einheitenumrechnung intern bei, damit Wh- oder Joule-Quellen weiterhin kWh liefern. Neue Zähler verwenden Werte unverändert; notwendige Umrechnungen erfolgen in der Quelle oder im Flow.
 
 Der migrierte Gesamtverbrauch enthält nur zuvor erfasste Sitzungsverbräuche. Frühere Leerlaufverbräuche lassen sich nicht nachträglich rekonstruieren.
+
+Das allgemeine Zählermodell ersetzt die Energieabrechnung vollständig: Alte Tarife und exakte Rechnungsmengen werden in Zähler-Snapshots und Rechnungspositionen migriert; die energiespezifischen Datenbankspalten werden entfernt. Historische Transaktionsbeträge und Audit-Referenzen bleiben erhalten. Ein Rollback auf die vorherige allgemeine Zählerversion erhält die konvertierten Nachweise. Eine Rückkehr zum reinen Energiemodell wird abgelehnt, sobald dabei Zählerhistorie verloren ginge; stattdessen muss eine Sicherung vor der Migration wiederhergestellt werden.

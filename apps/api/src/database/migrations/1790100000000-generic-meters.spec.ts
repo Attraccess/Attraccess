@@ -75,6 +75,9 @@ it('migrates energy definitions, readings and rates without changing historical 
     await runner.query("DELETE FROM resource_metering_operation WHERE id = 'idle'");
     await runner.query("DELETE FROM resource_metering_session WHERE id = 's2'");
     await runner.query('DELETE FROM resource_meter WHERE id = 2');
+    await runner.query("UPDATE resource_meter SET lifetimeValue = '1500000001'");
+    await expect(new GenericMeters1790100000000().down(runner)).rejects.toThrow('losing idle meter history');
+    await runner.query("UPDATE resource_meter SET lifetimeValue = '1500000000'");
     await new GenericMeters1790100000000().down(runner);
     expect(await runner.query('SELECT creditsPerKwh FROM resource_billing_configuration')).toEqual([
       { creditsPerKwh: 30 },

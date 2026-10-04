@@ -34,8 +34,8 @@ import type { MeteringReport } from '../flows/node-executors';
 import { AuditService } from '../../audit/audit.service';
 import { LiveNotificationsService } from '../../billing/liveNotificationsService';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
-import { MeteringValueError, toMicroWh } from './energy';
-import { meterCharge, formatMeterValue, toMeterValue } from './quantity';
+import { toLegacyMeterValue } from './legacy-energy-conversion';
+import { MeteringValueError, meterCharge, formatMeterValue, toMeterValue } from './quantity';
 
 const CLOCK_SKEW_MS = 5_000;
 const INTERIM_MAX_AGE_MS = 5 * 60_000;
@@ -772,7 +772,7 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   private readingValue(report: { value: string; legacyEnergyUnit?: string }): bigint {
-    return report.legacyEnergyUnit ? toMicroWh(report.value, report.legacyEnergyUnit) : toMeterValue(report.value);
+    return report.legacyEnergyUnit ? toLegacyMeterValue(report.value, report.legacyEnergyUnit) : toMeterValue(report.value);
   }
 
   private async acceptReading(

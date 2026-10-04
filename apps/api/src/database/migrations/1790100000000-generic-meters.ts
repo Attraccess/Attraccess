@@ -26,9 +26,10 @@ export class GenericMeters1790100000000 implements MigrationInterface {
         latestMicroWh: string | null;
         baselineMicroWh: string | null;
         latestObservedAt: string | null;
-      }[] = await runner.query('SELECT * FROM resource_metering_session WHERE resourceId = ? ORDER BY createdAt', [
-        resourceId,
-      ]);
+      }[] = await runner.query(
+        'SELECT * FROM resource_metering_session WHERE resourceId = ? ORDER BY createdAt, usageId',
+        [resourceId],
+      );
       const lifetime = sessions.reduce(
         (sum, s) => sum + BigInt(s.consumedMicroWh ?? s.latestMicroWh ?? '0'),
         BigInt(0),
@@ -36,7 +37,7 @@ export class GenericMeters1790100000000 implements MigrationInterface {
       const last = sessions.at(-1);
       const counter =
         last?.latestMicroWh == null
-          ? null
+          ? (last?.baselineMicroWh ?? null)
           : (BigInt(last.latestMicroWh) + BigInt(last.baselineMicroWh ?? '0')).toString();
       await runner.query(
         'UPDATE resource_meter SET lifetimeValue = ?, counterValue = ?, latestObservedAt = ? WHERE id = ?',
@@ -108,6 +109,25 @@ export class GenericMeters1790100000000 implements MigrationInterface {
       throw new Error(
         'Cannot revert generic meters without losing new meter history. Restore a pre-migration backup instead.',
       );
+    // Start baselines can collect idle consumption without a sessionless operation.
+    // The old schema has no lifetime counter in which to retain that history.
+    const meters: { id: number; lifetimeValue: string }[] = await runner.query(
+      'SELECT id, lifetimeValue FROM resource_meter',
+    );
+    for (const meter of meters) {
+      const sessions: { consumedValue: string | null; latestValue: string | null }[] = await runner.query(
+        'SELECT consumedValue, latestValue FROM resource_metering_session WHERE meterId = ?',
+        [meter.id],
+      );
+      const recorded = sessions.reduce(
+        (sum, session) => sum + BigInt(session.consumedValue ?? session.latestValue ?? '0'),
+        BigInt(0),
+      );
+      if (BigInt(meter.lifetimeValue) !== recorded)
+        throw new Error(
+          'Cannot revert generic meters without losing idle meter history. Restore a pre-migration backup instead.',
+        );
+    }
     const nodes: { id: string; type: string; data: string | null }[] = await runner.query(
       "SELECT id, type, data FROM resource_flow_node WHERE type LIKE '%.resource.metering.%'",
     );

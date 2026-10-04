@@ -1,4 +1,18 @@
-import { MeteringValueError } from './energy';
+export class MeteringValueError extends Error {
+  constructor(
+    public readonly code:
+      | 'invalid_value'
+      | 'unsupported_unit'
+      | 'power_is_not_energy'
+      | 'counter_decreased'
+      | 'stale_reading'
+      | 'invalid_observation_time',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'MeteringValueError';
+  }
+}
 
 const SCALE = BigInt(1_000_000_000);
 const MAX = BigInt('999999999999999999999999999999999999');

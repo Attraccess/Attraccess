@@ -98,7 +98,6 @@ const schemas = [
       sessionDurationCreditsPerMinute: { type: Number, nullable: true },
       operatingDurationCreditsPerMinute: { type: Number, nullable: true },
       creditsPerUsage: { type: Number, nullable: true },
-      energyCreditsPerKwh: { type: Number, nullable: true },
       meterRates: { type: 'simple-json', nullable: true },
       billingFactor: { type: Number, nullable: true },
       attributedOperatingDurationInMinutes: { type: Number, nullable: true },
@@ -401,7 +400,6 @@ describe('Flow-defined energy metering', () => {
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-        creditsPerKwh: 0,
       })),
       validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
       handleResourceUsageStart: jest.fn(

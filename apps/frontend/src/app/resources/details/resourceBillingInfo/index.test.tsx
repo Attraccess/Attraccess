@@ -70,7 +70,7 @@ function mockData() {
   } as ReturnType<typeof useBillingServiceGetBillingConfiguration>);
   vi.mocked(useBillingServiceGetResourceBillingConfiguration).mockReturnValue({
     data: {
-      configuration: { creditsPerUsage: 100, creditsPerMinute: 200, creditsPerOperatingMinute: 300, creditsPerKwh: 30 },
+      configuration: { creditsPerUsage: 100, creditsPerMinute: 200, creditsPerOperatingMinute: 300 },
       additionalItems: [],
     },
   } as ReturnType<typeof useBillingServiceGetResourceBillingConfiguration>);

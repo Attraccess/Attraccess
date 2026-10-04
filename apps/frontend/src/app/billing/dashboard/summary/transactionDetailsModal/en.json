@@ -39,10 +39,8 @@
       "PER_SESSION": "Per session",
       "PER_MINUTE": "Per minute",
       "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Per attributable operating minute",
-      "ENERGY": "Energy",
       "BILLING_FACTOR": "Billing factor"
     },
-    "energyDescription": "{{kwh}} kWh at {{rate}} per kWh",
     "empty": "No items",
     "total": "Items total",
     "meterDescription": "{{value}} at {{rate}} per measured value"
