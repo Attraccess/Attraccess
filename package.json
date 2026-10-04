@@ -6,9 +6,10 @@
     "serve": "node --experimental-strip-types scripts/dev-serve.mts",
     "seed:dev": "node scripts/seed-dev-user.mjs",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
+    "lint:files": "node scripts/check-file-size.mjs",
     "prepare": "husky",
-    "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin'",
-    "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
+    "precommit": "pnpm lint:files && pnpm lint:files --staged && pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin'",
+    "precommit:all": "pnpm lint:files && pnpm lint:files --staged && pnpm nx run-many -t lint,typecheck,build,test,e2e",
     "services": "node --experimental-strip-types scripts/services-compose.mts",
     "crap-score": "nx run-many -t crap-score --parallel=2",
     "crap-score:affected": "nx affected -t crap-score --parallel=2"

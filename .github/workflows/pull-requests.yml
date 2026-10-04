@@ -123,6 +123,10 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      - name: Test file size enforcement
+        run: node --test scripts/check-file-size.test.mjs
+      - name: Enforce file size limits
+        run: pnpm lint:files
       - name: Lint affected projects
         run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
       - name: Typecheck affected projects

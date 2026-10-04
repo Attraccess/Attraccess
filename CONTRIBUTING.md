@@ -1,5 +1,44 @@
 # Contributing to Attraccess
 
+## File size limits
+
+Keep code files **below 200 lines** (maximum 199) and test files **below 300 lines**
+(maximum 299). The check counts every physical line, including blank lines and
+comments; a final newline does not add an extra line. CRLF and LF count the same.
+
+Run `pnpm lint:files` to check tracked files and unignored new files in your working
+tree. `pnpm lint:files --staged` checks the Git index, including partially staged
+files. Both run before the existing `pnpm precommit` and `pnpm precommit:all`
+checks. The PR and merge-queue workflow runs the check in the required
+`lint-and-typecheck` job, independently of Nx's affected-project selection.
+
+Existing oversized files are grandfathered at their line count in the merge base
+with `origin/main`. They may stay unchanged or shrink, but cannot grow. Once a
+reduction lands on the target branch, that smaller count becomes the allowance;
+once a file meets the limit, the regular limit applies. New paths (including
+renamed files) must meet the regular limit. No oversized files need to be split
+just to enable this check.
+
+For another target branch, run `pnpm lint:files --base origin/<branch>`.
+`NX_AFFECTED_BASE` supplies the target in CI; otherwise the default is
+`origin/main`. Missing refs fail the check: fetch the target branch before running
+it. The Git merge base keeps unrelated target-branch changes out of the comparison.
+
+The check covers JS/TS (including module variants and declaration files), C/C++
+and Objective-C, Python, shell scripts, SQL, OpenSCAD, stylesheets, and HTML/MJML
+templates. Executable configuration in these languages is also code. Test files
+are identified by `.spec`, `.test`, `.e2e`, `.cy`, `test_` and equivalent filename
+segments, or directories named `test`, `tests`, `__tests__`, `__mocks__`,
+`test-utils`, `fixtures`, `acceptance`, or `e2e`.
+
+Documentation, JSON/YAML, lockfiles, declarative configuration (including CMake
+and Dockerfiles), and binary assets have no line limit. Their natural structure
+often needs larger files, so splitting them just to satisfy a line count adds
+little value. Generated/build output, generated API/WebSocket clients, dependency
+directories, and the vendored OpenSCAD WebAssembly runtime are excluded. Maintained
+public scripts and firmware headers remain covered. Exclusions are centralized
+in `scripts/check-file-size.mjs`.
+
 ## Commit Messages
 
 This repository enforces [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) on every commit (locally via the `commit-msg` Husky hook) and on every pull request title (in CI).
