@@ -50,18 +50,18 @@ Two-factor authentication adds an extra layer of security to your account.
 > [!WARNING]
 > If you lose access to your authenticator app, you will need to contact your workshop administrator to reset 2FA on your account.
 
-## NFC Cards
+## RFID Cards
 
-If your workshop uses Attractap NFC readers, you can view the NFC cards linked to your account.
+If your workshop uses Attractap RFID readers, you can view the RFID cards linked to your account.
 
 1. Navigate to **My Account**
-2. Find the **NFC Cards** section
+2. Find the **RFID Cards** section
 3. View your registered cards
 
-<!-- TODO: Screenshot of NFC cards section -->
+<!-- TODO: Screenshot of RFID cards section -->
 
 > [!NOTE]
-> NFC cards are typically registered by a workshop administrator or via an Attractap reader. Contact your administrator if you need to register a new card.
+> RFID cards are typically registered by a workshop administrator or via an Attractap reader. Contact your administrator if you need to register a new card.
 
 ## Delete Account
 

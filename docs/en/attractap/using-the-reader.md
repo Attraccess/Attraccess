@@ -1,8 +1,8 @@
 # Using the Attractap Reader
 
-Use your NFC card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
+Use your RFID card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
 
-You need an NFC card linked to your Attraccess account. If you do not have one yet, ask your workshop team to register a card for you.
+You need an RFID card linked to your Attraccess account. If you do not have one yet, ask your workshop team to register a card for you.
 
 ## Sign in with your card
 
@@ -98,5 +98,5 @@ After signing out, you can scan your card again to continue. Any running machine
 ## Related guides
 
 - [Using Resources](end-user/using-resources.md) – Use machines and tools from the Attraccess app
-- [NFC Cards](attractap/nfc-cards.md) – Register and manage cards
+- [RFID Cards](attractap/rfid-cards.md) – Register and manage cards
 - [Introductions](resources/introductions.md) – How access to a resource is granted

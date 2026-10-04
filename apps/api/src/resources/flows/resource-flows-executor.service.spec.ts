@@ -1477,6 +1477,82 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
+  describe('arithmetic templates', () => {
+    it('converts units in Set Payload using stored variables and publishes the converted fields', async () => {
+      (variablesService.getAll as jest.Mock).mockResolvedValue({ resource: { scale: 1000 }, global: {} });
+      const inputNode = createNode({ id: 'arithmetic-trigger' });
+      const setNode = createNode({
+        id: 'arithmetic-payload',
+        type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+        data: {
+          entries: [
+            { key: 'converted.energy_kwh', value: '{{divide payload.energy_wh variables.resource.scale}}' },
+            { key: 'converted.fahrenheit', value: '{{add (divide (multiply payload.celsius 9) 5) 32}}' },
+          ],
+        },
+      });
+      const mqttNode = createNode({
+        id: 'arithmetic-mqtt',
+        type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+        data: { serverId: 42, topic: 'devices/converted', payload: '{{json converted}}' },
+      });
+      initialNodes = [inputNode];
+      nodesById = { [inputNode.id]: inputNode, [setNode.id]: setNode, [mqttNode.id]: mqttNode };
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [{ source: setNode.id, target: mqttNode.id }];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { energy_wh: '1500', celsius: 20 } });
+
+      expect(mqttClientService.publish).toHaveBeenCalledWith(
+        42,
+        'devices/converted',
+        '{"energy_kwh":"1.5","fahrenheit":"68"}',
+        { qos: undefined, retain: undefined },
+      );
+    });
+
+    it('stores the result of an arithmetic template as a numeric variable', async () => {
+      const inputNode = createNode({ id: 'arithmetic-trigger' });
+      const setNode = createNode({
+        id: 'arithmetic-variable',
+        type: ResourceFlowNodeType.PROCESSING_SET_VARIABLES,
+        data: {
+          variables: [{ key: 'energy_kwh', value: '{{divide payload.energy_wh 1000}}', scope: 'resource' }],
+        },
+      });
+      initialNodes = [inputNode];
+      nodesById = { [inputNode.id]: inputNode, [setNode.id]: setNode };
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { energy_wh: 1500 } });
+
+      expect(variablesService.set).toHaveBeenCalledWith('resource', 1, 'energy_kwh', 1.5, 1);
+    });
+
+    it.each([0, undefined, 'not-a-number'])('stops a node with invalid arithmetic input %p', async (divisor) => {
+      const inputNode = createNode({ id: 'arithmetic-trigger' });
+      const setNode = createNode({
+        id: 'arithmetic-payload',
+        type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+        data: { entries: [{ key: 'converted', value: '{{divide payload.value payload.divisor}}' }] },
+      });
+      const mqttNode = createNode({
+        id: 'arithmetic-mqtt',
+        type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+        data: { serverId: 42, topic: 'devices/converted', payload: '{{converted}}' },
+      });
+      initialNodes = [inputNode];
+      nodesById = { [inputNode.id]: inputNode, [setNode.id]: setNode, [mqttNode.id]: mqttNode };
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [{ source: setNode.id, target: mqttNode.id }];
+
+      await expect(
+        service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { value: 1500, divisor } }),
+      ).rejects.toThrow('Template helper "divide"');
+      expect(mqttClientService.publish).not.toHaveBeenCalled();
+    });
+  });
+
   describe('variable nodes', () => {
     it('PROCESSING_SET_VARIABLES renders templates and stores JSON-parsed values', async () => {
       const setNode = createNode({

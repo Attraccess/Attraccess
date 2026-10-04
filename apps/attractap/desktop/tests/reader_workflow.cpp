@@ -1,6 +1,6 @@
 #include "application/application.hpp"
 #include "profile_store.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstring>
@@ -136,6 +136,7 @@ int main(int argc, char **argv) {
     unsigned listVersion = 0;
     std::string username = "Alex";
     bool active = false, supervised = false;
+    uint32_t activeUsageId = 99;
     std::string longDescription =
         "RFI 5-2 · Angstrom Engineering · Åmod · evaporation tool with a long description that must remain readable in details. ";
     while (longDescription.size() < 600)
@@ -158,7 +159,7 @@ int main(int argc, char **argv) {
             r["isHealthy"] = true;
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
             if (id == 1 && active) {
-                r["activeUsageSession"]["id"] = 99;
+                r["activeUsageSession"]["id"] = activeUsageId;
                 r["activeUsageSession"]["user"]["username"] = username;
                 char startTime[32];
                 const auto start = time(nullptr) - 1426;
@@ -185,7 +186,12 @@ int main(int argc, char **argv) {
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
         pump();
     };
-    list(false, true); pump(2100);
+    list(false, true);
+    // Wait for the boot delay and screen animation to complete on loaded runners.
+    const auto bootDeadline = millis() + 10000;
+    while (lv_screen_active() != Display::resourceListScreen.getScreen() &&
+           static_cast<int32_t>(bootDeadline - millis()) > 0)
+        pump();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     auto *networkBadge = lv_obj_get_parent(label(lv_layer_top(), "OK NET"));
     assert(lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
@@ -296,6 +302,27 @@ int main(int argc, char **argv) {
     const auto latestStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
     stats(latestStatsRequest, 99, "\"energyKwh\":\"0.250\",\"operatingDurationMs\":130000,\"isOperating\":false");
     assert(label(lv_screen_active(), "0.250 kWh"));
+    // Changing sessions clears A's cached reading before B's reply arrives.
+    activeUsageId = 100; list();
+    const auto replacementStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    assert(replacementStatsRequest != latestStatsRequest);
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(latestStatsRequest, 99, "\"energyKwh\":\"9\"");
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(replacementStatsRequest, 100, "\"energyKwh\":\"0.500\"");
+    stats(latestStatsRequest, 99, "\"energyKwh\":\"9\"");
+    server.push("RESOURCE_USAGE_STATS", "{\"resourceId\":1,\"requestId\":" + std::to_string(latestStatsRequest) + ",\"usage\":null}");
+    pump();
+    assert(label(lv_screen_active(), "0.500 kWh"));
+    // Ending a session while its lookup is outstanding keeps the panel hidden.
+    activeUsageId = 101; list();
+    const auto endingStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    active = false; list();
+    stats(endingStatsRequest, 101, "\"energyKwh\":\"9\"");
+    assert(!lv_obj_is_visible(label(lv_screen_active(), "Warte auf Messwert")));
+    active = true; activeUsageId = 99; list();
+    stats(server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>(), 99,
+          "\"energyKwh\":\"0.250\",\"operatingDurationMs\":130000,\"isOperating\":false");
     auto *backButton = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
     auto *logoutButton = lv_obj_get_parent(label(lv_screen_active(), "Abmelden"));
     assert(lv_obj_get_parent(backButton) == lv_obj_get_parent(logoutButton));

@@ -7,7 +7,7 @@
 #include "../demo/demo_store.hpp"
 #endif
 
-#include "../nfc/nfc_contract.hpp"
+#include "../rfid/rfid_contract.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
 #include "../network/network.hpp"
@@ -392,7 +392,11 @@ private:
 #endif
         APPLICATION_STATE_FIRMWARE_UPDATE
     };
-    applicationState_t state;
+#ifdef HAS_LVGL_DISPLAY
+    applicationState_t state = APPLICATION_STATE_BOOT;
+#else
+    applicationState_t state = APPLICATION_STATE_INIT;
+#endif
 
 #ifdef HAS_LVGL_DISPLAY
     void handleResourceListUpdate(const API::ResourceList &resourceList);

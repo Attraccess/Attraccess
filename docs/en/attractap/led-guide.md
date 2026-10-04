@@ -1,6 +1,6 @@
 # Attractap Lite LED Guide
 
-The Attractap Lite is a compact RFID/NFC reader without a display. It uses a circular ring of 24 WS2812 LEDs to communicate device status and feedback. This guide explains what each LED pattern means so you can interpret the device state at a glance.
+The Attractap Lite is a compact RFID reader without a display. It uses a circular ring of 24 WS2812 LEDs to communicate device status and feedback. This guide explains what each LED pattern means so you can interpret the device state at a glance.
 
 ## Overview
 
@@ -17,7 +17,7 @@ These animations run continuously while the device is in a given state.
 |-------|-------|------------|---------|
 | **Configuration Required** | Red / Orange | Three evenly-spaced dots alternating between red and orange (circular) or gentle orange pulsing (linear) | The device is not fully configured. Complete setup in Attraccess (e.g. connect to API, assign resources). |
 | **Initializing** | Blue | Bright dot with 8-LED fading tail moving around the ring (circular) or gentle pulsing (linear) | The device is booting or connecting to the network and API. |
-| **Ready / Wait for Card** | Green | Six alternating segments breathing in and out of phase (circular) or gentle pulsing (linear) | The device is ready. Present an NFC card to authenticate. |
+| **Ready / Wait for Card** | Green | Six alternating segments breathing in and out of phase (circular) or gentle pulsing (linear) | The device is ready. Present an RFID card to authenticate. |
 | **Authenticating** | Cyan | Fast-moving dot with 6-LED fading tail (circular) or quick pulsing (linear) | A card is being read and authenticated. |
 | **No Resources** | Orange | Alternating on/off flash of the entire ring | No resources are assigned to this device. Assign at least one resource in Attraccess. |
 | **Firmware Update** | Blue / White | Static alternating blue and white pixels | A firmware update is in progress. Do not power off. |

@@ -142,7 +142,7 @@ describe('NotificationPreferencesForm', () => {
     expect(screen.getAllByText('Messages').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Maintenance requests').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Resource health').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('NFC cards').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('RFID cards').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Access changes').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Email').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Push').length).toBeGreaterThan(0);
@@ -174,7 +174,7 @@ describe('NotificationPreferencesForm', () => {
     expect(within(general).getByText('All users')).toBeInTheDocument();
     expect(within(general).getByText('Notifications every user may receive.')).toBeInTheDocument();
     expect(within(general).getByText('Messages')).toBeInTheDocument();
-    expect(within(general).getByText('NFC cards')).toBeInTheDocument();
+    expect(within(general).getByText('RFID cards')).toBeInTheDocument();
     expect(within(general).getByText('Project invitations')).toBeInTheDocument();
 
     const resourceManagers = screen.getByTestId('notification-group-resourceManagers');
@@ -193,15 +193,15 @@ describe('NotificationPreferencesForm', () => {
     expect(within(admins).getByText('Access changes')).toBeInTheDocument();
   });
 
-  it('renders the German NFC card label and description', () => {
+  it('renders the German RFID card label and description', () => {
     hoisted.locale = 'de';
 
     renderForm();
 
     const general = screen.getByTestId('notification-group-general');
-    expect(within(general).getByText('NFC-Karten')).toBeInTheDocument();
+    expect(within(general).getByText('RFID-Karten')).toBeInTheDocument();
     expect(
-      within(general).getByText('Wenn eine deiner NFC-Karten registriert, aktiviert, deaktiviert oder gelöscht wird.'),
+      within(general).getByText('Wenn eine deiner RFID-Karten registriert, aktiviert, deaktiviert oder gelöscht wird.'),
     ).toBeInTheDocument();
   });
 

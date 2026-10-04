@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import scadSource from './nfc-keychain-card.scad?raw';
+import scadSource from './rfid-keychain-card.scad?raw';
 import { NO_OUTPUT_ERROR } from './errors';
 
 // OpenSCAD is GPL-licensed and deliberately kept at arm's length: it is fetched as an
@@ -124,7 +124,7 @@ async function renderPart(label: string, part: 'body' | 'letters'): Promise<Arra
  * OpenSCAD reports assert() failures on stderr; surface the message rather than a generic
  * failure. A compile-time assert line looks like:
  *   Assertion '<condition>' failed: "<message>" in file /card.scad, line 69
- * `<message>` is itself an OpenSCAD string (built with `str(...)` in nfc-keychain-card.scad) and
+ * `<message>` is itself an OpenSCAD string (built with `str(...)` in rfid-keychain-card.scad) and
  * may contain embedded, unescaped quotes of its own — e.g. `Label too long: "TOO LONG" does not
  * fit...`. So the outer quotes wrapping `<message>` can't be found by looking for *any* quote;
  * anchor on the ` in file ` marker that OpenSCAD always appends after the location, and take

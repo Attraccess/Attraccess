@@ -20,7 +20,7 @@ Jeder Attractap-Leser enthaelt die folgenden Komponenten:
 | Komponente | Beschreibung |
 |------------|-------------|
 | **ESP32 MCU** | Mikrocontroller, der die Attractap-Firmware ausfuehrt und alle Peripheriegeraete verwaltet |
-| **PN532 NFC-Leser** | Liest NFC-Karten (MIFARE Classic, MIFARE Ultralight, NTAG-Serien) |
+| **PN532 RFID-Leser** | Liest RFID-Karten (MIFARE Classic, MIFARE Ultralight, NTAG-Serien) |
 | **Display** | Zeigt Statusinformationen, Benutzer-Feedback und Zugangsentscheidungen. LCD oder Touch-LCD je nach Variante |
 | **Buzzer** | Gibt Audio-Feedback -- kurzer Piepton bei Zugang gewaehrt, Fehlerton bei Verweigerung |
 
@@ -62,7 +62,7 @@ Siehe [Firmware-Updates](attractap/firmware-updates.md) fuer Details zur Firmwar
 
 Attractap-Leser sind fuer die Montage neben einer Maschine oder Tuer konzipiert. Beachten Sie Folgendes bei der Wahl des Montageorts:
 
-- Der NFC-Leserbereich muss fuer Benutzer zugaenglich sein
+- Der RFID-Leserbereich muss fuer Benutzer zugaenglich sein
 - Das Display sollte gut ablesbar sein
 - WiFi-Varianten benoetigen ein ausreichendes Funksignal am Montageort
 - Ethernet-Varianten benoetigen Zugang zu einem Netzwerkanschluss

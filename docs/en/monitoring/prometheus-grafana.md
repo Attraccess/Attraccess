@@ -206,8 +206,8 @@ The main dashboard includes panels for:
 | **Resources** | Total resources and active usage sessions |
 | **Resource Usage Duration** | p50 and p95 session durations |
 | **Resource Usage Sessions** | Sessions started and ended over time |
-| **Connected Devices** | Number of connected Attractap NFC readers |
-| **NFC Tap Events** | Tap events over time |
+| **Connected Devices** | Number of connected Attractap RFID readers |
+| **RFID Tap Events** | Tap events over time |
 | **Billing Transactions** | Transaction counts by status |
 | **Emails Sent** | Email delivery counts |
 | **System Overview** | Projects, groups, MQTT servers, overdue maintenance |

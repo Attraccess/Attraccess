@@ -851,6 +851,48 @@ void testAuthenticatedList(Renderer &renderer)
     expect(resourceListAction(resource, "Alex") == ResourceListAction::None, "Foreign usage is never a quick stop");
 }
 
+void testUsageStatsExpiry(Renderer &renderer)
+{
+    ResourceDetailsScreen details;
+    API::ResourceBrief resource{};
+    resource.id = 1;
+    resource.hasActiveUsage = true;
+    resource.activeUsageId = 99;
+    resource.isHealthy = true;
+    resource.accessKnown = true;
+    resource.hasIntroduction = true;
+    std::strcpy(resource.name, "Lasercutter");
+    std::strcpy(resource.activeUser, Fixtures::userName);
+    details.setResourceAndUsageDetails(resource);
+    details.setUserDetails({Fixtures::userName, false, true, false, false});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    API::UsageStats stats{};
+    stats.resourceId = 1;
+    stats.usageId = 99;
+    stats.energyKwh = "0.125";
+    stats.operatingDurationMs = 60000;
+    stats.isOperating = 1;
+    const auto receivedAt = Fixtures::nowMs;
+    details.setUsageStats(stats);
+    Fixtures::nowMs = receivedAt + 24999;
+    details.loop();
+    requireObject(guard.root, &lv_label_class, "0.125 kWh");
+    requireObject(guard.root, &lv_label_class, "00:01:00 · Läuft");
+    Fixtures::nowMs = receivedAt + 25000;
+    details.loop();
+    requireObject(guard.root, &lv_label_class, "Warte auf Messwert");
+    requireObject(guard.root, &lv_label_class, "Keine Daten");
+    expect(!findObject(guard.root, &lv_label_class, "0 kWh"), "Expired energy is unavailable, not zero");
+    renderer.capture("usage-stats-expired");
+    stats.energyKwh = "0";
+    stats.isOperating = 0;
+    details.setUsageStats(stats);
+    requireObject(guard.root, &lv_label_class, "0 kWh");
+    requireObject(guard.root, &lv_label_class, "00:01:00 · Leerlauf");
+    renderer.capture("usage-stats-recovered");
+}
+
 void testIntroducerDetails(Renderer &renderer)
 {
     ResourceDetailsScreen details;
@@ -959,6 +1001,7 @@ int main(int argc, char **argv)
         test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurückgesetzt...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });
         test("screen/introducer-details", [&] { testIntroducerDetails(renderer); });
+        test("screen/usage-stats-expiry", [&] { testUsageStatsExpiry(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
                   << renderer.captures << " real LVGL frames\n";

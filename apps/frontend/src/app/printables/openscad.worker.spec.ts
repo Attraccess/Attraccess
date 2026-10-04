@@ -87,7 +87,7 @@ describe('createSerialQueue', () => {
 describe('assertionMessage', () => {
   it('extracts a clean message from a real OpenSCAD assert() failure, despite embedded quotes', () => {
     // Genuine stderr line for a label that doesn't fit: the message (built with `str(...)` in
-    // nfc-keychain-card.scad) itself quotes the label, so it contains two embedded, unescaped
+    // rfid-keychain-card.scad) itself quotes the label, so it contains two embedded, unescaped
     // quote characters in addition to the pair OpenSCAD wraps around the whole message.
     const line =
       'ERROR: Assertion \'(!HAS_LABEL || (LABEL_SIZE >= (LABEL_CAP_MIN / CAP_RATIO)))\' failed: ' +

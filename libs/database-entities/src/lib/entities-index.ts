@@ -4,7 +4,7 @@ import { EmailTemplate } from './entities/email-template.entity';
 import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { MqttServer } from './entities/mqttServer.entity';
-import { NFCCard } from './entities/nfcCard.entity';
+import { NFCCard } from './entities/rfidCard.entity';
 import { Resource } from './entities/resource.entity';
 import { ResourceType } from './entities/resource.type';
 import { ResourceGroup } from './entities/resourceGroup.entity';

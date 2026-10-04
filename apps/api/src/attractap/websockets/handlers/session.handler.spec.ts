@@ -4,6 +4,7 @@ import { AttractapEventType, AttractapEvent } from '../websocket.types';
 import { ResourceInUseError } from '../../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceActionGuard } from './resource-action.guard';
 
 describe('AttractapSessionHandler – session + flow button', () => {
   let handler: AttractapSessionHandler;
@@ -559,6 +560,39 @@ describe('AttractapSessionHandler – session + flow button', () => {
       mockResourceActionGuard.validateResourceAction.mockResolvedValue(false);
       await handler.handleResourceUsageStats(mockSocket as any, request);
       expect(mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    });
+    describe('reader access with the actual resource guard', () => {
+      let reader: { id: number; resources: { id: number }[] };
+      beforeEach(() => {
+        reader = { id: 42, resources: [{ id: 10 }] };
+        (handler as any).resourceActionGuard = Object.assign(new ResourceActionGuard(), {
+          attractapService: { findReaderById: jest.fn(async () => reader) },
+          usersService: mockUsersService,
+        });
+      });
+      it.each(['USER_NOT_AUTHENTICATED', 'RESOURCE_NOT_ASSOCIATED_WITH_READER'])(
+        'rejects %s without looking up or disclosing readings',
+        async (error) => {
+          if (error === 'USER_NOT_AUTHENTICATED') (mockSocket.state as any).lastAuthenticatedUserId = null;
+          else reader.resources = [];
+          await handler.handleResourceUsageStats(mockSocket as any, request);
+          expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+            new AttractapEvent(AttractapEventType.RESOURCE_USAGE_STATS, { requestId: 7, error }),
+          );
+          expect(mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+          expect(metering.getLive).not.toHaveBeenCalled();
+          expect(operating.getForResource).not.toHaveBeenCalled();
+        },
+      );
+      it('allows an authenticated session owner on a mapped resource', async () => {
+        await handler.handleResourceUsageStats(mockSocket as any, request);
+        expect(metering.getLive).toHaveBeenCalledWith(10);
+        expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toMatchObject({
+          id: 99,
+          energyKwh: '0.125',
+          operatingDurationMs: 120000,
+        });
+      });
     });
     it('discards results when the card changes during the lookup', async () => {
       metering.getLive.mockImplementation(async () => {
