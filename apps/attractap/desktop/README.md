@@ -32,6 +32,11 @@ open -n dist/apps/attractap-desktop/attractap-desktop.app
 pnpm nx test attractap-desktop
 ```
 
+The automated tests use SDL's dummy audio driver, so card scans and error
+patterns stay silent even when an agent runs tests in the background. The
+interactive simulator still plays its normal beeps. When running test binaries
+directly, set `SDL_AUDIO_DRIVER=dummy` as in the capture commands below.
+
 `pnpm nx serve attractap-desktop` builds and launches a fresh app process. Quit
 the previous simulator before restarting it. On macOS, `open` without `-n`
 only activates an already-running instance, even after its executable has been
@@ -68,7 +73,7 @@ data, and resized-window hit testing. To also capture preview images,
 pass an existing output directory:
 
 ```sh
-SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software \
+SDL_AUDIO_DRIVER=dummy SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software \
   dist/apps/attractap-desktop/attractap-desktop-display-tests /path/to/screenshots
 ```
 
@@ -88,7 +93,8 @@ need a device smoke test.
 To save packed RGBA8 framebuffers for conversion to PNG, pass an output path:
 
 ```sh
-dist/apps/attractap-desktop/attractap-reader-workflow-tests /tmp/reader-flow
+SDL_AUDIO_DRIVER=dummy \
+  dist/apps/attractap-desktop/attractap-reader-workflow-tests /tmp/reader-flow
 apps/attractap/firmware/tests/display-theme/build/display-theme-host --output /tmp/reader-states
 ```
 
