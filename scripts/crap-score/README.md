@@ -5,7 +5,7 @@ with statement coverage: `complexity² × (1 − coverage)³ + complexity`. High
 scores identify functions that may benefit from tests or refactoring.
 
 ```sh
-pnpm crap-score                                  # all 23 JS/TS projects
+pnpm crap-score                                  # all JS/TS projects
 pnpm nx run frontend:crap-score                   # one project
 pnpm crap-score:affected --base=origin/main       # changed projects and dependents
 ```
@@ -27,10 +27,11 @@ unit-test run; ordinary tests and Docker/hardware acceptance remain independent.
 ## Scope
 
 Every current JavaScript/TypeScript app, library and tool has a `crap-score`
-target, including plugin frontends, the companion renderer, WAGO runtime and
-TypeScript circuit designs. Files outside a nested Nx project, including standalone tools, root configuration,
-shared plugin/hardware scripts and examples, belong to the root target. The C/C++ Attractap firmware and desktop
-simulator cannot be analyzed by this JS/TS tool and retain their existing checks.
+target, including plugin frontends, the companion renderer and WAGO runtime.
+Files outside a nested Nx project, including standalone tools, root configuration,
+shared plugin scripts and examples, belong to the root target. The C/C++ Attractap
+firmware and desktop simulator cannot be analyzed by this JS/TS tool and retain
+their existing checks.
 
 Source discovery includes Git-tracked and unignored new JS/TS files. Tests,
 fixtures, declarations, generated clients and build output are excluded. Nested
