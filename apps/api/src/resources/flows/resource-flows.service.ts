@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
   ResourceFlowNode,
+  ResourceMeter,
   ResourceFlowEdge,
   Resource,
   getNodeDataSchema,
@@ -66,7 +67,7 @@ export class ResourceFlowsService {
       }),
     ]);
 
-    const validationContext = new Map<string, unknown>();
+    const validationContext = new Map<string, unknown>([['meterResourceId', resourceId]]);
     const validationErrors: ValidationError[] = [];
     // Plugin validators may query external state, so bound the fanout without serializing the whole flow.
     const validationConcurrency = 4;
@@ -145,7 +146,21 @@ export class ResourceFlowsService {
 
     try {
       const schema = getNodeDataSchema(nodeData.type as ResourceFlowNodeType);
-      schema.parse(nodeData.data);
+      const data = schema.parse(nodeData.data);
+      if (nodeData.type.includes('.resource.metering.') && data && typeof data === 'object' && 'meterId' in data) {
+        const resourceId = validationContext.get('meterResourceId');
+        if (
+          typeof resourceId === 'number' &&
+          !(await this.resourceRepository.manager.existsBy(ResourceMeter, { id: Number(data.meterId), resourceId }))
+        ) {
+          errors.push({
+            nodeId: nodeData.id,
+            nodeType: nodeData.type,
+            field: 'meterId',
+            message: 'Choose a meter belonging to this resource',
+          });
+        }
+      }
     } catch (error) {
       // Handle Zod validation errors
       if (error.errors) {
@@ -186,7 +201,7 @@ export class ResourceFlowsService {
 
     // Collect validation errors from all nodes
     const allValidationErrors: ValidationError[] = [];
-    const validationContext = new Map<string, unknown>();
+    const validationContext = new Map<string, unknown>([['meterResourceId', resourceId]]);
     for (const nodeData of flowData.nodes) {
       const nodeErrors = await this.validateNodeData(nodeData, validationContext);
       allValidationErrors.push(...nodeErrors);

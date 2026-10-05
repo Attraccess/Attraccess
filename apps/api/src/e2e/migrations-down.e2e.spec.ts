@@ -66,6 +66,7 @@ import {
   ResourceType,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
+  ResourceMeter,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
   ResourceMeteringOperation,
@@ -468,25 +469,35 @@ const seedDatabase = async (dataSource: DataSource) => {
     );
   }
 
+  const meter = await ensureEntity(dataSource.getRepository(ResourceMeter), () => ({
+    resourceId: resource.id,
+    name: 'Energy (kWh)',
+    creditsPerUnit: 30,
+    lifetimeValue: '500000000',
+    counterValue: '1500000000',
+  }));
   const meteringSession = await ensureEntity(dataSource.getRepository(ResourceMeteringSession), () => ({
     id: `seed-metering-session-${seedTag}`,
     resourceId: resource.id,
     usageId: usage.id,
     status: ResourceMeteringSessionStatus.Active,
-    creditsPerKwh: 30,
-    baselineMicroWh: '1000000000',
-    latestMicroWh: '500000000',
+    meterId: meter.id,
+    meterName: meter.name,
+    creditsPerUnit: 30,
+    baselineValue: '1000000000',
+    latestValue: '500000000',
     latestObservedAt: new Date(),
   }));
   await ensureEntity(dataSource.getRepository(ResourceMeteringOperation), () => ({
     id: `seed-metering-operation-${seedTag}`,
     sessionId: meteringSession.id,
+    meterId: meter.id,
     resourceId: resource.id,
     kind: 'interim' as const,
     status: 'completed' as const,
     requestedAt: new Date(),
     completedAt: new Date(),
-    totalMicroWh: '500000000',
+    totalValue: '500000000',
     observedAt: new Date(),
   }));
 
@@ -732,8 +743,7 @@ describe('Migrations down/up with data (e2e)', () => {
 
   beforeAll(async () => {
     // EncryptSensitiveData migration down() needs AUTH_SESSION_SECRET to decrypt; use a stable test value.
-    process.env.AUTH_SESSION_SECRET =
-      process.env.AUTH_SESSION_SECRET || 'e2e-migrations-test-secret';
+    process.env.AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET || 'e2e-migrations-test-secret';
 
     const tmpRoot = await getTestStorageRoot();
     if (!process.env.STORAGE_ROOT) {

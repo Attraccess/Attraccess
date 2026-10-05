@@ -81,6 +81,7 @@ describe('BillingService', () => {
         {
           provide: getRepositoryToken(ResourceBillingConfiguration),
           useValue: {
+            manager: { count: jest.fn().mockResolvedValue(0) },
             findOneBy: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
@@ -353,6 +354,36 @@ describe('BillingService', () => {
         );
       }
     });
+
+    it.each([
+      { charge: 45, factor: 50, amount: 22 },
+      { charge: Number.MAX_SAFE_INTEGER - 2, factor: 67, amount: 6034823500676463 },
+      { charge: 100, factor: 12.5, amount: 12 },
+    ])(
+      'settles $charge credits at $factor% without floating-point rounding errors',
+      async ({ charge, factor, amount }) => {
+        const usage = {
+          id: 22,
+          startTime: new Date('2026-09-20T09:00:00Z'),
+          endTime: new Date('2026-09-20T09:00:00Z'),
+          creditsPerUsage: charge,
+          sessionDurationCreditsPerMinute: 0,
+          operatingDurationCreditsPerMinute: 0,
+          billingFactor: factor,
+          resource: { id: 205 },
+          userId: 25,
+          user: { id: 25, billingFactor: 100 },
+        } as ResourceUsage;
+        jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({} as ResourceBillingConfiguration);
+        const manager = createMockManager();
+        const transaction = await service.chargeForResourceUsage(usage, manager as never);
+        expect(transaction.amount).toBe(-amount);
+        expect(manager.save).toHaveBeenCalledWith(
+          BillingTransactionItem,
+          expect.objectContaining({ name: 'BILLING_FACTOR', unitPrice: -(charge - amount) }),
+        );
+      },
+    );
 
     it.each([
       { durationMs: 0, roundedMinutes: 0 },
@@ -810,7 +841,6 @@ describe('BillingService', () => {
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-        creditsPerKwh: 0,
       });
       expect(resourceBillingConfigurationRepository.save).toHaveBeenCalledWith(created);
       expect(result).toBe(created);
@@ -983,36 +1013,17 @@ describe('BillingService', () => {
       );
     });
 
-    it('stores the energy rate, coerces null to 0, and rejects negative or fractional rates', async () => {
-      const cfg = {
-        resourceId: 1,
-        creditsPerUsage: 0,
-        creditsPerMinute: 0,
-        creditsPerKwh: 0,
-      } as ResourceBillingConfiguration;
-      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(cfg);
-      resourceBillingConfigurationRepository.save.mockImplementation(
-        async (arg) => arg as ResourceBillingConfiguration,
-      );
-
-      expect((await service.updateResourceBillingConfiguration(1, { creditsPerKwh: 30 })).creditsPerKwh).toBe(30);
-      expect((await service.updateResourceBillingConfiguration(1, { creditsPerKwh: null })).creditsPerKwh).toBe(0);
-      await expect(service.updateResourceBillingConfiguration(1, { creditsPerKwh: -1 })).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
-      await expect(service.updateResourceBillingConfiguration(1, { creditsPerKwh: 0.3 })).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
-    });
-
-    it('treats an energy rate alone as billing being enabled', async () => {
+    it('treats a captured meter rate alone as billing being enabled', async () => {
       jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-        creditsPerKwh: 30,
       } as ResourceBillingConfiguration);
-      await expect(service.isBillingEnabled(1)).resolves.toBe(true);
+      await expect(
+        service.isBillingEnabled(1, undefined, {
+          meterRates: [{ meterId: 1, name: 'Heartbeat', creditsPerUnit: 3 }],
+        } as ResourceUsage),
+      ).resolves.toBe(true);
     });
 
     it('allows partial update without validating undefined fields', async () => {

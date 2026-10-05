@@ -395,20 +395,83 @@ describe('EmailService', () => {
       },
     );
 
-    it.each(['en-US', 'de-DE'])(
-      'retains valid regional number formatting for %s',
-      async (locale) => {
-        const language = locale === 'de-DE' ? 'de' : 'en';
-        const { service, sendMail, user, usage, transaction } = setupReceipt(language);
-        user.locale = locale;
+    it.each(['en-US', 'de-DE'])('retains valid regional number formatting for %s', async (locale) => {
+      const language = locale === 'de-DE' ? 'de' : 'en';
+      const { service, sendMail, user, usage, transaction } = setupReceipt(language);
+      user.locale = locale;
 
-        await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
 
-        expect(sendMail.mock.calls[0][0].html).toContain(
-          locale === 'de-DE' ? 'Gemessen: 61,001 s' : 'Measured: 61.001 s',
-        );
-      },
-    );
+      expect(sendMail.mock.calls[0][0].html).toContain(
+        locale === 'de-DE' ? 'Gemessen: 61,001 s' : 'Measured: 61.001 s',
+      );
+    });
+
+    it('renders migrated energy and new meter charges from generic evidence without changing settled totals', async () => {
+      const { service, sendMail, user, usage, transaction } = setupReceipt('en');
+      transaction.amount = -45;
+      transaction.items = [
+        Object.assign(new BillingTransactionItem(), {
+          name: 'Energy (kWh)',
+          quantity: 1,
+          unitPrice: 45,
+          meterQuantity: '1.5',
+          meterCreditsPerUnit: 30,
+        }),
+        Object.assign(new BillingTransactionItem(), {
+          name: 'PER_MINUTE',
+          quantity: 1,
+          unitPrice: 0,
+          meterQuantity: '9007199254740993.123456789',
+          meterCreditsPerUnit: 0,
+        }),
+      ];
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+      const { html } = sendMail.mock.calls[0][0];
+      expect(html).toContain('Energy (kWh)');
+      expect(html).toContain('1.5');
+      expect(html).toContain('0.3');
+      expect(html).toContain('0.45');
+      expect(html).toContain('9007199254740993.123456789');
+      expect(html).toContain('PER_MINUTE');
+      expect(html).not.toContain('Session time');
+      expect(html).not.toContain('credits/min');
+    });
+
+    it('preserves every cent of a large captured meter rate in receipts', async () => {
+      const { service, sendMail, user, usage, transaction } = setupReceipt('en');
+      transaction.items = [
+        Object.assign(new BillingTransactionItem(), {
+          name: 'Heartbeats',
+          quantity: 1,
+          unitPrice: 0,
+          meterQuantity: '0',
+          meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
+        }),
+      ];
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+      expect(sendMail.mock.calls[0][0].html).toContain('90071992547409.91');
+    });
+
+    it('preserves every cent of nonzero settled meter totals and the receipt balance', async () => {
+      const { service, sendMail, user, usage, transaction } = setupReceipt('en');
+      user.creditBalance = Number.MAX_SAFE_INTEGER;
+      transaction.amount = -Number.MAX_SAFE_INTEGER;
+      transaction.items = [
+        Object.assign(new BillingTransactionItem(), {
+          name: 'Heartbeats',
+          quantity: 1,
+          unitPrice: Number.MAX_SAFE_INTEGER,
+          meterQuantity: '1',
+          meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
+        }),
+      ];
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+      const { html } = sendMail.mock.calls[0][0];
+      expect(html).toContain('>90071992547409.91</td>');
+      expect(html.match(/90071992547409\.91/g)?.length).toBeGreaterThanOrEqual(4);
+      expect(html).not.toContain('90071992547409.9<');
+    });
 
     it('renders historical rounded quantities without inventing raw durations or a factor snapshot', async () => {
       const { service, sendMail, user, usage, transaction } = setupReceipt('en');

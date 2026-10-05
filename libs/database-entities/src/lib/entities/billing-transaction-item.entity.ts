@@ -57,17 +57,14 @@ export class BillingTransactionItem {
 
   @Column({ type: 'varchar', nullable: true })
   @ApiProperty({
-    description: 'Metered energy in integer micro-watt-hours behind an energy charge; null for other items',
     nullable: true,
     required: false,
+    description:
+      'Exact metered quantity, without a unit; null with a captured meter price means the final reading was unavailable',
   })
-  energyMicroWh!: string | null;
+  meterQuantity!: string | null;
 
   @Column({ type: 'integer', nullable: true })
-  @ApiProperty({
-    description: 'Energy rate per kWh captured for an energy charge; null for other items',
-    nullable: true,
-    required: false,
-  })
-  energyCreditsPerKwh!: number | null;
+  @ApiProperty({ nullable: true, required: false, description: 'Captured price per measured value' })
+  meterCreditsPerUnit!: number | null;
 }

@@ -1,71 +1,72 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceMeteringSessionStatus } from '@attraccess/database-entities';
+import { IsInt, IsNotEmpty, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 
-class ResourceMeteringActiveSessionDto {
-  @ApiProperty() sessionId!: string;
-  @ApiProperty() usageId!: number;
-  @ApiProperty({ nullable: true, type: String, description: 'Latest accepted total since the metering start, in kWh' })
-  latestKwh!: string | null;
-  @ApiProperty({ nullable: true, type: String, format: 'date-time' }) latestObservedAt!: Date | null;
-  @ApiProperty({ nullable: true, type: String }) source!: string | null;
+export class MeterNameDto {
+  @ApiProperty({ description: 'The name of the meter', maxLength: 100 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  name!: string;
 }
-
+export class MeterRateDto {
+  @ApiProperty({ description: 'Minor currency units per measured value. 0 disables billing.' })
+  @IsInt()
+  @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
+  creditsPerUnit!: number;
+}
+class MeterSessionDto {
+  @ApiProperty({ type: String, nullable: true, description: 'Null when meter initialization was skipped' })
+  sessionId!: string | null;
+  @ApiProperty() usageId!: number;
+  @ApiProperty() meterName!: string;
+  @ApiProperty() creditsPerUnit!: number;
+  @ApiProperty({ type: String, nullable: true }) latestValue!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) chargeCredits!: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) latestObservedAt!: Date | null;
+  @ApiProperty({ type: String, nullable: true }) source!: string | null;
+}
+export class ResourceMeterDto {
+  @ApiProperty() id!: number;
+  @ApiProperty() name!: string;
+  @ApiProperty() creditsPerUnit!: number;
+  @ApiProperty({ description: 'Total recorded consumption, including outside sessions' }) lifetimeValue!: string;
+  @ApiProperty({ type: String, nullable: true }) counterValue!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) latestObservedAt!: Date | null;
+  @ApiProperty({ type: MeterSessionDto, nullable: true }) session!: MeterSessionDto | null;
+}
+class MeterDefinitionDto {
+  @ApiProperty() meterId!: number;
+  @ApiProperty() name!: string;
+  @ApiProperty() creditsPerUnit!: number;
+  @ApiProperty() configured!: boolean;
+  @ApiProperty({ type: [String] }) problems!: string[];
+  @ApiProperty() interimIntervalMinutes!: number;
+}
 class ResourceMeteringUnsettledSessionDto {
   @ApiProperty() sessionId!: string;
   @ApiProperty() usageId!: number;
+  @ApiProperty() meterId!: number;
+  @ApiProperty() meterName!: string;
   @ApiProperty({ enum: ResourceMeteringSessionStatus, enumName: 'ResourceMeteringSessionStatus' })
   status!: ResourceMeteringSessionStatus;
-  @ApiProperty({ nullable: true, type: String }) reason!: string | null;
-  @ApiProperty({ nullable: true, type: String, description: 'Last accepted total in kWh, informational only' })
-  latestKwh!: string | null;
-  @ApiProperty({ description: 'Whether collecting the final total again can still settle the energy charge' })
-  retryable!: boolean;
+  @ApiProperty({ type: String, nullable: true }) reason!: string | null;
+  @ApiProperty({ type: String, nullable: true }) latestValue!: string | null;
+  @ApiProperty() retryable!: boolean;
 }
-
 export class ResourceMeteringStatusDto {
-  @ApiProperty({ description: 'Whether the metering start and collection branches are complete' })
-  configured!: boolean;
-  @ApiProperty({
-    type: [String],
-    enum: ['start-trigger-missing', 'ready-unreachable', 'collect-trigger-missing', 'report-unreachable'],
-    description: 'What is missing from the meter definition',
-  })
-  problems!: string[];
-  @ApiProperty({ description: 'Minutes between interim readings; 0 when disabled' }) interimIntervalMinutes!: number;
-  @ApiProperty({ nullable: true, type: ResourceMeteringActiveSessionDto })
-  activeSession!: ResourceMeteringActiveSessionDto | null;
+  @ApiProperty({ type: [MeterDefinitionDto] }) meters!: MeterDefinitionDto[];
   @ApiProperty({ type: [ResourceMeteringUnsettledSessionDto] }) unsettled!: ResourceMeteringUnsettledSessionDto[];
 }
-
 export class ResourceMeteringSettlementDto {
   @ApiProperty() sessionId!: string;
   @ApiProperty({ enum: ResourceMeteringSessionStatus, enumName: 'ResourceMeteringSessionStatus' })
   status!: ResourceMeteringSessionStatus;
-  @ApiProperty({ nullable: true, type: Number }) chargeCredits!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) chargeCredits!: number | null;
 }
-
-class ResourceMeteringLiveSessionDto {
-  @ApiProperty() sessionId!: string;
-  @ApiProperty() usageId!: number;
-  @ApiProperty({ description: 'Energy rate captured for this session, in minor currency units per kWh' })
-  creditsPerKwh!: number;
-  @ApiProperty({ nullable: true, type: String, description: 'Latest accepted total since the metering start, in kWh' })
-  latestKwh!: string | null;
-  @ApiProperty({
-    nullable: true,
-    type: Number,
-    description: 'Energy cost so far in minor currency units, rounded like the final charge',
-  })
-  energyCredits!: number | null;
-  @ApiProperty({ nullable: true, type: String, format: 'date-time' }) latestObservedAt!: Date | null;
-  @ApiProperty({ nullable: true, type: String }) source!: string | null;
-}
-
 export class ResourceMeteringLiveDto {
-  @ApiProperty({
-    nullable: true,
-    type: ResourceMeteringLiveSessionDto,
-    description: 'Null when no metered session is running',
-  })
-  session!: ResourceMeteringLiveSessionDto | null;
+  @ApiProperty({ type: [ResourceMeterDto] }) meters!: ResourceMeterDto[];
 }

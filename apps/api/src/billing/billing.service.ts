@@ -7,10 +7,11 @@ import {
   BillingTransactionItem,
   ResourceUsage,
   ResourceFlowNodeType,
+  ResourceMeter,
 } from '@attraccess/database-entities';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, MoreThan, Repository } from 'typeorm';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { PaginationOptions } from '../types/request';
 import { TransactionsDto } from './dto/transactions.dto';
@@ -29,6 +30,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceBillingConfigurationChangedEvent } from './events/resource-billing-configuration-changed.event';
 import { MetricsService } from '../metrics/metrics.service';
 import { AuditService } from '../audit/audit.service';
+import { applyBillingFactor, toExactCredits } from '@attraccess/shared';
 
 @Injectable()
 export class BillingService {
@@ -226,7 +228,6 @@ export class BillingService {
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-        creditsPerKwh: 0,
       });
       configuration = await repository.save(configuration);
     }
@@ -285,19 +286,6 @@ export class BillingService {
       );
     }
 
-    if (data.creditsPerKwh === null) {
-      data.creditsPerKwh = 0;
-    }
-    if (data.creditsPerKwh !== undefined) {
-      if (data.creditsPerKwh < 0) {
-        throw new BadRequestException('Credits per kWh cannot be negative');
-      }
-      if (data.creditsPerKwh % 1 !== 0) {
-        throw new BadRequestException('Credits per kWh must be an integer (multiply by currency minor unit)');
-      }
-      configuration.creditsPerKwh = data.creditsPerKwh;
-    }
-
     const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
     this.eventEmitter.emit(
       ResourceBillingConfigurationChangedEvent.EVENT_NAME,
@@ -333,12 +321,12 @@ export class BillingService {
       const operatingDurationMs = Math.round((usage.attributedOperatingDurationInMinutes ?? 0) * 60_000);
       const roundedMinutes = Math.ceil(sessionDurationMs / 60_000);
       const roundedOperatingMinutes = Math.ceil(operatingDurationMs / 60_000);
-      const creditsForUsageDuration = sessionDurationRate * roundedMinutes;
-      const creditsForOperatingDuration = operatingDurationRate * roundedOperatingMinutes;
       // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
       const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
-      let totalCredits = creditsForUsageDuration + creditsForOperatingDuration;
-      totalCredits += creditsForSession;
+      let grossCredits =
+        toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes) +
+        toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes) +
+        toExactCredits(creditsForSession);
 
       let transaction = await manager.findOne(BillingTransaction, {
         where: {
@@ -347,17 +335,19 @@ export class BillingService {
         relations: ['items'],
       });
 
-      if (totalCredits === 0 && !transaction) {
+      if (grossCredits === BigInt(0) && !transaction) {
         return;
       }
 
       (transaction?.items ?? []).forEach((item) => {
-        totalCredits += item.unitPrice * item.quantity;
+        grossCredits += toExactCredits(item.unitPrice) * toExactCredits(item.quantity);
       });
 
       const billingFactor = usage.billingFactor ?? usage.user.billingFactor;
-      const billingFactorDiscountAmount = Math.round(totalCredits - totalCredits * (billingFactor / 100));
-      totalCredits = totalCredits - billingFactorDiscountAmount;
+      const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyBillingFactor(
+        grossCredits,
+        billingFactor,
+      );
 
       if (transaction) {
         const previousStatus = transaction.status;
@@ -531,7 +521,12 @@ export class BillingService {
       (usage?.creditsPerUsage ?? configuration.creditsPerUsage) > 0 ||
       (usage?.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute) > 0 ||
       (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0 ||
-      (usage?.energyCreditsPerKwh ?? configuration.creditsPerKwh) > 0
+      (usage?.meterRates
+        ? usage.meterRates.some((meter) => meter.creditsPerUnit > 0)
+        : (await (transactionalEntityManager ?? this.resourceBillingConfigurationRepository.manager).count(
+            ResourceMeter,
+            { where: { resourceId, creditsPerUnit: MoreThan(0) } },
+          )) > 0)
     ) {
       return true;
     }

@@ -1,3 +1,4 @@
+import { MetersCard } from '../meters/MetersCard';
 // Overview tab compositing Session, Billing, Docs preview, Recent sessions
 // FEATURE: ATT-386 Resource details page Overview tab
 import { useParams } from 'react-router-dom';
@@ -38,6 +39,7 @@ export function ResourceOverviewTab() {
       />
       <ResourceDocsPreviewCard className={CARD_CLASS} resourceId={resourceId} />
       <RecentSessionsCard className={CARD_CLASS} resourceId={resourceId} />
+      <MetersCard className={CARD_CLASS} resourceId={resourceId} />
       <OperatingDurationCard className={CARD_CLASS} resourceId={resourceId} />
       <PluginSlot<ResourceSlotContext> slotId={RESOURCE_OVERVIEW_SLOT} context={{ resourceId }} />
     </div>

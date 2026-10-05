@@ -361,7 +361,7 @@ void ResourceDetailsScreen::init()
       lv_obj_set_style_text_font(value, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
       return value;
    };
-   this->energyValue = createStat("Energie");
+   this->meterValue = createStat("Zähler");
    this->operatingValue = createStat("Betriebszeit");
    lv_obj_add_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN);
 
@@ -760,7 +760,7 @@ void ResourceDetailsScreen::destroy()
    this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
    this->usageStatsContainer = nullptr;
-   this->energyValue = nullptr;
+   this->meterValue = nullptr;
    this->operatingValue = nullptr;
 
    this->noIntroductionPanel = nullptr;

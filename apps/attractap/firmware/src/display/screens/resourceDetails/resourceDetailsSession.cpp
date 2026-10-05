@@ -46,9 +46,17 @@ void ResourceDetailsScreen::updateUsageStatsDisplay()
    lv_obj_set_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN, !visible);
    if (!visible) return;
    const bool fresh = this->usageStatsValid && millis() - this->usageStatsReceivedAt < 25000;
-   const std::string energy = fresh && !this->usageStats.energyKwh.empty()
-       ? this->usageStats.energyKwh + " kWh" : "Warte auf Messwert";
-   setLabelTextIfChanged(this->energyValue, energy.c_str());
+   std::string consumption;
+   if (fresh) {
+      for (const auto &meter : this->usageStats.meters) {
+         if (!consumption.empty()) consumption += "\n";
+         consumption += meter.name + ": " + (meter.value.empty() ? "Warte auf Messwert" : meter.value);
+         if (meter.creditsPerUnit >= 0 && !meter.formattedRate.empty())
+            consumption += "\n" + meter.formattedRate + " / Wert";
+      }
+   }
+   if (consumption.empty()) consumption = "Warte auf Messwert";
+   setLabelTextIfChanged(this->meterValue, consumption.c_str());
    std::string operating = "Keine Daten";
    if (fresh && this->usageStats.operatingDurationMs >= 0) {
       operating = millisToTimeString(this->usageStats.operatingDurationMs);
