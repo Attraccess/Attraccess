@@ -32,7 +32,8 @@ async function database() {
     CREATE TABLE resource_groups_resource_group (resourceId INTEGER, resourceGroupId INTEGER, UNIQUE(resourceId, resourceGroupId));
     CREATE TABLE resource_usage (id INTEGER PRIMARY KEY, resourceId INTEGER, userId INTEGER, usageAction TEXT,
       startTime TEXT, startNotes TEXT, endTime TEXT, isFinalized INTEGER DEFAULT 0, lifecyclePending INTEGER DEFAULT 0);
-    CREATE TABLE resource_usage_lifecycle_attempt (id TEXT PRIMARY KEY, resourceId INTEGER, candidateUsageId INTEGER);
+    CREATE TABLE resource_usage_lifecycle_attempt (id TEXT PRIMARY KEY, resourceId INTEGER, kind TEXT,
+      candidateUsageId INTEGER, previousUsageId INTEGER);
     INSERT INTO role VALUES (1, 'administrator', 'Admin', '', 1, 0);
     INSERT INTO permission VALUES ('resources.read');
   `,
@@ -66,7 +67,7 @@ test('accepts published sessions and pending candidates with a matching reservat
       db,
       `INSERT INTO resource_usage (id, resourceId, userId, usageAction, startTime, isFinalized, lifecyclePending)
       VALUES (1, 1, 1, 'usage', datetime('now'), 1, 0), (2, 1, 1, 'usage', datetime('now'), 0, 1);
-      INSERT INTO resource_usage_lifecycle_attempt VALUES ('takeover', 1, 2)`,
+      INSERT INTO resource_usage_lifecycle_attempt VALUES ('takeover', 1, 'takeover', 2, 1)`,
     );
     run(file);
     assert.equal((await rows(db, 'SELECT * FROM resource_usage')).length, 2);
@@ -75,6 +76,80 @@ test('accepts published sessions and pending candidates with a matching reservat
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('accepts a pending start candidate with a matching reservation', async () => {
+  const { directory, file, db } = await database();
+  try {
+    await execute(
+      db,
+      `INSERT INTO resource_usage (id, resourceId, userId, usageAction, startTime, isFinalized, lifecyclePending)
+      VALUES (1, 1, 1, 'usage', datetime('now'), 0, 1);
+      INSERT INTO resource_usage_lifecycle_attempt VALUES ('start', 1, 'start', 1, NULL)`,
+    );
+    const usages = await rows(db, 'SELECT * FROM resource_usage');
+    const attempts = await rows(db, 'SELECT * FROM resource_usage_lifecycle_attempt');
+    run(file);
+    assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage'), usages);
+    assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage_lifecycle_attempt'), attempts);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('accepts a pending end usage owned by the reservation through previousUsageId', async () => {
+  const { directory, file, db } = await database();
+  try {
+    await execute(
+      db,
+      `INSERT INTO resource_usage (id, resourceId, userId, usageAction, startTime, isFinalized, lifecyclePending)
+      VALUES (1, 1, 1, 'usage', datetime('now'), 1, 1);
+      INSERT INTO resource_usage_lifecycle_attempt VALUES ('end', 1, 'end', NULL, 1)`,
+    );
+    const usages = await rows(db, 'SELECT * FROM resource_usage');
+    const attempts = await rows(db, 'SELECT * FROM resource_usage_lifecycle_attempt');
+    run(file);
+    assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage'), usages);
+    assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage_lifecycle_attempt'), attempts);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+for (const [name, reservation] of [
+  ['missing reservation', ''],
+  ['end candidate reference', "INSERT INTO resource_usage_lifecycle_attempt VALUES ('end', 1, 'end', 1, NULL)"],
+  ['start previous reference', "INSERT INTO resource_usage_lifecycle_attempt VALUES ('start', 1, 'start', NULL, 1)"],
+  [
+    'takeover previous reference',
+    "INSERT INTO resource_usage_lifecycle_attempt VALUES ('takeover', 1, 'takeover', 2, 1)",
+  ],
+  ['different resource', "INSERT INTO resource_usage_lifecycle_attempt VALUES ('end', 2, 'end', NULL, 1)"],
+]) {
+  test(`rolls back a seed with an unreserved pending usage: ${name}`, async () => {
+    const { directory, file, db } = await database();
+    try {
+      await execute(
+        db,
+        `INSERT INTO resource_usage (id, resourceId, userId, usageAction, startTime, isFinalized, lifecyclePending)
+        VALUES (1, 1, 1, 'usage', datetime('now'), 1, 1);
+        ${reservation}`,
+      );
+      const usages = await rows(db, 'SELECT * FROM resource_usage');
+      const attempts = await rows(db, 'SELECT * FROM resource_usage_lifecycle_attempt');
+      const result = spawnSync(process.execPath, [script, '--db', file, '--allow-external-db'], { encoding: 'utf8' });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /unreserved candidates=1/);
+      assert.deepEqual(await rows(db, 'SELECT * FROM user'), []);
+      assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage'), usages);
+      assert.deepEqual(await rows(db, 'SELECT * FROM resource_usage_lifecycle_attempt'), attempts);
+    } finally {
+      await close(db);
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
 
 function run(file, args = []) {
   return execFileSync(
