@@ -116,10 +116,10 @@ export class ResourceMeteringService implements OnModuleInit {
           collectionMode: definition.incrementOnly ? 'increment' : 'requested',
           latestValue: definition.incrementOnly ? '0' : null,
         });
-        // Once initialization is issued, the device may reset even without a reply.
-        // Meters whose branches have not run retain their outgoing boundary evidence.
-        initializedMeters.add(meter.meterId);
         if (!definition.incrementOnly) {
+          // Once initialization is issued, the device may reset even without a reply.
+          // Increment-only meters dispatch no start branch and retain their outgoing evidence.
+          initializedMeters.add(meter.meterId);
           try {
             await this.runOperation(session, 'start', {
               trigger: ResourceFlowNodeType.INPUT_METERING_START,

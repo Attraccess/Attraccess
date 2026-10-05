@@ -795,6 +795,50 @@ describe('Flow-defined metering', () => {
     });
 
     describe('takeover', () => {
+      it('preserves increment-only charges when a later meter fails takeover initialization', async () => {
+        const requestedMeter = await source.getRepository(ResourceMeter).save({
+          resourceId: 1,
+          name: 'Water',
+          creditsPerUnit: 10,
+        });
+        await seedMeter({}, { finalAttempts: 1 });
+        const nodes = source.getRepository(ResourceFlowNode);
+        for (const node of await nodes.find()) {
+          await nodes.update(node.id, { data: { ...node.data, meterId: requestedMeter.id } });
+        }
+        await nodes.save({
+          id: 'increment-report',
+          resourceId: 1,
+          type: T.OUTPUT_METERING_REPORT,
+          data: { meterId: 1, mode: 'increment', value: '1' },
+        });
+        const first = await start(users[0]);
+        await metering.report(1, 1, { kind: 'reading', mode: 'increment', value: '2' });
+        const sessions = source.getRepository(ResourceMeteringSession);
+        const untouched = await sessions.findOneByOrFail({ usageId: first.id, meterId: 1 });
+        onStart = async () => {
+          throw new Error('water meter start failed');
+        };
+        await expect(start(users[1], { forceTakeOver: true })).rejects.toBeInstanceOf(BadRequestException);
+
+        expect((await usage.getActiveSession(1, true))?.id).toBe(first.id);
+        expect(await sessions.findOneByOrFail({ id: untouched.id })).toEqual(untouched);
+        expect(await sessions.countBy({ status: ResourceMeteringSessionStatus.Active })).toBe(2);
+        expect(await sessions.findOneByOrFail({ usageId: first.id, meterId: requestedMeter.id })).toEqual(
+          expect.objectContaining({ compromisedReason: expect.stringMatching(/re-initialized by a takeover/) }),
+        );
+
+        await end(users[0]);
+        const bill = await items(first.id);
+        expect(bill.transaction.amount).toBe(-60);
+        expect(bill.items).toEqual([
+          expect.objectContaining({ name: 'Energy (kWh)', meterQuantity: '2', meterCreditsPerUnit: 30, unitPrice: 60 }),
+        ]);
+        expect((await sessions.findOneByOrFail({ id: untouched.id })).status).toBe(
+          ResourceMeteringSessionStatus.Settled,
+        );
+      });
+
       it('preserves recovery for an untouched meter when another takeover start fails', async () => {
         await seedMeter({}, { finalAttempts: 1 });
         const secondMeter = await source.getRepository(ResourceMeter).save({
