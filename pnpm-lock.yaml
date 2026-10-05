@@ -64,10 +64,10 @@ importers:
         version: 3.2.6(tailwind-merge@3.6.0)(tailwindcss@4.3.3)
       '@hookform/resolvers':
         specifier: ^5.4.0
-        version: 5.7.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)
+        version: 5.9.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)
       '@icons-pack/react-simple-icons':
         specifier: ^13.13.0
-        version: 13.13.0(react@19.2.8)
+        version: 13.15.1(react@19.2.8)
       '@internationalized/date':
         specifier: 3.12.4
         version: 3.12.4
@@ -196,7 +196,7 @@ importers:
         version: 1.19.0
       balena-sdk:
         specifier: ^23.2.12
-        version: 23.2.14(@balena/sbvr-types@11.1.4)(encoding@0.1.13)
+        version: 23.2.15(@balena/sbvr-types@11.1.4)(encoding@0.1.13)
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -3053,8 +3053,8 @@ packages:
     peerDependencies:
       hono: ^4
 
-  '@hookform/resolvers@5.7.1':
-    resolution: {integrity: sha512-8wS/P4UDr5sQDe4nFaV51TVyfDPrWgNIXweqG0Bs9Z5LSuzKLb+RQNPvkN2oHM5SRrJyWrVH/F+LOUcFjUyvwQ==}
+  '@hookform/resolvers@5.9.1':
+    resolution: {integrity: sha512-7b7vsbraJxKgjVSA1Nur9tLwj539WGJUBLA7QNvXnFoT2pM5Z7G+6rlukk4B2/QrTZy6huRtH6wKeESPKuIr6w==}
     peerDependencies:
       '@sinclair/typebox': '>=0.25.24'
       '@standard-schema/spec': ^1.0.0
@@ -3072,13 +3072,13 @@ packages:
       fluentvalidation-ts: ^3.0.0
       fp-ts: ^2.7.0
       io-ts: ^2.0.0
-      joi: ^17.0.0
+      joi: ^17.0.0 || ^18.0.0
       nope-validator: '>=0.12.0'
       react-hook-form: ^7.55.0
       superstruct: '>=0.12.0'
       typanion: ^3.3.2
       valibot: '>=0.31.0 || ^1.0.0-beta.4 || ^1.0.0-rc'
-      vest: '>=3.0.0'
+      vest: '>=6.0.0'
       yup: ^1.0.0
       zod: ^3.25.0 || ^4.0.0
     peerDependenciesMeta:
@@ -3163,9 +3163,8 @@ packages:
   '@iarna/toml@2.2.5':
     resolution: {integrity: sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg==}
 
-  '@icons-pack/react-simple-icons@13.13.0':
-    resolution: {integrity: sha512-B5HhQMIpcSH4z8IZ8HFhD59CboHceKYMpPC9kAwGyKntvPdyJJv26DLu4Z1wAjcCLyrJhf11tMhiQGom9Rxb9g==}
-    engines: {node: '>=24', pnpm: '>=10'}
+  '@icons-pack/react-simple-icons@13.15.1':
+    resolution: {integrity: sha512-S35E7vJlJzMeoqjwwI7ZmQUJ2W+2KspnB6bc49KdoDGwp5mCgAy9L3sscfWMewQSMgBdPU8KWWwpSGq5DJyAFw==}
     peerDependencies:
       react: 19.2.8
 
@@ -6820,8 +6819,8 @@ packages:
   '@types/node@20.19.43':
     resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
 
-  '@types/node@22.20.1':
-    resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
+  '@types/node@22.20.5':
+    resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
 
   '@types/node@25.9.9':
     resolution: {integrity: sha512-b4e2xxj/yMeT2hNlD6x7zNFiQK2Dlmkb9CQ6v3/1G2RezKN4YS2lcEv8lzGm1mhs4f2lM4yNAMI/zUDBZBBt7w==}
@@ -8264,8 +8263,8 @@ packages:
     resolution: {integrity: sha512-wcs14fEBPmiLsnpY1/08sTtnsVXGl2j+JUIX5O+01bOYddrl3U7Qbrn0Ddw5WL/eB569SQHBPVSxECGx7Tu/sQ==}
     engines: {node: '>=18.0.0'}
 
-  balena-hup-action-utils@7.0.24:
-    resolution: {integrity: sha512-vO9V/stO8tlqHC8Qaeh45JMEqG6S9sqFl87nUkiRhwY9BAprjMNShZ1LSlZjY9G7AEFapa+EVflXk096Rtmcpw==}
+  balena-hup-action-utils@7.0.33:
+    resolution: {integrity: sha512-/2t3CZiNerb7rczZqBl92jdu8FhGapm0hSHJhsJYgM4TFnmP1kS2VK0ls0YSege4c3DnkOfU+jFnoJQeEVlnfA==}
     engines: {node: ^20.12.0 || >= 22.0.0}
 
   balena-register-device@9.0.35:
@@ -8280,12 +8279,12 @@ packages:
     peerDependencies:
       balena-auth: ^6.0.1
 
-  balena-sdk@23.2.14:
-    resolution: {integrity: sha512-82x7kaGAq2mk+Ttsy34TCgzzaMSMFAA0ErMtTu3JYivX+CDLgM/53JTPNvBcMGqT5fEiIyCAMazn9Ykzhe+Ssw==}
+  balena-sdk@23.2.15:
+    resolution: {integrity: sha512-aFmiwFOBk584LN2CzPIdcCNVitUqwyWgAbBF9KfMcfxjZInfY2H+Y8lsONfQQKzbeof5ezbHASPLz9iYs9u2hQ==}
     engines: {node: ^22.18.0 || >= 24.0.0}
 
-  balena-semver@4.1.10:
-    resolution: {integrity: sha512-Dc0Derl2kNx8RswvsEUCMmPtlP5np8Lt0I3HtfdgFNVcZGpqBrffOzmrS1jBU4ahUGLEEwvd3lHz/kbv7ASqKA==}
+  balena-semver@4.1.20:
+    resolution: {integrity: sha512-ew274eeIbMVu1sf4xEBg6BljfpsMbbRltfeFCpiZ68O0a/PGMIdnr8Pv8t3fZmbqDAPx2PPQKjRm9uwYepXJrQ==}
     engines: {node: ^20.12.0 || >= 22.0.0}
 
   balena-settings-client@6.0.3:
@@ -10191,6 +10190,9 @@ packages:
 
   es-toolkit@1.50.0:
     resolution: {integrity: sha512-OyZKhUVvEep9ITEiwHn8GKnMRQIVqoSIX7WnRbkWgJkllCujilqP2rD0u979tkl8wqyc8ICwlc1UBVv/Sl1G6w==}
+
+  es-toolkit@1.52.0:
+    resolution: {integrity: sha512-XTNEJQh1tY1ZJVcf6ayP/2n4ZPyaHlW2FWs7xvw5ddPuhUVjLD3olQVQS7kf58JbAB48iL0uL/jerTrjtV3lDA==}
 
   es5-ext@0.10.64:
     resolution: {integrity: sha512-p2snDhiLaXe6dahss1LddxqEm+SkuDvV8dnIQG0MWjyHpcMNfXKPE+/Cc0y+PhxJX3A4xGNeFCj5oc0BUh6deg==}
@@ -12275,6 +12277,10 @@ packages:
 
   js-yaml@3.15.0:
     resolution: {integrity: sha512-ttBQIIQPDeLjpPOohtUdXuXUVoA2uIB6fEH9HyJ7234s5mBJ5wTx20njxplLZQgLaOfpmPQA7X2t5AX6tIPbog==}
+    hasBin: true
+
+  js-yaml@3.15.2:
+    resolution: {integrity: sha512-6EuL879VkRA+1Cz578mKMiKvjPNEuk6+r1JaFzoSWejZmtf7xWbIyw1e3KkxlkzTIt9Taw6JBhEppG7utc1P+w==}
     hasBin: true
 
   js-yaml@4.1.0:
@@ -14415,8 +14421,8 @@ packages:
     resolution: {integrity: sha512-uB80kBFb/tfd68bVleG9T5GGsGPjJrLAUpR5PZIrhBnIaRTQRjqdJSsIKkOP6OAIFbj7GOrcudc5pNjZ+geV2g==}
     engines: {node: '>=6'}
 
-  pinejs-client-core@8.5.32:
-    resolution: {integrity: sha512-Va7VvrkDyPaM14dYt1OHAOgqe79rlzUHLvAGohFSp8TgVPaoYm0vaZK9B0iBo2+5LTmm04iE0i2qcxhuqzSubg==}
+  pinejs-client-core@8.5.43:
+    resolution: {integrity: sha512-brUNIvpXekKpR12p/zb4ts66mZgy9n6mqu6nTF9b6D1PHrn7dC4XdNnzseeqImD89WUpVCZ3gzdse/yUEutL6w==}
     engines: {node: '>=10.0.0', npm: '>=6.0.0'}
 
   pinkie-promise@2.0.1:
@@ -18483,19 +18489,19 @@ snapshots:
     dependencies:
       '@jsdevtools/ono': 7.1.3
       '@types/json-schema': 7.0.15
-      js-yaml: 4.3.1
+      js-yaml: 4.3.2
 
   '@apidevtools/json-schema-ref-parser@14.0.1':
     dependencies:
       '@types/json-schema': 7.0.15
-      js-yaml: 4.3.1
+      js-yaml: 4.3.2
 
   '@apidevtools/json-schema-ref-parser@9.1.2':
     dependencies:
       '@jsdevtools/ono': 7.1.3
       '@types/json-schema': 7.0.15
       call-me-maybe: 1.0.2
-      js-yaml: 4.3.2
+      js-yaml: 4.1.0
 
   '@apidevtools/openapi-schemas@2.1.0': {}
 
@@ -18658,7 +18664,7 @@ snapshots:
       '@asyncapi/specs': 4.3.1
       '@fmvilas/pseudo-yaml-ast': 0.3.1
       ajv: 6.15.0
-      js-yaml: 3.15.0
+      js-yaml: 3.15.2
       json-to-ast: 2.1.0
       lodash.clonedeep: 4.5.0
       node-fetch: 2.7.0(encoding@0.1.13)
@@ -18680,7 +18686,7 @@ snapshots:
       ajv-errors: 3.0.0(ajv@8.20.0)
       ajv-formats: 2.1.1(ajv@8.20.0)
       avsc: 5.7.9
-      js-yaml: 4.3.1
+      js-yaml: 4.1.0
       jsonpath-plus: 7.2.0
       node-fetch: 2.6.7(encoding@0.1.13)
       ramldt2jsonschema: 1.2.3
@@ -18747,7 +18753,7 @@ snapshots:
   '@asyncapi/raml-dt-schema-parser@4.0.24(encoding@0.1.13)':
     dependencies:
       '@asyncapi/parser': 3.6.0(encoding@0.1.13)
-      js-yaml: 4.3.2
+      js-yaml: 4.1.0
       ramldt2jsonschema: 1.2.3
       webapi-parser: 0.5.0
     transitivePeerDependencies:
@@ -21768,7 +21774,7 @@ snapshots:
     dependencies:
       hono: 4.12.21
 
-  '@hookform/resolvers@5.7.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)':
+  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.56.4(react@19.2.8)
@@ -21812,7 +21818,7 @@ snapshots:
 
   '@iarna/toml@2.2.5': {}
 
-  '@icons-pack/react-simple-icons@13.13.0(react@19.2.8)':
+  '@icons-pack/react-simple-icons@13.15.1(react@19.2.8)':
     dependencies:
       react: 19.2.8
 
@@ -21976,7 +21982,7 @@ snapshots:
       camelcase: 5.3.1
       find-up: 4.1.0
       get-package-type: 0.1.0
-      js-yaml: 3.15.0
+      js-yaml: 3.15.2
       resolve-from: 5.0.0
 
   '@istanbuljs/schema@0.1.6': {}
@@ -25590,7 +25596,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/path': 1.3.2
       '@stoplight/spectral-parsers': 1.0.5
       '@stoplight/spectral-ref-resolver': 1.0.5(encoding@0.1.13)
@@ -25617,7 +25623,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/path': 1.3.2
       '@stoplight/spectral-parsers': 1.0.5
       '@stoplight/spectral-ref-resolver': 1.0.5(encoding@0.1.13)
@@ -25652,8 +25658,8 @@ snapshots:
   '@stoplight/spectral-formats@1.8.5(encoding@0.1.13)':
     dependencies:
       '@scarf/scarf': 1.4.0
-      '@stoplight/json': 3.21.7
-      '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
+      '@stoplight/json': 3.21.0
+      '@stoplight/spectral-core': 1.23.1(encoding@0.1.13)
       '@types/json-schema': 7.0.15
       tslib: 2.8.1
     transitivePeerDependencies:
@@ -25662,7 +25668,7 @@ snapshots:
   '@stoplight/spectral-formats@1.9.0(encoding@0.1.13)':
     dependencies:
       '@scarf/scarf': 1.4.0
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
       '@types/json-schema': 7.0.15
       tslib: 2.8.1
@@ -25689,8 +25695,8 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
-      '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
+      '@stoplight/json': 3.21.0
+      '@stoplight/spectral-core': 1.23.1(encoding@0.1.13)
       '@stoplight/spectral-formats': 1.8.5(encoding@0.1.13)
       '@stoplight/spectral-runtime': 1.1.6(encoding@0.1.13)
       ajv: 8.20.0
@@ -25706,7 +25712,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.7
+      '@stoplight/json': 3.21.0
       '@stoplight/spectral-core': 1.24.0(encoding@0.1.13)
       '@stoplight/spectral-formats': 1.9.0(encoding@0.1.13)
       '@stoplight/spectral-runtime': 1.1.6(encoding@0.1.13)
@@ -26498,7 +26504,7 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@types/node@22.20.1':
+  '@types/node@22.20.5':
     dependencies:
       undici-types: 6.21.0
 
@@ -28295,9 +28301,9 @@ snapshots:
       tslib: 2.8.1
       typed-error: 3.2.3
 
-  balena-hup-action-utils@7.0.24:
+  balena-hup-action-utils@7.0.33:
     dependencies:
-      balena-semver: 4.1.10
+      balena-semver: 4.1.20
       tslib: 2.8.1
       typed-error: 3.2.3
 
@@ -28322,31 +28328,31 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  balena-sdk@23.2.14(@balena/sbvr-types@11.1.4)(encoding@0.1.13):
+  balena-sdk@23.2.15(@balena/sbvr-types@11.1.4)(encoding@0.1.13):
     dependencies:
       '@balena/abstract-sql-to-typescript': 5.1.5(@balena/sbvr-types@11.1.4)
       '@balena/es-version': 1.0.4
       '@types/json-schema': 7.0.15
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       balena-auth: 6.1.1
       balena-errors: 5.0.1
-      balena-hup-action-utils: 7.0.24
+      balena-hup-action-utils: 7.0.33
       balena-register-device: 9.0.35(balena-request@14.2.3(balena-auth@6.1.1)(encoding@0.1.13))
       balena-request: 14.2.3(balena-auth@6.1.1)(encoding@0.1.13)
-      balena-semver: 4.1.10
+      balena-semver: 4.1.20
       balena-settings-client: 6.0.3
       handlebars: 4.7.9
       memoizee: 0.4.17
       mime: 3.0.0
       ndjson: 2.0.0
       p-throttle: 4.1.1
-      pinejs-client-core: 8.5.32(@balena/sbvr-types@11.1.4)
+      pinejs-client-core: 8.5.43(@balena/sbvr-types@11.1.4)
       tslib: 2.8.1
     transitivePeerDependencies:
       - '@balena/sbvr-types'
       - encoding
 
-  balena-semver@4.1.10:
+  balena-semver@4.1.20:
     dependencies:
       '@types/memoizee': 0.4.12
       '@types/semver': 7.8.0
@@ -28355,10 +28361,10 @@ snapshots:
 
   balena-settings-client@6.0.3:
     dependencies:
-      es-toolkit: 1.50.0
+      es-toolkit: 1.52.0
       hidepath: 1.0.1
       home-or-tmp: 2.0.0
-      js-yaml: 3.15.0
+      js-yaml: 3.15.2
 
   balena-settings-storage@9.0.0:
     dependencies:
@@ -29455,7 +29461,7 @@ snapshots:
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
-      js-yaml: 4.3.1
+      js-yaml: 4.3.2
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
@@ -30674,6 +30680,8 @@ snapshots:
   es-toolkit@1.49.0: {}
 
   es-toolkit@1.50.0: {}
+
+  es-toolkit@1.52.0: {}
 
   es5-ext@0.10.64:
     dependencies:
@@ -33418,6 +33426,11 @@ snapshots:
   js-tokens@4.0.0: {}
 
   js-yaml@3.15.0:
+    dependencies:
+      argparse: 1.0.10
+      esprima: 4.0.1
+
+  js-yaml@3.15.2:
     dependencies:
       argparse: 1.0.10
       esprima: 4.0.1
@@ -36363,7 +36376,7 @@ snapshots:
   pify@4.0.1:
     optional: true
 
-  pinejs-client-core@8.5.32(@balena/sbvr-types@11.1.4):
+  pinejs-client-core@8.5.43(@balena/sbvr-types@11.1.4):
     dependencies:
       '@balena/abstract-sql-to-typescript': 6.1.23(@balena/sbvr-types@11.1.4)
     transitivePeerDependencies:
