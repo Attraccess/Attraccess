@@ -196,7 +196,7 @@ private:
 
     void updateUsageStatsDisplay();
     lv_obj_t *usageStatsContainer = nullptr;
-    lv_obj_t *energyValue = nullptr;
+    lv_obj_t *meterValue = nullptr;
     lv_obj_t *operatingValue = nullptr;
     API::UsageStats usageStats{};
     bool usageStatsValid = false;
@@ -231,8 +231,8 @@ private:
     void updateSelectButtonStyles(FormFieldWidget &widget);
     void updateSelectOptionLayout(FormFieldWidget &widget);
 
-    lv_obj_t *noIntroductionPanel;
-    lv_obj_t *introducersListLabel;
+    lv_obj_t *noIntroductionPanel = nullptr;
+    lv_obj_t *introducersListLabel = nullptr;
     lv_obj_t *maintenancePanel = nullptr;
     lv_obj_t *maintenanceIntroducersLabel = nullptr;
     lv_obj_t *healthPanel = nullptr;

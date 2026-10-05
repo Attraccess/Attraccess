@@ -16,24 +16,24 @@
     "description": "The resource is currently reporting an unhealthy state and cannot be used until it recovers."
   },
   "METER_NOT_CONFIGURED": {
-    "title": "Energy meter not set up",
-    "description": "Energy billing is enabled for this resource, but its flow does not define a complete meter. Ask an administrator to add the metering start and collection nodes."
+    "title": "Meter not set up",
+    "description": "Meter billing is enabled for this resource, but its flow does not define a complete meter. Ask an administrator to add the metering start and collection nodes."
   },
   "METER_INITIALIZATION_FAILED": {
-    "title": "Energy meter did not start",
-    "description": "The session was not started because the energy meter could not be initialized: {{error}}"
+    "title": "Meter did not start",
+    "description": "The session was not started because a billed meter could not be initialized: {{error}}"
   },
   "METER_SETTLEMENT_FAILED": {
-    "title": "Energy still unavailable",
+    "title": "Meter reading still unavailable",
     "description": "{{error}}"
   },
   "METER_SESSION_NOT_FOUND": {
     "title": "Session not found",
-    "description": "This energy charge no longer exists."
+    "description": "This meter charge no longer exists."
   },
   "METER_SESSION_NOT_PENDING": {
     "title": "Nothing left to settle",
-    "description": "This energy charge has already been settled or waived."
+    "description": "This meter charge has already been settled or waived."
   },
   "INSUFFICIENT_BALANCE": {
     "title": "Insufficient balance",

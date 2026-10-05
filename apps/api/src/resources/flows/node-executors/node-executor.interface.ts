@@ -10,11 +10,18 @@ export type FlowFailureKind =
   'transport-dispatch' | 'acknowledgement-timeout' | 'controller-rejection' | 'node-failure';
 
 export type MeteringReport =
-  | { kind: 'ready'; baseline?: { value: string; unit: string }; source?: string }
-  | { kind: 'reading'; value: string; unit: string; observedAt?: string; source?: string };
+  | { kind: 'ready'; baseline?: { value: string }; source?: string }
+  | {
+      kind: 'reading';
+      value: string;
+      mode?: 'total' | 'increment';
+      observedAt?: string;
+      source?: string;
+    };
 
 /** Identity of the metering operation a flow run belongs to; completion nodes reply through it. */
 export interface MeteringRunContext {
+  meterId: number;
   operationId: string;
   kind: 'start' | 'interim' | 'final';
   complete(report: MeteringReport): Promise<void>;

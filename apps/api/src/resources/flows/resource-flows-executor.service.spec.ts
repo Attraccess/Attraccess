@@ -23,6 +23,7 @@ import { CompanionGatewayService } from '../../companion/companion-gateway.servi
 import axios from 'axios';
 import { registerPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
+import { settleFlowBranches } from './flow-execution-engine';
 
 jest.mock('axios');
 
@@ -179,6 +180,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
       operatingIntervals as never,
+      { report: jest.fn() } as never,
     );
   });
 
@@ -286,7 +288,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
     const ordinaryFailure = Promise.reject(new Error('ordinary node failure'));
 
-    const settled = service['settleFlowBranches']([
+    const settled = settleFlowBranches([
       ordinaryFailure as Promise<NodeProcessingResult[]>,
       laterExternalFailure as Promise<NodeProcessingResult[]>,
     ]);
@@ -320,17 +322,21 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('routes a metering start and collection branch to the reply channel of its operation', async () => {
-    const start = createNode({ id: 'start', type: ResourceFlowNodeType.INPUT_METERING_START });
+    const start = createNode({ id: 'start', type: ResourceFlowNodeType.INPUT_METERING_START, data: { meterId: 1 } });
     const ready = createNode({
       id: 'ready',
       type: ResourceFlowNodeType.OUTPUT_METERING_READY,
-      data: { source: 'shelly' },
+      data: { meterId: 1, source: 'shelly' },
     });
-    const collect = createNode({ id: 'collect', type: ResourceFlowNodeType.INPUT_METERING_COLLECT });
+    const collect = createNode({
+      id: 'collect',
+      type: ResourceFlowNodeType.INPUT_METERING_COLLECT,
+      data: { meterId: 1 },
+    });
     const report = createNode({
       id: 'report',
       type: ResourceFlowNodeType.OUTPUT_METERING_REPORT,
-      data: { value: '{{reading.wh}}', unit: 'Wh' },
+      data: { meterId: 1, value: '{{scaleDecimal reading.wh "1/1000"}}' },
     });
     nodesById = { start, ready, collect, report };
     edgesBySourceAndHandle = {
@@ -341,18 +347,18 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     initialNodes = [start];
     await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_START, {}, undefined, {
-      metering: { operationId: 'op-1', kind: 'start', complete },
+      metering: { meterId: 1, operationId: 'op-1', kind: 'start', complete },
     });
     expect(complete).toHaveBeenLastCalledWith({ kind: 'ready', baseline: undefined, source: 'shelly' });
 
     initialNodes = [collect];
     await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_COLLECT, { reading: { wh: 1500 } }, undefined, {
-      metering: { operationId: 'op-2', kind: 'final', complete },
+      metering: { meterId: 1, operationId: 'op-2', kind: 'final', complete },
     });
     expect(complete).toHaveBeenLastCalledWith({
       kind: 'reading',
-      value: '1500',
-      unit: 'Wh',
+      mode: 'total',
+      value: '1.5',
       observedAt: undefined,
       source: undefined,
     });
@@ -883,20 +889,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     edgesBySourceAndHandle[`${mqttNode.id}|failure`] = [];
     edgesBySourceAndHandle[`${continuationNode.id}|`] = [];
     mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
-    const processNode = jest.spyOn(
-      service as unknown as { processNode: () => Promise<NodeProcessingResult[]> },
-      'processNode',
-    );
+    flowLogs.start(1);
 
-    await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
+    const results = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
 
-    expect(processNode).toHaveBeenCalledWith(
-      expect.any(String),
-      continuationNode,
-      expect.objectContaining({ outputHandle: 'output' }),
-      undefined,
-      expect.any(Map),
-      {},
+    expect(results).toEqual([expect.objectContaining({ requestId: 'abc' })]);
+    expect(flowLogs.getLogs(1).logs).toContainEqual(
+      expect.objectContaining({ nodeId: continuationNode.id, type: 'node.processing.completed' }),
     );
   });
 
@@ -1779,6 +1778,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
       { transition: jest.fn() } as never,
+      { report: jest.fn() } as never,
     );
   });
 

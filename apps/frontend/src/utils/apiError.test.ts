@@ -44,15 +44,56 @@ describe('getTranslationKeyForApiError', () => {
     expect(getTranslation(translations, 'INVALID_CSV.description')).not.toBe('INVALID_CSV');
   });
 
-  it('splits the reason off a prefixed meter error', () => {
+  it.each([
+    ['English', API_ERROR_TRANSLATIONS_EN, 'Meter not set up', 'METER_NOT_CONFIGURED: Heartbeats'],
+    ['German', API_ERROR_TRANSLATIONS_DE, 'Zähler nicht eingerichtet', 'METER_NOT_CONFIGURED: Heartbeats'],
+    [
+      'English',
+      API_ERROR_TRANSLATIONS_EN,
+      'Meter not set up',
+      'METER_INITIALIZATION_FAILED: METER_NOT_CONFIGURED: Heartbeats',
+    ],
+    [
+      'German',
+      API_ERROR_TRANSLATIONS_DE,
+      'Zähler nicht eingerichtet',
+      'METER_INITIALIZATION_FAILED: METER_NOT_CONFIGURED: Heartbeats',
+    ],
+  ])('uses localized setup guidance in %s (case %#)', (_locale, translations, expectedTitle, message) => {
     const result = getTranslationKeyForApiError({
-      error: { body: { message: 'METER_SETTLEMENT_FAILED: meter offline' } } as unknown as Error,
+      error: { body: { message } } as unknown as Error,
+      t: (key: string) => key,
+      tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+      baseTranslationKey: 'api',
+    });
+
+    expect(result.key).toBe('api.METER_NOT_CONFIGURED');
+    expect(result.errorMessage).toBe('Heartbeats');
+    expect(getTranslation(translations, 'METER_NOT_CONFIGURED.title')).toBe(expectedTitle);
+  });
+
+  it.each([
+    ['METER_SETTLEMENT_FAILED: meter offline', 'api.METER_SETTLEMENT_FAILED', 'meter offline'],
+    ['METER_INITIALIZATION_FAILED: meter offline', 'api.METER_INITIALIZATION_FAILED', 'meter offline'],
+    [
+      'METER_INITIALIZATION_FAILED: FLOW_EXECUTION_ERROR: device offline',
+      'api.METER_INITIALIZATION_FAILED',
+      'FLOW_EXECUTION_ERROR: device offline',
+    ],
+    [
+      'METER_INITIALIZATION_FAILED: METER_NOT_CONFIGURED: Heartbeats: METER_INITIALIZATION_FAILED: counter',
+      'api.METER_NOT_CONFIGURED',
+      'Heartbeats: METER_INITIALIZATION_FAILED: counter',
+    ],
+  ])('preserves the reason for %s', (message, key, errorMessage) => {
+    const result = getTranslationKeyForApiError({
+      error: { body: { message } } as unknown as Error,
       t: (key: string) => key,
       tExists: () => true,
       baseTranslationKey: 'api',
     });
 
-    expect(result.key).toBe('api.METER_SETTLEMENT_FAILED');
-    expect(result.errorMessage).toBe('meter offline');
+    expect(result.key).toBe(key);
+    expect(result.errorMessage).toBe(errorMessage);
   });
 });

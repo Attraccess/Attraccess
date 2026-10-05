@@ -515,7 +515,16 @@ describe('AttractapSessionHandler – session + flow button', () => {
     const startTime = new Date('2026-10-03T10:00:00Z');
     beforeEach(() => {
       mockResourceUsageService.getActiveSession.mockResolvedValue({ id: 99, userId: 1, startTime });
-      metering.getLive.mockResolvedValue({ session: { usageId: 99, latestKwh: '0.125' } });
+      metering.getLive.mockResolvedValue({
+        meters: [
+          {
+            id: 1,
+            name: 'Renamed Heartbeats',
+            creditsPerUnit: 100,
+            session: { usageId: 99, meterName: 'Heartbeats', creditsPerUnit: 2, latestValue: '0.125' },
+          },
+        ],
+      });
       operating.getForResource.mockResolvedValue({
         operatingDataAvailable: true,
         isOperating: true,
@@ -525,27 +534,105 @@ describe('AttractapSessionHandler – session + flow button', () => {
         ],
       });
     });
-    it('returns energy and operating time attributed to the current usage', async () => {
+    it('returns captured meter names and rates after edits, with operating time attributed to the current usage', async () => {
       await handler.handleResourceUsageStats(mockSocket as any, request);
       expect(operating.getForResource).toHaveBeenCalledWith(10, expect.any(Date), startTime);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         new AttractapEvent(AttractapEventType.RESOURCE_USAGE_STATS, {
           resourceId: 10,
           requestId: 7,
-          usage: { id: 99, energyKwh: '0.125', operatingDurationMs: 120000, isOperating: true },
+          usage: {
+            id: 99,
+            meters: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 2, formattedRate: '0,02 EUR', value: '0.125' }],
+            operatingDurationMs: 120000,
+            isOperating: true,
+          },
         }),
       );
     });
+    it('formats the captured rate using the configured currency precision', async () => {
+      mockBillingService.getConfiguration.mockResolvedValue({ currency: 'KWD', minorUnit: 3 });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage.meters[0]).toMatchObject({
+        name: 'Heartbeats',
+        creditsPerUnit: 2,
+        formattedRate: '0,002 KWD',
+      });
+    });
+    it('keeps a skipped free meter unavailable with its captured name and zero rate after edits', async () => {
+      metering.getLive.mockResolvedValue({
+        meters: [
+          {
+            id: 1,
+            name: 'Renamed Heartbeats',
+            creditsPerUnit: 100,
+            session: {
+              sessionId: null,
+              usageId: 99,
+              meterName: 'Heartbeats',
+              creditsPerUnit: 0,
+              latestValue: null,
+            },
+          },
+        ],
+      });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage.meters).toEqual([
+        { id: 1, name: 'Heartbeats', creditsPerUnit: 0, formattedRate: '0,00 EUR', value: null },
+      ]);
+    });
     it('keeps unavailable readings distinct from zero and discards a different meter session', async () => {
-      metering.getLive.mockResolvedValue({ session: { usageId: 100, latestKwh: '9' } });
+      metering.getLive.mockResolvedValue({
+        meters: [{ id: 1, name: 'Heartbeats', session: { usageId: 100, latestValue: '9' } }],
+      });
       operating.getForResource.mockResolvedValue({ operatingDataAvailable: false, attributions: [] });
       await handler.handleResourceUsageStats(mockSocket as any, request);
       expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toEqual({
         id: 99,
-        energyKwh: null,
+        meters: [],
         operatingDurationMs: null,
         isOperating: null,
       });
+    });
+    it('returns multiple named meters, preserving zero and unavailable values', async () => {
+      metering.getLive.mockResolvedValue({
+        meters: [
+          {
+            id: 1,
+            name: 'Energy (kWh)',
+            session: { usageId: 99, meterName: 'Energy (kWh)', creditsPerUnit: 0, latestValue: '0' },
+          },
+          {
+            id: 2,
+            name: 'Heartbeats',
+            session: {
+              usageId: 99,
+              meterName: 'Heartbeats',
+              creditsPerUnit: Number.MAX_SAFE_INTEGER,
+              latestValue: '9007199254740993.125',
+            },
+          },
+          {
+            id: 3,
+            name: 'Water',
+            session: { usageId: 99, meterName: 'Water', creditsPerUnit: 100, latestValue: null },
+          },
+          { id: 4, name: 'Other usage', session: { usageId: 100, latestValue: '9' } },
+          { id: 5, name: 'Idle meter', session: null },
+        ],
+      });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage.meters).toEqual([
+        { id: 1, name: 'Energy (kWh)', creditsPerUnit: 0, formattedRate: '0,00 EUR', value: '0' },
+        {
+          id: 2,
+          name: 'Heartbeats',
+          creditsPerUnit: Number.MAX_SAFE_INTEGER,
+          formattedRate: '90.071.992.547.409,91 EUR',
+          value: '9007199254740993.125',
+        },
+        { id: 3, name: 'Water', creditsPerUnit: 100, formattedRate: '1,00 EUR', value: null },
+      ]);
     });
     it.each([null, { id: 99, userId: 2, startTime }])(
       'does not expose readings without an owned session (%p)',
@@ -589,7 +676,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         expect(metering.getLive).toHaveBeenCalledWith(10);
         expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage).toMatchObject({
           id: 99,
-          energyKwh: '0.125',
+          meters: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 2, formattedRate: '0,02 EUR', value: '0.125' }],
           operatingDurationMs: 120000,
         });
       });
@@ -597,7 +684,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
     it('discards results when the card changes during the lookup', async () => {
       metering.getLive.mockImplementation(async () => {
         mockSocket.state.lastAuthenticatedUserId = 2;
-        return { session: null };
+        return { meters: [] };
       });
       await handler.handleResourceUsageStats(mockSocket as any, request);
       expect(mockSocket.sendMessage).not.toHaveBeenCalled();

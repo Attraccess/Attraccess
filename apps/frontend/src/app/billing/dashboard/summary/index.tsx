@@ -1,4 +1,5 @@
-import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import {
   Button,
   Chip,
@@ -28,7 +29,6 @@ import {
 } from '@attraccess/react-query-client';
 import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
 import { RefundModal } from './transactionDetailsModal/refund';
 
@@ -148,7 +148,7 @@ export function SummaryCard(props: Props) {
     }
   }, []);
 
-  const formatNumber = useNumberFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const [openedTransactionId, setOpenedTransactionId] = useState<number | undefined>(undefined);
   const [isOpenDetails, setIsOpenDetails] = useState(false);
@@ -171,7 +171,7 @@ export function SummaryCard(props: Props) {
       ) : (
         <p className="text-2xl font-bold">
           {t('balance', {
-            balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
+            balance: formatCredits(balance?.value ?? 0),
             currency: configuration.currency,
           })}
         </p>
@@ -208,7 +208,7 @@ export function SummaryCard(props: Props) {
                   </TableCell>
                   <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                     {transaction.amount > 0 && '+'}
-                    {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
+                    {formatCredits(transaction.amount)}
                   </TableCell>
                   <TableCell>
                     <RefundModal transactionId={transaction.id}>

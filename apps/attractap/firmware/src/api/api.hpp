@@ -234,7 +234,13 @@ public:
         uint32_t usageId = 0;
         int64_t operatingDurationMs = -1; // -1 means no operating data
         int8_t isOperating = -1; // -1 unknown, 0 idle, 1 running
-        std::string energyKwh;
+        struct MeterValue {
+            std::string name;
+            std::string value;
+            int64_t creditsPerUnit = -1; // -1 means no captured rate was provided
+            std::string formattedRate;
+        };
+        std::vector<MeterValue> meters;
     };
     void requestUsageStats(uint32_t resourceId);
     void setUsageStatsCallback(std::function<void(const UsageStats &)> callback);

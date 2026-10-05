@@ -1,4 +1,7 @@
 import {
+  useResourceMeteringServiceListResourceMeters,
+  useResourceMeteringServiceSetResourceMeterRate,
+  UseResourceMeteringServiceListResourceMetersKeyFn,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
   UseBillingServiceGetResourceBillingConfigurationKeyFn,
@@ -6,6 +9,9 @@ import {
 } from '@attraccess/react-query-client';
 import {
   Description,
+  FieldError,
+  Input,
+  TextField,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -28,8 +34,9 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
+import { MeterNameEditor } from '../../meters/MeterNameEditor';
 import { MeterSetupNotice } from '../metering/MeterNotices';
-import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
+import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency, formatCredits, parseCredits } from '@attraccess/shared';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
@@ -98,21 +105,34 @@ export function ResourceBillingInfoEditor(props: Props) {
     ),
   );
 
-  const [creditsPerKwh, setCreditsPerKwh] = useState(
-    dbCurrencyToUserCurrency(
-      resourceBillingConfiguration?.configuration.creditsPerKwh ?? 0,
-      configuration?.minorUnit ?? 1,
-    ),
-  );
+  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId });
+  const { mutateAsync: setMeterRate, isPending: ratesPending } = useResourceMeteringServiceSetResourceMeterRate();
+  const [rates, setRates] = useState<Record<number, string>>({});
+  useEffect(() => {
+    if (!isOpen) {
+      setRates((current) => (Object.keys(current).length ? {} : current));
+      return;
+    }
+    if (!configuration) return;
+    setRates((current) => {
+      const added = meters.filter((meter) => current[meter.id] === undefined);
+      if (!added.length) return current;
+      return {
+        ...current,
+        ...Object.fromEntries(
+          added.map((meter) => [
+            meter.id,
+            formatCredits(meter.creditsPerUnit, configuration.minorUnit, { useGrouping: false }),
+          ]),
+        ),
+      };
+    });
+  }, [isOpen, meters, configuration]);
 
   useEffect(() => {
     if (!configuration) {
       return;
     }
-
-    setCreditsPerKwh(
-      dbCurrencyToUserCurrency(resourceBillingConfiguration?.configuration.creditsPerKwh ?? 0, configuration.minorUnit),
-    );
 
     setCreditsPerUsage(
       dbCurrencyToUserCurrency(
@@ -140,13 +160,35 @@ export function ResourceBillingInfoEditor(props: Props) {
       return;
     }
 
+    let parsedRates: { meterId: number; creditsPerUnit: number }[];
+    try {
+      parsedRates = meters.map((meter) => ({
+        meterId: meter.id,
+        creditsPerUnit: parseCredits(
+          rates[meter.id] ?? formatCredits(meter.creditsPerUnit, configuration.minorUnit, { useGrouping: false }),
+          configuration.minorUnit,
+        ),
+      }));
+    } catch {
+      // Invalid prices are shown by the fields; validate every meter before saving any.
+      return;
+    }
+    try {
+      for (const rate of parsedRates)
+        await setMeterRate({ resourceId, meterId: rate.meterId, requestBody: { creditsPerUnit: rate.creditsPerUnit } });
+      await queryClient.invalidateQueries({
+        queryKey: UseResourceMeteringServiceListResourceMetersKeyFn({ resourceId }),
+      });
+    } catch (error) {
+      toast.apiError({ error: error as Error, t, tExists, baseTranslationKey: 'api' });
+      return;
+    }
     updateConfiguration({
       resourceId,
       requestBody: {
         creditsPerUsage: userCurrencyToDbCurrency(creditsPerUsage, configuration.minorUnit),
         creditsPerMinute: userCurrencyToDbCurrency(creditsPerMinute, configuration.minorUnit),
         creditsPerOperatingMinute: userCurrencyToDbCurrency(creditsPerOperatingMinute, configuration.minorUnit),
-        creditsPerKwh: userCurrencyToDbCurrency(creditsPerKwh, configuration.minorUnit),
       },
     });
   }, [
@@ -155,7 +197,13 @@ export function ResourceBillingInfoEditor(props: Props) {
     creditsPerUsage,
     creditsPerMinute,
     creditsPerOperatingMinute,
-    creditsPerKwh,
+    meters,
+    rates,
+    setMeterRate,
+    queryClient,
+    toast,
+    t,
+    tExists,
     configuration,
   ]);
 
@@ -171,7 +219,7 @@ export function ResourceBillingInfoEditor(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+      <StandardDrawer dialogProps={{ 'aria-label': t('title') }} isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
           <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
@@ -216,26 +264,38 @@ export function ResourceBillingInfoEditor(props: Props) {
                 <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
               </NumberFieldGroup>
             </NumberField>
-            <NumberField
-              value={creditsPerKwh}
-              minValue={0}
-              onChange={(value) => setCreditsPerKwh(value)}
-              defaultValue={0}
-            >
-              <Label>{t('inputs.creditsPerKwh.label', { currency: configuration.currency })}</Label>
-              <NumberFieldGroup>
-                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                <NumberFieldInput />
-                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-              </NumberFieldGroup>
-              <Description>{t('inputs.creditsPerKwh.description')}</Description>
-            </NumberField>
-            <MeterSetupNotice resourceId={resourceId} energyBillingEnabled={creditsPerKwh > 0} />
+            {meters.map((meter) => {
+              const value =
+                rates[meter.id] ?? formatCredits(meter.creditsPerUnit, configuration.minorUnit, { useGrouping: false });
+              let invalid = false;
+              try {
+                parseCredits(value, configuration.minorUnit);
+              } catch {
+                invalid = true;
+              }
+              return (
+                <TextField
+                  key={meter.id}
+                  value={value}
+                  onChange={(value) => setRates((previous) => ({ ...previous, [meter.id]: value }))}
+                  isInvalid={invalid}
+                >
+                  <Label>
+                    {meter.name} — {t('inputs.meterRate.label', { currency: configuration.currency })}
+                  </Label>
+                  <Input inputMode="decimal" />
+                  <Description>{t('inputs.meterRate.description')}</Description>
+                  <FieldError>{t('inputs.meterRate.invalid', { digits: configuration.minorUnit })}</FieldError>
+                </TextField>
+              );
+            })}
+            <MeterNameEditor resourceId={resourceId} />
+            <MeterSetupNotice resourceId={resourceId} />
             <input hidden type="submit" />
           </Form>
         </DrawerBody>
         <DrawerFooter>
-          <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
+          <Button variant="primary" onPress={onSubmit} isPending={isSaving || ratesPending}>
             {t('actions.save')}
           </Button>
         </DrawerFooter>

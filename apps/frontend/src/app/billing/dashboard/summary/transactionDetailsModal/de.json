@@ -20,7 +20,7 @@
   },
   "type": {
     "refund": "Erstattung",
-    "correction": "Energiekorrektur",
+    "correction": "Zählerkorrektur",
     "resourceUsage": "Ressourcen-Nutzung",
     "manual": "Manuelle Transaktion",
     "sumupTopup": "SumUp-Aufladung",
@@ -33,18 +33,21 @@
       "description": "Beschreibung",
       "quantity": "Menge",
       "unitPrice": "Einzelpreis",
-      "subtotal": "Zwischensumme"
+      "subtotal": "Zwischensumme",
+      "rateShort": "Preis",
+      "totalShort": "Summe"
     },
     "system": {
       "PER_SESSION": "Pro Sitzung",
       "PER_MINUTE": "Pro Minute",
       "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Pro zugeordneter Betriebsminute",
-      "ENERGY": "Energie",
       "BILLING_FACTOR": "Zahlungsfaktor"
     },
-    "energyDescription": "{{kwh}} kWh zu {{rate}} pro kWh",
     "empty": "Keine Positionen",
-    "total": "Summe Positionen"
+    "total": "Summe Positionen",
+    "meterDescription": "{{value}} zu {{rate}} pro Messwert",
+    "unavailable": "Nicht verfügbar",
+    "meterUnavailable": "Endwert nicht verfügbar; keine Zählergebühr enthalten. Erfasster Preis: {{rate}} pro Messwert."
   },
   "actions": {
     "refund": "Erstattung",
