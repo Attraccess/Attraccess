@@ -60,7 +60,7 @@ resource ID comes from the envelope; historical event names and usage data are
 not replayed. Health-only packets preserve the snapshot. Pending initial reads
 are shared; joining after a rejection requests a batched renewal on the same
 stream. Replay checks consumer, entry and transport ownership and is suppressed
-if a live packet already reached the consumer. Same-batch remounts can reuse a
+if live in-use state already reached the consumer. Same-batch remounts can reuse a
 snapshot; genuine removal, rejection, interruption/recovery and authentication
 replacement clear it. Other topics have no local replay. Delayed server initial
 results cannot override a newer in-use event or deliver after disconnect.

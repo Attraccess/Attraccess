@@ -8,7 +8,7 @@ import {
 import { events } from 'fetch-event-stream';
 import { v4 as uuidv4 } from 'uuid';
 
-type Consumer = { update: (payload: unknown) => void; restore?: () => void; deliveries: number };
+type Consumer = { update: (payload: unknown) => void; restore?: () => void; hasResourceState: boolean };
 type ResourceState = { resourceId: number; inUse: boolean; timestamp?: string };
 type Entry = { subscription: LiveSubscription; consumers: Set<Consumer>; snapshot?: ResourceState; rejected?: boolean };
 interface Transport {
@@ -53,7 +53,7 @@ export class LiveUpdateClient {
       entry = { subscription, consumers: new Set() };
       this.topics.set(key, entry);
     }
-    const consumer = { update, restore, deliveries: 0 };
+    const consumer = { update, restore, hasResourceState: false };
     entry.consumers.add(consumer);
     this.replay(entry, consumer);
     if (isNewTopic || entry.rejected) this.changed();
@@ -104,9 +104,9 @@ export class LiveUpdateClient {
         this.topics.get(liveSubscriptionKey(entry.subscription)) === entry &&
         entry.consumers.has(consumer) &&
         entry.snapshot === snapshot &&
-        consumer.deliveries === 0
+        !consumer.hasResourceState
       ) {
-        consumer.deliveries++;
+        consumer.hasResourceState = true;
         this.invoke(() => consumer.update({ ...snapshot }));
       }
     });
@@ -117,6 +117,7 @@ export class LiveUpdateClient {
     if (!entry?.consumers.size) return;
     entry.rejected = false;
     const payload = event.payload;
+    let isResourceState = false;
     if (
       event.topic === 'resource' &&
       payload &&
@@ -124,6 +125,7 @@ export class LiveUpdateClient {
       'inUse' in payload &&
       typeof payload.inUse === 'boolean'
     ) {
+      isResourceState = true;
       entry.snapshot = {
         resourceId: event.resourceId,
         inUse: payload.inUse,
@@ -132,7 +134,7 @@ export class LiveUpdateClient {
     }
     entry.consumers.forEach((consumer) => {
       if (this.isCurrent(transport) && entry.consumers.has(consumer)) {
-        consumer.deliveries++;
+        if (isResourceState) consumer.hasResourceState = true;
         this.invoke(() => consumer.update(payload));
       }
     });

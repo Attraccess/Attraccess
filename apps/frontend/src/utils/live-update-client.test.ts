@@ -319,6 +319,30 @@ describe('bundled live client', () => {
     expect(controls).toHaveLength(1);
   });
 
+  it('replays in-use state to a consumer that joins during a health-only callback', async () => {
+    const late = vi.fn();
+    client.subscribe({ topic: 'resource', resourceId: 1 }, (payload) => {
+      if (payload && typeof payload === 'object' && 'status' in payload) {
+        client.subscribe({ topic: 'resource', resourceId: 1 }, late);
+      }
+    });
+    await flush();
+    streams[0].send({ type: 'ready' });
+    streams[0].send({
+      type: 'event',
+      event: { topic: 'resource', resourceId: 1, eventType: 'update', payload: { inUse: true } },
+    });
+    await flush();
+    streams[0].send({
+      type: 'event',
+      event: { topic: 'resource', resourceId: 1, eventType: 'health', payload: { status: 'unavailable' } },
+    });
+    await flush();
+    expect(late.mock.calls).toEqual([[{ status: 'unavailable' }], [{ resourceId: 1, inUse: true }]]);
+    expect(streams).toHaveLength(1);
+    expect(controls).toHaveLength(1);
+  });
+
   it('shares pending initial state and cancels replay on removal, resource change or a newer live packet', async () => {
     const first = vi.fn();
     client.subscribe({ topic: 'resource', resourceId: 1 }, first);
