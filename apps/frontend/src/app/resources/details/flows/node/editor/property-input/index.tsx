@@ -6,6 +6,7 @@ import {
   Label,
   ModalBody,
   ModalHeader,
+  ModalHeading,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -593,7 +594,9 @@ function MqttPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
       <StandardModal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen} size="md">
         {({ close }) => (
           <>
-            <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
+            <ModalHeader>
+              <ModalHeading>{t('nodes.genericConfig.createMqttServer')}</ModalHeading>
+            </ModalHeader>
             <ModalBody>
               <CreateMqttServerForm
                 onSuccess={(server) => {

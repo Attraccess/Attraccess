@@ -88,7 +88,7 @@ export function AttraccessUser({
         {finalComponent}
       </Popover.Trigger>
       <Popover.Content>
-        <Popover.Dialog className="flex w-64 flex-col gap-3 p-4">
+        <Popover.Dialog aria-label={name} className="flex w-64 flex-col gap-3 p-4">
           {userInfoAndAvatar}
           {!isDeleted && (
             <Button variant="primary" size="sm" className="w-full" onPress={startDirectMessage}>

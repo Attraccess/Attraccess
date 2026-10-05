@@ -1,9 +1,17 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AttraccessUser } from './AttraccessUser';
 
 describe('AttraccessUser', () => {
+  it('names the user popover with the displayed username', async () => {
+    render(<AttraccessUser user={{ id: 42, username: 'supervisor' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /supervisor/i }));
+
+    expect(await screen.findByRole('dialog', { name: 'supervisor' })).toHaveAccessibleName('supervisor');
+  });
+
   it('renders a mini avatar without the username text', () => {
     render(<AttraccessUser user={{ id: 42, username: 'supervisor' }} variant="mini" />);
 

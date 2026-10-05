@@ -1,6 +1,6 @@
 // Device info drawer (ATT-498): reads Shelly Gen 1/2+ status + config from the
 // device via the plugin backend and renders a summary card grid.
-import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, Form, Skeleton } from '@heroui/react';
+import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form, Skeleton } from '@heroui/react';
 import { EyeIcon, EyeOffIcon, InfoIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { getDeviceInfo, type AuthState, type ShellyDevice, type ShellyDeviceInfo } from './api';
@@ -226,7 +226,7 @@ export function DeviceInfoDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <InfoIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">{device?.name ?? t('info.title')}</h2>
+              <DrawerHeading className="sh:text-lg sh:font-semibold">{device?.name ?? t('info.title')}</DrawerHeading>
             </div>
             {device && <p className="sh:text-sm sh:text-muted">{device.ipAddress}</p>}
           </div>

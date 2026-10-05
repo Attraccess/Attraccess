@@ -8,6 +8,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   useOverlayState,
 } from '@heroui/react';
 import { Button } from '../../../components/button';
@@ -201,7 +202,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <Form onSubmit={handleSubmit} data-cy="resource-group-upsert-modal" className="contents">
           <DrawerHeader>
-            <h2 className="text-lg font-semibold">{isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}</DrawerHeading>
           </DrawerHeader>
 
           <DrawerBody className="w-full space-y-4">

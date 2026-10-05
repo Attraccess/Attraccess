@@ -10,6 +10,7 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   TextField,
   useOverlayState,
 } from '@heroui/react';
@@ -253,7 +254,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
                 <Mail className="h-6 w-6 text-green-600 dark:text-green-300" />
               </div>
-              <div className="text-center">{t('success.title')}</div>
+              <ModalHeading className="text-center">{t('success.title')}</ModalHeading>
             </ModalHeader>
             <ModalBody>
               <p className="text-center text-gray-500 dark:text-gray-400">

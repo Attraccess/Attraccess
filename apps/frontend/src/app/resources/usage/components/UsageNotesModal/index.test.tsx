@@ -33,6 +33,7 @@ describe('UsageNotesDrawer', () => {
   it('shows the full supervisor user in the details drawer', () => {
     render(<UsageNotesDrawer isOpen={true} onClose={vi.fn()} session={supervisedSession} />);
 
+    expect(screen.getByRole('dialog', { name: 'sessionNotes' })).toBeInTheDocument();
     expect(screen.getByTestId('supervisor-user')).toHaveTextContent('supervisor');
     expect(screen.getByTestId('supervisor-user')).toHaveAttribute('data-variant', 'full');
   });
