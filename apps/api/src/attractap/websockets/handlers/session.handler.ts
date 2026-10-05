@@ -7,7 +7,7 @@ import { ResourceUsageService } from '../../../resources/usage/resourceUsage.ser
 import { ResourceFlowsExecutorService } from '../../../resources/flows/resource-flows-executor.service';
 import { SumUpService } from '../../../billing/sumup.service';
 import { BillingService } from '../../../billing/billing.service';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { dbCurrencyToUserCurrency, formatCredits } from '@attraccess/shared';
 import { ResourceInUseError } from '../../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { FlowExecutionError } from '../../../resources/flows/errors/flow-execution.error';
@@ -15,7 +15,12 @@ import { ResourceActionGuard } from './resource-action.guard';
 import { ResourceListService } from './resource-list.service';
 import { AttractapFormsHandler } from './forms.handler';
 import { SupervisionService } from '../../../resources/supervision/supervision.service';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import {
+  AuthenticatedWebSocket,
+  AttractapEvent,
+  AttractapEventType,
+  ResourceUsageStatsPayload,
+} from '../websocket.types';
 
 @Injectable()
 export class AttractapSessionHandler {
@@ -75,9 +80,10 @@ export class AttractapSessionHandler {
         return;
       }
       const asOf = new Date();
-      const [meter, operating] = await Promise.all([
+      const [meter, operating, billingConfiguration] = await Promise.all([
         this.meteringService.getLive(resourceId),
         this.operatingAttributionService.getForResource(resourceId, asOf, usage.startTime),
+        this.billingService.getConfiguration(),
       ]);
       if (socket.state.lastAuthenticatedUserId !== userId) return;
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, {
@@ -91,14 +97,30 @@ export class AttractapSessionHandler {
               )
             : null,
           isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
+          // Catalog entries include captured terms with unavailable values for skipped free meters.
           // Never attach a new session's meter reading to an earlier usage snapshot.
-          energyKwh: meter.session?.usageId === usage.id ? meter.session.latestKwh : null,
+          meters: meter.meters
+            .filter((entry) => entry.session?.usageId === usage.id)
+            .map((entry) => ({
+              id: entry.id,
+              name: entry.session.meterName,
+              creditsPerUnit: entry.session.creditsPerUnit,
+              formattedRate: this.formatMeterRate(entry.session.creditsPerUnit, billingConfiguration),
+              value: entry.session.latestValue,
+            })),
         },
-      });
+      } satisfies ResourceUsageStatsPayload);
     } catch (error) {
       this.logger.warn(`Failed to load live usage stats: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
     }
+  }
+
+  private formatMeterRate(creditsPerUnit: number, configuration: { minorUnit: number; currency: string }): string {
+    return `${formatCredits(creditsPerUnit, configuration.minorUnit, {
+      locale: 'de-DE',
+      minimumFractionDigits: configuration.minorUnit,
+    })} ${configuration.currency}`;
   }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {

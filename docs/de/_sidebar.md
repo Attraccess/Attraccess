@@ -44,7 +44,7 @@
   - [Flow-Editor](flows/flow-editor.md)
   - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md)
   - [Knotentypen](flows/node-types.md)
-  - [Energiemessung](flows/energy-metering.md)
+  - [Zähler](flows/energy-metering.md)
 
 - **Formulare**
   - [Überblick](forms/overview.md)

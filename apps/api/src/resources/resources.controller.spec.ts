@@ -5,10 +5,11 @@ import { Resource, DocumentationType, ResourceType } from '@attraccess/database-
 import { createMockResource } from '../test-utils/resource.fixtures';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, type ExecutionContext } from '@nestjs/common';
 import { PaginatedResponse } from '../types/response';
 import { ResourceImageService } from './resourceImage.service';
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import supertest from 'supertest';
 
 describe('ResourcesController', () => {
   let controller: ResourcesController;
@@ -191,6 +192,38 @@ describe('ResourcesController', () => {
   });
 
   describe('deleteOne', () => {
+    it('rejects update-only users at the HTTP endpoint and allows delete-authorized users', async () => {
+      const permissions = new Set(['resources.update']);
+      const module = await Test.createTestingModule({
+        controllers: [ResourcesController],
+        providers: [
+          { provide: ResourcesService, useValue: service },
+          { provide: ResourceImageService, useValue: {} },
+        ],
+      })
+        .overrideGuard(DualAuthGuard)
+        .useValue({
+          canActivate: (context: ExecutionContext) => {
+            context.switchToHttp().getRequest().user = { id: 9, effectivePermissions: permissions };
+            return true;
+          },
+        })
+        .compile();
+      const app = module.createNestApplication();
+      await app.init();
+      try {
+        await supertest(app.getHttpServer()).delete('/resources/1').expect(403);
+        expect(service.deleteResource).not.toHaveBeenCalled();
+        permissions.clear();
+        permissions.add('resources.delete');
+        await supertest(app.getHttpServer()).delete('/resources/1').expect(200);
+        expect(service.deleteResource).toHaveBeenCalledTimes(1);
+        expect(service.deleteResource).toHaveBeenCalledWith(1, expect.objectContaining({ id: 9 }));
+      } finally {
+        await app.close();
+      }
+    });
+
     it('should delete a resource', async () => {
       jest.spyOn(service, 'deleteResource').mockResolvedValue(undefined);
 

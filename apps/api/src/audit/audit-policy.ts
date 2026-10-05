@@ -22,6 +22,7 @@ export interface ResourceAuditEvent {
     | 'usage_session.started'
     | 'usage_session.ended'
     | 'energy_charge.waived'
+    | 'meter_charge.waived'
     | 'retraining.required'
     | 'retraining.cleared';
   operationId: string;
@@ -457,6 +458,7 @@ export const RESOURCE_AUDIT_ACTIONS: ResourceAuditEvent['action'][] = [
   'usage_session.started',
   'usage_session.ended',
   'energy_charge.waived',
+  'meter_charge.waived',
   'retraining.required',
   'retraining.cleared',
 ];
@@ -505,6 +507,7 @@ const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonl
   'usage_session.started': ['supervisorUserId', 'usageId', 'usageUserId'],
   'usage_session.ended': ['usageId', 'usageUserId'],
   'energy_charge.waived': ['usageId', 'waivedCredits'],
+  'meter_charge.waived': ['meterId', 'usageId', 'waivedCredits'],
   'retraining.required': ['introductionId', 'retrainingReason', 'usageUserId'],
   'retraining.cleared': ['introductionId', 'usageUserId'],
 };

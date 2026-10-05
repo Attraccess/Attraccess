@@ -123,24 +123,25 @@ Wählen Sie ein **Companion-Gerät** und optionale dezimale **Hersteller-ID / Pr
 
 ### Messung starten
 
-Typ: `input.resource.metering.start` · Maschinen · Abrechnung
+Typ: `input.resource.metering.start` · Maschinen
 
-Bereitet den Zähler vor, bevor eine abgerechnete Sitzung startet oder übernommen wird. **Zeitlimit (Sekunden)**: 1–600, Standard **30**. Der Zweig muss **Messung bereit** erreichen, sonst startet die Sitzung nicht.
+Einen vordefinierten **Zähler** auswählen oder einen mit einem Namen erstellen. Bereitet diesen Zähler vor, bevor eine erfasste Sitzung startet oder übernommen wird. **Zeitlimit (Sekunden)**: 1–600, Standard **30**. Der Zweig muss **Messung bereit** erreichen. Kann ein kostenpflichtiger Zähler nicht initialisiert werden, startet die Sitzung nicht.
 
-Die Payload enthält `metering: { sessionId, operationId, resourceId, usageId, kind, requestedAt }` mit `kind: "start"`. Beispiel: Lifetime-Zähler per HTTP lesen und dessen Baseline melden. Siehe [Energiemessung](flows/energy-metering.md).
+Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, usageId, kind, requestedAt }` mit `kind: "start"`. Beispiel: Lifetime-Zähler per HTTP lesen und dessen Basiswert melden. Siehe [Zähler](flows/energy-metering.md).
 
 ### Messwert abfragen
 
-Typ: `input.resource.metering.collect` · Maschinen · Abrechnung
+Typ: `input.resource.metering.collect` · Maschinen
 
-| Einstellung                                     | Bereich / Standard                            |
-| ----------------------------------------------- | --------------------------------------------- |
-| **Zeitlimit (Sekunden)**                        | 1–600 / **30**                                |
-| **Zwischenintervall (Minuten)**                 | 0–1440 / **1**; `0` deaktiviert Zwischenwerte |
-| **Versuche für den Endwert**                    | 1–10 / **3**                                  |
-| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5**                                 |
+| Einstellung | Bereich / Standard |
+| --- | --- |
+| **Zähler** | Vordefinierten Zähler auswählen oder einen erstellen |
+| **Zeitlimit (Sekunden)** | 1–600 / **30** |
+| **Zwischenintervall (Minuten)** | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
+| **Versuche für den Endwert** | 1–10 / **3** |
+| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5** |
 
-Läuft für laufende Zwischenwerte und Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"` oder `"final"`. Der Zweig muss **Energie melden** erreichen. Zwischenwerte werden nie abgerechnet. Siehe [Energiemessung](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
+Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"` oder `"final"`. Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
 
 ## Verarbeitungs-Knoten
 
@@ -354,36 +355,38 @@ Wählen Sie ein festes **Companion-Gerät**. Sendet einen Entsperrbefehl und spe
 
 ### Messung bereit
 
-Typ: `output.resource.metering.ready` · Maschinen · Abrechnung
+Typ: `output.resource.metering.ready` · Maschinen
 
-| Einstellung                          | Beschreibung                                                                                      |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| **Baseline-Wert / Baseline-Einheit** | Optionale Vorlagen für den aktuellen Gesamtstand eines Lifetime-Zählers und dessen Energieeinheit |
-| **Quelle**                           | Optionale Vorlage mit dem Namen des physischen Zählers                                            |
+| Einstellung | Beschreibung |
+| --- | --- |
+| **Zähler** | Den Zähler der Start-Anfrage auswählen |
+| **Basiswert** | Optionale Vorlage für den aktuellen Gesamtstand eines kumulierten Zählers |
+| **Quelle** | Optionale Vorlage mit dem Namen des physischen Zählers |
 
-Schließt eine **Messung starten**-Operation ab. Schlägt außerhalb eines Startzweigs fehl. Bei zurücksetzbaren Zählern Baseline leer lassen; eine konfigurierte Baseline, die leer gerendert wird, führt zum Fehler. Der Katalog bietet keinen ausgehenden Anschluss.
+Schließt eine **Messung starten**-Operation ab. Schlägt außerhalb eines Startzweigs fehl. Nach einem Reset auf null den Basiswert leer lassen; ein konfigurierter Basiswert, der leer gerendert wird, führt zum Fehler. Der Katalog bietet keinen ausgehenden Anschluss.
 
-Beispiel nach HTTP-Antwort `{"energy_wh":1500}`: Baseline `{{energy_wh}}`, Einheit `Wh`. Siehe [Energiemessung](flows/energy-metering.md).
+Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Einheit ist nicht erforderlich. Siehe [Zähler](flows/energy-metering.md).
 
-### Energie melden
+### Zähler melden
 
-Typ: `output.resource.metering.report` · Maschinen · Abrechnung
+Typ: `output.resource.metering.report`
 
-| Einstellung     | Beschreibung                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Wert**        | Erforderliche Vorlage für Gesamtenergie seit Messstart oder aktuellen Lifetime-Gesamtstand bei Baseline-Nutzung    |
-| **Einheit**     | Erforderliche Vorlage: `Wh`, `kWh`, `MWh`, `mWh`, `J`, `kJ`, `MJ` oder unterstützte ausgeschriebene Energieeinheit |
-| **Gemessen am** | Optionale ISO-Zeitstempelvorlage; Standard ist der Meldezeitpunkt                                                  |
-| **Quelle**      | Optionale Vorlage mit dem Zählernamen                                                                              |
+| Einstellung | Beschreibung |
+| --- | --- |
+| **Zähler** | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen |
+| **Modus** | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
+| **Wert** | Erforderlicher nichtnegativer Zahlenwert oder Vorlage |
+| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt |
+| **Quelle** | Optionale Vorlage mit dem Namen des Zählers |
 
-Schließt eine **Messwert abfragen**-Operation ab; schlägt außerhalb eines Abfragezweigs fehl. Meldet Energie, nicht Leistung oder einen Zuwachs. Leistungseinheiten (`W`, `kW` usw.) werden abgelehnt. Eine konfigurierte Zeitvorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
+Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine Antwort im Abfragezweig muss zum angefragten Zähler passen. Eine Einheit ist nicht erforderlich. Der erste unaufgeforderte Gesamtstand legt einen Basiswert fest; spätere Zuwächse erhöhen den Gesamtverbrauch. Inkremente erhöhen den Verbrauch direkt. Während einer laufenden Sitzung aktualisieren akzeptierte Zuwächse auch deren Verbrauch. Eine konfigurierte Messzeit-Vorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
 
-Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"energy_wh":1500}`: Wert `{{payload.energy_wh}}`, Einheit `Wh`. Siehe [Energiemessung](flows/energy-metering.md) für Baselines, Einheiten und Wiederholungsversuche.
+Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **Heartbeats** auswählen, Modus **total**, Wert `{{payload.heartbeats}}`. Siehe [Zähler](flows/energy-metering.md) für Basiswerte und Wiederholungsversuche.
 
 ## Siehe auch
 
 - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) — Datenpfade und vollständige Beispiele
 - [Flow-Editor](flows/flow-editor.md) — Knoten hinzufügen und verbinden
 - [MQTT & IoT](mqtt/overview.md) — MQTT-Server konfigurieren
-- [Energiemessung](flows/energy-metering.md) — Strom pro kWh abrechnen
+- [Zähler](flows/energy-metering.md) — Beliebigen Verbrauch erfassen und abrechnen
 - [Abrechnung](billing/overview.md) — Details zum Abrechnungssystem

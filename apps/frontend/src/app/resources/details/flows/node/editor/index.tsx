@@ -1,3 +1,4 @@
+import { MeterSelector } from '../../../meters/MeterSelector';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceResolveNodeSchema } from '@attraccess/react-query-client';
 import {
   Button,
@@ -152,7 +153,7 @@ export function NodeEditor(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardDrawer isOpen={isOpen} onOpenChange={(nextOpen) => nextOpen ? setOpen(true) : onClose()}>
+      <StandardDrawer dialogProps={{ 'aria-label': nodeTitle }} isOpen={isOpen} onOpenChange={(nextOpen) => nextOpen ? setOpen(true) : onClose()}>
         <DrawerHeader className="flex flex-col gap-1">
           <DrawerHeading className="text-lg font-semibold">{nodeTitle}</DrawerHeading>
           <p className="text-sm text-default-500">{nodeDescription}</p>
@@ -167,8 +168,21 @@ export function NodeEditor(props: Props) {
               </Button>
             ) : null}
             {isResolvingSchema ? <p className="text-sm text-default-500">Refreshing configuration...</p> : null}
-            {Object.entries((resolvedSchema.configSchema.properties ?? {}) as Record<string, Property<unknown>>).map(
-              ([propertyName, property]) => (
+            {resolvedSchema.type.includes('.resource.metering.') && (
+              <MeterSelector
+                resourceId={resourceId}
+                value={typeof data.meterId === 'number' ? data.meterId : undefined}
+                onChange={(id) => {
+                  onInputChange('meterId', id);
+                }}
+              />
+            )}
+            {Object.entries((resolvedSchema.configSchema.properties ?? {}) as Record<string, Property<unknown>>)
+              .filter(([name]) =>
+                !resolvedSchema.type.includes('.resource.metering.') ||
+                name !== 'meterId',
+              )
+              .map(([propertyName, property]) => (
                 <PropertyInput
                   key={propertyName}
                   isRequired={(resolvedSchema.configSchema.required as string[])?.includes(propertyName)}
@@ -180,8 +194,7 @@ export function NodeEditor(props: Props) {
                   value={data[propertyName]}
                   onChange={(value, refreshesSchema) => onInputChange(propertyName, value, refreshesSchema)}
                 />
-              ),
-            )}
+              ))}
             <input hidden type="submit" />
           </Form>
         </DrawerBody>

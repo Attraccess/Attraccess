@@ -24,6 +24,7 @@ import {
   ResourceFlowNodeType,
   ResourceType,
   ResourceUsage,
+  ResourceMeter,
   ResourceUsageAction,
   SupervisionMode,
   User,
@@ -905,7 +906,13 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
         usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
         usageData.creditsPerUsage = billingConfiguration.creditsPerUsage;
-        usageData.energyCreditsPerKwh = billingConfiguration.creditsPerKwh;
+        usageData.meterRates = this.metering
+          ? (await transactionalEntityManager.find(ResourceMeter, { where: { resourceId } })).map((meter) => ({
+              meterId: meter.id,
+              name: meter.name,
+              creditsPerUnit: meter.creditsPerUnit,
+            }))
+          : [];
 
         if (supervisorUserId !== null) {
           usageData.supervisorUserId = supervisorUserId;
@@ -992,15 +999,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
           })
         : { status: 'not-metered' };
       // A billed session must not start unless its meter acknowledged the start; nothing is energized yet.
-      if ((createdSession.energyCreditsPerKwh ?? 0) > 0) {
-        if (!this.metering) throw new Error('Energy billing requires the metering service');
-        await this.metering.initialize({
-          resourceId,
-          usageId: createdSession.id,
-          creditsPerKwh: createdSession.energyCreditsPerKwh as number,
-          supersedes: existingActiveSession?.id,
-        });
-      }
+      await this.metering?.initialize({
+        resourceId,
+        usageId: createdSession.id,
+        supersedes: existingActiveSession?.id,
+      });
       await this.runUsageFlow(
         undefined,
         resourceId,

@@ -1,6 +1,11 @@
 import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { TFunction, useTranslationState } from '@attraccess/plugins-frontend-ui';
-import { ResourceFlowNodeSchemaDto, ResourceFlowNodeType, ResourceFlowsService } from '@attraccess/react-query-client';
+import {
+  ResourceFlowNodeSchemaDto,
+  ResourceFlowNodeType,
+  ResourceFlowsService,
+  useResourceMeteringServiceListResourceMeters,
+} from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +41,10 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
   const locale = useTranslationState((state) => state.language);
   const nodeId = useNodeId();
   const nodeData = useNodesData(nodeId as string);
+  const isMeterNode = schema.type.includes('.resource.metering.');
+  const { data: meters } = useResourceMeteringServiceListResourceMeters({ resourceId: resourceId ?? 0 }, undefined, {
+    enabled: isMeterNode && !!resourceId,
+  });
   const resolvePreview = Boolean(
     nodeId &&
     nodeData &&
@@ -71,14 +80,20 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         { label: t('preview.configuration'), value: t(resolved.isError ? 'preview.unavailable' : 'preview.loading') },
       ];
     }
-    return getNodePreviewRows(
+    const rows = getNodePreviewRows(
       schema.type,
       t,
       nodeData,
       resolvePreview ? resolved.data?.configSchema : schema.configSchema,
       locale,
     );
-  }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError, locale]);
+    if (isMeterNode)
+      rows.unshift({
+        label: t('nodes.' + schema.type + '.config.meterId.label'),
+        value: meters?.find((meter) => meter.id === nodeData?.data.meterId)?.name ?? '-',
+      });
+    return rows;
+  }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError, locale, isMeterNode, meters]);
 }
 
 type PreviewNode = { data: Record<string, unknown> } | null;
@@ -273,7 +288,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
         ? [
             {
               label: t('nodes.output.resource.metering.ready.preview.baselineValue'),
-              value: `${baseline} ${(nodeData?.data.baselineUnit as string) ?? ''}`.trim(),
+              value: baseline,
             },
           ]
         : []),
@@ -290,8 +305,8 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
         value: (nodeData?.data.value as string) || '-',
       },
       {
-        label: t('nodes.output.resource.metering.report.preview.unit'),
-        value: (nodeData?.data.unit as string) || '-',
+        label: t('nodes.output.resource.metering.report.config.mode.label'),
+        value: t('nodes.output.resource.metering.report.config.mode.enum.' + (nodeData?.data.mode ?? 'total')),
       },
     ];
   },

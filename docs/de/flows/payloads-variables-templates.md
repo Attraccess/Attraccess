@@ -135,7 +135,7 @@ Um die Umrechnung direkt als JSON-Zahl in einer MQTT-Nachricht oder einem HTTP-B
 
 Dies ergibt `{ "energy_kwh": 1.5 }`. Nach einer bestätigten HTTP-Anfrage mit Antwort `{"energy_wh":1500}` verwenden Sie `energy_wh` anstelle von `payload.energy_wh`.
 
-Für die Energieabrechnung akzeptiert **Energie melden** auch die ursprüngliche Einheit: **Wert** `{{payload.energy_wh}}`, **Einheit** `Wh` meldet 1500 Wh, die Attraccess in 1.5 kWh umrechnet. Dafür ist keine Rechenvorlage nötig. Wenn Sie **Wert** `{{divide payload.energy_wh 1000}}` wählen, kombinieren Sie ihn mit **Einheit** `kWh`. Den erforderlichen Abfragezweig erklärt [Energiemessung](flows/energy-metering.md).
+Für die Verbrauchsabrechnung in **Zähler melden** einen Zähler **Energy (kWh)** auswählen oder erstellen, **total** wählen und als **Wert** `{{divide payload.energy_wh 1000}}` verwenden. Zähler speichern und konvertieren keine Einheiten: Namen und Preise müssen zu den gemeldeten Werten passen. Für unveränderte Werte `{{payload.energy_wh}}` an einen Zähler **Energy (Wh)** melden und dessen Preis passend festlegen. [Zähler](flows/energy-metering.md) erklärt Gesamtstände, Inkremente und Sitzungserfassung.
 
 ### Rechenoperationen kombinieren
 
@@ -151,7 +151,15 @@ Bei `temperature_c: 20` ergibt dies `68`. Die Klammern übergeben das innere num
 
 Fehlende Werte, leerer Text, boolesche Werte, `null`, Objekte, Arrays und nicht numerische Zeichenketten führen zu einem Knotenfehler. Division durch null und nicht endliche Ergebnisse, etwa bei Überlauf, führen ebenfalls zum Fehler, statt einen irreführenden Wert auszugeben. Das normale Fehlerverhalten des Knotens gilt; **Payload setzen** stoppt dabei den Flow.
 
-Die Arithmetik verwendet JavaScript-Gleitkommazahlen. Dezimalrechnungen können Rundungsartefakte zeigen, etwa `{{add 0.1 0.2}}` mit dem Ergebnis `0.30000000000000004`. Übergeben Sie für Energieabrechnung den ursprünglichen Wert mit seiner tatsächlichen Einheit an **Energie melden**, damit das Messsystem die Umrechnung und Abrechnung mit seiner eigenen exakten Berechnung durchführt.
+Die Arithmetik verwendet JavaScript-Gleitkommazahlen. Dezimalrechnungen können Rundungsartefakte zeigen, etwa `{{add 0.1 0.2}}` mit dem Ergebnis `0.30000000000000004`. Wenn möglich, den ursprünglichen Dezimalwert oder eine numerische Zeichenkette direkt an **Zähler melden** übergeben und den Preis für diese Werte konfigurieren. Messung und Abrechnung verwenden exakte Berechnungen mit neun Nachkommastellen.
+
+### Exakte Skalierung und Wertzuordnungen
+
+`{{scaleDecimal payload.count "1/1000"}}` skaliert Dezimalwerte ohne Gleitkomma-Zwischenschritte. Der Faktor kann eine Dezimalzahl oder ein Bruch wie `"5/18"` sein. Das Ergebnis ist Text mit neun Nachkommastellen; bei genau halben Werten wird von null weg gerundet. Mit `precision=2` werden zwei Nachkommastellen verwendet (erlaubter Bereich: 0–18); `min=0` lehnt negative Eingaben vor dem Runden ab.
+
+`{{mapValue payload.kind '{"box":"12","bag":"3"}'}}` sucht einen Wert in einem JSON-Objekt. Leerzeichen an den Schlüsselrändern werden entfernt; `foldCase=true` prüft zuerst den exakten Schlüssel, dann seine Kleinschreibung. Fehlende Zuordnungen führen zu einem Knotenfehler. `{{scaleDecimal payload.count (mapValue payload.kind '{"box":"12","bag":"3"}')}}` rechnet beispielsweise Kisten oder Beutel in einzelne Stücke um.
+
+`{{render "{{#if ready}}{{count}}{{else}}0{{/if}}"}}` wertet eine Vorlagenzeichenkette mit der aktuellen Payload aus. Damit kann eine vollständige Vorlage als Operand einer weiteren Hilfsfunktion dienen. Diese Hilfen funktionieren in allen Vorlagenfeldern und enthalten keine eingebauten Einheitendefinitionen.
 
 ## Die Payload ändern
 
@@ -246,4 +254,4 @@ Beim Beispielwert `42` sendet der Wahr-Zweig `{"temperature":42,"limit":40}`. **
 
 - [Knotentypen](flows/node-types.md) — Einstellungen, Vorlagenunterstützung und Payload-Verhalten aller Core-Knoten
 - [Flow-Editor](flows/flow-editor.md) — Knoten hinzufügen und verbinden
-- [Energiemessung](flows/energy-metering.md) — Zählerwerte lesen und melden
+- [Zähler](flows/energy-metering.md) — Zählerwerte lesen und melden
