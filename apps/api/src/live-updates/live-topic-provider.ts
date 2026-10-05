@@ -10,7 +10,7 @@ export type LiveTopicDefinition =
 /** Feature-owned adapter, registered during module initialization. */
 export interface LiveTopicProvider {
   readonly topics: readonly LiveTopicDefinition[];
-  /** Validate a whole set on every renewal; return rejection reasons by subscription key. */
+  /** Validate on every renewal. Returned reasons are public; thrown exceptions are redacted. */
   authorize?(
     subscriptions: readonly LiveSubscription[],
     user: AuthenticatedUser,

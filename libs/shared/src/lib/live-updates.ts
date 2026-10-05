@@ -5,6 +5,8 @@ export type LiveSubscription =
   | { topic: `plugin:${string}:${string}`; identifier?: string; resourceId?: never };
 
 export type LiveTopic = LiveSubscription['topic'];
+/** A valid same-user credential can recover by opening a new connection. */
+export const LIVE_UPDATES_SESSION_CHANGED = 'LIVE_UPDATES_SESSION_CHANGED';
 export type LiveEnvelope<T = unknown> = LiveSubscription & { eventType: string; payload: T };
 export type LivePacket =
   | { type: 'event'; event: LiveEnvelope }

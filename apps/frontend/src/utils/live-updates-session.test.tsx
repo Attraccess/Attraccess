@@ -5,6 +5,7 @@ import { usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
 import type { LivePacket, LiveSubscription } from '@attraccess/shared';
 import { afterEach, expect, it, vi } from 'vitest';
 import { LiveUpdatesProvider, resumeLiveUpdates, stopLiveUpdates, useLiveUpdates } from './live-updates';
+import { StrictMode } from 'react';
 
 let queryClient: QueryClient;
 
@@ -12,6 +13,7 @@ afterEach(() => {
   cleanup();
   stopLiveUpdates();
   queryClient?.clear();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -120,4 +122,153 @@ it('replaces an active client on same-user login and ignores the former sessionâ
   expect(onUpdate).toHaveBeenCalledExactlyOnceWith({ session: 'B' });
   expect(onPluginUpdate).toHaveBeenCalledExactlyOnceWith({ eventType: 'snapshot', value: { session: 'B' } });
   hook.unmount();
+});
+
+it('recovers cookie rotation without explicit login, retaining queries and only active core/plugin consumers', async () => {
+  vi.useFakeTimers();
+  const streams: Array<ReturnType<typeof stream> & { url: string }> = [];
+  const controls: LiveSubscription[][] = [];
+  let rotated = false;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init: RequestInit) => {
+      if (init.method === 'PUT') {
+        if (rotated && url.includes(streams[0].url.replace('/events', ''))) {
+          return new Response(JSON.stringify({ code: 'LIVE_UPDATES_SESSION_CHANGED' }), { status: 403 });
+        }
+        controls.push(JSON.parse(init.body as string).subscriptions);
+        return new Response(null, { status: 204 });
+      }
+      if (!init.signal) throw new Error('Missing signal');
+      const next = { ...stream(init.signal), url };
+      streams.push(next);
+      return next.response;
+    }),
+  );
+  resumeLiveUpdates();
+  queryClient = new QueryClient();
+  const authenticatedUser = { id: 1 };
+  queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), authenticatedUser);
+  const clear = vi.spyOn(queryClient, 'clear');
+  const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+  const onUpdate = vi.fn();
+  const onPluginUpdate = vi.fn();
+  const hook = renderHook(
+    ({ enabled }) => {
+      usePluginLiveUpdates({ plugin: 'wago', topic: 'diagnostics', identifier: '1', onUpdate: onPluginUpdate });
+      useLiveUpdates({ topic: 'resource', resourceId: 2, enabled, onUpdate: vi.fn() });
+      return useLiveUpdates({ topic: 'billing', onUpdate });
+    },
+    {
+      initialProps: { enabled: true },
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          <LiveUpdatesProvider userId={1}>{children}</LiveUpdatesProvider>
+        </QueryClientProvider>
+      ),
+    },
+  );
+  await act(flush);
+  await act(async () => {
+    streams[0].send({ type: 'ready' });
+    await flush();
+  });
+  rotated = true;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10_000);
+    await flush();
+  });
+  expect(streams[0].signal.aborted).toBe(true);
+  hook.rerender({ enabled: false });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(501);
+    await flush();
+  });
+  expect(streams).toHaveLength(2);
+  expect(streams[1].url).not.toBe(streams[0].url);
+  await act(async () => {
+    streams[1].send({ type: 'ready' });
+    streams[1].send({ type: 'event', event: { topic: 'billing', eventType: 'update', payload: { id: 7 } } });
+    streams[1].send({
+      type: 'event',
+      event: { topic: 'plugin:wago:diagnostics', identifier: '1', eventType: 'snapshot', payload: { value: 8 } },
+    });
+    await flush();
+  });
+  expect(controls.at(-1)).toEqual(
+    expect.arrayContaining([{ topic: 'billing' }, { topic: 'plugin:wago:diagnostics', identifier: '1' }]),
+  );
+  expect(controls.at(-1)).toHaveLength(2);
+  expect(invalidate).toHaveBeenCalledTimes(1);
+  expect(clear).not.toHaveBeenCalled();
+  expect(queryClient.getQueryData(UseUsersServiceGetCurrentKeyFn())).toEqual(authenticatedUser);
+  expect(onUpdate).toHaveBeenCalledExactlyOnceWith({ id: 7 });
+  expect(onPluginUpdate).toHaveBeenCalledExactlyOnceWith({ value: 8 });
+  act(() => stopLiveUpdates());
+  expect(streams[1].signal.aborted).toBe(true);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000);
+    await flush();
+  });
+  expect(streams).toHaveLength(2);
+  hook.unmount();
+});
+
+it('uses one real stream during StrictMode setup and navigation, then synchronously cancels authentication replacement', async () => {
+  const streams: ReturnType<typeof stream>[] = [];
+  const controls: LiveSubscription[][] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      if (init.method === 'PUT') {
+        controls.push(JSON.parse(init.body as string).subscriptions);
+        return new Response(null, { status: 204 });
+      }
+      if (!init.signal) throw new Error('Missing signal');
+      const next = stream(init.signal);
+      streams.push(next);
+      return next.response;
+    }),
+  );
+  resumeLiveUpdates();
+  queryClient = new QueryClient();
+  const update = vi.fn();
+  const hook = renderHook(({ resourceId }) => useLiveUpdates({ topic: 'resource', resourceId, onUpdate: update }), {
+    initialProps: { resourceId: 1 },
+    wrapper: ({ children }) => (
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <LiveUpdatesProvider userId={1}>{children}</LiveUpdatesProvider>
+        </QueryClientProvider>
+      </StrictMode>
+    ),
+  });
+  await act(flush);
+  expect(streams).toHaveLength(1);
+  await act(async () => {
+    streams[0].send({ type: 'ready' });
+    await flush();
+  });
+  hook.rerender({ resourceId: 2 });
+  await act(flush);
+  expect(streams).toHaveLength(1);
+  expect(controls.at(-1)).toEqual([{ topic: 'resource', resourceId: 2 }]);
+  await act(async () => {
+    streams[0].send({
+      type: 'event',
+      event: { topic: 'resource', resourceId: 2, eventType: 'update', payload: { inUse: true } },
+    });
+    await flush();
+  });
+  update.mockClear();
+  await act(async () => {
+    resumeLiveUpdates();
+    expect(streams[0].signal.aborted).toBe(true);
+    await flush();
+  });
+  expect(streams).toHaveLength(2);
+  expect(update).not.toHaveBeenCalled();
+  hook.unmount();
+  await act(flush);
+  expect(streams[1].signal.aborted).toBe(true);
 });

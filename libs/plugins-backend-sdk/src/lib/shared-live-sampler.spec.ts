@@ -96,4 +96,68 @@ describe('shared live sampler', () => {
     reused.unsubscribe();
     expect(jest.getTimerCount()).toBe(0);
   });
+
+  it.each(['resolve', 'reject'] as const)(
+    'guards unfinished reads across recreation until they %s',
+    async (settlement) => {
+      const sample = createSharedLiveSampler<string, number>();
+      let resolve!: (value: number) => void;
+      let reject!: (error: Error) => void;
+      const read = jest
+        .fn(async () => 2)
+        .mockImplementationOnce(
+          () =>
+            new Promise<number>((yes, no) => {
+              resolve = yes;
+              reject = no;
+            }),
+        );
+      const departed = jest.fn();
+      const replacement = jest.fn();
+      const oldSource = sample('device', 1_000, read);
+      const first = oldSource.subscribe(departed);
+      await jest.advanceTimersByTimeAsync(0);
+      first.unsubscribe();
+      expect(jest.getTimerCount()).toBe(0);
+      const next = sample('device', 1_000, read).subscribe(replacement);
+      const reused = oldSource.subscribe(replacement);
+      const otherRead = jest.fn(async () => 3);
+      const other = sample('other', 1_000, otherRead).subscribe();
+      await jest.advanceTimersByTimeAsync(2_000);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(otherRead).toHaveBeenCalledTimes(3);
+      if (settlement === 'resolve') resolve(1);
+      else reject(new Error('private device password'));
+      await jest.advanceTimersByTimeAsync(0);
+      expect(departed).not.toHaveBeenCalled();
+      expect(replacement).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1_000);
+      expect(read).toHaveBeenCalledTimes(2);
+      expect(replacement.mock.calls).toEqual([
+        [{ data: { eventType: 'snapshot', value: 2 } }],
+        [{ data: { eventType: 'snapshot', value: 2 } }],
+      ]);
+      next.unsubscribe();
+      reused.unsubscribe();
+      other.unsubscribe();
+      expect(jest.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('releases the guard after a synchronous read failure', async () => {
+    const sample = createSharedLiveSampler<string, number>();
+    const read = jest
+      .fn(async () => 2)
+      .mockImplementationOnce(() => {
+        throw new Error('private');
+      });
+    const next = jest.fn();
+    const sub = sample('device', 1_000, read).subscribe(next);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(next).toHaveBeenLastCalledWith({ data: { eventType: 'unavailable' } });
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(next).toHaveBeenLastCalledWith({ data: { eventType: 'snapshot', value: 2 } });
+    sub.unsubscribe();
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });

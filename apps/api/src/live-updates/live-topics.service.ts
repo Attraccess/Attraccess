@@ -4,6 +4,13 @@ import { LiveSubscription, LiveTopic, liveSubscriptionKey } from '@attraccess/sh
 import { LiveTopicProvider } from './live-topic-provider';
 import { LiveTopicSchema, liveSubscriptionSchema } from './live-updates.schemas';
 
+/** Only validation performed here supplies approved public exception text. */
+export class LiveTopicValidationException extends BadRequestException {
+  constructor(readonly reason: 'Invalid topic' | 'Unsupported topic') {
+    super(reason);
+  }
+}
+
 @Injectable()
 export class LiveTopicsService {
   private readonly logger = new Logger(LiveTopicsService.name);
@@ -33,11 +40,11 @@ export class LiveTopicsService {
 
   parse(value: unknown): LiveSubscription {
     const topic = LiveTopicSchema.safeParse(value);
-    if (!topic.success) throw new BadRequestException('Invalid topic');
+    if (!topic.success) throw new LiveTopicValidationException('Invalid topic');
     const registration = this.providers.get(topic.data.topic);
-    if (!registration) throw new BadRequestException('Unsupported topic');
+    if (!registration) throw new LiveTopicValidationException('Unsupported topic');
     const subscription = registration.schema.safeParse(value);
-    if (!subscription.success) throw new BadRequestException('Invalid topic');
+    if (!subscription.success) throw new LiveTopicValidationException('Invalid topic');
     return subscription.data;
   }
 
@@ -60,9 +67,9 @@ export class LiveTopicsService {
           const key = liveSubscriptionKey(subscription);
           if (reasons?.has(key)) rejected.set(key, reasons.get(key));
         }
-      } catch (error) {
+      } catch {
         // An unavailable provider must not interrupt authorized topics from another feature.
-        for (const subscription of group) rejected.set(liveSubscriptionKey(subscription), error.message);
+        for (const subscription of group) rejected.set(liveSubscriptionKey(subscription), 'Topic unavailable');
       }
     }
     return rejected;

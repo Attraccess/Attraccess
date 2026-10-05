@@ -1,9 +1,16 @@
-import { LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
+import {
+  LIVE_UPDATES_SESSION_CHANGED,
+  LiveEnvelope,
+  LivePacket,
+  LiveSubscription,
+  liveSubscriptionKey,
+} from '@attraccess/shared';
 import { events } from 'fetch-event-stream';
 import { v4 as uuidv4 } from 'uuid';
 
-type Consumer = { update: (payload: unknown) => void; restore?: () => void };
-type Entry = { subscription: LiveSubscription; consumers: Set<Consumer> };
+type Consumer = { update: (payload: unknown) => void; restore?: () => void; deliveries: number };
+type ResourceState = { resourceId: number; inUse: boolean; timestamp?: string };
+type Entry = { subscription: LiveSubscription; consumers: Set<Consumer>; snapshot?: ResourceState; rejected?: boolean };
 interface Transport {
   id: string;
   abort: AbortController;
@@ -23,9 +30,10 @@ export class LiveUpdateClient {
   private failures = 0;
   private disposed = false;
   private connected = false;
+  private reconciliationPending = false;
   private readonly visibilityChange = () => {
     const transport = this.transport;
-    if (!transport || !this.topics.has('notifications:')) return;
+    if (!transport || !this.topics.get('notifications:')?.consumers.size) return;
     transport.dirty = true;
     void this.sync(transport);
   };
@@ -40,44 +48,117 @@ export class LiveUpdateClient {
     if (this.disposed) return () => undefined;
     const key = liveSubscriptionKey(subscription);
     let entry = this.topics.get(key);
-    const isNewTopic = !entry;
+    const isNewTopic = !entry?.consumers.size;
     if (!entry) {
       entry = { subscription, consumers: new Set() };
       this.topics.set(key, entry);
     }
-    const consumer = { update, restore };
+    const consumer = { update, restore, deliveries: 0 };
     entry.consumers.add(consumer);
-    if (isNewTopic) this.changed();
+    this.replay(entry, consumer);
+    if (isNewTopic || entry.rejected) this.changed();
     let removed = false;
     return () => {
       if (removed) return;
       removed = true;
       entry.consumers.delete(consumer);
       if (entry.consumers.size === 0 && this.topics.get(key) === entry) {
-        this.topics.delete(key);
         this.changed();
       }
     };
   }
 
   private changed(): void {
-    if (!this.topics.size) {
-      this.stop();
-      return;
-    }
-    if (!this.transport && !this.retry) this.start();
     if (this.transport) {
       this.transport.revision++;
       this.transport.dirty = true;
-      // Coalesce React mount/cleanup bursts into one authoritative topic set.
-      queueMicrotask(() => {
+    }
+    if (this.reconciliationPending) return;
+    this.reconciliationPending = true;
+    // Keep the stream and same-key snapshot through React cleanup/setup bursts.
+    queueMicrotask(() => {
+      this.reconciliationPending = false;
+      if (this.disposed) return;
+      for (const [key, entry] of this.topics) {
+        if (!entry.consumers.size) this.topics.delete(key);
+      }
+      if (!this.hasConsumers()) this.stop();
+      else {
+        if (!this.transport && !this.retry) this.start();
         if (this.transport) void this.sync(this.transport);
-      });
+      }
+    });
+  }
+
+  private hasConsumers(): boolean {
+    return [...this.topics.values()].some((entry) => entry.consumers.size > 0);
+  }
+
+  private replay(entry: Entry, consumer: Consumer): void {
+    const snapshot = entry.snapshot;
+    const transport = this.transport;
+    if (!snapshot || !transport) return;
+    queueMicrotask(() => {
+      if (
+        this.isCurrent(transport) &&
+        this.topics.get(liveSubscriptionKey(entry.subscription)) === entry &&
+        entry.consumers.has(consumer) &&
+        entry.snapshot === snapshot &&
+        consumer.deliveries === 0
+      ) {
+        consumer.deliveries++;
+        this.invoke(() => consumer.update({ ...snapshot }));
+      }
+    });
+  }
+
+  private deliver(event: LiveEnvelope, transport: Transport): void {
+    const entry = this.topics.get(liveSubscriptionKey(event));
+    if (!entry?.consumers.size) return;
+    entry.rejected = false;
+    const payload = event.payload;
+    if (
+      event.topic === 'resource' &&
+      payload &&
+      typeof payload === 'object' &&
+      'inUse' in payload &&
+      typeof payload.inUse === 'boolean'
+    ) {
+      entry.snapshot = {
+        resourceId: event.resourceId,
+        inUse: payload.inUse,
+        ...('timestamp' in payload && typeof payload.timestamp === 'string' ? { timestamp: payload.timestamp } : {}),
+      };
+    }
+    entry.consumers.forEach((consumer) => {
+      if (this.isCurrent(transport) && entry.consumers.has(consumer)) {
+        consumer.deliveries++;
+        this.invoke(() => consumer.update(payload));
+      }
+    });
+  }
+
+  private reject(subscription: unknown): void {
+    if (
+      !subscription ||
+      typeof subscription !== 'object' ||
+      !('topic' in subscription) ||
+      typeof subscription.topic !== 'string'
+    )
+      return;
+    const entry = this.topics.get(liveSubscriptionKey(subscription as LiveSubscription));
+    if (entry) {
+      entry.snapshot = undefined;
+      entry.rejected = true;
     }
   }
 
+  private isCurrent(transport: Transport): boolean {
+    return this.transport === transport && !this.disposed && !transport.abort.signal.aborted;
+  }
+
   private start(): void {
-    if (this.disposed || !this.topics.size || this.transport) return;
+    if (this.disposed || !this.hasConsumers() || this.transport) return;
     const transport: Transport = {
       // uuid falls back to getRandomValues on supported plain-HTTP deployments.
       id: uuidv4(),
@@ -107,14 +188,14 @@ export class LiveUpdateClient {
         credentials: 'include',
         signal: transport.abort.signal,
       });
-      if (this.transport !== transport || this.disposed) return;
+      if (!this.isCurrent(transport)) return;
       if (response.status === 401 || response.status === 403) {
         this.expire();
         return;
       }
       if (!response.ok) throw new Error(`Live stream returned ${response.status}`);
       for await (const message of events(response, transport.abort.signal)) {
-        if (this.transport !== transport || this.disposed) return;
+        if (!this.isCurrent(transport)) return;
         transport.lastPacket = Date.now();
         let packet: LivePacket;
         try {
@@ -125,7 +206,7 @@ export class LiveUpdateClient {
         if (packet.type === 'ready') {
           transport.ready = true;
           await this.sync(transport);
-          if (this.transport !== transport || transport.abort.signal.aborted) return;
+          if (!this.isCurrent(transport)) return;
           if (this.connected) {
             this.invoke(this.recovered);
             this.topics.forEach((entry) => entry.consumers.forEach((c) => this.invoke(c.restore)));
@@ -135,29 +216,28 @@ export class LiveUpdateClient {
           // A healthy stream resets the exponential delay; a briefly opened stream does not.
           this.failures = 0;
         } else if (packet.type === 'event') {
-          const entry = this.topics.get(liveSubscriptionKey(packet.event));
-          entry?.consumers.forEach((consumer) => {
-            if (this.transport === transport && entry.consumers.has(consumer)) {
-              this.invoke(() => consumer.update(packet.event.payload));
-            }
-          });
+          this.deliver(packet.event, transport);
         } else if (packet.type === 'rejected') {
+          this.reject(packet.subscription);
           console.warn('[Live updates] Topic rejected:', packet.subscription, packet.reason);
         }
       }
     } catch (error) {
       if (!transport.abort.signal.aborted) console.warn('[Live updates] Stream interrupted:', error);
     } finally {
-      if (this.transport === transport) {
-        this.stopTransport();
-        if (!this.disposed && this.topics.size) {
-          const delay = Math.min(30_000, 500 * 2 ** Math.min(this.failures++, 6)) * (0.75 + Math.random() * 0.25);
-          this.retry = setTimeout(() => {
-            this.retry = undefined;
-            this.start();
-          }, delay);
-        }
-      }
+      this.reconnect(transport);
+    }
+  }
+
+  private reconnect(transport: Transport): void {
+    if (this.transport !== transport) return;
+    this.stopTransport();
+    if (!this.disposed && this.hasConsumers()) {
+      const delay = Math.min(30_000, 500 * 2 ** Math.min(this.failures++, 6)) * (0.75 + Math.random() * 0.25);
+      this.retry = setTimeout(() => {
+        this.retry = undefined;
+        this.start();
+      }, delay);
     }
   }
 
@@ -176,10 +256,21 @@ export class LiveUpdateClient {
           body: JSON.stringify({
             revision: transport.revision,
             present: document.visibilityState === 'visible',
-            subscriptions: [...this.topics.values()].map((entry) => entry.subscription),
+            subscriptions: [...this.topics.values()]
+              .filter((entry) => entry.consumers.size)
+              .map((entry) => entry.subscription),
           }),
         });
-        if (this.transport !== transport) return;
+        if (!this.isCurrent(transport)) return;
+        if (response.status === 403) {
+          const body: unknown = await response.json().catch(() => null);
+          // Reading an error body can finish after logout or transport replacement.
+          if (!this.isCurrent(transport)) return;
+          if (body && typeof body === 'object' && 'code' in body && body.code === LIVE_UPDATES_SESSION_CHANGED) {
+            this.reconnect(transport);
+            return;
+          }
+        }
         if (response.status === 401 || response.status === 403) {
           this.expire();
           return;
@@ -187,7 +278,7 @@ export class LiveUpdateClient {
         if (!response.ok) throw new Error(`Live subscriptions returned ${response.status}`);
       }
     } catch {
-      transport.abort.abort();
+      this.reconnect(transport);
     } finally {
       transport.syncing = false;
     }
@@ -210,6 +301,9 @@ export class LiveUpdateClient {
     document.removeEventListener('visibilitychange', this.visibilityChange);
     clearInterval(this.timer);
     this.timer = undefined;
+    this.topics.forEach((entry) => {
+      entry.snapshot = undefined;
+    });
   }
 
   private stop(): void {

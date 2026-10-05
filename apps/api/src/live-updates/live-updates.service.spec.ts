@@ -4,6 +4,7 @@ import { Subject } from 'rxjs';
 import { LiveTopicsService } from './live-topics.service';
 import { LiveUpdatesService } from './live-updates.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
+import { ForbiddenException } from '@nestjs/common';
 
 const id = '00000000-0000-4000-8000-000000000001';
 const user = { id: 1, jwtTokenId: 'session-a', effectivePermissions: new Set() } as AuthenticatedUser;
@@ -132,9 +133,72 @@ describe('bundled server lifecycle', () => {
   it('rejects cross-user and cross-session controls without changing delivery', async () => {
     service.open(id, user).subscribe();
     await service.update(id, user, body([{ topic: 'billing' }]));
-    expect(() => service.update(id, { ...user, id: 2 }, body([]))).toThrow('another session');
-    expect(() => service.update(id, { ...user, jwtTokenId: 'other' }, body([]))).toThrow('another session');
+    for (const [requestUser, expectedCode] of [
+      [{ ...user, id: 2 }, undefined],
+      [{ ...user, jwtTokenId: 'other' }, 'LIVE_UPDATES_SESSION_CHANGED'],
+    ] as const) {
+      try {
+        service.update(id, requestUser, body([]));
+        throw new Error('Control unexpectedly accepted');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect(error.getStatus()).toBe(403);
+        expect(error.getResponse().code).toBe(expectedCode);
+        expect(JSON.stringify(error.getResponse())).not.toContain('session-a');
+      }
+    }
     expect(source.observed).toBe(true);
+    expect(authorize).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['sync', new Error('secret source credential')],
+    ['async', new ForbiddenException('secret source credential')],
+    ['sync', 'secret source credential'],
+    ['async', { message: 'secret source credential' }],
+  ])('redacts %s source creation failures and keeps independent topics alive', async (mode, error) => {
+    service.open(id, user).subscribe(({ data }) => packets.push(data));
+    sourceFor.mockImplementation((subscription: LiveSubscription) => {
+      if (subscription.topic === 'billing') {
+        if (mode === 'sync') throw error;
+        return Promise.reject(error);
+      }
+      return source.asObservable();
+    });
+    await service.update(id, user, body([{ topic: 'billing' }, { topic: 'messaging' }]));
+    source.next({ data: { id: 5 } });
+    expect(packets).toContainEqual({
+      type: 'rejected',
+      subscription: { topic: 'billing' },
+      reason: 'Topic unavailable',
+    });
+    expect(packets).toContainEqual({
+      type: 'event',
+      event: { topic: 'messaging', eventType: 'update', payload: { id: 5 } },
+    });
+    expect(JSON.stringify(packets)).not.toContain('secret');
+  });
+
+  it('redacts unexpected parse failures while preserving known public validation and business reasons', async () => {
+    service.open(id, user).subscribe(({ data }) => packets.push(data));
+    jest.spyOn(topics, 'parse').mockImplementationOnce(() => {
+      throw new ForbiddenException('secret parse credential');
+    });
+    authorize.mockResolvedValueOnce(new Map([['resource:2', 'Resource not found']]));
+    await service.update(id, user, {
+      revision: 0,
+      subscriptions: [
+        { topic: 'billing' },
+        { topic: 'resource', resourceId: -1 },
+        { topic: 'resource', resourceId: 2 },
+      ],
+    });
+    expect(packets.filter((p) => p.type === 'rejected').map((p) => p.reason)).toEqual([
+      'Topic unavailable',
+      'Invalid topic',
+      'Resource not found',
+    ]);
+    expect(JSON.stringify(packets)).not.toContain('secret');
   });
 
   it('retains authorized subscriptions in a mixed set and revokes forbidden ones on renewal', async () => {

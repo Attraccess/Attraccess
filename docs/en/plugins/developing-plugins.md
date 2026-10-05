@@ -765,5 +765,11 @@ Use the backend SDK's `context.liveUpdates.register` and the frontend SDK's
 `usePluginLiveUpdates<T>` to share the host's authenticated live connection.
 Declare plugin-local topics, validate identifiers and authorize every subscription
 on the backend; do not open a separate SSE or WebSocket for plugin UI updates.
+Authorization and source exceptions are redacted by the host. With
+`createSharedLiveSampler`, a pending read keeps its per-key guard until settlement
+even after final unsubscribe; recreated consumers receive fresh samples.
+The host recovers valid same-user credential rotation without clearing queries
+and retains the stream across same-batch cleanup/setup. Plugin event payloads
+have no local replay.
 See [Plugin live updates](../../development/live-updates.md#plugin-live-updates)
 for the contract and examples, including reconnection and cleanup.

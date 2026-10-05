@@ -1,4 +1,4 @@
-import { catchError, defer, exhaustMap, finalize, map, Observable, of, shareReplay, timer } from 'rxjs';
+import { catchError, defer, EMPTY, exhaustMap, finalize, map, Observable, of, shareReplay, timer } from 'rxjs';
 
 export type LiveSample<Value> = {
   data: { eventType: 'snapshot'; value: Value } | { eventType: 'unavailable' };
@@ -7,6 +7,8 @@ export type LiveSample<Value> = {
 /** Share status reads per key until the final subscriber leaves. */
 export function createSharedLiveSampler<Key, Value = unknown>() {
   const sources = new Map<Key, Observable<LiveSample<Value>>>();
+  // Unsubscribing cannot cancel a device Promise. Keep only its guard until it settles.
+  const inFlight = new Set<Key>();
 
   return (key: Key, intervalMs: number, read: () => Promise<Value>): Observable<LiveSample<Value>> =>
     defer(() => {
@@ -15,7 +17,13 @@ export function createSharedLiveSampler<Key, Value = unknown>() {
         source = timer(0, intervalMs).pipe(
           // Skip ticks while a read is pending; failures allow the next tick to recover.
           exhaustMap(() =>
-            defer(read).pipe(
+            defer(() => {
+              if (inFlight.has(key)) return EMPTY;
+              inFlight.add(key);
+              return Promise.resolve()
+                .then(read)
+                .finally(() => inFlight.delete(key));
+            }).pipe(
               map((value): LiveSample<Value> => ({ data: { eventType: 'snapshot', value } })),
               // Device errors may contain credentials, so only expose availability.
               catchError(() => of<LiveSample<Value>>({ data: { eventType: 'unavailable' } })),

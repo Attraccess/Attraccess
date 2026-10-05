@@ -6,12 +6,12 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import { LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
+import { LIVE_UPDATES_SESSION_CHANGED, LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
 import { Observable, Subscriber, Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { Mutex } from 'async-mutex';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
-import { LiveTopicsService } from './live-topics.service';
+import { LiveTopicsService, LiveTopicValidationException } from './live-topics.service';
 import { LiveConnectionIdSchema, LiveSubscriptionSetSchema } from './live-updates.schemas';
 
 interface Connection {
@@ -68,8 +68,11 @@ export class LiveUpdatesService implements OnModuleDestroy {
   update(id: string, user: AuthenticatedUser, body: unknown): Promise<void> {
     const connection = this.connections.get(id);
     if (!connection) throw new NotFoundException('Live connection not found');
-    if (connection.userId !== user.id || connection.tokenId !== user.jwtTokenId) {
-      throw new ForbiddenException('Live connection belongs to another session');
+    if (connection.userId !== user.id) {
+      throw new ForbiddenException('Live connection belongs to another user');
+    }
+    if (connection.tokenId !== user.jwtTokenId) {
+      throw new ForbiddenException({ code: LIVE_UPDATES_SESSION_CHANGED, message: 'Live connection session changed' });
     }
     const parsed = LiveSubscriptionSetSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('Invalid subscription set');
@@ -94,7 +97,8 @@ export class LiveUpdatesService implements OnModuleDestroy {
         const subscription = this.topics.parse(value);
         wanted.set(liveSubscriptionKey(subscription), subscription);
       } catch (error) {
-        connection.subscriber.next({ data: { type: 'rejected', subscription: value, reason: error.message } });
+        const reason = error instanceof LiveTopicValidationException ? error.reason : 'Topic unavailable';
+        connection.subscriber.next({ data: { type: 'rejected', subscription: value, reason } });
       }
     }
     // Providers validate their whole set per renewal, retaining domain-owned batching.
@@ -138,8 +142,8 @@ export class LiveUpdatesService implements OnModuleDestroy {
             },
           });
         if (!sub.closed) connection.topics.set(key, { subscription, observer: sub });
-      } catch (error) {
-        connection.subscriber.next({ data: { type: 'rejected', subscription, reason: error.message } });
+      } catch {
+        connection.subscriber.next({ data: { type: 'rejected', subscription, reason: 'Topic unavailable' } });
       }
     }
     if (present !== undefined) {

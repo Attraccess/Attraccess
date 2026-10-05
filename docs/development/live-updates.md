@@ -17,6 +17,13 @@ flow logs, billing transactions, messages, system notifications and supervision
 requests retain their domain shapes inside a shared typed topic/event envelope.
 Heartbeat, readiness and rejection packets never enter feature callbacks.
 
+Departing callbacks are removed immediately. Subscription reconciliation and
+final-consumer teardown share a microtask boundary, so cleanup/setup within the
+same React lifecycle batch retains the physical connection, including StrictMode
+and same-key remounts. Still-empty entries are then pruned; genuine final cleanup
+aborts the stream and releases retries, timers and the visibility listener.
+Logout and explicit disposal remain synchronous.
+
 The six topics are `resource`, `flow-logs`, `billing`, `messaging`,
 `notifications` and `supervision`. The server validates positive, safe integer
 resource IDs and resource existence; flow logs require `resources.update`.
@@ -24,8 +31,16 @@ Resource existence is checked in one query over unique IDs per set/lease renewal
 session permissions are revalidated for every topic on each renewal.
 User topics always use the authenticated user, and supervision events are
 restricted to the user explicitly selected as supervisor. Connections bind to
-both user and a hash of the authenticated session credential. Controls cannot address another user's/session's
-stream. Invalid/forbidden topics are rejected individually, retaining authorized
+both user and a hash of the authenticated session credential. Cross-user controls
+are forbidden. If a valid authenticated control belongs to the same user but its
+credential hash changed, it returns HTTP 403 with JSON code
+`LIVE_UPDATES_SESSION_CHANGED`, without applying the control to the old stream.
+Only that explicit control-response code triggers recovery with a fresh connection
+ID under current credentials, retaining active subscriptions and authenticated
+query state. Stream authentication failures and ordinary control 401/403 responses
+expire the client. Error-body reads retain transport/authentication ownership
+checks, so late responses cannot expire or recover a replacement context.
+Invalid/forbidden topics are rejected individually, retaining authorized
 topics. Each set is limited to 256 topics. Monotonic revisions and serialized
 updates prevent an older set from overwriting a newer navigation state.
 
@@ -38,7 +53,17 @@ removed topics stay removed. After restoration, active React Query state is
 invalidated once by the host to recover persisted updates missed during interruption.
 Core and plugin consumers must not repeat this query invalidation in
 `onReconnect`; reserve that callback for state outside React Query.
-Resource subscriptions additionally receive their own initial in-use state.
+Resource sources additionally receive authoritative initial in-use state. The
+client retains only resource in-use snapshots and delivers a state-shaped
+`{ resourceId, inUse, timestamp? }` payload to each late local consumer. The
+resource ID comes from the envelope; historical event names and usage data are
+not replayed. Health-only packets preserve the snapshot. Pending initial reads
+are shared; joining after a rejection requests a batched renewal on the same
+stream. Replay checks consumer, entry and transport ownership and is suppressed
+if a live packet already reached the consumer. Same-batch remounts can reuse a
+snapshot; genuine removal, rejection, interruption/recovery and authentication
+replacement clear it. Other topics have no local replay. Delayed server initial
+results cannot override a newer in-use event or deliver after disconnect.
 Nonpersisted notifications and supervision events have no durable replay.
 
 Messaging subscriptions retain online presence. Notification controls report
@@ -89,6 +114,13 @@ while other providers continue. `ResourceLiveTopicsProvider` owns both resource
 and flow-log topics, keeping resource existence validation in one shared query
 and rechecking flow-log permissions on every renewal.
 
+Authorization-map reasons are intentional public business messages (for example
+`Forbidden` or `Resource not found`); providers must keep secrets out of them.
+Unexpected authorization exceptions, synchronous/asynchronous source-creation
+exceptions and observable errors expose only `Topic unavailable`, including
+arbitrary `Error`, `HttpException` and non-Error throws. Only the registry's own
+subscription-validation exceptions expose its fixed validation reasons.
+
 `source` returns an Observable (or a promise of one) wrapping the existing
 producer. Allocate subjects lazily and release them on RxJS finalization.
 The optional `setPresence` hook receives visibility controls for active topics
@@ -127,7 +159,7 @@ The source is an RxJS `Observable<{ data: object }>`; `data.eventType` (or
 stop work when unsubscribed. Registration returns an idempotent unregister
 function that completes active sources. The host also removes a plugin's
 registrations at module teardown. Duplicate ownership fails; other plugins and
-core subscriptions continue independently. Authorization errors are redacted.
+core subscriptions continue independently. Authorization and source errors are redacted.
 User-specific sources must derive identity from the supplied authenticated user.
 
 The wire topic is `plugin:<encoded manifest name>:<local topic>`, with an optional
@@ -162,7 +194,11 @@ Plugins that sample status can import `createSharedLiveSampler` from the backend
 SDK. Create one sampler per service, then call it with a key, interval in
 milliseconds and an asynchronous read function. It shares reads for that key,
 replays the latest sample to new subscribers, skips overlapping reads and
-releases its source when the final subscriber leaves. Reads emit
+releases its source, replay buffer and timers when the final subscriber leaves.
+A per-key in-flight guard survives teardown until an uncancellable read actually
+settles. A recreated source skips that key while busy, then samples afresh on an
+eligible tick; abandoned results/errors are never delivered to its consumers.
+Other keys remain independent. Reads emit
 `{ data: { eventType: 'snapshot', value } }`; failures emit
 `{ data: { eventType: 'unavailable' } }` without exposing device errors.
 

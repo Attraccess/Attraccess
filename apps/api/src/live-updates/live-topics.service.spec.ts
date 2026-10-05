@@ -134,7 +134,7 @@ describe('live topic provider registry', () => {
     await expect(service.authorize(subscriptions, user)).resolves.toEqual(
       new Map([
         ['flow-logs:1', 'Forbidden'],
-        ['billing:', 'Unavailable'],
+        ['billing:', 'Topic unavailable'],
       ]),
     );
     expect(resourceAuthorization).toHaveBeenCalledTimes(1);
@@ -142,6 +142,23 @@ describe('live topic provider registry', () => {
     await service.authorize(subscriptions, user);
     expect(resourceAuthorization).toHaveBeenCalledTimes(2);
   });
+
+  it.each([new Error('sensitive credential'), 'sensitive credential', { message: 'sensitive credential' }])(
+    'redacts unexpected authorization throws: %j',
+    async (error) => {
+      const service = new LiveTopicsService();
+      service.register({
+        topics: [{ topic: 'billing', scope: 'user' }],
+        authorize: () => {
+          throw error;
+        },
+        source: () => new Subject(),
+      });
+      const rejected = await service.authorize([{ topic: 'billing' }], user);
+      expect([...rejected]).toEqual([['billing:', 'Topic unavailable']]);
+      expect(JSON.stringify([...rejected])).not.toContain('sensitive');
+    },
+  );
 
   it('dispatches presence to whichever provider owns the topic', () => {
     const service = new LiveTopicsService();

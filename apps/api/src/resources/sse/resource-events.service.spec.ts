@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
-import { Resource } from '@attraccess/database-entities';
+import { Resource, ResourceUsage } from '@attraccess/database-entities';
 import { ResourceEventsService } from './resource-events.service';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 
 describe('resource initial state and subject cleanup', () => {
   it('delivers initial state only to the new consumer and releases the subject immediately', async () => {
@@ -42,6 +43,34 @@ describe('resource initial state and subject cleanup', () => {
     resolve({ usages: [] });
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(callback).not.toHaveBeenCalled();
+    expect(service['resourceSubjects'].size).toBe(0);
+  });
+
+  it('does not let a delayed initial read override a newer usage event', async () => {
+    let resolve!: (value: unknown) => void;
+    const repository = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce({ id: 1 })
+        .mockReturnValueOnce(
+          new Promise((r) => {
+            resolve = r;
+          }),
+        ),
+    };
+    const service = new ResourceEventsService(repository as unknown as Repository<Resource>);
+    const callback = jest.fn();
+    const sub = (await service.subscribeResource(1)).subscribe(callback);
+    const usage = new ResourceUsage();
+    usage.resource = Object.assign(new Resource(), { id: 1 });
+    service.handleResourceUsage(new ResourceSessionStartedEvent(usage));
+    resolve({ usages: [] });
+    await new Promise<void>((done) => setImmediate(done));
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith({
+      data: expect.objectContaining({ inUse: true, eventType: ResourceSessionStartedEvent.EVENT_NAME }),
+    });
+    sub.unsubscribe();
     expect(service['resourceSubjects'].size).toBe(0);
   });
 });

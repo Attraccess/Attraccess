@@ -281,5 +281,12 @@ im Frontend-SDK nutzen Plugins dieselbe authentifizierte Live-Verbindung wie der
 Host. Themen werden pro Plugin registriert; Kennungen und Berechtigungen müssen
 im Backend bei jeder Anmeldung und Erneuerung geprüft werden. Für UI-Updates ist
 keine eigene SSE- oder WebSocket-Verbindung nötig.
+Der Host gibt Ausnahmen aus Autorisierung und Quellen nicht an den Browser weiter.
+Bei `createSharedLiveSampler` bleibt die Sperre pro Kennung bis zum Abschluss
+einer laufenden Abfrage bestehen, auch nach dem letzten Abmelden; neue Verbraucher
+erhalten frische Werte. Der Host stellt die Verbindung bei gültigem
+Sitzungswechsel desselben Benutzers ohne Löschen des Abfragecaches wieder her und
+behält sie bei Abmelden/Anmelden im selben React-Batch. Plugin-Ereignisse werden
+lokal nicht erneut zugestellt.
 Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
 beschreibt auch Wiederverbindung und Freigabe von Abonnements.
