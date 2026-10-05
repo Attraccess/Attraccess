@@ -4,6 +4,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   FieldError,
   Input,
   Label,
@@ -102,7 +103,7 @@ export function CreateResourceDrawer({
       }}
     >
       <DrawerHeader>
-        <h2 className="text-lg font-semibold">{t('title')}</h2>
+        <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
       </DrawerHeader>
       <DrawerBody className="flex flex-col gap-6">
         <TextField

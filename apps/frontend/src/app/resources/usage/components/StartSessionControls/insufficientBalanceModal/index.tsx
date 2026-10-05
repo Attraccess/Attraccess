@@ -23,6 +23,7 @@ export function InsufficientBalanceModal(props: Props) {
         if (!open) onClose();
       }}
       size="md"
+      dialogProps={{ 'aria-label': t('title') }}
     >
       {() => (
         <BillingDashboardTopupCard

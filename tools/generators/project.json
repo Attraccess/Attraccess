@@ -12,6 +12,15 @@
     "plugins-frontend-sdk"
   ],
   "targets": {
+    "test": {
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        { "externalDependencies": ["jest"] }
+      ]
+    },
     "build": {
       "executor": "@nx/js:tsc",
       "dependsOn": [],

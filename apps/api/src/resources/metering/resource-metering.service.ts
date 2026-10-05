@@ -10,7 +10,7 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import {
   ResourceMeter,
   ResourceFlowEdge,
@@ -95,6 +95,7 @@ export class ResourceMeteringService implements OnModuleInit {
         name: m.name,
         creditsPerUnit: m.creditsPerUnit,
       }));
+    const initializedMeters = new Set<number>();
     try {
       for (const meter of meters) {
         const definition = await this.getDefinition(input.resourceId, meter.meterId);
@@ -115,6 +116,9 @@ export class ResourceMeteringService implements OnModuleInit {
           collectionMode: definition.incrementOnly ? 'increment' : 'requested',
           latestValue: definition.incrementOnly ? '0' : null,
         });
+        // Once initialization is issued, the device may reset even without a reply.
+        // Meters whose branches have not run retain their outgoing boundary evidence.
+        initializedMeters.add(meter.meterId);
         if (!definition.incrementOnly) {
           try {
             await this.runOperation(session, 'start', {
@@ -140,9 +144,9 @@ export class ResourceMeteringService implements OnModuleInit {
       }
     } catch (error) {
       await this.sessions.delete({ usageId: input.usageId });
-      if (input.supersedes !== undefined)
+      if (input.supersedes !== undefined && initializedMeters.size)
         await this.sessions.update(
-          { usageId: input.supersedes },
+          { usageId: input.supersedes, meterId: In([...initializedMeters]) },
           {
             compromisedReason: 'The meter was re-initialized by a takeover that did not complete',
           },

@@ -29,6 +29,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   useFilter,
   useOverlayState,
 } from '@heroui/react';
@@ -103,7 +104,9 @@ function MobileValueFilter({
         {label}
       </Button>
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen} contentProps={{ placement: 'bottom' }}>
-        <DrawerHeader>{ariaLabel}</DrawerHeader>
+        <DrawerHeader>
+          <DrawerHeading>{ariaLabel}</DrawerHeading>
+        </DrawerHeader>
         <DrawerBody className="flex flex-col gap-3">
           <SearchField value={query} onChange={setQuery} autoFocus aria-label={ariaLabel}>
             <SearchField.Group>

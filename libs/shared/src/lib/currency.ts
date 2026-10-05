@@ -14,6 +14,33 @@ export function toExactCredits(credits: number): bigint {
   return BigInt(credits);
 }
 
+/** Format integer credits without rounding cents through a major-unit Number. */
+export function formatCredits(
+  amount: number,
+  minorUnit: number,
+  options: { locale?: string; useGrouping?: boolean; minimumFractionDigits?: number } = {},
+): string {
+  if (!Number.isInteger(minorUnit) || minorUnit < 0 || minorUnit > 20)
+    throw new RangeError('Invalid currency minor unit');
+  const { locale = 'en', useGrouping = true, minimumFractionDigits = 0 } = options;
+  const credits = toExactCredits(amount);
+  const scale = BigInt('1' + '0'.repeat(minorUnit));
+  const whole = credits / scale;
+  const remainder = credits < BigInt(0) ? -(credits % scale) : credits % scale;
+  const fraction = minorUnit
+    ? remainder.toString().padStart(minorUnit, '0').replace(/0+$/, '').padEnd(minimumFractionDigits, '0')
+    : '';
+  const formatter = new Intl.NumberFormat(locale, { useGrouping, maximumFractionDigits: 0 });
+  // Negative amounts smaller than one major unit still need their minus sign.
+  const parts = formatter.formatToParts(credits < BigInt(0) && whole === BigInt(0) ? -0 : whole);
+  if (fraction) {
+    const decimal = new Intl.NumberFormat(locale).formatToParts(1.1).find((part) => part.type === 'decimal');
+    const position = parts.map((part) => part.type).lastIndexOf('integer') + 1;
+    parts.splice(position, 0, { type: 'decimal', value: decimal?.value ?? '.' }, { type: 'fraction', value: fraction });
+  }
+  return parts.map((part) => part.value).join('');
+}
+
 /** Round the discount half towards positive infinity, matching resource settlement. */
 export function applyBillingFactor(gross: bigint, factor: number): { amount: number; discount: number } {
   if (!Number.isFinite(factor) || factor < 0) throw new RangeError('Invalid billing factor');

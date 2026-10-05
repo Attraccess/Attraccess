@@ -63,7 +63,8 @@ export class MeteringReadings {
         if (
           existing.meterId === meterId &&
           existing.reportedValue === toMeterValue(report.value).toString() &&
-          existing.readingMode === (report.mode ?? 'total')
+          existing.readingMode === (report.mode ?? 'total') &&
+          this.matchesEvidence(existing, report)
         )
           return;
         throw new MeteringOperationError('A conflicting reading was already recorded for this flow node');
@@ -87,6 +88,18 @@ export class MeteringReadings {
     };
     if (transactionManager) await work(transactionManager);
     else await runSerializedTransaction(this.manager, work);
+  }
+
+  private matchesEvidence(
+    operation: ResourceMeteringOperation,
+    report: Extract<MeteringReport, { kind: 'reading' }>,
+  ): boolean {
+    // Omitted timestamps reuse the original server observation on an idempotent retry.
+    // Explicit observations and sources must agree with the persisted evidence.
+    return (
+      (operation.source ?? null) === (report.source ?? null) &&
+      (report.observedAt === undefined || new Date(report.observedAt).getTime() === operation.observedAt?.getTime())
+    );
   }
 
   private async acceptReading(
@@ -165,7 +178,12 @@ export class MeteringReadings {
       if (report.kind === 'ready') {
         const baseline = report.baseline ? toMeterValue(report.baseline.value).toString() : '0';
         if (operation.status !== 'pending') {
-          if (operation.status === 'completed' && session?.baselineValue === baseline) return;
+          if (
+            operation.status === 'completed' &&
+            session?.baselineValue === baseline &&
+            (operation.source ?? null) === (report.source ?? null)
+          )
+            return;
           throw new MeteringOperationError('The start request was already answered or has expired');
         }
         if (!session) throw new MeteringOperationError('A start request requires a session');
@@ -210,7 +228,8 @@ export class MeteringReadings {
         if (
           operation.status === 'completed' &&
           operation.reportedValue === toMeterValue(report.value).toString() &&
-          operation.readingMode === (report.mode ?? 'total')
+          operation.readingMode === (report.mode ?? 'total') &&
+          this.matchesEvidence(operation, report)
         )
           return;
         throw new MeteringOperationError('The collection was already answered or has expired');

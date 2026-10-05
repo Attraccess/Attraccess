@@ -7,7 +7,7 @@ import { ResourceUsageService } from '../../../resources/usage/resourceUsage.ser
 import { ResourceFlowsExecutorService } from '../../../resources/flows/resource-flows-executor.service';
 import { SumUpService } from '../../../billing/sumup.service';
 import { BillingService } from '../../../billing/billing.service';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { dbCurrencyToUserCurrency, formatCredits } from '@attraccess/shared';
 import { ResourceInUseError } from '../../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { FlowExecutionError } from '../../../resources/flows/errors/flow-execution.error';
@@ -116,13 +116,10 @@ export class AttractapSessionHandler {
   }
 
   private formatMeterRate(creditsPerUnit: number, configuration: { minorUnit: number; currency: string }): string {
-    const scale = BigInt(`1${'0'.repeat(configuration.minorUnit)}`);
-    const credits = BigInt(creditsPerUnit);
-    const whole = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(credits / scale);
-    const fraction = configuration.minorUnit
-      ? `,${(credits % scale).toString().padStart(configuration.minorUnit, '0')}`
-      : '';
-    return `${whole}${fraction} ${configuration.currency}`;
+    return `${formatCredits(creditsPerUnit, configuration.minorUnit, {
+      locale: 'de-DE',
+      minimumFractionDigits: configuration.minorUnit,
+    })} ${configuration.currency}`;
   }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {

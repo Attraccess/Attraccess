@@ -1,4 +1,10 @@
-import { applyBillingFactor, dbCurrencyToUserCurrency, toExactCredits, userCurrencyToDbCurrency } from './currency';
+import {
+  applyBillingFactor,
+  dbCurrencyToUserCurrency,
+  formatCredits,
+  toExactCredits,
+  userCurrencyToDbCurrency,
+} from './currency';
 
 describe('currency', () => {
   it('should convert api currency to frontend currency', () => {
@@ -40,5 +46,24 @@ describe('currency', () => {
     expect(() => applyBillingFactor(BigInt(Number.MAX_SAFE_INTEGER) + BigInt(1), 100)).toThrow('billing range');
     expect(() => applyBillingFactor(toExactCredits(Number.MAX_SAFE_INTEGER), 200)).toThrow('billing range');
     expect(() => toExactCredits(Number.MAX_SAFE_INTEGER + 1)).toThrow('billing range');
+  });
+
+  it.each([
+    [Number.MAX_SAFE_INTEGER, 2, 'en', '90,071,992,547,409.91'],
+    [Number.MAX_SAFE_INTEGER, 2, 'de', '90.071.992.547.409,91'],
+    [-Number.MAX_SAFE_INTEGER, 2, 'de', '-90.071.992.547.409,91'],
+    [-1, 2, 'en', '-0.01'],
+    [0, 2, 'de', '0'],
+    [30, 2, 'en', '0.3'],
+    [123456789, 9, 'de', '0,123456789'],
+    [Number.MAX_SAFE_INTEGER, 0, 'en', '9,007,199,254,740,991'],
+  ])('formats %s credits at scale %s exactly in %s', (credits, minorUnit, locale, expected) => {
+    expect(formatCredits(credits, minorUnit, { locale })).toBe(expected);
+  });
+
+  it('supports receipt decimals and fixed reader fraction digits', () => {
+    expect(formatCredits(Number.MAX_SAFE_INTEGER, 2, { useGrouping: false })).toBe('90071992547409.91');
+    expect(formatCredits(0, 2, { locale: 'de', minimumFractionDigits: 2 })).toBe('0,00');
+    expect(formatCredits(30, 2, { locale: 'de', minimumFractionDigits: 2 })).toBe('0,30');
   });
 });

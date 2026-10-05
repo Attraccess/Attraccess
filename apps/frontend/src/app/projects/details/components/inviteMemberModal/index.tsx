@@ -3,6 +3,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   useOverlayState,
 } from '@heroui/react';
 import { Button } from '../../../../../components/button';
@@ -106,7 +107,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
       {children(open)}
       <StandardDrawer isOpen={isOpen} onOpenChange={handleOpenChange}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody className="flex flex-col gap-4">
           <p className="text-small text-default-500">{t('description')}</p>

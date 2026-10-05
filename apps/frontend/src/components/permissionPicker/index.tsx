@@ -14,6 +14,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   EmptyState,
   Header,
   Label,
@@ -217,7 +218,7 @@ export function PermissionPicker({
 
         <StandardDrawer isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
           <DrawerHeader className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">{drawerTitle ?? label}</h2>
+            <DrawerHeading className="text-lg font-semibold">{drawerTitle ?? label}</DrawerHeading>
             {drawerDescription ? <p className="text-sm text-default-500">{drawerDescription}</p> : null}
           </DrawerHeader>
           <DrawerBody>

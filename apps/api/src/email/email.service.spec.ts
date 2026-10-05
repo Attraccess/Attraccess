@@ -438,6 +438,21 @@ describe('EmailService', () => {
       expect(html).not.toContain('credits/min');
     });
 
+    it('preserves every cent of a large captured meter rate in receipts', async () => {
+      const { service, sendMail, user, usage, transaction } = setupReceipt('en');
+      transaction.items = [
+        Object.assign(new BillingTransactionItem(), {
+          name: 'Heartbeats',
+          quantity: 1,
+          unitPrice: 0,
+          meterQuantity: '0',
+          meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
+        }),
+      ];
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+      expect(sendMail.mock.calls[0][0].html).toContain('90071992547409.91');
+    });
+
     it('renders historical rounded quantities without inventing raw durations or a factor snapshot', async () => {
       const { service, sendMail, user, usage, transaction } = setupReceipt('en');
       usage.billingFactor = null;

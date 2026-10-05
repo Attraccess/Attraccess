@@ -1,12 +1,13 @@
 import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormatter';
+import { useCreditsFormatter } from '../../../../../hooks/useCreditsFormatter';
 import { Fragment, useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
 import {
   useResourceMeteringServiceGetResourceMeteringLive,
   useResourcesServiceResourceUsageGetActiveSession,
 } from '@attraccess/react-query-client';
-import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { applyBillingFactor, dbCurrencyToUserCurrency, formatDurationMs, toExactCredits } from '@attraccess/shared';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { applyBillingFactor, formatDurationMs, toExactCredits } from '@attraccess/shared';
 import de from './de.json';
 import en from './en.json';
 
@@ -21,7 +22,7 @@ interface Props {
 /** Running session: meter value, meter cost so far, and an estimate of the whole bill. */
 export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, valueClass }: Props) {
   const { t } = useTranslations({ en, de });
-  const formatNumber = useNumberFormatter();
+  const formatMoney = useCreditsFormatter(minorUnit);
   const formatValue = useMeterValueFormatter();
 
   const { data: active } = useResourcesServiceResourceUsageGetActiveSession({ resourceId }, undefined);
@@ -40,18 +41,21 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
 
   if (!usage) return null;
 
-  const money = (credits: number) =>
-    t('live.billingValue', { credits: formatNumber(dbCurrencyToUserCurrency(credits, minorUnit)), currency });
+  const money = (credits: number) => t('live.billingValue', { credits: formatMoney(credits), currency });
 
   const elapsedMs = Math.max(0, now - new Date(usage.startTime).getTime());
-  const meters = live?.meters.flatMap((meter) => (meter.session ? [{ id: meter.id, ...meter.session }] : [])) ?? [];
+  const mismatchedUsage = live?.meters.some((meter) => meter.session && meter.session.usageId !== usage.id);
+  const meters =
+    live?.meters.flatMap((meter) =>
+      meter.session?.usageId === usage.id ? [{ id: meter.id, ...meter.session }] : [],
+    ) ?? [];
   let estimate: number | null = null;
   try {
     const gross =
       toExactCredits(usage.creditsPerUsage ?? 0) +
       toExactCredits(usage.sessionDurationCreditsPerMinute ?? 0) * toExactCredits(Math.ceil(elapsedMs / 60_000)) +
       meters.reduce((sum, meter) => sum + toExactCredits(meter.chargeCredits ?? 0), BigInt(0));
-    estimate = applyBillingFactor(gross, usage.billingFactor ?? 100).amount;
+    if (!mismatchedUsage) estimate = applyBillingFactor(gross, usage.billingFactor ?? 100).amount;
   } catch {
     // A running estimate must not crash the resource page or show an imprecise charge.
   }

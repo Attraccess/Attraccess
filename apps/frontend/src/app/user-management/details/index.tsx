@@ -22,7 +22,7 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Chip, ModalBody, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
+import { Chip, ModalBody, ModalFooter, ModalHeader, ModalHeading, Separator, useOverlayState } from '@heroui/react';
 import {
   AlertTriangleIcon,
   KeyRoundIcon,
@@ -366,7 +366,9 @@ function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: numb
       <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="sm">
         {({ close: modalClose }) => (
           <>
-            <ModalHeader>{t('delete.modal.title')}</ModalHeader>
+            <ModalHeader>
+              <ModalHeading>{t('delete.modal.title')}</ModalHeading>
+            </ModalHeader>
             <ModalBody>
               <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
             </ModalBody>

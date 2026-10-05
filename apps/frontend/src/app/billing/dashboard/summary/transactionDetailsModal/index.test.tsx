@@ -98,7 +98,7 @@ it('renders a migrated energy item through generic quantity and rate fields', as
   // quantity/unit price columns show the real kWh consumed and per-kWh rate,
   // not the raw quantity=1 / unitPrice=total-charge fields (ATT-1103).
   expect(screen.getByText('1,5')).toBeTruthy();
-  expect(screen.getByText('0.30')).toBeTruthy();
+  expect(screen.getByText('0,3')).toBeTruthy();
 });
 it.each([
   ['refund', { refundOfId: 4, amount: 100, status: 'pending' }, 'type.refund'],
@@ -151,5 +151,25 @@ it('preserves generic meter precision and user names that match system labels', 
   expect(await screen.findByText('9.007.199.254.740.993,123456789')).toBeTruthy();
   expect(screen.getByText('usage')).toBeTruthy();
   expect(screen.queryByText('items.system.usage')).toBeNull();
-  expect(screen.getByText('0.30')).toBeTruthy();
+  expect(screen.getByText('0,3')).toBeTruthy();
+});
+
+it('preserves every cent in a large captured meter rate', async () => {
+  state.transaction = {
+    id: 7,
+    status: 'completed',
+    amount: 0,
+    items: [
+      {
+        id: 1,
+        name: 'Heartbeats',
+        quantity: 1,
+        unitPrice: 0,
+        meterQuantity: '0',
+        meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={7} isOpen />);
+  expect(await screen.findByText('90.071.992.547.409,91')).toBeTruthy();
 });

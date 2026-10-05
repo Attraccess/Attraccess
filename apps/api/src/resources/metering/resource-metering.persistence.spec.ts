@@ -795,6 +795,48 @@ describe('Flow-defined metering', () => {
     });
 
     describe('takeover', () => {
+      it('preserves recovery for an untouched meter when another takeover start fails', async () => {
+        await seedMeter({}, { finalAttempts: 1 });
+        const secondMeter = await source.getRepository(ResourceMeter).save({
+          resourceId: 1,
+          name: 'Water',
+          creditsPerUnit: 10,
+        });
+        const nodes = source.getRepository(ResourceFlowNode);
+        const edges = source.getRepository(ResourceFlowEdge);
+        for (const node of await nodes.find()) {
+          await nodes.save({ ...node, id: `${node.id}-water`, data: { ...node.data, meterId: secondMeter.id } });
+        }
+        for (const edge of await edges.find()) {
+          await edges.save({
+            ...edge,
+            id: `${edge.id}-water`,
+            source: `${edge.source}-water`,
+            target: `${edge.target}-water`,
+          });
+        }
+        const first = await start(users[0]);
+        onStart = async () => {
+          throw new Error('first meter start failed');
+        };
+        await expect(start(users[1], { forceTakeOver: true })).rejects.toBeInstanceOf(BadRequestException);
+        const untouched = await source.getRepository(ResourceMeteringSession).findOneByOrFail({
+          usageId: first.id,
+          meterId: secondMeter.id,
+        });
+        expect(untouched.compromisedReason).toBeNull();
+        onCollect = async () => {
+          throw new Error('temporarily offline');
+        };
+        const ended = await end(users[0]);
+        expect((await source.getRepository(ResourceMeteringSession).findOneByOrFail({ id: untouched.id })).status).toBe(
+          ResourceMeteringSessionStatus.Pending,
+        );
+        onCollect = reading('2', { observedAt: ended.endTime?.toISOString() });
+        await metering.retrySettlement(1, untouched.id, users[0].id);
+        expect((await correctionsOf(first.id)).corrections[0].amount).toBe(-20);
+      });
+
       it('reads the outgoing total before re-initializing the meter for the next session and bills both', async () => {
         await seedMeter();
         const first = await start(users[0]);
@@ -1539,5 +1581,32 @@ describe('Flow-defined metering', () => {
         metering.report(1, 1, { ...report, value: '4' }, undefined, undefined, 'flow:1:node'),
       ).rejects.toThrow('conflicting');
     });
+
+    it.each([{ observedAt: '2020-01-01T00:00:00Z' }, { observedAt: 'invalid' }, { source: 'different-device' }])(
+      'rejects conflicting replay evidence %j for ordinary and collected readings',
+      async (conflict) => {
+        const report = { kind: 'reading' as const, mode: 'increment' as const, value: '3', source: 'device' };
+        await metering.report(1, 1, report, undefined, undefined, 'ordinary');
+        await metering.report(1, 1, report, undefined, undefined, 'ordinary');
+        await expect(
+          metering.report(1, 1, { ...report, ...conflict }, undefined, undefined, 'ordinary'),
+        ).rejects.toThrow('conflicting');
+        const observedAt = new Date().toISOString();
+        const operation = await source.getRepository(ResourceMeteringOperation).save({
+          id: 'collection',
+          meterId: 1,
+          resourceId: 1,
+          kind: 'interim',
+          status: 'pending',
+          requestedAt: new Date(),
+        });
+        await metering['readings'].complete(operation.id, { ...report, observedAt });
+        await metering['readings'].complete(operation.id, { ...report, observedAt });
+        await expect(
+          metering['readings'].complete(operation.id, { ...report, observedAt, ...conflict }),
+        ).rejects.toThrow('answered');
+        expect((await metering.listMeters(1))[0].lifetimeValue).toBe('6');
+      },
+    );
   });
 });

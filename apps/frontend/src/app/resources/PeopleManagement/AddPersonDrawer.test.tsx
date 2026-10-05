@@ -36,6 +36,13 @@ const pickUser = async (pointer: ReturnType<typeof userEvent.setup>, name: RegEx
 };
 
 describe('AddPersonDrawer', () => {
+  it.each(['introducer', 'maintainer', 'introduction'] as const)('names the %s drawer from its title', async (mode) => {
+    renderDrawer({ mode });
+    expect(await screen.findByRole('dialog', { name: `addModal.title.${mode}` })).toHaveAccessibleName(
+      `addModal.title.${mode}`,
+    );
+  });
+
   beforeEach(() => {
     mocks.useUsersServiceFindManyInfinite.mockReturnValue({
       data: { pages: [{ data: [{ id: 1, username: 'alan' }], total: 1, page: 1, limit: 50 }] },

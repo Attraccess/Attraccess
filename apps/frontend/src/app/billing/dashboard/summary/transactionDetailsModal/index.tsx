@@ -1,4 +1,5 @@
 import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormatter';
+import { useCreditsFormatter } from '../../../../../hooks/useCreditsFormatter';
 import {
   Button,
   Chip,
@@ -77,6 +78,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
 
   const formatNumber = useNumberFormatter();
   const formatMeterValue = useMeterValueFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const statusColor = (status: BillingTransaction['status']) => {
     switch (status) {
@@ -237,12 +239,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                                   {item.meterQuantity != null
                                     ? t('items.meterDescription', {
                                         value: formatMeterValue(item.meterQuantity),
-                                        rate: formatNumber(
-                                          dbCurrencyToUserCurrency(
-                                            item.meterCreditsPerUnit ?? 0,
-                                            configuration?.minorUnit ?? 2,
-                                          ),
-                                        ),
+                                        rate: formatCredits(item.meterCreditsPerUnit ?? 0),
                                       })
                                     : item.description}
                                 </TableCell>
@@ -250,12 +247,14 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                                   {item.meterQuantity != null ? formatMeterValue(item.meterQuantity) : item.quantity}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {formatNumber(
-                                    dbCurrencyToUserCurrency(
-                                      item.meterCreditsPerUnit ?? item.unitPrice,
-                                      configuration?.minorUnit ?? 2,
-                                    ),
-                                  )}
+                                  {item.meterQuantity != null
+                                    ? formatCredits(item.meterCreditsPerUnit ?? 0)
+                                    : formatNumber(
+                                        dbCurrencyToUserCurrency(
+                                          item.meterCreditsPerUnit ?? item.unitPrice,
+                                          configuration?.minorUnit ?? 2,
+                                        ),
+                                      )}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   {formatNumber(

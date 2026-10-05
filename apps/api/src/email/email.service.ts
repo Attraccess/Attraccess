@@ -13,7 +13,7 @@ import {
   Resource,
   ResourceHealthStatus,
 } from '@attraccess/database-entities';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { dbCurrencyToUserCurrency, formatCredits } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
@@ -264,7 +264,10 @@ export class EmailService {
       name: item.name,
       description: item.description,
       quantity: item.meterQuantity ?? item.quantity,
-      unitPrice: dbCurrencyToUserCurrency(item.meterCreditsPerUnit ?? item.unitPrice, currencyMinorUnit),
+      unitPrice:
+        item.meterCreditsPerUnit != null
+          ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
+          : dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
       isFixedFee: item.meterQuantity == null && item.name === 'PER_SESSION',
       isSessionDuration: item.meterQuantity == null && item.name === 'PER_MINUTE',
