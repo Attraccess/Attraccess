@@ -11,6 +11,7 @@
     "meterRate": "{{name}} session rate",
     "rateValue": "{{rate}} per measured value",
     "estimateUnavailable": "Estimate exceeds the supported billing range",
+    "estimateWaiting": "Waiting for session meter data",
     "estimate": "Estimated bill so far",
     "estimateNote": "Estimate without attributable operating minutes and additional flow items.",
     "billingValue": "{{credits}} {{currency}}"

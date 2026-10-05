@@ -13,7 +13,7 @@
 </mj-section>
 <mj-section background-color="#FFFFFF" padding="0 20px 24px 20px">
   <mj-column>
-    <mj-table table-layout="fixed" cellpadding="4px">
+    <mj-table table-layout="fixed">
       <tr>
         <th align="left" width="36%">{{t 'col_item' 'Item'}}</th>
         <th align="right" width="24%">{{t 'col_qty' 'Qty'}}</th>
@@ -22,7 +22,7 @@
       </tr>
       {{#each items}}
       <tr>
-        <td style="vertical-align:top;overflow-wrap:anywhere;word-break:break-word;">
+        <td style="overflow-wrap:anywhere;word-break:break-word;">
           {{#if this.isSessionDuration}}{{t 'item_session_duration' 'Session time'}}
           {{else if this.isOperatingDuration}}{{t 'item_operating_duration' 'Attributable operating time'}}
           {{else if this.isFixedFee}}{{t 'item_fixed_fee' 'Fixed session fee'}}
@@ -35,18 +35,18 @@
             {{t 'duration_billed' 'Billed: {minutes} min' minutes=this.quantity}}
           {{/if}}
         </td>
-        <td align="right" style="vertical-align:top;overflow-wrap:anywhere;word-break:break-word;">{{#if this.isUnavailable}}{{t 'quantity_unavailable' 'Unavailable'}}{{else}}{{this.quantity}}{{/if}}</td>
-        <td align="right" style="vertical-align:top;overflow-wrap:anywhere;word-break:break-word;">{{#if this.isDuration}}{{t 'duration_rate' '{credits} credits/min' credits=this.unitPrice}}{{else}}{{this.unitPrice}}{{/if}}</td>
-        <td align="right" style="vertical-align:top;overflow-wrap:anywhere;word-break:break-word;">{{this.total}}</td>
+        <td align="right" style="overflow-wrap:anywhere;word-break:break-word;">{{#if this.isUnavailable}}{{t 'quantity_unavailable' 'Unavailable'}}{{else}}{{this.quantity}}{{/if}}</td>
+        <td align="right" style="overflow-wrap:anywhere;word-break:break-word;">{{#if this.isDuration}}{{t 'duration_rate' '{credits} credits/min' credits=this.unitPrice}}{{else}}{{this.unitPrice}}{{/if}}</td>
+        <td align="right" style="white-space:nowrap;">{{this.total}}</td>
       </tr>
       {{/each}}
       <tr>
         <td colspan="3" align="right"><strong>{{t 'total_credits' 'Total Credits'}}</strong></td>
-        <td align="right" style="overflow-wrap:anywhere;word-break:break-word;"><strong>{{totalCredits}}</strong></td>
+        <td align="right" style="white-space:nowrap;"><strong>{{totalCredits}}</strong></td>
       </tr>
       <tr>
         <td colspan="3" align="right">{{t 'new_balance' 'New Balance'}}</td>
-        <td align="right" style="overflow-wrap:anywhere;word-break:break-word;">{{newBalance}}</td>
+        <td align="right" style="white-space:nowrap;">{{newBalance}}</td>
       </tr>
     </mj-table>
   </mj-column>

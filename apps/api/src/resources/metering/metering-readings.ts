@@ -113,7 +113,16 @@ export class MeteringReadings {
     const observedAt = report.observedAt ? new Date(report.observedAt) : now;
     if (Number.isNaN(observedAt.getTime()) || observedAt.getTime() > now.getTime() + CLOCK_SKEW_MS)
       throw new MeteringValueError('invalid_observation_time', 'The observation time is invalid or in the future');
-    if ((freshAfter && observedAt < freshAfter) || (meter.latestObservedAt && observedAt < meter.latestObservedAt))
+    // Increment-only starts do not update the meter's previous observation.
+    // Apply the persisted usage boundary before attributing any reading to it.
+    const usage = session
+      ? await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, select: { startTime: true } })
+      : null;
+    if (
+      (usage && observedAt < usage.startTime) ||
+      (freshAfter && observedAt < freshAfter) ||
+      (meter.latestObservedAt && observedAt < meter.latestObservedAt)
+    )
       throw new MeteringValueError(
         'stale_reading',
         'The reading is older than the required boundary or a previously accepted reading',

@@ -112,7 +112,7 @@ describe('LiveSessionBilling', () => {
     render(<LiveSessionBilling {...props} />);
     expect(screen.queryByText('Heartbeats')).not.toBeInTheDocument();
     expect(screen.queryByText('1.5')).not.toBeInTheDocument();
-    expect(screen.getByText(en.live.estimateUnavailable)).toBeInTheDocument();
+    expect(screen.getByText(en.live.estimateWaiting)).toBeInTheDocument();
   });
 
   it('preserves every cent in large captured rates', () => {
@@ -186,6 +186,41 @@ describe('LiveSessionBilling', () => {
     render(<LiveSessionBilling {...props} />);
     expect(screen.getByText(en.live.meterWaiting)).toBeInTheDocument();
     expect(screen.queryByText('0')).not.toBeInTheDocument();
+    expect(screen.getByText(en.live.estimateWaiting)).toBeInTheDocument();
+    expect(screen.queryByText('0 EUR')).not.toBeInTheDocument();
+  });
+
+  it('keeps the aggregate unavailable until the live response arrives', () => {
+    mock({ startTime: '2026-09-28T10:00:00Z', creditsPerUsage: 100 }, null);
+    vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({
+      data: undefined,
+    } as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringLive>);
+    render(<LiveSessionBilling {...props} />);
+    expect(screen.getByText(en.live.estimateWaiting)).toBeInTheDocument();
+    expect(screen.queryByText('1 EUR')).not.toBeInTheDocument();
+  });
+
+  it('keeps the estimate visible while paid captured meters have not loaded', () => {
+    mock(
+      {
+        startTime: '2026-09-28T10:00:00Z',
+        meterRates: [{ meterId: 1, name: 'Heartbeats', creditsPerUnit: 30 }],
+      },
+      null,
+    );
+    render(<LiveSessionBilling {...props} />);
+    expect(screen.getByText(en.live.estimateWaiting)).toBeInTheDocument();
+  });
+
+  it('keeps the base estimate available when only a free meter reading is unavailable', () => {
+    mock(
+      { startTime: '2026-09-28T10:00:00Z', creditsPerUsage: 100 },
+      { sessionId: null, creditsPerUnit: 0, latestValue: null, chargeCredits: null },
+    );
+    render(<LiveSessionBilling {...props} />);
+    expect(screen.getByText('Reading unavailable')).toBeInTheDocument();
+    expect(screen.getByText('1 EUR')).toBeInTheDocument();
+    expect(screen.queryByText(en.live.estimateWaiting)).not.toBeInTheDocument();
   });
 
   it('queries tracking-only meters during a session', () => {

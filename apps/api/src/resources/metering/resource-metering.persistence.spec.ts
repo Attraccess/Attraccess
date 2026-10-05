@@ -1618,6 +1618,48 @@ describe('Flow-defined metering', () => {
       await expect(metering.report(99, other.id, { kind: 'reading', value: '1' })).rejects.toThrow('METER_NOT_FOUND');
     });
 
+    it.each([0, 30])(
+      'rejects delayed idle increments after an increment-only session starts at rate %s',
+      async (rate) => {
+        await metering.setRate(1, 1, rate);
+        await source.getRepository(ResourceFlowNode).save({
+          id: 'increment-report',
+          resourceId: 1,
+          type: T.OUTPUT_METERING_REPORT,
+          data: { meterId: 1, mode: 'increment', value: '1' },
+        });
+        await metering.report(1, 1, {
+          kind: 'reading',
+          mode: 'increment',
+          value: '3',
+          observedAt: new Date(Date.now() - 60_000).toISOString(),
+        });
+        const started = await usage.startSession(1, users[0], {} as never);
+        await expect(
+          metering.report(1, 1, {
+            kind: 'reading',
+            mode: 'increment',
+            value: '5',
+            observedAt: new Date(started.startTime.getTime() - 1).toISOString(),
+          }),
+        ).rejects.toThrow('older than the required boundary');
+        expect((await metering.listMeters(1))[0].lifetimeValue).toBe('3');
+        expect((await sessionOf(started.id)).latestValue).toBe('0');
+        expect(await source.getRepository(ResourceMeteringOperation).count()).toBe(1);
+
+        // An observation exactly on the persisted start boundary belongs to the session.
+        await metering.report(1, 1, {
+          kind: 'reading',
+          mode: 'increment',
+          value: '2',
+          observedAt: started.startTime.toISOString(),
+        });
+        await usage.endSession(1, users[0], {} as never);
+        expect((await metering.listMeters(1))[0].lifetimeValue).toBe('5');
+        expect((await items(started.id)).transaction.amount).toBe(rate === 0 ? 0 : -2 * rate);
+      },
+    );
+
     it('uses the first cumulative reading as a baseline and never double-counts repeated totals', async () => {
       await metering.report(1, 1, { kind: 'reading', value: '100' });
       await metering.report(1, 1, { kind: 'reading', value: '102.25' });
@@ -1902,6 +1944,37 @@ describe('Flow-defined metering', () => {
       await usage.endSession(1, users[0], {} as never);
       expect((await items(started.id)).transaction.amount).toBe(-60);
       expect((await sessionOf(started.id)).status).toBe(ResourceMeteringSessionStatus.Settled);
+    });
+
+    it('keeps requested sessions pending when flow edits remove final collection', async () => {
+      await seedMeter();
+      const started = await usage.startSession(1, users[0], {} as never);
+      await metering.report(1, 1, { kind: 'reading', value: '2' });
+      await source.getRepository(ResourceFlowNode).delete({ resourceId: 1 });
+      await source.getRepository(ResourceFlowNode).save({
+        id: 'increment-report',
+        resourceId: 1,
+        type: T.OUTPUT_METERING_REPORT,
+        data: { meterId: 1, mode: 'increment', value: '1' },
+      });
+      onCollect = async () => {
+        throw new Error('The collection branch was removed');
+      };
+      const definition = await metering.getDefinition(1, 1);
+      expect(definition.incrementOnly).toBe(true);
+      // Skip the default retry delay in this unavailable-collection regression.
+      jest.spyOn(metering, 'getDefinition').mockResolvedValue({
+        ...definition,
+        collect: { ...definition.collect, finalAttempts: 1, finalRetryDelaySeconds: 0 },
+      });
+      await usage.endSession(1, users[0], {} as never);
+      expect(await sessionOf(started.id)).toMatchObject({
+        collectionMode: 'requested',
+        status: ResourceMeteringSessionStatus.Pending,
+        latestValue: '2000000000',
+        chargeCredits: null,
+      });
+      expect((await items(started.id)).transaction.amount).toBe(0);
     });
 
     it('does not charge idle consumption when a missing final reading is retried', async () => {

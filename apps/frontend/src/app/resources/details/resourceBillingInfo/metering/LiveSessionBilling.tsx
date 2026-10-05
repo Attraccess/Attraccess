@@ -49,19 +49,27 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
     live?.meters.flatMap((meter) =>
       meter.session?.usageId === usage.id ? [{ id: meter.id, ...meter.session }] : [],
     ) ?? [];
+  const paidRates =
+    usage.meterRates?.filter((rate) => typeof rate.creditsPerUnit === 'number' && rate.creditsPerUnit > 0) ?? [];
+  const waitingForMeters =
+    !live ||
+    mismatchedUsage ||
+    meters.some((meter) => meter.creditsPerUnit > 0 && meter.chargeCredits == null) ||
+    paidRates.some((rate) => !meters.some((meter) => meter.id === rate.meterId && meter.chargeCredits != null));
   let estimate: number | null = null;
   try {
     const gross =
       toExactCredits(usage.creditsPerUsage ?? 0) +
       toExactCredits(usage.sessionDurationCreditsPerMinute ?? 0) * toExactCredits(Math.ceil(elapsedMs / 60_000)) +
       meters.reduce((sum, meter) => sum + toExactCredits(meter.chargeCredits ?? 0), BigInt(0));
-    if (!mismatchedUsage) estimate = applyBillingFactor(gross, usage.billingFactor ?? 100).amount;
+    if (!waitingForMeters) estimate = applyBillingFactor(gross, usage.billingFactor ?? 100).amount;
   } catch {
     // A running estimate must not crash the resource page or show an imprecise charge.
   }
   const hasBillableRates =
     (usage.creditsPerUsage ?? 0) > 0 ||
     (usage.sessionDurationCreditsPerMinute ?? 0) > 0 ||
+    paidRates.length > 0 ||
     meters.some((meter) => (meter.creditsPerUnit ?? 0) > 0);
 
   return (
@@ -99,7 +107,11 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
           <>
             <dt>{t('live.estimate')}</dt>
             <dd className={`${valueClass} font-semibold`} data-cy="live-bill-estimate">
-              {estimate == null ? t('live.estimateUnavailable') : money(estimate)}
+              {waitingForMeters
+                ? t('live.estimateWaiting')
+                : estimate == null
+                  ? t('live.estimateUnavailable')
+                  : money(estimate)}
             </dd>
           </>
         )}

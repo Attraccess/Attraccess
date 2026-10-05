@@ -11,6 +11,7 @@
     "meterRate": "{{name}}: Sitzungspreis",
     "rateValue": "{{rate}} pro Messwert",
     "estimateUnavailable": "Schätzung überschreitet den unterstützten Abrechnungsbereich",
+    "estimateWaiting": "Warte auf Zählerdaten der Sitzung",
     "estimate": "Voraussichtliche Kosten bisher",
     "estimateNote": "Schätzung ohne zugeordnete Betriebsminuten und zusätzliche Flow-Positionen.",
     "billingValue": "{{credits}} {{currency}}"
