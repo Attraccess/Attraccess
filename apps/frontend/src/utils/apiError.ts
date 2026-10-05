@@ -14,6 +14,9 @@ export function getTranslationKeyForApiError(props: Props) {
     ((props.error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? props.error.message,
   );
 
+  // Initialization wraps setup errors; retain their actionable configuration guidance.
+  errorMessage = errorMessage.replace(/^METER_INITIALIZATION_FAILED: (?=METER_NOT_CONFIGURED: )/, '');
+
   let errorMessageTranslationKey = errorMessage;
 
   let fullKey = props.baseTranslationKey + '.' + errorMessageTranslationKey;

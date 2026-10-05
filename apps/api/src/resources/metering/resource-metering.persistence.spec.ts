@@ -551,8 +551,9 @@ describe('Flow-defined metering', () => {
     });
 
     it('does not start an unmetered billed session when the meter is not configured', async () => {
+      await source.getRepository(ResourceMeter).update(1, { name: 'Heartbeats' });
       await expect(start()).rejects.toThrow(
-        expect.objectContaining({ message: expect.stringContaining('METER_NOT_CONFIGURED') }),
+        expect.objectContaining({ message: 'METER_INITIALIZATION_FAILED: METER_NOT_CONFIGURED: Heartbeats' }),
       );
       expect(log).toEqual([]);
       expect(await source.getRepository(ResourceUsage).count()).toBe(0);
