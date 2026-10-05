@@ -152,7 +152,7 @@ jobs:
           esp-idf: 'false'
       - name: Test CRAP reporting integration
         run: node --test scripts/crap-score/run.test.mjs
-      - name: Report change risk for affected JS/TS projects
+      - name: Enforce CRAP score limit for affected JS/TS projects
         run: pnpm crap-score:affected --base=${{ env.NX_AFFECTED_BASE }}
       - name: Upload CRAP reports
         if: always()
