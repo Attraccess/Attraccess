@@ -199,6 +199,44 @@ describe('managed enrolment and durable credential lifecycle', () => {
     expect(reconcile).toHaveBeenCalledWith(1);
   });
 
+  it('confirms the installed image policy for a rebuilt release of the same version', async () => {
+    const imageId = `sha256:${'0'.repeat(64)}`;
+    const timestamp = new Date().toISOString();
+    await db.getRepository(WagoController).save(
+      Object.assign(new WagoController(), {
+        id: 1,
+        hardwareId: 'cc100-1',
+        trustState: 'claimed',
+        pairingCodeHash: 'fixture',
+        protocolVersion: '1.0.0',
+        runtimeVersion: artifact.manifest.runtimeVersion,
+        capabilities: '[]',
+        lastSeenAt: timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    service['heartbeats'].set(1, {
+      imageId,
+      runtimeVersion: artifact.manifest.runtimeVersion,
+      streamId: '00000000-0000-4000-8000-000000000001',
+      timestamp: Date.now(),
+      receivedAt: Date.now(),
+    });
+    const policy = jest.fn();
+    service['wago'].setRuntimePolicy = policy;
+    await service['refreshRuntimePolicy'](1);
+    expect(policy).toHaveBeenCalledWith(1, imageId, imageId, undefined);
+    expect(await service.status(1)).toMatchObject({
+      runtime: {
+        runningImageId: imageId,
+        desiredImageId: imageId,
+        runningVersion: artifact.manifest.runtimeVersion,
+        desiredVersion: artifact.manifest.runtimeVersion,
+      },
+    });
+  });
+
   it('persists authenticated ciphertext before remote mutation and rotates per enrolment', async () => {
     const execute = jest.fn(async (_script: string) => {
       const rows = await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access');

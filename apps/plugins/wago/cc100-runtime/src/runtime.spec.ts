@@ -1,4 +1,5 @@
 import { MemoryDeviceAdapter } from './adapters';
+import { runtimeVersion } from '../manifest.json';
 import {
   MAX_PENDING_CHANNEL_WRITES,
   JsonStateStore,
@@ -225,7 +226,7 @@ describe('WagoRuntime', () => {
         pairingCode: '482931',
         enrollmentSecret: 'enrollment-secret',
         protocolVersion: '1.0.0',
-        runtimeVersion: '0.1.0',
+        runtimeVersion,
         capabilities: expect.arrayContaining(['claim', 'heartbeat', 'configuration-v1']),
         sequence: expect.any(Number),
       }),
@@ -283,7 +284,7 @@ describe('WagoRuntime', () => {
           hardwareId: 'cc100-1',
           pairingCode: '482931',
           protocolVersion: '1.0.0',
-          runtimeVersion: '0.1.0',
+          runtimeVersion,
         }),
       }),
     );

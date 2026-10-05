@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { runtimeVersion } from '../manifest.json';
 import { acquireMeasurements, measurementErrorCode } from './modbus/acquisition';
 // The standalone runtime bundles the plugin-owned measurement contract.
 import { encodeMeasurement } from '../../measurement-contract';
@@ -300,7 +301,7 @@ export class WagoRuntime {
         pairingCode: this.options.pairingCode,
         enrollmentSecret: this.options.enrollmentSecret,
         protocolVersion: '1.0.0',
-        runtimeVersion: '0.1.0',
+        runtimeVersion,
         // Discovery proves enrollment reachability, not the permanent credential subscription.
         capabilities: CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
         sequence,
@@ -604,7 +605,7 @@ export class WagoRuntime {
             hardwareId: this.options.hardwareId,
             pairingCode: this.options.pairingCode,
             protocolVersion: '1.0.0',
-            runtimeVersion: '0.1.0',
+            runtimeVersion,
             ...(this.options.runtimeImageId ? { runtimeImageId: this.options.runtimeImageId } : {}),
             runtimePolicyToken: this.runtimePolicyToken,
             capabilities:

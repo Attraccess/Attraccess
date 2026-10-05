@@ -28,6 +28,7 @@ import type { BuildRuntimeArtifact } from './wago-build-runtime';
 import {
   WagoRuntimeUpdateCoordinator,
   RuntimeUpdateError,
+  runtimeTargetImageId,
   type RuntimeUpdateRecord,
   type RuntimeUpdateStore,
   type ManagedRuntimeUpdateHost,
@@ -62,6 +63,7 @@ type RootAcceptance = (
 type RootProbe = (host: string, fingerprint: string, password: string) => Promise<boolean>;
 type LiveHeartbeat = {
   imageId: string;
+  runtimeVersion?: string;
   streamId: string;
   timestamp: number;
   receivedAt: number;
@@ -152,6 +154,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         previous.runtimePolicyToken !== heartbeat.runtimePolicyToken ||
         previous.streamId !== heartbeat.streamId ||
         previous.imageId !== heartbeat.imageId ||
+        previous.runtimeVersion !== heartbeat.runtimeVersion ||
         heartbeat.receivedAt - previous.receivedAt > 90_000
       ) {
         this.wago.blockRuntime?.(id);
@@ -342,7 +345,13 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
               runningVersion: controller.runtimeVersion,
               runningImageId: this.heartbeats.get(controller.id)?.imageId || null,
               desiredVersion: desired?.manifest.runtimeVersion ?? null,
-              desiredImageId: desired && 'imageId' in desired ? desired.imageId : null,
+              desiredImageId:
+                desired && 'imageId' in desired
+                  ? runtimeTargetImageId(desired, {
+                      imageId: this.heartbeats.get(controller.id)?.imageId ?? '',
+                      runtimeVersion: this.heartbeats.get(controller.id)?.runtimeVersion ?? controller.runtimeVersion,
+                    })
+                  : null,
             },
           }
         : {}),
@@ -727,9 +736,15 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     // Confirm its running image during bootstrap; the server still blocks commands
     // until management is complete and the bundled image policy can be enforced.
     const enrolling = access?.state === 'verified' || access?.state === 'recovery_required';
+    const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
     await this.wago.setRuntimePolicy?.(
       id,
-      enrolling ? heartbeat.imageId : desired.imageId,
+      enrolling
+        ? heartbeat.imageId
+        : runtimeTargetImageId(desired, {
+            imageId: heartbeat.imageId,
+            runtimeVersion: heartbeat.runtimeVersion ?? controller?.runtimeVersion,
+          }),
       heartbeat.imageId,
       heartbeat.runtimePolicyToken,
     );
@@ -1076,7 +1091,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         if (!match) throw new RuntimeUpdateError('incompatible');
         return {
           imageId: match[2],
-          runtimeVersion: controller?.runtimeVersion,
+          runtimeVersion: this.heartbeats.get(id)?.runtimeVersion ?? controller?.runtimeVersion,
           claimed: !!controller,
           managed: true,
           compatible: true,
