@@ -107,6 +107,7 @@ describe('energy billing replacement', () => {
       { counterValue: null },
     ]);
     expect(JSON.parse(snapshots[3].meterRates)).toEqual([{ meterId: 2, name: 'Heartbeats', creditsPerUnit: 5 }]);
+    expect(JSON.parse(snapshots[4].meterRates)).toEqual([{ meterId: 3, name: 'Water', creditsPerUnit: 0 }]);
     expect(
       await runner.query('SELECT id, name, meterQuantity, meterCreditsPerUnit FROM billing_transaction_item'),
     ).toEqual([
@@ -155,7 +156,10 @@ describe('energy billing replacement', () => {
     await expect(new GenericMeters1790100000000().down(runner)).rejects.toThrow('pre-migration backup');
   });
 
-  it('freezes empty snapshots and preserves administrator receipt edits', async () => {
+  it.each([0, null])('freezes empty snapshots for legacy rate %s with a free session', async (legacyRate) => {
+    await runner.query('UPDATE resource_usage SET energyCreditsPerKwh = ? WHERE id = 4', [legacyRate]);
+    await runner.query(`INSERT INTO resource_metering_session VALUES
+      ('free', 3, 4, 'settled', 0, '10000000000', '1000000000', '1000000000', '2026-10-03', '2026-10-03')`);
     await new GenericMeters1790100000000().up(runner);
     await runner.query("INSERT INTO resource_meter(resourceId, name, creditsPerUnit) VALUES (3, 'Now billed', 50)");
     await runner.query('INSERT INTO email_templates VALUES (?, ?)', [
@@ -164,6 +168,13 @@ describe('energy billing replacement', () => {
     ]);
     await new ReplaceEnergyBilling1790200000000().up(runner);
     expect(await runner.query('SELECT meterRates FROM resource_usage WHERE id = 4')).toEqual([{ meterRates: '[]' }]);
+    expect(
+      await runner.query(
+        'SELECT creditsPerUnit, baselineValue, latestValue, consumedValue FROM resource_metering_session WHERE usageId = 4',
+      ),
+    ).toEqual([
+      { creditsPerUnit: 0, baselineValue: '10000000000', latestValue: '1000000000', consumedValue: '1000000000' },
+    ]);
     expect(await runner.query('SELECT body FROM email_templates')).toEqual([
       { body: '<mj-text>Custom receipt</mj-text>' },
     ]);

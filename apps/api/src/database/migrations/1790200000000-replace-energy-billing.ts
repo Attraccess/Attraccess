@@ -21,7 +21,8 @@ export class ReplaceEnergyBilling1790200000000 implements MigrationInterface {
 
     const usages: { id: number; resourceId: number; energyCreditsPerKwh: number | null }[] = await runner.query(
       `SELECT id, resourceId, energyCreditsPerKwh FROM resource_usage u WHERE meterRates IS NULL
-       AND (energyCreditsPerKwh > 0 OR EXISTS (SELECT 1 FROM resource_metering_session WHERE usageId = u.id))`,
+       AND (energyCreditsPerKwh > 0 OR EXISTS
+       (SELECT 1 FROM resource_metering_session WHERE usageId = u.id AND creditsPerUnit > 0))`,
     );
     for (const usage of usages) {
       const rates: { meterId: number; name: string; creditsPerUnit: number }[] = await runner.query(
