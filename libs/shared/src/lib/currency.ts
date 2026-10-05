@@ -14,7 +14,10 @@ export function parseCredits(value: string, minorUnit: number): number {
     throw new RangeError('Invalid currency minor unit');
   const match = /^(\d+)(?:[.,](\d*))?$/.exec(value.trim());
   if (!match) throw new RangeError('Invalid decimal price');
-  const fraction = (match[2] ?? '').replace(/0+$/, '');
+  const decimal = match[2] ?? '';
+  let fractionEnd = decimal.length;
+  while (fractionEnd > 0 && decimal[fractionEnd - 1] === '0') fractionEnd--;
+  const fraction = decimal.slice(0, fractionEnd);
   if (fraction.length > minorUnit) throw new RangeError('Price has too many decimal places');
   const credits = BigInt(match[1] + fraction.padEnd(minorUnit, '0'));
   if (credits > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError('Price exceeds the supported billing range');

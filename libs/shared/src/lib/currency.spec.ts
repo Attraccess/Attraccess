@@ -19,6 +19,14 @@ describe('currency', () => {
     expect(parseCredits(value, minorUnit)).toBe(expected);
   });
 
+  it('handles long zero runs without changing price precision or range validation', () => {
+    const zeroes = '0'.repeat(100_000);
+    expect(parseCredits('0.' + zeroes, 2)).toBe(0);
+    expect(parseCredits('1,23' + zeroes, 2)).toBe(123);
+    expect(() => parseCredits('0.' + zeroes + '1', 2)).toThrow('too many decimal places');
+    expect(() => parseCredits('90071992547409.92' + zeroes, 2)).toThrow('billing range');
+  });
+
   it.each(['', '-1', 'NaN', '1e3', '1.2.3', '1,234.56', '0.001', '90071992547409.92'])(
     'rejects an invalid or out-of-range price %j instead of changing it',
     (value) => {
