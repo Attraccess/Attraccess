@@ -9,13 +9,16 @@ export async function assertUsageIntegrity(db) {
   const duplicate = await all(`SELECT resourceId FROM resource_usage
     WHERE usageAction = 'usage' AND endTime IS NULL AND isFinalized = 1 AND lifecyclePending = 0
     GROUP BY resourceId HAVING COUNT(*) > 1`);
+  const duplicatePending = await all(`SELECT resourceId FROM resource_usage
+    WHERE endTime IS NULL AND lifecyclePending = 1
+    GROUP BY resourceId HAVING COUNT(*) > 1`);
   const unreserved = await all(`SELECT u.id FROM resource_usage u WHERE u.lifecyclePending = 1 AND NOT EXISTS (
     SELECT 1 FROM resource_usage_lifecycle_attempt a WHERE a.resourceId = u.resourceId AND (
       (a.kind IN ('start', 'takeover') AND a.candidateUsageId = u.id)
       OR (a.kind = 'end' AND a.previousUsageId = u.id)))`);
-  if (invalid.length || duplicate.length || unreserved.length) {
+  if (invalid.length || duplicate.length || duplicatePending.length || unreserved.length) {
     throw new Error(
-      `Invalid usage lifecycle state after seed/import: orphans=${invalid.length}, duplicate active resources=${duplicate.length}, unreserved candidates=${unreserved.length}`,
+      `Invalid usage lifecycle state after seed/import: orphans=${invalid.length}, duplicate active resources=${duplicate.length}, duplicate pending resources=${duplicatePending.length}, unreserved candidates=${unreserved.length}`,
     );
   }
 }
