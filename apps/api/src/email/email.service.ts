@@ -250,7 +250,9 @@ export class EmailService {
     }
 
     // Receipts describe the settled transaction, including its original rounding.
-    const roundedMinutes = transaction.items?.find((item) => item.name === 'PER_MINUTE')?.quantity;
+    const roundedMinutes = transaction.items?.find(
+      (item) => item.name === 'PER_MINUTE' && item.meterQuantity == null && item.meterCreditsPerUnit == null,
+    )?.quantity;
     const secondsFormatOptions = { maximumFractionDigits: 3 };
     let secondsFormatter: Intl.NumberFormat;
     try {

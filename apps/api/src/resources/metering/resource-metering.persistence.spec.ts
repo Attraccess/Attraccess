@@ -1694,6 +1694,7 @@ describe('Flow-defined metering', () => {
           quantity: '—',
         });
         expect(context.totalCredits).toBe(0.45);
+        expect(context.usage.roundedMinutes).toBeUndefined();
         const before = await items(started.id);
         const pending = await source
           .getRepository(ResourceMeteringSession)
