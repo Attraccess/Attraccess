@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import {
   Resource,
   ResourceMeter,
@@ -42,10 +42,19 @@ export class MeteringCatalog {
   }
 
   async listMeters(resourceId: number) {
-    const meters = await this.meters.find({ where: { resourceId }, order: { id: 'ASC' } });
-    const active = await this.findActiveSessions(resourceId);
+    const [meters, usage, active] = await Promise.all([
+      this.meters.find({ where: { resourceId }, order: { id: 'ASC' } }),
+      this.sessions.manager.findOne(ResourceUsage, {
+        where: { resourceId, endTime: IsNull(), lifecyclePending: false },
+      }),
+      this.findActiveSessions(resourceId),
+    ]);
     return meters.map((meter) => {
-      const session = active.find((s) => s.meterId === meter.id);
+      const captured = usage?.meterRates?.find((rate) => rate.meterId === meter.id);
+      const session = active.find(
+        (s) => s.meterId === meter.id && s.usageId === usage?.id && (usage.meterRates == null || captured != null),
+      );
+      const sessionRate = captured?.creditsPerUnit ?? session?.creditsPerUnit ?? 0;
       return {
         id: meter.id,
         name: meter.name,
@@ -57,15 +66,26 @@ export class MeteringCatalog {
           ? {
               sessionId: session.id,
               usageId: session.usageId,
-              meterName: session.meterName,
-              creditsPerUnit: session.creditsPerUnit,
+              meterName: captured?.name ?? session.meterName,
+              creditsPerUnit: sessionRate,
               latestValue: session.latestValue == null ? null : formatMeterValue(BigInt(session.latestValue)),
-              chargeCredits:
-                session.latestValue == null ? null : meterCharge(BigInt(session.latestValue), session.creditsPerUnit),
+              chargeCredits: session.latestValue == null ? null : meterCharge(BigInt(session.latestValue), sessionRate),
               latestObservedAt: session.latestObservedAt,
               source: session.source,
             }
-          : null,
+          : captured && usage
+            ? {
+                // Free-meter initialization may be skipped; its captured terms still belong to this usage.
+                sessionId: null,
+                usageId: usage.id,
+                meterName: captured.name,
+                creditsPerUnit: captured.creditsPerUnit,
+                latestValue: null,
+                chargeCredits: null,
+                latestObservedAt: null,
+                source: null,
+              }
+            : null,
       };
     });
   }

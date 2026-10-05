@@ -47,7 +47,8 @@ function mock(usage: object | null, live: object | null) {
             {
               id: 1,
               name: 'Renamed meter',
-              session: { usageId: 10, meterName: 'Heartbeats', creditsPerUnit: 30, ...live },
+              creditsPerUnit: 100,
+              session: { sessionId: 'retained', usageId: 10, meterName: 'Heartbeats', creditsPerUnit: 30, ...live },
             },
           ]
         : [],
@@ -131,6 +132,21 @@ describe('LiveSessionBilling', () => {
     expect(screen.getByText('0 EUR per measured value')).toBeInTheDocument();
     expect(screen.queryByText('Renamed meter')).not.toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
+  });
+
+  it('shows captured free-meter terms and unavailable evidence when initialization was skipped', () => {
+    mock(
+      { startTime: '2026-09-28T10:00:00Z' },
+      { sessionId: null, creditsPerUnit: 0, latestValue: null, chargeCredits: null },
+    );
+    render(<LiveSessionBilling {...props} />);
+    expect(screen.getByText('Heartbeats')).toBeInTheDocument();
+    expect(screen.getByText('Heartbeats session rate')).toBeInTheDocument();
+    expect(screen.getByText('0 EUR per measured value')).toBeInTheDocument();
+    expect(screen.getByText('Reading unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Renamed meter')).not.toBeInTheDocument();
+    expect(screen.queryByText(en.live.meterWaiting)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.live.estimate)).not.toBeInTheDocument();
   });
 
   it('matches exact settlement for a large charge at a half-credit boundary', () => {

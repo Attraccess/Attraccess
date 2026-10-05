@@ -26,8 +26,8 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransaction,
 } from '@attraccess/react-query-client';
-import { DateTimeDisplay, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
+import { toExactCredits } from '@attraccess/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { StandardModal } from '../../../../../components/standardModal';
 import { RefundModal } from './refund';
@@ -76,7 +76,6 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
     if (!isOpen) setUsageOpen(false);
   }, [isOpen]);
 
-  const formatNumber = useNumberFormatter();
   const formatMeterValue = useMeterValueFormatter();
   const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
@@ -94,9 +93,9 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
   };
 
   const totalItemsAmount = useMemo(() => {
-    if (!transaction?.items) return 0;
+    if (!transaction?.items) return BigInt(0);
     const items = Array.isArray(transaction.items) ? transaction.items : [transaction.items];
-    return items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    return items.reduce((sum, item) => sum + toExactCredits(item.unitPrice) * toExactCredits(item.quantity), BigInt(0));
   }, [transaction]);
 
   return (
@@ -168,7 +167,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                         className={transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'}
                       >
                         {transaction.amount > 0 && '+'}
-                        {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
+                        {formatCredits(transaction.amount)}
                       </div>
                     </div>
                     {transaction.initiator && (
@@ -277,20 +276,10 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                                   <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
                                     {isMeter
                                       ? formatCredits(item.meterCreditsPerUnit ?? 0)
-                                      : formatNumber(
-                                          dbCurrencyToUserCurrency(
-                                            item.meterCreditsPerUnit ?? item.unitPrice,
-                                            configuration?.minorUnit ?? 2,
-                                          ),
-                                        )}
+                                      : formatCredits(item.unitPrice)}
                                   </TableCell>
                                   <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
-                                    {formatNumber(
-                                      dbCurrencyToUserCurrency(
-                                        item.unitPrice * item.quantity,
-                                        configuration?.minorUnit ?? 2,
-                                      ),
-                                    )}
+                                    {formatCredits(toExactCredits(item.unitPrice) * toExactCredits(item.quantity))}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -302,9 +291,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                     <div className="mt-2 flex justify-end text-small text-default-500">
                       <div>
                         {t('items.total')}:{' '}
-                        <span className="font-semibold text-foreground">
-                          {formatNumber(dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
-                        </span>
+                        <span className="font-semibold text-foreground">{formatCredits(totalItemsAmount)}</span>
                       </div>
                     </div>
                   </div>

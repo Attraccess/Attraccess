@@ -169,6 +169,30 @@ describe('energy billing replacement', () => {
     ]);
   });
 
+  it.each([false, true])('refuses energy-only rollback that loses frozen snapshots, free-only=%s', async (freeOnly) => {
+    await runner.query('DELETE FROM resource_metering_operation');
+    await runner.query('DELETE FROM resource_metering_session');
+    await runner.query('DELETE FROM resource_flow_node');
+    await runner.query('DELETE FROM billing_transaction_item');
+    await runner.query('DELETE FROM resource_usage WHERE id NOT IN (3, 4)');
+    if (freeOnly) await runner.query('DELETE FROM resource_usage WHERE id = 3');
+
+    await new GenericMeters1790100000000().up(runner);
+    await new ReplaceEnergyBilling1790200000000().up(runner);
+    await new MeterFlowConversions1790300000000().up(runner);
+    const snapshots = await runner.query('SELECT id, meterRates FROM resource_usage ORDER BY id');
+    expect(snapshots.at(-1)).toEqual({ id: 4, meterRates: '[]' });
+    if (!freeOnly)
+      expect(JSON.parse(snapshots[0].meterRates)).toEqual([
+        expect.objectContaining({ name: 'Energy (kWh)', creditsPerUnit: 10 }),
+      ]);
+
+    await new MeterFlowConversions1790300000000().down(runner);
+    await new ReplaceEnergyBilling1790200000000().down(runner);
+    await expect(new GenericMeters1790100000000().down(runner)).rejects.toThrow('historical meter rate snapshots');
+    expect(await runner.query('SELECT id, meterRates FROM resource_usage ORDER BY id')).toEqual(snapshots);
+  });
+
   it('updates the previous shipped energy receipt to the generic receipt', async () => {
     await new GenericMeters1790100000000().up(runner);
     const current = readDefaultTemplateBody(EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY);
@@ -182,16 +206,18 @@ describe('energy billing replacement', () => {
   });
 
   it.each([
-    ['report', 'value', 'unit'],
-    ['ready', 'baselineValue', 'baselineUnit'],
+    ['report', 'value', 'unit', ''],
+    ['ready', 'baselineValue', 'baselineUnit', ''],
+    ['report', 'value', 'unit', undefined],
+    ['ready', 'baselineValue', 'baselineUnit', undefined],
   ])(
-    'preserves rejection of an explicitly empty %s unit through all meter migrations',
-    async (kind, valueField, unitField) => {
+    'preserves rejection of %s %s with %s=%s through all meter migrations',
+    async (kind, valueField, unitField, unit) => {
       await runner.query('DELETE FROM resource_flow_node');
       await runner.query('INSERT INTO resource_flow_node VALUES (?, 1, ?, ?)', [
         kind,
         `output.resource.metering.${kind}`,
-        JSON.stringify({ [valueField]: '{{reading}}', [unitField]: '' }),
+        JSON.stringify({ [valueField]: '{{reading}}', [unitField]: unit }),
       ]);
       await new GenericMeters1790100000000().up(runner);
       await new ReplaceEnergyBilling1790200000000().up(runner);
@@ -205,4 +231,18 @@ describe('energy billing replacement', () => {
       expect(() => compileFlowTemplate(data[valueField], { reading: '1500' })).toThrow('no mapping');
     },
   );
+
+  it('preserves a resettable ready node with no baseline through all meter migrations', async () => {
+    await runner.query('DELETE FROM resource_flow_node');
+    await runner.query('INSERT INTO resource_flow_node VALUES (?, 1, ?, ?)', [
+      'ready',
+      'output.resource.metering.ready',
+      '{}',
+    ]);
+    await new GenericMeters1790100000000().up(runner);
+    await new ReplaceEnergyBilling1790200000000().up(runner);
+    await new MeterFlowConversions1790300000000().up(runner);
+    const [node] = await runner.query('SELECT data FROM resource_flow_node');
+    expect(JSON.parse(node.data)).toEqual({ meterId: expect.any(Number) });
+  });
 });

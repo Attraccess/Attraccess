@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
     creditsPerUnit: 0,
     lifetimeValue: '110',
     latestObservedAt: null,
-    session: { latestValue: '10' },
+    session: { sessionId: 'retained' as string | null, meterName: 'Heartbeats', latestValue: '10' as string | null },
   },
 }));
 
@@ -28,13 +28,18 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: keyof typeof en) => en[key] }),
+  useTranslations: () => ({
+    t: (key: keyof typeof en, params?: Record<string, string>) =>
+      Object.entries(params ?? {}).reduce((out, [name, value]) => out.replaceAll(`{{${name}}}`, value), en[key]),
+  }),
   useTranslationState: () => ({ language: 'en' }),
 }));
 
 describe('meter permissions', () => {
   beforeEach(() => {
     state.permissions = new Set();
+    state.meter.name = 'Heartbeats';
+    state.meter.session = { sessionId: 'retained', meterName: 'Heartbeats', latestValue: '10' };
   });
 
   it('shows lifetime and session readings to a regular user without management controls', () => {
@@ -51,6 +56,25 @@ describe('meter permissions', () => {
     render(<MetersCard resourceId={7} />);
     expect(screen.getByRole('button', { name: en.rename })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: en.create })).toBeInTheDocument();
+  });
+
+  it('distinguishes the captured session label from the current renamed meter', () => {
+    state.meter.name = 'Renamed meter';
+    render(<MetersCard resourceId={7} />);
+    expect(screen.getByRole('heading', { name: 'Renamed meter' })).toBeInTheDocument();
+    expect(screen.getByText('Current session: Heartbeats')).toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument();
+  });
+
+  it('shows unavailable session evidence for a skipped free meter after a rename', () => {
+    state.meter.name = 'Renamed meter';
+    state.meter.session.sessionId = null;
+    state.meter.session.latestValue = null;
+    render(<MetersCard resourceId={7} />);
+    expect(screen.getByText('Current session: Heartbeats')).toBeInTheDocument();
+    expect(screen.getByText('Reading unavailable')).toBeInTheDocument();
+    expect(screen.queryByText(en.waiting)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.idle)).not.toBeInTheDocument();
   });
 
   it('hides the shared editor from billing-only managers even when rendered directly', () => {

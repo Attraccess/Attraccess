@@ -236,14 +236,14 @@ export class MeteringReadings {
       }
       if (!session) {
         const attempt = await manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: operation.resourceId });
-        const crossedSession = await manager
-          .createQueryBuilder(ResourceMeteringSession, 's')
-          .innerJoin(ResourceUsage, 'u', 'u.id = s.usageId')
-          .where('s.meterId = :meterId', { meterId: meter.id })
+        // Free meters may skip initialization or lose their session after a failed start.
+        // The resource usage still marks a boundary that an idle reply must not cross.
+        const crossedUsage = await manager
+          .createQueryBuilder(ResourceUsage, 'u')
+          .where('u.resourceId = :resourceId', { resourceId: operation.resourceId })
           .andWhere('(u.endTime IS NULL OR u.endTime >= :requestedAt)', { requestedAt: operation.requestedAt })
           .getExists();
-        if (attempt || crossedSession)
-          throw new MeteringOperationError('The idle collection crossed a session boundary');
+        if (attempt || crossedUsage) throw new MeteringOperationError('The idle collection crossed a session boundary');
       } else if (session.status === ResourceMeteringSessionStatus.Pending) {
         const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId } });
         // A current counter cannot distinguish consumption at session end from later idle use.

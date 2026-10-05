@@ -5,7 +5,7 @@ import { formatCredits } from '@attraccess/shared';
 export function useCreditsFormatter(minorUnit: number) {
   const { language } = useTranslationState();
   return useCallback(
-    (credits: number) => formatCredits(credits, minorUnit, { locale: language }),
+    (credits: number | bigint) => formatCredits(credits, minorUnit, { locale: language }),
     [language, minorUnit],
   );
 }

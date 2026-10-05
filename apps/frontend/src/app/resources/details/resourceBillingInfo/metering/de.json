@@ -5,6 +5,7 @@
     "meter": "Zählerstand",
     "meterValue": "{{value}} ",
     "meterWaiting": "Warte auf die erste Messung",
+    "meterUnavailable": "Messwert nicht verfügbar",
     "meterAsOf": "Stand {{time}}",
     "meterCost": "{{name}}: Kosten bisher",
     "meterRate": "{{name}}: Sitzungspreis",

@@ -122,6 +122,30 @@ describe('ResourceBillingInfo operating-minute billing', () => {
     expect(await screen.findByText('90,071,992,547,409.91 credits')).toBeInTheDocument();
   });
 
+  it('keeps captured skipped free meters visible to regular users', async () => {
+    auth.canManageBilling = false;
+    vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+      data: [
+        {
+          id: 1,
+          name: 'Renamed meter',
+          creditsPerUnit: 0,
+          session: { sessionId: null, meterName: 'Heartbeats', creditsPerUnit: 0, latestValue: null },
+        },
+      ],
+    } as never);
+    vi.mocked(useBillingServiceGetResourceBillingConfiguration).mockReturnValue({
+      data: {
+        configuration: { creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 },
+        additionalItems: [],
+      },
+    } as never);
+    const onVisibilityChange = vi.fn();
+    render(<ResourceBillingInfo resourceId={205} onVisibilityChange={onVisibilityChange} />);
+    expect(await screen.findByText(en.title)).toBeInTheDocument();
+    expect(onVisibilityChange).toHaveBeenCalledWith(true);
+  });
+
   it('displays the configured operating-minute rate', async () => {
     render(<ResourceBillingInfo resourceId={205} />);
 

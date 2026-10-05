@@ -92,4 +92,10 @@ describe('currency', () => {
     expect(formatCredits(0, 2, { locale: 'de', minimumFractionDigits: 2 })).toBe('0,00');
     expect(formatCredits(30, 2, { locale: 'de', minimumFractionDigits: 2 })).toBe('0,30');
   });
+
+  it('formats exact products and sums without a Number intermediate', () => {
+    const product = toExactCredits(4503599627370496) * toExactCredits(2);
+    expect(formatCredits(product, 2, { useGrouping: false })).toBe('90071992547409.92');
+    expect(formatCredits(product - BigInt(1), 2, { locale: 'de' })).toBe('90.071.992.547.409,91');
+  });
 });

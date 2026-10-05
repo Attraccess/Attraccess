@@ -32,14 +32,14 @@ export function toExactCredits(credits: number): bigint {
 
 /** Format integer credits without rounding cents through a major-unit Number. */
 export function formatCredits(
-  amount: number,
+  amount: number | bigint,
   minorUnit: number,
   options: { locale?: string; useGrouping?: boolean; minimumFractionDigits?: number } = {},
 ): string {
   if (!Number.isInteger(minorUnit) || minorUnit < 0 || minorUnit > 20)
     throw new RangeError('Invalid currency minor unit');
   const { locale = 'en', useGrouping = true, minimumFractionDigits = 0 } = options;
-  const credits = toExactCredits(amount);
+  const credits = typeof amount === 'bigint' ? amount : toExactCredits(amount);
   const scale = BigInt('1' + '0'.repeat(minorUnit));
   const whole = credits / scale;
   const remainder = credits < BigInt(0) ? -(credits % scale) : credits % scale;

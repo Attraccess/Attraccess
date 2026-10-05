@@ -19,7 +19,8 @@ export class MeterRateDto {
   creditsPerUnit!: number;
 }
 class MeterSessionDto {
-  @ApiProperty() sessionId!: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Null when meter initialization was skipped' })
+  sessionId!: string | null;
   @ApiProperty() usageId!: number;
   @ApiProperty() meterName!: string;
   @ApiProperty() creditsPerUnit!: number;

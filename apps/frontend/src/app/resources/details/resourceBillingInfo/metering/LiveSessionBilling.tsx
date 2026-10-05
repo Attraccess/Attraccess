@@ -77,7 +77,11 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
           <Fragment key={meter.id}>
             <dt>{meter.meterName}</dt>
             <dd className={valueClass} data-cy="live-meter-value">
-              {meter.latestValue == null ? t('live.meterWaiting') : formatValue(meter.latestValue)}
+              {meter.latestValue == null
+                ? meter.sessionId === null
+                  ? t('live.meterUnavailable')
+                  : t('live.meterWaiting')
+                : formatValue(meter.latestValue)}
             </dd>
             <dt>{t('live.meterRate', { name: meter.meterName })}</dt>
             <dd className={valueClass} data-cy="live-meter-rate">

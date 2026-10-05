@@ -13,7 +13,7 @@ import {
   Resource,
   ResourceHealthStatus,
 } from '@attraccess/database-entities';
-import { dbCurrencyToUserCurrency, formatCredits } from '@attraccess/shared';
+import { formatCredits, toExactCredits } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
@@ -271,8 +271,10 @@ export class EmailService {
       unitPrice:
         item.meterCreditsPerUnit != null
           ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
-          : dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
-      total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
+          : formatCredits(item.unitPrice, currencyMinorUnit, { useGrouping: false }),
+      total: formatCredits(toExactCredits(item.unitPrice) * toExactCredits(item.quantity), currencyMinorUnit, {
+        useGrouping: false,
+      }),
       isFixedFee: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_SESSION',
       isSessionDuration: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_MINUTE',
       isOperatingDuration:
@@ -289,7 +291,7 @@ export class EmailService {
       durationSeconds: item.durationMs == null ? undefined : secondsFormatter.format(item.durationMs / 1000),
     }));
 
-    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit);
+    const totalCredits = formatCredits(-transaction.amount, currencyMinorUnit, { useGrouping: false });
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -305,7 +307,7 @@ export class EmailService {
       },
       items,
       totalCredits,
-      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit),
+      newBalance: formatCredits(user.creditBalance, currencyMinorUnit, { useGrouping: false }),
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);

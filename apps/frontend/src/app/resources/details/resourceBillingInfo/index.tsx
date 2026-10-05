@@ -96,7 +96,9 @@ export function ResourceBillingInfo(props: Props) {
     );
   }, [resourceBillingConfiguration, configuration]);
 
-  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId });
+  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId }, undefined, {
+    refetchInterval: 10_000,
+  });
   const hasMeterRates = meters.some((meter) => meter.creditsPerUnit > 0);
   const hasMeterSessions = meters.some((meter) => meter.session != null);
 

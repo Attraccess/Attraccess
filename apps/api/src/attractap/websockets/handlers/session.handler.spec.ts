@@ -559,6 +559,28 @@ describe('AttractapSessionHandler – session + flow button', () => {
         formattedRate: '0,002 KWD',
       });
     });
+    it('keeps a skipped free meter unavailable with its captured name and zero rate after edits', async () => {
+      metering.getLive.mockResolvedValue({
+        meters: [
+          {
+            id: 1,
+            name: 'Renamed Heartbeats',
+            creditsPerUnit: 100,
+            session: {
+              sessionId: null,
+              usageId: 99,
+              meterName: 'Heartbeats',
+              creditsPerUnit: 0,
+              latestValue: null,
+            },
+          },
+        ],
+      });
+      await handler.handleResourceUsageStats(mockSocket as any, request);
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload.usage.meters).toEqual([
+        { id: 1, name: 'Heartbeats', creditsPerUnit: 0, formattedRate: '0,00 EUR', value: null },
+      ]);
+    });
     it('keeps unavailable readings distinct from zero and discards a different meter session', async () => {
       metering.getLive.mockResolvedValue({
         meters: [{ id: 1, name: 'Heartbeats', session: { usageId: 100, latestValue: '9' } }],

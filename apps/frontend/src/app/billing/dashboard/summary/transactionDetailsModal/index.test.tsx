@@ -61,13 +61,13 @@ it('shows usage charges, item totals and refund action using minor currency unit
   };
   render(<TransactionDetailsModal transactionId={7} isOpen />);
   expect(await screen.findByText('type.resourceUsage')).toBeTruthy();
-  expect(screen.getByText('-7.50')).toBeTruthy();
+  expect(screen.getByText('-7,5')).toBeTruthy();
   expect(screen.getByText('Lathe')).toBeTruthy();
   expect(screen.getByText('Ada')).toBeTruthy();
   expect(screen.getByText('items.system.usage')).toBeTruthy();
   expect(screen.getByText('Custom fee')).toBeTruthy();
   expect(screen.getByText('usage-item-1')).toBeTruthy();
-  expect(screen.getByText('8.50')).toBeTruthy();
+  expect(screen.getByText('8,5')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'actions.refund' }));
   expect(state.refund).toHaveBeenCalledOnce();
 });
@@ -113,7 +113,7 @@ it.each([
   expect(await screen.findByText(label)).toBeTruthy();
   expect(screen.getByText('items.empty')).toBeTruthy();
   expect(screen.getByText('status.' + fields.status)).toBeTruthy();
-  if (fields.amount > 0) expect(screen.getByText('+100.00')).toBeTruthy();
+  if (fields.amount > 0) expect(screen.getByText('+100')).toBeTruthy();
 });
 it('falls back to usage ID and closes when the controlled open flag changes', async () => {
   state.transaction = {
@@ -174,6 +174,29 @@ it('preserves every cent in a large captured meter rate', async () => {
   expect(await screen.findByText('90.071.992.547.409,91')).toBeTruthy();
 });
 
+it('preserves exact nonzero subtotals, aggregate totals and the settled amount', async () => {
+  state.transaction = {
+    id: 7,
+    status: 'completed',
+    amount: -Number.MAX_SAFE_INTEGER,
+    items: [
+      {
+        id: 1,
+        name: 'Heartbeats',
+        quantity: 1,
+        unitPrice: Number.MAX_SAFE_INTEGER - 2,
+        meterQuantity: '1',
+        meterCreditsPerUnit: 1,
+      },
+      { id: 2, name: 'Additional fee', quantity: 2, unitPrice: 1 },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={7} isOpen />);
+  expect(await screen.findByText('-90.071.992.547.409,91')).toBeTruthy();
+  expect(screen.getByText('90.071.992.547.409,89')).toBeTruthy();
+  expect(screen.getByText('90.071.992.547.409,91')).toBeTruthy();
+});
+
 it('distinguishes unavailable final evidence from a free zero reading and system labels', async () => {
   state.transaction = {
     id: 7,
@@ -200,5 +223,7 @@ it('distinguishes unavailable final evidence from a free zero reading and system
   expect(screen.queryByText('metering:session:unavailable')).toBeNull();
   expect(screen.getByText('0,17')).toBeTruthy();
   expect(screen.getByText('Free Heartbeats')).toBeTruthy();
-  expect(screen.getAllByText('0')).toHaveLength(2);
+  const freeRow = screen.getByText('Free Heartbeats').closest('tr');
+  expect(freeRow?.querySelectorAll('td')[2].textContent).toBe('0');
+  expect(freeRow?.querySelectorAll('td')[3].textContent).toBe('0');
 });

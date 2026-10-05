@@ -50,8 +50,14 @@ export class GenericMeters1790100000000 implements MigrationInterface {
       for (const node of nodes) {
         const data = JSON.parse(node.data ?? '{}');
         data.meterId = id;
-        // Preserve explicitly empty units so the conversion migration retains their rejection path.
-        if (Object.hasOwn(data, 'unit') || Object.hasOwn(data, 'baselineUnit'))
+        // Missing legacy units were also rejected for reports and configured baselines.
+        // Ready nodes without a baseline remain valid reset acknowledgements.
+        if (
+          Object.hasOwn(data, 'unit') ||
+          Object.hasOwn(data, 'baselineUnit') ||
+          node.type.endsWith('.report') ||
+          (node.type.endsWith('.ready') && typeof data.baselineValue === 'string' && data.baselineValue.trim())
+        )
           data.legacyEnergyUnit = data.unit ?? data.baselineUnit ?? '';
         delete data.unit;
         delete data.baselineUnit;
@@ -103,6 +109,15 @@ export class GenericMeters1790100000000 implements MigrationInterface {
   }
 
   async down(runner: QueryRunner): Promise<void> {
+    // Even an empty snapshot freezes a free usage's terms. The energy-only runtime
+    // cannot preserve that evidence when the generic snapshot column is removed.
+    const [{ snapshots }] = await runner.query(
+      'SELECT COUNT(*) AS snapshots FROM resource_usage WHERE meterRates IS NOT NULL',
+    );
+    if (snapshots > 0)
+      throw new Error(
+        'Cannot revert generic meters without losing historical meter rate snapshots. Restore a pre-migration backup instead.',
+      );
     const [{ count }] = await runner.query(`SELECT
       (SELECT COUNT(*) FROM resource_meter WHERE name <> 'Energy (kWh)') +
       (SELECT COUNT(*) FROM billing_transaction_item WHERE meterQuantity IS NOT NULL) +

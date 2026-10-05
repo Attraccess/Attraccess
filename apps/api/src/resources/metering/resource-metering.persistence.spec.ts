@@ -34,6 +34,7 @@ import { MeteringReadyExecutor, MeteringReportExecutor } from '../flows/node-exe
 import { compileFlowTemplate } from '../flows/flow-template';
 import { MeterFlowConversions1790300000000 } from '../../database/migrations/1790300000000-meter-flow-conversions';
 import { ResourceMeteringService } from './resource-metering.service';
+import { MeteringReadings } from './metering-readings';
 import { EmailService } from '../../email/email.service';
 import { readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../email-template/email-defaults';
 import { EmailTemplateType } from '@attraccess/database-entities';
@@ -1405,6 +1406,49 @@ describe('Flow-defined metering', () => {
       expect((await items(started.id)).transaction.amount).toBe(0);
     });
 
+    it.each(['failed', 'unconfigured'])(
+      'exposes captured unavailable terms after a %s free-meter start',
+      async (start) => {
+        await metering.setRate(1, 1, 0);
+        if (start === 'failed') {
+          await seedMeter();
+          onStart = async () => {
+            throw new Error('offline');
+          };
+        }
+        const started = await usage.startSession(1, users[0], {} as never);
+        expect(await source.getRepository(ResourceMeteringSession).count()).toBe(0);
+        await metering.updateMeter(1, 1, 'Renamed later');
+        await metering.setRate(1, 1, 99);
+        const unavailable = {
+          sessionId: null,
+          usageId: started.id,
+          meterName: 'Energy (kWh)',
+          creditsPerUnit: 0,
+          latestValue: null,
+          chargeCredits: null,
+          latestObservedAt: null,
+          source: null,
+        };
+        expect((await metering.listMeters(1))[0]).toMatchObject({
+          name: 'Renamed later',
+          creditsPerUnit: 99,
+          session: unavailable,
+        });
+        expect((await metering.getLive(1)).meters[0].session).toEqual(unavailable);
+
+        const usages = source.getRepository(ResourceUsage);
+        await usages.update(started.id, { meterRates: [] });
+        expect((await metering.listMeters(1))[0].session).toBeNull();
+        await usages.update(started.id, { meterRates: started.meterRates, lifecyclePending: true });
+        expect((await metering.listMeters(1))[0].session).toBeNull();
+        await usages.update(started.id, { lifecyclePending: false });
+        await usage.endSession(1, users[0], {} as never);
+        expect((await metering.listMeters(1))[0].session).toBeNull();
+        expect((await items(started.id)).transaction.amount).toBe(0);
+      },
+    );
+
     it('rejects an idle collection reply after an increment session starts', async () => {
       await seedMeter();
       await source.getRepository(ResourceMeter).update(1, { counterValue: '100000000000' });
@@ -1440,6 +1484,47 @@ describe('Flow-defined metering', () => {
         release();
         await collection;
       }
+    });
+
+    it.each([
+      ['failed', false],
+      ['failed', true],
+      ['unconfigured', false],
+      ['unconfigured', true],
+    ])('rejects an idle reply crossing a %s free-meter start, ended=%s', async (start, ended) => {
+      await seedMeter();
+      await metering.setRate(1, 1, 0);
+      await source.getRepository(ResourceMeter).update(1, { counterValue: '100000000000' });
+      await source.getRepository(ResourceMeteringOperation).save({
+        id: 'outstanding-idle',
+        resourceId: 1,
+        meterId: 1,
+        sessionId: null,
+        kind: 'interim',
+        status: 'pending',
+        requestedAt: new Date(),
+      });
+      if (start === 'failed') {
+        onStart = async () => {
+          throw new Error('offline');
+        };
+      } else {
+        await source.getRepository(ResourceFlowNode).delete(['start', 'ready']);
+        await source.getRepository(ResourceFlowEdge).delete('e1');
+      }
+      const started = await usage.startSession(1, users[0], {} as never);
+      expect(await source.getRepository(ResourceMeteringSession).count()).toBe(0);
+      expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
+      if (ended) await usage.endSession(1, users[0], {} as never);
+      await expect(
+        new MeteringReadings(source.manager, new Map()).complete('outstanding-idle', {
+          kind: 'reading',
+          value: '105',
+        }),
+      ).rejects.toThrow('session boundary');
+      expect((await metering.listMeters(1))[0].counterValue).toBe('100');
+      expect((await metering.listMeters(1))[0].lifetimeValue).toBe('0');
+      expect((await items(started.id)).transaction.amount).toBe(0);
     });
 
     it('records increments without a session and keeps other meters independent', async () => {
@@ -1693,7 +1778,7 @@ describe('Flow-defined metering', () => {
           isDuration: false,
           quantity: '—',
         });
-        expect(context.totalCredits).toBe(0.45);
+        expect(context.totalCredits).toBe('0.45');
         expect(context.usage.roundedMinutes).toBeUndefined();
         const before = await items(started.id);
         const pending = await source

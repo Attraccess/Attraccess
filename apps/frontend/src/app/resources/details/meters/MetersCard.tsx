@@ -39,11 +39,15 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
                 <dd className="font-medium break-all">{format(meter.lifetimeValue)}</dd>
               </div>
               <div>
-                <dt className="text-muted">{t('session')}</dt>
+                <dt className="text-muted break-all">
+                  {meter.session ? t('sessionName', { name: meter.session.meterName }) : t('session')}
+                </dt>
                 <dd className="font-medium break-all">
                   {meter.session
                     ? meter.session.latestValue == null
-                      ? t('waiting')
+                      ? meter.session.sessionId === null
+                        ? t('unavailable')
+                        : t('waiting')
                       : format(meter.session.latestValue)
                     : t('idle')}
                 </dd>

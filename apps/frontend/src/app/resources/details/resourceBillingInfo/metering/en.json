@@ -5,6 +5,7 @@
     "meter": "Meter reading",
     "meterValue": "{{value}} ",
     "meterWaiting": "Waiting for the first reading",
+    "meterUnavailable": "Reading unavailable",
     "meterAsOf": "as of {{time}}",
     "meterCost": "{{name}} cost so far",
     "meterRate": "{{name}} session rate",

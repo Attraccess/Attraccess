@@ -97,6 +97,7 @@ export class AttractapSessionHandler {
               )
             : null,
           isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
+          // Catalog entries include captured terms with unavailable values for skipped free meters.
           // Never attach a new session's meter reading to an earlier usage snapshot.
           meters: meter.meters
             .filter((entry) => entry.session?.usageId === usage.id)
