@@ -177,3 +177,4 @@ export * from './1790300000000-meter-flow-conversions';
 export * from './1790400000000-refresh-default-meter-receipt';
 export * from './1791000000000-rfid-card-management-permission';
 export * from './1791100000000-refresh-responsive-meter-receipt';
+export * from './1791200000000-refresh-meter-evidence-receipt';

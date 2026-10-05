@@ -8,6 +8,19 @@ export function userCurrencyToDbCurrency(amount: number, minorUnit: number) {
   return Math.round(amount * factor);
 }
 
+/** Parse a nonnegative decimal price without passing its major units through Number. */
+export function parseCredits(value: string, minorUnit: number): number {
+  if (!Number.isInteger(minorUnit) || minorUnit < 0 || minorUnit > 20)
+    throw new RangeError('Invalid currency minor unit');
+  const match = /^(\d+)(?:[.,](\d*))?$/.exec(value.trim());
+  if (!match) throw new RangeError('Invalid decimal price');
+  const fraction = (match[2] ?? '').replace(/0+$/, '');
+  if (fraction.length > minorUnit) throw new RangeError('Price has too many decimal places');
+  const credits = BigInt(match[1] + fraction.padEnd(minorUnit, '0'));
+  if (credits > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError('Price exceeds the supported billing range');
+  return Number(credits);
+}
+
 /** Convert integer minor currency units before adding or multiplying charges. */
 export function toExactCredits(credits: number): bigint {
   if (!Number.isSafeInteger(credits)) throw new RangeError('Charge exceeds the supported billing range');

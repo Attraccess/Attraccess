@@ -214,58 +214,87 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                     <div className="mb-2 font-semibold">{t('items.title')}</div>
                     <Table>
                       <TableScrollContainer>
-                        <TableContent aria-label="Transaction items">
+                        <TableContent aria-label="Transaction items" className="w-full table-fixed">
                           <TableHeader>
-                            <TableColumn isRowHeader>{t('items.columns.name')}</TableColumn>
-                            <TableColumn>{t('items.columns.description')}</TableColumn>
-                            <TableColumn>{t('items.columns.quantity')}</TableColumn>
-                            <TableColumn>{t('items.columns.unitPrice')}</TableColumn>
-                            <TableColumn>{t('items.columns.subtotal')}</TableColumn>
+                            <TableColumn isRowHeader className="w-[40%] sm:w-[22%]">
+                              {t('items.columns.name')}
+                            </TableColumn>
+                            <TableColumn className="hidden w-[28%] sm:table-cell">
+                              {t('items.columns.description')}
+                            </TableColumn>
+                            <TableColumn className="w-[25%] sm:w-[20%]">{t('items.columns.quantity')}</TableColumn>
+                            <TableColumn className="w-[17.5%] px-2 whitespace-normal wrap-anywhere sm:w-[15%]">
+                              <span className="sm:hidden">{t('items.columns.rateShort')}</span>
+                              <span className="hidden sm:inline">{t('items.columns.unitPrice')}</span>
+                            </TableColumn>
+                            <TableColumn className="w-[17.5%] px-2 whitespace-normal wrap-anywhere sm:w-[15%]">
+                              <span className="sm:hidden">{t('items.columns.totalShort')}</span>
+                              <span className="hidden sm:inline">{t('items.columns.subtotal')}</span>
+                            </TableColumn>
                           </TableHeader>
                           <TableBody renderEmptyState={() => t('items.empty')}>
-                            {(transaction.items ?? []).map((item) => (
-                              <TableRow key={item.id} id={item.id}>
-                                <TableCell>
-                                  <div className="font-medium">
-                                    {item.meterQuantity == null && tExists('items.system.' + item.name)
-                                      ? t('items.system.' + item.name)
-                                      : item.name}
-                                  </div>
-                                  {item.externalReference && item.meterQuantity == null && (
-                                    <div className="text-tiny text-default-400">{item.externalReference}</div>
-                                  )}
-                                </TableCell>
-                                <TableCell className="max-w-[28ch] truncate">
-                                  {item.meterQuantity != null
-                                    ? t('items.meterDescription', {
-                                        value: formatMeterValue(item.meterQuantity),
-                                        rate: formatCredits(item.meterCreditsPerUnit ?? 0),
-                                      })
-                                    : item.description}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {item.meterQuantity != null ? formatMeterValue(item.meterQuantity) : item.quantity}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {item.meterQuantity != null
-                                    ? formatCredits(item.meterCreditsPerUnit ?? 0)
-                                    : formatNumber(
-                                        dbCurrencyToUserCurrency(
-                                          item.meterCreditsPerUnit ?? item.unitPrice,
-                                          configuration?.minorUnit ?? 2,
-                                        ),
-                                      )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {formatNumber(
-                                    dbCurrencyToUserCurrency(
-                                      item.unitPrice * item.quantity,
-                                      configuration?.minorUnit ?? 2,
-                                    ),
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {(transaction.items ?? []).map((item) => {
+                              const isMeter = item.meterCreditsPerUnit != null || item.meterQuantity != null;
+                              const value =
+                                item.meterQuantity == null
+                                  ? t('items.unavailable')
+                                  : formatMeterValue(item.meterQuantity);
+                              return (
+                                <TableRow key={item.id} id={item.id}>
+                                  <TableCell className="min-w-0 whitespace-normal wrap-anywhere">
+                                    <div className="font-medium">
+                                      {!isMeter && tExists('items.system.' + item.name)
+                                        ? t('items.system.' + item.name)
+                                        : item.name}
+                                    </div>
+                                    <div className="text-tiny text-default-500 sm:hidden">
+                                      {isMeter && item.meterQuantity == null
+                                        ? t('items.meterUnavailable', {
+                                            rate: formatCredits(item.meterCreditsPerUnit ?? 0),
+                                          })
+                                        : item.description}
+                                    </div>
+                                    {item.externalReference && !isMeter && (
+                                      <div className="text-tiny text-default-400">{item.externalReference}</div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="hidden min-w-0 whitespace-normal wrap-anywhere sm:table-cell">
+                                    {isMeter
+                                      ? t(
+                                          item.meterQuantity == null
+                                            ? 'items.meterUnavailable'
+                                            : 'items.meterDescription',
+                                          {
+                                            value,
+                                            rate: formatCredits(item.meterCreditsPerUnit ?? 0),
+                                          },
+                                        )
+                                      : item.description}
+                                  </TableCell>
+                                  <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
+                                    {isMeter ? value : item.quantity}
+                                  </TableCell>
+                                  <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
+                                    {isMeter
+                                      ? formatCredits(item.meterCreditsPerUnit ?? 0)
+                                      : formatNumber(
+                                          dbCurrencyToUserCurrency(
+                                            item.meterCreditsPerUnit ?? item.unitPrice,
+                                            configuration?.minorUnit ?? 2,
+                                          ),
+                                        )}
+                                  </TableCell>
+                                  <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
+                                    {formatNumber(
+                                      dbCurrencyToUserCurrency(
+                                        item.unitPrice * item.quantity,
+                                        configuration?.minorUnit ?? 2,
+                                      ),
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </TableContent>
                       </TableScrollContainer>

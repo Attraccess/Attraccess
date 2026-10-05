@@ -173,3 +173,32 @@ it('preserves every cent in a large captured meter rate', async () => {
   render(<TransactionDetailsModal transactionId={7} isOpen />);
   expect(await screen.findByText('90.071.992.547.409,91')).toBeTruthy();
 });
+
+it('distinguishes unavailable final evidence from a free zero reading and system labels', async () => {
+  state.transaction = {
+    id: 7,
+    status: 'completed',
+    amount: 0,
+    items: [
+      {
+        id: 1,
+        name: 'usage',
+        quantity: 1,
+        unitPrice: 0,
+        meterQuantity: null,
+        meterCreditsPerUnit: 17,
+        externalReference: 'metering:session:unavailable',
+      },
+      { id: 2, name: 'Free Heartbeats', quantity: 1, unitPrice: 0, meterQuantity: '0', meterCreditsPerUnit: 0 },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={7} isOpen />);
+  expect(await screen.findByText('items.unavailable')).toBeTruthy();
+  expect(screen.getAllByText('items.meterUnavailable').length).toBeGreaterThan(0);
+  expect(screen.getByText('usage')).toBeTruthy();
+  expect(screen.queryByText('items.system.usage')).toBeNull();
+  expect(screen.queryByText('metering:session:unavailable')).toBeNull();
+  expect(screen.getByText('0,17')).toBeTruthy();
+  expect(screen.getByText('Free Heartbeats')).toBeTruthy();
+  expect(screen.getAllByText('0')).toHaveLength(2);
+});

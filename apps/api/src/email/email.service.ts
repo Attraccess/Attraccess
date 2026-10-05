@@ -263,18 +263,25 @@ export class EmailService {
     const items = (transaction.items ?? []).map((item) => ({
       name: item.name,
       description: item.description,
-      quantity: item.meterQuantity ?? item.quantity,
+      quantity:
+        item.meterCreditsPerUnit != null && item.meterQuantity == null ? '—' : (item.meterQuantity ?? item.quantity),
+      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null,
       unitPrice:
         item.meterCreditsPerUnit != null
           ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
           : dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
-      isFixedFee: item.meterQuantity == null && item.name === 'PER_SESSION',
-      isSessionDuration: item.meterQuantity == null && item.name === 'PER_MINUTE',
-      isOperatingDuration: item.meterQuantity == null && item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
-      isBillingFactor: item.meterQuantity == null && item.name === 'BILLING_FACTOR',
+      isFixedFee: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_SESSION',
+      isSessionDuration: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_MINUTE',
+      isOperatingDuration:
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      isBillingFactor: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'BILLING_FACTOR',
       isDuration:
-        item.meterQuantity == null && (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),
       durationMs: item.durationMs,
       hasDuration: item.durationMs != null,
       durationSeconds: item.durationMs == null ? undefined : secondsFormatter.format(item.durationMs / 1000),

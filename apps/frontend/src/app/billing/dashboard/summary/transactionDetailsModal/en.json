@@ -33,7 +33,9 @@
       "description": "Description",
       "quantity": "Qty",
       "unitPrice": "Unit price",
-      "subtotal": "Subtotal"
+      "subtotal": "Subtotal",
+      "rateShort": "Rate",
+      "totalShort": "Total"
     },
     "system": {
       "PER_SESSION": "Per session",
@@ -43,7 +45,9 @@
     },
     "empty": "No items",
     "total": "Items total",
-    "meterDescription": "{{value}} at {{rate}} per measured value"
+    "meterDescription": "{{value}} at {{rate}} per measured value",
+    "unavailable": "Unavailable",
+    "meterUnavailable": "Final reading unavailable; no meter charge included. Captured rate: {{rate}} per measured value."
   },
   "actions": {
     "refund": "Refund",

@@ -2,11 +2,29 @@ import {
   applyBillingFactor,
   dbCurrencyToUserCurrency,
   formatCredits,
+  parseCredits,
   toExactCredits,
   userCurrencyToDbCurrency,
 } from './currency';
 
 describe('currency', () => {
+  it.each([
+    ['90071992547409.91', 2, Number.MAX_SAFE_INTEGER],
+    ['9007199254740,991', 3, Number.MAX_SAFE_INTEGER],
+    ['9007199254740991', 0, Number.MAX_SAFE_INTEGER],
+    ['0,123456789', 9, 123456789],
+    ['1.2300', 2, 123],
+    ['0', 2, 0],
+  ])('parses the exact price %s at scale %s', (value, minorUnit, expected) => {
+    expect(parseCredits(value, minorUnit)).toBe(expected);
+  });
+
+  it.each(['', '-1', 'NaN', '1e3', '1.2.3', '1,234.56', '0.001', '90071992547409.92'])(
+    'rejects an invalid or out-of-range price %j instead of changing it',
+    (value) => {
+      expect(() => parseCredits(value, 2)).toThrow(RangeError);
+    },
+  );
   it('should convert api currency to frontend currency', () => {
     expect(dbCurrencyToUserCurrency(100, 2)).toBe(1);
     expect(dbCurrencyToUserCurrency(100, 3)).toBe(0.1);

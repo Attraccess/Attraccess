@@ -15,7 +15,8 @@
     },
     "meterRate": {
       "label": "per measured value ({{currency}})",
-      "description": "0 disables billing. The rate is captured when a session starts."
+      "description": "0 disables billing. The rate is captured when a session starts.",
+      "invalid": "Enter a valid price with up to {{digits}} decimal places."
     }
   },
   "actions": {

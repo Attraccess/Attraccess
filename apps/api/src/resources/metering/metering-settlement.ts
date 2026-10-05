@@ -39,6 +39,47 @@ export class MeteringSettlement {
         reading ?? { status: 'unavailable', reason: 'No final reading was collected' },
       );
     }
+    // Best-effort meters can be skipped at start. Their captured terms still
+    // belong on the receipt, with an unavailable quantity rather than a zero.
+    const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: usageId } });
+    const allSessions = await manager.find(ResourceMeteringSession, { where: { usageId } });
+    for (const meter of usage.meterRates ?? []) {
+      if (!allSessions.some((session) => session.meterId === meter.meterId)) {
+        await this.addUnavailableItem(
+          manager,
+          usageId,
+          meter.name,
+          meter.creditsPerUnit,
+          `metering:${usageId}:skipped:${meter.meterId}`,
+        );
+      }
+    }
+  }
+
+  private async addUnavailableItem(
+    manager: EntityManager,
+    usageId: number,
+    name: string,
+    creditsPerUnit: number,
+    externalReference: string,
+  ): Promise<void> {
+    const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: usageId } });
+    if (
+      await manager.exists(BillingTransactionItem, {
+        where: { billingTransactionId: transaction.id, externalReference },
+      })
+    )
+      return;
+    await manager.save(BillingTransactionItem, {
+      billingTransactionId: transaction.id,
+      name,
+      description: null,
+      externalReference,
+      unitPrice: 0,
+      quantity: 1,
+      meterQuantity: null,
+      meterCreditsPerUnit: creditsPerUnit,
+    });
   }
 
   private async settleSession(
@@ -54,6 +95,13 @@ export class MeteringSettlement {
           })
         : null;
     if (!operation) {
+      await this.addUnavailableItem(
+        manager,
+        usageId,
+        session.meterName,
+        session.creditsPerUnit,
+        `metering:${session.id}:unavailable`,
+      );
       const superseded = await manager.count(ResourceMeteringSession, {
         where: { resourceId: session.resourceId, meterId: session.meterId, usageId: MoreThan(usageId) },
       });
@@ -70,10 +118,8 @@ export class MeteringSettlement {
       });
       return;
     }
-    if (session.creditsPerUnit > 0) {
-      const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: usageId } });
-      await this.addMeterItem(manager, transaction, session, operation);
-    }
+    const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: usageId } });
+    await this.addMeterItem(manager, transaction, session, operation);
     await manager.update(ResourceMeteringSession, session.id, {
       status: ResourceMeteringSessionStatus.Settled,
       consumedValue: operation.totalValue,
