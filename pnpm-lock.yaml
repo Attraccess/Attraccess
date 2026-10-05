@@ -460,8 +460,8 @@ importers:
         specifier: ^7.29.7
         version: 7.29.7(@babel/core@7.29.7)
       '@balena/compose-parser':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.1
       '@commitlint/cli':
         specifier: ^19.6.1
         version: 19.8.1(@types/node@25.9.9)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
@@ -2105,8 +2105,8 @@ packages:
     peerDependencies:
       '@balena/sbvr-types': ^7.1.0 || ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
 
-  '@balena/compose-parser@0.3.0':
-    resolution: {integrity: sha512-Q7ThmKiIhFnJVra0OGeiCXwjDzV8F6cu7CS/Bjk7VQyEyiU27x87P6lOvOOk5SE0NT71hH5QrrEgXzn0PPvd2w==}
+  '@balena/compose-parser@0.4.1':
+    resolution: {integrity: sha512-Ik6UM6upXTJpZAS9Mt3/7FubwkWYyKfu8VF14BSc08sAF9aDD8Zl/61Ubeo0S6XXi3gwFl+/vHP8UZLquOt5/g==}
     engines: {node: '>= 22.14.0', npm: '>= 11.5.1'}
 
   '@balena/dockerignore@1.0.2':
@@ -20846,7 +20846,7 @@ snapshots:
       '@types/node': 20.19.43
       common-tags: 1.8.2
 
-  '@balena/compose-parser@0.3.0':
+  '@balena/compose-parser@0.4.1':
     dependencies:
       semver: 7.8.5
       tar: 7.5.22
