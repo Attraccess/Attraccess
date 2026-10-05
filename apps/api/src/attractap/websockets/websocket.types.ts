@@ -21,6 +21,7 @@ export enum AttractapEventType {
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_RESOURCE_LIST = 'REQUEST_RESOURCE_LIST',
+  RESOURCE_USAGE_STATS = 'RESOURCE_USAGE_STATS',
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
   CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
   // Two-card supervision (ATT-493): a non-introduced user taps first, then a
@@ -117,6 +118,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
     } | null;
     enrollNewCardData: {
+      userId: number;
       key: string;
       keyNo: number;
       cardUID: string;

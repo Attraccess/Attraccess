@@ -99,12 +99,9 @@ function owningProject(file: string): { name: string; tags: string[] } | null {
   }
 }
 
-/**
- * The files the guard scans: every `.tsx` under `apps`/`libs` except hardware boards
- * (tscircuit definitions tagged `scope:hardware`), which never render HeroUI fields.
- */
+/** The files the guard scans: every `.tsx` under `apps`/`libs`. */
 function scannedTsxFiles(): string[] {
-  return SCAN_DIRS.flatMap((dir) => listTsxFiles(path.join(ROOT, dir))).filter((file) => !owningProject(file)?.tags.includes('scope:hardware'));
+  return SCAN_DIRS.flatMap((dir) => listTsxFiles(path.join(ROOT, dir)));
 }
 
 const sourceCache = new Map<string, Node>();

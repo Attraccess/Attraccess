@@ -47,6 +47,9 @@
     "total": "Summe Positionen"
   },
   "actions": {
-    "refund": "Erstattung"
-  }
+    "refund": "Erstattung",
+    "openUsage": "Nutzungsdetails öffnen"
+  },
+  "loadError": "Abrechnungsdetails konnten nicht geladen werden.",
+  "retry": "Erneut versuchen"
 }

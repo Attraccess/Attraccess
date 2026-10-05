@@ -16,6 +16,7 @@ export type SystemPermission =
   | 'users.delete'
   | 'users.roles.manage'
   | 'users.api-tokens.manage'
+  | 'users.rfid-cards.manage'
   | 'system.settings.manage'
   | 'system.audit.read'
   | 'system.sso.manage'

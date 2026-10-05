@@ -4,6 +4,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   useOverlayState,
 } from '@heroui/react';
@@ -153,7 +154,7 @@ export function NodeEditor(props: Props) {
       {props.children(open)}
       <StandardDrawer isOpen={isOpen} onOpenChange={(nextOpen) => nextOpen ? setOpen(true) : onClose()}>
         <DrawerHeader className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold">{nodeTitle}</h2>
+          <DrawerHeading className="text-lg font-semibold">{nodeTitle}</DrawerHeading>
           <p className="text-sm text-default-500">{nodeDescription}</p>
         </DrawerHeader>
 

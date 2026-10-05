@@ -24,6 +24,10 @@ Configs ship inside the `attraccess` image:
 
 A short-lived `monitoring-init` helper service runs the same image, copies these files into named volumes on stack startup, and exits. Prometheus and Grafana mount those volumes read-only and depend on `monitoring-init` finishing successfully (`service_completed_successfully`). This lets the compose file deploy standalone — operators do not need to clone the repo or maintain a `./monitoring` directory next to their compose file.
 
+When Pushover is enabled, the bundled Coolify, Balena and development Compose configurations also run `grafana-contactpoints-cleanup` after Grafana starts. It removes legacy file-provisioned `Pushover` integrations without title/message templates only after the current `pushover-attraccess` receiver exists. This fixes duplicate notifications on upgrades from earlier provisioning builds, while preserving custom templates and UI/API-managed contact points. Update the Compose configuration as well as the app image when upgrading to receive this cleanup.
+
+The cleanup job needs the **current** Grafana admin credentials. If you changed the password in Grafana, set `GRAFANA_ADMIN_PASSWORD` (and `GRAFANA_ADMIN_USER` if needed) to those credentials; on Balena, use the `GF_SECURITY_ADMIN_PASSWORD` / `GF_SECURITY_ADMIN_USER` device or fleet variables instead. These variables do not reset an existing Grafana password. Authentication failures are reported in the cleanup service logs; after correcting the credentials, recreate that service to rerun it.
+
 ## Coolify Deployment
 
 Use [`coolify.docker-compose.yml`](https://github.com/Attraccess/Attraccess/blob/main/coolify.docker-compose.yml) from the repo root. Coolify auto-generates the FQDN routing and session secrets via `SERVICE_FQDN_*`, `SERVICE_URL_*`, and `SERVICE_BASE64_*` env conventions. After the stack is deployed:

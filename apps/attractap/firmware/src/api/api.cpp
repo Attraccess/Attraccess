@@ -118,7 +118,9 @@ void API::processIncomingMessage(const char *buf, size_t len)
                               strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
 
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    if (!isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
+    // Background stats failures must not interrupt start/stop controls with a popup.
+    const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
+    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
         inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
@@ -172,6 +174,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
     {
         this->sendAuthenticationRequest();
+    }
+    else if (strcmp(eventType, "RESOURCE_USAGE_STATS") == 0)
+    {
+        this->onUsageStats(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "RESOURCE_LIST") == 0)
     {

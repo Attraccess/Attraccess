@@ -171,3 +171,4 @@ export * from './1789900001000-refresh-default-usage-receipt';
 export * from './1790000000000-energy-metering';
 export * from './1765442000000-form-field-position';
 export * from './1783700000000-refresh-default-email-layout';
+export * from './1791000000000-rfid-card-management-permission';

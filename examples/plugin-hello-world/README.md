@@ -18,6 +18,9 @@ guide and exercises every core capability:
 
 ## Layout
 
+The frontend declares a **Hello World** sidebar group with `getSidebarGroups()`
+and places its navigation entry there using `group: 'hello-world'`.
+
 ```
 plugin-hello-world/
 ├── plugin.json              # manifest (backend + frontend entries, permissions)

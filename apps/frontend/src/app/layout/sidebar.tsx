@@ -43,7 +43,7 @@ import { Logo } from '../../components/logo';
 import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
 import { NavLink as RouterNavLink, useNavigate } from 'react-router-dom';
 import usePluginState from '../plugins/plugin.state';
-import type { PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
+import type { PluginSidebarGroup, PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
 import { useAppTheme } from '@attraccess/ui';
 
 interface NavLinkProps {
@@ -158,6 +158,13 @@ interface SidebarProps {
   toggleCollapsed: () => void;
 }
 
+interface NavigationGroup {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  items: NavLinkProps[];
+}
+
 export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }: SidebarProps) {
   const { logout, user, hasPermission } = useAuth();
   const { t, language, setLanguage } = useTranslations({
@@ -194,6 +201,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
       try {
         return manifest.plugin.getSidebarItems?.() ?? [];
       } catch (error) {
+        // eslint-disable-next-line no-console -- Report isolated plugin failures without breaking navigation.
         console.error(
           `Attraccess Plugin System: getSidebarItems() of plugin "${manifest.plugin.getPluginName()}" threw`,
           error,
@@ -203,8 +211,23 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
     });
   }, [plugins]);
 
+  const pluginNavGroups: PluginSidebarGroup[] = useMemo(() => {
+    return plugins.flatMap((manifest) => {
+      try {
+        return manifest.plugin.getSidebarGroups?.() ?? [];
+      } catch (error) {
+        // eslint-disable-next-line no-console -- Report isolated plugin failures without breaking navigation.
+        console.error(
+          `Attraccess Plugin System: getSidebarGroups() of plugin "${manifest.plugin.getPluginName()}" threw`,
+          error,
+        );
+        return [];
+      }
+    });
+  }, [plugins]);
+
   const showNavItem = useCallback(
-    (item: SidebarItem) => {
+    (item: Pick<SidebarItem, 'path'>) => {
       const routeOfItem = routes.find((route) => route.path === item.path);
 
       if (!routeOfItem?.authRequired) {
@@ -225,41 +248,67 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
   );
 
   // Get navigation items from routes that have sidebar config
-  const navigationGroups: SidebarItemGroup[] = useMemo(() => {
-    const defaultGroup: SidebarItemGroup = {
-      translationKey: '##default##',
+  const navigationGroups: NavigationGroup[] = useMemo(() => {
+    const defaultGroup: NavigationGroup = {
+      id: '##default##',
+      label: '',
       items: [],
-      icon: () => null,
-      isGroup: true,
+      icon: null,
     };
-    const groups: SidebarItemGroup[] = [defaultGroup];
+    const groups: NavigationGroup[] = [defaultGroup];
+
+    const navItem = (item: SidebarItem, groupKey: string): NavLinkProps => ({
+      href: item.path,
+      label: t('groups.' + groupKey + '.items.' + item.translationKey),
+      icon: <item.icon size={16} aria-hidden />,
+      badgeCount: item.badgeCount,
+      isExternal: item.isExternal,
+      'data-cy': `sidebar-nav-${item.path.replace('/', '')}`,
+    });
 
     sidebarItems.forEach((item) => {
-      if ((item as SidebarItem).path) {
-        defaultGroup.items.push(item as SidebarItem);
+      if ('path' in item) {
+        if (showNavItem(item)) defaultGroup.items.push(navItem(item, defaultGroup.id));
         return;
       }
 
-      groups.push(item as SidebarItemGroup);
+      groups.push({
+        id: item.translationKey,
+        label: t('groups.' + item.translationKey + '.label'),
+        icon: <item.icon size={16} aria-hidden />,
+        items: item.items.filter(showNavItem).map((child) => navItem(child, item.translationKey)),
+      });
     });
 
-    groups.forEach((group) => {
-      group.items = (group.items ?? []).filter(showNavItem);
+    pluginNavGroups.forEach((group) => {
+      if (!group.id || groups.some((existing) => existing.id === group.id)) return;
+      groups.push({
+        id: group.id,
+        label: group.label,
+        icon: group.icon ?? <PuzzleIcon size={16} aria-hidden />,
+        items: [],
+      });
+    });
+
+    pluginNavItems.filter(showNavItem).forEach((item) => {
+      const group = groups.find((group) => group.id === item.group) ?? defaultGroup;
+      group.items.push({
+        href: item.path,
+        label: item.label,
+        icon: item.icon ?? <PuzzleIcon size={16} aria-hidden />,
+        'data-cy': `sidebar-plugin-nav-${item.path.replace(/\//g, '-')}`,
+      });
     });
 
     return groups.filter((group) => group.items.length > 0);
-  }, [showNavItem, sidebarItems]);
+  }, [showNavItem, sidebarItems, pluginNavItems, pluginNavGroups, t]);
 
   const defaultGroupItems = useMemo(() => {
-    return navigationGroups.find((group) => group.translationKey === '##default##')?.items;
+    return navigationGroups.find((group) => group.id === '##default##')?.items;
   }, [navigationGroups]);
 
-  const visiblePluginNavItems = useMemo(() => {
-    return pluginNavItems.filter((item) => showNavItem({ path: item.path } as SidebarItem));
-  }, [pluginNavItems, showNavItem]);
-
   const otherGroups = useMemo(() => {
-    return navigationGroups.filter((group) => group.translationKey !== '##default##');
+    return navigationGroups.filter((group) => group.id !== '##default##');
   }, [navigationGroups]);
 
   const sidebarEndItems = useSidebarEndItems();
@@ -340,52 +389,33 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
         <div className="flex-grow overflow-y-auto py-4">
           <nav className="px-2 space-y-1">
             {(defaultGroupItems ?? []).map((item) => (
-              <NavLink
-                key={item.path}
-                href={item.path}
-                icon={<item.icon size={16} aria-hidden />}
-                label={t('groups.##default##.items.' + item.translationKey)}
-                data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
-                badgeCount={item.badgeCount}
-                collapsed={isCollapsed}
-              />
-            ))}
-            {visiblePluginNavItems.map((item) => (
-              <NavLink
-                key={item.path}
-                href={item.path}
-                icon={item.icon ?? <PuzzleIcon size={16} aria-hidden />}
-                label={item.label}
-                data-cy={`sidebar-plugin-nav-${item.path?.replace(/\//g, '-')}`}
-                collapsed={isCollapsed}
-              />
+              <NavLink key={item.href} {...item} collapsed={isCollapsed} />
             ))}
             {isCollapsed ? (
               otherGroups.map((group) => (
                 <CollapsedGroupDropdown
-                  key={group.translationKey}
-                  label={t('groups.' + group.translationKey + '.label')}
-                  icon={<group.icon size={16} aria-hidden />}
-                  data-cy={`sidebar-group-${group.translationKey}`}
+                  key={group.id}
+                  label={group.label}
+                  icon={group.icon}
+                  data-cy={`sidebar-group-${group.id}`}
                   items={group.items.map((item) => ({
-                    key: item.path,
-                    path: item.path,
-                    icon: <item.icon size={16} aria-hidden />,
-                    label: t('groups.' + group.translationKey + '.items.' + item.translationKey),
+                    key: item.href,
+                    path: item.href,
+                    icon: item.icon,
+                    label: item.label,
+                    isExternal: item.isExternal,
                   }))}
                 />
               ))
             ) : (
               <Accordion>
                 {otherGroups.map((group) => (
-                  <AccordionItem key={group.translationKey} id={group.translationKey}>
+                  <AccordionItem key={group.id} id={group.id}>
                     <AccordionHeading>
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
-                          <span className="mr-3 flex items-center">
-                            <group.icon size={16} aria-hidden />
-                          </span>
-                          {t('groups.' + group.translationKey + '.label')}
+                          <span className="mr-3 flex items-center">{group.icon}</span>
+                          {group.label}
                         </span>
                         <AccordionIndicator />
                       </AccordionTrigger>
@@ -393,14 +423,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                     <AccordionPanel>
                       <AccordionBody className="px-0 pt-0 pb-0">
                         {group.items.map((item) => (
-                          <NavLink
-                            key={item.path}
-                            href={item.path}
-                            icon={<item.icon size={16} aria-hidden />}
-                            label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
-                            data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
-                            indent
-                          />
+                          <NavLink key={item.href} {...item} indent />
                         ))}
                       </AccordionBody>
                     </AccordionPanel>
@@ -536,12 +559,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                       <User className="h-4 w-4" />
                       {t('account')}
                     </DropdownItem>
-                    <DropdownItem
-                      key="theme"
-                      id="theme"
-                      onPress={cycleTheme}
-                      data-cy="sidebar-theme-toggle"
-                    >
+                    <DropdownItem key="theme" id="theme" onPress={cycleTheme} data-cy="sidebar-theme-toggle">
                       {theme === 'light' ? (
                         <Sun className="h-4 w-4" />
                       ) : theme === 'dark' ? (

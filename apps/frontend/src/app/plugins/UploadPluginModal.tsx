@@ -1,6 +1,6 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
-import { DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { Button } from '../../components/button';
 import { Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -80,7 +80,7 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
     >
       <div data-cy="upload-plugin-modal" className="contents">
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <div className="space-y-4">

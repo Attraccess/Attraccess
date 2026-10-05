@@ -1,7 +1,7 @@
 // Firmware/OTA UI (ATT-501): shows the installed version, whatever the device
 // offers on the stable/beta channel, and runs the update while polling for the
 // device to come back.
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, Spinner, Tooltip } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner, Tooltip } from '@heroui/react';
 import { ArrowUpCircleIcon, CpuIcon, DownloadIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
@@ -234,7 +234,7 @@ export function FirmwareDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <CpuIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">{t('devices.firmware')}</h2>
+              <DrawerHeading className="sh:text-lg sh:font-semibold">{t('devices.firmware')}</DrawerHeading>
             </div>
             {device && (
               <p className="sh:text-sm sh:text-muted">

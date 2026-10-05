@@ -13,6 +13,7 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   TextField,
   useOverlayState,
 } from '@heroui/react';
@@ -97,7 +98,9 @@ export function EmailForm() {
       >
         {({ close: modalClose }) => (
           <>
-            <ModalHeader>{t('modal.title')}</ModalHeader>
+            <ModalHeader>
+              <ModalHeading>{t('modal.title')}</ModalHeading>
+            </ModalHeader>
             <ModalBody>
               <Alert status="warning">
                 <AlertStatusIcon status="warning" />

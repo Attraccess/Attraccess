@@ -47,6 +47,9 @@
     "total": "Items total"
   },
   "actions": {
-    "refund": "Refund"
-  }
+    "refund": "Refund",
+    "openUsage": "Open usage details"
+  },
+  "loadError": "Unable to load billing details.",
+  "retry": "Try again"
 }
