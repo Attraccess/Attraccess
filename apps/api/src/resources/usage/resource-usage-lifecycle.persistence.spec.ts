@@ -17,7 +17,7 @@ import {
   SupervisionMode,
   User,
 } from '@attraccess/database-entities';
-import { DataSource, EntityManager, EntitySchema } from 'typeorm';
+import { DataSource, DataSourceOptions, EntityManager, EntitySchema } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,6 +30,7 @@ import { InsufficientBalanceError } from '../../billing/errors/insufficient-bala
 import { recoverOrphanedUsages, USAGE_RECOVERY_TABLE_SQL } from '../../database/resource-usage-integrity';
 import { ResourceUsageIntegrity1790100000000 } from '../../database/migrations/1790100000000-resource-usage-integrity';
 import { ResourceInUseError } from './errors/resource-in-use.error';
+import { dataSourceConfig } from '../../database/datasource';
 
 // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
 const schemas = [
@@ -606,6 +607,61 @@ describe('Usage lifecycle persistence around external flows', () => {
       isFinalized: false,
     });
   });
+
+  it.each(['startup', 'upgrade migration'])(
+    'rolls back a written recovery journal when the usage update fails (%s)',
+    async (recoveryPath) => {
+      const orphan = await source.getRepository(ResourceUsage).save({
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date('2026-09-23T14:00:40Z'),
+        startNotes: 'DEMO: ongoing laboratory run',
+        endNotes: 'Original note',
+        attributedOperatingDurationInMinutes: 17,
+        isFinalized: false,
+        lifecyclePending: false,
+      });
+      const before = await publishedState();
+      const journalBefore = await source.query('SELECT * FROM resource_usage_recovery');
+      // This failure proves the journal INSERT succeeded within the recovery transaction.
+      await source.query(`CREATE TRIGGER reject_recovery_update BEFORE UPDATE ON resource_usage
+        WHEN OLD.id = ${orphan.id}
+        BEGIN
+          SELECT CASE WHEN EXISTS (SELECT 1 FROM resource_usage_recovery WHERE usageId = OLD.id)
+            THEN RAISE(ABORT, 'usage update rejected after journal insert')
+            ELSE RAISE(ABORT, 'recovery journal missing before update') END;
+        END`);
+
+      // Retain the production automatic migration runner and its transaction configuration.
+      const upgrade = new DataSource({
+        ...dataSourceConfig,
+        database: source.options.database,
+        entities: schemas,
+        migrations: [ResourceUsageIntegrity1790100000000],
+      } as DataSourceOptions);
+      try {
+        const recover = () =>
+          recoveryPath === 'startup' ? usage.recoverInterruptedLifecycles() : upgrade.initialize();
+        await expect(recover()).rejects.toThrow('usage update rejected after journal insert');
+        expect(await publishedState()).toEqual(before);
+        expect(await source.query('SELECT * FROM resource_usage_recovery')).toEqual(journalBefore);
+        if (recoveryPath === 'upgrade migration') {
+          expect(await source.query('SELECT * FROM migrations')).toEqual([]);
+        }
+
+        await source.query('DROP TRIGGER reject_recovery_update');
+        await recover();
+        expect(await source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toMatchObject({
+          endTime: orphan.startTime,
+          isFinalized: false,
+          attributedOperatingDurationInMinutes: 0,
+        });
+        expect(await source.query('SELECT usageId FROM resource_usage_recovery')).toEqual([{ usageId: orphan.id }]);
+      } finally {
+        if (upgrade.isInitialized) await upgrade.destroy();
+      }
+    },
+  );
 
   it.each([false, true])(
     'preserves the complete price contract through a start flow (takeover=%s)',
