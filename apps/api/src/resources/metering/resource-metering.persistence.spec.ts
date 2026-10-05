@@ -1527,6 +1527,84 @@ describe('Flow-defined metering', () => {
       expect((await items(started.id)).transaction.amount).toBe(0);
     });
 
+    it.each([
+      ['failed', 'increment'],
+      ['failed', 'total'],
+      ['unconfigured', 'increment'],
+      ['unconfigured', 'total'],
+    ] as const)('keeps lifetime polling after a %s free-meter start, mode=%s', async (start, mode) => {
+      await seedMeter({}, { interimIntervalMinutes: 1 });
+      await metering.setRate(1, 1, 0);
+      await source.getRepository(ResourceMeter).update(1, { counterValue: '100000000000' });
+      if (start === 'failed') {
+        onStart = async () => {
+          throw new Error('offline');
+        };
+      } else {
+        await source.getRepository(ResourceFlowNode).delete(['start', 'ready']);
+        await source.getRepository(ResourceFlowEdge).delete('e1');
+      }
+      const started = await usage.startSession(1, users[0], {} as never);
+      expect(await source.getRepository(ResourceMeteringSession).count()).toBe(0);
+      // Keep the poll strictly after the persisted boundary, even on fast machines.
+      await source.getRepository(ResourceUsage).update(started.id, { startTime: new Date(Date.now() - 1_000) });
+      onCollect = reading(mode === 'increment' ? '5' : '105', { mode });
+      await metering.collectInterimReadings();
+      expect((await metering.listMeters(1))[0]).toMatchObject({ counterValue: '105', lifetimeValue: '5' });
+      const operation = await source.getRepository(ResourceMeteringOperation).findOneByOrFail({ kind: 'interim' });
+      expect(operation).toMatchObject({ status: 'completed', sessionId: null });
+      await usage.endSession(1, users[0], {} as never);
+      const bill = await items(started.id);
+      expect(bill.transaction.amount).toBe(0);
+      expect(bill.items).toMatchObject([{ unitPrice: 0, meterQuantity: null, meterCreditsPerUnit: 0 }]);
+    });
+
+    it('rejects a lifetime poll that crosses the end of a skipped free-meter usage', async () => {
+      await seedMeter({}, { interimIntervalMinutes: 1 });
+      await metering.setRate(1, 1, 0);
+      await source.getRepository(ResourceMeter).update(1, { counterValue: '100000000000' });
+      onStart = async () => {
+        throw new Error('offline');
+      };
+      const started = await usage.startSession(1, users[0], {} as never);
+      await source.getRepository(ResourceUsage).update(started.id, { startTime: new Date(Date.now() - 1_000) });
+      onCollect = async ({ complete }) => {
+        await usage.endSession(1, users[0], {} as never);
+        await complete({ kind: 'reading', mode: 'increment', value: '5' });
+      };
+      await metering.collectInterimReadings();
+      expect(log).toContain('meter:interim');
+      const operation = await source.getRepository(ResourceMeteringOperation).findOneByOrFail({ kind: 'interim' });
+      expect(operation).toMatchObject({ status: 'failed', error: expect.stringContaining('session boundary') });
+      expect((await metering.listMeters(1))[0]).toMatchObject({ counterValue: '100', lifetimeValue: '0' });
+      expect((await items(started.id)).transaction.amount).toBe(0);
+    });
+
+    it('rejects a sessionless poll dispatched after a metering session became active', async () => {
+      await seedMeter();
+      const started = await usage.startSession(1, users[0], {} as never);
+      await source.getRepository(ResourceUsage).update(started.id, { startTime: new Date(Date.now() - 1_000) });
+      // A queued poll may have selected no session before initialization completed.
+      await source.getRepository(ResourceMeteringOperation).save({
+        id: 'queued-lifetime-poll',
+        resourceId: 1,
+        meterId: 1,
+        sessionId: null,
+        kind: 'interim',
+        status: 'pending',
+        requestedAt: new Date(),
+      });
+      await expect(
+        new MeteringReadings(source.manager, new Map()).complete('queued-lifetime-poll', {
+          kind: 'reading',
+          mode: 'increment',
+          value: '5',
+        }),
+      ).rejects.toThrow('session boundary');
+      expect((await metering.listMeters(1))[0].lifetimeValue).toBe('0');
+      expect((await sessionOf(started.id)).latestValue).toBeNull();
+    });
+
     it('records increments without a session and keeps other meters independent', async () => {
       const other = await metering.createMeter(1, 'Heartbeats');
       await metering.report(1, other.id, { kind: 'reading', mode: 'increment', value: '2.5' });
