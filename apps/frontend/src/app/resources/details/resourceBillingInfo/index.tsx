@@ -26,6 +26,7 @@ import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { FlatSection } from '../../../../components/flatSection';
+import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import { LiveSessionBilling } from './metering/LiveSessionBilling';
 import { EnergySettlementNotices, MeterSetupNotice } from './metering/MeterNotices';
 
@@ -46,6 +47,7 @@ export function ResourceBillingInfo(props: Props) {
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const formatNumber = useNumberFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const { user: currentUser, hasPermission } = useAuth();
   const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 }, undefined, {
@@ -224,7 +226,7 @@ export function ResourceBillingInfo(props: Props) {
               </dt>
               <dd className={cn(valueClass, 'text-warning')}>
                 {t('billingValue', {
-                  credits: formatNumber(dbCurrencyToUserCurrency(meter.creditsPerUnit, configuration.minorUnit)),
+                  credits: formatCredits(meter.creditsPerUnit),
                   currency: configuration.currency,
                 })}
               </dd>

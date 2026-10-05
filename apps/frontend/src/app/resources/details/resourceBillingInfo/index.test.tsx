@@ -41,6 +41,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
   };
   return {
     useTranslations: () => ({ t, tExists: (key: string) => resolve(key) !== undefined }),
+    useTranslationState: () => ({ language: 'en' }),
     useNumberFormatter: () => (value: number) => String(value),
   };
 });
@@ -111,6 +112,14 @@ describe('ResourceBillingInfo operating-minute billing', () => {
     render(<ResourceBillingInfo resourceId={205} onVisibilityChange={onVisibilityChange} />);
     expect(await screen.findByText(en.title)).toBeInTheDocument();
     expect(onVisibilityChange).toHaveBeenCalledWith(true);
+  });
+
+  it('preserves the cents in a large configured meter rate', async () => {
+    vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+      data: [{ id: 1, name: 'Heartbeats', creditsPerUnit: Number.MAX_SAFE_INTEGER }],
+    } as never);
+    render(<ResourceBillingInfo resourceId={1} />);
+    expect(await screen.findByText('90,071,992,547,409.91 credits')).toBeInTheDocument();
   });
 
   it('displays the configured operating-minute rate', async () => {
