@@ -1360,6 +1360,93 @@ describe('Flow-defined metering', () => {
     });
   });
   describe('generic meters', () => {
+    async function seedLegacyMeterUsages(newestHasMeter: boolean) {
+      const usages = source.getRepository(ResourceUsage);
+      const sessions = source.getRepository(ResourceMeteringSession);
+      // Insert the newest start first so selection must consider time before ID.
+      const newest = await usages.save({
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(Date.now() - 1_800_000),
+        isFinalized: true,
+        meterRates: [{ meterId: 1, name: 'Newest', creditsPerUnit: 0 }],
+      });
+      const older = await usages.save({
+        resourceId: 1,
+        userId: 2,
+        startTime: new Date(Date.now() - 3_600_000),
+        isFinalized: true,
+        meterRates: [{ meterId: 1, name: 'Older', creditsPerUnit: 30 }],
+      });
+      for (const session of newestHasMeter ? [older, newest] : [older]) {
+        await sessions.save({
+          id: `meter-${session.id}`,
+          resourceId: 1,
+          usageId: session.id,
+          status: ResourceMeteringSessionStatus.Active,
+          creditsPerUnit: session.meterRates?.[0].creditsPerUnit,
+          latestValue: '0',
+        });
+      }
+      return { newest, older };
+    }
+
+    it.each([
+      ['report', true],
+      ['report', false],
+      ['poll', true],
+      ['poll', false],
+    ] as const)('attributes %s to the newest usage only, initialized=%s', async (path, initialized) => {
+      await seedMeter();
+      await metering.setRate(1, 1, 0);
+      const { newest, older } = await seedLegacyMeterUsages(initialized);
+      expect((await usage.getActiveSession(1))?.id).toBe(newest.id);
+      expect((await metering.getLive(1)).meters[0].session).toMatchObject({ usageId: newest.id });
+
+      const report = { kind: 'reading', mode: 'increment', value: '2' } as const;
+      if (path === 'report') await metering.report(1, 1, report);
+      else {
+        onCollect = ({ complete }) => complete(report);
+        await metering.collectInterimReadings();
+      }
+
+      expect((await sessionOf(older.id)).latestValue).toBe('0');
+      if (initialized) expect((await sessionOf(newest.id)).latestValue).toBe('2000000000');
+      else expect(await source.getRepository(ResourceMeteringSession).countBy({ usageId: newest.id })).toBe(0);
+      expect((await metering.getLive(1)).meters[0].lifetimeValue).toBe('2');
+      expect(await source.getRepository(ResourceMeteringOperation).findOneByOrFail({ kind: 'interim' })).toMatchObject({
+        status: 'completed',
+        sessionId: initialized ? `meter-${newest.id}` : null,
+      });
+      expect(await source.getRepository(BillingTransaction).count()).toBe(0);
+    });
+
+    it.each(['start', 'takeover', 'end'] as const)(
+      'retains explicit %s lifecycle report targeting over the newest published usage',
+      async (kind) => {
+        const { newest, older } = await seedLegacyMeterUsages(true);
+        await source.getRepository(ResourceUsage).update(older.id, {
+          isFinalized: kind === 'end',
+          lifecyclePending: true,
+        });
+        await source.getRepository(ResourceUsageLifecycleAttempt).save({
+          id: 'explicit-lifecycle',
+          resourceId: 1,
+          kind,
+          candidateUsageId: kind === 'end' ? null : older.id,
+          previousUsageId: kind === 'end' ? older.id : kind === 'takeover' ? newest.id : null,
+          transitionTime: new Date(),
+          formSubmissions: [],
+          billingItems: [],
+        });
+        const report = { kind: 'reading', mode: 'increment', value: '3' } as const;
+        await expect(metering.report(1, 1, report)).rejects.toThrow('METER_LIFECYCLE_BUSY');
+        await metering.report(1, 1, report, undefined, 'explicit-lifecycle');
+        expect((await sessionOf(older.id)).latestValue).toBe('3000000000');
+        expect((await sessionOf(newest.id)).latestValue).toBe('0');
+      },
+    );
+
     it('excludes unpublished usages and selects the newest legacy session for live meters and reports', async () => {
       const usages = source.getRepository(ResourceUsage);
       const sessions = source.getRepository(ResourceMeteringSession);

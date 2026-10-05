@@ -7,11 +7,10 @@ import {
   ResourceFlowEdge,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
-  ResourceUsage,
 } from '@attraccess/database-entities';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
-import { activeUsageSql, activeUsageWhere } from '../usage/active-usage';
+import { findActiveUsage } from '../usage/active-usage';
 
 export async function requireMeter(manager: EntityManager, resourceId: number, meterId: number) {
   const meter = await manager.findOne(ResourceMeter, { where: { id: meterId, resourceId } });
@@ -45,10 +44,7 @@ export class MeteringCatalog {
   async listMeters(resourceId: number) {
     const [meters, usage, active] = await Promise.all([
       this.meters.find({ where: { resourceId }, order: { id: 'ASC' } }),
-      this.sessions.manager.findOne(ResourceUsage, {
-        where: { resourceId, ...activeUsageWhere() },
-        order: { startTime: 'DESC', id: 'DESC' },
-      }),
+      findActiveUsage(this.sessions.manager, resourceId),
       this.findActiveSessions(resourceId),
     ]);
     return meters.map((meter) => {
@@ -132,15 +128,12 @@ export class MeteringCatalog {
     return { meters: await this.listMeters(resourceId) };
   }
 
-  findActiveSessions(resourceId: number) {
-    return this.sessions
-      .createQueryBuilder('s')
-      .innerJoin(ResourceUsage, 'u', 'u.id = s.usageId')
-      .where(`s.resourceId = :resourceId AND s.status = :status AND ${activeUsageSql('u')}`, {
-        resourceId,
-        status: ResourceMeteringSessionStatus.Active,
-      })
-      .getMany();
+  async findActiveSessions(resourceId: number) {
+    const usage = await findActiveUsage(this.sessions.manager, resourceId);
+    if (!usage) return [];
+    return this.sessions.find({
+      where: { resourceId, usageId: usage.id, status: ResourceMeteringSessionStatus.Active },
+    });
   }
 
   async getStatus(resourceId: number) {
