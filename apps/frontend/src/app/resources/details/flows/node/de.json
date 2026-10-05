@@ -86,7 +86,7 @@
             "config": {
               "timeoutSeconds": {
                 "label": "Zeitlimit (Sekunden)",
-                "helpText": "Maximale Wartezeit auf „Energie melden“."
+                "helpText": "Maximale Wartezeit auf „Zähler melden“."
               },
               "interimIntervalMinutes": {
                 "label": "Zwischenintervall (Minuten)",
@@ -94,7 +94,7 @@
               },
               "finalAttempts": {
                 "label": "Versuche für den Endwert",
-                "helpText": "Versuche, beim Sitzungsende einen frischen Endstand zu erhalten, bevor die Energieabrechnung ausstehend bleibt."
+                "helpText": "Versuche, beim Sitzungsende einen frischen Endstand zu erhalten, bevor die Zählerabrechnung ausstehend bleibt."
               },
               "finalRetryDelaySeconds": {
                 "label": "Pause zwischen Endwert-Versuchen (Sekunden)"

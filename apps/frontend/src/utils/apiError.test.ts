@@ -44,6 +44,22 @@ describe('getTranslationKeyForApiError', () => {
     expect(getTranslation(translations, 'INVALID_CSV.description')).not.toBe('INVALID_CSV');
   });
 
+  it.each([
+    ['English', API_ERROR_TRANSLATIONS_EN, 'Meter not set up'],
+    ['German', API_ERROR_TRANSLATIONS_DE, 'Zähler nicht eingerichtet'],
+  ])('uses localized setup guidance for a named incomplete meter in %s', (_locale, translations, expectedTitle) => {
+    const result = getTranslationKeyForApiError({
+      error: { body: { message: 'METER_NOT_CONFIGURED: Heartbeats' } } as unknown as Error,
+      t: (key: string) => key,
+      tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+      baseTranslationKey: 'api',
+    });
+
+    expect(result.key).toBe('api.METER_NOT_CONFIGURED');
+    expect(result.errorMessage).toBe('Heartbeats');
+    expect(getTranslation(translations, 'METER_NOT_CONFIGURED.title')).toBe(expectedTitle);
+  });
+
   it('splits the reason off a prefixed meter error', () => {
     const result = getTranslationKeyForApiError({
       error: { body: { message: 'METER_SETTLEMENT_FAILED: meter offline' } } as unknown as Error,

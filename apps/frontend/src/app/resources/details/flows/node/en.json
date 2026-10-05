@@ -94,7 +94,7 @@
               },
               "finalAttempts": {
                 "label": "Final attempts",
-                "helpText": "Attempts to obtain a fresh final total when a session ends before the energy charge is left pending."
+                "helpText": "Attempts to obtain a fresh final total when a session ends before the meter charge is left pending."
               },
               "finalRetryDelaySeconds": {
                 "label": "Final retry delay (seconds)"
