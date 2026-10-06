@@ -7,7 +7,8 @@ interface DurationDisplayProps {
 }
 
 /**
- * Component to display a duration as hh:mm:ss, rounded to the nearest second.
+ * Component to display a duration in a localized format
+ * using the Intl.DurationFormat API
  */
 export function DurationDisplay({
   minutes,
