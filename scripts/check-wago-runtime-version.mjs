@@ -13,6 +13,7 @@ export function isRuntimeSource(path) {
       path.startsWith(prefix),
     ) ||
     [
+      'apps/plugins/wago/project.json',
       'apps/plugins/wago/channel-behavior.ts',
       'apps/plugins/wago/measurement-contract.ts',
       'apps/plugins/wago/backend/protocol.ts',

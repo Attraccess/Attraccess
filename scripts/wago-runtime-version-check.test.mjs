@@ -17,6 +17,7 @@ test('covers shared contracts, runtime dependencies, image construction and acti
     manifest,
     'apps/plugins/wago/modbus/model.ts',
     'apps/plugins/wago/shared/hardware-profile.ts',
+    'apps/plugins/wago/project.json',
     'apps/plugins/wago/channel-behavior.ts',
     'apps/plugins/wago/measurement-contract.ts',
     'apps/plugins/wago/cc100-runtime/Dockerfile',

@@ -801,10 +801,15 @@ describe('WagoRuntime', () => {
   it('retries a failed scheduled pulse shutdown', async () => {
     const snapshot = pulsedSnapshot;
     const writes: boolean[] = [];
+    let shutdownCompleted: () => void = () => undefined;
+    const shutdown = new Promise<void>((resolve) => {
+      shutdownCompleted = resolve;
+    });
     const flakyDevice = {
       write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
         writes.push(value);
         if (!value && writes.filter((written) => !written).length === 1) throw new Error('temporary shutdown failure');
+        if (!value) shutdownCompleted();
       },
       read: async () => false,
     };
@@ -820,7 +825,7 @@ describe('WagoRuntime', () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, validCommand({ action: 'pulse' }));
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await shutdown;
 
     expect(writes).toEqual([true, false, false]);
   });
