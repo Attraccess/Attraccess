@@ -10,6 +10,9 @@ export function useWagoLiveQuery(queryKey: QueryKey, topic: string, identifier?:
     identifier,
     enabled,
     onUpdate: (event) => {
+      // Cancel synchronously before applying live state, so an older initial/reconnect
+      // REST read cannot overwrite it (even when its query function ignores the signal).
+      void client.cancelQueries({ queryKey, exact: true });
       if (event.eventType === 'snapshot') {
         client.setQueryData(queryKey, event.value);
       } else {

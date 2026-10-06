@@ -16,7 +16,7 @@ vi.mock('./api', async (original) => ({
 
 afterEach(cleanup);
 
-function setup() {
+function setup(queryFn?: () => Promise<unknown>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   const queryKey = ['wago', 'diagnostics', 1];
   const consumers = new Set<{ update: (payload: unknown) => void; reconnect?: () => void }>();
@@ -36,7 +36,7 @@ function setup() {
     () => {
       useWagoLiveQuery(queryKey, 'diagnostics', '1');
       useWagoLiveQuery(queryKey, 'diagnostics', '1');
-      return useQuery({ queryKey, queryFn: read });
+      return useQuery({ queryKey, queryFn: queryFn ?? read, notifyOnChangeProps: 'all' });
     },
     {
       wrapper: ({ children }: { children: ReactNode }) => (
@@ -105,6 +105,121 @@ function setupFrontPanel() {
 }
 
 describe('WAGO shared live queries', () => {
+  it.each(['snapshot', 'unavailable'] as const)(
+    'keeps a streamed %s authoritative when the initial REST read settles later',
+    async (eventType) => {
+      let resolve!: (value: unknown) => void;
+      const pending = new Promise((done) => {
+        resolve = done;
+      });
+      const read = vi.fn(() => pending);
+      const { hook, queryClient, queryKey, consumers } = setup(read);
+      await waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        consumers.forEach((consumer) => consumer.update({ eventType, value: { revision: 8 } }));
+      });
+      await act(async () => resolve({ revision: 7 }));
+      await waitFor(() => expect(hook.result.current.isFetching).toBe(false));
+      expect(queryClient.getQueryState(queryKey)?.status).toBe(eventType === 'snapshot' ? 'success' : 'error');
+      expect(queryClient.getQueryData(queryKey)).toEqual(eventType === 'snapshot' ? { revision: 8 } : undefined);
+      await act(async () => {
+        consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 9 } }));
+      });
+      expect(queryClient.getQueryData(queryKey)).toEqual({ revision: 9 });
+      await waitFor(() => expect(hook.result.current.data).toEqual({ revision: 9 }));
+      expect(hook.result.current.isSuccess).toBe(true);
+      hook.unmount();
+      queryClient.clear();
+    },
+  );
+
+  it('retains live revisions and unavailable state across a pending reconnect refresh', async () => {
+    const { hook, queryClient, queryKey, consumers } = setup();
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+    const otherKey = ['wago', 'diagnostics', 2];
+    queryClient.setQueryData(otherKey, { revision: 3 });
+    await act(async () => {
+      consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 8 } }));
+    });
+    const updatedAt = queryClient.getQueryState(queryKey)?.dataUpdatedAt;
+    let resolve!: (value: unknown) => void;
+    const pending = new Promise((done) => {
+      resolve = done;
+    });
+    const read = vi.fn(() => pending);
+    let refresh!: Promise<void>;
+    await act(async () => {
+      queryClient.getQueryCache().find({ queryKey, exact: true })?.setOptions({ queryKey, queryFn: read });
+      refresh = queryClient.invalidateQueries({ queryKey, exact: true });
+    });
+    expect(read).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      consumers.forEach((consumer) => consumer.update({ eventType: 'unavailable' }));
+      resolve({ revision: 7 });
+      await refresh;
+    });
+    await waitFor(() => expect(hook.result.current.isFetching).toBe(false));
+    expect(hook.result.current.isError).toBe(true);
+    expect(hook.result.current.data).toEqual({ revision: 8 });
+    expect(queryClient.getQueryState(queryKey)?.dataUpdatedAt).toBe(updatedAt);
+    expect(queryClient.getQueryState(otherKey)?.status).toBe('success');
+    await act(async () => {
+      consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 9 } }));
+    });
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+    expect(hook.result.current.data).toEqual({ revision: 9 });
+    hook.unmount();
+    queryClient.clear();
+  });
+
+  it.each(['diagnostics', 'configuration-baseline'])(
+    'keeps panel %s unavailable after an older reconnect read resolves',
+    async (topic) => {
+      const { hook, queryClient, baseline, diagnostics, baselineKey, diagnosticsKey, send } = setupFrontPanel();
+      await waitFor(() => expect(hook.result.current.ready).toBe(true));
+      const queryKey = topic === 'diagnostics' ? diagnosticsKey : baselineKey;
+      const value = topic === 'diagnostics' ? diagnostics : baseline;
+      const otherKey = topic === 'diagnostics' ? baselineKey : diagnosticsKey;
+      const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+      if (!query) throw new Error('Missing panel query');
+      let resolve!: (value: unknown) => void;
+      const pending = new Promise((done) => {
+        resolve = done;
+      });
+      let refresh!: Promise<unknown>;
+      await act(async () => {
+        refresh = query.fetch({ ...query.options, queryFn: () => pending });
+      });
+      await send(topic, { eventType: 'unavailable' });
+      await act(async () => {
+        resolve(
+          topic === 'diagnostics'
+            ? { ...diagnostics, configuration: { appliedRevision: 6 } }
+            : { ...baseline, revision: 6 },
+        );
+        await refresh;
+      });
+      await waitFor(() => expect(queryClient.getQueryState(queryKey)?.fetchStatus).toBe('idle'));
+      expect(queryClient.getQueryState(queryKey)?.status).toBe('error');
+      expect(queryClient.getQueryData(queryKey)).toEqual(value);
+      expect(queryClient.getQueryState(otherKey)?.status).toBe('success');
+      if (topic === 'diagnostics') {
+        expect(hook.result.current.live.enabled).toBe(false);
+        const channel = hook.result.current.applied?.snapshot.logicalChannels[0];
+        if (!channel) throw new Error('Missing output fixture');
+        act(() => hook.result.current.live.command(channel, true));
+        expect(panelApi.manual).not.toHaveBeenCalled();
+      } else {
+        expect(hook.result.current.ready).toBe(false);
+        expect(hook.result.current.applied?.snapshot.logicalChannels[0].id).toBe('output');
+      }
+      await send(topic, { eventType: 'snapshot', value });
+      await waitFor(() => expect(hook.result.current.ready && hook.result.current.live.enabled).toBe(true));
+      hook.unmount();
+      queryClient.clear();
+    },
+  );
+
   it('disables panel commands when streamed diagnostics become unavailable and restores them on snapshot', async () => {
     const { hook, queryClient, diagnostics, diagnosticsKey, baselineKey, send } = setupFrontPanel();
     await waitFor(() => expect(hook.result.current.ready).toBe(true));
