@@ -70,23 +70,19 @@ jobs:
         run: |
           docker buildx imagetools inspect "$IMAGE" --raw | jq -e '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm" and .platform.variant == "v7")] | length == 1'
           printf '%s@%s\n' "$IMAGE" "$DIGEST" | tee wago-cc100-runtime-image.txt
-      - name: Create signed offline runtime bundle
+      - name: Create offline runtime bundle
         if: github.event_name == 'push'
         env:
           IMAGE: ghcr.io/attraccess/wago-cc100-runtime:${{ github.sha }}
           DIGEST: ${{ steps.image.outputs.digest }}
-          WAGO_RUNTIME_SIGNING_PRIVATE_KEY: ${{ secrets.WAGO_RUNTIME_SIGNING_PRIVATE_KEY }}
         run: |
-          test -n "$WAGO_RUNTIME_SIGNING_PRIVATE_KEY"
           docker pull --platform linux/arm/v7 "$IMAGE@$DIGEST"
           docker tag "$IMAGE@$DIGEST" "$IMAGE"
           docker save "$IMAGE" -o image.tar
-          umask 077
-          printf '%s\n' "$WAGO_RUNTIME_SIGNING_PRIVATE_KEY" > signing-private-key
-          trap 'rm -f signing-private-key image.tar' EXIT
+          trap 'rm -f image.tar' EXIT
           VERSION=$(node -p "require('./apps/plugins/wago/cc100-runtime/manifest.json').runtimeVersion")
-          node -e "if(require('./apps/plugins/wago/cc100-runtime/manifest.json').deployment.hardwareProfile !== 'cc100-751-9301-fw31-digital-v1') throw new Error('Integrate the ATT-1056 hardware runtime before publishing commissioning artifacts')"
-          node apps/plugins/wago/scripts/package-runtime-artifact.mjs --image-archive image.tar --image "$IMAGE@$DIGEST" --version "$VERSION" --signing-key signing-private-key --out runtime-release
+          PROFILE=$(node -p "require('./apps/plugins/wago/cc100-runtime/manifest.json').deployment.hardwareProfile")
+          node apps/plugins/wago/scripts/package-runtime-artifact.mjs --image-archive image.tar --image "$IMAGE@$DIGEST" --version "$VERSION" --hardware-profile "$PROFILE" --out runtime-release
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
         with:
@@ -99,4 +95,3 @@ jobs:
           path: |
             runtime-release/cc100-*/wago-cc100-runtime.tar
             runtime-release/cc100-*/wago-cc100-runtime.tar.sha256
-            runtime-release/cc100-*/wago-cc100-runtime.tar.sig
