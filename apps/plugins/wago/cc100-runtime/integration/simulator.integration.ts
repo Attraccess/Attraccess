@@ -499,7 +499,12 @@ describe('isolated broker / executable simulator', () => {
       'restored output',
     );
     expect(messages.slice(start).some((item) => item.topic === discoveryTopic(hardwareId))).toBe(false);
-    expect(errors).toEqual([]);
+    // This scenario deliberately destroys both MQTT sockets. The simulator logs
+    // ECONNRESET on platforms that report the forced close as a connection error.
+    const unexpectedErrors = errors
+      .flatMap((chunk) => chunk.trim().split('\n'))
+      .filter((line) => line !== 'WAGO simulator MQTT connection error: read ECONNRESET');
+    expect(unexpectedErrors).toEqual([]);
   });
 
   it.each(['stale-heartbeat', 'offline', 'reject-configuration'])(

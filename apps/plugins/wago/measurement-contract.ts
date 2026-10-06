@@ -1,11 +1,24 @@
 /** Configuration transforms remain in their original physical units, including persisted v1 snapshots. */
-const UNITS = {
+export const MEASUREMENT_UNITS = {
   ampere: 'milliampere',
   volt: 'millivolt',
   watt: 'milliwatt',
   'watt-hour': 'milliwatt-hour',
   percent: 'millipercent',
+  hertz: 'millihertz',
+  var: 'millivar',
+  'volt-ampere': 'milli-volt-ampere',
+  'var-hour': 'millivar-hour',
+  ratio: 'milli-ratio',
+  number: 'milli-number',
+  second: 'millisecond',
+  'pulse-per-kilowatt-hour': 'milli-pulse-per-kilowatt-hour',
 } as const;
+const UNITS = MEASUREMENT_UNITS;
+export type EngineeringUnit = keyof typeof UNITS;
+export const ENGINEERING_UNITS = Object.keys(UNITS) as EngineeringUnit[];
+export const MILLI_MEASUREMENT_UNITS = Object.values(UNITS);
+export const CANONICAL_MEASUREMENT_UNITS = [...ENGINEERING_UNITS, ...MILLI_MEASUREMENT_UNITS];
 
 export type MeasurementUnit = keyof typeof UNITS | (typeof UNITS)[keyof typeof UNITS];
 export type MeasurementKind = 'live' | 'cumulative';

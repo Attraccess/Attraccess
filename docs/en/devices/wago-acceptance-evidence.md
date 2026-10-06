@@ -35,7 +35,7 @@ Retain one JSON evidence record outside the source tree with these fields:
 | `schemaVersion` | `1` |
 | `environment` | `physical`; simulator-only evidence is rejected |
 | `controller` | `model: "751-9301"`, `firmware: "31"`, `hardwareId`, `startingState`, `wiringEvidence` |
-| `build` | Full 40-character `pluginCommit` and `runtimeCommit`; `frontendDigest`, `backendDigest`, `runtimeDigest` in `sha256:<64 hex>` form; `protocolVersion`, `signedBundleEvidence`, `visualArtifactProvisioningEvidence` |
+| `build` | Full 40-character `pluginCommit` and `runtimeCommit`; `frontendDigest`, `backendDigest`, `runtimeDigest` in `sha256:<64 hex>` form; `protocolVersion`, `bundleChecksumEvidence`, `visualArtifactProvisioningEvidence` |
 | `modbus` | Actual `model`, `transport`, `profileVersion`, `qualificationEvidence`; do not substitute an unqualified reference assembly |
 | `participant` | Non-secret participant `id` and `experience` (`nontechnical` or `lightly-technical`) |
 | `implementerId` | Distinct from participant |
@@ -59,6 +59,6 @@ The checker never connects to hardware, changes Linear, signs artifacts or publi
 
 ## Publication Boundary
 
-ATT-985 remains blocked by physical/nontechnical acceptance and ATT-983 audit coverage. Attach the reviewed evidence to those tickets. Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and signed ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
+ATT-985 remains blocked by physical/nontechnical acceptance and ATT-983 audit coverage. Attach the reviewed evidence to those tickets. Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and checksum-checked ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
 
 Broader four-assembly qualification, billing, telemetry history and arbitration are deferred. They must not be advertised as proven capabilities of this first slice.

@@ -36,7 +36,12 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
           params,
         ];
     }
-  return { ...original, ...hooks };
+  return {
+    ...original,
+    ...hooks,
+    useAccessControlServiceResourceIntroductionsGetPeopleKey: 'resourceIntroductions',
+    UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn: (params: unknown) => ['resourceIntroductions', params],
+  };
 });
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
@@ -109,6 +114,9 @@ it.each(['resource', 'group'] as const)(
       requestBody: { comment: undefined },
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: [scope, 'Introductions', 'GetMany', target] });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: type === 'group' ? ['resourceIntroductions'] : ['resourceIntroductions', { resourceId: 7 }],
+    });
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: [scope, 'Introductions', 'GetHistory', { ...target, userId: 3 }],
     });

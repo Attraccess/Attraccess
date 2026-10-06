@@ -113,6 +113,26 @@ describe('AttraccessNode', () => {
     expect(card).not.toHaveClass('border-accent', 'ring-2');
   });
 
+  it('uses plugin handle names without requesting missing core translations', () => {
+    const translate = vi.fn(tStub);
+    render(
+      <AttraccessNode
+        schema={{
+          ...schema,
+          type: 'plugin.example.command',
+          label: 'Example command',
+          inputs: ['input'],
+          outputs: ['output', 'failure'],
+        }}
+        tNodeTranslations={translate}
+        tNodeExists={() => false}
+      />,
+    );
+    expect(translate).not.toHaveBeenCalledWith('nodes.plugin.example.command.inputs.input');
+    expect(translate).not.toHaveBeenCalledWith('nodes.plugin.example.command.outputs.failure');
+    expect(screen.getByText('Example command')).toBeInTheDocument();
+  });
+
   it.each([
     [ResourceFlowLogType.NODE_PROCESSING_STARTED, 'border-accent', 'bg-accent'],
     [ResourceFlowLogType.NODE_PROCESSING_COMPLETED, 'border-green-500', 'bg-green-500'],
@@ -150,4 +170,19 @@ describe('AttraccessNode', () => {
     expect(container.querySelector('.card')).not.toHaveClass('border-accent');
     expect(screen.getByText('Invalid node')).toHaveClass('text-danger');
   });
+});
+
+
+it('retains translated input and output handle labels when tNodeExists is omitted', () => {
+  const translate = vi.fn((key: string) => `Translated ${key}`);
+  render(<AttraccessNode schema={{ ...schema, inputs: ['in'] }} tNodeTranslations={translate} />);
+  expect(translate).toHaveBeenCalledWith('nodes.input.event.inputs.in');
+  expect(translate).toHaveBeenCalledWith('nodes.input.event.outputs.out');
+});
+
+it('uses raw plugin handle names only for explicitly missing translations', () => {
+  const translate = vi.fn((key: string) => key);
+  render(<AttraccessNode schema={{ ...schema, inputs: ['in'] }} tNodeTranslations={translate} tNodeExists={() => false} />);
+  expect(translate).not.toHaveBeenCalledWith('nodes.input.event.inputs.in');
+  expect(translate).not.toHaveBeenCalledWith('nodes.input.event.outputs.out');
 });

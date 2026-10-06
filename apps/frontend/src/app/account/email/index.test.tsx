@@ -38,7 +38,8 @@ vi.mock('@heroui/react', () => ({
   Label: ({ children }: { children: React.ReactNode }) => <label>{children}</label>,
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ModalFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalHeader: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  ModalHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  ModalHeading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
   TextField: ({
     children,
     value,

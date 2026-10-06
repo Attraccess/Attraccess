@@ -223,6 +223,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       </Alert>
 
       <StandardModal
+        dialogProps={{ 'aria-label': allCompleted ? t('modal.completedTitle') : t('modal.title') }}
         isOpen={isModalOpen}
         onOpenChange={(open) => { if (!open && !isEndingAll) setIsModalOpen(false); }}
         size="md"

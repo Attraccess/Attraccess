@@ -402,8 +402,10 @@
         padding: 12px !important;
         font-size: 13px;
       }
-      .markdown-section code {
-        word-break: break-word;
+      /* Inline code: wrap long examples while keeping fenced blocks scrollable */
+      .markdown-section :not(pre) > code {
+        white-space: normal !important;
+        overflow-wrap: anywhere;
       }
 
       /* Images: constrain to viewport */

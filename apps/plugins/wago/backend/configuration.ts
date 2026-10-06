@@ -1,3 +1,4 @@
+import { ENGINEERING_UNITS, type EngineeringUnit } from '../measurement-contract';
 import { pulseBehaviorError } from '../channel-behavior';
 import { createHash } from 'node:crypto';
 import { CONFIGURATION_PROTOCOL_VERSION } from './protocol';
@@ -53,13 +54,14 @@ export interface WagoConfigurationSnapshot {
     physicalPointId: string;
     profile: (typeof CHANNEL_PROFILES)[number];
     capabilities: Array<(typeof CAPABILITIES)[number]>;
+    invert?: boolean;
     disconnectPolicy: { mode: 'hold' | 'immediate' | 'watchdog'; timeoutMs?: number };
     range?: { minimum: number; maximum: number };
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
     measurement?: {
-      unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent';
+      unit: EngineeringUnit;
       scale: number;
       offset: number;
       kind?: 'live' | 'cumulative';
@@ -198,6 +200,7 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
         'physicalPointId',
         'profile',
         'capabilities',
+        'invert',
         'disconnectPolicy',
         'range',
         'pulse',
@@ -211,6 +214,12 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
       errors.push(referenceError(`${path}.physicalPointId`, 'physical point', channel.physicalPointId));
     enumValue(channel.profile, `${path}.profile`, CHANNEL_PROFILES, errors);
     const capabilities = capabilityList(channel.capabilities, `${path}.capabilities`, errors);
+    if (channel.invert !== undefined && (typeof channel.invert !== 'boolean' || !capabilities.has('input')))
+      errors.push({
+        path: `${path}.invert`,
+        code: 'invalid_invert',
+        message: 'invert requires a boolean and an input channel',
+      });
     validateDisconnectPolicy(channel.disconnectPolicy, `${path}.disconnectPolicy`, errors);
     validateRange(channel.range, `${path}.range`, capabilities, errors);
     validatePulse(channel.pulse, `${path}.pulse`, capabilities, errors);
@@ -289,7 +298,8 @@ function exactKeys(
     );
   allowed
     .filter(
-      (key) => !['range', 'pulse', 'guard', 'feedback', 'measurement', ...optional].includes(key) && !(key in value),
+      (key) =>
+        !['range', 'pulse', 'guard', 'feedback', 'measurement', 'invert', ...optional].includes(key) && !(key in value),
     )
     .forEach((key) =>
       errors.push({
@@ -425,7 +435,7 @@ function validateMeasurement(
   if (value === undefined) return;
   if (!record(value, path, errors)) return;
   exactKeys(value, path, ['unit', 'scale', 'offset', 'kind'], errors, ['kind']);
-  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'watt-hour', 'percent'], errors);
+  enumValue(value.unit, `${path}.unit`, ENGINEERING_UNITS, errors);
   if (!Number.isFinite(value.scale) || !Number.isFinite(value.offset))
     errors.push({ path, code: 'invalid_measurement', message: 'scale and offset must be finite numbers' });
   if (value.kind !== undefined && !['live', 'cumulative'].includes(value.kind as string))

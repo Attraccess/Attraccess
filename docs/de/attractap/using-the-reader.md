@@ -1,8 +1,8 @@
 # Den Attractap-Leser benutzen
 
-Mit Ihrer NFC-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
+Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
 
-Sie benötigen eine NFC-Karte, die mit Ihrem Attraccess-Konto verknüpft ist. Wenn Sie noch keine haben, bitten Sie Ihr Werkstattteam, eine Karte für Sie zu registrieren.
+Sie benötigen eine RFID-Karte, die mit Ihrem Attraccess-Konto verknüpft ist. Wenn Sie noch keine haben, bitten Sie Ihr Werkstattteam, eine Karte für Sie zu registrieren.
 
 ## Mit der Karte anmelden
 
@@ -27,6 +27,12 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 ### Ein Projekt auswählen
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
+
+## Live-Statistiken ansehen
+
+Tippen Sie nach der Anmeldung auf den Namen der Maschine, die Sie gerade nutzen. Die Details zeigen die Sitzungsdauer sowie **Aktuelle Nutzung** mit dem Energieverbrauch in **kWh**, der Betriebszeit und dem Status „Läuft“ oder „Leerlauf“. Die Messwerte werden alle 10 Sekunden aktualisiert, solange Sie die Details ansehen.
+
+Energiewerte benötigen eine eingerichtete Verbrauchsmessung; die Betriebszeit benötigt die Erfassung des Betriebszustands. **Warte auf Messwert** bedeutet, dass kein aktueller Energiewert vorliegt. **Keine Daten** bedeutet, dass keine Betriebszeitdaten verfügbar sind. Fehlende Messwerte werden nicht als null gezählt. Die Statistiken verschwinden, sobald Sie die Nutzung beenden oder sich abmelden.
 
 ## Die Nutzung einer Maschine beenden
 
@@ -92,5 +98,5 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 ## Weiterführende Anleitungen
 
 - [Ressourcen nutzen](end-user/using-resources.md) – Maschinen und Werkzeuge über die Attraccess-App nutzen
-- [NFC-Karten](attractap/nfc-cards.md) – Karten registrieren und verwalten
+- [RFID-Karten](attractap/rfid-cards.md) – Karten registrieren und verwalten
 - [Einweisungen](resources/introductions.md) – Wie Sie Zugang zu einer Ressource erhalten

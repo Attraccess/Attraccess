@@ -1,6 +1,6 @@
 #include "application/application.hpp"
 #include "profile_store.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstring>
@@ -118,7 +118,16 @@ int main(int argc, char **argv) {
     auto click = [&](const char *text, bool popup = false) {
         auto *found = label(popup ? lv_layer_top() : lv_screen_active(), text);
         if (!found) throw std::runtime_error(std::string("Missing button: ") + text);
-        assert(!lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED));
+        // Screen transitions can leave controls disabled until their animation finishes.
+        const auto readyDeadline = millis() + 2000;
+        while (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED) &&
+               static_cast<int32_t>(readyDeadline - millis()) > 0) {
+            pump();
+            found = label(popup ? lv_layer_top() : lv_screen_active(), text);
+            if (!found) throw std::runtime_error(std::string("Button disappeared: ") + text);
+        }
+        if (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED))
+            throw std::runtime_error(std::string("Button stayed disabled: ") + text);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_PRESSED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_RELEASED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_CLICKED, nullptr);
@@ -127,6 +136,7 @@ int main(int argc, char **argv) {
     unsigned listVersion = 0;
     std::string username = "Alex";
     bool active = false, supervised = false;
+    uint32_t activeUsageId = 99;
     std::string longDescription =
         "RFI 5-2 · Angstrom Engineering · Åmod · evaporation tool with a long description that must remain readable in details. ";
     while (longDescription.size() < 600)
@@ -148,7 +158,14 @@ int main(int argc, char **argv) {
             r["type"] = id == 3 ? "door" : "machine";
             r["isHealthy"] = true;
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
-            if (id == 1 && active) { r["activeUsageSession"]["user"]["username"] = username; r["activeUsageSession"]["startTime"] = "2026-09-22T07:00:00Z"; }
+            if (id == 1 && active) {
+                r["activeUsageSession"]["id"] = activeUsageId;
+                r["activeUsageSession"]["user"]["username"] = username;
+                char startTime[32];
+                const auto start = time(nullptr) - 1426;
+                std::strftime(startTime, sizeof(startTime), "%Y-%m-%dT%H:%M:%SZ", gmtime(&start));
+                r["activeUsageSession"]["startTime"] = startTime;
+            }
         }
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
         pump();
@@ -169,7 +186,12 @@ int main(int argc, char **argv) {
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
         pump();
     };
-    list(false, true); pump(2100);
+    list(false, true);
+    // Wait for the boot delay and screen animation to complete on loaded runners.
+    const auto bootDeadline = millis() + 10000;
+    while (lv_screen_active() != Display::resourceListScreen.getScreen() &&
+           static_cast<int32_t>(bootDeadline - millis()) > 0)
+        pump();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     auto *networkBadge = lv_obj_get_parent(label(lv_layer_top(), "OK NET"));
     assert(lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
@@ -238,6 +260,43 @@ int main(int argc, char **argv) {
     assert(lv_obj_get_height(fullDescription) == 28);
     lv_area_t fullDescriptionBounds;
     lv_obj_get_coords(fullDescription, &fullDescriptionBounds);
+    assert(server.count("RESOURCE_USAGE_STATS") == 1);
+    const auto statsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    assert(server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["resourceId"].as<uint32_t>() == 1);
+    auto stats = [&](uint32_t request, uint32_t usage, const char *values) {
+        server.push("RESOURCE_USAGE_STATS", "{\"resourceId\":1,\"requestId\":" + std::to_string(request) +
+            ",\"usage\":{\"id\":" + std::to_string(usage) + "," + values + "}}");
+        pump();
+    };
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    display.capture(output, "05c-usage-stats-waiting");
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9007199254740993.125\",\"creditsPerUnit\":9007199254740991,\"formattedRate\":\"90.071.992.547.409,91 EUR\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: 9007199254740993.125\n90.071.992.547.409,91 EUR / Wert"));
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":null,\"creditsPerUnit\":0,\"formattedRate\":\"0,00 EUR\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: Warte auf Messwert\n0,00 EUR / Wert"));
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Energy (kWh)\",\"value\":\"0.125\",\"creditsPerUnit\":30,\"formattedRate\":\"0,30 EUR\"},"
+          "{\"name\":\"Heartbeats\",\"value\":\"0\",\"creditsPerUnit\":0,\"formattedRate\":\"0,00 EUR\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
+    assert(label(lv_screen_active(), "Energy (kWh): 0.125\n0,30 EUR / Wert\nHeartbeats: 0\n0,00 EUR / Wert"));
+    display.capture(output, "05f-usage-stats-captured-rates");
+    stats(statsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.125\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
+    assert(label(lv_screen_active(), "Heartbeats: 0.125"));
+    assert(label(lv_screen_active(), "00:02:03 · Läuft"));
+    display.capture(output, "05d-usage-stats-running");
+    // Replies for earlier requests or another usage cannot overwrite the displayed reading.
+    stats(statsRequest - 1, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    stats(statsRequest, 100, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: 0.125"));
+    stats(statsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0\"}],\"operatingDurationMs\":0,\"isOperating\":false");
+    assert(label(lv_screen_active(), "Heartbeats: 0"));
+    assert(label(lv_screen_active(), "00:00:00 · Leerlauf"));
+    display.capture(output, "05e-usage-stats-idle");
+    stats(statsRequest, 99, "\"meters\":[],\"operatingDurationMs\":null,\"isOperating\":null");
+    assert(label(lv_screen_active(), "Keine Daten"));
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(statsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.125\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
     display.capture(output, "05-details-running");
     const auto beforeMarquee = display.pixels;
     pump(1200);
@@ -247,6 +306,34 @@ int main(int argc, char **argv) {
         for (int x = fullDescriptionBounds.x1; x <= fullDescriptionBounds.x2; ++x)
             marqueeMoved |= beforeMarquee[y * 480 + x] != display.pixels[y * 480 + x];
     assert(marqueeMoved);
+    lv_obj_send_event(lv_screen_active(), LV_EVENT_PRESSED, nullptr);
+    const auto pollsBefore = server.count("RESOURCE_USAGE_STATS");
+    pump(10000);
+    assert(server.count("RESOURCE_USAGE_STATS") > pollsBefore);
+    const auto latestStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    stats(latestStatsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.250\"}],\"operatingDurationMs\":130000,\"isOperating\":false");
+    assert(label(lv_screen_active(), "Heartbeats: 0.250"));
+    // Changing sessions clears A's cached reading before B's reply arrives.
+    activeUsageId = 100; list();
+    const auto replacementStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    assert(replacementStatsRequest != latestStatsRequest);
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(latestStatsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(replacementStatsRequest, 100, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.500\"}]");
+    stats(latestStatsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    server.push("RESOURCE_USAGE_STATS", "{\"resourceId\":1,\"requestId\":" + std::to_string(latestStatsRequest) + ",\"usage\":null}");
+    pump();
+    assert(label(lv_screen_active(), "Heartbeats: 0.500"));
+    // Ending a session while its lookup is outstanding keeps the panel hidden.
+    activeUsageId = 101; list();
+    const auto endingStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    active = false; list();
+    stats(endingStatsRequest, 101, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    assert(!lv_obj_is_visible(label(lv_screen_active(), "Warte auf Messwert")));
+    active = true; activeUsageId = 99; list();
+    stats(server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>(), 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.250\"}],\"operatingDurationMs\":130000,\"isOperating\":false");
     auto *backButton = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
     auto *logoutButton = lv_obj_get_parent(label(lv_screen_active(), "Abmelden"));
     assert(lv_obj_get_parent(backButton) == lv_obj_get_parent(logoutButton));
@@ -294,11 +381,16 @@ int main(int argc, char **argv) {
     assert(server.count("RESOURCE_USAGE_FORM_SUBMIT_PAGE") == 1);
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":true})"); pump();
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeForm + 2);
-    server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
+    server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"billingSummary":{"amount":1250,"total":"12,50 EUR"}})"); pump();
+    assert(label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
+    assert(label(lv_layer_top(), "12,50 EUR"));
     active = false; list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Start"));
     display.capture(output, "06c-form-completed-stop");
+    display.capture(output, "06d-session-billing-summary");
+    click("OK", true);
+    assert(!label(lv_layer_top(), "12,50 EUR"));
     // A separately running usage is unaffected by reader logout.
     active = true; list();
     const auto stopsBeforeLogout = server.count("STOP_RESOURCE_USAGE_SESSION");
@@ -349,7 +441,8 @@ int main(int argc, char **argv) {
     server.push("RESOURCE_LIST", R"({"revision":1,"authenticatedUsername":"Alex","resources":[]})"); pump();
     assert(label(lv_screen_active(), "Stop"));
     // A newer broadcast can overtake the matching refresh without trapping input.
-    click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
+    click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"billingSummary":{"amount":0,"total":"0,00 EUR"}})"); pump();
+    assert(!label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
     active = false; list(true, false, false);
     const auto refreshId = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
     server.push("RESOURCE_LIST", "{\"revision\":" + std::to_string(listVersion - 1) + ",\"requestId\":" + std::to_string(refreshId) + ",\"resources\":[]}"); pump();

@@ -1,35 +1,18 @@
-import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import filesystem from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import { PassThrough, Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { ClientRequest, IncomingMessage, request as httpRequest, Server } from 'node:http';
 import { promisify } from 'node:util';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
-import { loadRuntimeArtifactSigningKey, WAGO_RUNTIME_RELEASE_KEY } from './wago-runtime-artifacts-verification';
-import { CallHandler, ExecutionContext, INestApplication } from '@nestjs/common';
-import * as fileFields from '@nestjs/platform-express/multer/interceptors/file-fields.interceptor';
-import { Reflector } from '@nestjs/core';
-import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
 import { Test } from '@nestjs/testing';
-import { defer, lastValueFrom, of } from 'rxjs';
-import { WagoArtifactsController, WagoArtifactUploadInterceptor } from './wago-artifacts.controller';
-import request from 'supertest';
+import { WagoArtifactsController } from './wago-artifacts.controller';
+import { WagoBuildRuntimeCatalog, sameRuntimeImage } from './wago-build-runtime';
 
-const keys = generateKeyPairSync('ed25519');
-function sshString(data: Buffer | string) {
-  const bytes = Buffer.from(data);
-  const size = Buffer.alloc(4);
-  size.writeUInt32BE(bytes.length);
-  return Buffer.concat([size, bytes]);
-}
-const publicKey = Buffer.concat([
-  sshString('ssh-ed25519'),
-  sshString(keys.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32)),
-]);
 const image = `ghcr.io/attraccess/wago-cc100-runtime@sha256:${'a'.repeat(64)}`;
 const manifest = {
   schemaVersion: 1,
@@ -78,512 +61,168 @@ function bundle(value: unknown = manifest, reference = image, extra = Buffer.all
     Buffer.alloc(1024),
   ]);
 }
-function signature(data: Buffer, namespace = 'attraccess-wago-runtime') {
-  const digest = createHash('sha512').update(data).digest();
-  const signed = Buffer.concat([
-    Buffer.from('SSHSIG'),
-    sshString(namespace),
-    sshString(''),
-    sshString('sha512'),
-    sshString(digest),
-  ]);
-  const version = Buffer.alloc(4);
-  version.writeUInt32BE(1);
-  const packet = Buffer.concat([
-    Buffer.from('SSHSIG'),
-    version,
-    sshString(publicKey),
-    sshString(namespace),
-    sshString(''),
-    sshString('sha512'),
-    sshString(Buffer.concat([sshString('ssh-ed25519'), sshString(sign(null, signed, keys.privateKey))])),
-  ]);
-  return `-----BEGIN SSH SIGNATURE-----\n${packet.toString('base64')}\n-----END SSH SIGNATURE-----\n`;
-}
-function upload(data = bundle(), checksum = createHash('sha256').update(data).digest('hex'), sig = signature(data)) {
-  return { bundle: Readable.from([data]), checksum: Readable.from([checksum]), signature: Readable.from([sig]) };
+function upload(data = bundle(), checksum = createHash('sha256').update(data).digest('hex')) {
+  return { bundle: Readable.from([data]), checksum: Readable.from([checksum]) };
 }
 
-async function waitUntil(assertion: () => Promise<void> | void) {
-  const deadline = Date.now() + 2000;
-  for (;;) {
-    try {
-      await assertion();
-      return;
-    } catch (error) {
-      if (Date.now() >= deadline) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  }
-}
-
-function uploadContext(req: Readable): ExecutionContext {
-  return {
-    switchToHttp: () => ({ getRequest: () => req, getResponse: () => ({}) }),
-  } as unknown as ExecutionContext;
-}
-
-describe('signed runtime artifact catalog (isolated disk and ephemeral keys only)', () => {
+describe('runtime artifact catalog (isolated disk)', () => {
   let root: string;
   let catalog: WagoRuntimeArtifactCatalog;
   beforeEach(async () => {
     jest.replaceProperty(process, 'env', { ...process.env });
-    delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
     root = await mkdtemp(join(tmpdir(), 'wago-artifact-test-'));
-    catalog = new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'));
+    catalog = new WagoRuntimeArtifactCatalog(root);
   });
   afterEach(async () => {
     await catalog.onModuleDestroy();
     await rm(root, { recursive: true, force: true });
     jest.restoreAllMocks();
   });
-  describe('visual importer development signing', () => {
-    let service: WagoRuntimeArtifactsService | undefined;
-    let keyPath: string;
-    beforeEach(async () => {
-      service = undefined;
-      keyPath = join(root, 'development.pub');
-      await writeFile(keyPath, `ssh-ed25519 ${publicKey.toString('base64')} fixture\n`);
-      process.env.STORAGE_ROOT = root;
-      process.env.NODE_ENV = 'development';
-      process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH = ` ${keyPath} `;
-    });
-    afterEach(async () => {
-      await service?.onModuleDestroy();
-    });
-    it('imports an explicitly trusted development signature and pins it through validation and delivery', async () => {
-      service = new WagoRuntimeArtifactsService();
-      // Selection must capture bytes at construction, not read a mutable file during verification.
-      await writeFile(keyPath, `ssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}\n`);
-      delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
-      const imported = await service.import(upload());
-      expect(await service.get(imported.digest)).toEqual(imported);
-      expect(await service.has()).toBe(true);
-      const snapshot = await service.acquire(imported.digest);
-      try {
-        expect(await readFile(snapshot.path)).toEqual(bundle());
-        expect(snapshot.digest).toBe(imported.digest);
-      } finally {
-        await snapshot.cleanup();
-      }
-    });
-    it.each(['production', 'test', 'staging', '', undefined])(
-      'rejects an override in %s before reading it',
-      async (environment) => {
-        if (environment === undefined) delete process.env.NODE_ENV;
-        else process.env.NODE_ENV = environment;
-        await rm(keyPath);
-        expect(() => new WagoRuntimeArtifactsService()).toThrow(
-          'local CC100 runtime signing keys are only allowed in development',
-        );
-        expect(await readdir(root)).toEqual([]);
-      },
-    );
-    it.each(['development', 'production', 'test', undefined])(
-      'keeps the release default without an override in %s',
-      async (environment) => {
-        if (environment === undefined) delete process.env.NODE_ENV;
-        else process.env.NODE_ENV = environment;
-        delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
-        expect(loadRuntimeArtifactSigningKey(environment, undefined)).toBe(WAGO_RUNTIME_RELEASE_KEY);
-        service = new WagoRuntimeArtifactsService();
-        process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH = keyPath;
-        await expect(service.import(upload())).rejects.toThrow('Runtime import failed');
-        expect(await service.current()).toBeNull();
-      },
-    );
-    it('treats a blank override as the release default', async () => {
-      process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH = '  ';
-      service = new WagoRuntimeArtifactsService();
-      await expect(service.import(upload())).rejects.toThrow('Runtime import failed');
-    });
-    it('rejects retained development artifacts after restarting with production release trust', async () => {
-      service = new WagoRuntimeArtifactsService();
-      const imported = await service.import(upload());
-      await service.onModuleDestroy();
-      process.env.NODE_ENV = 'production';
-      delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
-      service = new WagoRuntimeArtifactsService();
+
+  it('ignores a legacy imported release when local build assets have not been installed', async () => {
+    process.env.STORAGE_ROOT = root;
+    delete process.env.WAGO_CC100_BUILD_ASSETS_PATH;
+    process.env.NODE_ENV = 'development';
+    await catalog.import(upload());
+    const service = new WagoRuntimeArtifactsService();
+    try {
+      expect(await service.current()).toBeNull();
+      expect(await service.list()).toEqual([]);
       expect(await service.has()).toBe(false);
-      await expect(service.get(imported.digest)).rejects.toThrow('Invalid signed runtime artifact');
-      await expect(service.acquire(imported.digest)).rejects.toThrow('Invalid signed runtime artifact');
-    });
-    it('rejects a signature from a different key without trusting the uploaded signature key', async () => {
-      await writeFile(keyPath, `ssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}\n`);
-      service = new WagoRuntimeArtifactsService();
-      await expect(service.import(upload())).rejects.toThrow('Runtime import failed');
-    });
-    it.each([
-      ['checksum', () => upload(bundle(), '0'.repeat(64))],
-      [
-        'tampered bytes with updated checksum',
-        () => upload(bundle({ ...manifest, runtimeVersion: '0.2.0' }), undefined, signature(bundle())),
-      ],
-      ['wrong namespace', () => upload(bundle(), undefined, signature(bundle(), 'wrong'))],
-      ['mutable image', () => upload(bundle({ ...manifest, image: 'latest' }, 'latest'))],
-      ['image mismatch', () => upload(bundle(manifest, image.replace('aaaa', 'bbbb')))],
-    ])('still rejects %s with development signing', async (_name, fixture) => {
-      service = new WagoRuntimeArtifactsService();
-      const imported = await service.import(upload());
-      await expect(service.import(fixture())).rejects.toThrow('Runtime import failed');
-      expect(await service.current()).toEqual(imported);
-      expect(await readdir(join(await service.root(), 'staging'))).toEqual([]);
-    });
-    it.each([
-      '',
-      'ssh-rsa AAAA',
-      'ssh-ed25519 AAAA',
-      `ssh-ed25519 ${publicKey.toString('base64')}\nssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}`,
-    ])('fails closed for malformed key file %j', async (text) => {
-      await writeFile(keyPath, text);
-      expect(() => new WagoRuntimeArtifactsService()).toThrow('Invalid development CC100 runtime signing public key');
-    });
-    it('fails closed without exposing an unreadable configured path', async () => {
-      await rm(keyPath);
-      expect(() => new WagoRuntimeArtifactsService()).toThrow('Invalid development CC100 runtime signing public key');
-    });
+      await expect(service.acquire()).rejects.toThrow('Build');
+      const source = upload();
+      await expect(service.import(source)).rejects.toThrow('server build owns');
+      expect(source.bundle.destroyed).toBe(true);
+    } finally {
+      await service.onModuleDestroy();
+    }
   });
-  describe('loopback multipart lifecycle', () => {
-    let app: INestApplication;
-    let url: string;
-    let staging: string;
-    let clients: ClientRequest[];
-    let incoming: IncomingMessage[];
 
-    function incompleteUpload() {
-      const client = httpRequest(`${url}/wago/runtime-artifacts/import`, {
-        method: 'POST',
-        headers: { 'content-type': 'multipart/form-data; boundary=disconnect-test' },
-      });
-      client.on('error', () => undefined); // Socket destruction is intentional.
-      clients.push(client);
-      client.write(
-        '--disconnect-test\r\nContent-Disposition: form-data; name="bundle"; filename="runtime.tar"\r\n' +
-          'Content-Type: application/octet-stream\r\n\r\npartial runtime file',
-      );
-      return client;
+  it('requires bundled runtime assets when starting in production', async () => {
+    process.env.STORAGE_ROOT = root;
+    delete process.env.WAGO_CC100_BUILD_ASSETS_PATH;
+    process.env.NODE_ENV = 'production';
+    await catalog.import(upload());
+    const service = new WagoRuntimeArtifactsService();
+    try {
+      await expect(service.onModuleInit()).rejects.toThrow();
+      expect(await service.has()).toBe(false);
+    } finally {
+      await service.onModuleDestroy();
     }
-
-    async function expectWriting(count: number) {
-      await waitUntil(async () => {
-        const directories = await readdir(staging);
-        expect(directories).toHaveLength(count);
-        for (const directory of directories) {
-          expect((await lstat(join(staging, directory, 'bundle'))).size).toBeGreaterThan(0);
-        }
-      });
-    }
-
-    function completeUpload(admin = true) {
-      const data = bundle();
-      return request(url)
-        .post('/wago/runtime-artifacts/import')
-        .set('x-test-admin', String(admin))
-        .attach('bundle', data, 'runtime.tar')
-        .attach('checksum', Buffer.from(createHash('sha256').update(data).digest('hex')), 'runtime.tar.sha256')
-        .attach('signature', Buffer.from(signature(data)), 'runtime.tar.sig');
-    }
-
-    beforeEach(async () => {
-      clients = [];
-      incoming = [];
-      const module = await Test.createTestingModule({
-        controllers: [WagoArtifactsController],
-        providers: [WagoArtifactUploadInterceptor, { provide: WagoRuntimeArtifactsService, useValue: catalog }],
-      })
-        .overrideGuard(DualAuthGuard)
-        .useValue({
-          canActivate(context: ExecutionContext) {
-            const req = context.switchToHttp().getRequest();
-            incoming.push(req);
-            req.user = {
-              id: 1,
-              effectivePermissions: new Set(req.headers['x-test-admin'] === 'false' ? [] : ['system.settings.manage']),
-            };
-            return true;
-          },
-        })
-        .compile();
-      app = module.createNestApplication({ logger: false });
-      await app.listen(0, '127.0.0.1');
-      url = await app.getUrl();
-      staging = join(await catalog.root(), 'staging');
-    });
-
-    afterEach(async () => {
-      for (const client of clients) client.destroy();
-      (app.getHttpServer() as Server).closeAllConnections();
-      await app.close();
-      jest.restoreAllMocks();
-    });
-
-    it('removes a disconnected first file and accepts both replacement upload slots', async () => {
-      const first = incompleteUpload();
-      const second = incompleteUpload();
-      await expectWriting(2);
-      await completeUpload().expect(409);
-      first.destroy();
-      second.destroy();
-      await waitUntil(async () => expect(await readdir(staging)).toEqual([]));
-
-      const replacements = [incompleteUpload(), incompleteUpload()];
-      await expectWriting(2);
-      await completeUpload().expect(409);
-      for (const replacement of replacements) replacement.destroy();
-      await waitUntil(async () => expect(await readdir(staging)).toEqual([]));
-      const response = await completeUpload().expect(201);
-      expect(response.body.manifest).toEqual(manifest);
-      expect(JSON.stringify(response.body)).not.toContain(root);
-      expect(await readdir(staging)).toEqual([]);
-    });
-
-    it('removes a directory created after the incoming request has already aborted', async () => {
-      let release!: () => void;
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      const create = catalog.createUploadDirectory.bind(catalog);
-      const allocation = jest.spyOn(catalog, 'createUploadDirectory').mockImplementationOnce(async () => {
-        await gate;
-        return create();
-      });
-      const client = incompleteUpload();
-      try {
-        await waitUntil(() => expect(allocation).toHaveBeenCalledTimes(1));
-        client.destroy();
-        await waitUntil(() => expect(incoming[0].aborted).toBe(true));
-      } finally {
-        release();
-      }
-      await allocation.mock.results[0].value;
-      await waitUntil(async () => expect(await readdir(staging)).toEqual([]));
-      await completeUpload().expect(201);
-      expect(await readdir(staging)).toEqual([]);
-    });
-
-    it('runs the real admin guard before allocating upload storage', async () => {
-      const allocation = jest.spyOn(catalog, 'createUploadDirectory');
-      await completeUpload(false).expect(403);
-      expect(allocation).not.toHaveBeenCalled();
-      expect(await readdir(staging)).toEqual([]);
-    });
   });
-  describe('upload cancellation lifecycle', () => {
-    let interceptor: WagoArtifactUploadInterceptor;
-    let staging: string;
-    let sources: PassThrough[];
 
-    function startUpload() {
-      const source = Object.assign(new PassThrough(), {
-        headers: {
-          'content-type': 'multipart/form-data; boundary=cancellation-test',
-          'transfer-encoding': 'chunked',
-        },
-      });
-      sources.push(source);
-      const handle = jest.fn();
-      const result = interceptor.intercept(uploadContext(source), { handle }).then(
-        () => undefined,
-        (error: Error) => error,
+  describe('build-owned assets outside the plugin archive', () => {
+    const imageId = `sha256:${'b'.repeat(64)}`;
+    const buildId = 'c'.repeat(40);
+    let owned: WagoBuildRuntimeCatalog;
+    let directory: string;
+    async function assets(data = bundle(), descriptor: Record<string, unknown> = {}) {
+      const digest = createHash('sha256').update(data).digest('hex');
+      await writeFile(join(directory, 'wago-cc100-runtime.tar'), data);
+      await writeFile(join(directory, 'wago-cc100-runtime.tar.sha256'), digest);
+      await writeFile(
+        join(directory, 'release.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          buildId,
+          imageId,
+          manifest,
+          bundleBytes: data.length,
+          bundleSha256: digest,
+          ...descriptor,
+        }),
       );
-      source.write(
-        '--cancellation-test\r\nContent-Disposition: form-data; name="bundle"; filename="runtime.tar"\r\n' +
-          'Content-Type: application/octet-stream\r\n\r\npartial runtime file',
-      );
-      return { source, result, handle };
+      return digest;
     }
-
     beforeEach(async () => {
-      interceptor = new WagoArtifactUploadInterceptor(catalog as WagoRuntimeArtifactsService);
-      staging = join(await catalog.root(), 'staging');
-      sources = [];
+      directory = await mkdtemp(join(root, 'build-'));
+      owned = new WagoBuildRuntimeCatalog(root, directory);
     });
+    afterEach(async () => owned.onModuleDestroy());
 
-    afterEach(() => {
-      for (const source of sources) {
-        source.emit('aborted');
-        source.destroy();
-      }
-      jest.restoreAllMocks();
-    });
-
-    it('destroys active multipart files at the whole-upload deadline and clears the timer', async () => {
-      const timers = jest.spyOn(global, 'setTimeout');
-      const clear = jest.spyOn(global, 'clearTimeout');
-      const pending = startUpload();
-      await waitUntil(async () => {
-        const [directory] = await readdir(staging);
-        expect(directory).toBeDefined();
-        expect((await lstat(join(staging, directory, 'bundle'))).size).toBeGreaterThan(0);
-      });
-      const index = timers.mock.calls.findIndex(([, delay]) => delay === 10 * 60 * 1000);
-      expect(index).toBeGreaterThanOrEqual(0);
-      const timer = timers.mock.results[index].value as NodeJS.Timeout;
-      expect(timer.hasRef()).toBe(false);
-      timers.mock.calls[index][0]();
-      expect(await pending.result).toMatchObject({
-        message: 'Runtime upload timed out. Retry with the signed release files.',
-      });
-      expect(pending.source.destroyed).toBe(true);
-      expect(pending.handle).not.toHaveBeenCalled();
-      expect(clear).toHaveBeenCalledWith(timer);
-      expect(await readdir(staging)).toEqual([]);
-      const replacements = [startUpload(), startUpload()];
-      await waitUntil(async () => expect(await readdir(staging)).toHaveLength(2));
-      for (const replacement of replacements) replacement.source.emit('aborted');
-      await Promise.all(replacements.map(({ result }) => result));
-      expect(await readdir(staging)).toEqual([]);
-    });
-
-    it('releases capacity once during directory creation and removes the late directory', async () => {
-      let release!: () => void;
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      const create = catalog.createUploadDirectory.bind(catalog);
-      const allocation = jest.spyOn(catalog, 'createUploadDirectory').mockImplementationOnce(async () => {
-        await gate;
-        return create();
-      });
-      const pending = startUpload();
+    it('loads installed local build assets through the same service used by commissioning and updates', async () => {
+      process.env.STORAGE_ROOT = root;
+      process.env.WAGO_CC100_BUILD_ASSETS_PATH = directory;
+      process.env.NODE_ENV = 'development';
+      const service = new WagoRuntimeArtifactsService();
       try {
-        await waitUntil(() => expect(allocation).toHaveBeenCalledTimes(1));
-        pending.source.emit('aborted');
-        const replacements = [startUpload(), startUpload()];
-        await waitUntil(async () => expect(await readdir(staging)).toHaveLength(2));
-        expect(await startUpload().result).toMatchObject({ message: 'Two runtime uploads are already in progress' });
-        // The old request finishing cleanup must not release another upload's slot.
-        release();
-        expect(await pending.result).toMatchObject({ message: expect.stringContaining('interrupted') });
-        expect(pending.handle).not.toHaveBeenCalled();
-        expect(await readdir(staging)).toHaveLength(2);
-        expect(await startUpload().result).toMatchObject({ message: 'Two runtime uploads are already in progress' });
-        for (const replacement of replacements) replacement.source.emit('aborted');
-        await Promise.all(replacements.map(({ result }) => result));
-        expect(await readdir(staging)).toEqual([]);
+        await service.onModuleInit();
+        expect(await service.current()).toBeNull();
+        const digest = await assets();
+        expect(await service.current()).toMatchObject({ digest, buildId, imageId });
+        expect(await service.has()).toBe(true);
+        await catalog.import(upload(bundle({ ...manifest, runtimeVersion: '9.0.0' })));
+        const snapshot = await service.acquire();
+        expect(snapshot).toMatchObject({ digest, buildId, imageId });
+        await snapshot.cleanup();
+        expect(await service.list()).toHaveLength(1);
       } finally {
-        release();
+        await service.onModuleDestroy();
       }
     });
 
-    it('settles cancellation before Multer settles and prevents late controller execution', async () => {
-      let finishMulter!: () => void;
-      const gate = new Promise<void>((resolve) => {
-        finishMulter = resolve;
-      });
-      const parser = jest.spyOn(fileFields, 'FileFieldsInterceptor').mockReturnValueOnce(
-        class {
-          async intercept(_context: ExecutionContext, next: CallHandler) {
-            await gate;
-            return next.handle();
-          }
-        },
-      );
-      const pending = startUpload();
-      try {
-        await waitUntil(() => expect(parser).toHaveBeenCalledTimes(1));
-        pending.source.emit('aborted');
-        expect(await pending.result).toMatchObject({ message: expect.stringContaining('interrupted') });
-        expect(await readdir(staging)).toEqual([]);
-        const replacements = [startUpload(), startUpload()];
-        await waitUntil(async () => expect(await readdir(staging)).toHaveLength(2));
-        finishMulter();
-        await new Promise((resolve) => setImmediate(resolve));
-        expect(pending.handle).not.toHaveBeenCalled();
-        expect(await startUpload().result).toMatchObject({ message: 'Two runtime uploads are already in progress' });
-        for (const replacement of replacements) replacement.source.emit('aborted');
-        await Promise.all(replacements.map(({ result }) => result));
-        expect(await readdir(staging)).toEqual([]);
-      } finally {
-        finishMulter();
-      }
-    });
-
-    it('sanitizes success-finalization failures and clears its timer and abort listener', async () => {
-      const timers = jest.spyOn(global, 'setTimeout');
-      const clear = jest.spyOn(global, 'clearTimeout');
-      const source = new PassThrough();
-      sources.push(source);
-      // A non-multipart request finishes Multer immediately, isolating response finalization.
-      Object.assign(source, { headers: {} });
-      const response = await interceptor.intercept(uploadContext(source), { handle: () => of({ success: true }) });
-      const remove = jest.spyOn(filesystem, 'rm').mockRejectedValueOnce(new Error(`EACCES: ${root}/private`));
-      try {
-        await expect(lastValueFrom(response)).rejects.toMatchObject({
-          message: 'Runtime upload cleanup could not be completed. Retry shortly.',
-          status: 503,
-        });
-        expect(remove).toHaveBeenCalledTimes(1);
-        expect(source.listenerCount('aborted')).toBe(0);
-        const index = timers.mock.calls.findIndex(([, delay]) => delay === 10 * 60 * 1000);
-        expect(index).toBeGreaterThanOrEqual(0);
-        expect(clear).toHaveBeenCalledWith(timers.mock.results[index].value);
-      } finally {
-        remove.mockRestore();
-      }
-    });
-
-    it('ends the receipt deadline before import and does not report failure while activation is pending', async () => {
-      const timers = jest.spyOn(global, 'setTimeout');
-      const clear = jest.spyOn(global, 'clearTimeout');
-      const source = Object.assign(new PassThrough(), {
-        headers: { 'content-type': 'multipart/form-data; boundary=accepted-body', 'transfer-encoding': 'chunked' },
-      });
-      sources.push(source);
-      const controller = new WagoArtifactsController(catalog as WagoRuntimeArtifactsService);
-      let finish!: () => void;
-      let entered!: () => void;
-      const started = new Promise<void>((resolve) => {
-        entered = resolve;
-      });
-      const pending = new Promise<void>((resolve) => {
-        finish = resolve;
-      });
-      const originalImport = catalog.import.bind(catalog);
-      jest.spyOn(catalog, 'import').mockImplementation(async (input) => {
-        entered();
-        await pending;
-        return originalImport(input);
-      });
-      const req = Object.assign(source, { files: {} });
-      const response = interceptor.intercept(uploadContext(req), {
-        handle: () => defer(() => controller.import(req.files)),
-      });
-      const data = bundle();
-      const parts: [string, Buffer][] = [
-        ['bundle', data],
-        ['checksum', Buffer.from(createHash('sha256').update(data).digest('hex'))],
-        ['signature', Buffer.from(signature(data))],
-      ];
-      source.end(
-        Buffer.concat([
-          ...parts.map(([name, bytes]) =>
-            Buffer.concat([
-              Buffer.from(
-                `--accepted-body\r\nContent-Disposition: form-data; name="${name}"; filename="fixture"\r\nContent-Type: application/octet-stream\r\n\r\n`,
-              ),
-              bytes,
-              Buffer.from('\r\n'),
-            ]),
+    it('selects only this build even when another build or a legacy importer changes shared storage', async () => {
+      const digest = await assets();
+      await owned.onModuleInit();
+      await catalog.import(
+        upload(
+          bundle(
+            { ...manifest, image: image.replace(/a{64}/, 'd'.repeat(64)) },
+            image.replace(/a{64}/, 'd'.repeat(64)),
           ),
-          Buffer.from('--accepted-body--\r\n'),
-        ]),
+        ),
       );
-      const result = lastValueFrom(await response);
-      await started;
-      try {
-        const index = timers.mock.calls.findIndex(([, delay]) => delay === 10 * 60 * 1000);
-        expect(index).toBeGreaterThanOrEqual(0);
-        expect(clear).toHaveBeenCalledWith(timers.mock.results[index].value);
-        // Even a callback already queued at body acceptance cannot cancel import.
-        timers.mock.calls[index][0]();
-        source.emit('aborted');
-      } finally {
-        finish();
-      }
-      const imported = await result;
-      expect((await catalog.current()).digest).toBe(imported.digest);
-      expect(await readdir(staging)).toEqual([]);
+      expect((await catalog.current())?.digest).not.toBe(digest);
+      expect(await owned.current()).toMatchObject({ digest, imageId, buildId });
+      expect(await owned.list()).toHaveLength(1);
+      const snapshot = await owned.acquire();
+      expect(snapshot.imageId).toBe(imageId);
+      expect(await readFile(snapshot.path)).toEqual(bundle());
+      await snapshot.cleanup();
+    });
+
+    it('uses the next server build rather than a persisted old release pointer', async () => {
+      const previous = await catalog.import(upload());
+      const nextImage = image.replace(/a{64}/, 'e'.repeat(64));
+      const nextManifest = { ...manifest, image: nextImage };
+      const digest = await assets(bundle(nextManifest, nextImage), { manifest: nextManifest });
+      expect(await owned.current()).toMatchObject({ digest, image: nextImage });
+      expect((await catalog.current())?.digest).toBe(previous.digest);
+    });
+
+    it('rejects importing and acquiring a stale session digest', async () => {
+      await assets();
+      const source = upload();
+      await expect(owned.import(source)).rejects.toThrow('deployed server build owns');
+      expect(source.bundle.destroyed).toBe(true);
+      await expect(owned.acquire('f'.repeat(64))).rejects.toThrow('does not belong');
+    });
+
+    it.each([
+      { bundleSha256: 'f'.repeat(64) },
+      { bundleBytes: 1 },
+      { imageId: 'mutable:latest' },
+      { buildId: 'main' },
+      { manifest: { ...manifest, protocolVersion: '2.0.0' } },
+    ])('fails closed for mismatched/incompatible build metadata %j', async (descriptor) => {
+      await assets(bundle(), descriptor);
+      await expect(owned.onModuleInit()).rejects.toThrow();
+      expect(await owned.has()).toBe(false);
+    });
+
+    it('fails closed with missing assets and retries after they are made available', async () => {
+      expect(await owned.has()).toBe(false);
+      await assets();
+      expect(await owned.has()).toBe(true);
+    });
+
+    it('does not treat a changed tar, tag, or build ID as a new Docker image', () => {
+      expect(
+        sameRuntimeImage({ image, imageId }, { image: image.replace('runtime@', 'runtime:other@'), imageId }),
+      ).toBe(true);
+      expect(sameRuntimeImage({ image }, { image: image.replace('runtime@', 'runtime:other@') })).toBe(true);
+      expect(sameRuntimeImage({ image, imageId }, { image, imageId: `sha256:${'d'.repeat(64)}` })).toBe(false);
     });
   });
   it('uses exactly cwd/storage when the existing application setting is absent', async () => {
@@ -619,7 +258,7 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
       await writeFile(pointer, metadata.digest);
       await mkdir(unknown);
       // A live owner must survive regardless of another catalog's startup.
-      const restarted = new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'));
+      const restarted = new WagoRuntimeArtifactCatalog(root);
       await restarted.current();
       await restarted.onModuleDestroy();
       expect((await lstat(abandonedUpload)).isDirectory()).toBe(true);
@@ -687,12 +326,6 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     await catalog.root();
     expect(await readdir(staging)).toEqual(expect.arrayContaining([basename(active), remote, malformed]));
   });
-  it('keeps the release anchor equal to the packaged public key', async () => {
-    expect((await readFile(resolve(__dirname, '../cc100-runtime/signing-public-key.pub'), 'utf8')).trim()).toBe(
-      `ssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}`,
-    );
-  });
-
   it('does not let the manifest-copy task cache and restore stale runtime/frontend bundles', async () => {
     const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
     expect(project.targets.build.outputs).toEqual([
@@ -720,7 +353,7 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
       }).compile();
       expect(await module.get(WagoRuntimeArtifactsService).has()).toBe(false);
       expect(get).not.toHaveBeenCalled();
-      expect(await readdir(root)).toEqual(['wago-runtime-artifacts']);
+      expect(await readdir(root)).toEqual([]);
       await module.close();
     } finally {
       if (previous === undefined) delete process.env.STORAGE_ROOT;
@@ -733,7 +366,7 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     expect(imported.manifest).toEqual(manifest);
     expect(Object.isFrozen(imported.manifest.hardware)).toBe(true);
     expect(Object.keys(imported).sort()).toEqual(['bytes', 'digest', 'image', 'manifest']);
-    const restarted = new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'));
+    const restarted = new WagoRuntimeArtifactCatalog(root);
     expect(await restarted.current()).toEqual(imported);
     expect(await restarted.has()).toBe(true);
   });
@@ -744,7 +377,7 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
 
     // Reimporting the same release must repair the existing object rather than discard staged metadata.
     await catalog.import(upload());
-    const restarted = new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'));
+    const restarted = new WagoRuntimeArtifactCatalog(root);
     expect(await restarted.current()).toEqual(imported);
     expect(await restarted.list()).toEqual([imported]);
     expect(await restarted.has()).toBe(true);
@@ -838,8 +471,6 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
   });
   it.each([
     ['checksum', () => upload(bundle(), '0'.repeat(64))],
-    ['signature', () => upload(bundle(), undefined, signature(Buffer.from('other')))],
-    ['namespace', () => upload(bundle(), undefined, signature(bundle(), 'wrong'))],
     ['manifest schema', () => upload(bundle({ ...manifest, schemaVersion: 2 }))],
     ['mutable image', () => upload(bundle({ ...manifest, image: 'latest' }))],
     ['hardware', () => upload(bundle({ ...manifest, hardware: { ...manifest.hardware, model: 'other' } }))],
@@ -872,15 +503,9 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     expect(await catalog.current()).toEqual(previous);
     expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
   });
-  it('rejects uploads signed with an untrusted fixture key', async () => {
-    await expect(new WagoRuntimeArtifactCatalog(root).import(upload())).rejects.toThrow('Runtime import failed');
-  });
   it('bounds tar and sidecar writes and cleans up stream errors', async () => {
-    await expect(
-      new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'), 100).import(upload()),
-    ).rejects.toThrow();
+    await expect(new WagoRuntimeArtifactCatalog(root, 100).import(upload())).rejects.toThrow();
     await expect(catalog.import(upload(bundle(), 'x'.repeat(4097)))).rejects.toThrow();
-    await expect(catalog.import(upload(bundle(), undefined, 'x'.repeat(16385)))).rejects.toThrow();
     const failed = upload();
     failed.bundle = Readable.from(
       (async function* () {
@@ -904,11 +529,10 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     expect(await catalog.has()).toBe(false);
     await expect(catalog.acquire('../outside')).rejects.toThrow();
   });
-  it('round-trips the packaging CLI and real OpenSSH signatures without exposing signing stderr', async () => {
+  it('round-trips the compressed packaging CLI, checksum and catalog import', async () => {
     const exec = promisify(execFile);
-    const privateKey = join(root, 'fixture-key');
-    await exec('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', privateKey]);
-    await writeFile(join(root, 'image.tar'), 'isolated fake docker image');
+    const inner = Buffer.concat([tarMember('fixture', 'isolated image fixture'), Buffer.alloc(1024)]);
+    await writeFile(join(root, 'image.tar'), inner);
     await exec(process.execPath, [
       resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
       '--image-archive',
@@ -917,26 +541,136 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
       image,
       '--version',
       '0.3.0',
-      '--signing-key',
-      privateKey,
       '--out',
       join(root, 'releases'),
     ]);
     const release = join(root, 'releases', (await readdir(join(root, 'releases')))[0]);
+    expect((await readdir(release)).sort()).toEqual(['wago-cc100-runtime.tar', 'wago-cc100-runtime.tar.sha256']);
     const data = await readFile(join(release, 'wago-cc100-runtime.tar'));
-    const trusted = (await readFile(`${privateKey}.pub`, 'utf8')).split(' ')[1];
-    const fixtureCatalog = new WagoRuntimeArtifactCatalog(root, trusted);
+    const imageHeader = data.subarray(0, 512);
+    const compressedBytes = parseInt(imageHeader.subarray(124, 136).toString('ascii'), 8);
+    const compressedImage = data.subarray(512, 512 + compressedBytes);
+    expect(compressedImage.subarray(0, 2)).toEqual(Buffer.from([0x1f, 0x8b]));
+    expect(compressedImage.subarray(4, 8)).toEqual(Buffer.alloc(4)); // no gzip timestamp
+    expect(gunzipSync(compressedImage)).toEqual(inner);
+    const fixtureCatalog = new WagoRuntimeArtifactCatalog(root);
     const result = await fixtureCatalog.import(
-      upload(
-        data,
-        await readFile(join(release, 'wago-cc100-runtime.tar.sha256'), 'utf8'),
-        await readFile(join(release, 'wago-cc100-runtime.tar.sig'), 'utf8'),
-      ),
+      upload(data, await readFile(join(release, 'wago-cc100-runtime.tar.sha256'), 'utf8')),
     );
     expect(result.manifest.runtimeVersion).toBe('0.3.0');
     expect(result.manifest.hardware.profile).toBe(manifest.hardware.profile);
+    await exec(process.execPath, [
+      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+      '--image-archive',
+      join(root, 'image.tar'),
+      '--image',
+      image,
+      '--version',
+      '0.3.0',
+      '--out',
+      join(root, 'releases'),
+    ]);
+    const releases = await readdir(join(root, 'releases'));
+    const secondRelease = releases.find((name) => name !== basename(release));
+    expect(secondRelease).toBeDefined();
+    expect(await readFile(join(root, 'releases', secondRelease ?? '', 'wago-cc100-runtime.tar'))).toEqual(data);
+    await writeFile(join(root, 'compressed-image.tar'), gzipSync(inner));
+    await expect(
+      exec(process.execPath, [
+        resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+        '--image-archive',
+        join(root, 'compressed-image.tar'),
+        '--image',
+        image,
+        '--version',
+        '0.3.1',
+        '--out',
+        join(root, 'releases'),
+      ]),
+    ).rejects.toThrow();
+    expect(await readdir(join(root, 'releases'))).toHaveLength(2);
   });
-  it('redacts filesystem failures from controller and upload interceptor errors', async () => {
+
+  it('packages a fixed build-owned descriptor and verifies it without a manual import', async () => {
+    const exec = promisify(execFile);
+    await writeFile(
+      join(root, 'image.tar'),
+      Buffer.concat([tarMember('fixture', 'image fixture'), Buffer.alloc(1024)]),
+    );
+    const args = [
+      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+      '--image-archive',
+      join(root, 'image.tar'),
+      '--image',
+      image,
+      '--version',
+      '0.1.0',
+      '--build-id',
+      'a'.repeat(40),
+      '--image-id',
+      `sha256:${'b'.repeat(64)}`,
+      '--out',
+      join(root, 'build-assets'),
+    ];
+    await exec(process.execPath, args);
+    const directory = join(root, 'build-assets/cc100-build');
+    const owned = new WagoBuildRuntimeCatalog(root, directory);
+    try {
+      await owned.onModuleInit();
+      expect(await owned.current()).toMatchObject({ buildId: 'a'.repeat(40), imageId: `sha256:${'b'.repeat(64)}` });
+      // Explicit rebuilds publish fresh assets, while running catalogs retain
+      // their selected release until the server is restarted.
+      const nextArgs = [...args];
+      nextArgs[nextArgs.indexOf('--version') + 1] = '0.2.0';
+      await exec(process.execPath, nextArgs);
+      expect((await owned.current()).manifest.runtimeVersion).toBe('0.1.0');
+      const restarted = new WagoBuildRuntimeCatalog(root, directory);
+      try {
+        expect((await restarted.current()).manifest.runtimeVersion).toBe('0.2.0');
+      } finally {
+        await restarted.onModuleDestroy();
+      }
+      expect(await readdir(join(root, 'build-assets'))).toEqual(['cc100-build']);
+    } finally {
+      await owned.onModuleDestroy();
+    }
+  });
+  const dockerImage = process.env.WAGO_DOCKER_TEST_IMAGE;
+  (dockerImage ? it : it.skip)(
+    'loads the packaged release image member with a real Docker daemon',
+    async () => {
+      const exec = promisify(execFile);
+      const archive = join(root, 'docker-image.tar');
+      if (!dockerImage) throw new Error('Set WAGO_DOCKER_TEST_IMAGE to run this integration test');
+      await exec('docker', ['save', '-o', archive, dockerImage]);
+      await exec(process.execPath, [
+        resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+        '--image-archive',
+        archive,
+        '--image',
+        image,
+        '--version',
+        '0.4.0',
+        '--out',
+        join(root, 'releases'),
+      ]);
+      const release = join(root, 'releases', (await readdir(join(root, 'releases')))[0]);
+      const data = await readFile(join(release, 'wago-cc100-runtime.tar'));
+      const importedCatalog = new WagoRuntimeArtifactCatalog(root);
+      const imported = await importedCatalog.import(
+        upload(data, await readFile(join(release, 'wago-cc100-runtime.tar.sha256'), 'utf8')),
+      );
+      expect(imported.manifest.runtimeVersion).toBe('0.4.0');
+      await importedCatalog.onModuleDestroy();
+      const size = parseInt(data.subarray(124, 136).toString('ascii'), 8);
+      const compressedImage = join(root, 'image-compressed.tar');
+      await writeFile(compressedImage, data.subarray(512, 512 + size));
+      const { stdout } = await exec('docker', ['load', '-i', compressedImage], { maxBuffer: 1024 * 1024 });
+      expect(stdout).toContain('Loaded image:');
+    },
+    120000,
+  );
+  it('redacts filesystem failures from the read-only runtime controller', async () => {
     const controller = new WagoArtifactsController(catalog as WagoRuntimeArtifactsService);
     const source = join(root, 'private-source', 'runtime.tar');
     const rawError = new Error(`EACCES: permission denied, open '${source}'`);
@@ -945,75 +679,5 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
       await expect(controller[method]()).rejects.toMatchObject({ message: expect.not.stringContaining(root) });
       spy.mockRestore();
     }
-    await expect(
-      controller.import({ bundle: [{ path: source }], checksum: [{ path: source }], signature: [{ path: source }] }),
-    ).rejects.toMatchObject({ message: 'Runtime import failed. Check the signed release files and retry.' });
-    const spy = jest.spyOn(catalog, 'createUploadDirectory').mockRejectedValueOnce(rawError);
-    const interceptor = new WagoArtifactUploadInterceptor(catalog as WagoRuntimeArtifactsService);
-    await expect(interceptor.intercept(uploadContext(new PassThrough()), { handle: jest.fn() })).rejects.toMatchObject({
-      message: 'Runtime upload could not be completed. Retry with the signed release files.',
-    });
-    spy.mockRestore();
-  });
-  it('accepts browser multipart uploads and enforces the real admin permission guard before allocating disk', async () => {
-    const controller = new WagoArtifactsController(catalog as WagoRuntimeArtifactsService);
-    const interceptor = new WagoArtifactUploadInterceptor(catalog as WagoRuntimeArtifactsService);
-    const guard = new EffectivePermissionsGuard(new Reflector());
-    // Real multipart parser and permission metadata, in-memory HTTP request stream: no listening socket.
-    async function multipart(parts: [string, Buffer][], admin = true) {
-      const boundary = 'isolated-artifact-boundary';
-      const body = Buffer.concat([
-        ...parts.map(([name, data]) =>
-          Buffer.concat([
-            Buffer.from(
-              `--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="../../operator-file"\r\nContent-Type: application/octet-stream\r\n\r\n`,
-            ),
-            data,
-            Buffer.from('\r\n'),
-          ]),
-        ),
-        Buffer.from(`--${boundary}--\r\n`),
-      ]);
-      const req = Object.assign(Readable.from([body]), {
-        headers: { 'content-type': `multipart/form-data; boundary=${boundary}`, 'content-length': String(body.length) },
-        user: { id: 1, effectivePermissions: new Set(admin ? ['system.settings.manage'] : []) },
-        files: {},
-      });
-      const context = {
-        getClass: () => WagoArtifactsController,
-        getHandler: () => controller.import,
-        switchToHttp: () => ({ getRequest: () => req, getResponse: () => ({}) }),
-      } as unknown as ExecutionContext;
-      guard.canActivate(context);
-      return lastValueFrom(
-        await interceptor.intercept(context, { handle: () => defer(() => controller.import(req.files)) }),
-      );
-    }
-    const data = bundle();
-    const checksum = createHash('sha256').update(data).digest('hex');
-    await expect(multipart([['bundle', data]], false)).rejects.toThrow('Insufficient permissions');
-    expect(await readdir(root)).toEqual([]);
-    const result = await multipart([
-      ['bundle', data],
-      ['checksum', Buffer.from(checksum)],
-      ['signature', Buffer.from(signature(data))],
-    ]);
-    expect(result.manifest).toEqual(manifest);
-    expect(result).not.toHaveProperty('path');
-    expect(Object.keys(result).sort()).toEqual(['bytes', 'digest', 'image', 'manifest']);
-    expect(JSON.stringify(result)).not.toContain(root);
-    expect(JSON.stringify(result)).not.toContain('operator-file');
-    expect(await controller.current()).toEqual(result);
-    expect(await controller.list()).toEqual([result]);
-    await expect(multipart([['bundle', data]])).rejects.toThrow('Select the runtime');
-    await expect(multipart([['key', Buffer.from('not trusted')]])).rejects.toThrow();
-    await expect(multipart([['signature', Buffer.alloc(16385)]])).rejects.toThrow();
-    await expect(
-      multipart([
-        ['bundle', data],
-        ['bundle', data],
-      ]),
-    ).rejects.toThrow();
-    expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
   });
 });

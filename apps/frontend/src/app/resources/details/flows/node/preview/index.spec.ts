@@ -78,4 +78,51 @@ describe('flow node previews', () => {
     for (const type of ['plugin.wago.output', '__proto__', 'toString'])
       expect(getNodePreviewRows(type, keyTranslation, null)).toEqual([]);
   });
+
+  it('renders only the concise preview explicitly supplied by a plugin', () => {
+    const preview = [
+      { label: 'Device', value: 'Demo' },
+      { label: 'Channel', value: 'Demo relay (DO1)' },
+      { label: 'Action', value: 'Turn OFF' },
+    ];
+    expect(
+      getNodePreviewRows(
+        'plugin.example.command',
+        keyTranslation,
+        {
+          data: { controllerId: 4, channelId: 'relay', value: false, password: 'do-not-display' },
+        },
+        { preview },
+      ),
+    ).toEqual(preview);
+  });
+
+  it('ignores malformed plugin rows and limits a preview to four plain-text fields', () => {
+    const rows = Array.from({ length: 6 }, (_, i) => ({ label: `Field ${i}`, value: String(i) }));
+    expect(
+      getNodePreviewRows('plugin.example.read', keyTranslation, null, {
+        preview: [null, { label: 'Bad', value: {} }, { label: '', value: 'empty label' }, ...rows],
+      }),
+    ).toEqual(rows.slice(0, 4));
+  });
+});
+
+it('selects exact and base locale overrides with safe fallback to plain strings', () => {
+  const preview = [
+    {
+      label: 'Action',
+      value: 'Turn OFF',
+      translations: {
+        de: { label: 'Aktion', value: 'Ausschalten' },
+        'de-CH': { label: 'Aktion', value: 'Aus' },
+        fr: { label: 'Action', value: {} },
+      },
+    },
+  ];
+  const rows = (locale: string) =>
+    getNodePreviewRows('plugin.example.command', keyTranslation, null, { preview }, locale);
+  expect(rows('de-DE')).toEqual([{ label: 'Aktion', value: 'Ausschalten' }]);
+  expect(rows('de-CH')).toEqual([{ label: 'Aktion', value: 'Aus' }]);
+  expect(rows('fr')).toEqual([{ label: 'Action', value: 'Turn OFF' }]);
+  expect(rows('es')).toEqual([{ label: 'Action', value: 'Turn OFF' }]);
 });

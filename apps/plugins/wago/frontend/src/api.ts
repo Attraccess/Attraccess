@@ -16,7 +16,7 @@ export interface WagoController {
   lastHeartbeatAt: string | null;
   lastSeenAt: string;
   compatibilityError: string | null;
-  connectivity: 'online' | 'stale' | 'untrusted';
+  connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_check' | 'runtime_update';
 }
 export interface WagoSettings {
   defaultMqttServerId: number | null;
@@ -49,7 +49,9 @@ export type WagoCommissioningState =
   | 'recovery_revocation_pending'
   | 'revoked';
 export interface CommissioningSession {
+  operationDeadlineAt?: string | null;
   runtimeRecoveryAvailable?: boolean;
+  managedAccessAvailable?: boolean;
   managementControllerId?: number | null;
   dockerProvisionState?: string | null;
   platformReport?: string | null;
@@ -74,7 +76,6 @@ export interface CommissioningSession {
 }
 
 export interface CreateCommissioningSessionInput {
-  runtimeArtifactDigest?: string;
   targetHost: string;
   mqttServerId: number;
   name: string;
@@ -161,6 +162,27 @@ export const setSettings = (defaultMqttServerId: number | null) =>
 
 export const listMqttServers = () => hostApi.request<MqttServer[]>('/mqtt/servers');
 
+export interface NetworkChangeStatus {
+  available: boolean;
+  targetHost: string | null;
+  mqttServerId: number | null;
+  pendingCredentialRetirements: number;
+  operation: {
+    targetHost: string;
+    mqttServerId: number | null;
+    phase: 'connecting' | 'provisioning' | 'applying' | 'verifying' | 'saving' | 'completed';
+    failure: string | null;
+    running: boolean;
+  } | null;
+}
+export const getNetworkChangeStatus = (id: number) => api.request<NetworkChangeStatus>(`/controllers/${id}/network-change`);
+export const changeControllerNetwork = (id: number, input: { targetHost: string; mqttServerId: number | null }) =>
+  api.request<NetworkChangeStatus>(`/controllers/${id}/network-change`, { method: 'POST', body: input });
+export const retryControllerNetworkChange = (id: number) =>
+  api.request<NetworkChangeStatus>(`/controllers/${id}/network-change/retry`, { method: 'POST' });
+export const retirePreviousMqttCredentials = (id: number) =>
+  api.request<NetworkChangeStatus>(`/controllers/${id}/network-change/retire-credentials`, { method: 'POST' });
+
 export const claimController = (id: number, input: ClaimControllerInput) =>
   api.request<WagoController>(`/controllers/${id}/claim`, { method: 'POST', body: input });
 
@@ -181,8 +203,8 @@ export const confirmCommissioningHostKey = (
     },
   });
 
-export const listCommissioningSessions = (limit = 100, offset = 0) =>
-  api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`);
+export const listCommissioningSessions = (limit = 100, offset = 0, signal?: AbortSignal) =>
+  api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`, { signal });
 
 export interface CommissioningVerification {
   controllerId: number | null;
@@ -216,6 +238,78 @@ export const revokeCommissioningSession = (id: number) =>
 export const removeCommissioningSession = (id: number) =>
   api.request<void>(`/commissioning/sessions/${id}`, { method: 'DELETE' });
 export const removeController = (id: number) => api.request<void>(`/controllers/${id}`, { method: 'DELETE' });
+
+export interface RuntimeUpdateStatus {
+  managementFailure?: string;
+  managementSetup?: { state: 'waiting' | 'running'; reason: string };
+  runtime?: {
+    runningVersion: string;
+    runningImageId: string | null;
+    desiredVersion: string | null;
+    desiredImageId: string | null;
+  };
+  blocker?: string;
+  runtimeUpdateRequired?: boolean;
+  sessionId: number | null;
+  management: 'pending' | 'verified' | 'managed' | 'recovery_required' | 'retiring' | 'retired' | 'reenrol_required';
+  keyFingerprint: string | null;
+  physicalQualification: 'unverified';
+  update: {
+    phase:
+      | 'blocked'
+      | 'preparing'
+      | 'staging'
+      | 'activating'
+      | 'verifying'
+      | 'accepting'
+      | 'recovering'
+      | 'recovery_required'
+      | 'failed'
+      | 'current';
+    desiredImageId: string;
+    desiredRuntimeVersion?: string;
+    previousRuntimeVersion?: string | null;
+    previousImageId: string | null;
+    buildId: string;
+    attempt: number;
+    failure: string | null;
+    storageDiagnostics?: { path: string; requiredKiB: number; availableKiB: number }[];
+    retryAt: number;
+    cleanupAttempt?: number;
+    cleanupRetryAt?: number;
+  } | null;
+}
+export const getRuntimeUpdateStatus = (id: number) =>
+  api.request<RuntimeUpdateStatus>(`/controllers/${id}/runtime-update`);
+export const getManagedAccessStatus = (id: number) =>
+  api.request<RuntimeUpdateStatus>(`/commissioning/sessions/${id}/managed-access`);
+export const getRootRecoveryPassword = (sessionId: number) =>
+  api.request<{ password: string }>(`/commissioning/sessions/${sessionId}/root-recovery`, {
+    method: 'POST',
+    body: { confirm: true },
+  });
+export const retryManagedAccess = (sessionId: number) =>
+  api.request<void>(`/commissioning/sessions/${sessionId}/managed-access/retry`, { method: 'POST' });
+export const retryRuntimeUpdate = (controllerId: number) =>
+  api.request<void>(`/controllers/${controllerId}/runtime-update/retry`, { method: 'POST' });
+export const restoreManagedAccess = (sessionId: number) =>
+  api.request<void>(`/commissioning/sessions/${sessionId}/managed-access/restore`, {
+    method: 'POST',
+    body: { confirm: true },
+  });
+
+export interface ManualCommand {
+  channelId: string;
+  action: 'set' | 'pulse' | 'release';
+  value?: boolean;
+  expectedConfigurationRevision: number;
+  acknowledgementTimeoutSeconds: number;
+}
+export const manualCommand = (id: number, command: ManualCommand) =>
+  api.request<{ result: 'acknowledged' | 'rejected' | 'timeout' | 'transport_failure' }>(
+    `/controllers/${id}/commands`,
+    { method: 'POST', body: command },
+  );
 
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);

@@ -77,7 +77,7 @@ export class WagoControllerApi {
   @Auth('system.settings.manage')
   @Post('commissioning/sessions')
   createCommissioningSession(
-    @Body() body: { mqttServerId?: number; targetHost?: string; name?: string; runtimeArtifactDigest?: string },
+    @Body() body: { mqttServerId?: number; targetHost?: string; name?: string },
     @Req() request?: AuthenticatedRequest,
   ) {
     if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
@@ -87,7 +87,6 @@ export class WagoControllerApi {
         mqttServerId: body.mqttServerId,
         targetHost: body.targetHost ?? '',
         name: body.name,
-        runtimeArtifactDigest: body.runtimeArtifactDigest,
       },
       commissioningPrincipal(request),
     );
@@ -146,20 +145,6 @@ export class WagoControllerApi {
   @Get('commissioning/sessions/:id/management')
   managementStatus(@Param('id', ParseIntPipe) id: number) {
     return this.commissioning.managementStatus(id);
-  }
-  @Auth('system.settings.manage')
-  @Get('commissioning/sessions/:id/operation')
-  operationStatus(@Param('id', ParseIntPipe) id: number) {
-    return this.commissioning.operationStatus(id);
-  }
-  @Auth('system.settings.manage')
-  @Post('commissioning/sessions/:id/operation/recover')
-  recoverOperation(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: Parameters<WagoCommissioningService['recoverOperation']>[1],
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.commissioning.recoverOperation(id, body ?? {}, commissioningPrincipal(request));
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/platform/:action')
@@ -253,10 +238,19 @@ export class WagoControllerApi {
   ) {
     if (!body || Object.keys(body).some((key) => key !== 'confirm' && key !== 'retry') || body.confirm !== true)
       throw new BadRequestException('Explicit credential rotation consent is required');
-    if (body.retry !== undefined && typeof body.retry !== 'boolean') throw new BadRequestException('Invalid rotation retry flag');
+    if (body.retry !== undefined && typeof body.retry !== 'boolean')
+      throw new BadRequestException('Invalid rotation retry flag');
     const settings = await this.wago.getSettings();
-    return this.commissioning.operateControllerSafely(id, (_assertOwned, guard) =>
-      this.credentialRotation.rotate(id, settings.operationalPrefix, wagoAuditPrincipal(request), guard, body.retry === true),
+    return this.commissioning.operateControllerSafely(
+      id,
+      (_assertOwned, guard) =>
+        this.credentialRotation.rotate(
+          id,
+          settings.operationalPrefix,
+          wagoAuditPrincipal(request),
+          guard,
+          body.retry === true,
+        ),
       true,
     );
   }

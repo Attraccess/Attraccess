@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Configuration",
+    "loading": "Loading summary…",
+    "unavailable": "Preview unavailable"
+  },
   "editor": {
     "buttons": {
       "save": "Save",
@@ -51,6 +56,53 @@
             "description": "Triggers when a usage session is taken over.",
             "outputs": {
               "output": "Output"
+            }
+          }
+        },
+        "metering": {
+          "start": {
+            "title": "Metering start",
+            "description": "Runs when a session starts. Prepare the selected meter, then acknowledge with Metering ready.",
+            "outputs": {
+              "output": "Output"
+            },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Timeout (seconds)",
+                "helpText": "Maximum time to wait for Metering ready. Billed meters must acknowledge before the session starts. Failed zero-rate meters are skipped and the session can still start."
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
+              }
+            }
+          },
+          "collect": {
+            "title": "Metering collection",
+            "description": "Read the selected meter periodically, including outside sessions, and once at session end.",
+            "outputs": {
+              "output": "Output"
+            },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Timeout (seconds)",
+                "helpText": "Maximum time to wait for Report meter."
+              },
+              "interimIntervalMinutes": {
+                "label": "Interim interval (minutes)",
+                "helpText": "Minutes between readings, including outside sessions. 0 disables periodic collection."
+              },
+              "finalAttempts": {
+                "label": "Final attempts",
+                "helpText": "Attempts to obtain a fresh final total when a session ends before the meter charge is left pending."
+              },
+              "finalRetryDelaySeconds": {
+                "label": "Final retry delay (seconds)"
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
+              }
             }
           }
         },
@@ -663,6 +715,67 @@
           }
         },
 
+        "metering": {
+          "ready": {
+            "title": "Metering ready",
+            "description": "Confirms the meter is initialized. Billed meters require this acknowledgement before the session starts. Failed zero-rate meters are skipped and the session can still start.",
+            "inputs": {
+              "input": "Input"
+            },
+            "config": {
+              "baselineValue": {
+                "label": "Baseline value",
+                "helpText": "Only for meters that cannot be reset: the counter's current total (templates allowed). Consumption is counted from it. Leave empty when the meter was reset."
+              },
+              "source": {
+                "label": "Source",
+                "helpText": "Optional name of the physical meter (templates allowed)."
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
+              }
+            },
+            "preview": {
+              "baselineValue": "Baseline",
+              "source": "Meter"
+            }
+          },
+          "report": {
+            "title": "Report meter",
+            "description": "Report a cumulative counter value or add an increment. Works with or without a running session.",
+            "inputs": {
+              "input": "Input"
+            },
+            "config": {
+              "value": {
+                "label": "Value",
+                "helpText": "Non-negative numeric value (templates allowed). No unit conversion."
+              },
+              "observedAt": {
+                "label": "Observed at",
+                "helpText": "Optional ISO time the source took the reading. Readings from before the session ended are rejected as stale. Defaults to now."
+              },
+              "source": {
+                "label": "Source",
+                "helpText": "Optional name of the physical meter (templates allowed)."
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
+              },
+              "mode": {
+                "enum": { "total": "Cumulative total", "increment": "Increment" },
+                "label": "Reporting mode",
+                "helpText": "total: cumulative reading; increment: add this amount."
+              }
+            },
+            "preview": {
+              "value": "Value",
+              "mode": "Reporting mode"
+            }
+          }
+        },
         "activity": {
           "operating": {
             "title": "Record operation started",

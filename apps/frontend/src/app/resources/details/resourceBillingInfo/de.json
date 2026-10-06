@@ -17,6 +17,9 @@
   "perOperatingMinute": {
     "label": "Pro zugeordneter Betriebsminute"
   },
+  "perKwh": {
+    "label": "Pro kWh"
+  },
   "example": {
     "label": "Beispielkosten",
     "sessionDuration": {

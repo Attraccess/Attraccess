@@ -9,8 +9,10 @@ import { MqttSettingsModal } from './MqttSettingsModal';
 import type { CommissioningSession, WagoController } from './api';
 import { RemoveControllerDrawer } from './RemoveControllerDrawer';
 import { useCommissioningSessionsQuery, useControllersQuery } from './queries';
+import { useWagoTranslations } from './i18n';
 
 export function ControllersPage() {
+  const { t } = useWagoTranslations();
   const controllersQuery = useControllersQuery();
   const sessionsQuery = useCommissioningSessionsQuery();
   const [claimControllerId, setClaimControllerId] = useState<number | null>(null);
@@ -31,25 +33,22 @@ export function ControllersPage() {
     <main className="wg:mx-auto wg:flex wg:w-full wg:max-w-6xl wg:flex-col wg:gap-6 wg:p-4 wg:md:p-6">
       <header className="wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-4">
         <div>
-          <h1 className="wg:text-2xl wg:font-semibold">WAGO controllers</h1>
-          <p className="wg:mt-1 wg:text-sm wg:text-muted">
-            Commission a controller through a host-key-pinned SSH session; controller credentials are never displayed
-            here.
-          </p>
+          <h1 className="wg:text-2xl wg:font-semibold">{t('controllers.title')}</h1>
+          <p className="wg:mt-1 wg:text-sm wg:text-muted">{t('controllers.description')}</p>
         </div>
         <div className="wg:flex wg:flex-wrap wg:gap-2">
           <Button variant="secondary" onPress={() => setSettingsOpen(true)}>
-            <SettingsIcon className="wg:h-4 wg:w-4" /> Settings
+            <SettingsIcon className="wg:h-4 wg:w-4" /> {t('common.settings')}
           </Button>
           <Button onPress={() => setCommissioningOpen(true)}>
-            <PlusIcon className="wg:h-4 wg:w-4" /> Commission controller
+            <PlusIcon className="wg:h-4 wg:w-4" /> {t('controllers.commission')}
           </Button>
           <Button
             variant="ghost"
             isPending={controllersQuery.isFetching}
             onPress={() => void controllersQuery.refetch()}
           >
-            <RefreshCwIcon className="wg:h-4 wg:w-4" /> Refresh
+            <RefreshCwIcon className="wg:h-4 wg:w-4" /> {t('common.refresh')}
           </Button>
         </div>
       </header>
@@ -58,8 +57,10 @@ export function ControllersPage() {
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Could not load WAGO controllers</Alert.Title>
-            <Alert.Description>{getErrorMessage(controllersQuery.error)}</Alert.Description>
+            <Alert.Title>{t('controllers.loadError')}</Alert.Title>
+            <Alert.Description>
+              {controllersQuery.error instanceof Error ? controllersQuery.error.message : t('common.retry')}
+            </Alert.Description>
           </Alert.Content>
         </Alert>
       )}
@@ -108,8 +109,4 @@ export function ControllersPage() {
       />
     </main>
   );
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Please try again.';
 }

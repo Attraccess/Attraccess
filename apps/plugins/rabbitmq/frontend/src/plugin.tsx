@@ -1,19 +1,14 @@
 // RabbitMQ management plugin — frontend half.
 //
-// ATT-526 bootstrapped this remote with one route + sidebar entry. ATT-521 adds
-// the MQTT slot contributions: a "RabbitMQ" badge in the MQTT server list and a
+// Contributes a "RabbitMQ" badge in the MQTT server list and a
 // connection-status panel in the MQTT server detail view, both driven by the
 // plugin's backend detection endpoint. The host stays RabbitMQ-agnostic — it
 // only exposes the generic slots and renders whatever we contribute.
 import './styles.css';
-import { Card } from '@heroui/react';
-import { RabbitIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
-  PluginSidebarItem,
   PluginSlotContribution,
-  RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
 import { useDetection } from './detection';
@@ -53,26 +48,6 @@ function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
   );
 }
 
-function RabbitmqPage() {
-  return (
-    <div className="rmq:flex rmq:flex-col rmq:gap-6 rmq:p-6 rmq:max-w-4xl rmq:mx-auto">
-      <div className="rmq:flex rmq:items-center rmq:gap-3">
-        <RabbitIcon className="rmq:w-6 rmq:h-6 rmq:text-accent-soft-foreground" />
-        <h1 className="rmq:text-2xl rmq:font-semibold rmq:text-default-800">RabbitMQ</h1>
-      </div>
-      <Card className="rmq:border rmq:border-default-200 rmq:dark:border-default-100">
-        <Card.Content>
-          <p className="rmq:text-sm rmq:text-default-500">
-            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in the
-            MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT server
-            detail view.
-          </p>
-        </Card.Content>
-      </Card>
-    </div>
-  );
-}
-
 export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
   getPluginName(): string {
     return 'rabbitmq-plugin@0.1.0';
@@ -100,21 +75,6 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
 
   onApiEndpointChange(_endpoint: string): void {
     // no-op
-  }
-
-  getRoutes(): RouteConfig[] {
-    // Same access level as the host MQTT servers settings page.
-    return [{ path: '/rabbitmq', authRequired: 'resources.update', element: <RabbitmqPage /> }];
-  }
-
-  getSidebarItems(): PluginSidebarItem[] {
-    return [
-      {
-        label: 'RabbitMQ',
-        path: '/rabbitmq',
-        icon: <RabbitIcon className="rmq:w-5 rmq:h-5" />,
-      },
-    ];
   }
 
   // Contribute UI into the host's generic MQTT slots. Each contribution is

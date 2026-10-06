@@ -80,6 +80,28 @@ keyword and an `attraccess` object:
 | `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
 | `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
 
+## Dependencies on other Attraccess plugins
+
+Declare plugin dependencies in `package.json` under `attraccess.dependencies`:
+
+```json
+{
+  "attraccess": {
+    "dependencies": [
+      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
+    ]
+  }
+}
+```
+
+`name` is the immutable npm package identity, `version` is a semver range (not a dist-tag or URL), and `required` defaults to `true`. Duplicate identities are rejected. These entries represent installed Attraccess plugins with their own modules, permissions, migrations, and state. Keep ordinary JavaScript runtime dependencies in npm's top-level `dependencies`.
+
+The marketplace resolves the entire required dependency graph before installation and displays the resolved versions, sources, classifications, and permissions for confirmation. Compatible installed plugins are reused; missing plugins are installed together. Conflicting installed versions are not automatically replaced. Cycles and incompatible ranges block the operation with an explanation. Dependencies resolve from the selected registry, so publish dependencies there too; an already-installed compatible dependency may come from another registry.
+
+Optional dependencies (`required: false`) are not installed automatically and do not gate activation. If present, their versions must satisfy the declared range. Required dependencies load and migrate before their dependants. A missing, incompatible, quarantined, or failed required dependency keeps its dependants inactive; the Plugins settings page shows the failure. Repair the dependency and restart to reactivate its dependants.
+
+Updates and downgrades must satisfy both the target version's dependencies and installed dependants' requirements. Removing a required dependency requires explicit confirmation of every direct and transitive dependant to remove in the same operation. Automatically installed dependencies remain ordinary plugins and are not automatically removed when their last dependant is removed. Package changes commit together; migrations and runtime activation run on restart, using the existing plugin lifecycle. Removing npm plugins retains their data and secrets.
+
 ## Backend plugins
 
 A backend plugin runs **inside** the Attraccess server process. It exports a
@@ -430,6 +452,70 @@ See [Permissions](../user-management/permissions.md) for the full list of availa
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.
 
+### Sidebar entries and groups
+
+Implement `getSidebarItems()` to add links to your plugin's routes. Set `group`
+to an existing host group ID such as `devices`, or declare your own group with
+`getSidebarGroups()`:
+
+```tsx
+import type { PluginSidebarGroup, PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
+import { PlugIcon } from 'lucide-react';
+
+getSidebarGroups(): PluginSidebarGroup[] {
+  return [{ id: 'my-plugin-tools', label: 'My Plugin', icon: <PlugIcon size={16} aria-hidden /> }];
+}
+
+getSidebarItems(): PluginSidebarItem[] {
+  return [{ label: 'Tools', path: '/my-plugin/tools', group: 'my-plugin-tools' }];
+}
+```
+
+Use stable, nonempty group IDs. Prefix private groups with your plugin's name;
+use an agreed ID for groups shared with other plugins. A group has a
+`label` and an optional React node `icon`; the host supplies a puzzle icon when
+none is provided. Plugin labels are rendered as supplied, so your plugin is
+responsible for their translations.
+
+The host checks each entry's target route permissions before displaying it and
+hides groups with no visible entries. Declared groups work in the expanded
+sidebar, collapsed menus, and mobile navigation. Entries with no group or an
+unknown group ID stay at the root. Host groups keep their labels and icons when
+a plugin declares the same ID; for duplicate plugin group IDs, the first loaded
+plugin's declaration wins and entries share that group.
+
+#### Sharing a group between plugins
+
+Each plugin that needs a shared group should declare it through
+`getSidebarGroups()` and reference the same ID in its entries. Declarations with
+matching IDs merge into one group, so plugins work alone or together. For example:
+
+```tsx
+// In the 3D printer plugin:
+getSidebarGroups(): PluginSidebarGroup[] {
+  return [{ id: '3d-printer', label: '3D Printers' }];
+}
+
+// In the BambuLab plugin:
+getSidebarGroups(): PluginSidebarGroup[] {
+  return [{ id: '3d-printer', label: '3D Printers' }];
+}
+
+getSidebarItems(): PluginSidebarItem[] {
+  return [{ label: 'BambuLab', path: '/printers/bambulab', group: '3d-printer' }];
+}
+```
+
+BambuLab creates **3D Printers** when installed on its own. When the 3D printer
+plugin or another printer plugin also declares `3d-printer`, their entries share
+the same group. Use consistent labels and icons for shared IDs: the first loaded
+declaration supplies the group's metadata.
+
+The host collects all group declarations before placing entries. A plugin may
+also reference a group declared only by another plugin, but should declare the
+group itself if it needs to work independently. Without any declaration, the
+existing root fallback applies.
+
 ### Slots (embedded extension points)
 
 Routes give a plugin its own pages. **Slots** let a plugin inject UI _into_ a
@@ -476,13 +562,63 @@ knowledge. Host slot ids available today:
 | `mqtt.server.detail`   | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
 | `mqtt.server.list.row` | MQTT server list, per-row action area             | `{ mqttServerId }` |
 
+### Translations and language switching
+
+Use the core `useTranslations` hook from `@attraccess/plugins-frontend-ui` with
+your plugin's own English and German catalogs. The hook reads the host's active
+language and updates mounted plugin pages, drawers and slot contributions when
+the user switches language. Plugins do not run language detection or maintain
+their own language preference.
+
+```tsx
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
+
+export function DevicesPage() {
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
+  return <h1>{t('title')}</h1>;
+}
+```
+
+Include every user-facing label, description, placeholder and accessibility label
+in both catalogs. Use `{{name}}` interpolation for dynamic values and `{ one,
+many }` messages with `t('key', { count })` for pluralization. Missing German
+keys fall back to English. Use the returned `language` for date and number
+formatting; keep user-entered names and protocol identifiers intact. For status
+messages retained in React state, store the translation key and parameters and
+translate during rendering so existing messages also switch language.
+
+For plain React text, `{ escapeValues: false }` preserves names such as `R&D`
+without displaying HTML entities; React escapes the text when rendering it. Do
+not use this option for translated HTML or `Trans`. For retained local messages,
+store `{ key: 'saved', data: { name } }` and render `tMessage(message)`. Literal
+server errors passed to `tMessage` are preserved.
+
+**Share `@attraccess/plugins-frontend-ui` through module federation.** Bundling
+a private copy creates a separate language store and prevents automatic switching.
+The repository's `createPluginFederationConfig` already declares it with
+`import: false` and `generate: false`, so remotes always use the host's copy.
+External plugin builds must include the same shared entry:
+
+```ts
+'@attraccess/plugins-frontend-ui': {
+  requiredVersion: '*', import: false, generate: false,
+}
+```
+
+Declare `@attraccess/plugins-frontend-ui` as a peer dependency and require
+Attraccess 1.11.0 or later in both the npm `attraccess.host` range and the ZIP
+manifest's `attraccessVersion.min`, since older hosts do not share this module.
+
 ### Packaging the frontend
 
 Build the frontend as a module federation remote exposing `./plugin`. Its
 `shared` list must include every host singleton your plugin **imports at
 runtime**, so it reuses the host's copy instead of bundling its own. The host
 shares: `react`, `react-dom`, `react-router-dom`, `react-pluggable`,
-`@heroui/react`, `lucide-react`, `@tanstack/react-query`.
+`@heroui/react`, `lucide-react`, `@tanstack/react-query`,
+`@attraccess/plugins-frontend-ui` (including the core translation hooks).
 
 > [!TIP]
 > List `@heroui/react` and `lucide-react` here when you follow the recommended
@@ -636,6 +772,22 @@ so they share the workspace toolchain, caching and CI.
   plugin apps via `apps/plugins/scripts/` (`esbuild-backend.mjs`,
   `vite-federation.config.mjs`, `verify-packed-plugin.mjs`). Each plugin's `project.json`
   wires them into nx targets:
+
+  For local development, build and install a plugin into the dev API's plugin
+  directory:
+
+  ```bash
+  pnpm nx install-dev plugin-shelly
+  ```
+
+  This target is available for Shelly, RabbitMQ and WAGO. `install-dev`
+  depends on `build` and always copies the resulting `package/` contents into
+  `storage/plugins/<manifest-name>/`, replacing the previous local installation
+  and removing stale files. It honors `PLUGIN_DIR`, then `STORAGE_ROOT` from the
+  environment or workspace `.env`; relative paths resolve from the workspace
+  root. Other plugins are preserved. Restart a running API to load the updated
+  plugin. Plugin source changes require running `install-dev` again; this target
+  does not watch plugin sources.
 
   | Target           | Produces                                                                |
   | ---------------- | ----------------------------------------------------------------------- |

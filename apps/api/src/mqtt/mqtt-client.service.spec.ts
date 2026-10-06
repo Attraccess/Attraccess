@@ -9,6 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { EventEmitter } from 'node:events';
 
 // Interface to access private members for testing
 interface MqttClientServicePrivate {
@@ -358,10 +359,7 @@ describe('MqttClientService', () => {
 
       const servicePrivate = service as unknown as MqttClientServicePrivate;
       const client = await servicePrivate.getOrCreateClient(1);
-      servicePrivate.subscriptions.set(
-        1,
-        new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]),
-      );
+      servicePrivate.subscriptions.set(1, new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]));
       client.subscribe = jest.fn(
         (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
           callback?.(new Error('Subscribe error'));
@@ -409,6 +407,107 @@ describe('MqttClientService', () => {
       jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
 
       await expect(service.subscribe(1, 'sensors/+', undefined, true)).rejects.toThrow('Subscribe error');
+    });
+  });
+
+  describe('refreshConnection', () => {
+    function useRealConnections() {
+      jest.restoreAllMocks();
+      for (const level of ['log', 'error', 'debug', 'warn'] as const)
+        jest.spyOn(Logger.prototype, level).mockImplementation(jest.fn());
+      return service as unknown as MqttClientServicePrivate;
+    }
+
+    it('uses current address, credentials and TLS settings, preserving shared subscriptions and rejecting late old-client events', async () => {
+      const internal = useRealConnections();
+      const previous = await internal.getOrCreateClient(1);
+      await service.subscribe(1, 'devices/#', 2);
+      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...mockServer,
+        host: 'new-broker.test',
+        port: 8883,
+        useTls: true,
+        password: 'enc:fresh-password',
+        caCert: 'public-ca',
+        tlsServername: 'broker.internal',
+      });
+      jest.mocked(mqtt.connect).mockClear();
+      await service.refreshConnection(1);
+      const current = internal.clients.get(1);
+      expect(current).toBeDefined();
+      expect(current).not.toBe(previous);
+      expect(previous.end).toHaveBeenCalledWith(true);
+      expect(mqtt.connect).toHaveBeenCalledWith(
+        'mqtts://new-broker.test:8883',
+        expect.objectContaining({
+          username: 'testuser',
+          password: 'fresh-password',
+          ca: 'public-ca',
+          servername: 'broker.internal',
+        }),
+      );
+      expect(current?.subscribe).toHaveBeenCalledWith('devices/#', { qos: 2 }, expect.any(Function));
+      jest.mocked(mockEventEmitter.emit as EventEmitter2['emit']).mockClear();
+      previous.emit('connect', { cmd: 'connack', sessionPresent: false, returnCode: 0 });
+      previous.emit('message', 'devices/old', Buffer.from('stale'), {
+        cmd: 'publish',
+        topic: 'devices/old',
+        payload: Buffer.from('stale'),
+        qos: 0,
+        dup: false,
+        retain: false,
+      });
+      expect(internal.clients.get(1)).toBe(current);
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('keeps reconnecting after refresh times out and restores existing subscriptions when the broker recovers', async () => {
+      const internal = useRealConnections();
+      await internal.getOrCreateClient(1);
+      await service.subscribe(1, 'devices/#', 2);
+      const replacement = Object.assign(new EventEmitter(), {
+        connected: false,
+        end: jest.fn(),
+        subscribe: jest.fn((_topic, _options, done) => done()),
+      }) as unknown as mqtt.MqttClient;
+      jest.mocked(mqtt.connect).mockReturnValueOnce(replacement);
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+      try {
+        const refresh = service.refreshConnection(1);
+        const failure = expect(refresh).rejects.toThrow('Timeout connecting');
+        await new Promise(setImmediate);
+        await jest.advanceTimersByTimeAsync(10_000);
+        await failure;
+        expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(0);
+        expect(replacement.end).not.toHaveBeenCalled();
+        replacement.connected = true;
+        replacement.emit('connect');
+        expect(internal.clients.get(1)).toBe(replacement);
+        expect(replacement.subscribe).toHaveBeenCalledWith('devices/#', { qos: 2 }, expect.any(Function));
+        expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('replaces an unreachable pending client without waiting for the previous broker and prevents it from reconnecting', async () => {
+      const internal = useRealConnections();
+      const previous = Object.assign(new EventEmitter(), {
+        connected: false,
+        end: jest.fn(),
+      }) as unknown as mqtt.MqttClient;
+      jest.mocked(mqtt.connect).mockReturnValueOnce(previous);
+      const pending = internal.getOrCreateClient(1, true);
+      const rejected = pending.catch((error) => error);
+      await new Promise(setImmediate);
+      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({ ...mockServer, host: 'new-broker.test' });
+      await service.refreshConnection(1);
+      expect((await rejected).message).toBe('MQTT connection was replaced');
+      expect(previous.end).toHaveBeenCalledWith(true);
+      const current = internal.clients.get(1);
+      previous.emit('connect', { cmd: 'connack', sessionPresent: false, returnCode: 0 });
+      expect(internal.clients.get(1)).toBe(current);
+      expect(mqtt.connect).toHaveBeenLastCalledWith('mqtt://new-broker.test:1883', expect.anything());
     });
   });
 

@@ -1,5 +1,6 @@
 import { Alert, Button, Checkbox, Form, Input, Label, TextField } from '@heroui/react';
 import { useEffect, useRef, useState } from 'react';
+import { useWagoTranslations } from './i18n';
 import type {
   ManagementException,
   ManagementMode,
@@ -24,6 +25,7 @@ export interface ManagementSecurityStatusProps {
 }
 
 export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
+  const { t } = useWagoTranslations();
   const [status, setStatus] = useState(props.status);
   const [mode, setMode] = useState<ManagementMode>('baseline');
   const [exceptions, setExceptions] = useState<ManagementException[]>([]);
@@ -95,33 +97,33 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
     JSON.stringify([...status.exceptions].sort()) === JSON.stringify([...exceptions].sort());
   const recovery = status?.recoveryRequired || status?.state === 'key_enrolled' || status?.state === 'hardened';
   const residuals: { id: ManagementException; label: string }[] = [
-    { id: 'wbm_exposed', label: 'Acknowledge WBM exposure or unverified WBM security' },
-    { id: 'other_services_exposed', label: 'Acknowledge other management service exposure or unknown security' },
-    { id: 'unqualified_privileges', label: 'Acknowledge unqualified account privileges (required for key enrollment)' },
+    { id: 'wbm_exposed', label: t('security.exceptions.wbm_exposed') },
+    { id: 'other_services_exposed', label: t('security.exceptions.other_services_exposed') },
+    { id: 'unqualified_privileges', label: t('security.exceptions.unqualified_privileges') },
   ];
 
   return (
-    <section className="wg:space-y-3" aria-label="Management security">
-      <h3>Management security</h3>
+    <section className="wg:space-y-3" aria-label={t('security.title')}>
+      <h3>{t('security.title')}</h3>
       <div className="wg:space-y-3">
         <ManagementSummary status={status} recovery={recovery} />
-        <Form ref={form} onSubmit={(event) => event.preventDefault()} aria-label="Management security actions">
+        <Form ref={form} onSubmit={(event) => event.preventDefault()} aria-label={t('security.actions')}>
           <TextField key={`username-${credentialGeneration}`} name="managementUsername" isRequired isDisabled={pending}>
-            <Label>Temporary SSH username</Label>
+            <Label>{t('commissioningUI.installationUsername')}</Label>
             <Input autoComplete="off" maxLength={32} />
           </TextField>
           <TextField key={`password-${credentialGeneration}`} name="managementPassword" isRequired isDisabled={pending}>
-            <Label>Temporary SSH password</Label>
+            <Label>{t('commissioningUI.installationPassword')}</Label>
             <Input type="password" autoComplete="off" maxLength={4096} />
           </TextField>
-          <p>Credentials are cleared after each request. Apply and recovery require fresh credentials.</p>
+          <p>{t('security.credentials')}</p>
           <Button
             type="button"
             variant="secondary"
             isDisabled={pending || !!recovery}
             onPress={() => void run('inspect')}
           >
-            Inspect management
+            {t('security.inspect')}
           </Button>
           <Button
             type="button"
@@ -132,7 +134,7 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
               setConfirmed(false);
             }}
           >
-            Full baseline
+            {t('security.baseline')}
           </Button>
           <Button
             type="button"
@@ -143,7 +145,7 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
               setConfirmed(false);
             }}
           >
-            Add management key only
+            {t('security.keyOnly')}
           </Button>
           {residuals.map(({ id, label }) => (
             <Checkbox
@@ -157,10 +159,12 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
                 setConfirmed(false);
               }}
             >
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>{label}</Checkbox.Content>
+              <Checkbox.Content className="wg:items-start">
+                <Checkbox.Control className="wg:mt-0.5">
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                {label}
+              </Checkbox.Content>
             </Checkbox>
           ))}
           <Button
@@ -169,27 +173,23 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
             isDisabled={pending || !status?.inspection || !!recovery}
             onPress={() => void run('review')}
           >
-            Review changes
+            {t('security.review')}
           </Button>
-          {reviewed && (
-            <p>
-              {mode === 'key_only'
-                ? 'Review: snapshot authorized keys, arm rollback, add a unique key, verify a new pinned key connection, then retain the recovery snapshot. Existing access remains enabled.'
-                : 'Review: snapshot access, arm reboot-safe rollback, add and verify a unique management key, restrict access, verify a new connection and the service baseline, then retain recovery.'}
-            </p>
-          )}
+          {reviewed && <p>{t(mode === 'key_only' ? 'security.keyReview' : 'security.baselineReview')}</p>}
           <Checkbox isSelected={confirmed} isDisabled={pending} onChange={setConfirmed}>
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>I confirm the reviewed change or explicit recovery for this controller.</Checkbox.Content>
+            <Checkbox.Content className="wg:items-start">
+              <Checkbox.Control className="wg:mt-0.5">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              {t('security.confirm')}
+            </Checkbox.Content>
           </Checkbox>
           <Button
             type="button"
             isDisabled={pending || !confirmed || !reviewed || status?.support !== 'supported'}
             onPress={() => void run('apply')}
           >
-            Apply reviewed change
+            {t('security.apply')}
           </Button>
           <Button
             type="button"
@@ -197,15 +197,10 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
             isDisabled={pending || !confirmed || !recovery}
             onPress={() => void run('recover')}
           >
-            Recover saved access
+            {t('security.recover')}
           </Button>
         </Form>
-        {failed && (
-          <p role="alert">
-            The management request did not complete. Refresh the saved status before retrying; interrupted transitions
-            require recovery.
-          </p>
-        )}
+        {failed && <p role="alert">{t('security.requestFailed')}</p>}
       </div>
     </section>
   );
@@ -218,67 +213,53 @@ function ManagementSummary({
   status: ManagementPublicStatus | null;
   recovery: boolean | undefined;
 }) {
+  const { t, tBackendMessage } = useWagoTranslations();
   return (
     <>
       <p role="status">
-        {status?.hardened ? 'Management baseline verified' : 'Management baseline not verified'} ·{' '}
-        {status?.state ?? 'Inspection required'} · {status?.support ?? 'qualification_required'}
+        {t(status?.hardened ? 'security.verified' : 'security.notVerified')} ·{' '}
+        {status?.state ? tBackendMessage(status.state) : t('security.inspectionRequired')} · {status?.support ? tBackendMessage(status.support) : t('security.qualificationRequired')}
       </p>
       <Alert status="warning">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Description>
-            Automatic FW31 management hardening is not implemented. Missing operations are a restricted management
-            account, root/password restrictions, WBM and service restrictions, and recovery that survives reboot. The
-            FW31 vendor procedure for applying, restoring and persisting these changes is still needed. Key enrollment
-            supports an existing non-root OpenSSH account or a detected Dropbear 2025.88 account. The new key disables
-            forwarding and PTY allocation; account privileges and existing access remain enabled. Exceptions never count
-            as hardened. Physical hardware verification is separate.
-          </Alert.Description>
+          <Alert.Description>{t('security.limitations')}</Alert.Description>
         </Alert.Content>
       </Alert>
       {status?.inspection && (
         <dl>
-          <dt>Firmware / SSH / service control</dt>
+          <dt>{t('security.firmware')}</dt>
           <dd>
-            {status.inspection.firmware} / {status.inspection.ssh} / {status.inspection.serviceControl}
+            {tBackendMessage(status.inspection.firmware)} / {tBackendMessage(status.inspection.ssh)} / {tBackendMessage(status.inspection.serviceControl)}
           </dd>
           {status.inspection.ssh === 'dropbear' && (
             <>
-              <dt>Connected SSH peer version</dt>
-              <dd>{status.inspection.dropbearVersion ?? 'unknown'}</dd>
+              <dt>{t('security.peerVersion')}</dt>
+              <dd>{status.inspection.dropbearVersion ?? t('diagnostics.unknown')}</dd>
             </>
           )}
-          <dt>Possible WBM listeners (HTTP/HTTPS)</dt>
-          <dd>{status.inspection.wbm}</dd>
-          <dt>Other management listeners</dt>
-          <dd>{status.inspection.otherManagement}</dd>
-          <dt>Password / default access</dt>
+          <dt>{t('security.wbm')}</dt>
+          <dd>{tBackendMessage(status.inspection.wbm)}</dd>
+          <dt>{t('security.otherListeners')}</dt>
+          <dd>{tBackendMessage(status.inspection.otherManagement)}</dd>
+          <dt>{t('security.passwordAccess')}</dt>
           <dd>
-            {status.inspection.passwordAccess} / {status.inspection.defaultAccess}
+            {tBackendMessage(status.inspection.passwordAccess)} / {tBackendMessage(status.inspection.defaultAccess)}
           </dd>
         </dl>
       )}
-      <p>Socket observations do not verify firewall reachability, WBM credentials or TLS.</p>
+      <p>{t('security.socketHint')}</p>
       {status?.keyFingerprint && (
         <p>
-          Generated management key: <code className="wg:break-all">{status.keyFingerprint}</code>
+          {t('security.key')} <code className="wg:break-all">{status.keyFingerprint}</code>
         </p>
       )}
       {status?.failure && (
         <p role="alert">
-          {status.failure === 'rollback_failed'
-            ? 'Rollback could not be verified. The recovery journal and encrypted key are retained.'
-            : 'The transition failed; check the saved recovery state.'}
+          {t(status.failure === 'rollback_failed' ? 'security.rollbackFailed' : 'security.transitionFailed')}
         </p>
       )}
-      {recovery && (
-        <p>
-          Recovery restores saved management access. Enter fresh credentials for the original account. After
-          interruption, recovery may remain busy until the five-minute operation lease expires. If SSH is unavailable,
-          use the locally qualified USB-C/WBM recovery procedure.
-        </p>
-      )}
+      {recovery && <p>{t('security.recoveryDescription')}</p>}
     </>
   );
 }

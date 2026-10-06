@@ -1,3 +1,4 @@
+import { ENGINEERING_UNITS } from '../../measurement-contract';
 import { createHash } from 'node:crypto';
 
 // Keep persisted runtime snapshots subject to the same Modbus contract as API acceptance.
@@ -117,6 +118,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         'physicalPointId',
         'profile',
         'capabilities',
+        'invert',
         'disconnectPolicy',
         'range',
         'pulse',
@@ -137,6 +139,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
     const capabilities = Array.isArray(channel?.capabilities) ? channel.capabilities : [];
+    if (channel.invert !== undefined && (typeof channel.invert !== 'boolean' || !capabilities.includes('input')))
+      errors.push({
+        path: `${path}.invert`,
+        code: 'invalid_invert',
+        message: 'invert requires a boolean and an input channel',
+      });
     if (!capabilities.length) {
       errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
     }
@@ -270,7 +278,7 @@ function validateChannelMeasurements(
   if (
     channel.measurement &&
     (!capabilities.includes('measurement') ||
-      !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
+      !ENGINEERING_UNITS.some((unit) => unit === channel.measurement?.unit) ||
       !Number.isFinite(channel.measurement.scale) ||
       !Number.isFinite(channel.measurement.offset) ||
       !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))

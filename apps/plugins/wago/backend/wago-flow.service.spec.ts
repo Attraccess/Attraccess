@@ -54,8 +54,78 @@ describe('WagoFlowService', () => {
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
+    return {
+      service: new WagoFlowService(context),
+      trigger,
+      context,
+      revisionQuery,
+      revisionRepository,
+      controllerRepository,
+    };
   }
+
+  it('isolates filtered preview controller lookups in a shared context', async () => {
+    const { service, controllerRepository } = createService();
+    controllerRepository.find.mockImplementation(async ({ where }: { where: { id: number } }) => [
+      { ...controller, id: where.id, hardwareId: `controller-${where.id}` },
+    ]);
+    const context = new Map<string, unknown>();
+    const first = await service.resolveConfigSchema(
+      { controllerId: 1, channelId: 'door', category: 'state' },
+      'read',
+      context,
+      true,
+    );
+    const second = await service.resolveConfigSchema(
+      { controllerId: 2, channelId: 'door', category: 'state' },
+      'read',
+      context,
+      true,
+    );
+    expect(first.preview).toMatchObject([
+      { label: 'Device', value: 'controller-1' },
+      { label: 'Channel', value: 'door' },
+      { label: 'Read', value: 'Output state' },
+    ]);
+    expect(second.preview).toMatchObject([
+      { label: 'Device', value: 'controller-2' },
+      { label: 'Channel', value: 'door' },
+      { label: 'Read', value: 'Output state' },
+    ]);
+    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+    await service.resolveConfigSchema({ controllerId: 1, channelId: 'door' }, 'read', context, true);
+    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts with an unavailable MQTT broker and retries flow subscriptions', async () => {
+    const { service, context } = createService();
+    const subscribe = context.mqtt.subscribe as jest.Mock;
+    subscribe.mockRejectedValueOnce(new Error('broker unavailable'));
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+    expect(context.logger.warn).toHaveBeenCalledWith(expect.stringContaining('broker unavailable'));
+
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(subscribe).toHaveBeenCalledTimes(2);
+    service.onModuleDestroy();
+  });
+
+  it('still fails startup when flow settings cannot be read', async () => {
+    const { service, context } = createService();
+    const settings = context.getRepository(WagoSettings) as unknown as { findOneBy: jest.Mock };
+    settings.findOneBy.mockRejectedValueOnce(new Error('settings unavailable'));
+
+    await expect(service.onModuleInit()).rejects.toThrow('settings unavailable');
+  });
+
+  it('rejects an invalid operational prefix before attempting MQTT subscriptions', async () => {
+    const { service, context } = createService();
+    const settings = context.getRepository(WagoSettings) as unknown as { findOneBy: jest.Mock };
+    settings.findOneBy.mockResolvedValueOnce({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'bad/#' });
+
+    await expect(service.onModuleInit()).rejects.toThrow();
+    expect(context.mqtt.subscribe).not.toHaveBeenCalled();
+  });
 
   it('registers the plugin before the host datasource is available', () => {
     const { context } = createService();
@@ -77,6 +147,63 @@ describe('WagoFlowService', () => {
     await expect(service.validateConfig({ ...config, category: 'measurement' }, kind)).resolves.toEqual(
       expect.arrayContaining([expect.objectContaining({ field: 'category' })]),
     );
+  });
+
+  it.each(['event', 'read', 'wait'] as const)('provides a concise %s preview for the selected output', async (kind) => {
+    const { service } = createService();
+    const schema = await service.resolveConfigSchema(
+      {
+        controllerId: 1,
+        channelId: 'door',
+        category: 'state',
+        equals: false,
+        timeoutMs: 1500,
+      },
+      kind,
+    );
+    expect(schema.preview).toMatchObject([
+      { label: 'Device', value: 'cc100-01' },
+      { label: 'Channel', value: 'door' },
+      ...(kind === 'event'
+        ? [{ label: 'When', value: 'Output state received' }]
+        : kind === 'read'
+          ? [{ label: 'Read', value: 'Output state' }]
+          : [
+              { label: 'Wait for', value: 'Output state = OFF' },
+              { label: 'Timeout', value: '1.5 s' },
+            ]),
+    ]);
+  });
+
+  it('identifies an external meter and keeps a zero-valued wait condition visible', async () => {
+    const { service, revisionRepository } = createService();
+    revisionRepository.find.mockResolvedValue([
+      {
+        ...revision,
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'power', physicalPointId: 'meter-point', capabilities: ['measurement'] }],
+          physicalPoints: [{ id: 'meter-point', hardwareProfile: 'modbus', modbus: { deviceId: 'meter' } }],
+          modbus: { devices: [{ id: 'meter', name: 'WAGO 879-3000' }] },
+        }),
+        presetProvenance: JSON.stringify({ editor: { names: { power: 'Active power' } } }),
+      },
+    ]);
+    const schema = await service.resolveConfigSchema(
+      {
+        controllerId: 1,
+        channelId: 'power',
+        category: 'measurement',
+        equals: 0,
+        timeoutMs: 30_000,
+      },
+      'wait',
+    );
+    expect(schema.preview).toMatchObject([
+      { label: 'Device', value: 'cc100-01' },
+      { label: 'Channel', value: 'Active power · WAGO 879-3000' },
+      { label: 'Wait for', value: 'Measurement = 0 (wire value)' },
+      { label: 'Timeout', value: '30 s' },
+    ]);
   });
 
   it('uses current applied channel names in the form even when the runtime cache is populated', async () => {
@@ -426,6 +553,23 @@ describe('WagoFlowService', () => {
       await expect(service.wait(config)).resolves.toMatchObject({ value: true });
       expect(service['waiters'].size).toBe(0);
     });
+
+    it.each([42, 2100, 5000])(
+      'keeps flow reads and waits available with %i ms of positive clock skew',
+      async (skew) => {
+        const { service } = createService();
+        await service.refresh();
+        await stateMessage(service, 1, { age: -skew });
+        const cached = service.read(config);
+        expect(cached).not.toBeNull();
+        expect(cached && service.payload(cached)).toMatchObject({ available: true, stale: false });
+        await expect(service.wait(config)).resolves.toMatchObject({ sequence: 1, value: true });
+        await stateMessage(service, 99, { age: -5001 });
+        expect(service.read(config)).toMatchObject({ sequence: 1 });
+        await jest.advanceTimersByTimeAsync(skew + 90_001);
+        expect(cached && service.payload(cached)).toMatchObject({ available: false, stale: true });
+      },
+    );
 
     it('does not let future-dated samples block fresh updates after clock correction', async () => {
       const { service } = createService();

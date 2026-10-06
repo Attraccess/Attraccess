@@ -10,7 +10,7 @@ const fixture = () => ({
   build: {
     pluginCommit: 'a'.repeat(40), runtimeCommit: 'b'.repeat(40),
     frontendDigest: `sha256:${'c'.repeat(64)}`, backendDigest: `sha256:${'d'.repeat(64)}`, runtimeDigest: `sha256:${'e'.repeat(64)}`,
-    protocolVersion: '1.0.0', signedBundleEvidence: 'fixture-ref', visualArtifactProvisioningEvidence: 'fixture-ref',
+    protocolVersion: '1.0.0', bundleChecksumEvidence: 'fixture-ref', visualArtifactProvisioningEvidence: 'fixture-ref',
   },
   modbus: { model: 'fixture', transport: 'fixture', profileVersion: 'fixture', qualificationEvidence: 'fixture-ref' },
   participant: { id: 'participant', experience: 'nontechnical' },

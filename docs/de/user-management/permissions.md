@@ -38,6 +38,12 @@ Auch ohne Systemberechtigungen können Benutzer:
 - Ressourcen nutzen (Sitzungen starten/beenden)
 - An Projekten teilnehmen, zu denen sie eingeladen wurden
 
+## RFID-Karten anderer Benutzer verwalten
+
+Die Berechtigung `users.rfid-cards.manage` erlaubt das Anzeigen, Registrieren, Aktivieren, Deaktivieren und Löschen von RFID-Karten für beliebige Benutzer. Die Rolle **Administrator** enthält diese Berechtigung automatisch; sie kann auch über eine eigene Rolle vergeben werden.
+
+Öffnen Sie einen Benutzer und klicken Sie auf **RFID-Karten verwalten**. Für den Zugriff auf die Benutzerdetails benötigen Sie zusätzlich `users.read`.
+
 ## Siehe auch
 
 - [Benutzerverwaltung](user-management/overview.md)

@@ -16,6 +16,11 @@ import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
 import { AuditService } from '../audit/audit.service';
+import { createTranslator } from '../i18n/translate';
+import * as en from './rfid-card-notification.en.json';
+import * as de from './rfid-card-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class AttractapService {
@@ -50,17 +55,12 @@ export class AttractapService {
     void this.notifications.dispatch({
       category: NotificationCategory.NFC_CARDS,
       recipients: [card.user],
-      title: `NFC card ${action}`,
-      body:
-        action === 'registered'
-          ? `NFC card #${card.id} was registered for your account.`
-          : action === 'deleted'
-            ? `NFC card #${card.id} was deleted from your account.`
-            : `NFC card #${card.id} was ${action}.`,
+      title: (recipient) => t(recipient.locale, `${action}Title`),
+      body: (recipient) => t(recipient.locale, `${action}Body`, { cardId: card.id }),
       url: '/attractap/nfc-cards',
       dedupeKey: `nfc-card-${card.id}-${action}`,
     }).catch((error) => {
-      this.logger.error(`Failed to notify user ${card.user.id} about NFC card ${action}: ${(error as Error).message}`);
+      this.logger.error(`Failed to notify user ${card.user.id} about RFID card ${action}: ${(error as Error).message}`);
     });
   }
 
@@ -121,9 +121,9 @@ export class AttractapService {
   }
 
   /**
-   * Activates an NFC card (deactivates all other cards for the same user)
-   * @param id The ID of the NFC card to activate
-   * @returns The activated NFC card
+   * Activates an RFID card (deactivates all other cards for the same user)
+   * @param id The ID of the RFID card to activate
+   * @returns The activated RFID card
    */
   public async activateNFCCard(id: number): Promise<NFCCard> {
     const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
@@ -150,9 +150,9 @@ export class AttractapService {
   }
 
   /**
-   * Deactivates an NFC card
-   * @param id The ID of the NFC card to deactivate
-   * @returns The deactivated NFC card
+   * Deactivates an RFID card
+   * @param id The ID of the RFID card to deactivate
+   * @returns The deactivated RFID card
    */
   public async deactivateNFCCard(id: number): Promise<NFCCard> {
     await this.nfcCardRepository.update(id, { isActive: false });
@@ -452,7 +452,7 @@ export class AttractapService {
   }
 
   /**
-   * Generates a new key for the NFC card using PBKDF2 with salt and iterations for enhanced security.
+   * Generates a new key for the RFID card using PBKDF2 with salt and iterations for enhanced security.
    * The key derivation is based on:
    * - A unique random token per user (stored in user.nfcKeySeedToken)
    * - The key number
@@ -460,7 +460,7 @@ export class AttractapService {
    * - A deterministic salt derived from the card UID and key number
    * - 100,000 iterations for PBKDF2
    * @param keyNo The key number to generate
-   * @param cardUID The UID of the NFC card
+   * @param cardUID The UID of the RFID card
    * @param userId The ID of the user who owns the card
    * @returns 16 bytes Uint8Array
    */

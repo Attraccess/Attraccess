@@ -260,7 +260,7 @@ export function EditMqttServerPage() {
               <Checkbox.Control>
                 <Checkbox.Indicator />
               </Checkbox.Control>
-              <Label>{t('clearPasswordLabel')}</Label>
+              {t('clearPasswordLabel')}
             </Checkbox.Content>
             <Description>{t('clearPasswordDescription')}</Description>
           </Checkbox>

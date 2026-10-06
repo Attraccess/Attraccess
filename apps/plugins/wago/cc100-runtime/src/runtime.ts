@@ -5,7 +5,7 @@ import { encodeMeasurement } from '../../measurement-contract';
 // The API and standalone runtime enforce the same configured output behavior.
 import { supportsOutputAction } from '../../channel-behavior';
 import { hash, validateDesired } from './configuration';
-import { OutputController } from './output-controller';
+import { OutputController, OutputRoutingBusyError } from './output-controller';
 import {
   WriteAdmissionError,
   type DeviceAdapter,
@@ -35,6 +35,8 @@ export const CAPABILITIES = [
   'fault',
   'acknowledgement',
   'credential-rotation-v1',
+  'front-panel-v1',
+  'runtime-update-gate-v1',
 ];
 
 export class WagoRuntime {
@@ -42,6 +44,9 @@ export class WagoRuntime {
   private connected = true;
   private loaded = false;
   private configurationPending = false;
+  private runtimeUpdateRequired: boolean;
+  private runtimeFailsafePending = false;
+  private runtimePolicyToken = randomUUID();
   private measurementsPending = false;
   private readonly streamId = randomUUID();
   private connectionPolicies = Promise.resolve();
@@ -55,7 +60,9 @@ export class WagoRuntime {
   private statePersistence = Promise.resolve();
   private lastPublishedState?: string;
   private polling = false;
-  private publishingHeartbeat = false;
+  private readonly pollingModbusOutputConnections = new Set<string>();
+  private heartbeatPublication?: Promise<void>;
+  private heartbeatRefreshRequested = false;
   private credentialUpdates = Promise.resolve();
   private credentialRotationSubscribed = false;
   private sequence = 0;
@@ -70,12 +77,19 @@ export class WagoRuntime {
       prefix: string;
       pairingCode: string;
       enrollmentSecret?: string;
+      /** Docker config identity supplied by the root-owned launch transaction. */
+      runtimeImageId?: string;
       store: StateStore;
       transport: Transport;
       device: DeviceAdapter;
       reconnectCredentials?: (credentials: DiscoveryClaim) => Promise<void>;
+      /** Observes every evaluated readiness, including unchanged/unpublished ones. */
+      onReadiness?: (readiness: { connected: boolean; configurationAccepted: boolean; ready: boolean }) => void;
     },
   ) {
+    this.runtimeUpdateRequired = options.runtimeImageId !== undefined;
+    if (options.runtimeImageId !== undefined && !/^sha256:[a-f0-9]{64}$/.test(options.runtimeImageId))
+      throw new Error('Invalid runtime image identity');
     this.outputs = new OutputController({
       device: options.device,
       getSnapshot: () => this.state.accepted?.snapshot,
@@ -83,6 +97,7 @@ export class WagoRuntime {
       saveState: () => this.saveState(),
       publishState: () => this.requestStatePublication(),
       publishFault: (channelId, error) => this.publishFault(channelId, error),
+      feedbackEnabled: () => !this.runtimeUpdateRequired && !this.runtimeFailsafePending,
     });
   }
 
@@ -104,7 +119,8 @@ export class WagoRuntime {
     }
     this.outputs.recoverPulses();
     this.loaded = true;
-    await this.outputs.applyDisconnectPolicies(this.connected);
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
+    else await this.outputs.applyDisconnectPolicies(this.connected);
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
     await this.retryCredentialRotationSubscription();
@@ -297,7 +313,14 @@ export class WagoRuntime {
     return `${this.discoveryTopic()}/claim`;
   }
   async receiveDesired(payload: Buffer): Promise<void> {
-    let desired: { protocolVersion: number; revision: number; contentHash: string; snapshot: Snapshot };
+    let desired: {
+      protocolVersion: number;
+      revision: number;
+      contentHash: string;
+      snapshot: Snapshot;
+      runtimeImageId?: string;
+      runtimePolicyToken?: string;
+    };
     try {
       desired = JSON.parse(payload.toString('utf8'));
     } catch {
@@ -305,7 +328,18 @@ export class WagoRuntime {
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },
       ]);
     }
+    if (desired && Object.prototype.hasOwnProperty.call(desired, 'runtimeImageId')) {
+      if (typeof desired.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(desired.runtimeImageId)) return;
+      if (this.options.runtimeImageId && desired.runtimePolicyToken !== this.runtimePolicyToken) return;
+      this.runtimeUpdateRequired = desired.runtimeImageId !== this.options.runtimeImageId;
+      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
+      this.requestStatePublication();
+      // Policy-only messages use the existing authenticated configuration ACL.
+      if (!Object.prototype.hasOwnProperty.call(desired, 'snapshot')) return;
+    }
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
     await this.runConfigurationUpdate(async () => {
+      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
       const errors = validateDesired(desired);
       if (!errors.length && desired.contentHash !== hash(desired.snapshot))
         errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
@@ -322,28 +356,13 @@ export class WagoRuntime {
         return this.reportRejected(desired.revision, desired.contentHash, [
           { path: 'revision', code: 'stale_revision', message: 'configuration revision is stale' },
         ]);
-      if (
-        this.options.device.prepareConfiguration &&
-        (this.outputs.busy ||
-          this.inFlightCommandIds.size ||
-          this.state.uncertainOutputChannelIds?.length ||
-          this.state.pendingPulseChannelIds?.length ||
-          Object.values(this.state.outputs).some(Boolean))
-      )
-        return this.reportRejected(desired.revision, desired.contentHash, [
-          {
-            path: 'snapshot',
-            code: 'outputs_busy',
-            message:
-              'finish pending commands and confirm outputs off, including uncertain outputs, before reconfiguration',
-          },
-        ]);
       const installRouting =
         this.options.device.prepareConfiguration?.(desired.snapshot) ??
         (() => this.options.device.configure?.(desired.snapshot));
       // Keep the command barrier through this commit so old-revision commands cannot cross the boundary.
       try {
         await this.outputs.replaceConfiguration(async () => {
+          this.outputs.assertConfigurationSafe(desired.snapshot);
           const accepted = {
             revision: desired.revision,
             contentHash: desired.contentHash,
@@ -353,18 +372,28 @@ export class WagoRuntime {
           const resume = this.options.device.suspend?.();
           try {
             await this.queueStateUpdate(async () => {
-              await this.options.store.save({ ...this.state, accepted });
+              const manualOutputChannelIds = (this.state.manualOutputChannelIds ?? []).filter((id) =>
+                accepted.snapshot.logicalChannels.some(
+                  (channel) => channel.id === id && channel.capabilities.includes('output'),
+                ),
+              );
+              await this.options.store.save({ ...this.state, accepted, manualOutputChannelIds });
               installRouting();
               this.state.accepted = accepted;
+              this.state.manualOutputChannelIds = manualOutputChannelIds;
             });
           } finally {
             resume?.();
             this.configurationPending = false;
           }
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof OutputRoutingBusyError)
+          return this.reportRejected(desired.revision, desired.contentHash, [
+            { path: 'snapshot', code: 'outputs_busy', message: 'switch outputs off before changing their routing' },
+          ]);
         return this.reportRejected(desired.revision, desired.contentHash, [
-          { path: 'snapshot', code: 'pulse_shutdown_failed', message: 'failed to de-energize active pulse' },
+          { path: 'snapshot', code: 'configuration_commit_failed', message: 'failed to commit configuration' },
         ]);
       }
       await this.publishReport(desired.revision, desired.contentHash, []);
@@ -377,7 +406,8 @@ export class WagoRuntime {
       id: string;
       expiresAt?: unknown;
       channelId: string;
-      action: 'set' | 'pulse';
+      action: 'set' | 'pulse' | 'release';
+      source?: 'manual';
       value?: boolean;
       expectedConfigurationRevision?: unknown;
     };
@@ -390,9 +420,14 @@ export class WagoRuntime {
       typeof command?.id !== 'string' ||
       !command.id ||
       !command.channelId ||
-      !['set', 'pulse'].includes(command.action)
+      !['set', 'pulse', 'release'].includes(command.action)
     )
       return;
+    if (
+      (command.source !== undefined && command.source !== 'manual') ||
+      (command.action === 'release' && command.source !== 'manual')
+    )
+      return this.acknowledge(command.id, 'rejected', 'invalid command source', 'invalid_command');
     if (command.action === 'set' && typeof command.value !== 'boolean')
       return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value', 'invalid_command');
     const expiresAt = command.expiresAt;
@@ -407,6 +442,13 @@ export class WagoRuntime {
       return this.acknowledge(command.id, 'rejected', 'command requires a configuration revision', 'invalid_command');
     if (this.configurationPending)
       return this.acknowledge(command.id, 'rejected', 'configuration persistence is in progress', 'configuration_busy');
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending)
+      return this.acknowledge(
+        command.id,
+        'rejected',
+        'Runtime update required; outputs are held in failsafe',
+        'runtime_update',
+      );
     this.pruneCommandExpiries();
     if (this.state.commandIds.includes(command.id) || this.state.commandExpiries?.[command.id])
       return this.acknowledge(command.id, 'duplicate');
@@ -425,7 +467,7 @@ export class WagoRuntime {
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
       if (!channel || !channel.capabilities.includes('output'))
         return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
-      if (!supportsOutputAction(channel, command.action))
+      if (command.action !== 'release' && !supportsOutputAction(channel, command.action))
         return this.acknowledge(
           command.id,
           'rejected',
@@ -439,6 +481,10 @@ export class WagoRuntime {
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
       await this.saveState();
       const failure = await this.outputs.runForCommand(channel.id, async () => {
+        if (this.runtimeUpdateRequired || this.runtimeFailsafePending) {
+          await this.releaseCommand(command.id);
+          return { error: 'Runtime update required; outputs are held in failsafe', code: 'runtime_update' };
+        }
         const currentChannel = this.state.accepted?.snapshot.logicalChannels.find(
           (item) => item.id === command.channelId,
         );
@@ -453,6 +499,14 @@ export class WagoRuntime {
           await this.releaseCommand(command.id);
           return { error: 'command has expired', code: 'expired' };
         }
+        if (command.action === 'release') {
+          this.state.manualOutputChannelIds = (this.state.manualOutputChannelIds ?? []).filter(
+            (id) => id !== currentChannel.id,
+          );
+          await this.saveState();
+          this.requestStatePublication();
+          return undefined;
+        }
         if (!supportsOutputAction(currentChannel, command.action)) {
           await this.releaseCommand(command.id);
           return { error: 'command does not match the configured output behavior', code: 'unsupported_operation' };
@@ -463,6 +517,8 @@ export class WagoRuntime {
         }
         const admit = Object.assign(
           () => {
+            if (this.runtimeUpdateRequired || this.runtimeFailsafePending)
+              throw new WriteAdmissionError('runtime_update');
             if (Date.parse(expiresAt) <= Date.now()) throw new WriteAdmissionError('expired');
           },
           { expiresAt: Date.parse(expiresAt) },
@@ -478,6 +534,7 @@ export class WagoRuntime {
               undefined,
               admit,
               currentDuration,
+              command.source === 'manual' ? 'manual' : 'flow',
             ))
           )
             return this.releaseFailedWrite(command.id, currentChannel.id);
@@ -488,6 +545,8 @@ export class WagoRuntime {
             undefined,
             () => this.outputs.clearPulse(currentChannel.id),
             admit,
+            undefined,
+            command.source === 'manual' ? 'manual' : 'flow',
           ))
         )
           return this.releaseFailedWrite(command.id, currentChannel.id);
@@ -510,60 +569,87 @@ export class WagoRuntime {
   }
 
   async setConnected(connected: boolean): Promise<void> {
+    if (!connected && this.options.runtimeImageId) {
+      this.runtimePolicyToken = randomUUID();
+      this.runtimeUpdateRequired = true;
+    }
     if (!this.loaded) {
       this.connected = connected;
       return;
     }
     const transition = this.connectionPolicies.then(async () => {
       this.connected = connected;
-      await this.outputs.applyDisconnectPolicies(connected);
+      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
+      else await this.outputs.applyDisconnectPolicies(connected);
     });
     this.connectionPolicies = transition.catch(() => undefined);
     await transition;
     // Connection callbacks must complete after the hardware policy. Otherwise a
     // stalled MQTT state publish can delay a following disconnect shutdown.
     this.requestStatePublication();
+    if (connected && this.options.runtimeImageId) void this.publishHeartbeat(true).catch(() => undefined);
   }
 
   async publishHeartbeat(ignoreStatePublicationFailure = false): Promise<void> {
-    if (this.publishingHeartbeat) return;
-    this.publishingHeartbeat = true;
-    try {
-      try {
-        await this.publishOperational('heartbeat', {
-          hardwareId: this.options.hardwareId,
-          pairingCode: this.options.pairingCode,
-          protocolVersion: '1.0.0',
-          runtimeVersion: '0.1.0',
-          capabilities:
-            this.credentialRotationSubscribed && this.state.credentials?.credentialEpoch
-              ? CAPABILITIES
-              : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
-        });
-      } catch (error) {
-        if (!ignoreStatePublicationFailure) throw error;
-      }
-      try {
-        await this.publishState();
-      } catch (error) {
-        // State telemetry reserves a durable sequence. A read-only state volume
-        // must not prevent startup or disconnect safety policies from running.
-        if (!ignoreStatePublicationFailure) throw error;
-      }
-    } finally {
-      this.publishingHeartbeat = false;
+    if (this.heartbeatPublication) {
+      this.heartbeatRefreshRequested = true;
+      return this.heartbeatPublication;
     }
+    this.heartbeatPublication = (async () => {
+      do {
+        this.heartbeatRefreshRequested = false;
+        if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
+        try {
+          await this.publishOperational('heartbeat', {
+            hardwareId: this.options.hardwareId,
+            pairingCode: this.options.pairingCode,
+            protocolVersion: '1.0.0',
+            runtimeVersion: '0.1.0',
+            ...(this.options.runtimeImageId ? { runtimeImageId: this.options.runtimeImageId } : {}),
+            runtimePolicyToken: this.runtimePolicyToken,
+            capabilities:
+              this.credentialRotationSubscribed && this.state.credentials?.credentialEpoch
+                ? CAPABILITIES
+                : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
+          });
+        } catch (error) {
+          if (!ignoreStatePublicationFailure) throw error;
+        }
+        try {
+          await this.publishState();
+        } catch (error) {
+          // State telemetry reserves a durable sequence. A read-only state volume
+          // must not prevent startup or disconnect safety policies from running.
+          if (!ignoreStatePublicationFailure) throw error;
+        }
+      } while (this.heartbeatRefreshRequested);
+    })().finally(() => {
+      this.heartbeatPublication = undefined;
+    });
+    return this.heartbeatPublication;
   }
 
   async publishMeasurements(): Promise<void> {
-    if (this.measurementsPending || this.configurationPending) return;
+    if (
+      this.runtimeUpdateRequired ||
+      this.runtimeFailsafePending ||
+      this.measurementsPending ||
+      this.configurationPending
+    )
+      return;
     const accepted = this.state.accepted;
     if (!accepted) return;
     this.measurementsPending = true;
     try {
       for await (const reading of acquireMeasurements(accepted.snapshot, this.options.device)) {
         for (const channel of reading.channels) {
-          if (accepted !== this.state.accepted || this.configurationPending) return;
+          if (
+            this.runtimeUpdateRequired ||
+            this.runtimeFailsafePending ||
+            accepted !== this.state.accepted ||
+            this.configurationPending
+          )
+            return;
           try {
             if (reading.ok === false) throw reading.error;
             const { raw, timestamp } = reading;
@@ -573,7 +659,11 @@ export class WagoRuntime {
               'measurements',
               measurement,
               undefined,
-              () => accepted === this.state.accepted && !this.configurationPending,
+              () =>
+                !this.runtimeUpdateRequired &&
+                !this.runtimeFailsafePending &&
+                accepted === this.state.accepted &&
+                !this.configurationPending,
               timestamp,
             );
           } catch (error) {
@@ -592,9 +682,10 @@ export class WagoRuntime {
 
   async pollInputs(): Promise<void> {
     // Slow I/O/MQTT must not create an unbounded interval backlog.
-    if (this.polling || !this.connected) return;
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending || this.polling || !this.connected) return;
     this.polling = true;
     try {
+      void this.pollModbusOutputs().catch(() => undefined);
       await this.publishState(false);
     } finally {
       this.polling = false;
@@ -631,8 +722,90 @@ export class WagoRuntime {
     return this.statePublication;
   }
 
+  private readonly modbusOutputSamples = new Map<
+    string,
+    { revision: number; value?: boolean; error?: string; acquiredAt: number; commanded: boolean | undefined }
+  >();
+
+  /** One acquisition per bus, across at most the 64 validated connections. */
+  async pollModbusOutputs(): Promise<void> {
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
+    const accepted = this.state.accepted;
+    const readOutput = this.options.device.readOutput?.bind(this.options.device);
+    if (!this.connected || !accepted || !readOutput) return;
+    const buses = new Map<
+      string,
+      Array<{
+        channel: Snapshot['logicalChannels'][number];
+        point: Snapshot['physicalPoints'][number];
+        pollIntervalMs: number;
+      }>
+    >();
+    for (const channel of accepted.snapshot.logicalChannels) {
+      if (!channel.capabilities.includes('output')) continue;
+      const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
+      if (!point?.modbus) continue;
+      const device = accepted.snapshot.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
+      if (!device) continue;
+      const bus = buses.get(device.connectionId) ?? [];
+      bus.push({ channel, point, pollIntervalMs: device.pollIntervalMs ?? 5000 });
+      buses.set(device.connectionId, bus);
+    }
+    const acquisitions: Promise<void>[] = [];
+    let acquired = false;
+    for (const [connectionId, channels] of buses) {
+      if (this.pollingModbusOutputConnections.has(connectionId)) continue;
+      // Configuration changes must not accumulate additional work while old
+      // transport requests are still unwinding.
+      if (this.pollingModbusOutputConnections.size >= 64) break;
+      this.pollingModbusOutputConnections.add(connectionId);
+      acquisitions.push(
+        (async () => {
+          for (const { channel, point, pollIntervalMs } of channels) {
+            if (accepted !== this.state.accepted || !this.connected) return;
+            const sample = this.modbusOutputSamples.get(channel.id);
+            if (
+              sample?.revision === accepted.revision &&
+              Date.now() - sample.acquiredAt < pollIntervalMs &&
+              sample.commanded === this.state.outputs[channel.id]
+            )
+              continue;
+            const commanded = this.state.outputs[channel.id];
+            acquired = true;
+            try {
+              const value = await readOutput(point);
+              if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
+              if (accepted !== this.state.accepted) return;
+              this.modbusOutputSamples.set(channel.id, {
+                revision: accepted.revision,
+                value,
+                commanded,
+                acquiredAt: Date.now(),
+              });
+            } catch (error) {
+              if (accepted !== this.state.accepted) return;
+              // Replace the old success with the failure; heartbeats must retain the fault.
+              this.modbusOutputSamples.set(channel.id, {
+                revision: accepted.revision,
+                commanded,
+                acquiredAt: Date.now(),
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+            // A healthy connection must be visible before any other bus completes.
+            void this.publishState(false).catch(() => undefined);
+          }
+        })().finally(() => this.pollingModbusOutputConnections.delete(connectionId)),
+      );
+    }
+    await Promise.all(acquisitions);
+    if (acquired) await this.publishState(false);
+  }
+
   private async readAndPublishState(force: boolean): Promise<void> {
     const accepted = this.state.accepted;
+    for (const [id, sample] of this.modbusOutputSamples)
+      if (sample.revision !== accepted?.revision) this.modbusOutputSamples.delete(id);
     const inputs: Record<string, boolean> = Object.create(null);
     const outputs: Record<string, boolean> = Object.create(null);
     const commandedOutputs: Record<string, boolean> = Object.create(null);
@@ -647,22 +820,37 @@ export class WagoRuntime {
         message: `Check firmware profile, DIN/DOUT mounts and runtime UID permissions: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
-    if (accepted && supported) {
+    if (accepted && supported && !this.runtimeUpdateRequired && !this.runtimeFailsafePending) {
       for (const channel of accepted.snapshot.logicalChannels) {
         const output = channel.capabilities.includes('output');
         if (!output && !channel.capabilities.includes('input')) continue;
         if (output && typeof this.state.outputs[channel.id] === 'boolean')
           commandedOutputs[channel.id] = this.state.outputs[channel.id];
         const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-        if (!point || point.modbus) continue;
+        if (!point) continue;
+        if (point.modbus) {
+          const sample = this.modbusOutputSamples.get(channel.id);
+          const device = accepted.snapshot.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
+          const maxAge = (device?.pollIntervalMs ?? 5000) * 2;
+          if (sample?.revision === accepted.revision) {
+            if (sample.error) errors.push({ path: channel.id, code: 'modbus_read_failed', message: sample.error });
+            else if (
+              Date.now() - sample.acquiredAt <= maxAge &&
+              sample.commanded === this.state.outputs[channel.id] &&
+              typeof sample.value === 'boolean'
+            )
+              outputs[channel.id] = sample.value;
+          }
+          continue;
+        }
         try {
           const value = await this.options.device.read(point);
           if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
-          (output ? outputs : inputs)[channel.id] = value;
+          (output ? outputs : inputs)[channel.id] = !output && channel.invert ? !value : value;
         } catch (error) {
           errors.push({
             path: channel.id,
-            code: 'digital_read_failed',
+            code: point.modbus ? 'modbus_read_failed' : 'digital_read_failed',
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -677,17 +865,31 @@ export class WagoRuntime {
       inputs,
       outputs,
       commandedOutputs,
+      manualOutputChannelIds: (this.state.manualOutputChannelIds ?? []).filter((id) =>
+        accepted?.snapshot.logicalChannels.some(
+          (channel) => channel.id === id && channel.capabilities.includes('output'),
+        ),
+      ),
       readiness: {
+        ...(this.runtimeUpdateRequired || this.runtimeFailsafePending ? { runtimeUpdate: true } : {}),
         configurationAccepted: Boolean(accepted),
-        hardwareAvailable: !errors.length,
-        ready: Boolean(accepted) && !errors.length && this.connected,
+        hardwareAvailable: !errors.some((error) => error.code !== 'modbus_read_failed'),
+        // A peripheral bus fault remains a channel diagnostic, not a failure
+        // of the controller/runtime proof used for commissioning and updates.
+        ready:
+          !this.runtimeUpdateRequired &&
+          !this.runtimeFailsafePending &&
+          Boolean(accepted) &&
+          !errors.some((error) => error.code !== 'modbus_read_failed') &&
+          this.connected,
         errors,
       },
     };
+    this.options.onReadiness?.({ connected: this.connected, ...payload.readiness });
     const signature = JSON.stringify(payload);
     if (!force && signature === this.lastPublishedState) return;
     for (const error of errors) {
-      if (error.code === 'digital_read_failed')
+      if (error.code === 'digital_read_failed' || error.code === 'modbus_read_failed')
         void this.publishFault(error.path, { code: error.code, message: error.message }).catch(() => undefined);
     }
     await this.publishOperational('state', payload, { retain: true }, () => accepted === this.state.accepted);
@@ -792,6 +994,17 @@ export class WagoRuntime {
   }
   private commandTopic(): string {
     return this.topic('commands');
+  }
+
+  private async applyRuntimeUpdateFailsafe(): Promise<void> {
+    this.runtimeFailsafePending = true;
+    try {
+      await this.runConfigurationUpdate(() => this.outputs.applyRuntimeUpdateFailsafe());
+      this.runtimeFailsafePending = false;
+    } catch {
+      // The pending shutdown blocks readiness and is retried by heartbeats.
+      // Preserve any matching image approval received while hardware was unavailable.
+    }
   }
   private async releaseFailedWrite(id: string, channelId: string): Promise<{ error: string; code: string }> {
     if (this.outputs.isWriteUncertain(channelId))

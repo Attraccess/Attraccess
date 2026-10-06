@@ -11,6 +11,7 @@ import {
   DrawerBody,
   DrawerHeader,
   TextArea,
+  ToggleButton,
   useOverlayState,
 } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -21,6 +22,7 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import {
   ResourceFlowLog,
   ResourceFlowNodeDto,
+  useResourceFlowsServiceGetNodeSchemas,
   useResourceFlowsServiceGetFlowLogRecordingStatus,
   useResourceFlowsServiceGetFlowLogRecordingStatusKey,
   useResourceFlowsServiceGetResourceFlow,
@@ -29,7 +31,7 @@ import {
   useResourceFlowsServiceStopFlowLogRecording,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { CircleStopIcon, CircleDotIcon } from 'lucide-react';
+import { CircleStopIcon, CircleDotIcon, PartyPopperIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import de from './de.json';
@@ -42,6 +44,8 @@ import { useFlowContext } from '../flowContext';
 interface Props {
   children: (open: () => void) => React.ReactNode;
   resourceId: number;
+  confettiEnabled: boolean;
+  onConfettiEnabledChange: (enabled: boolean) => void;
 }
 
 const DURATION_OPTIONS = [
@@ -97,7 +101,7 @@ function useCountdown(until: Date | string | null | undefined) {
 export function LogViewer(props: Props) {
   const { isOpen, setOpen, open } = useOverlayState();
 
-  const { t } = useTranslations({
+  const { t, tExists } = useTranslations({
     de: {
       ...de,
       nodes: nodeTranslationsDe.nodes,
@@ -114,6 +118,20 @@ export function LogViewer(props: Props) {
   const queryClient = useQueryClient();
 
   const { data: flowData } = useResourceFlowsServiceGetResourceFlow({ resourceId: props.resourceId });
+  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId: props.resourceId });
+
+  const nodeTitle = useCallback(
+    (node?: ResourceFlowNodeDto) => {
+      const nodeType = node?.type ?? 'flow';
+      const titleKey = 'nodes.' + nodeType + '.title';
+      if (tExists(titleKey)) {
+        return t(titleKey);
+      }
+
+      return nodeSchemas?.find((schema) => schema.type === nodeType)?.label ?? nodeType;
+    },
+    [nodeSchemas, t, tExists],
+  );
 
   // Recording expires on its own; poll while the drawer is open to notice. Status only —
   // polling the logs endpoint would re-ship the whole buffer every tick.
@@ -150,17 +168,24 @@ export function LogViewer(props: Props) {
 
   const countdown = useCountdown(isRecording ? recording?.expiresAt : null);
 
-  const logsWithNodes = useMemo(() => {
-    if (!isRecording) {
-      return [];
-    }
+  const [recordedLogs, setRecordedLogs] = useState<ResourceFlowLog[]>([]);
+  const fetchedLogs = logs?.logs;
+  const recordingStartedAt = recording?.startedAt;
 
-    // The SSE stream accumulates for the lifetime of the page, so drop anything
-    // that predates the running recording — those logs are already deleted.
-    const recordingStart = new Date(recording?.startedAt ?? 0).getTime();
-    const allLogs = [...(logs?.logs ?? []), ...(sseLogs ?? [])].filter(
-      (log) => new Date(log.createdAt).getTime() >= recordingStart,
-    );
+  // The server discards its buffer on stop. Keep downloaded entries for this page visit;
+  // the SSE buffer already lasts for the lifetime of the flow page.
+  useEffect(() => {
+    if (!isRecording || !recordingStartedAt || !fetchedLogs?.length) return;
+
+    const recordingStart = new Date(recordingStartedAt).getTime();
+    const currentLogs = fetchedLogs.filter((log) => new Date(log.createdAt).getTime() >= recordingStart);
+    if (!currentLogs.length) return;
+
+    setRecordedLogs((previous) => [...new Map([...previous, ...currentLogs].map((log) => [log.id, log])).values()]);
+  }, [fetchedLogs, isRecording, recordingStartedAt]);
+
+  const logsWithNodes = useMemo(() => {
+    const allLogs = [...recordedLogs, ...(sseLogs ?? [])];
     const uniqueLogs = [...new Map(allLogs.map((log) => [log.id, log])).values()];
 
     return uniqueLogs.map((log) => {
@@ -169,10 +194,10 @@ export function LogViewer(props: Props) {
       return {
         ...log,
         node: nodeOfLog,
-        title: `${t('nodes.' + (nodeOfLog?.type ?? 'flow') + '.title')} -> ${log.type}`,
+        title: `${nodeTitle(nodeOfLog)} -> ${log.type}`,
       };
     });
-  }, [flowData, logs, recording, sseLogs, t, isRecording]);
+  }, [flowData, recordedLogs, sseLogs, nodeTitle]);
 
   const logsOrdered = useMemo(() => {
     return [...logsWithNodes].sort((a, b) => b.id - a.id);
@@ -195,11 +220,11 @@ export function LogViewer(props: Props) {
   const runHeader = useCallback(
     (logsOfRun: typeof logsOrdered) => {
       return {
-        title: t('nodes.' + (triggerNodeOfRun(logsOfRun)?.type ?? 'flow') + '.title'),
+        title: nodeTitle(triggerNodeOfRun(logsOfRun)),
         subtitle: formatDateTime(logsOfRun[logsOfRun.length - 1]?.createdAt),
       };
     },
-    [t, formatDateTime],
+    [nodeTitle, formatDateTime],
   );
 
   const durationItems = useMemo(
@@ -210,7 +235,7 @@ export function LogViewer(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen} dialogProps={{ 'aria-label': t('title') }}>
         <DrawerHeader>
           <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin />
         </DrawerHeader>
@@ -262,7 +287,16 @@ export function LogViewer(props: Props) {
               )}
             </div>
 
-            {!isRecording && <EmptyState message={t('recording.hint')} />}
+            <ToggleButton
+              className="self-start"
+              isSelected={props.confettiEnabled}
+              onChange={props.onConfettiEnabledChange}
+            >
+              <PartyPopperIcon />
+              {t('confetti')}
+            </ToggleButton>
+
+            {!isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.hint')} />}
             {isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.waiting')} />}
 
             {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (

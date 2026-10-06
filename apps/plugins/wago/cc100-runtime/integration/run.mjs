@@ -28,7 +28,9 @@ async function snapshot(ref, label, directories) {
   })
     .trim()
     .split('\n');
-  for (const path of paths.filter((path) => path.endsWith('.ts'))) {
+  for (const path of paths.filter(
+    (path) => path.endsWith('.ts') || path === 'apps/plugins/wago/cc100-runtime/manifest.json',
+  )) {
     const target = join(destination, path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, execFileSync('git', ['show', `${commit}:${path}`], { cwd: root }));
@@ -38,21 +40,19 @@ async function snapshot(ref, label, directories) {
 try {
   const backend = 'apps/plugins/wago/backend';
   const measurementContract = 'apps/plugins/wago/measurement-contract.ts';
-  const channelBehavior = 'apps/plugins/wago/channel-behavior.ts';
-  const modbus = 'apps/plugins/wago/modbus';
   const runtime = 'apps/plugins/wago/cc100-runtime';
-  const flowRoot = argument('flow-ref')
-    ? await snapshot(argument('flow-ref'), 'flow', [backend, measurementContract, channelBehavior, modbus])
-    : root;
-  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [
-    runtime,
-    backend,
+  const sharedSources = [
     measurementContract,
-    channelBehavior,
-    modbus,
-  ]);
+    'apps/plugins/wago/channel-behavior.ts',
+    'apps/plugins/wago/modbus',
+    'apps/plugins/wago/shared',
+  ];
+  const flowRoot = argument('flow-ref')
+    ? await snapshot(argument('flow-ref'), 'flow', [backend, ...sharedSources])
+    : root;
+  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [runtime, backend, ...sharedSources]);
   const runtimeRoot = argument('runtime-ref')
-    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, measurementContract, channelBehavior, modbus])
+    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, ...sharedSources])
     : root;
   for (const stagedRoot of [mainRoot, ...(runtimeRoot !== root ? [runtimeRoot] : [])]) {
     await symlink(join(root, 'node_modules'), join(stagedRoot, 'node_modules'), 'dir');

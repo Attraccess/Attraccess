@@ -66,6 +66,17 @@ process.exit(Number(env.STATUS || 0));
   const run = (format = '%u:%g:%a:%h', env: Record<string, string> = {}, path = '/etc', follow = false) =>
     runScript(`${wagoShellStat()}\nstat ${follow ? '-Lc' : '-c'} ${quote(format)} ${quote(path)}`, env);
 
+  it.each(['native', 'terse'])('reports exact file size without reading its contents (%s)', (mode) => {
+    const file = join(root, 'archive');
+    writeFileSync(file, Buffer.alloc(65537));
+    const result = run('%s', mode === 'native' ? { NATIVE: '65537\n' } : { REAL: '1' }, file);
+    expect({ status: result.status, stderr: result.stderr, stdout: result.stdout }).toEqual({
+      status: 0,
+      stderr: '',
+      stdout: '65537\n',
+    });
+  });
+
   it.each(['native', 'terse'])('caches %s mode across observations, preserving caller and nested arguments', (mode) => {
     const helper = wagoShellStat();
     const calls = join(root, 'calls');

@@ -1,5 +1,5 @@
 import { PageHeader } from '../../components/pageHeader';
-import { DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { Button } from '../../components/button';
 import { BellIcon, KeyRoundIcon, LockKeyholeIcon, ShieldIcon, Trash2Icon, UserIcon } from 'lucide-react';
 import { StandardDrawer } from '../../components/standardDrawer';
@@ -135,7 +135,7 @@ export default function AccountPage() {
 
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('deleteAccount.modal.title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('deleteAccount.modal.title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>

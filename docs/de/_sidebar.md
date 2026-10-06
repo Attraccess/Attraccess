@@ -42,7 +42,9 @@
 - **Flows & Automatisierung**
   - [Überblick](flows/overview.md)
   - [Flow-Editor](flows/flow-editor.md)
+  - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md)
   - [Knotentypen](flows/node-types.md)
+  - [Zähler](flows/energy-metering.md)
 
 - **Formulare**
   - [Überblick](forms/overview.md)
@@ -53,12 +55,12 @@
   - [Projekte erstellen](projects/creating-projects.md)
   - [Teamverwaltung](projects/team-management.md)
 
-- **Attractap NFC-Leser**
+- **Attractap RFID-Leser**
   - [Überblick](attractap/overview.md)
   - [Leser benutzen](attractap/using-the-reader.md)
   - [Hardware](attractap/hardware.md)
   - [Einrichtung](attractap/setup.md)
-  - [NFC-Karten](attractap/nfc-cards.md)
+  - [RFID-Karten](attractap/rfid-cards.md)
   - [Firmware-Updates](attractap/firmware-updates.md)
 
 - **MQTT & IoT**
@@ -90,6 +92,7 @@
 - **Für Entwickler**
   - [Überblick](developer/overview.md)
   - [Architektur](developer/architecture.md)
+  - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
   - [Mitwirken](developer/contributing.md)
 

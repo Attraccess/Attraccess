@@ -1,10 +1,11 @@
+import { ResourceMeter } from './entities/resource-meter.entity';
 // Import entities
 import { AuditLog } from './entities/audit-log.entity';
 import { EmailTemplate } from './entities/email-template.entity';
 import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { MqttServer } from './entities/mqttServer.entity';
-import { NFCCard } from './entities/nfcCard.entity';
+import { NFCCard } from './entities/rfidCard.entity';
 import { Resource } from './entities/resource.entity';
 import { ResourceType } from './entities/resource.type';
 import { ResourceGroup } from './entities/resourceGroup.entity';
@@ -53,6 +54,10 @@ import {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  MeteringStartNodeDataSchema,
+  MeteringCollectNodeDataSchema,
+  MeteringReadyNodeDataSchema,
+  MeteringReportNodeDataSchema,
   getExternalEffectFailureBehavior,
 } from './entities/resourceFlowNode';
 import { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from './entities/resourceHealthState.entity';
@@ -106,9 +111,19 @@ import { ApiTokenPermission } from './entities/api-token-permission.entity';
 import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
 export type { LifecycleBillingItem } from './entities/resource-usage-lifecycle-attempt.entity';
+import {
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
+  ResourceMeteringSessionStatus,
+} from './entities/resource-metering.entity';
+export type {
+  ResourceMeteringOperationKind,
+  ResourceMeteringOperationStatus,
+} from './entities/resource-metering.entity';
 
 // Export all entities individually
 export {
+  ResourceMeter,
   AuditLog,
   AuthenticationDetail,
   MqttServer,
@@ -198,6 +213,10 @@ export {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  MeteringStartNodeDataSchema,
+  MeteringCollectNodeDataSchema,
+  MeteringReadyNodeDataSchema,
+  MeteringReportNodeDataSchema,
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,
@@ -224,10 +243,14 @@ export {
   ApiTokenPermission,
   ResourceOperatingInterval,
   ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
+  ResourceMeteringSessionStatus,
 };
 
 // Export the entities object
 export const entities = {
+  ResourceMeter,
   AuditLog,
   User,
   AuthenticationDetail,
@@ -286,4 +309,6 @@ export const entities = {
   ApiTokenPermission,
   ResourceOperatingInterval,
   ResourceUsageLifecycleAttempt,
+  ResourceMeteringSession,
+  ResourceMeteringOperation,
 };

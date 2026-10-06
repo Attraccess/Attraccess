@@ -45,6 +45,8 @@ jobs:
       # `balena push` uploads firmware_output/ with the build context.
       - uses: ./.github/actions/build-attractap-firmware
 
+      - uses: ./.github/actions/build-cc100-runtime
+
       - uses: ./.github/actions/download-companion
 
       - uses: ./.github/actions/balena-push

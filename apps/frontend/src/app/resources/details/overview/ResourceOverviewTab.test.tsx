@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import usePluginState, { PluginManifestWithPlugin } from '../../../plugins/plugin.state';
 import { ResourceOverviewTab } from './ResourceOverviewTab';
 
+vi.mock('../meters/MetersCard', () => ({ MetersCard: () => null }));
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: '11' }) }));
 vi.mock('@attraccess/react-query-client', () => ({ useResourcesServiceGetOneResourceById: () => ({ data: {} }) }));
 vi.mock('../../usage/resourceUsageSession', () => ({ ResourceUsageSession: () => null }));

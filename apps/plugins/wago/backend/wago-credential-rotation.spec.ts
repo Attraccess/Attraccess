@@ -126,49 +126,53 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       .addSelect('rotation.encryptedCredentials')
       .getOne();
 
-  it('persists encrypted handoff before dispatch and finishes only after matching reconnect acknowledgement', async () => {
-    let acknowledge!: () => Promise<void>;
-    let started!: () => void;
-    const dispatched = new Promise<void>((resolve) => {
-      started = resolve;
-    });
-    publish.mockImplementation(async (serverId, topic, payload, options) => {
-      expect(options).toEqual({ qos: 1, retain: false });
-      const persisted = await row();
-      expect(persisted?.phase).toBe('pending');
-      expect(persisted?.encryptedCredentials).not.toContain(credential.password);
-      const { revision, token } = JSON.parse(payload);
-      acknowledge = async () => {
+  it.each([0, 2100])(
+    'persists encrypted handoff and requires reconnect acknowledgement with %i ms clock skew',
+    async (skew) => {
+      await db.getRepository(WagoController).update(1, { lastHeartbeatAt: new Date(Date.now() + skew).toISOString() });
+      let acknowledge!: () => Promise<void>;
+      let started!: () => void;
+      const dispatched = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      publish.mockImplementation(async (serverId, topic, payload, options) => {
+        expect(options).toEqual({ qos: 1, retain: false });
+        const persisted = await row();
+        expect(persisted?.phase).toBe('pending');
+        expect(persisted?.encryptedCredentials).not.toContain(credential.password);
+        const { revision, token } = JSON.parse(payload);
+        acknowledge = async () => {
+          await receive({
+            serverId,
+            topic: `${topic}/ack`,
+            payload: Buffer.from(JSON.stringify({ revision, token, credentialEpoch, status: 'reconnected' })),
+          });
+        };
         await receive({
           serverId,
           topic: `${topic}/ack`,
-          payload: Buffer.from(JSON.stringify({ revision, token, credentialEpoch, status: 'reconnected' })),
+          payload: Buffer.from(JSON.stringify({ revision, token: 'wrong', credentialEpoch, status: 'reconnected' })),
         });
-      };
-      await receive({
-        serverId,
-        topic: `${topic}/ack`,
-        payload: Buffer.from(JSON.stringify({ revision, token: 'wrong', credentialEpoch, status: 'reconnected' })),
+        started();
       });
-      started();
-    });
-    const operation = service.rotate(1, 'attraccess/wago', principal, guard());
-    await dispatched;
-    expect((await row())?.phase).toBe('pending');
-    expect(record.mock.calls.map(([event]) => event.outcome)).not.toContain('succeeded');
-    await acknowledge();
-    await expect(operation).resolves.toEqual({ state: 'completed', revision: 1 });
-    expect(await row()).toMatchObject({ phase: 'completed', encryptedCredentials: null });
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(record.mock.calls)).not.toContain(credential.password);
-    expect(rotate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        topicPolicy: expect.objectContaining({
-          subscribe: expect.arrayContaining(['attraccess/wago/v1/controllers/fixture/credentials/rotate']),
+      const operation = service.rotate(1, 'attraccess/wago', principal, guard());
+      await dispatched;
+      expect((await row())?.phase).toBe('pending');
+      expect(record.mock.calls.map(([event]) => event.outcome)).not.toContain('succeeded');
+      await acknowledge();
+      await expect(operation).resolves.toEqual({ state: 'completed', revision: 1 });
+      expect(await row()).toMatchObject({ phase: 'completed', encryptedCredentials: null });
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(record.mock.calls)).not.toContain(credential.password);
+      expect(rotate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topicPolicy: expect.objectContaining({
+            subscribe: expect.arrayContaining(['attraccess/wago/v1/controllers/fixture/credentials/rotate']),
+          }),
         }),
-      }),
-    );
-  });
+      );
+    },
+  );
 
   it('times out, then retries the same durable credential and token after service restart without rotating again', async () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });

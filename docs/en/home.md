@@ -26,7 +26,7 @@ Attraccess helps you manage machines, tools and other resources in your workshop
 
 - **Resource Management** – Manage machines, tools and equipment
 - **Access Control** – Per-resource introductions and permissions
-- **NFC Access Control** – Physical access via Attractap NFC readers
+- **RFID Access Control** – Physical access via Attractap RFID readers
 - **Maintenance Planning** – Schedule and track maintenance tasks
 - **Flows & Automation** – Create visual automation workflows
 - **Projects** – Project-based team management

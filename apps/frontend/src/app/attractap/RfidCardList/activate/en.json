@@ -1,0 +1,6 @@
+{
+  "title": "Activate RFID card",
+  "description": "Are you sure you want to activate the RFID card? This will deactivate all other RFID cards you have.",
+  "cancel": "Cancel",
+  "activate": "Activate"
+}

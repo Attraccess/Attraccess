@@ -219,7 +219,7 @@ void Application::processState() {
   // waiting for its key). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
-    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte NFC-Karte erneut auflegen.");
+    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte RFID-Karte erneut auflegen.");
   }
 #endif
 

@@ -11,6 +11,8 @@ import { Choice } from './DigitalChannelEditor';
 import { ConfigurationChanges, ConfigurationErrors } from './ConfigurationChanges';
 import { boundMeasurement, emptyModbus } from './modbus-editor';
 import { isEditableDigitalChannel } from '../../backend/configuration-digital';
+import { useWagoTranslations } from './i18n';
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 export function ConfigurationPresets({
   controllerId,
@@ -25,6 +27,7 @@ export function ConfigurationPresets({
   onApply: (snapshot: WagoConfigurationSnapshot, application: WagoPresetApplication) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const { t, tExists, tMessage } = useWagoTranslations();
   const presets = usePresetsQuery();
   const preview = usePreviewPresetMutation(controllerId);
   const apply = useApplyPresetMutation();
@@ -34,7 +37,7 @@ export function ConfigurationPresets({
   const [feedbackChannelId, setFeedbackChannelId] = useState('');
   const [result, setResult] = useState<PresetPreview | null>(null);
   const [paths, setPaths] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | TranslationMessage | null>(null);
   const [processing, setProcessing] = useState(false);
   const generation = useRef(0);
   const busy = processing;
@@ -85,8 +88,7 @@ export function ConfigurationPresets({
       setResult(next);
       setPaths(next.diff.map((change) => change.path));
     } catch (error) {
-      if (current === generation.current)
-        setError(error instanceof Error ? error.message : 'Could not preview preset.');
+      if (current === generation.current) setError(error instanceof Error ? error.message : { key: 'presets.previewError' });
     } finally {
       setProcessing(false);
     }
@@ -108,28 +110,35 @@ export function ConfigurationPresets({
       onApply(JSON.parse(next.snapshot), application);
       setResult(null);
     } catch (error) {
-      if (current === generation.current) setError(error instanceof Error ? error.message : 'Could not copy preset.');
+      if (current === generation.current) setError(error instanceof Error ? error.message : { key: 'presets.copyError' });
     } finally {
       setProcessing(false);
     }
   }
   return (
     <fieldset className="wg:flex wg:flex-col wg:gap-3">
-      <legend className="wg:font-medium">Preset foundation</legend>
-      <p>Preview settings, then copy selected changes into your local edits. Save draft when ready.</p>
-      {presets.isError && <p role="alert">Could not load presets: {presets.error.message}</p>}
+      <legend className="wg:font-medium">{t('presets.title')}</legend>
+      <p>{t('presets.description')}</p>
+      {presets.isError && <p role="alert">{t('presets.loadError', { error: presets.error.message })}</p>}
       <Choice
-        label="Preset"
+        label={t('presets.preset')}
         value={presetId}
-        options={(presets.data ?? []).map((item) => ({ id: item.id, label: item.name }))}
+        options={(presets.data ?? []).map((item) => ({
+          id: item.id,
+          label: tExists(`presets.items.${item.id}.name`) ? t(`presets.items.${item.id}.name`) : item.name,
+        }))}
         onChange={(id) => {
           setPresetId(id as typeof presetId);
           setChannelId('');
         }}
       />
-      <p>{presets.data?.find((item) => item.id === presetId)?.description}</p>
+      <p>
+        {tExists(`presets.items.${presetId}.description`)
+          ? t(`presets.items.${presetId}.description`)
+          : presets.data?.find((item) => item.id === presetId)?.description}
+      </p>
       <Choice
-        label="Apply to channel"
+        label={t('presets.applyTo')}
         value={target?.id ?? ''}
         options={compatibleChannels.map((item) => ({ id: item.id, label: metadata.names[item.id] ?? item.id }))}
         onChange={setChannelId}
@@ -137,18 +146,20 @@ export function ConfigurationPresets({
       {!compatibleChannels.length && (
         <p>
           {presetId === 'metered-switched-load'
-            ? 'Bind a live power measurement and a named output action to the same Modbus point to use this preset.'
-            : `Add a digital ${presetId === 'generic-monitored-input' ? 'input' : 'output'} or a compatible Modbus output to use this preset.`}
+            ? t('presets.meteredHint')
+            : t('presets.digitalHint', {
+                direction: t(presetId === 'generic-monitored-input' ? 'channels.input' : 'channels.output'),
+              })}
         </p>
       )}
       {presetId === 'guarded-enable-request' && (
-        <Choice label="Guard input" value={guardChannelId} options={inputs} onChange={setGuardChannelId} />
+        <Choice label={t('channels.guardInput')} value={guardChannelId} options={inputs} onChange={setGuardChannelId} />
       )}
       {presetId === 'generic-digital-output' && (
         <Choice
-          label="Optional feedback input"
+          label={t('presets.feedback')}
           value={feedbackChannelId || 'none'}
-          options={[{ id: 'none', label: 'No feedback' }, ...inputs]}
+          options={[{ id: 'none', label: t('presets.noFeedback') }, ...inputs]}
           onChange={(value) => setFeedbackChannelId(value === 'none' ? '' : value)}
         />
       )}
@@ -158,7 +169,7 @@ export function ConfigurationPresets({
         isPending={preview.isPending}
         onPress={() => void showPreview()}
       >
-        Preview preset
+        {t('presets.preview')}
       </Button>
       {result && (
         <>
@@ -173,16 +184,12 @@ export function ConfigurationPresets({
             }
           />
           <ConfigurationErrors errors={result.errors} snapshot={result.snapshot} names={metadata.names} />
-          <Button
-            isDisabled={!canCopy}
-            isPending={apply.isPending}
-            onPress={() => void copyChanges()}
-          >
-            {result.diff.length ? 'Copy selected changes to local edits' : 'Reapply preset to local edits'}
+          <Button isDisabled={!canCopy} isPending={apply.isPending} onPress={() => void copyChanges()}>
+            {t(result.diff.length ? 'presets.copy' : 'presets.reapply')}
           </Button>
         </>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{tMessage(error)}</p>}
     </fieldset>
   );
 }

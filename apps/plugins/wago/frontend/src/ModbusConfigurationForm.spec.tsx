@@ -6,85 +6,147 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ModbusConfigurationForm } from './ModbusConfigurationForm';
 import { BUILTIN_MODBUS_PROFILES, type ModbusConfiguration } from '../../modbus/model';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
+import germanModbus from './modbus.de.json';
 
-afterEach(cleanup);
-describe('Modbus custom profile editing', () => {
-  it('edits only the selected profile during a temporary ID collision', async () => {
-    const other = { id: 'other', name: 'Other profile', version: 2, measurements: [], actions: [] };
-    const initial: ModbusConfiguration = {
-      connections: [],
-      devices: [],
-      profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [] }, other],
-    };
-    let latest = initial;
+afterEach(() => {
+  cleanup();
+  useTranslationState.setState({ language: 'en' });
+});
+
+// Full-catalog editors render every built-in register and rerender on each key.
+// Allow CI to finish typing before cleanup; timed-out user-event tasks otherwise
+// continue typing into the next test's focused input.
+const catalogEditTimeoutMs = 60_000;
+
+it(
+  'creates localized signal defaults from a German form and preserves later user edits',
+  async () => {
+    useTranslationState.setState({ language: 'de' });
+    let latest: ModbusConfiguration = { connections: [], devices: [], profiles: [] };
     function Editor() {
-      const [value, onChange] = useState(initial);
+      const [value, onChange] = useState(latest);
       latest = value;
       return <ModbusConfigurationForm value={value} onChange={onChange} />;
     }
     render(<Editor />);
     const user = userEvent.setup();
-    const id = screen.getByDisplayValue('custom');
-    await user.clear(id);
-    await user.type(id, 'other');
-    expect(screen.getByRole('alert')).toHaveTextContent('unique non-empty ID required');
-    const name = screen.getByDisplayValue('Custom');
+    await user.click(screen.getByRole('button', { name: germanModbus.addDevice }));
+    expect(latest.devices[0].name).toBe('Modbus device');
+    await user.click(screen.getByRole('button', { name: germanModbus.createProfile }));
+    expect(latest.profiles[0].name).toBe('Custom profile');
+    const measurementButton = screen
+      .getAllByRole('button', { name: germanModbus.addMeasurement })
+      .find((button) => !button.hasAttribute('disabled'));
+    expect(measurementButton).toBeTruthy();
+    if (!measurementButton) throw new Error('Missing editable custom profile');
+    await user.click(measurementButton);
+    const actionButton = screen
+      .getAllByRole('button', { name: germanModbus.addAction })
+      .find((button) => !button.hasAttribute('disabled'));
+    if (!actionButton) throw new Error('Missing editable custom profile');
+    await user.click(actionButton);
+    expect(latest.profiles[0].measurements[0].name).toBe(germanModbus.defaultMeasurement);
+    expect(latest.profiles[0].actions[0].name).toBe(germanModbus.defaultAction);
+    const name = screen.getByDisplayValue(germanModbus.defaultMeasurement);
     await user.clear(name);
-    await user.type(name, 'Renamed');
-    expect(latest.profiles[0]).toMatchObject({ id: 'other', name: 'Renamed', version: 1 });
-    expect(latest.profiles[1]).toBe(other);
-    expect(screen.getByDisplayValue('Other profile')).toBeInTheDocument();
-  });
-  it('allows repairing a built-in ID collision while actual built-in profiles remain read-only', async () => {
-    function Editor() {
-      const [value, onChange] = useState<ModbusConfiguration>({
+    await user.type(name, 'My reading');
+    const saved = JSON.stringify(latest);
+    act(() => useTranslationState.setState({ language: 'en' }));
+    expect(screen.getByDisplayValue('My reading')).toBe(name);
+    expect(JSON.stringify(latest)).toBe(saved);
+  },
+  catalogEditTimeoutMs,
+);
+describe('Modbus custom profile editing', () => {
+  it(
+    'edits only the selected profile during a temporary ID collision',
+    async () => {
+      const other = { id: 'other', name: 'Other profile', version: 2, measurements: [], actions: [] };
+      const initial: ModbusConfiguration = {
         connections: [],
         devices: [],
-        profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [] }],
-      });
-      return <ModbusConfigurationForm value={value} onChange={onChange} />;
-    }
-    render(<Editor />);
-    const user = userEvent.setup();
-    const builtin = BUILTIN_MODBUS_PROFILES[0];
-    const builtinId = screen.getByDisplayValue(builtin.id);
-    const builtinName = screen.getByDisplayValue(builtin.name);
-    const id = screen.getByDisplayValue('custom');
-    await user.clear(id);
-    await user.type(id, builtin.id);
-    expect(id).toBeEnabled();
-    expect(screen.getByRole('alert')).toHaveTextContent('built-ins are immutable');
-    const name = screen.getByDisplayValue('Custom');
-    await user.clear(name);
-    await user.type(name, 'Renamed');
-    expect(name).toHaveValue('Renamed');
-    expect(builtinId).toBeDisabled();
-    expect(builtinName).toBeDisabled();
-    expect(builtinName).toHaveValue(builtin.name);
-    expect(Object.isFrozen(builtin)).toBe(true);
-    await user.clear(id);
-    await user.type(id, 'repaired');
-    expect(id).toHaveValue('repaired');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-  it('keeps the input mounted and focused throughout a multi-character ID edit', async () => {
-    function Editor() {
-      const [value, onChange] = useState<ModbusConfiguration>({
-        connections: [],
-        devices: [],
-        profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [] }],
-      });
-      return <ModbusConfigurationForm value={value} onChange={onChange} />;
-    }
-    render(<Editor />);
-    const user = userEvent.setup();
-    const input = screen.getByDisplayValue('custom');
-    await user.click(input);
-    await user.keyboard('-edited');
-    expect(input).toHaveFocus();
-    expect(input).toHaveValue('custom-edited');
-    expect(screen.getByDisplayValue('custom-edited')).toBe(input);
-  });
+        profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [] }, other],
+      };
+      let latest = initial;
+      function Editor() {
+        const [value, onChange] = useState(initial);
+        latest = value;
+        return <ModbusConfigurationForm value={value} onChange={onChange} />;
+      }
+      render(<Editor />);
+      const user = userEvent.setup();
+      const id = screen.getByDisplayValue('custom');
+      await user.clear(id);
+      await user.type(id, 'other');
+      expect(screen.getByRole('alert')).toHaveTextContent('unique non-empty ID required');
+      const name = screen.getByDisplayValue('Custom');
+      await user.clear(name);
+      await user.type(name, 'Renamed');
+      expect(latest.profiles[0]).toMatchObject({ id: 'other', name: 'Renamed', version: 1 });
+      expect(latest.profiles[1]).toBe(other);
+      expect(screen.getByDisplayValue('Other profile')).toBeInTheDocument();
+    },
+    catalogEditTimeoutMs,
+  );
+  it(
+    'allows repairing a built-in ID collision while actual built-in profiles remain read-only',
+    async () => {
+      function Editor() {
+        const [value, onChange] = useState<ModbusConfiguration>({
+          connections: [],
+          devices: [],
+          profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [] }],
+        });
+        return <ModbusConfigurationForm value={value} onChange={onChange} />;
+      }
+      render(<Editor />);
+      const user = userEvent.setup();
+      const builtin = BUILTIN_MODBUS_PROFILES[0];
+      const builtinId = screen.getByDisplayValue(builtin.id);
+      const builtinName = screen.getByDisplayValue(builtin.name);
+      const id = screen.getByDisplayValue('custom');
+      await user.clear(id);
+      await user.type(id, builtin.id);
+      expect(id).toBeEnabled();
+      expect(screen.getByRole('alert')).toHaveTextContent('built-ins are immutable');
+      const name = screen.getByDisplayValue('Custom');
+      await user.clear(name);
+      await user.type(name, 'Renamed');
+      expect(name).toHaveValue('Renamed');
+      expect(builtinId).toBeDisabled();
+      expect(builtinName).toBeDisabled();
+      expect(builtinName).toHaveValue(builtin.name);
+      expect(Object.isFrozen(builtin)).toBe(true);
+      await user.clear(id);
+      await user.type(id, 'repaired');
+      expect(id).toHaveValue('repaired');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    },
+    catalogEditTimeoutMs,
+  );
+  it(
+    'keeps the input mounted and focused throughout a multi-character ID edit',
+    async () => {
+      function Editor() {
+        const [value, onChange] = useState<ModbusConfiguration>({
+          connections: [],
+          devices: [],
+          profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [] }],
+        });
+        return <ModbusConfigurationForm value={value} onChange={onChange} />;
+      }
+      render(<Editor />);
+      const user = userEvent.setup();
+      const input = screen.getByDisplayValue('custom');
+      await user.click(input);
+      await user.keyboard('-edited');
+      expect(input).toHaveFocus();
+      expect(input).toHaveValue('custom-edited');
+      expect(screen.getByDisplayValue('custom-edited')).toBe(input);
+    },
+    catalogEditTimeoutMs,
+  );
   it('keeps the selected custom profile open when its version changes', async () => {
     function Editor() {
       const [value, onChange] = useState<ModbusConfiguration>({

@@ -18,9 +18,12 @@ import { UsersService } from '../../../users-and-auth/users/users.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceFlowsExecutorService } from '../../../resources/flows/resource-flows-executor.service';
 import { SumUpService } from '../../../billing/sumup.service';
+import { BillingService } from '../../../billing/billing.service';
 import { ResourceListService } from './resource-list.service';
 import { AttractapEvent, AttractapEventType } from '../websocket.types';
 import { SupervisionService } from '../../../resources/supervision/supervision.service';
+import { ResourceMeteringService } from '../../../resources/metering/resource-metering.service';
+import { ResourceOperatingAttributionService } from '../../../resources/operating-intervals/resource-operating-attribution.service';
 
 // ATT-545 regression (backend half): the Attractap form reopens after the last
 // field only if the server re-sends RESOURCE_USAGE_FORM_REQUEST, i.e.
@@ -87,8 +90,11 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
         { provide: ResourceUsageService, useValue: { startSession } },
         { provide: ResourceFlowsExecutorService, useValue: {} },
         { provide: SumUpService, useValue: { getIsEnabled: jest.fn().mockResolvedValue(false) } },
+        { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
         { provide: ResourceListService, useValue: { sendResourceListToSocket: jest.fn() } },
         { provide: SupervisionService, useValue: { settleByCard: jest.fn() } },
+        { provide: ResourceMeteringService, useValue: {} },
+        { provide: ResourceOperatingAttributionService, useValue: {} },
       ],
     }).compile();
 

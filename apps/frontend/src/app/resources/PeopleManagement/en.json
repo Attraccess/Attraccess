@@ -33,7 +33,8 @@
     "revokeIntroducer": "Revoke introducer status",
     "revokeMaintainer": "Revoke maintainer status",
     "revokeIntroduction": "Revoke introduction",
-    "grantIntroduction": "Re-grant introduction"
+    "grantIntroduction": "Re-grant introduction",
+    "revokeDirectIntroduction": "Revoke direct introduction"
   },
   "addModal": {
     "title": {
@@ -91,5 +92,9 @@
       "title": "Failed to revoke introduction",
       "description": "{{error}}"
     }
+  },
+  "sources": {
+    "direct": "Direct introduction",
+    "group": "Introduced via {{{group}}}"
   }
 }

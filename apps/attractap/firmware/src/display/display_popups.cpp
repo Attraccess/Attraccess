@@ -11,6 +11,16 @@
 
 void Display::showErrorPopup(const std::string &title, const std::string &message)
 {
+    Display::showMessagePopup(title, message, true);
+}
+
+void Display::showBillingSummary(const std::string &total)
+{
+    Display::showMessagePopup("Gesamtkosten dieser Sitzung", total, false);
+}
+
+void Display::showMessagePopup(const std::string &title, const std::string &message, bool error)
+{
     // Close existing popup if any
     Display::hidePopup();
     if (Display::popupAutoCloseTimer)
@@ -45,6 +55,7 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     // Title
     lv_obj_t *titleLbl = lv_label_create(dialog);
     lv_label_set_text(titleLbl, title.c_str());
+    lv_obj_set_width(titleLbl, lv_pct(100));
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -52,7 +63,7 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     lv_obj_t *msgLbl = lv_label_create(dialog);
     lv_label_set_text(msgLbl, message.c_str());
     lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(msgLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(msgLbl, error ? &attractap_font_montserrat_latin1_14 : &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
     // Footer with OK button
@@ -66,7 +77,7 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     lv_obj_t *okBtn = lv_button_create(footer);
     lv_obj_set_height(okBtn, LV_SIZE_CONTENT);
     lv_obj_set_width(okBtn, LV_SIZE_CONTENT);
-    DisplayTheme::button(okBtn, DisplayTheme::danger());
+    DisplayTheme::button(okBtn, error ? DisplayTheme::danger() : DisplayTheme::primary());
 
     lv_obj_t *okLbl = lv_label_create(okBtn);
     lv_label_set_text(okLbl, "OK");

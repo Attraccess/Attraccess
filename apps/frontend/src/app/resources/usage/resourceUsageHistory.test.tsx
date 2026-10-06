@@ -1,7 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceUsageHistory } from './resourceUsageHistory';
+import type { ResourceUsage } from '@attraccess/react-query-client';
+import { useUsageSessionProject } from './hooks/useUsageSessionProject';
 const state = vi.hoisted(() => ({
   permitted: true,
   type: 'machine',
@@ -34,6 +36,8 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   useResourcesServiceGetOneResourceById: () => ({ data: { id: 7, type: state.type } }),
   UseResourcesServiceResourceUsageGetHistoryKeyFn: (input: unknown) => ['history', input],
+  UseResourcesServiceResourceUsageGetSessionKeyFn: (input: unknown) => ['session', input],
+  useProjectsServiceGetProjectUsageHistoryKey: 'project-history',
   useResourcesServiceResourceUsageUpdateSessionProject: (callbacks: typeof state.callbacks) => {
     state.callbacks = callbacks;
     return { mutate: state.update };
@@ -74,20 +78,10 @@ vi.mock('../../../components/projectsSelect', () => ({
   ),
 }));
 vi.mock('./components/UsageNotesModal', () => ({
-  UsageNotesModal: ({
-    isOpen,
-    onClose,
-    session,
-    operatingDurationMs,
-  }: {
-    isOpen: boolean;
-    onClose: () => void;
-    session: { id: number } | null;
-    operatingDurationMs: number;
-  }) =>
+  UsageNotesModal: ({ isOpen, onClose, usageId }: { isOpen: boolean; onClose: () => void; usageId: number | null }) =>
     isOpen ? (
       <div role="dialog">
-        Session {session?.id}, operating {operatingDurationMs}
+        Session {usageId}
         <button onClick={onClose}>Close notes</button>
       </div>
     ) : null,
@@ -124,6 +118,20 @@ beforeEach(() => {
   ];
 });
 afterEach(cleanup);
+it('accepts refreshed project assignments after a failed table edit', () => {
+  const { result } = renderHook(() => useUsageSessionProject(7));
+  const session = state.rows[0] as ResourceUsage;
+  act(() => result.current.handleProjectChange(session, 5));
+  expect(result.current.resolveProjectId(session)).toBe(5);
+  act(() => {
+    state.callbacks?.onError(new Error('Offline'), { usageId: 11 });
+    state.callbacks?.onSettled(undefined, undefined, { usageId: 11 });
+  });
+  expect(result.current.resolveProjectId(session)).toBe(4);
+  // A successful edit from the independently loaded drawer refreshes the history data.
+  const refreshedSession = { ...session, project: { id: 5, name: 'New project' } } as ResourceUsage;
+  expect(result.current.resolveProjectId(refreshedSession)).toBe(5);
+});
 it('optimistically updates projects, rolls back failures and refreshes matching history queries', async () => {
   render(
     <MemoryRouter>
@@ -147,8 +155,9 @@ it('optimistically updates projects, rolls back failures and refreshes matching 
   expect(state.toastError).toHaveBeenCalledWith({ title: 'Project update failed' });
   fireEvent.change(project, { target: { value: '' } });
   expect(state.update).toHaveBeenLastCalledWith({ resourceId: 7, usageId: 11, requestBody: { projectId: null } });
-  act(() => {
-    state.callbacks?.onSuccess({ id: 11, project: null });
+  await act(async () => {
+    state.rows[0] = { ...(state.rows[0] as Record<string, unknown>), project: null };
+    await state.callbacks?.onSuccess({ id: 11, project: null });
     state.callbacks?.onSettled(undefined, undefined, { usageId: 11 });
   });
   expect(project).toHaveValue('');
@@ -181,7 +190,7 @@ it('filters users, paginates and opens session notes from the real history table
   expect(screen.getByText('Other project')).toBeInTheDocument();
   const row = screen.getByRole('combobox').closest('tr')!;
   fireEvent.click(row);
-  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Session 11, operating 60000'));
+  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Session 11'));
   fireEvent.click(screen.getByText('Close notes'));
   expect(screen.queryByRole('dialog')).toBeNull();
 });

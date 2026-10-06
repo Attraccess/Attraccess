@@ -46,8 +46,8 @@
       "description": "Wenn jemand anderes oder das System deine aktive Ressourcennutzung beendet (nicht wenn du sie selbst beendest)."
     },
     "nfc_cards": {
-      "label": "NFC-Karten",
-      "description": "Wenn eine deiner NFC-Karten registriert, aktiviert, deaktiviert oder gelöscht wird."
+      "label": "RFID-Karten",
+      "description": "Wenn eine deiner RFID-Karten registriert, aktiviert, deaktiviert oder gelöscht wird."
     },
     "project_invitations": {
       "label": "Projekteinladungen",

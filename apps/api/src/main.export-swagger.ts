@@ -1,25 +1,27 @@
 import { join } from 'path';
 import { writeFileSync } from 'fs';
-
-/* eslint-disable no-console */
+import { Logger } from '@nestjs/common';
 
 async function main() {
-  console.log('Exporting swagger');
+  Logger.attachBuffer();
+  const logger = new Logger('SwaggerExport');
+  logger.log('Exporting swagger');
 
-  console.log('Bootstrapping');
+  logger.log('Bootstrapping');
 
   process.env.DISABLE_PLUGINS = 'true';
   const main = await import('./main.bootstrap');
-  const { swaggerDocumentFactory } = await main.bootstrap();
+  const { app, swaggerDocumentFactory } = await main.bootstrap();
 
-  console.log('Creating swagger document');
+  logger.log('Creating swagger document');
   const distDir = join(__dirname, '../../apps/api-swagger');
   const swaggerDocument = swaggerDocumentFactory();
 
-  console.log('Writing swagger');
+  logger.log('Writing swagger');
   writeFileSync(join(distDir, 'swagger.json'), JSON.stringify(swaggerDocument, null, 2));
 
-  console.log('Done');
+  logger.log('Done');
+  await app.close();
   process.exit(0);
 }
 

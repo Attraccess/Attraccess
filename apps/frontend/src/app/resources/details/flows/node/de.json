@@ -1,4 +1,9 @@
 {
+  "preview": {
+    "configuration": "Konfiguration",
+    "loading": "Zusammenfassung wird geladen…",
+    "unavailable": "Vorschau nicht verfügbar"
+  },
   "editor": {
     "buttons": {
       "save": "Speichern",
@@ -51,6 +56,53 @@
             "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird.",
             "outputs": {
               "output": "Ausgabe"
+            }
+          }
+        },
+        "metering": {
+          "start": {
+            "title": "Messung starten",
+            "description": "Läuft beim Sitzungsstart. Den gewählten Zähler vorbereiten und mit Messung bereit bestätigen.",
+            "outputs": {
+              "output": "Ausgabe"
+            },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Zeitlimit (Sekunden)",
+                "helpText": "Maximale Wartezeit auf „Messung bereit“. Kostenpflichtige Zähler müssen den Start bestätigen, bevor die Sitzung startet. Fehlgeschlagene Zähler mit einem Preis von null werden übersprungen; die Sitzung kann trotzdem starten."
+              },
+              "meterId": {
+                "label": "Zähler",
+                "helpText": "Einen Zähler dieser Ressource auswählen."
+              }
+            }
+          },
+          "collect": {
+            "title": "Messwert abfragen",
+            "description": "Den gewählten Zähler regelmäßig abfragen, auch außerhalb von Sitzungen, und einmal beim Sitzungsende.",
+            "outputs": {
+              "output": "Ausgabe"
+            },
+            "config": {
+              "timeoutSeconds": {
+                "label": "Zeitlimit (Sekunden)",
+                "helpText": "Maximale Wartezeit auf „Zähler melden“."
+              },
+              "interimIntervalMinutes": {
+                "label": "Zwischenintervall (Minuten)",
+                "helpText": "Minuten zwischen Messungen, auch außerhalb von Sitzungen. 0 deaktiviert regelmäßige Abfragen."
+              },
+              "finalAttempts": {
+                "label": "Versuche für den Endwert",
+                "helpText": "Versuche, beim Sitzungsende einen frischen Endstand zu erhalten, bevor die Zählerabrechnung ausstehend bleibt."
+              },
+              "finalRetryDelaySeconds": {
+                "label": "Pause zwischen Endwert-Versuchen (Sekunden)"
+              },
+              "meterId": {
+                "label": "Zähler",
+                "helpText": "Einen Zähler dieser Ressource auswählen."
+              }
             }
           }
         },
@@ -659,6 +711,67 @@
                   "label": "Externe Referenz"
                 }
               }
+            }
+          }
+        },
+        "metering": {
+          "ready": {
+            "title": "Messung bereit",
+            "description": "Bestätigt, dass der Zähler initialisiert ist. Kostenpflichtige Zähler benötigen diese Bestätigung vor dem Sitzungsstart. Fehlgeschlagene Zähler mit einem Preis von null werden übersprungen; die Sitzung kann trotzdem starten.",
+            "inputs": {
+              "input": "Eingabe"
+            },
+            "config": {
+              "baselineValue": {
+                "label": "Baseline-Wert",
+                "helpText": "Nur für Zähler, die sich nicht zurücksetzen lassen: der aktuelle Gesamtstand (Templates erlaubt). Der Verbrauch wird ab diesem Wert gezählt. Leer lassen, wenn der Zähler zurückgesetzt wurde."
+              },
+              "source": {
+                "label": "Quelle",
+                "helpText": "Optionale Bezeichnung des physischen Zählers (Templates erlaubt)."
+              },
+              "meterId": {
+                "label": "Zähler",
+                "helpText": "Einen Zähler dieser Ressource auswählen."
+              }
+            },
+            "preview": {
+              "baselineValue": "Ausgangsstand",
+              "source": "Zähler"
+            }
+          },
+          "report": {
+            "title": "Zähler melden",
+            "description": "Einen kumulativen Zählerstand melden oder einen Zuwachs hinzufügen. Funktioniert auch ohne laufende Sitzung.",
+            "inputs": {
+              "input": "Eingabe"
+            },
+            "config": {
+              "value": {
+                "label": "Wert",
+                "helpText": "Nichtnegativer Zahlenwert (Vorlagen erlaubt). Keine Einheitenumrechnung."
+              },
+              "observedAt": {
+                "label": "Gemessen am",
+                "helpText": "Optionale ISO-Zeit der Messung. Werte von vor dem Sitzungsende werden als veraltet abgelehnt. Standard: jetzt."
+              },
+              "source": {
+                "label": "Quelle",
+                "helpText": "Optionale Bezeichnung des physischen Zählers (Templates erlaubt)."
+              },
+              "meterId": {
+                "label": "Zähler",
+                "helpText": "Einen Zähler dieser Ressource auswählen."
+              },
+              "mode": {
+                "enum": { "total": "Kumulativer Zählerstand", "increment": "Zuwachs" },
+                "label": "Meldemodus",
+                "helpText": "total: kumulativer Zählerstand; increment: diesen Betrag hinzufügen."
+              }
+            },
+            "preview": {
+              "value": "Wert",
+              "mode": "Meldemodus"
             }
           }
         },

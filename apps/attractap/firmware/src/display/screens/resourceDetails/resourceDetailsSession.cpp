@@ -27,3 +27,41 @@ void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t value) { sessionHeade
 void ResourceDetailsScreen::setSessionTimeoutPaused(bool value) { sessionHeader.setPaused(value); }
 void ResourceDetailsScreen::extendSessionTimeoutBy(uint32_t value) { sessionHeader.extend(value); }
 void ResourceDetailsScreen::updateSessionTimeoutIndicator() { sessionHeader.update(); }
+
+void ResourceDetailsScreen::setUsageStats(const API::UsageStats &stats)
+{
+   if (!this->resourceCacheValid || stats.resourceId != this->resourceCache.id ||
+       (stats.usageId && stats.usageId != this->resourceCache.activeUsageId)) return;
+   this->usageStats = stats;
+   this->usageStatsValid = stats.usageId != 0;
+   this->usageStatsReceivedAt = millis();
+   this->updateUsageStatsDisplay();
+}
+
+void ResourceDetailsScreen::updateUsageStatsDisplay()
+{
+   if (!this->usageStatsContainer) return;
+   const bool visible = this->resourceCacheValid && this->resourceCache.hasActiveUsage &&
+       this->resourceCache.activeUsageId && this->loginUsernameCache == this->resourceCache.activeUser;
+   lv_obj_set_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN, !visible);
+   if (!visible) return;
+   const bool fresh = this->usageStatsValid && millis() - this->usageStatsReceivedAt < 25000;
+   std::string consumption;
+   if (fresh) {
+      for (const auto &meter : this->usageStats.meters) {
+         if (!consumption.empty()) consumption += "\n";
+         consumption += meter.name + ": " + (meter.value.empty() ? "Warte auf Messwert" : meter.value);
+         if (meter.creditsPerUnit >= 0 && !meter.formattedRate.empty())
+            consumption += "\n" + meter.formattedRate + " / Wert";
+      }
+   }
+   if (consumption.empty()) consumption = "Warte auf Messwert";
+   setLabelTextIfChanged(this->meterValue, consumption.c_str());
+   std::string operating = "Keine Daten";
+   if (fresh && this->usageStats.operatingDurationMs >= 0) {
+      operating = millisToTimeString(this->usageStats.operatingDurationMs);
+      if (this->usageStats.isOperating >= 0)
+         operating += this->usageStats.isOperating ? " · Läuft" : " · Leerlauf";
+   }
+   setLabelTextIfChanged(this->operatingValue, operating.c_str());
+}

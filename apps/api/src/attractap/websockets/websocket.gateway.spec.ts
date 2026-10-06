@@ -5,6 +5,7 @@ import { AttractapService } from '../attractap.service';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import { AttractapFirmwareService } from '../firmware.service';
 import { SumUpService } from '../../billing/sumup.service';
+import { BillingService } from '../../billing/billing.service';
 import { LicenseService } from '../../license/license.service';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
@@ -19,6 +20,8 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './we
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { WS_METRICS } from '../../metrics/definitions/tokens';
+import { ResourceMeteringService } from '../../resources/metering/resource-metering.service';
+import { ResourceOperatingAttributionService } from '../../resources/operating-intervals/resource-operating-attribution.service';
 import { ResourceListService } from './handlers/resource-list.service';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { AttractapAuthHandler } from './handlers/auth.handler';
@@ -94,6 +97,7 @@ describe('AttractapGateway', () => {
         { provide: UsersService, useValue: {} },
         { provide: AttractapFirmwareService, useValue: {} },
         { provide: SumUpService, useValue: {} },
+        { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
         { provide: LicenseService, useValue: licenseService },
         { provide: ResourceUsageService, useValue: {} },
         { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
@@ -119,6 +123,8 @@ describe('AttractapGateway', () => {
         AttractapCardHandler,
         AttractapFormsHandler,
         AttractapSessionHandler,
+        { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
+        { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
         AttractapBillingHandler,
         AttractapProjectsHandler,
         AttractapSupervisionHandler,

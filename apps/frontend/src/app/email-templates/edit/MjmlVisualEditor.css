@@ -1,4 +1,5 @@
 .mjml-visual-editor {
+  container-type: inline-size;
   /* Theme editor chrome only; the email canvas keeps its authored colors. */
   --gjs-primary-color: var(--surface);
   --gjs-secondary-color: var(--foreground);
@@ -11,9 +12,9 @@
 }
 
 /* GrapesJS sizes its views panel at 15% of the editor, which gets unusably
-   narrow below desktop widths; pin it to a fixed width, and drop it entirely
-   on phones where the canvas needs every pixel (inline text editing still
-   works there). */
+   narrow below desktop widths; pin it to a fixed width, and drop it when the
+   editor is narrow (including tablets with the app sidebar open). Inline text
+   editing still works there. */
 .mjml-visual-editor .gjs-pn-views-container,
 .mjml-visual-editor .gjs-pn-views {
   width: 200px;
@@ -23,7 +24,7 @@
   width: calc(100% - 200px);
 }
 
-@media (max-width: 767px) {
+@container (max-width: 650px) {
   .mjml-visual-editor .gjs-pn-views-container,
   .mjml-visual-editor .gjs-pn-views {
     display: none;

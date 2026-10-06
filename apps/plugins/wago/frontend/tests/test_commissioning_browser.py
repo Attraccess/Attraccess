@@ -1,4 +1,4 @@
-"""Mounted production UI + real signing/catalog/commissioning HTTP; only device transports are fixtures."""
+"""Mounted production UI + real catalog/commissioning HTTP; only device transports are fixtures."""
 
 import json
 import mimetypes
@@ -30,6 +30,7 @@ class CommissioningFixture(WagoFixture):
         self.network = []
         self.client = build_opener(ProxyHandler({}), NoRedirect())
         self.catalog_unavailable = False
+        self.catalog_missing = False
 
     def api(self, path, method="POST", body=None, content_type="application/json"):
         if not path.startswith(("/api/wago/", "/fixture/")) or ".." in path or "?" in path:
@@ -61,8 +62,10 @@ class CommissioningFixture(WagoFixture):
             if self.catalog_unavailable and request.method == "GET" and "/runtime-artifacts" in path:
                 route.fulfill(status=503, json={"message": "Fixture catalog connection interrupted"})
                 return
-            # The exact runner-owned origin is already checked. Chromium sends the
-            # real multipart file bytes; Playwright's post_data omits uploaded files.
+            # Forward ordinary requests only to the checked runner-owned API origin.
+            if self.catalog_missing and request.method == "GET" and path == "/api/wago/runtime-artifacts/current":
+                route.fulfill(body="null", content_type="application/json")
+                return
             route.continue_()
             return
         if path == "/api/wago/controllers/91058/diagnostics":
@@ -98,7 +101,7 @@ class CommissioningDesktop(unittest.TestCase):
         self.assertEqual(status, 200)
         self.runtime = sync_playwright().start()
         self.addCleanup(self.runtime.stop)
-        self.browser = self.runtime.chromium.launch(args=["--disable-background-networking", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"])
+        self.browser = self.runtime.chromium.launch(executable_path=os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE"), args=["--disable-background-networking", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"])
         self.addCleanup(self.browser.close)
         self.context = self.browser.new_context(viewport=self.viewport, locale="en-US", service_workers="block", is_mobile=self.viewport["width"] < 500, has_touch=self.viewport["width"] < 500)
         self.context.route("**/*", self.fixture.route)
@@ -134,14 +137,13 @@ class CommissioningDesktop(unittest.TestCase):
     def button(self, name):
         return self.page.get_by_role("button", name=name, exact=True)
 
-    def upload(self, release, invalid=False):
-        files = Path(os.environ["WAGO_COMMISSIONING_FIXTURE_FILES"])
-        for label, extension in [("Runtime bundle (.tar)", "tar"), ("Checksum (.sha256)", "sha256"), ("Signature (.sig)", "sig")]:
-            self.page.get_by_label(label, exact=True).set_input_files(str(files / ("invalid.sig" if invalid and extension == "sig" else f"{release}.{extension}")))
-        self.button("Import and select release").click()
-
     def credentials(self, prefix, scope=None):
         scope = scope or self.page
+        if not scope.get_by_label(f"{prefix} username", exact=True).count():
+            advanced = scope.get_by_role("button", name="Use a different SSH login", exact=True)
+            if not advanced.count():
+                advanced = scope.get_by_text("Advanced: use different SSH credentials", exact=True)
+            (advanced.last if prefix == "Recovery SSH" else advanced.first).click()
         scope.get_by_label(f"{prefix} username", exact=True).fill("operator")
         scope.get_by_label(f"{prefix} password", exact=True).fill("fixture-password")
 
@@ -154,66 +156,73 @@ class CommissioningDesktop(unittest.TestCase):
         self.page.get_by_role("button", name=re.compile(r"^(Resume|View progress)$")).first.click()
         expect(self.page.get_by_role("dialog", name="Commission a controller")).to_be_visible()
 
-    def test_signed_import_recovery_and_navigation(self):
+    def open_runtime_step(self):
         self.button("Commission controller").click()
         self.page.get_by_label("Controller name", exact=True).fill("Workshop fixture")
-        self.fixture.catalog_unavailable = True
         self.button("Continue").click()
-        expect(self.page.get_by_text("Runtime releases are unavailable.", exact=True)).to_be_visible()
-        expect(self.button("Scan controller for review")).to_be_disabled()
-        self.fixture.catalog_unavailable = False
-        self.button("Retry loading releases").click()
-        expect(self.page.get_by_text("Import a release before commissioning a controller.", exact=True)).to_be_visible()
         self.page.get_by_label("Controller IP address", exact=True).fill("10.99.0.7")
-        self.upload("first", invalid=True)
-        expect(self.page.get_by_role("alert").filter(has_text="Import failed.")).to_be_visible()
-        expect(self.button("Scan controller for review")).to_be_disabled()
-        self.capture("invalid-signature")
-        self.upload("first")
+
+    def test_bundled_runtime_availability(self):
+        self.fixture.catalog_missing = True
+        self.open_runtime_step()
+        expect(self.page.get_by_text(re.compile("pnpm nx run plugin-wago:install-runtime-dev"))).to_be_visible()
+        expect(self.page.locator('input[type="file"]')).to_have_count(0)
+        expect(self.button("Import and select release")).to_have_count(0)
+        expect(self.button("Continue")).to_be_disabled()
+        self.capture("local-runtime-missing")
+        self.fixture.catalog_missing = False
+        self.button("Check runtime again").click()
         expect(self.page.get_by_text(re.compile(r"^Selected: 0\.1\.0"))).to_be_visible()
-        self.upload("second")
-        expect(self.page.get_by_text(re.compile(r"^Selected: 0\.2\.0"))).to_be_visible()
-        # Current UI selects an older retained release by importing its signed files again.
-        self.upload("first")
+        expect(self.button("Continue")).to_be_enabled()
+        self.capture("bundled-runtime-available")
+        self.assertFalse(any(call["method"] == "POST" and "runtime-artifacts" in call["path"] for call in self.fixture.calls))
+
+    def test_bundled_runtime_recovery_and_navigation(self):
+        self.fixture.catalog_unavailable = True
+        self.open_runtime_step()
+        expect(self.page.get_by_text("Runtime releases could not be loaded. Check your connection and retry.", exact=True)).to_be_visible()
+        expect(self.button("Continue")).to_be_disabled()
+        self.fixture.catalog_unavailable = False
+        self.button("Check runtime again").click()
         expect(self.page.get_by_text(re.compile(r"^Selected: 0\.1\.0"))).to_be_visible()
-        expect(self.page.get_by_text("Retained releases (2)", exact=True)).to_be_visible()
+        expect(self.page.locator('input[type="file"]')).to_have_count(0)
+        expect(self.button("Import and select release")).to_have_count(0)
         self.capture("release-selected")
-        self.button("Scan controller for review").click()
+        self.button("Continue").click()
+        self.page.get_by_text("Verify with a trusted SSH fingerprint", exact=True).click()
         self.page.get_by_label("Reviewed SSH host-key fingerprint", exact=True).fill("SHA256:" + "A" * 43)
         self.button("Confirm host key").click()
-        self.credentials("Preflight SSH")
+        self.page.get_by_text("Technical details and activity", exact=True).click()
+        preflight = self.page.get_by_role("region", name="Controller installation preflight", exact=True)
+        self.credentials("Preflight SSH", preflight)
         self.button("Inspect installation prerequisites").click()
         expect(self.page.get_by_text("running", exact=True)).to_be_visible()
-        expect(self.page.get_by_label("Preflight SSH password", exact=True)).to_have_value("")
-        expect(self.page.get_by_text("Destructive installation", exact=True)).to_be_visible()
-        expect(self.page.get_by_text(re.compile("Existing applications and workloads may stop working or be erased"))).to_be_visible()
-        expect(self.page.get_by_role("checkbox")).to_have_count(1)
-        expect(self.button("Install runtime")).to_be_disabled()
+        expect(self.page.get_by_label("Preflight SSH password", exact=True)).to_have_count(0)
+        expect(self.page.get_by_text("Before installing", exact=True)).to_be_visible()
+        expect(self.page.get_by_text(re.compile("Back up existing applications"))).to_be_visible()
+        expect(self.page.get_by_role("checkbox")).to_have_count(0)
+        expect(self.button("Install runtime")).to_be_enabled()
         self.credentials("Temporary SSH")
-        expect(self.button("Install runtime")).to_be_disabled()
-        self.approve(r"^I approve this destructive installation")
+        expect(self.button("Install runtime")).to_be_enabled()
         self.capture("destructive-install-confirmation")
         self.button("Install runtime").click()
-        expect(self.button("Retry installation")).to_be_visible()
-        expect(self.page.get_by_label("Temporary SSH password", exact=True)).to_have_value("")
+        expect(self.button("Retry installation")).to_have_count(0)
+        expect(self.page.get_by_label("Temporary SSH password", exact=True)).to_have_count(0)
         self.capture("delivery-interrupted")
         self.resume()
-        expect(self.button("Clean up failed installation")).to_be_disabled()
+        expect(self.button("Clean up failed installation")).to_be_enabled()
         self.credentials("Recovery SSH")
-        self.approve(r"^I approve interrupting")
         self.button("Clean up failed installation").click()
-        expect(self.page.get_by_text("Recovery requires attention", exact=True)).to_be_visible()
+        expect(self.page.get_by_text("Installation cleanup or credential revocation failed; finish the retained recovery before retrying delivery.", exact=True)).to_be_visible()
         expect(self.page.get_by_label("Recovery SSH password", exact=True)).to_have_value("")
         self.capture("recovery-failed")
         self.assertEqual(self.fixture.api("/fixture/allow-recovery")[0], 200)
         self.credentials("Recovery SSH")
-        self.approve(r"^I approve interrupting")
         self.button("Clean up failed installation").click()
         expect(self.page.get_by_text("Runtime installation cleaned up", exact=True)).to_be_visible()
         self.assertEqual(self.fixture.api("/fixture/allow-delivery")[0], 200)
         self.credentials("Temporary SSH")
-        expect(self.button("Retry installation")).to_be_disabled()
-        self.approve(r"^I approve this destructive installation")
+        expect(self.button("Retry installation")).to_be_enabled()
         self.button("Retry installation").click()
         expect(self.page.get_by_text("Waiting for controller connection", exact=True)).to_be_visible()
         self.resume()
@@ -271,20 +280,19 @@ class CommissioningDesktop(unittest.TestCase):
         self.capture("management-recovered")
         self.button("Configure inputs and outputs").click()
         # The configuration editor is a full-page workspace on its host route, not a dialog.
-        editor = self.page.get_by_role("main", name="Controller configuration", exact=True)
+        editor = self.page.get_by_role("main", name="Inputs & outputs", exact=True)
         expect(editor).to_be_visible()
-        expect(editor.get_by_role("heading", name="Controller configuration", level=1)).to_be_visible()
+        expect(editor.get_by_role("heading", name="Inputs & outputs", level=1)).to_be_visible()
         # The workspace only enables editing after draft/baseline/preset APIs initialize it.
-        expect(editor.get_by_role("button", name="Add channel", exact=True)).to_be_enabled()
+        expect(editor.get_by_role("button", name="Configure DO1", exact=True)).to_be_enabled()
         self.assertEqual(editor.locator("textarea").count(), 0)
         self.capture("configuration-navigation")
         self.button("WAGO controllers").click()
         self.page.get_by_role("button", name=re.compile(r"^(Resume|View progress)$")).first.click()
         expect(self.page.get_by_role("dialog", name="Commission a controller")).to_be_visible()
-        expect(self.button("Clean up failed installation")).to_be_disabled()
+        expect(self.button("Clean up failed installation")).to_be_enabled()
         expect(self.page.get_by_text("Verifying commissioned controller", exact=True)).to_be_visible()
         expect(self.page.get_by_text(re.compile("Physical qualification: required"))).to_be_visible()
-        expect(self.page.get_by_text(re.compile("Pinned signed release:"))).to_be_visible()
         dialog = self.page.get_by_role("dialog", name="Commission a controller", exact=True)
         bounds = dialog.bounding_box()
         self.assertIsNotNone(bounds)

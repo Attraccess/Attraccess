@@ -158,6 +158,26 @@ describe('AttractapCardHandler', () => {
     });
   });
 
+  it('enrolls for the target user while auditing the admin API-token principal', async () => {
+    const socket = createMockSocket();
+    websocketService.sockets.set(socket.id, socket);
+    await handler.startEnrollOfNewNfcCard({
+      readerId: 42,
+      userId: 1,
+      actorId: 99,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
+    });
+    await handler.onEnrollNewCardRequestNFCKey(socket, { payload: { uid: 'abc', keyNo: 1 } } as AttractapEvent['data']);
+    await handler.onEnrollNewCard(socket, { payload: { success: true } } as AttractapEvent['data']);
+    expect(attractapService.generateNTAG424Key).toHaveBeenCalledWith({ userId: 1, cardUID: 'abc', keyNo: 1 });
+    expect(usersService.findOne).toHaveBeenLastCalledWith({ id: 1 });
+    expect(attractapService.createNFCCard).toHaveBeenCalledWith(mockUser, { uid: 'abc', key: 'deadbeef', keyNo: 1 });
+    expect(audit.recordAttractap).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 99, authenticationMethod: 'api-token', apiTokenId: 9 }),
+    );
+  });
+
   describe('onResetNfcCard', () => {
     it('sends RESET_NFC_CARD_DATA_NOT_SET when no reset state', async () => {
       const socket = createMockSocket();
@@ -323,6 +343,7 @@ describe('AttractapCardHandler', () => {
       });
       expect(attractapService.uint8ArrayToHexString).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]));
       expect(socket.state.enrollNewCardData).toEqual({
+        userId: 1,
         keyNo: 2,
         key: 'deadbeef',
         cardUID: 'abc',
@@ -361,7 +382,7 @@ describe('AttractapCardHandler', () => {
         state: {
           lastAuthenticatedUserId: 1,
           enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
-          enrollNewCardData: { key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
+          enrollNewCardData: { userId: 1, key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
         },
       });
       const data = { payload: { success: false } } as AttractapEvent['data'];
@@ -376,7 +397,7 @@ describe('AttractapCardHandler', () => {
       const socket = createMockSocket({
         state: {
           lastAuthenticatedUserId: 1,
-          enrollNewCardData: { key: '', keyNo: 1, cardUID: 'abc' },
+          enrollNewCardData: { userId: 1, key: '', keyNo: 1, cardUID: 'abc' },
         },
       });
       const data = { payload: { success: true } } as AttractapEvent['data'];
@@ -397,7 +418,7 @@ describe('AttractapCardHandler', () => {
       const socket = createMockSocket({
         state: {
           lastAuthenticatedUserId: 1,
-          enrollNewCardData: { key: 'deadbeef', keyNo: 0, cardUID: 'abc' },
+          enrollNewCardData: { userId: 1, key: 'deadbeef', keyNo: 0, cardUID: 'abc' },
         },
       });
       const data = { payload: { success: true } } as AttractapEvent['data'];
@@ -420,7 +441,7 @@ describe('AttractapCardHandler', () => {
         state: {
           lastAuthenticatedUserId: 1,
           enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
-          enrollNewCardData: { key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
+          enrollNewCardData: { userId: 1, key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
         },
       });
       const data = { payload: { success: true } } as AttractapEvent['data'];
@@ -443,7 +464,7 @@ describe('AttractapCardHandler', () => {
         state: {
           lastAuthenticatedUserId: 1,
           enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
-          enrollNewCardData: { key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
+          enrollNewCardData: { userId: 1, key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
         },
       });
       const data = { payload: { success: true } } as AttractapEvent['data'];
@@ -480,7 +501,7 @@ describe('AttractapCardHandler', () => {
         state: {
           enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
           enrollNewCardData: {
-            key: 'deadbeef', keyNo: 1, cardUID: 'abc',
+            userId: 1, key: 'deadbeef', keyNo: 1, cardUID: 'abc',
             auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 },
           },
         },
@@ -519,7 +540,7 @@ describe('AttractapCardHandler', () => {
     websocketService.sockets.set(socket.id, socket);
     const principal = { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 };
     socket.state.enrollment = { userId: 1, auditPrincipal: principal };
-    socket.state.enrollNewCardData = { key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: principal };
+    socket.state.enrollNewCardData = { userId: 1, key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: principal };
     let finish!: (value: { id: number }) => void;
     attractapService.createNFCCard.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     const pending = handler.onEnrollNewCard(socket, { payload: { success: true } } as any);
