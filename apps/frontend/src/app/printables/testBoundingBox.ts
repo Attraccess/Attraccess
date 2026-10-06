@@ -3,7 +3,7 @@ import type { Mesh } from './stl';
 /**
  * Test-only helper: no production code calls this (the app never needs a mesh's bounding box
  * at runtime), so it lives here rather than in stl.ts to keep it out of the lazy-loaded
- * /printables route chunk. Used by stl.spec.ts and nfc-keychain-card.spec.ts to assert on
+ * /printables route chunk. Used by stl.spec.ts and rfid-keychain-card.spec.ts to assert on
  * rendered geometry.
  */
 export function boundingBox(mesh: Mesh): { min: [number, number, number]; max: [number, number, number] } {

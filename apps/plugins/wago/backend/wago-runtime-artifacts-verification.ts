@@ -1,10 +1,6 @@
-import { createHash, createPublicKey, verify } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
-import { WAGO_HARDWARE_PROFILE } from './wago-hardware-deployment';
+import { isCc100HardwareProfile, type Cc100HardwareProfile } from '../shared/hardware-profile';
 
-/** Release trust anchor: identical to cc100-runtime/signing-public-key.pub. Never supplied by an upload. */
-export const WAGO_RUNTIME_RELEASE_KEY = 'AAAAC3NzaC1lZDI1NTE5AAAAIOHA1fO/SL9FqNn5xtSbFrYxMBs/SOyAkyTrA30GZ7Qv';
 export const WAGO_RUNTIME_MAX_BYTES = 512 * 1024 * 1024;
 export interface RuntimeArtifactManifest {
   readonly schemaVersion: 1;
@@ -16,109 +12,13 @@ export interface RuntimeArtifactManifest {
     model: '751-9301';
     platform: 'linux/arm/v7';
     firmwareBaseline: '31';
-    profile: typeof WAGO_HARDWARE_PROFILE;
+    profile: Cc100HardwareProfile;
   }>;
 }
 
 function invalid(): never {
-  throw new Error('Invalid signed runtime artifact');
+  throw new Error('Invalid runtime artifact');
 }
-function sshString(value: Buffer | string): Buffer {
-  const data = Buffer.from(value);
-  const length = Buffer.alloc(4);
-  length.writeUInt32BE(data.length);
-  return Buffer.concat([length, data]);
-}
-function reader(data: Buffer) {
-  let offset = 0;
-  return {
-    string() {
-      if (offset + 4 > data.length) invalid();
-      const length = data.readUInt32BE(offset);
-      offset += 4;
-      if (length > data.length - offset) invalid();
-      const result = data.subarray(offset, offset + length);
-      offset += length;
-      return result;
-    },
-    end() {
-      if (offset !== data.length) invalid();
-    },
-  };
-}
-
-/** Resolve host configuration once; uploads never supply trust anchors. */
-export function loadRuntimeArtifactSigningKey(
-  environment: string | undefined,
-  configuredPath: string | undefined,
-): string {
-  const path = configuredPath?.trim();
-  if (!path) return WAGO_RUNTIME_RELEASE_KEY;
-  if (environment !== 'development')
-    throw new Error('local CC100 runtime signing keys are only allowed in development');
-  try {
-    const match = readFileSync(path, 'utf8')
-      .trim()
-      .match(/^ssh-ed25519[ \t]+([A-Za-z0-9+/]+={0,2})(?:[ \t]+[^\r\n]*)?$/);
-    if (!match) invalid();
-    const bytes = Buffer.from(match[1], 'base64');
-    if (bytes.toString('base64') !== match[1]) invalid();
-    const fields = reader(bytes);
-    if (fields.string().toString() !== 'ssh-ed25519' || fields.string().length !== 32) invalid();
-    fields.end();
-    return match[1];
-  } catch {
-    throw new Error('Invalid development CC100 runtime signing public key');
-  }
-}
-
-/** OpenSSH SSHSIG v1/Ed25519 verification. Only the small signed digest is buffered. */
-export async function verifyRuntimeSignature(file: FileHandle, armor: string, trustedKey = WAGO_RUNTIME_RELEASE_KEY) {
-  const match = armor
-    .trim()
-    .match(/^-----BEGIN SSH SIGNATURE-----\n([A-Za-z0-9+/=\r\n]+)\n-----END SSH SIGNATURE-----$/);
-  if (!match) invalid();
-  const packet = Buffer.from(match[1].replace(/\s/g, ''), 'base64');
-  if (packet.length < 10 || packet.subarray(0, 6).toString() !== 'SSHSIG' || packet.readUInt32BE(6) !== 1) invalid();
-  const fields = reader(packet.subarray(10));
-  const key = fields.string();
-  const namespace = fields.string();
-  const reserved = fields.string();
-  const algorithm = fields.string();
-  const signature = reader(fields.string());
-  fields.end();
-  if (
-    !key.equals(Buffer.from(trustedKey, 'base64')) ||
-    namespace.toString() !== 'attraccess-wago-runtime' ||
-    reserved.length
-  )
-    invalid();
-  if (!['sha256', 'sha512'].includes(algorithm.toString()) || signature.string().toString() !== 'ssh-ed25519')
-    invalid();
-  const rawSignature = signature.string();
-  signature.end();
-  const publicFields = reader(key);
-  if (publicFields.string().toString() !== 'ssh-ed25519') invalid();
-  const rawKey = publicFields.string();
-  publicFields.end();
-  if (rawKey.length !== 32 || rawSignature.length !== 64) invalid();
-  const hash = createHash(algorithm.toString());
-  for await (const chunk of file.createReadStream({ start: 0, autoClose: false })) hash.update(chunk);
-  const signed = Buffer.concat([
-    Buffer.from('SSHSIG'),
-    sshString(namespace),
-    sshString(reserved),
-    sshString(algorithm),
-    sshString(hash.digest()),
-  ]);
-  const publicKey = createPublicKey({
-    key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), rawKey]),
-    format: 'der',
-    type: 'spki',
-  });
-  if (!verify(null, signed, publicKey, rawSignature)) invalid();
-}
-
 export function validateRuntimeManifest(value: unknown): RuntimeArtifactManifest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid();
   const data = value as Record<string, unknown>;
@@ -139,7 +39,7 @@ export function validateRuntimeManifest(value: unknown): RuntimeArtifactManifest
     hardware.model !== '751-9301' ||
     hardware.platform !== 'linux/arm/v7' ||
     hardware.firmwareBaseline !== '31' ||
-    hardware.profile !== WAGO_HARDWARE_PROFILE
+    !isCc100HardwareProfile(hardware.profile)
   )
     invalid();
   return Object.freeze({
@@ -152,7 +52,7 @@ export function validateRuntimeManifest(value: unknown): RuntimeArtifactManifest
       model: hardware.model,
       platform: hardware.platform,
       firmwareBaseline: hardware.firmwareBaseline,
-      profile: WAGO_HARDWARE_PROFILE,
+      profile: hardware.profile,
     }),
   });
 }

@@ -40,10 +40,14 @@ type Bus = {
   pending: number;
   retryAt: number;
   quarantined?: ModbusTransportError;
+  recovery?: BusRecovery;
+  lastRecoveryFailureAt?: number;
   quarantine: Promise<ModbusTransportError>;
   markQuarantined: (error: ModbusTransportError) => void;
 };
 const buses = new Map<string, Bus>();
+const READ_FUNCTION_CODES = new Set([0x01, 0x02, 0x03, 0x04]);
+const MAX_RECOVERY_DELAY_MS = 60_000;
 
 /** One FIFO per bus, including all unit IDs. Failed writes are never replayed. */
 export class QueuedModbusTransport implements ModbusTransport {
@@ -72,7 +76,33 @@ export class QueuedModbusTransport implements ModbusTransport {
       buses.set(key, bus);
     }
     const queue = bus;
-    if (queue.quarantined) return Promise.reject(queue.quarantined);
+    // Only an idempotent read may probe the bus back to life; a failed write may have reached the device.
+    const recovery = (): BusRecovery | undefined =>
+      READ_FUNCTION_CODES.has(pdu[0])
+        ? {
+            delayMs: Math.max(2 * this.connection.timeoutMs, this.connection.reconnectMs),
+            probe: async () => {
+              if (isCurrent && !isCurrent()) throw new Error('Modbus configuration changed before recovery');
+              const connection = this.connection;
+              if (connection.transport !== 'rtu') throw new Error('only RTU buses are probed');
+              const abort = new AbortController();
+              const operation = this.serial(connection, rtuFrame(unit, pdu), abort.signal, isCurrent);
+              const teardown = operation.catch(() => undefined);
+              try {
+                const frame = await deadline(operation, connection.timeoutMs, () => abort.abort());
+                validateResponse(pdu, rtuPayload(frame, unit));
+              } finally {
+                await teardown;
+              }
+            },
+          }
+        : undefined;
+    if (queue.quarantined) {
+      // Keep the endpoint quarantined, but let a current read supply corrected framing/unit/map.
+      // A failed write has no recovery and must never be made recoverable by a later read.
+      if (queue.recovery && (!isCurrent || isCurrent())) queue.recovery = recovery() ?? queue.recovery;
+      return Promise.reject(queue.quarantined);
+    }
     if (queue.pending >= this.connection.queueLimit) return Promise.reject(new Error('Modbus queue full'));
     queue.pending++;
     const work = queue.tail.then(async () => {
@@ -91,17 +121,10 @@ export class QueuedModbusTransport implements ModbusTransport {
           // The public deadline is bounded, but the bus remains owned until teardown settles.
           teardown = operation.catch(() => undefined);
           const frame = await deadline(operation, this.connection.timeoutMs, () => {
-            quarantineBus(queue, 'Modbus RTU request timed out; bus quarantined pending external resynchronization');
+            quarantineBus(queue, 'Modbus RTU request timed out; bus quarantined', recovery());
             abort.abort();
           });
-          if (
-            frame.length < 5 ||
-            frame.length > 256 ||
-            frame[0] !== unit ||
-            crc16(frame.subarray(0, -2)) !== frame.readUInt16LE(frame.length - 2)
-          )
-            throw new Error('Modbus RTU unit/CRC/length mismatch');
-          response = frame.subarray(1, -2);
+          response = rtuPayload(frame, unit);
         }
         return validateResponse(pdu, response);
       } catch (error) {
@@ -110,7 +133,8 @@ export class QueuedModbusTransport implements ModbusTransport {
         if (this.connection.transport === 'rtu' && !(error instanceof ModbusException))
           quarantineBus(
             queue,
-            `Modbus RTU bus quarantined: ${error instanceof Error ? error.message : 'ambiguous transaction'}; external resynchronization required`,
+            `Modbus RTU bus quarantined: ${error instanceof Error ? error.message : 'ambiguous transaction'}`,
+            recovery(),
           );
         queue.retryAt = Date.now() + this.connection.reconnectMs;
         throw error;
@@ -137,10 +161,54 @@ export class QueuedModbusTransport implements ModbusTransport {
     ]);
   }
 }
-function quarantineBus(bus: Bus, message: string): void {
+type BusRecovery = { delayMs: number; probe: () => Promise<void> };
+function rtuPayload(frame: Buffer, unit: number): Buffer {
+  if (
+    frame.length < 5 ||
+    frame.length > 256 ||
+    frame[0] !== unit ||
+    crc16(frame.subarray(0, -2)) !== frame.readUInt16LE(frame.length - 2)
+  )
+    throw new Error('Modbus RTU unit/CRC/length mismatch');
+  return frame.subarray(1, -2);
+}
+function quarantineBus(bus: Bus, message: string, recovery?: BusRecovery): void {
   if (bus.quarantined) return;
-  bus.quarantined = new ModbusTransportError('modbus_rtu_quarantined', message);
+  bus.quarantined = new ModbusTransportError(
+    'modbus_rtu_quarantined',
+    recovery ? `${message}; probing for recovery` : `${message}; external resynchronization required`,
+  );
   bus.markQuarantined(bus.quarantined);
+  bus.recovery = recovery;
+  bus.lastRecoveryFailureAt = Date.now();
+  if (recovery) scheduleRecovery(bus, recovery.delayMs);
+}
+/** After a quiet period (any late reply has long arrived and the port is flushed before sending), one validated
+ * read proves the bus answers again. Failed probes back off. Requests keep failing fast until then. */
+function scheduleRecovery(bus: Bus, delayMs: number): void {
+  const timer = setTimeout(async () => {
+    const recovery = bus.recovery;
+    if (!recovery) return;
+    const quietRemaining = (bus.lastRecoveryFailureAt ?? 0) + recovery.delayMs - Date.now();
+    if (quietRemaining > 0) {
+      scheduleRecovery(bus, quietRemaining);
+      return;
+    }
+    try {
+      await bus.tail;
+      await recovery.probe();
+    } catch {
+      bus.lastRecoveryFailureAt = Date.now();
+      scheduleRecovery(bus, Math.min(Math.max(delayMs * 2, bus.recovery?.delayMs ?? 0), MAX_RECOVERY_DELAY_MS));
+      return;
+    }
+    bus.quarantined = undefined;
+    bus.recovery = undefined;
+    bus.quarantine = new Promise<ModbusTransportError>((resolve) => {
+      bus.markQuarantined = resolve;
+    });
+  }, delayMs);
+  timer.unref?.();
 }
 function deadline<T>(operation: Promise<T>, ms: number, onTimeout: () => void): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -246,7 +314,7 @@ try:
   response+=os.read(fd,256)
   if len(response)>256: raise ValueError('oversized RTU frame')
   if len(response)>=3:
-   size=5 if response[1]&128 else (response[2]+5 if response[1] in (3,4) else 8)
+   size=5 if response[1]&128 else (response[2]+5 if response[1] in (1,3,4) else 8)
    if len(response)>=size: sys.stdout.buffer.write(response); break
  else: raise TimeoutError('serial read timeout')
  if not response: raise TimeoutError('serial read timeout')

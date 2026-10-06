@@ -1,0 +1,10 @@
+{
+  "title": "CC100 runtime release",
+  "description": "The CC100 runtime is built and bundled with the server. Commissioning and runtime updates use this release automatically.",
+  "loading": "Loading bundled runtime…",
+  "selected": "Selected: {{version}} · WAGO {{model}} · firmware {{firmware}} · {{size}} MiB",
+  "required": "The CC100 runtime has not been built for this local server. Run pnpm nx run plugin-wago:install-runtime-dev to build and install it, then retry. Production server images bundle it automatically.",
+  "details": "Release details",
+  "retry": "Check runtime again",
+  "loadError": "Runtime releases could not be loaded. Check your connection and retry."
+}

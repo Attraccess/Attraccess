@@ -27,7 +27,7 @@ Click on a user to see and edit their details:
 - Account information (username, email)
 - Login methods (local password, SSO links)
 - System permissions
-- Linked NFC cards
+- Linked RFID cards
 
 ### Login Methods
 

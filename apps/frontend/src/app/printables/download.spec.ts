@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { scadWithLabel, triggerDownload } from './download';
-import scadSource from './nfc-keychain-card.scad?raw';
+import scadSource from './rfid-keychain-card.scad?raw';
 
 describe('scadWithLabel', () => {
   it('rewrites the LABEL default so the downloaded source matches what the preview showed', () => {
@@ -26,7 +26,7 @@ describe('scadWithLabel', () => {
   });
 
   it('matches the .scad actually shipped, so the pattern cannot drift unnoticed', () => {
-    // Without this, renaming or reformatting the LABEL line in nfc-keychain-card.scad would make
+    // Without this, renaming or reformatting the LABEL line in rfid-keychain-card.scad would make
     // every .scad download throw, and only in the browser.
     expect(scadWithLabel(scadSource, 'Robot Lab')).toContain('LABEL = "Robot Lab";');
   });

@@ -1,3 +1,4 @@
+import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   claimController,
@@ -55,8 +56,9 @@ export function useControllersQuery() {
 export function useCommissioningSessionsQuery() {
   return useQuery({
     queryKey: queryKeys.commissioningSessions,
-    queryFn: () => listCommissioningSessions(),
+    queryFn: ({ signal }) => listCommissioningSessions(100, 0, signal),
     refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -279,6 +281,7 @@ export function useConfigurationActions(controllerId: number) {
     await Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.revisions(controllerId) }),
       client.invalidateQueries({ queryKey: queryKeys.draft(controllerId) }),
+      client.invalidateQueries({ queryKey: FLOW_NODE_PREVIEW_QUERY_KEY }),
     ]);
   };
   const validate = useMutation({

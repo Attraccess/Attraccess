@@ -13,7 +13,7 @@ import {
   Resource,
   ResourceHealthStatus,
 } from '@attraccess/database-entities';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { formatCredits, toExactCredits } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
@@ -250,7 +250,9 @@ export class EmailService {
     }
 
     // Receipts describe the settled transaction, including its original rounding.
-    const roundedMinutes = transaction.items?.find((item) => item.name === 'PER_MINUTE')?.quantity;
+    const roundedMinutes = transaction.items?.find(
+      (item) => item.name === 'PER_MINUTE' && item.meterQuantity == null && item.meterCreditsPerUnit == null,
+    )?.quantity;
     const secondsFormatOptions = { maximumFractionDigits: 3 };
     let secondsFormatter: Intl.NumberFormat;
     try {
@@ -263,20 +265,33 @@ export class EmailService {
     const items = (transaction.items ?? []).map((item) => ({
       name: item.name,
       description: item.description,
-      quantity: item.quantity,
-      unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
-      total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
-      isFixedFee: item.name === 'PER_SESSION',
-      isSessionDuration: item.name === 'PER_MINUTE',
-      isOperatingDuration: item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
-      isBillingFactor: item.name === 'BILLING_FACTOR',
-      isDuration: item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      quantity:
+        item.meterCreditsPerUnit != null && item.meterQuantity == null ? '—' : (item.meterQuantity ?? item.quantity),
+      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null,
+      unitPrice:
+        item.meterCreditsPerUnit != null
+          ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
+          : formatCredits(item.unitPrice, currencyMinorUnit, { useGrouping: false }),
+      total: formatCredits(toExactCredits(item.unitPrice) * toExactCredits(item.quantity), currencyMinorUnit, {
+        useGrouping: false,
+      }),
+      isFixedFee: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_SESSION',
+      isSessionDuration: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_MINUTE',
+      isOperatingDuration:
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      isBillingFactor: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'BILLING_FACTOR',
+      isDuration:
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),
       durationMs: item.durationMs,
       hasDuration: item.durationMs != null,
       durationSeconds: item.durationMs == null ? undefined : secondsFormatter.format(item.durationMs / 1000),
     }));
 
-    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit);
+    const totalCredits = formatCredits(-transaction.amount, currencyMinorUnit, { useGrouping: false });
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -292,7 +307,7 @@ export class EmailService {
       },
       items,
       totalCredits,
-      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit),
+      newBalance: formatCredits(user.creditBalance, currencyMinorUnit, { useGrouping: false }),
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);

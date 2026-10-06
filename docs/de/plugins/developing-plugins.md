@@ -28,6 +28,28 @@ Ein Frontend-Plugin kann:
 > [!TIP]
 > Lesen Sie die SDK-Dokumentation, die mit `@attraccess/plugins-frontend-sdk` mitgeliefert wird, für eine detaillierte API-Referenz, Beispiele und Typdefinitionen.
 
+## Abhängigkeiten von anderen Attraccess-Plugins
+
+Deklariere Plugin-Abhängigkeiten in `package.json` unter `attraccess.dependencies`:
+
+```json
+{
+  "attraccess": {
+    "dependencies": [
+      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
+    ]
+  }
+}
+```
+
+`name` ist die unveränderliche npm-Paketidentität, `version` ein Semver-Bereich (kein Dist-Tag und keine URL). `required` ist standardmäßig `true`. Doppelte Identitäten werden abgelehnt. Diese Einträge beschreiben installierte Attraccess-Plugins mit eigenen Modulen, Berechtigungen, Migrationen und Zustand. Normale JavaScript-Abhängigkeiten gehören weiterhin in das oberste npm-Feld `dependencies`.
+
+Der Marktplatz löst alle erforderlichen direkten und indirekten Abhängigkeiten vor der Installation auf und zeigt Versionen, Quellen, Klassifizierung und Berechtigungen zur Bestätigung. Kompatible installierte Plugins werden weiterverwendet; fehlende Plugins werden gemeinsam installiert. Konflikte und Zyklen blockieren den Vorgang. Abhängigkeiten werden aus der ausgewählten Registry aufgelöst; veröffentliche sie daher dort ebenfalls. Bereits installierte kompatible Plugins können aus einer anderen Registry stammen.
+
+Optionale Abhängigkeiten (`required: false`) werden nicht automatisch installiert und blockieren die Aktivierung nicht. Wenn sie installiert sind, muss ihre Version kompatibel sein. Erforderliche Plugins werden vor ihren abhängigen Plugins geladen und migriert. Fehlende, inkompatible, deaktivierte oder fehlgeschlagene Abhängigkeiten halten abhängige Plugins inaktiv. Die Plugin-Einstellungen zeigen die Ursache. Repariere die Abhängigkeit und starte neu.
+
+Updates und Downgrades müssen auch die Anforderungen installierter abhängiger Plugins erfüllen. Beim Entfernen einer erforderlichen Abhängigkeit müssen alle direkt und indirekt abhängigen Plugins ausdrücklich zur gemeinsamen Entfernung bestätigt werden. Automatisch installierte Abhängigkeiten bleiben normale Plugins; sie werden nicht automatisch entfernt, wenn ihr letztes abhängiges Plugin entfernt wird. Paketänderungen werden gemeinsam übernommen; Migrationen und Aktivierung erfolgen beim Neustart gemäß dem bestehenden Lebenszyklus. Beim Entfernen von npm-Plugins bleiben Daten und Geheimnisse erhalten.
+
 ## Backend-Plugins
 
 Das Backend-SDK ermöglicht es Ihrem Plugin, API-Endpunkte zu registrieren, die auf dem Attraccess-Server ausgeführt werden.
@@ -196,9 +218,58 @@ pnpm nx show projects --projects=tag:type:plugin
 PR-Builds laden die ZIPs als Artefakte hoch (mit Sticky-PR-Kommentar); Releases
 hängen sie als Release-Assets an.
 
+Für die lokale Entwicklung steht bei Shelly, RabbitMQ und WAGO zusätzlich
+`install-dev` zur Verfügung:
+
+```bash
+pnpm nx install-dev plugin-shelly
+```
+
+`install-dev` baut das Plugin und kopiert den Inhalt von `package/` nach
+`storage/plugins/<Manifest-Name>/`. Die bisherige lokale Installation wird
+ersetzt und veraltete Dateien werden entfernt; andere Plugins bleiben erhalten.
+`PLUGIN_DIR` hat Vorrang vor `STORAGE_ROOT`, jeweils aus der Umgebung oder der
+Workspace-`.env`. Relative Pfade beziehen sich auf das Workspace-Verzeichnis.
+Eine bereits laufende API muss nach `install-dev` neu gestartet werden.
+Nach Änderungen am Plugin erneut `install-dev` ausführen; das Target überwacht
+die Plugin-Quellen nicht.
+
 ## Siehe auch
 
 - [Plugins Überblick](plugins/overview.md) -- Was sind Plugins?
 - [Plugins installieren](plugins/installing-plugins.md) -- Plugins hochladen und verwalten
 - [Entwicklerhandbuch](developer/overview.md) -- Attraccess-Architektur und -Entwicklung
 - [API-Referenz](developer/api-reference.md) -- Attraccess-REST-API
+## Übersetzungen und Sprachwechsel
+
+Verwende `useTranslations` aus `@attraccess/plugins-frontend-ui` mit eigenen
+englischen und deutschen Übersetzungskatalogen. Der Hook übernimmt die Sprache
+des Hosts und aktualisiert Plugin-Seiten, Dialoge und Slot-Beiträge automatisch
+beim Sprachwechsel. Plugins benötigen weder eigene Spracherkennung noch eine
+eigene gespeicherte Sprachpräferenz.
+
+```tsx
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
+
+export function DevicesPage() {
+  const { t } = useTranslations({ en, de });
+  return <h1>{t('title')}</h1>;
+}
+```
+
+Übersetze auch Beschreibungen, Platzhalter und Barrierefreiheitsbeschriftungen.
+Verwende `{{name}}` für dynamische Werte und den zurückgegebenen `language`-Wert
+für Datums- und Zahlenformatierung. Fehlende deutsche Einträge fallen auf Englisch
+zurück. Benutzereingaben und Protokollkennungen bleiben unverändert. Speichere
+für Meldungen im React-Zustand Übersetzungsschlüssel und Parameter statt bereits
+übersetzter Texte, damit sie beim Sprachwechsel ebenfalls aktualisiert werden.
+
+Teile **`@attraccess/plugins-frontend-ui` über Module Federation** mit
+`requiredVersion: '*'`, `import: false` und `generate: false`. Eine eigene Kopie
+würde einen separaten Sprachzustand erzeugen. Die gemeinsame Konfiguration
+`createPluginFederationConfig` enthält diesen Eintrag bereits. Deklariere die
+Bibliothek als Peer-Abhängigkeit und setze `attraccess.host` beziehungsweise
+`attraccessVersion.min` auf mindestens Version **1.11.0**, da ältere Hosts diese
+Bibliothek noch nicht teilen.

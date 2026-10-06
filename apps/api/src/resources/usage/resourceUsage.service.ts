@@ -24,6 +24,7 @@ import {
   ResourceFlowNodeType,
   ResourceType,
   ResourceUsage,
+  ResourceMeter,
   ResourceUsageAction,
   SupervisionMode,
   User,
@@ -75,11 +76,13 @@ import {
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import type { Redis } from 'ioredis';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
+import { FlowExecutionError } from '../flows/errors/flow-execution.error';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import { AuditService } from '../../audit/audit.service';
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
 import { randomUUID } from 'node:crypto';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { FinalCollection, ResourceMeteringService } from '../metering/resource-metering.service';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -128,12 +131,14 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         triggerNodeType,
         payload,
         manager,
-        lifecycleCandidateCancellation ? { lifecycleAttemptId, lifecycleCandidateCancellation: true } : { lifecycleAttemptId },
+        lifecycleCandidateCancellation
+          ? { lifecycleAttemptId, lifecycleCandidateCancellation: true }
+          : { lifecycleAttemptId },
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
-      if (error instanceof ExternalEffectFailureError) {
+      if (error instanceof ExternalEffectFailureError || error instanceof FlowExecutionError) {
         throw error;
       }
     }
@@ -215,6 +220,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
       if (!attempt) return false;
       if (attempt.candidateUsageId !== null) {
+        await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
         await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
       }
       await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
@@ -276,6 +282,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       const attempts = await manager.find(ResourceUsageLifecycleAttempt);
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {
+          await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
           await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
         }
         await manager.delete(ResourceUsageLifecycleAttempt, attempt.id);
@@ -316,6 +323,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly rbacService: RbacService,
     private readonly audit: AuditService,
     @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
+    @Optional()
+    @Inject(forwardRef(() => ResourceMeteringService))
+    private readonly metering?: ResourceMeteringService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -896,6 +906,13 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
         usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
         usageData.creditsPerUsage = billingConfiguration.creditsPerUsage;
+        usageData.meterRates = this.metering
+          ? (await transactionalEntityManager.find(ResourceMeter, { where: { resourceId } })).map((meter) => ({
+              meterId: meter.id,
+              name: meter.name,
+              creditsPerUnit: meter.creditsPerUnit,
+            }))
+          : [];
 
         if (supervisorUserId !== null) {
           usageData.supervisorUserId = supervisorUserId;
@@ -975,6 +992,18 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     let newSession: ResourceUsage;
     try {
       const { createdSession, existingActiveSession, formSubmissions, attempt } = prepared;
+      // The outgoing session's total must be read before the meter is re-initialized for the next one.
+      const outgoingFinal: FinalCollection = existingActiveSession
+        ? ((await this.metering?.collectFinal(existingActiveSession.id, attempt.transitionTime)) ?? {
+            status: 'not-metered',
+          })
+        : { status: 'not-metered' };
+      // A billed session must not start unless its meter acknowledged the start; nothing is energized yet.
+      await this.metering?.initialize({
+        resourceId,
+        usageId: createdSession.id,
+        supersedes: existingActiveSession?.id,
+      });
       await this.runUsageFlow(
         undefined,
         resourceId,
@@ -1016,6 +1045,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
             relations: ['user', 'resource'],
           });
           await this.persistAttributedOperatingDuration(endedSession, manager);
+          await this.metering?.settleInTransaction(manager, endedSession.id, outgoingFinal);
           chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
           endedUsageIdToEmit = endedSession.id;
         } else {
@@ -1216,6 +1246,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         'end',
         attemptId,
       );
+      // Stop effects have run; only now read the final total. Failure leaves energy billing pending, not the stop undone.
+      const final: FinalCollection = (await this.metering?.collectFinal(
+        prepared.activeSession.id,
+        prepared.attempt.transitionTime,
+      )) ?? { status: 'not-metered' };
       updatedUsage = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
         await this.applyLifecycleDrafts(manager, attempt);
@@ -1230,6 +1265,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
           relations: ['user', 'resource'],
         });
         await this.persistAttributedOperatingDuration(endedSession, manager);
+        await this.metering?.settleInTransaction(manager, endedSession.id, final);
         chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
         return endedSession;
@@ -1459,6 +1495,30 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
+  private readonly DETAIL_RELATIONS = [
+    'user',
+    'project',
+    'supervisorUser',
+    'formSubmissions',
+    'formSubmissions.form',
+    'formSubmissions.user',
+  ];
+
+  async getSessionDetails(resourceId: number, usageId: number, user: AuthenticatedUser): Promise<ResourceUsage> {
+    const usage = await this.resourceUsageRepository.findOne({
+      where: { id: usageId, resourceId, lifecyclePending: false },
+      relations: this.DETAIL_RELATIONS,
+    });
+    if (!usage) throw new NotFoundException('Usage session not found');
+
+    if (usage.userId !== user.id && !user.effectivePermissions?.has('resources.update')) {
+      if (!usage.projectId) throw new NotFoundException('Usage session not found');
+      await this.projectsService.findOneById(user.id, usage.projectId);
+    }
+
+    return usage;
+  }
+
   async getResourceUsageHistory(
     resourceId: number,
     page = 1,
@@ -1478,14 +1538,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: [
-        'user',
-        'project',
-        'supervisorUser',
-        'formSubmissions',
-        'formSubmissions.form',
-        'formSubmissions.user',
-      ],
+      relations: this.DETAIL_RELATIONS,
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);

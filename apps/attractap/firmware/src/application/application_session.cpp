@@ -288,6 +288,7 @@ void Application::resetSessionOnDisconnect() {
   }
 
   this->logger.info("Connectivity lost; resetting session state");
+  Display::hidePopup();
 
   // Ensure any in-progress UI overlays are dismissed
   Display::resourceDetailsScreen.hideActionProgress();
@@ -399,6 +400,7 @@ void Application::finishReaderAction(bool success) {
 }
 
 void Application::logoutReader() {
+  Display::hidePopup();
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;
@@ -432,4 +434,27 @@ void Application::finishCardAuthentication(bool success) {
     this->nfc.enableCardDetection();
   }
 }
+void Application::pollUsageStats() {
+  const API::ResourceBrief *resource = nullptr;
+  if (this->unlocked && this->resourceIsSelected && this->state == APPLICATION_STATE_UNLOCKED &&
+      this->cardAuthenticationData.username == this->resourceList.authenticatedUsername) {
+    for (uint16_t i = 0; i < this->resourceList.count; ++i)
+      if (this->resourceList.items[i].id == this->selectedResourceId) resource = &this->resourceList.items[i];
+  }
+  if (!resource || !resource->hasActiveUsage || !resource->activeUsageId ||
+      this->cardAuthenticationData.username != resource->activeUser) {
+    this->usageStatsResourceId = 0;
+    this->usageStatsUsageId = 0;
+    return;
+  }
+  const uint32_t now = millis();
+  if (this->usageStatsResourceId != resource->id || this->usageStatsUsageId != resource->activeUsageId ||
+      now - this->usageStatsRequestedAt >= 10000) {
+    this->usageStatsResourceId = resource->id;
+    this->usageStatsUsageId = resource->activeUsageId;
+    this->usageStatsRequestedAt = now;
+    this->api.requestUsageStats(resource->id);
+  }
+}
+
 #endif

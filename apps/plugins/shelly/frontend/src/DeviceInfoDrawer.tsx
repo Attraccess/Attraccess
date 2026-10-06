@@ -1,16 +1,13 @@
 // Device info drawer (ATT-498): reads Shelly Gen 1/2+ status + config from the
 // device via the plugin backend and renders a summary card grid.
-import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, Form, Skeleton } from '@heroui/react';
+import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form, Skeleton } from '@heroui/react';
 import { EyeIcon, EyeOffIcon, InfoIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { getDeviceInfo, type AuthState, type ShellyDevice, type ShellyDeviceInfo } from './api';
 import { StandardDrawer, TextFieldRow } from './drawer';
 import { StatusAlert } from './StatusAlert';
-
-function generationLabel(generation: number | null): string {
-  if (generation === null) return 'Unknown';
-  return generation === 1 ? 'Gen 1' : `Gen ${generation}+`;
-}
+import { useShellyTranslations } from './i18n';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -31,15 +28,15 @@ function firstValue(source: unknown, paths: string[]): unknown {
   return undefined;
 }
 
-function formatValue(value: unknown, suffix = ''): string {
-  if (value === undefined || value === null || value === '') return 'Not reported';
-  if (typeof value === 'boolean') return value ? 'On' : 'Off';
-  if (typeof value === 'number') return `${Number.isInteger(value) ? value : value.toFixed(1)}${suffix}`;
+function formatInfoValue(value: unknown, t: TFunction, language: string, suffix = ''): string {
+  if (value === undefined || value === null || value === '') return t('info.notReported');
+  if (typeof value === 'boolean') return t(value ? 'info.on' : 'info.off');
+  if (typeof value === 'number') return `${value.toLocaleString(language, { maximumFractionDigits: 1 })}${suffix}`;
   return String(value);
 }
 
-function formatUptime(seconds: unknown): string {
-  if (typeof seconds !== 'number') return formatValue(seconds);
+function formatUptime(seconds: unknown, t: TFunction, language: string): string {
+  if (typeof seconds !== 'number') return formatInfoValue(seconds, t, language);
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -61,6 +58,7 @@ function AuthProtectedForm({
   loading: boolean;
   onLoad: () => void;
 }) {
+  const { t } = useShellyTranslations();
   const [visible, setVisible] = useState(false);
 
   if (authState !== 'required') return null;
@@ -74,22 +72,20 @@ function AuthProtectedForm({
         }}
         className="sh:flex sh:flex-col sh:gap-3"
       >
-        <p className="sh:text-sm">
-          This device requires authentication. Enter its admin password to read protected info.
-        </p>
+        <p className="sh:text-sm">{t('info.auth')}</p>
         <div className="sh:relative">
           <TextFieldRow
-            label="Admin password"
+            label={t('password.title')}
             value={currentPassword}
             onChange={onChange}
-            placeholder="device admin password"
+            placeholder={t('info.passwordPlaceholder')}
             dataCy="shelly-info-current-password"
           />
           <Button
             isIconOnly
             variant="ghost"
             size="sm"
-            aria-label={visible ? 'Hide password' : 'Show password'}
+            aria-label={t(visible ? 'password.hide' : 'password.show')}
             className="sh:absolute sh:right-1 sh:top-6"
             onPress={() => setVisible((v) => !v)}
           >
@@ -98,7 +94,7 @@ function AuthProtectedForm({
         </div>
         <div className="sh:flex sh:justify-end">
           <Button variant="primary" size="sm" isPending={loading} onPress={onLoad} data-cy="shelly-info-unlock">
-            Load info
+            {t('info.load')}
           </Button>
         </div>
         <input type="submit" hidden />
@@ -108,6 +104,8 @@ function AuthProtectedForm({
 }
 
 export function DeviceInfoCards({ info }: { info: ShellyDeviceInfo }) {
+  const { t, language } = useShellyTranslations();
+  const formatValue = (value: unknown, suffix = '') => formatInfoValue(value, t, language, suffix);
   const status = info.status;
   const config = info.config;
   const output = firstValue(status, ['switch:0.output', 'relays.0.ison', 'lights.0.ison']);
@@ -117,29 +115,37 @@ export function DeviceInfoCards({ info }: { info: ShellyDeviceInfo }) {
 
   const cards: Array<{ title: string; rows: Array<{ label: string; value: string }> }> = [
     {
-      title: 'Device',
+      title: t('devices.device'),
       rows: [
-        { label: 'Name', value: formatValue(firstValue(config, ['sys.device.name', 'name', 'device.name'])) },
-        { label: 'Generation', value: generationLabel(info.generation) },
-        { label: 'Timezone', value: formatValue(firstValue(config, ['sys.location.tz', 'timezone'])) },
-        { label: 'Uptime', value: formatUptime(firstValue(status, ['sys.uptime', 'uptime'])) },
+        { label: t('info.name'), value: formatValue(firstValue(config, ['sys.device.name', 'name', 'device.name'])) },
+        {
+          label: t('info.generation'),
+          value:
+            info.generation === null
+              ? t('devices.unknown')
+              : t(info.generation === 1 ? 'devices.generation' : 'devices.generationPlus', {
+                  generation: info.generation,
+                }),
+        },
+        { label: t('info.timezone'), value: formatValue(firstValue(config, ['sys.location.tz', 'timezone'])) },
+        { label: t('info.uptime'), value: formatUptime(firstValue(status, ['sys.uptime', 'uptime']), t, language) },
       ],
     },
     {
-      title: 'Network',
+      title: t('info.network'),
       rows: [
-        { label: 'IP address', value: formatValue(firstValue(status, ['wifi.sta_ip', 'wifi_sta.ip', 'sta_ip'])) },
-        { label: 'Wi-Fi network', value: formatValue(firstValue(status, ['wifi.ssid', 'wifi_sta.ssid', 'ssid'])) },
-        { label: 'Signal', value: formatValue(firstValue(status, ['wifi.rssi', 'wifi_sta.rssi']), ' dBm') },
+        { label: t('add.ip'), value: formatValue(firstValue(status, ['wifi.sta_ip', 'wifi_sta.ip', 'sta_ip'])) },
+        { label: t('info.wifi'), value: formatValue(firstValue(status, ['wifi.ssid', 'wifi_sta.ssid', 'ssid'])) },
+        { label: t('info.signal'), value: formatValue(firstValue(status, ['wifi.rssi', 'wifi_sta.rssi']), ' dBm') },
       ],
     },
     {
-      title: 'Output',
+      title: t('info.output'),
       rows: [
-        { label: 'State', value: formatValue(output) },
-        { label: 'Power', value: formatValue(power, ' W') },
-        { label: 'Voltage', value: formatValue(voltage, ' V') },
-        { label: 'Current', value: formatValue(current, ' A') },
+        { label: t('info.state'), value: formatValue(output) },
+        { label: t('info.power'), value: formatValue(power, ' W') },
+        { label: t('info.voltage'), value: formatValue(voltage, ' V') },
+        { label: t('info.current'), value: formatValue(current, ' A') },
       ],
     },
   ];
@@ -178,6 +184,7 @@ export function DeviceInfoDrawer({
   device: ShellyDevice | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t, language } = useShellyTranslations();
   const [info, setInfo] = useState<ShellyDeviceInfo | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -219,11 +226,11 @@ export function DeviceInfoDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <InfoIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">{device?.name ?? 'Device info'}</h2>
+              <DrawerHeading className="sh:text-lg sh:font-semibold">{device?.name ?? t('info.title')}</DrawerHeading>
             </div>
             {device && <p className="sh:text-sm sh:text-muted">{device.ipAddress}</p>}
           </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
+          <Button isIconOnly variant="ghost" aria-label={t('common.close')} onPress={close}>
             <XIcon size={16} />
           </Button>
         </div>
@@ -238,7 +245,7 @@ export function DeviceInfoDrawer({
             onLoad={() => void load()}
           />
           {error && (
-            <StatusAlert status="danger" title="Could not load device info">
+            <StatusAlert status="danger" title={t('info.loadError')}>
               {error}
             </StatusAlert>
           )}
@@ -256,10 +263,10 @@ export function DeviceInfoDrawer({
       <DrawerFooter>
         <div className="sh:flex sh:w-full sh:items-center sh:justify-between sh:gap-3">
           <span className="sh:text-xs sh:text-default-500">
-            {info ? `Updated ${new Date(info.fetchedAt).toLocaleTimeString()}` : ''}
+            {info ? t('info.updated', { time: new Date(info.fetchedAt).toLocaleTimeString(language) }) : ''}
           </span>
           <Button variant="secondary" onPress={() => void load()} isPending={loading} data-cy="shelly-info-refresh">
-            <RefreshCwIcon className="sh:h-4 sh:w-4" /> Refresh
+            <RefreshCwIcon className="sh:h-4 sh:w-4" /> {t('common.refresh')}
           </Button>
         </div>
       </DrawerFooter>

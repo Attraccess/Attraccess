@@ -6,83 +6,12 @@
   "tags": ["type:plugin", "scope:plugin"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
-    "build-cc100-runtime": {
-      "executor": "nx:run-commands",
-      "cache": true,
-      "dependsOn": ["build-cc100-runtime-esbuild"],
-      "inputs": ["default", "{projectRoot}/cc100-runtime/package.json", "{projectRoot}/cc100-runtime/pnpm-lock.yaml"],
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
-      "options": {
-        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-runtime ./main.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-runtime/"
-      }
-    },
-    "build-cc100-runtime-esbuild": {
-      "inputs": ["default", "{projectRoot}/cc100-runtime/src/**/*", "{projectRoot}/channel-behavior.ts", "{projectRoot}/backend/protocol.ts", "{projectRoot}/backend/protocol/**/*", "{projectRoot}/backend/**/*.entity.ts", "{projectRoot}/modbus/**/*"],
-      "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
-      "options": {
-        "main": "apps/plugins/wago/cc100-runtime/src/main.ts",
-        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
-        "outputPath": "dist/apps/wago-cc100-runtime",
-        "platform": "node",
-        "format": ["cjs"],
-        "bundle": true,
-        "thirdParty": true,
-        "generatePackageJson": false,
-        "esbuildOptions": { "target": "node24" }
-      }
-    },
-    "build-cc100-simulator": {
-      "executor": "nx:run-commands",
-      "cache": true,
-      "dependsOn": ["build-cc100-simulator-esbuild"],
-      "inputs": ["default", "{projectRoot}/cc100-runtime/package.json", "{projectRoot}/cc100-runtime/pnpm-lock.yaml"],
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
-      "options": {
-        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-simulator ./simulator.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-simulator/"
-      }
-    },
-    "build-cc100-simulator-esbuild": {
-      "inputs": ["default", "{projectRoot}/cc100-runtime/src/**/*", "{projectRoot}/channel-behavior.ts", "{projectRoot}/modbus/**/*"],
-      "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
-      "options": {
-        "main": "apps/plugins/wago/cc100-runtime/src/simulator.ts",
-        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
-        "outputPath": "dist/apps/wago-cc100-simulator",
-        "platform": "node",
-        "format": ["cjs"],
-        "bundle": true,
-        "thirdParty": true,
-        "generatePackageJson": false,
-        "esbuildOptions": { "target": "node24" }
-      }
-    },
-    "test-cc100-runtime": {
-      "inputs": ["default", "{projectRoot}/cc100-runtime/src/**/*", "{projectRoot}/channel-behavior.ts", "{projectRoot}/modbus/**/*", "{projectRoot}/measurement-contract.ts", "{projectRoot}/backend/protocol.ts", "{projectRoot}/backend/protocol/**/*", "{projectRoot}/backend/**/*.entity.ts"],
-      "executor": "@nx/jest:jest",
-      "options": { "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts" }
-    },
-    "lint-cc100-runtime": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "eslint apps/plugins/wago/cc100-runtime/src --max-warnings=0 && prettier --check apps/plugins/wago/cc100-runtime/src"
-      }
-    },
-    "typecheck-cc100-runtime": {
-      "inputs": ["default", "{projectRoot}/cc100-runtime/src/**/*", "{projectRoot}/channel-behavior.ts", "{projectRoot}/modbus/**/*", "{projectRoot}/measurement-contract.ts", "{projectRoot}/backend/protocol.ts", "{projectRoot}/backend/protocol/**/*", "{projectRoot}/backend/**/*.entity.ts"],
-      "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "tsc --noEmit -p tsconfig.json" }
-    },
-    "test-cc100-simulator-integration": {
+    "install-dev": {
       "executor": "nx:run-commands",
       "cache": false,
-      "options": { "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs" }
-    },
-    "crap-score-cc100-runtime": {
-      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
       "options": {
-        "command": "node scripts/crap-score/run.mjs apps/plugins/wago/cc100-runtime"
+        "command": "node apps/plugins/scripts/install-dev-plugin.mjs --src apps/plugins/wago/package"
       }
     },
     "production-fleet": {
@@ -123,7 +52,7 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "dependsOn": ["test-frontend"],
+      "dependsOn": ["test-frontend", "test-runtime-build"],
       "options": {
         "jestConfig": "apps/plugins/wago/jest.config.ts",
         "passWithNoTests": true
@@ -132,7 +61,15 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/channel-behavior.ts"],
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/channel-behavior.ts",
+        "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*",
+        "{workspaceRoot}/apps/plugins/shelly/frontend/src/{i18n.ts,en.json,de.json}",
+        "{workspaceRoot}/apps/plugins/rabbitmq/frontend/src/{i18n.ts,en.json,de.json}"
+      ],
       "options": {
         "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
       }
@@ -144,15 +81,15 @@
         "{projectRoot}/diagnostics-types.ts",
         "{projectRoot}/channel-behavior.ts",
         "{projectRoot}/backend/**/*",
+        "{projectRoot}/shared/**/*",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/measurement-contract.ts",
-        "{projectRoot}/cc100-runtime/signing-public-key.pub",
         "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
       ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
       }
     },
     "build-frontend": {
@@ -162,8 +99,10 @@
         "{projectRoot}/diagnostics-types.ts",
         "{projectRoot}/channel-behavior.ts",
         "{projectRoot}/frontend/**/*",
+        "{projectRoot}/shared/**/*",
         "{projectRoot}/modbus/**/*",
-        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
       ],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": {
@@ -215,7 +154,10 @@
       ],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css"
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "env": {
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+        }
       }
     },
     "publish": {
@@ -288,6 +230,170 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/wago"
+      }
+    },
+    "test-runtime-build": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node --test apps/plugins/wago/scripts/install-dev-runtime.test.mjs apps/plugins/wago/scripts/docker-image-identity.test.mjs"
+      }
+    },
+    "build-runtime": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "outputs": ["{projectRoot}/runtime-assets/cc100-build"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/build-owned-runtime.mjs --build"
+      }
+    },
+    "install-runtime-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build-runtime"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/install-dev-runtime.mjs"
+      }
+    },
+    "build-cc100-runtime": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build-cc100-runtime-esbuild"],
+      "inputs": [
+        "default",
+        "{projectRoot}/cc100-runtime/package.json",
+        "{projectRoot}/cc100-runtime/pnpm-lock.yaml",
+        "{projectRoot}/shared/**/*",
+        "{projectRoot}/cc100-runtime/manifest.json"
+      ],
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
+      "options": {
+        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-runtime ./main.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-runtime/"
+      }
+    },
+    "build-cc100-runtime-esbuild": {
+      "inputs": [
+        "default",
+        "{projectRoot}/cc100-runtime/src/**/*",
+        "{projectRoot}/channel-behavior.ts",
+        "{projectRoot}/backend/protocol.ts",
+        "{projectRoot}/backend/protocol/**/*",
+        "{projectRoot}/backend/**/*.entity.ts",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/shared/**/*",
+        "{projectRoot}/cc100-runtime/manifest.json"
+      ],
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
+      "options": {
+        "main": "apps/plugins/wago/cc100-runtime/src/main.ts",
+        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
+        "outputPath": "dist/apps/wago-cc100-runtime",
+        "platform": "node",
+        "format": ["cjs"],
+        "bundle": true,
+        "thirdParty": true,
+        "generatePackageJson": false,
+        "esbuildOptions": {
+          "target": "node24"
+        }
+      }
+    },
+    "build-cc100-simulator": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build-cc100-simulator-esbuild"],
+      "inputs": [
+        "default",
+        "{projectRoot}/cc100-runtime/package.json",
+        "{projectRoot}/cc100-runtime/pnpm-lock.yaml",
+        "{projectRoot}/shared/**/*",
+        "{projectRoot}/cc100-runtime/manifest.json"
+      ],
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "options": {
+        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-simulator ./simulator.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-simulator/"
+      }
+    },
+    "build-cc100-simulator-esbuild": {
+      "inputs": [
+        "default",
+        "{projectRoot}/cc100-runtime/src/**/*",
+        "{projectRoot}/channel-behavior.ts",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/shared/**/*",
+        "{projectRoot}/cc100-runtime/manifest.json"
+      ],
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "options": {
+        "main": "apps/plugins/wago/cc100-runtime/src/simulator.ts",
+        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
+        "outputPath": "dist/apps/wago-cc100-simulator",
+        "platform": "node",
+        "format": ["cjs"],
+        "bundle": true,
+        "thirdParty": true,
+        "generatePackageJson": false,
+        "esbuildOptions": {
+          "target": "node24"
+        }
+      }
+    },
+    "test-cc100-runtime": {
+      "inputs": [
+        "default",
+        "{projectRoot}/cc100-runtime/src/**/*",
+        "{projectRoot}/channel-behavior.ts",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/measurement-contract.ts",
+        "{projectRoot}/backend/protocol.ts",
+        "{projectRoot}/backend/protocol/**/*",
+        "{projectRoot}/backend/**/*.entity.ts",
+        "{projectRoot}/shared/**/*",
+        "{projectRoot}/cc100-runtime/manifest.json"
+      ],
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts"
+      }
+    },
+    "lint-cc100-runtime": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/plugins/wago/cc100-runtime/src --max-warnings=0 && prettier --check apps/plugins/wago/cc100-runtime/src"
+      }
+    },
+    "typecheck-cc100-runtime": {
+      "inputs": [
+        "default",
+        "{projectRoot}/cc100-runtime/src/**/*",
+        "{projectRoot}/channel-behavior.ts",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/measurement-contract.ts",
+        "{projectRoot}/backend/protocol.ts",
+        "{projectRoot}/backend/protocol/**/*",
+        "{projectRoot}/backend/**/*.entity.ts",
+        "{projectRoot}/shared/**/*",
+        "{projectRoot}/cc100-runtime/manifest.json"
+      ],
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/plugins/wago/cc100-runtime",
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    },
+    "test-cc100-simulator-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs"
+      }
+    },
+    "crap-score-cc100-runtime": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/wago/cc100-runtime"
       }
     }
   }

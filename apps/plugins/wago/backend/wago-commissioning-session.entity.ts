@@ -29,6 +29,7 @@ export class WagoCommissioningSession {
   @Column({ type: 'varchar', name: 'pairing_code', nullable: true }) pairingCode!: string | null;
   @Column({ type: 'varchar', name: 'delivery_token', nullable: true }) deliveryToken!: string | null;
   @Column({ type: 'text', name: 'initiating_principal', nullable: true }) initiatingPrincipal!: string | null;
+  /** Last attempted delivery's digest for observation only; never used to choose the next bundle. */
   @Column({ type: 'varchar', name: 'runtime_artifact_digest', nullable: true }) runtimeArtifactDigest!: string | null;
   @Column({ type: 'integer', name: 'management_controller_id', nullable: true }) managementControllerId!: number | null;
   @Column({ type: 'varchar', name: 'docker_provision_token', nullable: true }) dockerProvisionToken!: string | null;

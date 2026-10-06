@@ -4,14 +4,26 @@ on:
   pull_request:
     paths:
       - 'apps/plugins/wago/**'
-      - 'apps/plugins/wago/project.json'
+      - 'nx.json'
+      - 'eslint.config.cjs'
+      - 'eslint.base.config.cjs'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
       - '.github/workflows/wago-cc100-runtime.yml'
   push:
     branches: [main]
     paths:
       - 'apps/plugins/wago/**'
-      - 'apps/plugins/wago/project.json'
+      - 'nx.json'
+      - 'eslint.config.cjs'
+      - 'eslint.base.config.cjs'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
       - '.github/workflows/wago-cc100-runtime.yml'
 

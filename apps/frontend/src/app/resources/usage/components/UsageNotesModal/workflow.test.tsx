@@ -1,7 +1,7 @@
 import type { ResourceUsage } from '@attraccess/react-query-client';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { UsageNotesModal } from './index';
+import { UsageNotesDrawer } from './drawer';
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
@@ -29,7 +29,7 @@ it('lets owners reassign completed sessions and forwards close', async () => {
   const change = vi.fn(),
     close = vi.fn();
   render(
-    <UsageNotesModal
+    <UsageNotesDrawer
       isOpen
       onClose={close}
       session={session}
@@ -49,7 +49,7 @@ it('lets owners reassign completed sessions and forwards close', async () => {
 });
 it('shows read-only project attribution for another user or an ongoing session', () => {
   const view = render(
-    <UsageNotesModal
+    <UsageNotesDrawer
       isOpen
       onClose={vi.fn()}
       session={{ ...session, userId: 2 }}
@@ -63,7 +63,7 @@ it('shows read-only project attribution for another user or an ongoing session',
   expect(screen.queryByRole('button', { name: /Workshop/ })).toBeNull();
   view.unmount();
   render(
-    <UsageNotesModal
+    <UsageNotesDrawer
       isOpen
       onClose={vi.fn()}
       session={{ ...session, endTime: null, project: null, startNotes: ' ' }}
@@ -95,16 +95,16 @@ it('renders historical form values including booleans, numbers, selects and text
     { id: 11, formId: 21, data: {} },
   ];
   render(
-    <UsageNotesModal isOpen onClose={vi.fn()} session={{ ...session, formSubmissions: forms } as ResourceUsage} />,
+    <UsageNotesDrawer isOpen onClose={vi.fn()} session={{ ...session, formSubmissions: forms } as ResourceUsage} />,
   );
   for (const text of ['Form #20', 'Yes', 'No', '3', 'PLA', 'All clear'])
     expect(await screen.findByText(text)).toBeTruthy();
   expect(screen.queryByText('Form #21')).toBeNull();
 });
 it('renders loading until the session arrives and nothing while closed', () => {
-  const view = render(<UsageNotesModal isOpen onClose={vi.fn()} session={null} />);
+  const view = render(<UsageNotesDrawer isOpen onClose={vi.fn()} session={null} />);
   expect(document.querySelector('.spinner')).toBeTruthy();
   view.unmount();
-  render(<UsageNotesModal isOpen={false} onClose={vi.fn()} session={session} />);
+  render(<UsageNotesDrawer isOpen={false} onClose={vi.fn()} session={session} />);
   expect(screen.queryByText('Session Notes')).toBeNull();
 });

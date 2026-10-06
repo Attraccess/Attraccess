@@ -9,13 +9,14 @@ import {
   type DiagnosticStream,
 } from './diagnostics-envelope';
 import { safeValidationSummaries } from './diagnostics-validation';
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 /** Process-local, allowlisted diagnostics. Never retain raw MQTT payloads or free-form device errors. */
 export type Freshness = 'missing' | 'invalid' | 'future' | 'stale' | 'fresh';
 export function freshness(timestamp: string | null | undefined, now = Date.now(), maxAge = 90_000): Freshness {
   if (!timestamp) return 'missing';
   const time = sourceTime(timestamp);
   if (time === null) return 'invalid';
-  if (time > now) return 'future';
+  if (time > now + CONTROLLER_CLOCK_TOLERANCE_MS) return 'future';
   return now - time > maxAge ? 'stale' : 'fresh';
 }
 export interface DiagnosticSample {
@@ -42,6 +43,7 @@ interface RuntimeDiagnostics extends DiagnosticStream {
   revision?: number;
   contentHash?: string;
   stateSourceAt?: string;
+  manualOutputChannelIds?: string[];
   measurementAfter?: number;
   inputs: Record<string, DiagnosticSample>;
   outputs: Record<string, DiagnosticSample>;
@@ -53,7 +55,7 @@ interface RuntimeDiagnostics extends DiagnosticStream {
     receivedAt: string;
     errors: Array<{ path: string; code: string }>;
   };
-  faults: Record<string, { code: string; receivedAt: string }>;
+  faults: Record<string, { code: string; receivedAt: string; sourceAt: string | null }>;
   acknowledgements: Record<string, DiagnosticAcknowledgement>;
   events: Array<{ kind: string; receivedAt: string }>;
 }
@@ -65,6 +67,9 @@ const faultCodes = new Set([
   'device_write_failed',
   'feedback_mismatch',
   'feedback_read_failed',
+  'modbus_read_failed',
+  'modbus_rtu_quarantined',
+  'digital_read_failed',
 ]);
 function identifier(value: unknown): value is string {
   return (
@@ -78,6 +83,14 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 function validStatePayload(data: Record<string, unknown>, kind: string, canonical: boolean): boolean {
+  if (
+    kind === 'state' &&
+    data.manualOutputChannelIds !== undefined &&
+    (!Array.isArray(data.manualOutputChannelIds) ||
+      data.manualOutputChannelIds.length > MAX_CHANNELS ||
+      !data.manualOutputChannelIds.every(identifier))
+  )
+    return false;
   if (
     canonical &&
     kind === 'state' &&
@@ -308,6 +321,7 @@ export class WagoDiagnosticsStore {
         state.rejection = undefined;
         state.hardwareAvailable = undefined;
         state.stateSourceAt = undefined;
+        state.manualOutputChannelIds = undefined;
         state.revision = undefined;
         state.contentHash = undefined;
       }
@@ -353,6 +367,8 @@ export class WagoDiagnosticsStore {
     state.contentHash = contentHash;
     state.hardwareAvailable = hardwareAvailable;
     state.stateSourceAt = canonical ? (data.timestamp as string) : undefined;
+    state.manualOutputChannelIds =
+      canonical && Array.isArray(data.manualOutputChannelIds) ? (data.manualOutputChannelIds as string[]) : undefined;
     if (data.outputs && typeof data.outputs === 'object' && !Array.isArray(data.outputs)) {
       for (const [channelId, value] of Object.entries(data.outputs).slice(0, MAX_CHANNELS)) {
         if (identifier(channelId) && typeof value === 'boolean')
@@ -364,6 +380,9 @@ export class WagoDiagnosticsStore {
         if (identifier(channelId) && typeof value === 'boolean')
           state.inputs[channelId] = { kind: 'input', value, ...metadata };
       }
+    for (const id of [...Object.keys(state.outputs), ...Object.keys(state.inputs)]) {
+      if (['modbus_read_failed', 'digital_read_failed'].includes(state.faults[id]?.code)) delete state.faults[id];
+    }
   }
 
   private applyEvents(
@@ -390,11 +409,20 @@ export class WagoDiagnosticsStore {
         ...(canonical ? { measurementKind: data.kind as 'live' | 'cumulative' } : {}),
         ...metadata,
       };
+      const fault = state.faults[data.channelId];
+      if (
+        canonical &&
+        fault?.sourceAt &&
+        ['measurement_read_failed', 'modbus_read_failed', 'modbus_rtu_quarantined'].includes(fault.code) &&
+        (sourceTime(metadata.sourceAt) as number) > (sourceTime(fault.sourceAt) as number)
+      )
+        delete state.faults[data.channelId];
     }
     if (kind === 'faults' && identifier(data.channelId))
       state.faults[data.channelId] = {
         code: faultCodes.has(data.code as string) ? (data.code as string) : 'runtime_fault',
         receivedAt,
+        sourceAt: metadata.sourceAt,
       };
     if (
       kind === 'acknowledgements' &&

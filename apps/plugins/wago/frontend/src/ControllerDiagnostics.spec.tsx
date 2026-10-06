@@ -1,11 +1,12 @@
-/** @jest-environment jsdom */
-import { act, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { ControllerDiagnostics, WagoStatus } from './ControllerDiagnostics';
 import { useWagoDiagnostics } from './diagnostics';
 import type { WagoDiagnostics } from './diagnostics';
 
-jest.mock('./diagnostics', () => ({ useWagoDiagnostics: jest.fn() }));
-jest.mock('@heroui/react', () => {
+vi.mock('./diagnostics', () => ({ useWagoDiagnostics: vi.fn() }));
+vi.mock('@heroui/react', () => {
   const part = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={className}>{children}</div>
   );
@@ -13,6 +14,13 @@ jest.mock('@heroui/react', () => {
     Button: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
     Card: Object.assign(part, { Header: part, Title: part, Description: part, Content: part }),
   };
+});
+
+beforeEach(() => useTranslationState.getState().setLanguage('en'));
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 function fixture(): WagoDiagnostics {
@@ -61,8 +69,8 @@ function fixture(): WagoDiagnostics {
 
 describe('diagnostics isolation', () => {
   it('keeps its surrounding host usable after a diagnostics render failure', () => {
-    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    (useWagoDiagnostics as jest.Mock).mockImplementation(() => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(useWagoDiagnostics, { partial: true }).mockImplementation(() => {
       throw new Error('render failure');
     });
     render(
@@ -76,12 +84,12 @@ describe('diagnostics isolation', () => {
     error.mockRestore();
   });
   it('reports polling failures without hiding host controls', () => {
-    (useWagoDiagnostics as jest.Mock).mockReturnValue({
+    vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
       isError: true,
       isPending: false,
       dataUpdatedAt: Date.now(),
       data: fixture(),
-      refetch: jest.fn(),
+      refetch: vi.fn(),
     });
     render(<ControllerDiagnostics controllerId={1} onConfigure={() => undefined} />);
     expect(screen.getByText('Open configuration')).toBeTruthy();
@@ -115,12 +123,12 @@ describe('diagnostics isolation', () => {
         acknowledgement: null,
       },
     ];
-    (useWagoDiagnostics as jest.Mock).mockReturnValue({
+    vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
       isError: false,
       isPending: false,
       data,
       dataUpdatedAt: Date.now(),
-      refetch: jest.fn(),
+      refetch: vi.fn(),
     });
     render(<ControllerDiagnostics controllerId={1} />);
     expect(screen.getByText(/Latest input: true/)).toBeTruthy();
@@ -128,23 +136,23 @@ describe('diagnostics isolation', () => {
     expect(screen.queryByText(/Latest output/)).toBeNull();
   });
   it('hides cached online status when successful polling stalls, without another query update', () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     try {
       const data = fixture();
-      (useWagoDiagnostics as jest.Mock).mockReturnValue({
+      vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
         isError: false,
         isPending: false,
         data,
         dataUpdatedAt: Date.now(),
-        refetch: jest.fn(),
+        refetch: vi.fn(),
       });
       render(<ControllerDiagnostics controllerId={1} />);
       expect(screen.getByText('Controller: online')).toBeTruthy();
-      act(() => jest.advanceTimersByTime(16_000));
+      act(() => vi.advanceTimersByTime(16_000));
       expect(screen.queryByText('Controller: online')).toBeNull();
       expect(screen.getByRole('alert').textContent).toContain('refresh is overdue');
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
   it('accepts polling failure from an embedding host and suppresses the cached status', () => {
@@ -153,21 +161,21 @@ describe('diagnostics isolation', () => {
     expect(screen.getByRole('alert').textContent).toContain('status is unknown');
   });
   it('uses local receipt time rather than the server-generated timestamp for polling freshness', () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
       const data = fixture();
       data.generatedAt = '2026-09-05T12:01:00Z';
-      (useWagoDiagnostics as jest.Mock).mockReturnValue({
+      vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
         isError: false,
         isPending: false,
         data,
         dataUpdatedAt: Date.now(),
-        refetch: jest.fn(),
+        refetch: vi.fn(),
       });
       render(<ControllerDiagnostics controllerId={1} />);
       expect(screen.getByText('Controller: online')).toBeTruthy();
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 });

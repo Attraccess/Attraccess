@@ -6,6 +6,7 @@ import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
 import { RabbitmqPermissionsModal } from './RabbitmqPermissionsModal';
 import { useDetection, type RabbitmqDetectionResult } from './detection';
 import { DEFAULT_MQTT_PERMISSIONS } from './users-api';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@attraccess/plugins-frontend-sdk', () => ({
@@ -28,7 +29,10 @@ const user = { name: 'sensor', tags: ['management'], permissions: [{ vhost: '/',
 beforeEach(() => {
   request.mockReset();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useTranslationState.setState({ language: 'en' });
+});
 
 it('deduplicates concurrent detection, serves cached results, and refreshes without discarding the last result on failure', async () => {
   let resolve!: (value: RabbitmqDetectionResult) => void;
@@ -197,4 +201,19 @@ it('shows user-list failures and permits an explicit retry', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Reload RabbitMQ users' }));
   await waitFor(() => expect(screen.queryByText('List unavailable')).toBeNull());
   expect(await screen.findByRole('grid', { name: 'RabbitMQ users' })).toBeTruthy();
+});
+
+it('refreshes cached row translations without reloading users or changing their names', async () => {
+  request.mockImplementation(async (path: string) => {
+    if (path.includes('/detection/')) return detected;
+    return { mqttServerId: 106, users: [{ ...user, tags: [] }], vhosts: ['/'] };
+  });
+  render(<RabbitmqUserPanel mqttServerId={106} />);
+  await screen.findByRole('button', { name: 'Edit user sensor' });
+  const calls = request.mock.calls.length;
+  act(() => useTranslationState.setState({ language: 'de' }));
+  expect(screen.getByRole('button', { name: 'Benutzer sensor bearbeiten' })).toBeTruthy();
+  expect(screen.getByText('keine')).toBeTruthy();
+  expect(screen.getByText('sensor')).toBeTruthy();
+  expect(request).toHaveBeenCalledTimes(calls);
 });

@@ -40,10 +40,6 @@ apps/attractap-touch-firmware/.pio/
 apps/api/src/assets/attractap-firmwares/
 secrets/
 
-apps/attractap/hardware/**/dist/
-apps/attractap/hardware/**/.tscircuit/
-apps/attractap/hardware/**/index.circuit.json
-
 # Plugin build staging dir (zip output lives in dist/, covered above)
 apps/plugins/**/package/
 apps/plugins/**/package.zip
@@ -70,3 +66,5 @@ output/
 libs/companion-ws-client/src/lib/
 apps/plugins/*/package.zip
 apps/attractap/firmware/__pycache__/
+# Generated build-owned CC100 Docker assets (never commit bundles or keys).
+apps/plugins/wago/runtime-assets/

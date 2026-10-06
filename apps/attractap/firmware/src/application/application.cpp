@@ -94,6 +94,16 @@ void Application::setup() {
   this->api.onDeviceName(
       [this](std::string deviceName) { Display::setDeviceName(deviceName); });
 #endif
+#ifdef HAS_LVGL_DISPLAY
+  this->api.setUsageStatsCallback([this](const API::UsageStats &stats) {
+    lv_lock();
+    if (this->unlocked && this->resourceIsSelected && stats.resourceId == this->selectedResourceId &&
+        this->cardAuthenticationData.username == this->resourceList.authenticatedUsername)
+      Display::resourceDetailsScreen.setUsageStats(stats);
+    lv_unlock();
+  });
+#endif
+
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
 #ifdef HAS_LVGL_DISPLAY
@@ -254,7 +264,13 @@ void Application::setup() {
       const auto &result = payload->result;
       if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
         self->finishReaderAction(result.success);
-        if (result.success) self->onActionResult(result.type);
+        if (result.success) {
+          self->onActionResult(result.type);
+          if (!result.billingTotal.empty()) {
+            self->restartSessionTimeout();
+            Display::showBillingSummary(result.billingTotal);
+          }
+        }
         else {
           self->handleFormsCancel();
           if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
@@ -677,6 +693,7 @@ void Application::loop() {
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
+  this->pollUsageStats();
   lv_unlock();
 #else
   this->processState();

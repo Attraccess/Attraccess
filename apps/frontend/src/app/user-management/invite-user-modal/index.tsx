@@ -2,6 +2,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   TextField,
   Label,
@@ -131,7 +132,7 @@ export function InviteUserModal(props: Props) {
         dialogProps={{ 'aria-label': t('title') }}
       >
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as 'single' | 'csv')}>

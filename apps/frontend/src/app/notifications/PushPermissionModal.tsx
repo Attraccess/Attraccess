@@ -2,7 +2,7 @@
 // iOS Safari/PWA requires a gesture to call Notification.requestPermission(),
 // so auto-subscription on mount is not permitted — this modal bridges the gap.
 import { useCallback, useEffect, useState } from 'react';
-import { ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { Button } from '../../components/button';
 import { StandardModal } from '../../components/standardModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -94,7 +94,9 @@ export function PushPermissionModal({ enabled, userId }: { enabled: boolean; use
     >
       {({ close: _close }) => (
         <>
-          <ModalHeader>{t('title')}</ModalHeader>
+          <ModalHeader>
+            <ModalHeading>{t('title')}</ModalHeading>
+          </ModalHeader>
           <ModalBody>
             <p className="text-sm text-default-600">{t('description')}</p>
             <p className="text-sm text-default-600">{t('question')}</p>

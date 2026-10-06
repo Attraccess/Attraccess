@@ -54,4 +54,17 @@ export class BillingTransactionItem {
     required: false,
   })
   durationMs!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    description:
+      'Exact metered quantity, without a unit; null with a captured meter price means the final reading was unavailable',
+  })
+  meterQuantity!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ nullable: true, required: false, description: 'Captured price per measured value' })
+  meterCreditsPerUnit!: number | null;
 }

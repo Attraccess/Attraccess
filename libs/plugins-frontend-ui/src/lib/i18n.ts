@@ -19,7 +19,7 @@ interface TranslationModules<T extends TranslationRecord = TranslationRecord> {
   de: T;
 }
 
-type Language = keyof TranslationModules;
+export type Language = keyof TranslationModules;
 
 interface TranslationState {
   language: Language;
@@ -28,12 +28,26 @@ interface TranslationState {
 export const useTranslationState = create<TranslationState>((set) => ({
   language: 'en',
   setLanguage: (language) => {
-    set({ language });
-    localStorage.setItem(I18N_LANGUAGE_STORAGE_KEY, language);
+    const supportedLanguage = language === 'de' ? 'de' : 'en';
+    set({ language: supportedLanguage });
+    try {
+      globalThis.localStorage?.setItem(I18N_LANGUAGE_STORAGE_KEY, supportedLanguage);
+    } catch {
+      // Language switching must still work when browser storage is unavailable.
+    }
   },
 }));
 
 export type TFunction = (key: string, data?: Record<string, unknown>) => string;
+/** Retained translations stay reactive; literal API errors remain intact. */
+export interface TranslationMessage {
+  key: string;
+  data?: Record<string, unknown>;
+}
+interface TranslationOptions {
+  /** Disable only for React text rendering, never for messages rendered as HTML. */
+  escapeValues?: boolean;
+}
 interface TExistsOptions {
   succeedIfKeyIsObject?: boolean;
 }
@@ -62,12 +76,13 @@ const resolvePlural = (value: PluralObject, count: number): string => {
 
 interface UseTranslationsResponse {
   t: TFunction;
+  tMessage: (message: TranslationMessage | string) => string;
   tExists: TExists;
   language: Language;
   setLanguage: (language: Language) => void;
 }
 
-export function useTranslations(translations: TranslationModules): UseTranslationsResponse {
+export function useTranslations(translations: TranslationModules, options: TranslationOptions = {}): UseTranslationsResponse {
   const { language, setLanguage } = useTranslationState();
 
   // Keep a stable reference to the provided translations so callers
@@ -101,10 +116,15 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
         return ABSOLUTE_FALLBACK_TRANSLATION;
       }
 
-      const template = Handlebars.compile(translation);
+      const template = Handlebars.compile(translation, { noEscape: options.escapeValues === false });
       return template(data);
     },
-    [getTranslationRaw],
+    [getTranslationRaw, options.escapeValues],
+  );
+
+  const tMessage = useCallback(
+    (message: TranslationMessage | string) => typeof message === 'string' ? message : t(message.key, message.data),
+    [t],
   );
 
   const tExists = useCallback(
@@ -175,6 +195,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
 
   return {
     t,
+    tMessage,
     tExists,
     language,
     setLanguage,
@@ -190,5 +211,5 @@ export function detectAndSetLanguage() {
   }
 
   const language = localStorageLanguage || sessionStorageLanguage || navigatorLanguage;
-  useTranslationState.getState().setLanguage(language as Language);
+  useTranslationState.getState().setLanguage(language === 'de' ? 'de' : 'en');
 }

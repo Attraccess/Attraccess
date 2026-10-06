@@ -146,6 +146,11 @@ export class PluginSandboxService {
           require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.publish(${serverId}, ${topic})`);
           return base.mqtt.publish(serverId, topic, payload, options);
         },
+        refreshConnection(serverId) {
+          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.refreshConnection(${serverId})`);
+          if (!base.mqtt.refreshConnection) throw new Error('MQTT connection refresh is unavailable in this host');
+          return base.mqtt.refreshConnection(serverId);
+        },
       },
       events: guardedEvents,
       get dataSource() {

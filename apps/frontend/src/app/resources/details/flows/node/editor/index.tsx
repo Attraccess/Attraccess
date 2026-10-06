@@ -1,9 +1,11 @@
+import { MeterSelector } from '../../../meters/MeterSelector';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceResolveNodeSchema } from '@attraccess/react-query-client';
 import {
   Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   useOverlayState,
 } from '@heroui/react';
@@ -15,8 +17,11 @@ import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import { initializeValue, isValueValid } from './property-input/schema-values';
 
-const configProperty = (schema: ResourceFlowNodeSchemaDto) =>
-  ({ ...schema.configSchema, type: 'object' }) as Property<unknown>;
+const configProperty = (schema: ResourceFlowNodeSchemaDto) => {
+  const configSchema = { ...schema.configSchema };
+  delete configSchema.preview;
+  return { ...configSchema, type: 'object' } as Property<unknown>;
+};
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;
@@ -148,9 +153,9 @@ export function NodeEditor(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardDrawer isOpen={isOpen} onOpenChange={(nextOpen) => nextOpen ? setOpen(true) : onClose()}>
+      <StandardDrawer dialogProps={{ 'aria-label': nodeTitle }} isOpen={isOpen} onOpenChange={(nextOpen) => nextOpen ? setOpen(true) : onClose()}>
         <DrawerHeader className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold">{nodeTitle}</h2>
+          <DrawerHeading className="text-lg font-semibold">{nodeTitle}</DrawerHeading>
           <p className="text-sm text-default-500">{nodeDescription}</p>
         </DrawerHeader>
 
@@ -163,8 +168,21 @@ export function NodeEditor(props: Props) {
               </Button>
             ) : null}
             {isResolvingSchema ? <p className="text-sm text-default-500">Refreshing configuration...</p> : null}
-            {Object.entries((resolvedSchema.configSchema.properties ?? {}) as Record<string, Property<unknown>>).map(
-              ([propertyName, property]) => (
+            {resolvedSchema.type.includes('.resource.metering.') && (
+              <MeterSelector
+                resourceId={resourceId}
+                value={typeof data.meterId === 'number' ? data.meterId : undefined}
+                onChange={(id) => {
+                  onInputChange('meterId', id);
+                }}
+              />
+            )}
+            {Object.entries((resolvedSchema.configSchema.properties ?? {}) as Record<string, Property<unknown>>)
+              .filter(([name]) =>
+                !resolvedSchema.type.includes('.resource.metering.') ||
+                name !== 'meterId',
+              )
+              .map(([propertyName, property]) => (
                 <PropertyInput
                   key={propertyName}
                   isRequired={(resolvedSchema.configSchema.required as string[])?.includes(propertyName)}
@@ -176,8 +194,7 @@ export function NodeEditor(props: Props) {
                   value={data[propertyName]}
                   onChange={(value, refreshesSchema) => onInputChange(propertyName, value, refreshesSchema)}
                 />
-              ),
-            )}
+              ))}
             <input hidden type="submit" />
           </Form>
         </DrawerBody>

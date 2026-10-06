@@ -7,6 +7,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   TextArea,
   useOverlayState,
@@ -118,7 +119,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         <DrawerHeader>
           <div className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">{t('title')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
           </div>
         </DrawerHeader>
 

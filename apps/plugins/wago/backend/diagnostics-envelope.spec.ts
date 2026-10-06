@@ -1,5 +1,6 @@
 import { WagoDiagnosticsStore, freshness } from './diagnostics-store';
 import { safeValidationSummaries } from './diagnostics-validation';
+import { ENGINEERING_UNITS, encodeMeasurement } from '../measurement-contract';
 
 describe('canonical diagnostic consumer', () => {
   let now: number;
@@ -35,6 +36,28 @@ describe('canonical diagnostic consumer', () => {
     now = Date.parse('2026-09-05T12:00:00Z');
     store = new WagoDiagnosticsStore(() => now);
   });
+  it.each(ENGINEERING_UNITS)('retains current canonical meter readings in %s', (unit) => {
+    expect(state()).toBe(true);
+    const reading = encodeMeasurement('meter', 12.345, { unit, scale: 1, offset: 0 });
+    expect(send('measurements', { ...reading, ...envelope(1) })).toBe(true);
+    expect(store.read(1).measurements.meter).toMatchObject({
+      value: 12345,
+      unit: reading.unit,
+      sourceAt: new Date(now).toISOString(),
+    });
+  });
+  it.each([42, 2100, 5000])('admits a controller clock %i ms ahead without rewriting source times', (skew) => {
+    const timestamp = new Date(now + skew).toISOString();
+    expect(send('heartbeat', envelope(1, 1, now + skew))).toBe(true);
+    expect(state(1, 1, { timestamp })).toBe(true);
+    expect(measurement(1, { timestamp })).toBe(true);
+    expect(store.read(1).heartbeatAt).toBe(timestamp);
+    expect(store.read(1).measurements.meter.sourceAt).toBe(timestamp);
+    expect(freshness(timestamp, now)).toBe('fresh');
+    expect(measurement(2, { timestamp: new Date(now + 5001).toISOString() })).toBe(false);
+    expect(store.read(1).measurements.meter.sequence).toBe(1);
+    expect(freshness(timestamp, now + skew + 90_001)).toBe('stale');
+  });
   it('keeps validated boolean inputs separate from outputs and preserves canonical integer measurements', () => {
     expect(state()).toBe(true);
     expect(measurement()).toBe(true);
@@ -50,12 +73,15 @@ describe('canonical diagnostic consumer', () => {
     expect(store.read(1).cumulativeMeasurements.meter.measurementKind).toBe('cumulative');
     expect(store.read(1).measurements.meter).toMatchObject({ value: 500, measurementKind: 'live' });
     expect(measurement(3, { unit: 'watt-hour', kind: 'cumulative', value: Number.MAX_SAFE_INTEGER })).toBe(true);
-    expect(store.read(1).cumulativeMeasurements.meter).toMatchObject({ unit: 'watt-hour', value: Number.MAX_SAFE_INTEGER });
+    expect(store.read(1).cumulativeMeasurements.meter).toMatchObject({
+      unit: 'watt-hour',
+      value: Number.MAX_SAFE_INTEGER,
+    });
   });
   it('rejects malformed/future timestamps and invalid category values before watermarks', () => {
     state();
     for (const extra of [
-      { timestamp: new Date(now + 1).toISOString() },
+      { timestamp: new Date(now + 5001).toISOString() },
       { timestamp: '2026-02-30T12:00:00Z' },
       { timestamp: 'bad' },
       { value: 1.5 },
@@ -72,7 +98,7 @@ describe('canonical diagnostic consumer', () => {
     expect(state(2)).toBe(true);
     expect(store.read(1).sequenceGaps).toBe(0);
     expect(freshness('2026-09-05T14:00:00+02:00', now)).toBe('fresh');
-    expect(freshness('2026-09-05T14:00:01+02:00', now)).toBe('future');
+    expect(freshness('2026-09-05T14:00:05.001+02:00', now)).toBe('future');
   });
   it('admits heartbeat liveness without state, with category ordering and retired-boot protection', () => {
     expect(state(1, 1, { timestamp: new Date(now - 100_000).toISOString() })).toBe(false);
@@ -147,6 +173,48 @@ describe('canonical diagnostic consumer', () => {
     expect(store.read(1).measurements).toEqual({});
     expect(send('state', { connected: true, revision: 2, outputs: { relay: true } })).toBe(false);
     expect(store.read(1).outputs).toEqual({});
+  });
+  it.each([
+    ['relay', 'modbus_read_failed'],
+    ['door', 'digital_read_failed'],
+  ])('retains %s read faults across omitted samples until a successful reading', (channelId, code) => {
+    expect(state()).toBe(true);
+    expect(send('faults', { channelId, code, ...envelope(1) })).toBe(true);
+
+    for (let sequence = 2; sequence <= 4; sequence++) {
+      now++;
+      expect(state(sequence, 1, { inputs: {}, outputs: {} })).toBe(true);
+      expect(store.read(1).inputs).toEqual({});
+      expect(store.read(1).outputs).toEqual({});
+      expect(store.read(1).faults[channelId]).toMatchObject({ code });
+    }
+
+    now++;
+    expect(state(5)).toBe(true);
+    expect(store.read(1).faults[channelId]).toBeUndefined();
+  });
+  it.each(['measurement_read_failed', 'modbus_read_failed', 'modbus_rtu_quarantined'])(
+    'clears %s only after a newer successful meter acquisition',
+    (code) => {
+      expect(state()).toBe(true);
+      now += 10;
+      expect(send('faults', { channelId: 'meter', code, ...envelope(1) })).toBe(true);
+      expect(store.read(1).faults.meter.code).toBe(code);
+      expect(measurement(1, { timestamp: new Date(now - 5).toISOString() })).toBe(true);
+      expect(store.read(1).faults.meter.code).toBe(code);
+      now++;
+      expect(measurement(2)).toBe(true);
+      expect(store.read(1).faults.meter).toBeUndefined();
+      expect(store.read(1).events.some((event) => event.kind === 'faults')).toBe(true);
+    },
+  );
+  it('does not clear an actuator fault when a meter measurement succeeds', () => {
+    state();
+    now++;
+    send('faults', { channelId: 'meter', code: 'device_write_failed', ...envelope(1) });
+    now++;
+    measurement();
+    expect(store.read(1).faults.meter.code).toBe('device_write_failed');
   });
   it('fails closed when retired stream tracking is full and bounds category tracking', () => {
     for (let index = 1; index <= 17; index++) {

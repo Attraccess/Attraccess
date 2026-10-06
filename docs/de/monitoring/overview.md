@@ -11,7 +11,7 @@ Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur M
 | **Benutzer** | Gesamtbenutzer, neue Registrierungen |
 | **Ressourcen** | Aktive Nutzungssitzungen, Sitzungsdauern, abgeschlossene Einweisungen |
 | **Wartung** | Wartungsereignisse, überfällige Wartungswarnungen |
-| **Attractap-Geräte** | Verbundene NFC-Leser, Tap-Ereignisse, Firmware-Updates |
+| **Attractap-Geräte** | Verbundene RFID-Leser, Tap-Ereignisse, Firmware-Updates |
 | **Abrechnung** | Transaktionsanzahl und -beträge |
 | **Infrastruktur** | MQTT-Server-Status, WebSocket-Verbindungen, E-Mail-Zustellung, Plugin-Status |
 | **Node.js-Laufzeit** | CPU-Nutzung, Speicher (Heap/RSS), Event-Loop-Verzögerung |

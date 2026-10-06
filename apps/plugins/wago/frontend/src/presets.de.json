@@ -1,0 +1,38 @@
+{
+  "title": "Vorlagengrundlage",
+  "description": "Prüfe Einstellungen und kopiere ausgewählte Änderungen in deine lokalen Bearbeitungen. Speichere den Entwurf, wenn du bereit bist.",
+  "previewError": "Vorlage konnte nicht geprüft werden.",
+  "copyError": "Vorlage konnte nicht kopiert werden.",
+  "loadError": "Vorlagen konnten nicht geladen werden: {{error}}",
+  "preset": "Vorlage",
+  "applyTo": "Auf Kanal anwenden",
+  "meteredHint": "Ordne diesem Modbus-Punkt einen aktuellen Leistungsmesswert und eine benannte Ausgangsaktion zu, um diese Vorlage zu verwenden.",
+  "digitalHint": "Füge einen digitalen {{direction}} oder einen kompatiblen Modbus-Ausgang hinzu, um diese Vorlage zu verwenden.",
+  "feedback": "Optionaler Rückmeldeeingang",
+  "noFeedback": "Keine Rückmeldung",
+  "preview": "Vorlage prüfen",
+  "copy": "Ausgewählte Änderungen lokal übernehmen",
+  "reapply": "Vorlage erneut lokal anwenden",
+  "items": {
+    "metered-switched-load": {
+      "name": "Gemessene geschaltete Last",
+      "description": "Schaltet einen Ausgang bei Verbindungsabbruch sofort aus und meldet einen umgerechneten Messwert."
+    },
+    "pulsed-lock-bank": {
+      "name": "Gepulste Schlosssteuerung",
+      "description": "Pulst einen Ausgang kurz und schaltet ihn bei Verbindungsabbruch sofort aus."
+    },
+    "guarded-enable-request": {
+      "name": "Bedingte Freigabeanforderung",
+      "description": "Stellt eine nicht sicherheitsbezogene Freigabeanforderung nur bei erfüllter betrieblicher Freigabebedingung."
+    },
+    "generic-digital-output": {
+      "name": "Allgemeiner digitaler Ausgang",
+      "description": "Eine konservative Ausgangsgrundlage."
+    },
+    "generic-monitored-input": {
+      "name": "Allgemeiner überwachter Eingang",
+      "description": "Eine Grundlage für einen überwachten digitalen Eingang."
+    }
+  }
+}

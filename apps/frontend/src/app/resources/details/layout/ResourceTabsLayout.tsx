@@ -66,6 +66,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   const { t } = useTranslations({ en, de });
 
   const canUpdateResources = hasPermission('resources.update');
+  const canDeleteResources = hasPermission('resources.delete');
 
   const {
     data: resource,
@@ -89,6 +90,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   }, [location.pathname, resourceId, tabs]);
 
   const handleDelete = async () => {
+    if (!canDeleteResources) return;
     try {
       await deleteResource.mutateAsync({ id: resourceId });
       success({
@@ -149,7 +151,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       label: t('actions.delete'),
       icon: <Trash className="w-4 h-4" />,
       variant: 'destructive',
-      isHidden: !canUpdateResources,
+      isHidden: !canDeleteResources,
       onPress: open,
       dataCy: 'delete-resource-button',
     },
@@ -214,23 +216,23 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
 
+      {canDeleteResources && (
+        <DeleteConfirmationModal
+          isOpen={isOpen}
+          onClose={closeDeleteModal}
+          onConfirm={handleDelete}
+          itemName={resource.name}
+          data-cy="delete-confirmation-modal"
+        />
+      )}
       {canUpdateResources && (
-        <>
-          <DeleteConfirmationModal
-            isOpen={isOpen}
-            onClose={closeDeleteModal}
-            onConfirm={handleDelete}
-            itemName={resource.name}
-            data-cy="delete-confirmation-modal"
-          />
-          <ResourceQrCode
-            resourceId={resourceId}
-            renderTrigger={(onOpen) => {
-              qrOpenRef.current = onOpen;
-              return null;
-            }}
-          />
-        </>
+        <ResourceQrCode
+          resourceId={resourceId}
+          renderTrigger={(onOpen) => {
+            qrOpenRef.current = onOpen;
+            return null;
+          }}
+        />
       )}
 
       {tabs.find((tab) => tab.key === activeTabKey) ? null : <Navigate to={`/resources/${resourceId}`} replace />}

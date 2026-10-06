@@ -159,6 +159,15 @@ export class ResourceUsage {
   })
   billingFactor!: number | null;
 
+  @Column({ type: 'simple-json', nullable: true })
+  @ApiProperty({
+    type: [Object],
+    nullable: true,
+    required: false,
+    description: 'Meter rates captured when the usage began',
+  })
+  meterRates!: { meterId: number; name: string; creditsPerUnit: number }[] | null;
+
   @OneToOne(() => BillingTransaction, (billingTransaction) => billingTransaction.resourceUsage, {
     onDelete: 'CASCADE',
     nullable: true,

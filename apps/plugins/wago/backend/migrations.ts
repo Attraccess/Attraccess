@@ -14,3 +14,6 @@ export * from './wago-credential-rotation.migration';
 export * from './migrations/1780010580000-add-wago-revision-editor-metadata';
 export * from './migrations/1780010600000-add-wago-claim-intent';
 export * from './migrations/1780010630000-add-wago-rejection-acknowledgement';
+export * from './migrations/1780010640000-drop-wago-commissioning-lease';
+export * from './migrations/1780010650000-add-wago-managed-updates';
+export * from './migrations/1780010660000-add-wago-network-changes';

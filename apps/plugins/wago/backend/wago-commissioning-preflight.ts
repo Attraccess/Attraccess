@@ -4,13 +4,9 @@ import { X509Certificate } from 'node:crypto';
 
 /** Validate local configuration before SSH or broker credential provisioning. */
 export function assertCommissioningBroker(config: MqttServerConnectionConfig, now = Date.now()): void {
-  if (!config.useTls || config.tlsInsecure)
-    throw new ConflictException('CC100 commissioning requires MQTT TLS with certificate verification enabled.');
   if (!/^[a-zA-Z0-9.-]+$/.test(config.host) || !Number.isInteger(config.port) || config.port < 1 || config.port > 65535)
     throw new ConflictException('Configure a valid MQTT hostname and port before commissioning.');
-  // The current runtime authenticates the URL hostname; do not silently ignore an override.
-  if (config.tlsServername && config.tlsServername !== config.host)
-    throw new ConflictException('Use the MQTT certificate DNS name as the broker host before commissioning.');
+  if (!config.useTls || config.tlsInsecure) return;
   if (config.caCert == null) return;
   const certificates = config.caCert.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g);
   if (

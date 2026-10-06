@@ -63,6 +63,21 @@ export class ResourceFlowsController {
     return await this.resourceFlowsService.resolveNodeSchema(resourceId, nodeType, body.config);
   }
 
+  @Post('node-previews/:nodeType')
+  @ApiOperation({
+    summary: 'Resolve a plugin flow-node preview',
+    description: 'Resolve a canvas summary without editor-only schema lookups.',
+    operationId: 'resolveNodePreview',
+  })
+  @ApiResponse({ status: 201, description: 'Node preview resolved successfully', type: ResourceFlowNodeSchemaDto })
+  public async resolveNodePreview(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('nodeType') nodeType: string,
+    @Body() body: ResolveResourceFlowNodeSchemaDto,
+  ): Promise<ResourceFlowNodeSchemaDto> {
+    return await this.resourceFlowsService.resolveNodeSchema(resourceId, nodeType, body.config, 'preview');
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Get resource flow',

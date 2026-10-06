@@ -1,7 +1,7 @@
 // Firmware/OTA UI (ATT-501): shows the installed version, whatever the device
 // offers on the stable/beta channel, and runs the update while polling for the
 // device to come back.
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, Spinner, Tooltip } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner, Tooltip } from '@heroui/react';
 import { ArrowUpCircleIcon, CpuIcon, DownloadIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -14,13 +14,13 @@ import {
 } from './api';
 import { PasswordFieldRow, StandardDrawer } from './drawer';
 import { StatusAlert } from './StatusAlert';
+import { useShellyTranslations } from './i18n';
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 const POLL_INTERVAL_MS = 5000;
 // A Shelly OTA takes ~30-90s including the reboot; past this we stop claiming
 // progress and let the operator re-check manually.
 const UPDATE_TIMEOUT_MS = 5 * 60 * 1000;
-
-const STAGE_LABEL: Record<FirmwareStage, string> = { stable: 'stable', beta: 'beta' };
 
 /**
  * Gen1 reports versions as `20230913-114150/v1.14.0` — only the tail is useful
@@ -33,8 +33,9 @@ function shortVersion(version: string): string {
 
 /** Table cell summarising a device's firmware state from the bulk overview. */
 export function FirmwareCell({ entry }: { entry: FirmwareOverviewEntry | undefined }) {
+  const { t } = useShellyTranslations();
   if (!entry) {
-    return <span className="sh:text-sm sh:text-default-400">Checking…</span>;
+    return <span className="sh:text-sm sh:text-default-400">{t('firmware.checking')}</span>;
   }
   if (entry.error || !entry.status) {
     return (
@@ -42,7 +43,7 @@ export function FirmwareCell({ entry }: { entry: FirmwareOverviewEntry | undefin
         className="sh:block sh:max-w-40 sh:truncate sh:text-sm sh:text-default-400"
         title={entry.error ?? undefined}
       >
-        Unavailable
+        {t('firmware.unavailable')}
       </span>
     );
   }
@@ -52,11 +53,11 @@ export function FirmwareCell({ entry }: { entry: FirmwareOverviewEntry | undefin
         className="sh:block sh:max-w-40 sh:truncate sh:text-sm sh:text-default-700"
         title={entry.status.currentVersion ?? undefined}
       >
-        {entry.status.currentVersion ? shortVersion(entry.status.currentVersion) : 'Unknown'}
+        {entry.status.currentVersion ? shortVersion(entry.status.currentVersion) : t('devices.unknown')}
       </span>
       {entry.status.hasUpdate && entry.status.available.stable && (
         <span className="sh:max-w-40 sh:truncate sh:text-xs sh:text-warning-600" title={entry.status.available.stable}>
-          {shortVersion(entry.status.available.stable)} available
+          {t('firmware.available', { version: shortVersion(entry.status.available.stable) })}
         </span>
       )}
     </div>
@@ -70,9 +71,10 @@ export function FirmwareCell({ entry }: { entry: FirmwareOverviewEntry | undefin
  * table's visible width on tablets.
  */
 export function UpdateAvailableIndicator({ entry }: { entry: FirmwareOverviewEntry | undefined }) {
+  const { t } = useShellyTranslations();
   const version = entry?.status?.hasUpdate ? entry.status.available.stable : null;
   if (!version) return null;
-  const label = `Firmware update available: ${shortVersion(version)}`;
+  const label = t('firmware.updateAvailable', { version: shortVersion(version) });
   return (
     <Tooltip>
       <Tooltip.Trigger>
@@ -104,10 +106,11 @@ function VersionRow({ label, value }: { label: string; value: string }) {
 }
 
 export function FirmwareDetails({ status }: { status: FirmwareStatus | null }) {
+  const { t, language } = useShellyTranslations();
   if (!status) {
     return (
       <div className="sh:rounded-xl sh:border sh:border-dashed sh:border-default-300 sh:p-4 sh:text-sm sh:text-default-500">
-        No firmware info loaded yet.
+        {t('firmware.empty')}
       </div>
     );
   }
@@ -116,10 +119,10 @@ export function FirmwareDetails({ status }: { status: FirmwareStatus | null }) {
       className="sh:rounded-xl sh:border sh:border-default-200 sh:bg-surface sh:p-4"
       data-cy="shelly-firmware-details"
     >
-      <VersionRow label="Installed" value={status.currentVersion ?? 'Unknown'} />
-      <VersionRow label="Stable channel" value={status.available.stable ?? 'Up to date'} />
-      <VersionRow label="Beta channel" value={status.available.beta ?? 'Nothing newer'} />
-      <VersionRow label="Checked" value={new Date(status.fetchedAt).toLocaleString()} />
+      <VersionRow label={t('firmware.installed')} value={status.currentVersion ?? t('devices.unknown')} />
+      <VersionRow label={t('firmware.stable')} value={status.available.stable ?? t('firmware.upToDate')} />
+      <VersionRow label={t('firmware.beta')} value={status.available.beta ?? t('firmware.nothingNewer')} />
+      <VersionRow label={t('firmware.checked')} value={new Date(status.fetchedAt).toLocaleString(language)} />
     </section>
   );
 }
@@ -133,10 +136,11 @@ export function FirmwareDrawer({
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
 }) {
+  const { t, tMessage } = useShellyTranslations();
   const [status, setStatus] = useState<FirmwareStatus | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | TranslationMessage | null>(null);
   const [installing, setInstalling] = useState<FirmwareStage | null>(null);
   const [installedVersion, setInstalledVersion] = useState<string | null>(null);
   const targetVersion = useRef<string | null>(null);
@@ -203,9 +207,7 @@ export function FirmwareDrawer({
       if (cancelled) return;
       if (Date.now() > deadline.current) {
         setInstalling(null);
-        setError(
-          'The device did not report the expected firmware version within 5 minutes. Check it and re-check the firmware manually.',
-        );
+        setError({ key: 'firmware.timeout' });
         return;
       }
       try {
@@ -240,15 +242,15 @@ export function FirmwareDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <CpuIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">Firmware</h2>
+              <DrawerHeading className="sh:text-lg sh:font-semibold">{t('devices.firmware')}</DrawerHeading>
             </div>
             {device && (
               <p className="sh:text-sm sh:text-muted">
-                Check for and install firmware updates on {device.name} ({device.ipAddress}).
+                {t('firmware.description', { name: device.name, address: device.ipAddress })}
               </p>
             )}
           </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
+          <Button isIconOnly variant="ghost" aria-label={t('common.close')} onPress={close}>
             <XIcon size={16} />
           </Button>
         </div>
@@ -257,35 +259,36 @@ export function FirmwareDrawer({
         <div className="sh:flex sh:flex-col sh:gap-4">
           {device?.authState === 'required' && (
             <PasswordFieldRow
-              label="Current password"
+              label={t('password.current')}
               value={currentPassword}
               onChange={setCurrentPassword}
-              description="Required because this device already has authentication enabled."
+              description={t('password.currentDescription')}
               autoComplete="current-password"
               dataCy="shelly-firmware-current-password"
             />
           )}
 
           {error && (
-            <StatusAlert status="danger" title="Firmware check failed" dataCy="shelly-firmware-error">
-              {error}
+            <StatusAlert status="danger" title={t('firmware.error')} dataCy="shelly-firmware-error">
+              {tMessage(error)}
             </StatusAlert>
           )}
 
           {installing && (
-            <StatusAlert status="accent" title="Update running" dataCy="shelly-firmware-progress">
+            <StatusAlert status="accent" title={t('firmware.running')} dataCy="shelly-firmware-progress">
               <span className="sh:flex sh:items-center sh:gap-2">
                 <Spinner size="sm" color="accent" />
-                Installing the {STAGE_LABEL[installing]} firmware
-                {targetVersion.current ? ` (${targetVersion.current})` : ''}. The device reboots during the update and
-                is offline for a moment — this page keeps checking.
+                {t('firmware.installing', {
+                  stage: t(`firmware.${installing}Stage`),
+                  version: targetVersion.current ? ` (${targetVersion.current})` : '',
+                })}
               </span>
             </StatusAlert>
           )}
 
           {installedVersion && !installing && (
-            <StatusAlert status="success" title="Update finished" dataCy="shelly-firmware-success">
-              The device now runs {installedVersion}.
+            <StatusAlert status="success" title={t('firmware.finished')} dataCy="shelly-firmware-success">
+              {t('firmware.success', { version: installedVersion })}
             </StatusAlert>
           )}
 
@@ -308,7 +311,7 @@ export function FirmwareDrawer({
           isDisabled={!!installing}
           data-cy="shelly-firmware-refresh"
         >
-          <RefreshCwIcon className="sh:h-4 sh:w-4" /> Check again
+          <RefreshCwIcon className="sh:h-4 sh:w-4" /> {t('firmware.recheck')}
         </Button>
         {stages.map((stage) => {
           const version = status?.available[stage];
@@ -321,9 +324,10 @@ export function FirmwareDrawer({
               isPending={installing === stage}
               isDisabled={!!installing}
               data-cy={`shelly-firmware-install-${stage}`}
-              aria-label={`Install ${STAGE_LABEL[stage]} firmware ${version}`}
+              aria-label={t('firmware.installLabel', { stage: t(`firmware.${stage}Stage`), version })}
             >
-              <DownloadIcon className="sh:h-4 sh:w-4" /> Install {STAGE_LABEL[stage]} {shortVersion(version)}
+              <DownloadIcon className="sh:h-4 sh:w-4" />{' '}
+              {t('firmware.install', { stage: t(`firmware.${stage}Stage`), version: shortVersion(version) })}
             </Button>
           );
         })}

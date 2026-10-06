@@ -11,6 +11,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   InputGroup,
   Label,
   Table,
@@ -123,7 +124,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
         <DrawerHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <Settings2Icon className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">{t('title')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
           </div>
           <p className="text-sm text-default-500">{t('subtitle')}</p>
         </DrawerHeader>

@@ -12,6 +12,11 @@
     "creditsPerOperatingMinute": {
       "label": "{{currency}} pro Betriebsminute",
       "description": "Dieser Betrag wird pro Betriebsminute abgezogen, die der Nutzung zugeordnet ist."
+    },
+    "meterRate": {
+      "label": "pro Messwert ({{currency}})",
+      "description": "0 deaktiviert die Abrechnung. Der Preis wird beim Sitzungsstart gespeichert.",
+      "invalid": "Gib einen gültigen Preis mit bis zu {{digits}} Nachkommastellen ein."
     }
   },
   "actions": {

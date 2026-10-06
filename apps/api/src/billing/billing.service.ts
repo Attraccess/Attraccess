@@ -7,10 +7,11 @@ import {
   BillingTransactionItem,
   ResourceUsage,
   ResourceFlowNodeType,
+  ResourceMeter,
 } from '@attraccess/database-entities';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, MoreThan, Repository } from 'typeorm';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { PaginationOptions } from '../types/request';
 import { TransactionsDto } from './dto/transactions.dto';
@@ -29,6 +30,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceBillingConfigurationChangedEvent } from './events/resource-billing-configuration-changed.event';
 import { MetricsService } from '../metrics/metrics.service';
 import { AuditService } from '../audit/audit.service';
+import { applyBillingFactor, toExactCredits } from '@attraccess/shared';
 
 @Injectable()
 export class BillingService {
@@ -122,6 +124,14 @@ export class BillingService {
 
   private DEFAULT_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
 
+  async getTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
+    const transaction = await this.billingTransactionRepository.findOne({
+      where: { resourceUsageId: usageId, userId },
+      select: ['id'],
+    });
+    return transaction?.id ?? null;
+  }
+
   async getHistory(userId: number, options: PaginationOptions): Promise<TransactionsDto> {
     const { page, limit } = options;
 
@@ -145,6 +155,14 @@ export class BillingService {
     return await this.billingTransactionRepository.findOne({
       where: { id: transactionId, userId },
       relations: this.DEFAULT_RELATIONS,
+    });
+  }
+
+  async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransaction | null> {
+    return this.billingTransactionRepository.findOneBy({
+      resourceUsageId,
+      userId,
+      status: BillingTransactionStatus.Completed,
     });
   }
 
@@ -303,12 +321,12 @@ export class BillingService {
       const operatingDurationMs = Math.round((usage.attributedOperatingDurationInMinutes ?? 0) * 60_000);
       const roundedMinutes = Math.ceil(sessionDurationMs / 60_000);
       const roundedOperatingMinutes = Math.ceil(operatingDurationMs / 60_000);
-      const creditsForUsageDuration = sessionDurationRate * roundedMinutes;
-      const creditsForOperatingDuration = operatingDurationRate * roundedOperatingMinutes;
       // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
       const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
-      let totalCredits = creditsForUsageDuration + creditsForOperatingDuration;
-      totalCredits += creditsForSession;
+      let grossCredits =
+        toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes) +
+        toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes) +
+        toExactCredits(creditsForSession);
 
       let transaction = await manager.findOne(BillingTransaction, {
         where: {
@@ -317,17 +335,19 @@ export class BillingService {
         relations: ['items'],
       });
 
-      if (totalCredits === 0 && !transaction) {
+      if (grossCredits === BigInt(0) && !transaction) {
         return;
       }
 
       (transaction?.items ?? []).forEach((item) => {
-        totalCredits += item.unitPrice * item.quantity;
+        grossCredits += toExactCredits(item.unitPrice) * toExactCredits(item.quantity);
       });
 
       const billingFactor = usage.billingFactor ?? usage.user.billingFactor;
-      const billingFactorDiscountAmount = Math.round(totalCredits - totalCredits * (billingFactor / 100));
-      totalCredits = totalCredits - billingFactorDiscountAmount;
+      const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyBillingFactor(
+        grossCredits,
+        billingFactor,
+      );
 
       if (transaction) {
         const previousStatus = transaction.status;
@@ -410,8 +430,8 @@ export class BillingService {
       return await doCalculation(transactionManager);
     }
 
-    const transaction = await this.billingTransactionItemRepository.manager.transaction(
-      (transactionalEntityManager) => doCalculation(transactionalEntityManager),
+    const transaction = await this.billingTransactionItemRepository.manager.transaction((transactionalEntityManager) =>
+      doCalculation(transactionalEntityManager),
     );
     if (transaction) await this.notifyResourceUsageCharge(transaction.id);
     return transaction;
@@ -500,7 +520,13 @@ export class BillingService {
     if (
       (usage?.creditsPerUsage ?? configuration.creditsPerUsage) > 0 ||
       (usage?.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute) > 0 ||
-      (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0
+      (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0 ||
+      (usage?.meterRates
+        ? usage.meterRates.some((meter) => meter.creditsPerUnit > 0)
+        : (await (transactionalEntityManager ?? this.resourceBillingConfigurationRepository.manager).count(
+            ResourceMeter,
+            { where: { resourceId, creditsPerUnit: MoreThan(0) } },
+          )) > 0)
     ) {
       return true;
     }
@@ -541,7 +567,7 @@ export class BillingService {
       refundOfId: transaction.id,
     } as Partial<BillingTransaction>);
 
-    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    this.liveNotificationsService.notifyTransactionUpdate(refundTransaction);
     void this.auditService.recordBillingTransaction({
       transactionId: refundTransaction.id,
       userId: refundTransaction.userId,

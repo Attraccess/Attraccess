@@ -14,11 +14,13 @@
     "initiator": "Initiator",
     "resourceUsage": "Resource / Usage",
     "refundOf": "Refund of",
+    "correctionOf": "Correction of",
     "externalReference": "External reference",
     "type": "Type"
   },
   "type": {
     "refund": "Refund",
+    "correction": "Meter correction",
     "resourceUsage": "Resource usage",
     "manual": "Manual",
     "sumupTopup": "SumUp top-up",
@@ -31,7 +33,9 @@
       "description": "Description",
       "quantity": "Qty",
       "unitPrice": "Unit price",
-      "subtotal": "Subtotal"
+      "subtotal": "Subtotal",
+      "rateShort": "Rate",
+      "totalShort": "Total"
     },
     "system": {
       "PER_SESSION": "Per session",
@@ -40,9 +44,15 @@
       "BILLING_FACTOR": "Billing factor"
     },
     "empty": "No items",
-    "total": "Items total"
+    "total": "Items total",
+    "meterDescription": "{{value}} at {{rate}} per measured value",
+    "unavailable": "Unavailable",
+    "meterUnavailable": "Final reading unavailable; no meter charge included. Captured rate: {{rate}} per measured value."
   },
   "actions": {
-    "refund": "Refund"
-  }
+    "refund": "Refund",
+    "openUsage": "Open usage details"
+  },
+  "loadError": "Unable to load billing details.",
+  "retry": "Try again"
 }

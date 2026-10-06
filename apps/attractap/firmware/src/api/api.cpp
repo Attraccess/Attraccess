@@ -118,7 +118,9 @@ void API::processIncomingMessage(const char *buf, size_t len)
                               strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
 
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    if (!isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
+    // Background stats failures must not interrupt start/stop controls with a popup.
+    const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
+    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
         inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
@@ -172,6 +174,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
     {
         this->sendAuthenticationRequest();
+    }
+    else if (strcmp(eventType, "RESOURCE_USAGE_STATS") == 0)
+    {
+        this->onUsageStats(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "RESOURCE_LIST") == 0)
     {
@@ -235,7 +241,13 @@ void API::processIncomingMessage(const char *buf, size_t len)
         }
         if (this->actionResultCallback)
         {
-            this->actionResultCallback({eventType, success, requestId, {}, false});
+            ActionResult result{eventType, success, requestId, {}, false};
+            JsonObject summary = inboundDoc["data"]["payload"]["billingSummary"].as<JsonObject>();
+            if (success && strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 &&
+                summary["amount"].is<int64_t>() && summary["amount"].as<int64_t>() != 0 &&
+                summary["total"].is<const char *>())
+                result.billingTotal = summary["total"].as<std::string>();
+            this->actionResultCallback(result);
         }
     }
     else if (strcmp(eventType, "READER_FIRMWARE_UPDATE_REQUIRED") == 0)

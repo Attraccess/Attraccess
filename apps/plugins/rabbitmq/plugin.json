@@ -13,7 +13,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.0.0"
+    "min": "1.11.0"
   },
   "permissions": ["ACCESS_MQTT_SERVERS"]
 }

@@ -103,6 +103,12 @@ COPY --from=builder /app/dist dist
 COPY --from=builder /app/docs docs
 COPY --from=builder /app/deploy/api /app/dist/apps/api
 
+# Large controller assets are server-owned, never embedded in the 50 MiB npm
+# plugin package. Missing/mismatched assets fail the server image build.
+COPY --from=builder --chown=appuser:appuser /app/apps/plugins/wago/runtime-assets/cc100-build /app/share/cc100-runtime
+RUN gosu appuser node -e "const fs=require('fs'),crypto=require('crypto'),p='/app/share/cc100-runtime/',r=JSON.parse(fs.readFileSync(p+'release.json'));const b=fs.readFileSync(p+'wago-cc100-runtime.tar');if(r.schemaVersion!==1 || b.length!==r.bundleBytes || crypto.createHash('sha256').update(b).digest('hex')!==r.bundleSha256) throw new Error('Invalid build-owned CC100 assets');"
+ENV WAGO_CC100_BUILD_ASSETS_PATH=/app/share/cc100-runtime
+
 # Bundle sidecar configs (Prometheus rules, Grafana provisioning, dashboards)
 # so they can be copied into shared volumes by a monitoring-init container.
 COPY --from=builder /app/monitoring /app/share/monitoring

@@ -121,16 +121,17 @@ process.exit(result.status ?? 1);
     const plcBoot = boot();
     expect(plcBoot.status).not.toBe(0);
     expect(plcBoot.stderr).toContain('codesys-active');
-    expect(exists(config + '/runtime-enabled')).toBe(false);
+    // Enablement is durable operator intent: a rejected boot contains the
+    // runtime but never silently disables it.
+    expect(exists(config + '/runtime-enabled')).toBe(true);
 
     fixture.file('plc', 'stopped');
-    fixture.file(config + '/runtime-enabled', '');
     rmSync(join(fixture.root, WAGO_DOUT));
     const missingIoBoot = boot();
     expect(missingIoBoot.status).toBe(1);
     expect(fixture.read('docker.log').slice(beforeRejectedBoots.length)).not.toMatch(/^start /m);
     expect(fixture.containers()[0]).toMatchObject({ running: false, restart: 'no' });
-    expect(exists(config + '/runtime-enabled')).toBe(false);
+    expect(exists(config + '/runtime-enabled')).toBe(true);
   }, 240000);
 
   it('resumes interrupted recovery disposal and receipt acknowledgement without restoring workloads', () => {
@@ -177,12 +178,14 @@ process.exit(result.status ?? 1);
     const accepted = tx + '.accepted-cleanup';
     const accept = () => runtimeBundleAcceptScript(fixture.root);
     interruptDisposal(accepted, 'prepared');
-    const before = fixture.read('docker.log');
     expect(fixture.run(accept(), 'journal-disposal').signal).toBe('SIGKILL');
     expect(exists(tx)).toBe(false);
     expect(exists(accepted + '/prepared')).toBe(false);
     expect(exists(accepted + '/accepting')).toBe(true);
     expect(exists(accepted + '/started')).toBe(true);
+    // Acceptance verifies the runtime is running through a read-only inspect
+    // before journaling; recovery and the resumed accept must not touch Docker.
+    const before = fixture.read('docker.log');
 
     const recovery = fixture.run(runtimeBundleRecoveryScript(fixture.root, token));
     expect(recovery.status).not.toBe(0);

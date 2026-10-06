@@ -14,7 +14,7 @@ The existing delivery request carries `confirmInstall: true` and fresh temporary
 SSH credentials. One consequence confirmation authorizes destructive preparation;
 there is no separate workload-preservation, Docker or mandatory WBM gate.
 
-Delivery validates the pinned SSH identity, signed offline runtime and broker
+Delivery validates the pinned SSH identity, offline runtime checksum and broker
 requirements, then prepares the controller under its operation lock:
 
 1. Verify the CC100 `751-9301` FW31 identity, required firmware-installed tools
@@ -29,7 +29,7 @@ requirements, then prepares the controller under its operation lock:
    Unsupported packages, missing tools and ambiguous service states fail closed.
 4. Establish persistent access limited to the required digital registers and
    recheck output ownership and runtime-account permissions.
-5. Complete restricted enrollment and locked signed runtime delivery, then wait
+5. Complete restricted enrollment and locked runtime delivery, then wait
    for permanent discovery and independent readiness verification.
 
 `codesysState=disabled` is recorded only after successful verified preparation.
@@ -62,9 +62,13 @@ and deploys with:
 --env WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1
 --mount type=bind,src=/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din,dst=/run/attraccess-wago/io/din,readonly
 --mount type=bind,src=/sys/kernel/dout_drv/DOUT_DATA,dst=/run/attraccess-wago/io/dout
+--mount type=bind,src=/sys/devices/platform/led/leds/run-green/brightness,dst=/run/attraccess-wago/io/led-run-green
+--mount type=bind,src=/sys/devices/platform/led/leds/run-red/brightness,dst=/run/attraccess-wago/io/led-run-red
 ```
 
-Both sources must exist as the expected regular files, not substitute directories
+The two RUN LED mounts are optional status feedback. They are added only when the
+files exist, and a failed LED grant never blocks I/O (see [RUN LED status](#run-led-status)).
+Both DIN/DOUT sources must exist as the expected regular files, not substitute directories
 or final-component symlinks. No root fallback, privileged mode, broad `/sys`,
 `/dev`, host-root or Docker-socket mount is permitted. The protected runtime
 state directory and separate read-only private CA mount retain their TLS contract.
@@ -134,6 +138,24 @@ staging file in the validated boot directory. Unsafe existing paths are rejected
 Docker commands select the controller's local Unix endpoint and discard inherited
 remote-context settings. They never target the developer machine's daemon.
 
+## RUN LED status
+
+The runtime drives the CC100 RUN LED (green and red dies; both lit show yellow):
+
+| Pattern                              | Meaning                                          |
+| ------------------------------------ | ------------------------------------------------ |
+| Steady yellow                        | Runtime process starting                         |
+| Yellow blink                         | Connected, waiting to be claimed (pairing)       |
+| Red blink                            | MQTT broker unreachable                          |
+| Alternating green/yellow             | Claimed, no configuration accepted yet           |
+| Mostly red, short gap                | Hardware or configuration fault; check readiness |
+| Green heartbeat, periodic light show | Ready                                            |
+| Off                                  | Runtime stopped (or LED access unavailable)      |
+
+WAGO `ledserverd` leaves RUN at `STATIC_OFF` once CODESYS is disabled, so it does not
+compete with the runtime. The LED is cosmetic: missing files or permissions only
+disable it, and it is not a safety indicator.
+
 ## Reports, cleanup and security
 
 The version-1 report contains exactly eight newline-terminated fields:
@@ -185,7 +207,7 @@ container is stopped or absent before recording success. Runtime removal also
 verifies absence afterward. A missing/unreachable daemon or failed Docker query
 is not proof of a stopped writer; the error and recovery ownership are retained.
 
-Pinned SSH, signed artifacts, TLS and enrollment revocation remain enforced.
+Pinned SSH, runtime checksum/manifest checks, TLS and enrollment revocation remain enforced.
 Management-key enrollment and **Recover saved access** retain their separate
 security/recovery contract. Full management hardening remains unsupported where
 its vendor dependency and lockout-safe recovery requirements are unmet; that

@@ -102,5 +102,6 @@ export class ResourceIntroduction {
 
   @ManyToOne(() => ResourceGroup, (group) => group.introductions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'resourceGroupId' })
+  @ApiProperty({ description: 'The group providing this introduction', type: () => ResourceGroup, required: false })
   resourceGroup!: ResourceGroup;
 }

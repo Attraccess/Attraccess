@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "../nfc/nfc_contract.hpp"
+#include "../rfid/rfid_contract.hpp"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"

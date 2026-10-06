@@ -2,7 +2,10 @@ import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { SwaggerModule } from '@nestjs/swagger';
-import { Logger } from '@nestjs/common';
+import { Body, Controller, Logger, Post } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
 import { bootstrap } from './main.bootstrap';
 import { SettingsService } from './settings/settings.service';
 import { PluginService } from './plugin-system/plugin.service';
@@ -12,6 +15,12 @@ import { PluginMigrationService } from './plugin-system/plugin-migration.service
 import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { createCert } from 'mkcert';
+import { initializeProcessLogging } from './logging/process-logging';
+
+jest.mock('./logging/process-logging', () => ({
+  initializeProcessLogging: jest.fn(() => ({ log: jest.fn(), error: jest.fn(), warn: jest.fn() })),
+  withLoggingLifecycle: jest.fn((module) => module),
+}));
 
 jest.mock('./app/app.module', () => ({ AppModule: class AppModule {} }));
 jest.mock('./plugin-system/plugin.service', () => ({
@@ -38,6 +47,16 @@ jest.mock('mkcert', () => ({
   createCert: jest.fn(async () => ({ key: 'key', cert: 'cert' })),
 }));
 
+// Plugin controllers share the host's HTTP body parser. Echo a configuration
+// request to verify that parsing preserves snapshots and draft conflict data.
+@Controller('plugin-configuration')
+class ConfigurationRequestController {
+  @Post(':id/:action')
+  receive(@Body() body: object) {
+    return body;
+  }
+}
+
 describe('API bootstrap ordering and configuration', () => {
   const appConfig = {
     PLUGIN_DIR: '/plugins',
@@ -51,6 +70,7 @@ describe('API bootstrap ordering and configuration', () => {
     VERSION: 'test',
     PORT: 3999,
     NODE_ENV: 'test',
+    LOG_LEVELS: ['error', 'warn', 'log'],
   };
   const datasource = {
     isInitialized: false,
@@ -61,7 +81,7 @@ describe('API bootstrap ordering and configuration', () => {
   };
   const settings = { getUrl: jest.fn() };
   const config = { get: jest.fn((key: string) => (key === 'app' ? appConfig : { root: '/storage' })) };
-  const early = { get: jest.fn(() => config), close: jest.fn() };
+  const early = { get: jest.fn(() => config), close: jest.fn(), useLogger: jest.fn() };
   const app = {
     get: jest.fn((token: unknown) => {
       if (token === ConfigService) return config;
@@ -74,6 +94,7 @@ describe('API bootstrap ordering and configuration', () => {
     set: jest.fn(),
     useGlobalFilters: jest.fn(),
     use: jest.fn(),
+    useBodyParser: jest.fn(),
     enableCors: jest.fn(),
     setGlobalPrefix: jest.fn(),
     useWebSocketAdapter: jest.fn(),
@@ -100,9 +121,100 @@ describe('API bootstrap ordering and configuration', () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => {
+    Logger.detachBuffer();
+    Logger.flush();
     jest.restoreAllMocks();
     if (originalSkip === undefined) delete process.env.SKIP_DATABASE_MIGRATIONS;
     else process.env.SKIP_DATABASE_MIGRATIONS = originalSkip;
+  });
+
+  describe('configuration request bodies (HTTP integration)', () => {
+    let httpApp: NestExpressApplication;
+
+    beforeEach(async () => {
+      const module = await Test.createTestingModule({
+        controllers: [ConfigurationRequestController],
+        providers: [
+          { provide: ConfigService, useValue: config },
+          { provide: SettingsService, useValue: settings },
+          { provide: DataSource, useValue: datasource },
+        ],
+      }).compile();
+      httpApp = module.createNestApplication<NestExpressApplication>({ logger: false });
+      jest
+        .mocked(NestFactory.create)
+        .mockResolvedValueOnce(app as never)
+        .mockResolvedValueOnce(httpApp);
+      await bootstrap();
+      await httpApp.listen(0, '127.0.0.1');
+    });
+
+    afterEach(async () => {
+      await httpApp?.close();
+    });
+
+    it.each([100 * 1024 + 1, 10 * 1024 * 1024])('parses configuration requests of %i bytes', async (bytes) => {
+      const body = { snapshot: { version: 1, profile: '' } };
+      body.snapshot.profile = 'x'.repeat(bytes - Buffer.byteLength(JSON.stringify(body)));
+      const response = await request(httpApp.getHttpServer()).post('/api/plugin-configuration/1/validate').send(body);
+
+      expect(response.body).not.toHaveProperty('message', 'request entity too large');
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(body);
+    });
+
+    it('saves a draft when its snapshot and optimistic concurrency data exceed 100 KiB together', async () => {
+      const snapshot = { version: 1, profile: 'x'.repeat(60 * 1024) };
+      const body = {
+        snapshot,
+        metadata: { labels: { point: 'Power meter' } },
+        expectedDraft: {
+          snapshot: JSON.stringify(snapshot),
+          presetProvenance: null,
+          updatedAt: '2026-10-03T12:00:00.000Z',
+        },
+      };
+      const response = await request(httpApp.getHttpServer()).post('/api/plugin-configuration/1/draft').send(body);
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(body);
+    });
+
+    it('keeps parsing small JSON requests', async () => {
+      const body = { snapshot: { version: 1, physicalPoints: [], logicalChannels: [] } };
+      const response = await request(httpApp.getHttpServer()).post('/api/plugin-configuration/1/validate').send(body);
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(body);
+    });
+
+    it('still rejects JSON requests exceeding 10 MiB', async () => {
+      const response = await request(httpApp.getHttpServer())
+        .post('/api/plugin-configuration/1/draft')
+        .send({ snapshot: 'x'.repeat(10 * 1024 * 1024) });
+
+      expect(response.status).toBe(413);
+      expect(response.body.message).toBe('request entity too large');
+    });
+
+    it('still rejects malformed JSON', async () => {
+      await request(httpApp.getHttpServer())
+        .post('/api/plugin-configuration/1/draft')
+        .set('Content-Type', 'application/json')
+        .send('{"snapshot":')
+        .expect(400);
+    });
+
+    it('keeps parsing URL-encoded requests used by SSO callbacks', async () => {
+      const body = { SAMLResponse: 'test-response', RelayState: 'test-state' };
+      const response = await request(httpApp.getHttpServer())
+        .post('/api/plugin-configuration/1/draft')
+        .type('form')
+        .send(body);
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(body);
+    });
   });
 
   it('configures plugins and migrates before returning the configured application', async () => {
@@ -133,6 +245,8 @@ describe('API bootstrap ordering and configuration', () => {
       .invocationCallOrder[0];
     expect(migrationOrder).toBeLessThan(jest.mocked(NestFactory.create).mock.invocationCallOrder[0]);
     expect(early.close).toHaveBeenCalled();
+    expect(initializeProcessLogging).toHaveBeenCalledTimes(1);
+    expect(early.useLogger).toHaveBeenCalledWith(jest.mocked(initializeProcessLogging).mock.results[0].value);
     expect(PluginModule.resetHostReferences).toHaveBeenCalled();
     expect(datasource.initialize).toHaveBeenCalled();
     expect(datasource.runMigrations).toHaveBeenCalled();
@@ -170,10 +284,7 @@ describe('API bootstrap ordering and configuration', () => {
   it('records migration failures and stops boot before accepting requests', async () => {
     const error = new Error('migration failed');
     datasource.runMigrations.mockRejectedValue(error);
-    jest.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process exited');
-    });
-    await expect(bootstrap()).rejects.toThrow('process exited');
+    await expect(bootstrap()).rejects.toThrow('migration failed');
     expect(PluginService.recordBootFailure).toHaveBeenCalledWith(error);
     expect(app.setGlobalPrefix).not.toHaveBeenCalled();
   });

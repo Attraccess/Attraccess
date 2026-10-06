@@ -36,20 +36,18 @@ import { useDetection } from './detection';
 import { deleteUser, fetchUsers, type RabbitmqUser, type RabbitmqUserList } from './users-api';
 import { RabbitmqPermissionsModal } from './RabbitmqPermissionsModal';
 import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
+import { useRabbitmqTranslations } from './i18n';
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 function PermissionChips({ user }: { user: RabbitmqUser }) {
+  const { t } = useRabbitmqTranslations();
   if (user.permissions.length === 0) {
-    return <span className="rmq:text-xs rmq:text-default-400">none</span>;
+    return <span className="rmq:text-xs rmq:text-default-400">{t('users.none')}</span>;
   }
   return (
     <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
       {user.permissions.map((permission) => (
-        <Chip
-          key={permission.vhost}
-          size="sm"
-          variant="soft"
-          title={`configure: ${permission.configure}\nwrite: ${permission.write}\nread: ${permission.read}`}
-        >
+        <Chip key={permission.vhost} size="sm" variant="soft" title={t('permissions.summary', { ...permission })}>
           {permission.vhost}
         </Chip>
       ))}
@@ -58,11 +56,12 @@ function PermissionChips({ user }: { user: RabbitmqUser }) {
 }
 
 export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
+  const { t, tMessage, language } = useRabbitmqTranslations();
   const { result } = useDetection(mqttServerId);
 
   const [data, setData] = useState<RabbitmqUserList | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | TranslationMessage | null>(null);
 
   // Modal state. `formUser` doubles as the mode flag (null = create).
   const [formOpen, setFormOpen] = useState(false);
@@ -70,7 +69,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
   const [permissionsUser, setPermissionsUser] = useState<RabbitmqUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<RabbitmqUser | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | TranslationMessage | null>(null);
 
   // The panel can unmount while a fetch is in flight (navigation away) — drop
   // the result instead of calling setState on an unmounted component.
@@ -96,7 +95,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
       }
     } catch (err) {
       if (mounted.current) {
-        setLoadError(err instanceof Error ? err.message : 'Loading users failed.');
+        setLoadError(err instanceof Error ? err.message : { key: 'users.loadError' });
       }
     } finally {
       if (mounted.current) {
@@ -131,7 +130,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
       setUserToDelete(null);
       void reload();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Deleting the user failed.');
+      setDeleteError(err instanceof Error ? err.message : { key: 'users.deleteError' });
     } finally {
       setDeleting(false);
     }
@@ -145,14 +144,14 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
       <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
         <div className="rmq:flex rmq:items-center rmq:gap-2">
           <UsersIcon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
-          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">RabbitMQ users</p>
+          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('users.title')}</p>
         </div>
         <div className="rmq:flex rmq:items-center rmq:gap-2">
           <Button
             isIconOnly
             size="sm"
             variant="ghost"
-            aria-label="Reload RabbitMQ users"
+            aria-label={t('users.reload')}
             onPress={() => void reload()}
             isDisabled={loading}
             data-cy={`rabbitmq-user-panel-reload-${mqttServerId}`}
@@ -169,7 +168,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
             data-cy={`rabbitmq-user-panel-create-button-${mqttServerId}`}
           >
             <PlusIcon className="rmq:w-4 rmq:h-4" />
-            Add user
+            {t('users.add')}
           </Button>
         </div>
       </Card.Header>
@@ -177,7 +176,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
         {loadError && (
           <Alert status="danger" data-cy="rabbitmq-user-panel-error-alert">
             <AlertContent>
-              <AlertDescription>{loadError}</AlertDescription>
+              <AlertDescription>{tMessage(loadError)}</AlertDescription>
             </AlertContent>
           </Alert>
         )}
@@ -191,20 +190,20 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
         {data && (
           <Table data-cy="rabbitmq-user-panel-table">
             <TableScrollContainer>
-              <TableContent aria-label="RabbitMQ users">
+              <TableContent aria-label={t('users.title')}>
                 <TableHeader>
-                  <TableColumn isRowHeader>Username</TableColumn>
-                  <TableColumn>Tags</TableColumn>
-                  <TableColumn>Vhost access</TableColumn>
-                  <TableColumn>Actions</TableColumn>
+                  <TableColumn isRowHeader>{t('users.username')}</TableColumn>
+                  <TableColumn>{t('users.tags')}</TableColumn>
+                  <TableColumn>{t('users.access')}</TableColumn>
+                  <TableColumn>{t('users.actions')}</TableColumn>
                 </TableHeader>
-                <TableBody items={data.users}>
+                <TableBody items={data.users} dependencies={[language]}>
                   {(user) => (
                     <TableRow key={user.name} id={user.name}>
                       <TableCell className="rmq:whitespace-nowrap rmq:font-medium">{user.name}</TableCell>
                       <TableCell>
                         {user.tags.length === 0 ? (
-                          <span className="rmq:text-xs rmq:text-default-400">none</span>
+                          <span className="rmq:text-xs rmq:text-default-400">{t('users.none')}</span>
                         ) : (
                           <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
                             {user.tags.map((tag) => (
@@ -224,7 +223,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             isIconOnly
                             size="sm"
                             variant="ghost"
-                            aria-label={`Edit user ${user.name}`}
+                            aria-label={t('users.edit', { name: user.name })}
                             onPress={() => {
                               setFormUser(user);
                               setFormOpen(true);
@@ -237,7 +236,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             isIconOnly
                             size="sm"
                             variant="ghost"
-                            aria-label={`Edit permissions of ${user.name}`}
+                            aria-label={t('users.permissions', { name: user.name })}
                             onPress={() => setPermissionsUser(user)}
                             data-cy={`rabbitmq-user-permissions-button-${user.name}`}
                           >
@@ -247,7 +246,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             isIconOnly
                             size="sm"
                             variant="ghost"
-                            aria-label={`Delete user ${user.name}`}
+                            aria-label={t('users.delete', { name: user.name })}
                             onPress={() => {
                               setDeleteError(null);
                               setUserToDelete(user);
@@ -298,24 +297,21 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
               {({ close }) => (
                 <>
                   <ModalHeader>
-                    <ModalHeading>Delete user</ModalHeading>
+                    <ModalHeading>{t('users.deleteTitle')}</ModalHeading>
                   </ModalHeader>
                   <ModalBody className="rmq:flex rmq:flex-col rmq:gap-3">
-                    <p>
-                      Delete the RabbitMQ user <strong>{userToDelete?.name}</strong>? Connected clients using this
-                      account will be disconnected and its permissions removed.
-                    </p>
+                    <p>{t('users.deleteDescription', { name: userToDelete?.name })}</p>
                     {deleteError && (
                       <Alert status="danger" data-cy="rabbitmq-user-delete-error-alert">
                         <AlertContent>
-                          <AlertDescription>{deleteError}</AlertDescription>
+                          <AlertDescription>{tMessage(deleteError)}</AlertDescription>
                         </AlertContent>
                       </Alert>
                     )}
                   </ModalBody>
                   <ModalFooter>
                     <Button variant="secondary" onPress={close} data-cy="rabbitmq-user-delete-cancel-button">
-                      Cancel
+                      {t('common.cancel')}
                     </Button>
                     <Button
                       variant="danger"
@@ -323,7 +319,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                       isPending={deleting}
                       data-cy="rabbitmq-user-delete-confirm-button"
                     >
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </ModalFooter>
                 </>

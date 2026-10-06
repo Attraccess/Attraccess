@@ -7,19 +7,23 @@ import { wagoShellStat } from './wago-shell-stat';
  */
 export function wagoShellFilesystemGuard({
   acquireLock = true,
+  createConfiguration = true,
+  waitForLock = false,
   lockName = 'install.lock',
   descriptor = 9,
 }: {
   acquireLock?: boolean;
+  createConfiguration?: boolean;
+  waitForLock?: boolean;
   lockName?: 'install.lock' | 'supervisor.lock';
   descriptor?: 8 | 9;
 } = {}): string {
   return `
 ${wagoShellRootDirectoryCheck()}
 wago_require_root_directory "$root/etc" || fail 'Unsafe configuration parent ownership or permissions'
-if test ! -e "$config" && test ! -L "$config"; then
+${createConfiguration ? `if test ! -e "$config" && test ! -L "$config"; then
   mkdir -m 0700 "$config" || fail 'Cannot create private runtime configuration'
-fi
+fi` : ''}
 test -d "$config" && test ! -L "$config" || fail 'Runtime configuration must be a regular directory'
 test "$(stat -c '%u:%g:%a' "$config")" = 0:0:700 || fail 'Unsafe runtime configuration ownership or permissions'
 ${
@@ -37,7 +41,12 @@ validate_controller_lock || fail 'Unsafe controller lock ownership, permissions 
 ${
   acquireLock
     ? `exec ${descriptor}<>"$config/${lockName}"
-flock -n ${descriptor} || fail 'Another runtime transaction holds the controller lock'
+  ${
+    waitForLock
+      ? `command -v timeout >/dev/null || fail 'Bounded controller lock wait unavailable'
+  timeout -k 5 310 flock ${descriptor}`
+      : `flock -n ${descriptor}`
+  } || fail 'Another runtime transaction holds the controller lock'
 validate_controller_lock || fail 'Controller lock changed during acquisition'`
     : ''
 }

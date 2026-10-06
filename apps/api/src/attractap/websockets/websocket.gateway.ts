@@ -443,6 +443,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.sessionHandler.handleStartResourceUsageSession(socket, eventData),
     [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
       this.sessionHandler.handleStopResourceUsageSession(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_STATS]: (socket, eventData) =>
+      this.sessionHandler.handleResourceUsageStats(socket, eventData),
     [AttractapEventType.LOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleLockDoor(socket, eventData),
     [AttractapEventType.UNLOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlockDoor(socket, eventData),
     [AttractapEventType.UNLATCH_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlatchDoor(socket, eventData),
@@ -508,6 +510,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   public async startEnrollOfNewNfcCard(data: {
     readerId: number;
     userId: number;
+    actorId?: number;
     authenticationMethod?: 'session' | 'api-token';
     apiTokenId?: number;
   }) {

@@ -3,6 +3,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Input,
   Label,
   Table,
@@ -152,7 +153,7 @@ export const RoleMappingsSection = ({
 
       <StandardDrawer isOpen={isOpen} onOpenChange={handleOpenChange}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('roleMappingsDrawerTitle')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('roleMappingsDrawerTitle')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody className="flex flex-col gap-4">
           <p className="text-small text-default-500">{t('roleMappingsDrawerDescription')}</p>

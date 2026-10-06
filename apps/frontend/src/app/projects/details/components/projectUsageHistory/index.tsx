@@ -107,7 +107,14 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
         </Card.Content>
       </Card>
 
-      <UsageNotesModal isOpen={isModalOpen} onClose={closeModal} session={selectedSession} />
+      {selectedSession && (
+        <UsageNotesModal
+          isOpen={isModalOpen}
+          onClose={closeModal}
+          resourceId={selectedSession.resourceId}
+          usageId={selectedSession.id}
+        />
+      )}
     </>
   );
 }

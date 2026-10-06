@@ -39,7 +39,7 @@ import {
 } from './audit-administration-policy';
 
 const billingStatuses = new Set(['pending', 'completed', 'failed']);
-const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup']);
+const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup', 'energy-correction']);
 const SQLITE_BUSY_TIMEOUT_MS = 10;
 const SQLITE_CONTENTION_RECOVERY_DELAY_MS = 500;
 

@@ -18,9 +18,9 @@ Legen Sie fest, dass Benutzer eine Einweisung erhalten müssen, bevor sie eine R
 
 Planen Sie regelmäßige Wartungen für Ihre Ressourcen. Attraccess zeigt den aktuellen Wartungsstatus an und erinnert bei fälligen Wartungen.
 
-### NFC-Zugangskontrolle
+### RFID-Zugangskontrolle
 
-Mit dem **Attractap NFC-Leser** können Sie den physischen Zugang zu Maschinen über NFC-Karten steuern. Benutzer halten ihre Karte an den Leser, und Attraccess prüft die Berechtigung.
+Mit dem **Attractap RFID-Leser** können Sie den physischen Zugang zu Maschinen über RFID-Karten steuern. Benutzer halten ihre Karte an den Leser, und Attraccess prüft die Berechtigung.
 
 ### Flows & Automatisierung
 
@@ -44,7 +44,7 @@ Attraccess besteht aus:
 
 - **Webanwendung** – React-Frontend mit NestJS-Backend
 - **Datenbank** – SQLite (keine separate Datenbank nötig)
-- **NFC-Hardware** – Attractap-Leser (ESP32-basiert, optional)
+- **RFID-Hardware** – Attractap-Leser (ESP32-basiert, optional)
 - **Bereitstellung** – Docker-Container
 
 ## Nächste Schritte
