@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button, DateField, FieldError, Label } from '@heroui/react';
 import {
@@ -16,19 +16,52 @@ interface Props {
   clearLabel: string;
   value: string;
   onChange: (value: string) => void;
+  onValidityChange?: (isValid: boolean) => void;
+  errorMessage: string;
   withTime?: boolean;
   isDisabled?: boolean;
 }
 
+function DateFieldValidity({
+  incomplete,
+  invalid,
+  onIncompleteChange,
+  onValidityChange,
+}: {
+  incomplete: boolean;
+  invalid: boolean;
+  onIncompleteChange: (incomplete: boolean) => void;
+  onValidityChange?: (isValid: boolean) => void;
+}) {
+  useEffect(() => {
+    onIncompleteChange(incomplete);
+    onValidityChange?.(!incomplete && !invalid);
+  }, [incomplete, invalid, onIncompleteChange, onValidityChange]);
+  return null;
+}
+
 /** Values stay Gregorian and locale-independent; callers own timezone conversion. */
-export function LocaleDateField({ label, clearLabel, value, onChange, withTime, isDisabled }: Props) {
+export function LocaleDateField({
+  label,
+  clearLabel,
+  value,
+  onChange,
+  onValidityChange,
+  errorMessage,
+  withTime,
+  isDisabled,
+}: Props) {
   const [clearCount, setClearCount] = useState(0);
-  let parsed: CalendarDate | CalendarDateTime | null = null;
-  try {
-    if (value) parsed = withTime ? parseDateTime(value) : parseDate(value);
-  } catch {
-    /* Preserve invalid values for the caller's validation. */
-  }
+  const [incomplete, setIncomplete] = useState(false);
+  // React Aria resets partial segments when the controlled value's identity changes.
+  const parsed = useMemo<CalendarDate | CalendarDateTime | null>(() => {
+    try {
+      return value ? (withTime ? parseDateTime(value) : parseDate(value)) : null;
+    } catch {
+      /* Preserve invalid values for the caller's validation. */
+      return null;
+    }
+  }, [value, withTime]);
   return (
     <DateTimeLocaleProvider>
       <DateField
@@ -37,27 +70,42 @@ export function LocaleDateField({ label, clearLabel, value, onChange, withTime, 
         onChange={(date) => onChange(date ? toCalendar(date, new GregorianCalendar()).toString() : '')}
         granularity={withTime ? 'minute' : 'day'}
         isDisabled={isDisabled}
-        isInvalid={!!value && !parsed}
+        isInvalid={incomplete || (!!value && !parsed)}
+        validationBehavior="aria"
       >
-        <Label>{label}</Label>
-        <DateField.Group>
-          <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
-          <DateField.Suffix>
-            <Button
-              variant="ghost"
-              isIconOnly
-              aria-label={clearLabel}
-              isDisabled={isDisabled}
-              onPress={() => {
-                onChange('');
-                setClearCount((count) => count + 1);
-              }}
-            >
-              <X size={16} />
-            </Button>
-          </DateField.Suffix>
-        </DateField.Group>
-        <FieldError />
+        {({ state }) => (
+          <>
+            {/* onChange retains the last complete date while segments are incomplete. */}
+            <DateFieldValidity
+              incomplete={
+                state.segments.some((segment) => segment.isEditable && segment.isPlaceholder) &&
+                (!!value || state.segments.some((segment) => segment.isEditable && !segment.isPlaceholder))
+              }
+              invalid={!!value && !parsed}
+              onIncompleteChange={setIncomplete}
+              onValidityChange={onValidityChange}
+            />
+            <Label>{label}</Label>
+            <DateField.Group>
+              <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+              <DateField.Suffix>
+                <Button
+                  variant="ghost"
+                  isIconOnly
+                  aria-label={clearLabel}
+                  isDisabled={isDisabled}
+                  onPress={() => {
+                    onChange('');
+                    setClearCount((count) => count + 1);
+                  }}
+                >
+                  <X size={16} />
+                </Button>
+              </DateField.Suffix>
+            </DateField.Group>
+            <FieldError>{errorMessage}</FieldError>
+          </>
+        )}
       </DateField>
     </DateTimeLocaleProvider>
   );

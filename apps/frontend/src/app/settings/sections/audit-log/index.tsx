@@ -270,6 +270,9 @@ export function AuditLogSection() {
   const [advanced, setAdvanced] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterError, setFilterError] = useState<string>();
+  const [fromDateValid, setFromDateValid] = useState(true);
+  const [toDateValid, setToDateValid] = useState(true);
+  const [dateFieldResetCount, setDateFieldResetCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
   const [draft, setDraft] = useState<AuditSettingsDto>();
@@ -295,12 +298,14 @@ export function AuditLogSection() {
   const updateFilter = (key: keyof AuditFilters, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
   const clearFilters = () => {
+    setDateFieldResetCount((count) => count + 1);
     setFilters(emptyFilters);
     setApplied(emptyFilters);
     setCursors([undefined]);
     setFilterError(undefined);
   };
   const applyFilters = () => {
+    if (!fromDateValid || !toDateValid) return;
     const result = filterRequest(filters, meta.data?.subjectTypes);
     if (result.error) {
       setFilterError(t(result.error));
@@ -408,17 +413,23 @@ export function AuditLogSection() {
                 <Input placeholder={t('eventPlaceholder')} />
               </TextField>
               <LocaleDateField
+                key={`from-${dateFieldResetCount}`}
                 label={t('from')}
                 clearLabel={`${t('clearDate')}: ${t('from')}`}
                 value={filters.from}
                 onChange={(value) => updateFilter('from', value)}
+                onValidityChange={setFromDateValid}
+                errorMessage={t('invalidDate')}
                 withTime
               />
               <LocaleDateField
+                key={`to-${dateFieldResetCount}`}
                 label={t('to')}
                 clearLabel={`${t('clearDate')}: ${t('to')}`}
                 value={filters.to}
                 onChange={(value) => updateFilter('to', value)}
+                onValidityChange={setToDateValid}
+                errorMessage={t('invalidDate')}
                 withTime
               />
             </div>
@@ -449,7 +460,7 @@ export function AuditLogSection() {
             )}
             {filterError && <Notice title={filterError} />}
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" isDisabled={!fromDateValid || !toDateValid}>
                 <SearchIcon size={16} />
                 {t('search')}
               </Button>

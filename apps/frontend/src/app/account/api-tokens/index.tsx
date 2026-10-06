@@ -62,6 +62,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const [name, setName] = useState('');
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
   const [expiresAt, setExpiresAt] = useState('');
+  const [expiryValid, setExpiryValid] = useState(true);
   const [secret, setSecret] = useState<string | null>(null);
   const {
     data: tokenPage,
@@ -81,6 +82,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   }, [isTokenListError, showToast, t]);
 
   const createToken = async () => {
+    if (!expiryValid) return;
     try {
       const created = await createApiToken({
         requestBody: {
@@ -231,12 +233,14 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         label={t('expiryLabel')}
         value={expiresAt}
         onChange={setExpiresAt}
+        onValidityChange={setExpiryValid}
+        errorMessage={t('invalidDate')}
         isDisabled={isCreating}
       />
       <Button
         onPress={createToken}
         isPending={isCreating}
-        isDisabled={!name.trim() || permissionKeys.size === 0 || isCreating}
+        isDisabled={!name.trim() || permissionKeys.size === 0 || !expiryValid || isCreating}
         data-cy="api-token-create-button"
       >
         <KeyRound size={16} />
