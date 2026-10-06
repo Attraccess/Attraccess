@@ -1,9 +1,14 @@
+import { DateTimeLocaleProvider } from '../../../../../components/dateTimeLocaleProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
   AlertTitle,
   DatePicker,
+  DateField,
+  Calendar,
+  FieldError,
+  Label,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -125,17 +130,79 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
 
         <DrawerBody>
           <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
-            <DatePicker value={startTime} isRequired hideTimeZone onChange={setStartTime} />
+            <DateTimeLocaleProvider>
+              <DatePicker value={startTime} isRequired hideTimeZone onChange={setStartTime}>
+                <Label>{t('inputs.startTime.label')}</Label>
+                <DateField.Group>
+                  <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+                  <DateField.Suffix>
+                    <DatePicker.Trigger>
+                      <DatePicker.TriggerIndicator />
+                    </DatePicker.Trigger>
+                  </DateField.Suffix>
+                </DateField.Group>
+                <FieldError />
+                <DatePicker.Popover>
+                  <Calendar aria-label={t('inputs.startTime.label')}>
+                    <Calendar.Header>
+                      <Calendar.YearPickerTrigger>
+                        <Calendar.YearPickerTriggerHeading />
+                        <Calendar.YearPickerTriggerIndicator />
+                      </Calendar.YearPickerTrigger>
+                      <Calendar.NavButton slot="previous" />
+                      <Calendar.NavButton slot="next" />
+                    </Calendar.Header>
+                    <Calendar.Grid>
+                      <Calendar.GridHeader>
+                        {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+                      </Calendar.GridHeader>
+                      <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
+                    </Calendar.Grid>
+                  </Calendar>
+                </DatePicker.Popover>
+              </DatePicker>
+            </DateTimeLocaleProvider>
 
             <LabeledSwitch isSelected={hasEndDate} onChange={onHasEndDateChange}>
               {t('inputs.hasEndDate.label')}
             </LabeledSwitch>
-            {hasEndDate && <DatePicker value={endTime} isRequired hideTimeZone onChange={setEndTime} />}
+            {hasEndDate && (
+              <DateTimeLocaleProvider>
+                <DatePicker value={endTime} isRequired hideTimeZone onChange={setEndTime}>
+                  <Label>{t('inputs.endTime.label')}</Label>
+                  <DateField.Group>
+                    <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+                    <DateField.Suffix>
+                      <DatePicker.Trigger>
+                        <DatePicker.TriggerIndicator />
+                      </DatePicker.Trigger>
+                    </DateField.Suffix>
+                  </DateField.Group>
+                  <FieldError />
+                  <DatePicker.Popover>
+                    <Calendar aria-label={t('inputs.endTime.label')}>
+                      <Calendar.Header>
+                        <Calendar.YearPickerTrigger>
+                          <Calendar.YearPickerTriggerHeading />
+                          <Calendar.YearPickerTriggerIndicator />
+                        </Calendar.YearPickerTrigger>
+                        <Calendar.NavButton slot="previous" />
+                        <Calendar.NavButton slot="next" />
+                      </Calendar.Header>
+                      <Calendar.Grid>
+                        <Calendar.GridHeader>
+                          {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+                        </Calendar.GridHeader>
+                        <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
+                      </Calendar.Grid>
+                    </Calendar>
+                  </DatePicker.Popover>
+                </DatePicker>
+              </DateTimeLocaleProvider>
+            )}
 
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">
-                {t('inputs.reason.label')}
-              </label>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t('inputs.reason.label')}</label>
               {reason ? (
                 <p className="text-sm text-default-500 mb-2">
                   {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />

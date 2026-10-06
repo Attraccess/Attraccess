@@ -14,6 +14,10 @@
     "password": { "title": "Passwort", "description": "Anmeldepasswort ändern" },
     "twoFactor": { "title": "Zwei-Faktor-Authentifizierung", "description": "Authenticator-App hinzufügen" },
     "passkeys": { "title": "Passkeys", "description": "Passwortlose Anmeldung verwalten" },
+    "dateTime": {
+      "title": "Datum und Uhrzeit",
+      "description": "Sprachcode für Datum und Uhrzeit unabhängig von der App-Sprache wählen"
+    },
     "notifications": { "title": "Benachrichtigungen", "description": "Auswählen, was dich wo erreicht" },
     "tokens": { "title": "API-Tokens", "description": "Zugriff für Integrationen verwalten" },
     "delete": { "title": "Konto löschen", "description": "Dauerhafte Kontolöschung anfordern" }

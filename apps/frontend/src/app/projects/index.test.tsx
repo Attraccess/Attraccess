@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ProjectsListPage } from './index';
+import { useDateTimePreferences, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { UpsertProjectModal } from './upsertModal';
 type MutationOptions = {
   onSuccess: (value: unknown) => void;
@@ -9,6 +10,7 @@ type MutationOptions = {
   onSettled?: () => void;
 };
 const state = vi.hoisted(() => ({
+  translate: (key: string) => key,
   projects: undefined as
     undefined | { data: { id: number; name: string; description: string; archivedAt?: string; logo?: string }[] },
   existing: undefined as undefined | { id: number; name: string; description: string; logo?: string },
@@ -61,8 +63,9 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: state.update };
   },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: state.translate, tExists: () => true }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../components/toastProvider', () => ({
@@ -81,7 +84,11 @@ beforeEach(() => {
   state.accept.mockResolvedValue(undefined);
   state.decline.mockResolvedValue(undefined);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useDateTimePreferences.setState({ dateTimeLocale: null });
+  useTranslationState.setState({ language: 'en' });
+});
 function Location() {
   return <output>{useLocation().search}</output>;
 }
@@ -177,4 +184,22 @@ it('loads existing project fields and explicitly deletes the previous logo', asy
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));
   act(() => state.options.update.onSuccess({ id: 4, name: 'Existing' }));
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'actions.update.success.title' }));
+});
+
+it('updates invitation timestamps immediately when the formatting locale changes', () => {
+  const date = new Date('2026-11-23T16:45:37Z');
+  const fields = {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  } as const;
+  state.invitations = [{ id: 9, requestedRole: 'member', createdAt: date.toISOString() }];
+  useDateTimePreferences.setState({ dateTimeLocale: 'en-GB' });
+  show();
+  expect(screen.getByText(new Intl.DateTimeFormat('en-GB', fields).format(date))).toBeTruthy();
+  act(() => useDateTimePreferences.setState({ dateTimeLocale: 'en-US' }));
+  expect(screen.getByText(new Intl.DateTimeFormat('en-US', fields).format(date))).toBeTruthy();
 });

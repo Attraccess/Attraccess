@@ -375,5 +375,6 @@
     "metrics.toggles.external": "External service metrics",
     "metrics.toggles.sse": "Live update metrics",
     "metrics.toggles.flow": "Resource flow metrics"
-  }
+  },
+  "clearDate": "Clear date"
 }

@@ -1,3 +1,4 @@
+import { DateTimePreferences, validateDateTimeLocale } from '@attraccess/shared';
 import { BadRequestException, Injectable, Logger, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import {
   Repository,
@@ -1044,6 +1045,17 @@ export class UsersService {
     } else {
       await this.dataSource.transaction(run);
     }
+  }
+
+  async updateDateTimePreferences(userId: number, preferences: DateTimePreferences): Promise<User> {
+    const validation = preferences.dateTimeLocale === null ? null : validateDateTimeLocale(preferences.dateTimeLocale);
+    if (validation?.error) {
+      throw new BadRequestException(`Invalid or unsupported date/time locale: ${validation.error}`);
+    }
+    await this.userRepository.update(userId, { dateTimeLocale: validation?.locale ?? null });
+    const updated = await this.findOne({ id: userId });
+    if (!updated) throw new UserNotFoundException(userId);
+    return updated;
   }
 
   async updateLocale(userId: number, locale: string): Promise<User> {

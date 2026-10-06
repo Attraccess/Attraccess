@@ -1,4 +1,5 @@
 {
+  "clearExpiry": "Clear expiry date",
   "title": "API tokens",
   "description": "Create least-privilege tokens for the REST API. A token can use only the permissions you select and currently hold.",
   "empty": "You have not created an API token yet.",

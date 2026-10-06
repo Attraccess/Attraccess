@@ -48,9 +48,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => permissions.has(permission) }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', async () => {
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
   const { get } = await import('lodash-es');
   return {
+    ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
     useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
       language: 'en',
       t: (key: string) => get(en, key, key),
@@ -60,7 +61,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
 
 const entry: AuditEntryDto = {
   id: 52,
-  at: '2026-09-13T12:00:00.000Z',
+  at: '2026-09-13T12:00:37.000Z',
   domain: 'resource',
   pluginId: 'core',
   action: 'maintenance_schedule.updated',
@@ -144,6 +145,18 @@ describe('audit admin workflows', () => {
     mount();
     await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
     const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        new Intl.DateTimeFormat('en', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }).format(new Date(entry.at)),
+      ),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText('Audit logging')).toBeInTheDocument();
     expect(within(dialog).getByText('settings.updated')).toBeInTheDocument();
     expect(within(dialog).getByText('setting #123456')).toBeInTheDocument();
