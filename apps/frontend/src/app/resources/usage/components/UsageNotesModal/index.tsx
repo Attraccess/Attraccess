@@ -54,12 +54,14 @@ function OpenUsageNotesModal({
     () => (session?.endTime ? { start: new Date(session.startTime), end: new Date(session.endTime) } : undefined),
     [session],
   );
+  // Cancelled recovery candidates have an empty interval and no inferred operating duration.
+  const isZeroDuration = !!range && range.start.getTime() === range.end.getTime();
   const {
     data: operatingDuration,
     error: operatingDurationError,
     refetch: refetchOperatingDuration,
     isFetching: isFetchingOperatingDuration,
-  } = useOperatingDuration(resourceId, canViewOperatingDuration && !!session, range);
+  } = useOperatingDuration(resourceId, canViewOperatingDuration && !!session && !isZeroDuration, range);
   const relatedTransactionId = session?.userId === user?.id ? billing?.transactionId : null;
 
   return (
@@ -73,7 +75,7 @@ function OpenUsageNotesModal({
         billingError={session?.userId === user?.id && !!billingError}
         onRetryBilling={() => refetchBilling()}
         isRetryingBilling={isFetchingBilling}
-        operatingDurationError={canViewOperatingDuration && !!operatingDurationError}
+        operatingDurationError={canViewOperatingDuration && !isZeroDuration && !!operatingDurationError}
         onRetryOperatingDuration={() => refetchOperatingDuration()}
         isRetryingOperatingDuration={isFetchingOperatingDuration}
         projectLabel={t('projectSelectLabel')}
@@ -82,7 +84,11 @@ function OpenUsageNotesModal({
         updatingSessionIds={updatingSessionIds}
         onProjectChange={handleProjectChange}
         operatingDurationMs={
-          canViewOperatingDuration ? attributedOperatingDurationForUsage(operatingDuration, usageId) : undefined
+          canViewOperatingDuration
+            ? isZeroDuration
+              ? 0
+              : attributedOperatingDurationForUsage(operatingDuration, usageId)
+            : undefined
         }
         onOpenBilling={
           relatedTransactionId != null ? (onOpenBilling ?? (() => setTransactionId(relatedTransactionId))) : undefined

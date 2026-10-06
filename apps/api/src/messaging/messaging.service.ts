@@ -222,7 +222,7 @@ export class MessagingService {
   }
 
   public async resolveResourceHolder(resourceId: number): Promise<User | null> {
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId, true);
+    const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
     return activeSession?.user ?? null;
   }
 

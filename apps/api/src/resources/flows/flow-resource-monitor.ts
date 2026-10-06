@@ -3,7 +3,6 @@ import {
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
@@ -13,6 +12,7 @@ import { Repository } from 'typeorm';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { NodeProcessingResult, heartbeatKey } from './node-executors';
+import { activeUsageSql } from '../usage/active-usage';
 
 /** Minute-based activity triggers and heartbeat expiry share the executor's live state. */
 export class FlowResourceMonitor {
@@ -98,8 +98,7 @@ export class FlowResourceMonitor {
         .innerJoin(
           ResourceUsage,
           'usage',
-          'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
-          { usageAction: ResourceUsageAction.Usage },
+          `usage.resourceId = node.resourceId AND ${activeUsageSql('usage')}`,
         )
         .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
         .distinct(true)

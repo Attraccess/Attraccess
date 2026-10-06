@@ -435,7 +435,8 @@ const seedDatabase = async (dataSource: DataSource) => {
     projectId: project.id,
     startNotes: 'Seed usage',
     endNotes: null,
-    isFinalized: false,
+    isFinalized: true,
+    lifecyclePending: false,
     creditsPerUsage: 5,
     billingFactor: 50,
   }));

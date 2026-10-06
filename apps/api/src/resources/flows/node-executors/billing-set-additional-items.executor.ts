@@ -69,7 +69,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
     const savePendingItem = async (manager: EntityManager): Promise<void> => {
       const activeUsageSession = usageId
         ? undefined
-        : await this.resourceUsageService.getActiveSession(node.resourceId, false, manager);
+        : await this.resourceUsageService.getActiveSession(node.resourceId, manager);
       if (!usageId && !activeUsageSession) {
         throw new NoUsageSessionError();
       }

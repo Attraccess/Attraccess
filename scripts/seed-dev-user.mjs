@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { assertUsageIntegrity } from './usage-integrity.mjs';
 
 const sqlite3 = sqlite3pkg.verbose();
 
@@ -300,6 +301,7 @@ async function main() {
       await assignRole(db, username, 'demo-resource-user');
     }
     if (fixture) await applyFixture(db, fixture);
+    await assertUsageIntegrity(db);
     await run(db, 'COMMIT');
     console.log(`Seeded local admin user id=${userId}`);
     console.log(`  username: ${username}`);
