@@ -43,9 +43,10 @@ export function useCanViewOperatingDuration(resourceId: number) {
 }
 
 export function useOperatingDuration(resourceId: number, enabled: boolean, range?: OperatingDurationRange) {
+  const isZeroDuration = !!range && range.start.getTime() === range.end.getTime();
   const query = useQuery({
     queryKey: ['resource-operating-attribution', resourceId, range?.start, range?.end],
-    enabled,
+    enabled: enabled && !isZeroDuration,
     queryFn: async () => {
       const params = range && new URLSearchParams({ start: range.start.toISOString(), end: range.end.toISOString() });
       // eslint-disable-next-line no-restricted-syntax -- The generated client has no query hook for this range-dependent request.

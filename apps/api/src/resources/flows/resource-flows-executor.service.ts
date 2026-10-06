@@ -330,7 +330,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
-    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId, false);
+    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId);
 
     if (
       !executingUserId ||

@@ -23,7 +23,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       return { payload: input };
     }
 
-    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, false, ctx.transactionManager);
+    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, ctx.transactionManager);
 
     if (!activeUsage) {
       throw new NoUsageSessionError();

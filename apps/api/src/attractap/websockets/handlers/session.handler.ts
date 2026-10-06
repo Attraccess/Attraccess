@@ -73,7 +73,7 @@ export class AttractapSessionHandler {
       return;
 
     try {
-      const usage = await this.resourceUsageService.getActiveSession(resourceId, false);
+      const usage = await this.resourceUsageService.getActiveSession(resourceId);
       // Live session readings belong to the current user, just like the active-session web UI.
       if (!usage || usage.userId !== userId) {
         await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });

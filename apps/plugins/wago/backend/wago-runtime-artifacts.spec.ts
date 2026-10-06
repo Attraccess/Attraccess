@@ -529,67 +529,74 @@ describe('runtime artifact catalog (isolated disk)', () => {
     expect(await catalog.has()).toBe(false);
     await expect(catalog.acquire('../outside')).rejects.toThrow();
   });
-  it('round-trips the compressed packaging CLI, checksum and catalog import', async () => {
-    const exec = promisify(execFile);
-    const inner = Buffer.concat([tarMember('fixture', 'isolated image fixture'), Buffer.alloc(1024)]);
-    await writeFile(join(root, 'image.tar'), inner);
-    await exec(process.execPath, [
-      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
-      '--image-archive',
-      join(root, 'image.tar'),
-      '--image',
-      image,
-      '--version',
-      '0.3.0',
-      '--out',
-      join(root, 'releases'),
-    ]);
-    const release = join(root, 'releases', (await readdir(join(root, 'releases')))[0]);
-    expect((await readdir(release)).sort()).toEqual(['wago-cc100-runtime.tar', 'wago-cc100-runtime.tar.sha256']);
-    const data = await readFile(join(release, 'wago-cc100-runtime.tar'));
-    const imageHeader = data.subarray(0, 512);
-    const compressedBytes = parseInt(imageHeader.subarray(124, 136).toString('ascii'), 8);
-    const compressedImage = data.subarray(512, 512 + compressedBytes);
-    expect(compressedImage.subarray(0, 2)).toEqual(Buffer.from([0x1f, 0x8b]));
-    expect(compressedImage.subarray(4, 8)).toEqual(Buffer.alloc(4)); // no gzip timestamp
-    expect(gunzipSync(compressedImage)).toEqual(inner);
-    const fixtureCatalog = new WagoRuntimeArtifactCatalog(root);
-    const result = await fixtureCatalog.import(
-      upload(data, await readFile(join(release, 'wago-cc100-runtime.tar.sha256'), 'utf8')),
-    );
-    expect(result.manifest.runtimeVersion).toBe('0.3.0');
-    expect(result.manifest.hardware.profile).toBe(manifest.hardware.profile);
-    await exec(process.execPath, [
-      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
-      '--image-archive',
-      join(root, 'image.tar'),
-      '--image',
-      image,
-      '--version',
-      '0.3.0',
-      '--out',
-      join(root, 'releases'),
-    ]);
-    const releases = await readdir(join(root, 'releases'));
-    const secondRelease = releases.find((name) => name !== basename(release));
-    expect(secondRelease).toBeDefined();
-    expect(await readFile(join(root, 'releases', secondRelease ?? '', 'wago-cc100-runtime.tar'))).toEqual(data);
-    await writeFile(join(root, 'compressed-image.tar'), gzipSync(inner));
-    await expect(
-      exec(process.execPath, [
+  it.each(['cc100-751-9301-fw31-digital-v1', 'cc100-751-9301-fw31-digital-rtu-v1'])(
+    'round-trips the compressed packaging CLI, checksum and catalog import for %s',
+    async (hardwareProfile) => {
+      const exec = promisify(execFile);
+      const inner = Buffer.concat([tarMember('fixture', 'isolated image fixture'), Buffer.alloc(1024)]);
+      await writeFile(join(root, 'image.tar'), inner);
+      await exec(process.execPath, [
         resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
         '--image-archive',
-        join(root, 'compressed-image.tar'),
+        join(root, 'image.tar'),
         '--image',
         image,
         '--version',
-        '0.3.1',
+        '0.3.0',
+        '--hardware-profile',
+        hardwareProfile,
         '--out',
         join(root, 'releases'),
-      ]),
-    ).rejects.toThrow();
-    expect(await readdir(join(root, 'releases'))).toHaveLength(2);
-  });
+      ]);
+      const release = join(root, 'releases', (await readdir(join(root, 'releases')))[0]);
+      expect((await readdir(release)).sort()).toEqual(['wago-cc100-runtime.tar', 'wago-cc100-runtime.tar.sha256']);
+      const data = await readFile(join(release, 'wago-cc100-runtime.tar'));
+      const imageHeader = data.subarray(0, 512);
+      const compressedBytes = parseInt(imageHeader.subarray(124, 136).toString('ascii'), 8);
+      const compressedImage = data.subarray(512, 512 + compressedBytes);
+      expect(compressedImage.subarray(0, 2)).toEqual(Buffer.from([0x1f, 0x8b]));
+      expect(compressedImage.subarray(4, 8)).toEqual(Buffer.alloc(4)); // no gzip timestamp
+      expect(gunzipSync(compressedImage)).toEqual(inner);
+      const fixtureCatalog = new WagoRuntimeArtifactCatalog(root);
+      const result = await fixtureCatalog.import(
+        upload(data, await readFile(join(release, 'wago-cc100-runtime.tar.sha256'), 'utf8')),
+      );
+      expect(result.manifest.runtimeVersion).toBe('0.3.0');
+      expect(result.manifest.hardware.profile).toBe(hardwareProfile);
+      await exec(process.execPath, [
+        resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+        '--image-archive',
+        join(root, 'image.tar'),
+        '--image',
+        image,
+        '--version',
+        '0.3.0',
+        '--hardware-profile',
+        hardwareProfile,
+        '--out',
+        join(root, 'releases'),
+      ]);
+      const releases = await readdir(join(root, 'releases'));
+      const secondRelease = releases.find((name) => name !== basename(release));
+      expect(secondRelease).toBeDefined();
+      expect(await readFile(join(root, 'releases', secondRelease ?? '', 'wago-cc100-runtime.tar'))).toEqual(data);
+      await writeFile(join(root, 'compressed-image.tar'), gzipSync(inner));
+      await expect(
+        exec(process.execPath, [
+          resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+          '--image-archive',
+          join(root, 'compressed-image.tar'),
+          '--image',
+          image,
+          '--version',
+          '0.3.1',
+          '--out',
+          join(root, 'releases'),
+        ]),
+      ).rejects.toThrow();
+      expect(await readdir(join(root, 'releases'))).toHaveLength(2);
+    },
+  );
 
   it('packages a fixed build-owned descriptor and verifies it without a manual import', async () => {
     const exec = promisify(execFile);

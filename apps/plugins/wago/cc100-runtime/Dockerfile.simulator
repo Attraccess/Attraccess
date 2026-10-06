@@ -1,7 +1,7 @@
 FROM node:24-bookworm-slim AS build
 WORKDIR /workspace
 COPY . .
-RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx run wago-cc100-runtime:build-simulator
+RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx run plugin-wago:build-cc100-simulator
 
 FROM node:24-bookworm-slim
 WORKDIR /app
@@ -11,4 +11,4 @@ COPY --from=build /workspace/dist/apps/wago-cc100-simulator ./
 RUN chown -R runtime:runtime /app /var/lib/attraccess-wago
 USER runtime
 VOLUME ["/var/lib/attraccess-wago"]
-CMD ["node", "simulator.js"]
+CMD ["node", "simulator.cjs"]

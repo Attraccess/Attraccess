@@ -82,7 +82,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     resourceUsageService.getActiveSession.mockResolvedValue(null);
 
     await expect(executor.execute(createNode(baseData), {}, ctx)).rejects.toBeInstanceOf(NoUsageSessionError);
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, false, ctx.transactionManager);
+    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, ctx.transactionManager);
     expect(manager.findOne).not.toHaveBeenCalled();
   });
 
@@ -172,7 +172,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await executor.execute(createNode(baseData), { id: -1 }, ctx);
 
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, false, ctx.transactionManager);
+    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, ctx.transactionManager);
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
       where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
     });
@@ -263,7 +263,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await executor.execute(createNode(baseData), {}, ctx);
 
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, false, repoManager);
+    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, repoManager);
     expect(repoManager.save).toHaveBeenCalledWith(
       BillingTransactionItem,
       expect.objectContaining({ billingTransactionId: 42, quantity: 2 }),

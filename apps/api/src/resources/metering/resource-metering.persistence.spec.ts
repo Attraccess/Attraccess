@@ -834,7 +834,7 @@ describe('Flow-defined metering', () => {
         };
         await expect(start(users[1], { forceTakeOver: true })).rejects.toBeInstanceOf(BadRequestException);
 
-        expect((await usage.getActiveSession(1, true))?.id).toBe(first.id);
+        expect((await usage.getActiveSession(1))?.id).toBe(first.id);
         expect(await sessions.findOneByOrFail({ id: untouched.id })).toEqual(untouched);
         expect(await sessions.countBy({ status: ResourceMeteringSessionStatus.Active })).toBe(2);
         expect(await sessions.findOneByOrFail({ usageId: first.id, meterId: requestedMeter.id })).toEqual(
@@ -932,7 +932,7 @@ describe('Flow-defined metering', () => {
           throw new Error('meter did not answer');
         };
         await expect(start(users[1], { forceTakeOver: true })).rejects.toBeInstanceOf(BadRequestException);
-        expect((await usage.getActiveSession(1, true))?.id).toBe(first.id);
+        expect((await usage.getActiveSession(1))?.id).toBe(first.id);
         expect((await sessionOf(first.id)).compromisedReason).toMatch(/re-initialized by a takeover/);
 
         onStart = ready;
@@ -1010,7 +1010,7 @@ describe('Flow-defined metering', () => {
           };
 
           const started = await start(users[1]);
-          expect((await usage.getActiveSession(1, true))?.id).toBe(started.id);
+          expect((await usage.getActiveSession(1))?.id).toBe(started.id);
           expect(await source.getRepository(ResourceMeteringSession).countBy({ usageId: started.id })).toBe(0);
           const acceptedMeter = await source.getRepository(ResourceMeter).findOneByOrFail({ id: 1 });
           expect(acceptedMeter).toEqual(
@@ -1061,7 +1061,7 @@ describe('Flow-defined metering', () => {
         };
 
         const started = await start(users[1]);
-        expect((await usage.getActiveSession(1, true))?.id).toBe(started.id);
+        expect((await usage.getActiveSession(1))?.id).toBe(started.id);
         expect(await source.getRepository(ResourceMeteringSession).countBy({ usageId: started.id })).toBe(0);
         expect(await source.getRepository(ResourceMeter).findOneByOrFail({ id: 1 })).toEqual(priorMeter);
         expect(await sessionOf(ended.id)).toEqual(session);
@@ -1360,6 +1360,136 @@ describe('Flow-defined metering', () => {
     });
   });
   describe('generic meters', () => {
+    async function seedLegacyMeterUsages(newestHasMeter: boolean) {
+      const usages = source.getRepository(ResourceUsage);
+      const sessions = source.getRepository(ResourceMeteringSession);
+      // Insert the newest start first so selection must consider time before ID.
+      const newest = await usages.save({
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(Date.now() - 1_800_000),
+        isFinalized: true,
+        meterRates: [{ meterId: 1, name: 'Newest', creditsPerUnit: 0 }],
+      });
+      const older = await usages.save({
+        resourceId: 1,
+        userId: 2,
+        startTime: new Date(Date.now() - 3_600_000),
+        isFinalized: true,
+        meterRates: [{ meterId: 1, name: 'Older', creditsPerUnit: 30 }],
+      });
+      for (const session of newestHasMeter ? [older, newest] : [older]) {
+        await sessions.save({
+          id: `meter-${session.id}`,
+          resourceId: 1,
+          usageId: session.id,
+          status: ResourceMeteringSessionStatus.Active,
+          creditsPerUnit: session.meterRates?.[0].creditsPerUnit,
+          latestValue: '0',
+        });
+      }
+      return { newest, older };
+    }
+
+    it.each([
+      ['report', true],
+      ['report', false],
+      ['poll', true],
+      ['poll', false],
+    ] as const)('attributes %s to the newest usage only, initialized=%s', async (path, initialized) => {
+      await seedMeter();
+      await metering.setRate(1, 1, 0);
+      const { newest, older } = await seedLegacyMeterUsages(initialized);
+      expect((await usage.getActiveSession(1))?.id).toBe(newest.id);
+      expect((await metering.getLive(1)).meters[0].session).toMatchObject({ usageId: newest.id });
+
+      const report = { kind: 'reading', mode: 'increment', value: '2' } as const;
+      if (path === 'report') await metering.report(1, 1, report);
+      else {
+        onCollect = ({ complete }) => complete(report);
+        await metering.collectInterimReadings();
+      }
+
+      expect((await sessionOf(older.id)).latestValue).toBe('0');
+      if (initialized) expect((await sessionOf(newest.id)).latestValue).toBe('2000000000');
+      else expect(await source.getRepository(ResourceMeteringSession).countBy({ usageId: newest.id })).toBe(0);
+      expect((await metering.getLive(1)).meters[0].lifetimeValue).toBe('2');
+      expect(await source.getRepository(ResourceMeteringOperation).findOneByOrFail({ kind: 'interim' })).toMatchObject({
+        status: 'completed',
+        sessionId: initialized ? `meter-${newest.id}` : null,
+      });
+      expect(await source.getRepository(BillingTransaction).count()).toBe(0);
+    });
+
+    it.each(['start', 'takeover', 'end'] as const)(
+      'retains explicit %s lifecycle report targeting over the newest published usage',
+      async (kind) => {
+        const { newest, older } = await seedLegacyMeterUsages(true);
+        await source.getRepository(ResourceUsage).update(older.id, {
+          isFinalized: kind === 'end',
+          lifecyclePending: true,
+        });
+        await source.getRepository(ResourceUsageLifecycleAttempt).save({
+          id: 'explicit-lifecycle',
+          resourceId: 1,
+          kind,
+          candidateUsageId: kind === 'end' ? null : older.id,
+          previousUsageId: kind === 'end' ? older.id : kind === 'takeover' ? newest.id : null,
+          transitionTime: new Date(),
+          formSubmissions: [],
+          billingItems: [],
+        });
+        const report = { kind: 'reading', mode: 'increment', value: '3' } as const;
+        await expect(metering.report(1, 1, report)).rejects.toThrow('METER_LIFECYCLE_BUSY');
+        await metering.report(1, 1, report, undefined, 'explicit-lifecycle');
+        expect((await sessionOf(older.id)).latestValue).toBe('3000000000');
+        expect((await sessionOf(newest.id)).latestValue).toBe('0');
+      },
+    );
+
+    it('excludes unpublished usages and selects the newest legacy session for live meters and reports', async () => {
+      const usages = source.getRepository(ResourceUsage);
+      const sessions = source.getRepository(ResourceMeteringSession);
+      const seedSession = async (isFinalized: boolean, lifecyclePending: boolean, name: string) => {
+        const session = await usages.save({
+          resourceId: 1,
+          userId: 1,
+          startTime: new Date('2026-01-01T00:00:00Z'),
+          isFinalized,
+          lifecyclePending,
+          meterRates: [{ meterId: 1, name, creditsPerUnit: 30 }],
+        });
+        await sessions.save({
+          id: `meter-${session.id}`,
+          resourceId: 1,
+          usageId: session.id,
+          status: ResourceMeteringSessionStatus.Active,
+          creditsPerUnit: 30,
+          collectionMode: 'increment',
+          latestValue: '0',
+        });
+        return session;
+      };
+
+      const orphan = await seedSession(false, false, 'Orphan');
+      const pending = await seedSession(true, true, 'Pending end');
+      expect((await metering.getLive(1)).meters[0].session).toBeNull();
+      await metering.report(1, 1, { kind: 'reading', mode: 'increment', value: '1' });
+      expect((await sessionOf(orphan.id)).latestValue).toBe('0');
+      expect((await sessionOf(pending.id)).latestValue).toBe('0');
+
+      const older = await seedSession(true, false, 'Older');
+      const newest = await seedSession(true, false, 'Newest');
+      expect((await usage.getActiveSession(1))?.id).toBe(newest.id);
+      expect((await metering.getLive(1)).meters[0].session).toMatchObject({ usageId: newest.id, meterName: 'Newest' });
+      await metering.report(1, 1, { kind: 'reading', mode: 'increment', value: '2' });
+      expect((await sessionOf(newest.id)).latestValue).toBe('2000000000');
+      expect((await sessionOf(older.id)).latestValue).toBe('0');
+      expect((await sessionOf(orphan.id)).latestValue).toBe('0');
+      expect((await sessionOf(pending.id)).latestValue).toBe('0');
+      expect((await metering.getLive(1)).meters[0].lifetimeValue).toBe('3');
+    });
+
     it('preserves concurrent consumption and pricing when renaming a meter', async () => {
       const manager = source.manager;
       const findOne = manager.findOne.bind(manager);
