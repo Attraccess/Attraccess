@@ -52,6 +52,8 @@ export interface RuntimeUpdateRecord {
   token: string | null;
   desiredImageId: string;
   desiredRuntimeVersion?: string;
+  /** Verified installed image; a rebuild of the same version may have a different config digest. */
+  currentImageId?: string;
   previousRuntimeVersion?: string | null;
   desiredDigest: string;
   buildId: string;
@@ -85,6 +87,17 @@ export interface RuntimeUpdateInspection {
   claimed: boolean;
   compatible: boolean;
   online: boolean;
+}
+
+/** Runtime releases are manually versioned. Image identity still pins transfers
+ * and readiness, but rebuilding a release is not a reason to reinstall it. */
+export function runtimeTargetImageId(
+  desired: BuildRuntimeArtifact,
+  installed: { imageId: string; runtimeVersion?: string },
+): string {
+  return installed.imageId && installed.runtimeVersion === desired.manifest.runtimeVersion
+    ? installed.imageId
+    : desired.imageId;
 }
 
 /** Privileged host transaction seam. Implementations must use a fixed scoped host
@@ -121,7 +134,10 @@ export interface ManagedRuntimeUpdateHost {
 }
 
 export class RuntimeUpdateError extends Error {
-  constructor(readonly failure: RuntimeUpdateFailure, readonly storageDiagnostics?: RuntimeStorageDiagnostic[]) {
+  constructor(
+    readonly failure: RuntimeUpdateFailure,
+    readonly storageDiagnostics?: RuntimeStorageDiagnostic[],
+  ) {
     super(
       `CC100 runtime update failed: ${failure}. See the controller runtime status for the reason and recovery steps.`,
     );
@@ -140,8 +156,8 @@ const OPERATION_MS = 25 * 60_000;
 const LEASE_MS = 30 * 60_000;
 const CURRENT_RECHECK_MS = 5 * 60_000;
 
-/** Durable reconciliation core. Only desired Docker config identity drives upgrades;
- * build IDs, registry tags and recompressed tar digests never cause a restart.
+/** Durable reconciliation core. Runtime versions drive upgrades; Docker config
+ * identity pins installation and verifies the running image. Rebuilds do not restart it.
  * Crash recovery precedes new work, including when the deployed build changed.
  * No controller can be considered current from a staged/loaded bundle alone.
  */
@@ -261,7 +277,9 @@ export class WagoRuntimeUpdateCoordinator {
       const desired = await this.desired();
       assertOwned();
       const contradictedCurrent =
-        record?.phase === 'current' && observedImageId !== undefined && observedImageId !== desired.imageId;
+        record?.phase === 'current' &&
+        observedImageId !== undefined &&
+        observedImageId !== (record.currentImageId ?? record.desiredImageId);
       if (record && !contradictedCurrent && record.desiredImageId === desired.imageId && record.retryAt > this.now())
         return 'deferred';
       const attempt = (record?.desiredImageId === desired.imageId ? record.attempt : 0) + 1;
@@ -343,16 +361,17 @@ export class WagoRuntimeUpdateCoordinator {
           return 'settled';
         }
       }
-      if (inspection.imageId === desired.imageId) {
+      const targetImageId = runtimeTargetImageId(desired, inspection);
+      if (inspection.imageId === targetImageId) {
         // Read-only proof permits the existing boot, but requires a recent
         // permanent heartbeat and matching readiness. No restart or staging.
         const since = record.startedAt;
         try {
-          const proof = await this.host.verify(controllerId, null, desired.imageId, since, operation.signal);
+          const proof = await this.host.verify(controllerId, null, targetImageId, since, operation.signal);
           if (
             !proof.permanent ||
             !proof.ready ||
-            proof.imageId !== desired.imageId ||
+            proof.imageId !== targetImageId ||
             !Number.isSafeInteger(proof.observedAt) ||
             proof.observedAt <= since ||
             proof.observedAt > this.now()
@@ -368,6 +387,7 @@ export class WagoRuntimeUpdateCoordinator {
           return 'settled';
         }
         record.phase = 'current';
+        record.currentImageId = targetImageId;
         record.attempt = 0;
         record.retryAt = this.now() + CURRENT_RECHECK_MS;
         await persist(record);
@@ -408,6 +428,7 @@ export class WagoRuntimeUpdateCoordinator {
         await persist(record);
         await this.host.accept(controllerId, record.token, operation.signal);
         record.phase = 'current';
+        record.currentImageId = desired.imageId;
         record.attempt = 0;
         record.retryAt = this.now() + CURRENT_RECHECK_MS;
         await persist(record);

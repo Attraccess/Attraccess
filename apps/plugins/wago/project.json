@@ -3,13 +3,18 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/wago",
-  "tags": ["type:plugin", "scope:plugin"],
+  "tags": [
+    "type:plugin",
+    "scope:plugin"
+  ],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
     "install-dev": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "command": "node apps/plugins/scripts/install-dev-plugin.mjs --src apps/plugins/wago/package"
       }
@@ -17,7 +22,10 @@
     "production-fleet": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
+      "dependsOn": [
+        "typecheck-acceptance",
+        "test-production-fleet-cleanup"
+      ],
       "options": {
         "command": "node apps/plugins/wago/scripts/test-production-fleet.mjs"
       }
@@ -52,7 +60,10 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "dependsOn": ["test-frontend", "test-runtime-build"],
+      "dependsOn": [
+        "test-frontend",
+        "test-runtime-build"
+      ],
       "options": {
         "jestConfig": "apps/plugins/wago/jest.config.ts",
         "passWithNoTests": true
@@ -86,7 +97,9 @@
         "{projectRoot}/measurement-contract.ts",
         "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
       ],
-      "outputs": ["{projectRoot}/package/dist"],
+      "outputs": [
+        "{projectRoot}/package/dist"
+      ],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
@@ -104,7 +117,9 @@
         "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
         "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
       ],
-      "outputs": ["{projectRoot}/package/frontend"],
+      "outputs": [
+        "{projectRoot}/package/frontend"
+      ],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "pnpm exec vite build --config frontend/vite.config.ts"
@@ -113,9 +128,18 @@
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
+      "dependsOn": [
+        "build-backend",
+        "build-frontend"
+      ],
+      "inputs": [
+        "{projectRoot}/package.json",
+        "{projectRoot}/plugin.json"
+      ],
+      "outputs": [
+        "{projectRoot}/package/package.json",
+        "{projectRoot}/package/plugin.json"
+      ],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
@@ -124,9 +148,16 @@
     "zip": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["build"],
-      "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
-      "outputs": ["{projectRoot}/dist/plugin-wago.zip"],
+      "dependsOn": [
+        "build"
+      ],
+      "inputs": [
+        "{projectRoot}/package/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"
+      ],
+      "outputs": [
+        "{projectRoot}/dist/plugin-wago.zip"
+      ],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-wago.zip"
@@ -135,9 +166,15 @@
     "pack": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["build"],
-      "inputs": ["{projectRoot}/package/**/*"],
-      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": [
+        "build"
+      ],
+      "inputs": [
+        "{projectRoot}/package/**/*"
+      ],
+      "outputs": [
+        "{projectRoot}/dist"
+      ],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "rm -rf dist && mkdir dist && (cd package && npm pack --pack-destination ../dist)"
@@ -146,7 +183,10 @@
     "pack-test": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["pack", "plugins-backend-sdk:build"],
+      "dependsOn": [
+        "pack",
+        "plugins-backend-sdk:build"
+      ],
       "inputs": [
         "{projectRoot}/package/**/*",
         "{workspaceRoot}/apps/plugins/scripts/verify-packed-plugin.mjs",
@@ -163,7 +203,9 @@
     "publish": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["pack-test"],
+      "dependsOn": [
+        "pack-test"
+      ],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/publish-plugin.mjs package dist"
@@ -208,7 +250,9 @@
     "e2e": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["typecheck-acceptance"],
+      "dependsOn": [
+        "typecheck-acceptance"
+      ],
       "options": {
         "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.audit-hooks.config.cjs --runInBand"
       }
@@ -216,7 +260,10 @@
     "test-commissioning-acceptance": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["typecheck-acceptance", "typecheck-frontend-tests"],
+      "dependsOn": [
+        "typecheck-acceptance",
+        "typecheck-frontend-tests"
+      ],
       "options": {
         "commands": [
           "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning.config.cjs --runInBand",
@@ -242,7 +289,9 @@
     "build-runtime": {
       "executor": "nx:run-commands",
       "cache": false,
-      "outputs": ["{projectRoot}/runtime-assets/cc100-build"],
+      "outputs": [
+        "{projectRoot}/runtime-assets/cc100-build"
+      ],
       "options": {
         "command": "node apps/plugins/wago/scripts/build-owned-runtime.mjs --build"
       }
@@ -250,7 +299,9 @@
     "install-runtime-dev": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["build-runtime"],
+      "dependsOn": [
+        "build-runtime"
+      ],
       "options": {
         "command": "node apps/plugins/wago/scripts/install-dev-runtime.mjs"
       }
@@ -258,7 +309,9 @@
     "build-cc100-runtime": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["build-cc100-runtime-esbuild"],
+      "dependsOn": [
+        "build-cc100-runtime-esbuild"
+      ],
       "inputs": [
         "default",
         "{projectRoot}/cc100-runtime/package.json",
@@ -266,7 +319,9 @@
         "{projectRoot}/shared/**/*",
         "{projectRoot}/cc100-runtime/manifest.json"
       ],
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
+      "outputs": [
+        "{workspaceRoot}/dist/apps/wago-cc100-runtime"
+      ],
       "options": {
         "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-runtime ./main.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-runtime/"
       }
@@ -284,25 +339,32 @@
         "{projectRoot}/cc100-runtime/manifest.json"
       ],
       "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
+      "outputs": [
+        "{workspaceRoot}/dist/apps/wago-cc100-runtime"
+      ],
       "options": {
         "main": "apps/plugins/wago/cc100-runtime/src/main.ts",
         "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
         "outputPath": "dist/apps/wago-cc100-runtime",
         "platform": "node",
-        "format": ["cjs"],
+        "format": [
+          "cjs"
+        ],
         "bundle": true,
         "thirdParty": true,
         "generatePackageJson": false,
         "esbuildOptions": {
           "target": "node24"
         }
-      }
+      },
+      "dependsOn": []
     },
     "build-cc100-simulator": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["build-cc100-simulator-esbuild"],
+      "dependsOn": [
+        "build-cc100-simulator-esbuild"
+      ],
       "inputs": [
         "default",
         "{projectRoot}/cc100-runtime/package.json",
@@ -310,7 +372,9 @@
         "{projectRoot}/shared/**/*",
         "{projectRoot}/cc100-runtime/manifest.json"
       ],
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "outputs": [
+        "{workspaceRoot}/dist/apps/wago-cc100-simulator"
+      ],
       "options": {
         "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-simulator ./simulator.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-simulator/"
       }
@@ -325,20 +389,25 @@
         "{projectRoot}/cc100-runtime/manifest.json"
       ],
       "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "outputs": [
+        "{workspaceRoot}/dist/apps/wago-cc100-simulator"
+      ],
       "options": {
         "main": "apps/plugins/wago/cc100-runtime/src/simulator.ts",
         "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
         "outputPath": "dist/apps/wago-cc100-simulator",
         "platform": "node",
-        "format": ["cjs"],
+        "format": [
+          "cjs"
+        ],
         "bundle": true,
         "thirdParty": true,
         "generatePackageJson": false,
         "esbuildOptions": {
           "target": "node24"
         }
-      }
+      },
+      "dependsOn": []
     },
     "test-cc100-runtime": {
       "inputs": [
