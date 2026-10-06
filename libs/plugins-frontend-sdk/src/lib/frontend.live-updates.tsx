@@ -56,10 +56,10 @@ export function usePluginLiveUpdates<T>(props: {
     const remove = client.subscribe(
       { topic: `plugin:${encodeURIComponent(plugin)}:${topic}`, ...(identifier !== undefined ? { identifier } : {}) },
       (payload) => {
-        if (matches()) latest.current.props.onUpdate(payload as T);
+        if (matches()) return latest.current.props.onUpdate(payload as T);
       },
       () => {
-        if (matches()) latest.current.props.onReconnect?.();
+        if (matches()) return latest.current.props.onReconnect?.();
       },
     );
     const cleanup = () => {

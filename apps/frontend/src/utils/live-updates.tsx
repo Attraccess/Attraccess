@@ -102,10 +102,10 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
     const unsubscribe = client.subscribe(
       subscription,
       (payload) => {
-        if (matches()) latest.current.props.onUpdate(payload as LivePayloads[T]);
+        if (matches()) return latest.current.props.onUpdate(payload as LivePayloads[T]);
       },
       () => {
-        if (matches()) latest.current.props.onReconnect?.();
+        if (matches()) return latest.current.props.onReconnect?.();
       },
     );
     const cleanup = () => {

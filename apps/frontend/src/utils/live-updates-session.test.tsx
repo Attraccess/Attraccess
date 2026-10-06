@@ -20,14 +20,21 @@ afterEach(() => {
 
 function stream(signal: AbortSignal) {
   let controller: ReadableStreamDefaultController<Uint8Array>;
+  let ended = false;
   const body = new ReadableStream<Uint8Array>({
     start(next) {
       controller = next;
     },
   });
-  signal.addEventListener('abort', () => controller.close(), { once: true });
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    controller.close();
+  };
+  signal.addEventListener('abort', end, { once: true });
   return {
     signal,
+    end,
     response: new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }),
     send: (packet: LivePacket) => controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(packet)}\n\n`)),
   };
@@ -36,6 +43,114 @@ function stream(signal: AbortSignal) {
 async function flush() {
   for (let turn = 0; turn < 30; turn++) await Promise.resolve();
 }
+
+it.each(['core', 'plugin'] as const)(
+  'isolates async %s hook callback failures through the shared client',
+  async (kind) => {
+    vi.useFakeTimers();
+    const streams: ReturnType<typeof stream>[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        if (init.method === 'PUT') return new Response(null, { status: 204 });
+        if (!init.signal) throw new Error('Missing signal');
+        const next = stream(init.signal);
+        streams.push(next);
+        return next.response;
+      }),
+    );
+    resumeLiveUpdates();
+    queryClient = new QueryClient();
+    const updateError = new Error(`${kind} update failed`);
+    const reconnectError = new Error(`${kind} reconnect failed`);
+    const failingUpdate = vi.fn(async () => {
+      throw updateError;
+    });
+    const failingReconnect = vi.fn(async () => {
+      throw reconnectError;
+    });
+    const healthyUpdate = vi.fn();
+    const healthyReconnect = vi.fn();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const hook = renderHook(
+      () => {
+        useLiveUpdates({
+          topic: 'billing',
+          enabled: kind === 'core',
+          onUpdate: failingUpdate,
+          onReconnect: failingReconnect,
+        });
+        useLiveUpdates({
+          topic: 'billing',
+          enabled: kind === 'core',
+          onUpdate: healthyUpdate,
+          onReconnect: healthyReconnect,
+        });
+        usePluginLiveUpdates({
+          plugin: 'wago',
+          topic: 'diagnostics',
+          identifier: '1',
+          enabled: kind === 'plugin',
+          onUpdate: failingUpdate,
+          onReconnect: failingReconnect,
+        });
+        usePluginLiveUpdates({
+          plugin: 'wago',
+          topic: 'diagnostics',
+          identifier: '1',
+          enabled: kind === 'plugin',
+          onUpdate: healthyUpdate,
+          onReconnect: healthyReconnect,
+        });
+      },
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            <LiveUpdatesProvider userId={1}>{children}</LiveUpdatesProvider>
+          </QueryClientProvider>
+        ),
+      },
+    );
+    const event: LivePacket = {
+      type: 'event',
+      event:
+        kind === 'core'
+          ? { topic: 'billing', eventType: 'update', payload: { id: 7 } }
+          : { topic: 'plugin:wago:diagnostics', identifier: '1', eventType: 'snapshot', payload: { value: 8 } },
+    };
+    await act(flush);
+    expect(streams).toHaveLength(1);
+    await act(async () => {
+      streams[0].send({ type: 'ready' });
+      streams[0].send(event);
+      await flush();
+      // Reconnect through the real transport and exercise the hook's restore wrapper.
+      streams[0].end();
+      await flush();
+      await vi.advanceTimersByTimeAsync(501);
+      await flush();
+    });
+    expect(streams).toHaveLength(2);
+    await act(async () => {
+      streams[1].send({ type: 'ready' });
+      streams[1].send(event);
+      await flush();
+    });
+    expect(failingUpdate).toHaveBeenCalledTimes(2);
+    expect(healthyUpdate).toHaveBeenCalledTimes(2);
+    expect(healthyUpdate).toHaveBeenLastCalledWith(event.event.payload);
+    expect(failingReconnect).toHaveBeenCalledTimes(1);
+    expect(healthyReconnect).toHaveBeenCalledTimes(1);
+    expect(errors.mock.calls).toEqual([
+      ['[Live updates] Consumer failed:', updateError],
+      ['[Live updates] Consumer failed:', reconnectError],
+      ['[Live updates] Consumer failed:', updateError],
+    ]);
+    hook.unmount();
+    await act(flush);
+    expect(streams[1].signal.aborted).toBe(true);
+  },
+);
 
 it('replaces an active client on same-user login and ignores the former session’s late 403', async () => {
   const streams: ReturnType<typeof stream>[] = [];
