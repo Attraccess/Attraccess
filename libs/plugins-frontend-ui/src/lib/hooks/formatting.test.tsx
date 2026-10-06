@@ -28,21 +28,29 @@ it('formats dates with selected fields and preserves fallbacks for missing or in
     ),
   );
 });
-it('uses localized duration fallbacks when native formatting is unavailable', () => {
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  vi.stubGlobal('Intl', { ...Intl, DurationFormat: undefined });
-  const { result } = renderHook(() => useFormatedDuration(1505));
-  expect(result.current).toBe('1T 1h 5m');
-  act(() => useTranslationState.getState().setLanguage('de'));
-  expect(result.current).toBe('1T 1Std. 5Min.');
+it.each([
+  [0, '00:00:00'],
+  [1.0459662973880768, '00:01:03'],
+  [0.14946676790714264, '00:00:09'],
+  [0.1195661723613739, '00:00:07'],
+  [59.49 / 60, '00:00:59'],
+  [59.5 / 60, '00:01:00'],
+  [59 + 59.5 / 60, '01:00:00'],
+  [24 * 60, '24:00:00'],
+  [2432.099783420562744, '40:32:06'],
+  [100 * 60, '100:00:00'],
+])('formats %s minutes as %s', (minutes, expected) => {
+  const { result } = renderHook(() => useFormatedDuration(minutes));
+  expect(result.current).toBe(expected);
 });
-it('passes normalized duration parts to native formatting', () => {
-  const format = vi.fn(() => 'native duration');
-  class DurationFormat {
-    format = format;
-  }
-  vi.stubGlobal('Intl', { ...Intl, DurationFormat });
-  const { result } = renderHook(() => useFormatedDuration(1505.4));
-  expect(result.current).toBe('native duration');
-  expect(format).toHaveBeenCalledWith({ days: 1, hours: 1, minutes: 5 });
+it('formats durations consistently across languages without native duration formatting', () => {
+  vi.stubGlobal('Intl', { ...Intl, DurationFormat: undefined });
+  const { result, rerender } = renderHook(({ minutes }) => useFormatedDuration(minutes), {
+    initialProps: { minutes: 1505.4 },
+  });
+  expect(result.current).toBe('25:05:24');
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(result.current).toBe('25:05:24');
+  rerender({ minutes: 1.0459662973880768 });
+  expect(result.current).toBe('00:01:03');
 });
