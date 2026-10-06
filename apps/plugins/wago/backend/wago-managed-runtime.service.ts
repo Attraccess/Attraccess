@@ -94,7 +94,10 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   private coordinator!: WagoRuntimeUpdateCoordinator;
   private readonly heartbeats = new Map<number, LiveHeartbeat>();
   private readonly heartbeatStreams = new Map<number, DiagnosticStream>();
-  private readonly previousBoots = new Map<string, string>();
+  private readonly runtimeActivations = new Map<
+    string,
+    { imageId: string; startedAt: number; previousStreamId?: string }
+  >();
   private readonly verifyingControllers = new Set<number>();
   private readonly connectingControllers = new Set<number>();
   private readonly reconciliationFailures = new Map<number, RuntimeUpdateFailure>();
@@ -1140,10 +1143,15 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
           await bundle.cleanup();
         }
       },
-      activate: async (id, token, _artifact, signal) => {
+      activate: async (id, token, artifact, signal) => {
         const heartbeat = this.heartbeats.get(id);
-        if (!heartbeat || Date.now() - heartbeat.receivedAt > 90_000) throw new RuntimeUpdateError('offline');
-        this.previousBoots.set(token, heartbeat.streamId);
+        // Managed SSH and the token-owned staged journal prove which container
+        // is being replaced. A stalled runtime must not need MQTT to repair it.
+        this.runtimeActivations.set(token, {
+          imageId: artifact.imageId,
+          startedAt: Date.now(),
+          previousStreamId: heartbeat?.streamId,
+        });
         this.verifyingControllers.add(id);
         await command(id, 'activate', token, signal);
       },
@@ -1151,6 +1159,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         const controller = await this.controllers.findOneByOrFail({ id, trustState: 'claimed' });
         if (!controller.mqttServerId) throw new RuntimeUpdateError('offline');
         const prefix = (await this.wago.getSettings()).operationalPrefix;
+        const activation = _token === null ? undefined : this.runtimeActivations.get(_token);
+        const freshSince = Math.max(since, activation?.startedAt ?? since);
         for (let attempt = 0; attempt < 120; attempt++) {
           signal.throwIfAborted();
           const heartbeat = this.heartbeats.get(id);
@@ -1158,11 +1168,11 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
           if (
             heartbeat?.imageId === imageId &&
             (_token === null ||
-              (this.previousBoots.has(_token) && heartbeat.streamId !== this.previousBoots.get(_token))) &&
-            heartbeat.timestamp > since &&
-            heartbeat.receivedAt > since &&
+              (activation?.imageId === imageId && heartbeat.streamId !== activation.previousStreamId)) &&
+            heartbeat.timestamp > freshSince &&
+            heartbeat.receivedAt > freshSince &&
             Date.now() - heartbeat.receivedAt < 90_000 &&
-            state?.timestamp > since &&
+            state?.timestamp > freshSince &&
             Date.now() - state.timestamp < 90_000 &&
             state.streamId === heartbeat.streamId &&
             state.ready
@@ -1179,7 +1189,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         try {
           await command(id, 'acknowledge', token, signal);
         } finally {
-          this.previousBoots.delete(token);
+          this.runtimeActivations.delete(token);
           this.verifyingControllers.delete(id);
         }
       },
@@ -1187,7 +1197,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         try {
           await command(id, 'recover', token, signal, previous);
         } finally {
-          this.previousBoots.delete(token);
+          this.runtimeActivations.delete(token);
           this.verifyingControllers.delete(id);
         }
       },
@@ -1225,7 +1235,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     await stopped;
     this.heartbeats.clear();
     this.heartbeatStreams.clear();
-    this.previousBoots.clear();
+    this.runtimeActivations.clear();
     this.verifyingControllers.clear();
     this.enrolmentProgress.clear();
   }

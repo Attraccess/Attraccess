@@ -356,6 +356,27 @@ describe('WagoRuntime', () => {
     await starting;
   });
 
+  it('retries interrupted startup without reloading state or duplicating established subscriptions', async () => {
+    const subscribe = jest.spyOn(transport, 'subscribe');
+    subscribe.mockImplementationOnce(async (topic, listener) => {
+      transport.listeners.set(topic, listener);
+    });
+    subscribe.mockRejectedValueOnce(new Error('MQTT subscribe acknowledgment timed out'));
+    const load = jest.fn(async () => ({ outputs: {}, commandIds: [] }));
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store: { load, save: async () => undefined },
+      transport,
+      device,
+    });
+    await expect(runtime.start()).rejects.toThrow('timed out');
+    await runtime.start();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(subscribe.mock.calls.map(([topic]) => topic)).toEqual([desired, commands, commands]);
+  });
+
   it('starts when reserving initial state telemetry fails', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await store.save({

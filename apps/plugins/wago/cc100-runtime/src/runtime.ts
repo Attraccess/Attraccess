@@ -66,6 +66,8 @@ export class WagoRuntime {
   private heartbeatRefreshRequested = false;
   private credentialUpdates = Promise.resolve();
   private credentialRotationSubscribed = false;
+  private desiredSubscribed = false;
+  private commandsSubscribed = false;
   private sequence = 0;
   private reservedSequence = 0;
   private initialSequence = 0;
@@ -103,27 +105,37 @@ export class WagoRuntime {
   }
 
   async start(activateConnectionHandling?: () => Promise<void>): Promise<void> {
-    this.state = await this.options.store.load();
-    this.sequence = this.state.sequence ?? 0;
-    this.reservedSequence = this.sequence;
-    this.initialSequence = 0;
-    if (this.state.accepted) {
-      // Keep operating configurations written by older runtime versions alive. New
-      // desired configurations reject invalid measurement metadata, but a persisted
-      // legacy transform is handled by the measurement fault path instead of making
-      // the controller unavailable after a restart.
-      const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted }).filter(
-        ({ code }) => code !== 'invalid_measurement',
-      );
-      if (errors.length) throw new Error('persisted configuration is invalid');
-      this.options.device.configure?.(this.state.accepted.snapshot);
+    // Startup can be interrupted by a missing MQTT acknowledgement. Retry only
+    // unfinished subscriptions, preserving the loaded state and sequence counters.
+    if (!this.loaded) {
+      this.state = await this.options.store.load();
+      this.sequence = this.state.sequence ?? 0;
+      this.reservedSequence = this.sequence;
+      this.initialSequence = 0;
+      if (this.state.accepted) {
+        // Keep operating configurations written by older runtime versions alive. New
+        // desired configurations reject invalid measurement metadata, but a persisted
+        // legacy transform is handled by the measurement fault path instead of making
+        // the controller unavailable after a restart.
+        const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted }).filter(
+          ({ code }) => code !== 'invalid_measurement',
+        );
+        if (errors.length) throw new Error('persisted configuration is invalid');
+        this.options.device.configure?.(this.state.accepted.snapshot);
+      }
+      this.outputs.recoverPulses();
+      this.loaded = true;
     }
-    this.outputs.recoverPulses();
-    this.loaded = true;
     if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
     else await this.outputs.applyDisconnectPolicies(this.connected);
-    await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
-    await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
+    if (!this.desiredSubscribed) {
+      await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
+      this.desiredSubscribed = true;
+    }
+    if (!this.commandsSubscribed) {
+      await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
+      this.commandsSubscribed = true;
+    }
     await this.retryCredentialRotationSubscription();
     await activateConnectionHandling?.();
     await this.publishHeartbeat(true);
