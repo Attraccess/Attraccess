@@ -28,6 +28,7 @@ import type { BuildRuntimeArtifact } from './wago-build-runtime';
 import {
   WagoRuntimeUpdateCoordinator,
   RuntimeUpdateError,
+  runtimeTargetImageId,
   type RuntimeUpdateRecord,
   type RuntimeUpdateStore,
   type ManagedRuntimeUpdateHost,
@@ -62,6 +63,7 @@ type RootAcceptance = (
 type RootProbe = (host: string, fingerprint: string, password: string) => Promise<boolean>;
 type LiveHeartbeat = {
   imageId: string;
+  runtimeVersion?: string;
   streamId: string;
   timestamp: number;
   receivedAt: number;
@@ -92,7 +94,10 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
   private coordinator!: WagoRuntimeUpdateCoordinator;
   private readonly heartbeats = new Map<number, LiveHeartbeat>();
   private readonly heartbeatStreams = new Map<number, DiagnosticStream>();
-  private readonly previousBoots = new Map<string, string>();
+  private readonly runtimeActivations = new Map<
+    string,
+    { imageId: string; startedAt: number; previousStreamId?: string }
+  >();
   private readonly verifyingControllers = new Set<number>();
   private readonly connectingControllers = new Set<number>();
   private readonly reconciliationFailures = new Map<number, RuntimeUpdateFailure>();
@@ -152,6 +157,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         previous.runtimePolicyToken !== heartbeat.runtimePolicyToken ||
         previous.streamId !== heartbeat.streamId ||
         previous.imageId !== heartbeat.imageId ||
+        previous.runtimeVersion !== heartbeat.runtimeVersion ||
         heartbeat.receivedAt - previous.receivedAt > 90_000
       ) {
         this.wago.blockRuntime?.(id);
@@ -342,7 +348,13 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
               runningVersion: controller.runtimeVersion,
               runningImageId: this.heartbeats.get(controller.id)?.imageId || null,
               desiredVersion: desired?.manifest.runtimeVersion ?? null,
-              desiredImageId: desired && 'imageId' in desired ? desired.imageId : null,
+              desiredImageId:
+                desired && 'imageId' in desired
+                  ? runtimeTargetImageId(desired, {
+                      imageId: this.heartbeats.get(controller.id)?.imageId ?? '',
+                      runtimeVersion: this.heartbeats.get(controller.id)?.runtimeVersion ?? controller.runtimeVersion,
+                    })
+                  : null,
             },
           }
         : {}),
@@ -727,9 +739,15 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     // Confirm its running image during bootstrap; the server still blocks commands
     // until management is complete and the bundled image policy can be enforced.
     const enrolling = access?.state === 'verified' || access?.state === 'recovery_required';
+    const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
     await this.wago.setRuntimePolicy?.(
       id,
-      enrolling ? heartbeat.imageId : desired.imageId,
+      enrolling
+        ? heartbeat.imageId
+        : runtimeTargetImageId(desired, {
+            imageId: heartbeat.imageId,
+            runtimeVersion: heartbeat.runtimeVersion ?? controller?.runtimeVersion,
+          }),
       heartbeat.imageId,
       heartbeat.runtimePolicyToken,
     );
@@ -1076,7 +1094,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         if (!match) throw new RuntimeUpdateError('incompatible');
         return {
           imageId: match[2],
-          runtimeVersion: controller?.runtimeVersion,
+          runtimeVersion: this.heartbeats.get(id)?.runtimeVersion ?? controller?.runtimeVersion,
           claimed: !!controller,
           managed: true,
           compatible: true,
@@ -1125,10 +1143,15 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
           await bundle.cleanup();
         }
       },
-      activate: async (id, token, _artifact, signal) => {
+      activate: async (id, token, artifact, signal) => {
         const heartbeat = this.heartbeats.get(id);
-        if (!heartbeat || Date.now() - heartbeat.receivedAt > 90_000) throw new RuntimeUpdateError('offline');
-        this.previousBoots.set(token, heartbeat.streamId);
+        // Managed SSH and the token-owned staged journal prove which container
+        // is being replaced. A stalled runtime must not need MQTT to repair it.
+        this.runtimeActivations.set(token, {
+          imageId: artifact.imageId,
+          startedAt: Date.now(),
+          previousStreamId: heartbeat?.streamId,
+        });
         this.verifyingControllers.add(id);
         await command(id, 'activate', token, signal);
       },
@@ -1136,6 +1159,8 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         const controller = await this.controllers.findOneByOrFail({ id, trustState: 'claimed' });
         if (!controller.mqttServerId) throw new RuntimeUpdateError('offline');
         const prefix = (await this.wago.getSettings()).operationalPrefix;
+        const activation = _token === null ? undefined : this.runtimeActivations.get(_token);
+        const freshSince = Math.max(since, activation?.startedAt ?? since);
         for (let attempt = 0; attempt < 120; attempt++) {
           signal.throwIfAborted();
           const heartbeat = this.heartbeats.get(id);
@@ -1143,11 +1168,11 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
           if (
             heartbeat?.imageId === imageId &&
             (_token === null ||
-              (this.previousBoots.has(_token) && heartbeat.streamId !== this.previousBoots.get(_token))) &&
-            heartbeat.timestamp > since &&
-            heartbeat.receivedAt > since &&
+              (activation?.imageId === imageId && heartbeat.streamId !== activation.previousStreamId)) &&
+            heartbeat.timestamp > freshSince &&
+            heartbeat.receivedAt > freshSince &&
             Date.now() - heartbeat.receivedAt < 90_000 &&
-            state?.timestamp > since &&
+            state?.timestamp > freshSince &&
             Date.now() - state.timestamp < 90_000 &&
             state.streamId === heartbeat.streamId &&
             state.ready
@@ -1164,7 +1189,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         try {
           await command(id, 'acknowledge', token, signal);
         } finally {
-          this.previousBoots.delete(token);
+          this.runtimeActivations.delete(token);
           this.verifyingControllers.delete(id);
         }
       },
@@ -1172,7 +1197,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
         try {
           await command(id, 'recover', token, signal, previous);
         } finally {
-          this.previousBoots.delete(token);
+          this.runtimeActivations.delete(token);
           this.verifyingControllers.delete(id);
         }
       },
@@ -1210,7 +1235,7 @@ export class WagoManagedRuntimeService implements OnApplicationBootstrap, OnModu
     await stopped;
     this.heartbeats.clear();
     this.heartbeatStreams.clear();
-    this.previousBoots.clear();
+    this.runtimeActivations.clear();
     this.verifyingControllers.clear();
     this.enrolmentProgress.clear();
   }

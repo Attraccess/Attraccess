@@ -151,6 +151,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         id: number,
         heartbeat: {
           imageId: string;
+          runtimeVersion?: string;
           streamId: string;
           timestamp: number;
           receivedAt: number;
@@ -1801,6 +1802,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     ) {
       this.runtimeStatusHandler?.(controller.id, {
         imageId: heartbeat.runtimeImageId ?? '',
+        runtimeVersion: heartbeat.runtimeVersion,
         streamId: rawHeartbeat.streamId,
         timestamp: Date.parse(rawHeartbeat.timestamp),
         receivedAt: Date.now(),

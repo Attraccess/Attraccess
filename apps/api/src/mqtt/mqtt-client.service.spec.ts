@@ -31,6 +31,7 @@ jest.mock('mqtt', () => {
       reconnecting: false,
       on: emitter.on.bind(emitter),
       once: emitter.once.bind(emitter),
+      removeListener: emitter.removeListener.bind(emitter),
       end: jest.fn(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publish: jest.fn((topic: string, message: string, optsOrCb: any, cb?: any) => {
@@ -224,6 +225,84 @@ describe('MqttClientService', () => {
       expect(url).toBe('mqtt://localhost:1883');
       expect(options.ca).toBeUndefined();
       expect(options.rejectUnauthorized).toBeUndefined();
+    });
+  });
+
+  describe('connection ownership', () => {
+    beforeEach(() => {
+      jest.restoreAllMocks();
+      jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
+      jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+    });
+
+    afterEach(() => jest.useRealTimers());
+
+    it('shares the reconnecting client between concurrent callers instead of creating a duplicate identity', async () => {
+      const internal = service as unknown as MqttClientServicePrivate;
+      const client = await internal.getOrCreateClient(1);
+      client.connected = false;
+      client.emit('offline');
+      (mqtt.connect as jest.Mock).mockClear();
+
+      const first = internal.getOrCreateClient(1);
+      const second = internal.getOrCreateClient(1);
+      client.connected = true;
+      client.emit('connect');
+
+      await expect(first).resolves.toBe(client);
+      await expect(second).resolves.toBe(client);
+      expect(mqtt.connect).not.toHaveBeenCalled();
+      expect(client.end).not.toHaveBeenCalled();
+    });
+
+    it('bounds reconnect waits without replacing or stopping the client', async () => {
+      const internal = service as unknown as MqttClientServicePrivate;
+      const client = await internal.getOrCreateClient(1);
+      client.connected = false;
+      (mqtt.connect as jest.Mock).mockClear();
+
+      const waiting = expect(internal.getOrCreateClient(1)).rejects.toThrow('Timeout');
+      await jest.advanceTimersByTimeAsync(10_000);
+      await waiting;
+      expect(mqtt.connect).not.toHaveBeenCalled();
+      expect(client.end).not.toHaveBeenCalled();
+
+      const retry = internal.getOrCreateClient(1);
+      client.connected = true;
+      client.emit('connect');
+      await expect(retry).resolves.toBe(client);
+    });
+
+    it('retains a failed refresh connection for later callers while it continues reconnecting', async () => {
+      const unreachable = Object.assign(new EventEmitter(), { connected: false, end: jest.fn() });
+      (mqtt.connect as jest.Mock).mockImplementationOnce(() => unreachable);
+      const refresh = expect(service.refreshConnection(1)).rejects.toThrow('Timeout');
+      await jest.advanceTimersByTimeAsync(10_000);
+      await refresh;
+      (mqtt.connect as jest.Mock).mockClear();
+
+      const retry = (service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
+      unreachable.connected = true;
+      unreachable.emit('connect');
+      await expect(retry).resolves.toBe(unreachable);
+      expect(mqtt.connect).not.toHaveBeenCalled();
+    });
+
+    it('rejects a reconnect waiter when refreshing and ignores late events from the retired client', async () => {
+      const internal = service as unknown as MqttClientServicePrivate;
+      const previous = await internal.getOrCreateClient(1);
+      previous.connected = false;
+      const waiting = expect(internal.getOrCreateClient(1)).rejects.toThrow('replaced');
+
+      await service.refreshConnection(1);
+      await waiting;
+      const replacement = internal.clients.get(1);
+      previous.connected = true;
+      previous.emit('connect');
+      expect(internal.clients.get(1)).toBe(replacement);
+      expect(previous.end).toHaveBeenCalledWith(true);
     });
   });
 

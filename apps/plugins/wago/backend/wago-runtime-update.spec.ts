@@ -294,6 +294,66 @@ describe('durable managed runtime reconciliation', () => {
     expect(host.verify).toHaveBeenCalledWith(1, null, desired.imageId, expect.any(Number), expect.any(AbortSignal));
   });
 
+  it('keeps the installed image for a rebuilt release with the same runtime version, including after restart', async () => {
+    const installedImage = release('a').imageId;
+    host.inspect.mockResolvedValue({
+      imageId: installedImage,
+      runtimeVersion: desired.manifest.runtimeVersion,
+      managed: true,
+      claimed: true,
+      compatible: true,
+      online: true,
+    });
+    host.verify.mockImplementation(async (_id, _token, imageId) => ({
+      imageId,
+      permanent: true,
+      ready: true,
+      observedAt: ++now,
+    }));
+    await coordinator.reconcile(1);
+    expect(rows.get(1)).toMatchObject({ phase: 'current', currentImageId: installedImage });
+    expect(host.stage).not.toHaveBeenCalled();
+    expect(host.activate).not.toHaveBeenCalled();
+    expect(host.verify).toHaveBeenCalledWith(1, null, installedImage, expect.any(Number), expect.any(AbortSignal));
+    host.inspect.mockClear();
+    await coordinator.stop();
+    coordinator = new WagoRuntimeUpdateCoordinator(
+      store,
+      async () => desired,
+      host,
+      audit,
+      () => now,
+    );
+    await coordinator.reconcile(1, false, installedImage);
+    expect(host.inspect).not.toHaveBeenCalled();
+    now += 5 * 60_000;
+    desired = release('c');
+    await coordinator.reconcile(1, false, installedImage);
+    expect(rows.get(1)).toMatchObject({ phase: 'current', currentImageId: installedImage });
+    expect(host.stage).not.toHaveBeenCalled();
+    desired = release('d');
+    desired = { ...desired, manifest: { ...desired.manifest, runtimeVersion: '0.2.0' } };
+    await coordinator.reconcile(1);
+    expect(host.stage).toHaveBeenCalledTimes(1);
+    expect(host.activate).toHaveBeenCalledTimes(1);
+    expect(rows.get(1)).toMatchObject({ phase: 'current', currentImageId: desired.imageId });
+  });
+
+  it('still requires readiness for an installed image with the same runtime version', async () => {
+    host.inspect.mockResolvedValue({
+      imageId: release('a').imageId,
+      runtimeVersion: desired.manifest.runtimeVersion,
+      managed: true,
+      claimed: true,
+      compatible: true,
+      online: true,
+    });
+    host.verify.mockResolvedValue({ imageId: release('a').imageId, permanent: true, ready: false, observedAt: ++now });
+    await coordinator.reconcile(1);
+    expect(rows.get(1)).toMatchObject({ phase: 'blocked', failure: 'readiness' });
+    expect(host.stage).not.toHaveBeenCalled();
+  });
+
   it.each([{ permanent: false }, { ready: false }, { observedAt: 0 }, { imageId: release('b').imageId }])(
     'requires fresh permanent readiness even for an identical image %j',
     async (overrides) => {

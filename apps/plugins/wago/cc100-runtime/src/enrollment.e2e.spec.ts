@@ -1,4 +1,5 @@
 import { rm } from 'node:fs/promises';
+import { runtimeVersion } from '../manifest.json';
 import * as mqtt from 'mqtt';
 import type { MqttClient } from 'mqtt';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
@@ -105,7 +106,7 @@ describe('CC100 MQTT enrollment (e2e)', () => {
         hardwareId: 'cc100-e2e',
         pairingCode: '482931',
         protocolVersion: '1.0.0',
-        runtimeVersion: '0.1.0',
+        runtimeVersion,
         capabilities: expect.arrayContaining(['claim', 'heartbeat', 'configuration-v1']),
         sequence: expect.any(Number),
       }),
