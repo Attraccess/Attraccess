@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { EntityManager, In, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import {
   Resource,
   ResourceMeter,
@@ -7,10 +7,10 @@ import {
   ResourceFlowEdge,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
-  ResourceUsage,
 } from '@attraccess/database-entities';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
+import { findActiveUsage } from '../usage/active-usage';
 
 export async function requireMeter(manager: EntityManager, resourceId: number, meterId: number) {
   const meter = await manager.findOne(ResourceMeter, { where: { id: meterId, resourceId } });
@@ -44,9 +44,7 @@ export class MeteringCatalog {
   async listMeters(resourceId: number) {
     const [meters, usage, active] = await Promise.all([
       this.meters.find({ where: { resourceId }, order: { id: 'ASC' } }),
-      this.sessions.manager.findOne(ResourceUsage, {
-        where: { resourceId, endTime: IsNull(), lifecyclePending: false },
-      }),
+      findActiveUsage(this.sessions.manager, resourceId),
       this.findActiveSessions(resourceId),
     ]);
     return meters.map((meter) => {
@@ -130,15 +128,12 @@ export class MeteringCatalog {
     return { meters: await this.listMeters(resourceId) };
   }
 
-  findActiveSessions(resourceId: number) {
-    return this.sessions
-      .createQueryBuilder('s')
-      .innerJoin(ResourceUsage, 'u', 'u.id = s.usageId')
-      .where('s.resourceId = :resourceId AND s.status = :status AND u.endTime IS NULL AND u.lifecyclePending = false', {
-        resourceId,
-        status: ResourceMeteringSessionStatus.Active,
-      })
-      .getMany();
+  async findActiveSessions(resourceId: number) {
+    const usage = await findActiveUsage(this.sessions.manager, resourceId);
+    if (!usage) return [];
+    return this.sessions.find({
+      where: { resourceId, usageId: usage.id, status: ResourceMeteringSessionStatus.Active },
+    });
   }
 
   async getStatus(resourceId: number) {

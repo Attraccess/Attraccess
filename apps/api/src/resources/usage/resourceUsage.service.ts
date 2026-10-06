@@ -83,6 +83,8 @@ import { ResourceAuditOrigin } from '../../audit/audit-policy';
 import { randomUUID } from 'node:crypto';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 import { FinalCollection, ResourceMeteringService } from '../metering/resource-metering.service';
+import { activeUsageWhere } from './active-usage';
+import { recoverOrphanedUsages } from '../../database/resource-usage-integrity';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -153,7 +155,10 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async assertLifecycleAvailable(manager: EntityManager, resourceId: number): Promise<void> {
-    if (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) {
+    if (
+      (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) ||
+      (await manager.findOne(ResourceUsage, { where: { resourceId, endTime: IsNull(), lifecyclePending: true } }))
+    ) {
       throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
     }
   }
@@ -279,6 +284,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
   async recoverInterruptedLifecycles(): Promise<void> {
     const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const recovered = await recoverOrphanedUsages(manager);
+      if (recovered)
+        this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
       const attempts = await manager.find(ResourceUsageLifecycleAttempt);
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {
@@ -865,7 +873,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
           throw new BadRequestException('Resource is not a machine');
         }
 
-        const existingActiveSession = await this.getActiveSession(resourceId, false, transactionalEntityManager);
+        const existingActiveSession = await this.getActiveSession(resourceId, transactionalEntityManager);
         if (existingActiveSession) {
           this.logger.debug(
             `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
@@ -1170,7 +1178,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       this.resourceUsageRepository.manager,
       async (transactionalEntityManager) => {
         await this.assertLifecycleAvailable(transactionalEntityManager, resourceId);
-        activeSession = await this.getActiveSession(resourceId, true, transactionalEntityManager);
+        activeSession = await this.getActiveSession(resourceId, transactionalEntityManager);
         if (!activeSession) {
           throw new BadRequestException('No active session found');
         }
@@ -1464,7 +1472,6 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
 
   async getActiveSession(
     resourceId: number,
-    onlyFinalized: boolean,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceUsage | null> {
     const resourceUsageRepository = transactionalEntityManager
@@ -1474,10 +1481,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return await resourceUsageRepository.findOne({
       where: {
         resourceId,
-        endTime: IsNull(),
-        isFinalized: onlyFinalized ? true : undefined,
-        lifecyclePending: false,
+        ...activeUsageWhere(),
       },
+      order: { startTime: 'DESC', id: 'DESC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
   }
@@ -1486,11 +1492,13 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     const map = new Map<number, ResourceUsage | null>(resourceIds.map((id) => [id, null]));
     if (resourceIds.length === 0) return map;
     const sessions = await this.resourceUsageRepository.find({
-      where: { resourceId: In(resourceIds), endTime: IsNull(), isFinalized: true, lifecyclePending: false },
+      where: { resourceId: In(resourceIds), ...activeUsageWhere() },
+      order: { startTime: 'DESC', id: 'DESC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
     for (const session of sessions) {
-      map.set(session.resourceId, session);
+      // Legacy duplicates are retained for explicit resolution. Single and bulk reads agree.
+      if (!map.get(session.resourceId)) map.set(session.resourceId, session);
     }
     return map;
   }

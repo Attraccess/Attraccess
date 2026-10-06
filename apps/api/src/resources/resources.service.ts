@@ -13,6 +13,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceChangedEvent } from './events/resource-changed.event';
 import { MetricsService } from '../metrics/metrics.service';
 import { AuditService } from '../audit/audit.service';
+import { activeUsageSql } from './usage/active-usage';
 
 const MAX_AUDIT_DETAILS_BYTES = 4096;
 
@@ -259,9 +260,9 @@ export class ResourcesService {
 
     if (onlyInUse || onlyInUseByUserId !== undefined || returnUsingUser) {
       if (returnUsingUser) {
-        queryBuilder.leftJoinAndSelect('resource.usages', 'usage', 'usage.lifecyclePending = FALSE');
+        queryBuilder.leftJoinAndSelect('resource.usages', 'usage', activeUsageSql('usage'));
       } else {
-        queryBuilder.leftJoin('resource.usages', 'usage', 'usage.endTime IS NULL AND usage.lifecyclePending = FALSE');
+        queryBuilder.leftJoin('resource.usages', 'usage', activeUsageSql('usage'));
       }
     }
 

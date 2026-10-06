@@ -13,6 +13,7 @@ import type { MeteringReport } from '../flows/node-executors';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 import { requireMeter } from './metering-catalog';
 import { MeteringValueError, meterCharge, toMeterValue } from './quantity';
+import { findActiveUsage } from '../usage/active-usage';
 
 const CLOCK_SKEW_MS = 5_000;
 const INTERIM_MAX_AGE_MS = 5 * 60_000;
@@ -47,16 +48,15 @@ export class MeteringReadings {
       const meter = await requireMeter(manager, resourceId, meterId);
       const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } });
       if (attempt && attempt.id !== lifecycleAttemptId) throw new ConflictException('METER_LIFECYCLE_BUSY');
-      const query = manager
-        .createQueryBuilder(ResourceMeteringSession, 's')
-        .innerJoin(ResourceUsage, 'u', 'u.id = s.usageId')
-        .where('s.meterId = :meterId AND s.status = :status', {
-          meterId,
-          status: ResourceMeteringSessionStatus.Active,
-        });
-      if (attempt) query.andWhere('u.id = :usageId', { usageId: attempt.candidateUsageId ?? attempt.previousUsageId });
-      else query.andWhere('u.endTime IS NULL AND u.lifecyclePending = false');
-      const session = await query.getOne();
+      const usageId = attempt
+        ? (attempt.candidateUsageId ?? attempt.previousUsageId)
+        : (await findActiveUsage(manager, resourceId))?.id;
+      const session =
+        usageId == null
+          ? null
+          : await manager.findOne(ResourceMeteringSession, {
+              where: { resourceId, meterId, usageId, status: ResourceMeteringSessionStatus.Active },
+            });
       const id = reportId ?? randomUUID();
       const existing = await manager.findOne(ResourceMeteringOperation, { where: { id } });
       if (existing) {
@@ -245,6 +245,7 @@ export class MeteringReadings {
       }
       if (!session) {
         const attempt = await manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: operation.resourceId });
+        const activeUsage = await findActiveUsage(manager, operation.resourceId);
         // Free meters may skip initialization or lose their session after a failed start.
         // Their fresh lifetime polls are valid while usage stays unchanged, but a
         // reply must not cross a usage boundary or bypass an active meter session.
@@ -253,8 +254,8 @@ export class MeteringReadings {
           .leftJoin(ResourceMeteringSession, 's', 's.usageId = u.id AND s.meterId = :meterId', { meterId: meter.id })
           .where('u.resourceId = :resourceId', { resourceId: operation.resourceId })
           .andWhere(
-            '(u.startTime >= :requestedAt OR u.endTime >= :requestedAt OR (u.endTime IS NULL AND s.id IS NOT NULL))',
-            { requestedAt: operation.requestedAt },
+            '(u.startTime >= :requestedAt OR u.endTime >= :requestedAt OR (u.id = :activeUsageId AND s.id IS NOT NULL))',
+            { requestedAt: operation.requestedAt, activeUsageId: activeUsage?.id ?? null },
           )
           .getExists();
         if (attempt || conflictingUsage)

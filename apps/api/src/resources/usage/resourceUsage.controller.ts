@@ -272,7 +272,7 @@ export class ResourceUsageController {
     description: 'Resource not found',
   })
   async getActiveSession(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<GetActiveUsageSessionDto> {
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId, true);
+    const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
     return { usage: activeSession || null };
   }
 
