@@ -75,17 +75,16 @@ export class MqttClientService implements OnModuleDestroy {
       }
     }
 
-    // If we already have a connected client, return it
-    if (this.clients.has(serverId)) {
-      const client = this.clients.get(serverId);
-      if (client && client.connected) {
-        return client;
-      }
-    }
+    const existing = this.clients.get(serverId);
+    if (existing?.connected) return existing;
 
     // Otherwise, create a new connection promise
     const version = this.connectionVersions.get(serverId) ?? 0;
-    const connectionPromise = this.createClient(serverId, keepTryingToConnect);
+    // An offline client still owns its identity and automatic reconnect loop.
+    // Creating another client here makes the broker kick them off in turn.
+    const connectionPromise = existing
+      ? this.waitForReconnect(serverId, existing)
+      : this.createClient(serverId, keepTryingToConnect);
     this.connectionPromises.set(serverId, connectionPromise);
 
     try {
@@ -96,6 +95,27 @@ export class MqttClientService implements OnModuleDestroy {
     } finally {
       if (this.connectionPromises.get(serverId) === connectionPromise) this.connectionPromises.delete(serverId);
     }
+  }
+
+  private waitForReconnect(serverId: number, client: MqttClient): Promise<MqttClient> {
+    return new Promise((resolve, reject) => {
+      const cancellations = this.connectionCancellations.get(serverId) ?? new Set<() => void>();
+      this.connectionCancellations.set(serverId, cancellations);
+      const finish = (error?: Error) => {
+        clearTimeout(timeout);
+        client.removeListener('connect', onConnect);
+        client.removeListener('end', cancel);
+        cancellations.delete(cancel);
+        if (error) reject(error);
+        else resolve(client);
+      };
+      const onConnect = () => finish();
+      const cancel = () => finish(new Error('MQTT connection was replaced'));
+      const timeout = setTimeout(() => finish(new Error(`Timeout reconnecting to MQTT server ${serverId}`)), 10000);
+      cancellations.add(cancel);
+      client.once('connect', onConnect);
+      client.once('end', cancel);
+    });
   }
 
   private async createClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
@@ -142,6 +162,9 @@ export class MqttClientService implements OnModuleDestroy {
       }
 
       const client = mqtt.connect(url, options);
+      // Track ownership before the first CONNACK, including attempts allowed to
+      // reconnect after their initial wait has timed out.
+      this.clients.set(serverId, client);
       let active = true;
       const cancellations = this.connectionCancellations.get(serverId) ?? new Set<() => void>();
       this.connectionCancellations.set(serverId, cancellations);
@@ -150,6 +173,7 @@ export class MqttClientService implements OnModuleDestroy {
         active = false;
         clearTimeout(timeout);
         cancellations.delete(cancel);
+        if (this.clients.get(serverId) === client) this.clients.delete(serverId);
         client.end(true);
         reject(new Error('MQTT connection was replaced'));
       };
@@ -197,7 +221,9 @@ export class MqttClientService implements OnModuleDestroy {
                 subscription.effectiveQos = effectiveQos;
               } else {
                 void this.reconcileSubscription(serverId, t, true).catch((error) => {
-                  this.logger.warn(`Failed to reconcile MQTT subscription ${t} on server ${server.name}: ${error.message}`);
+                  this.logger.warn(
+                    `Failed to reconcile MQTT subscription ${t} on server ${server.name}: ${error.message}`,
+                  );
                 });
               }
             });
@@ -397,50 +423,54 @@ export class MqttClientService implements OnModuleDestroy {
     const operations = this.subscriptionOperations.get(serverId) ?? new Map<string, Promise<void>>();
     this.subscriptionOperations.set(serverId, operations);
     const previous = operations.get(topic) ?? Promise.resolve();
-    const operation = previous.catch(() => undefined).then(async () => {
-      const version = this.connectionVersions.get(serverId) ?? 0;
-      const subscription = this.subscriptions.get(serverId)?.get(topic);
-      const client = connect ? await this.getOrCreateClient(serverId, true) : this.clients.get(serverId);
+    const operation = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const version = this.connectionVersions.get(serverId) ?? 0;
+        const subscription = this.subscriptions.get(serverId)?.get(topic);
+        const client = connect ? await this.getOrCreateClient(serverId, true) : this.clients.get(serverId);
 
-      if (!subscription) {
-        if (!client?.connected) {
+        if (!subscription) {
+          if (!client?.connected) {
+            return;
+          }
+          await new Promise<void>((resolve, reject) => {
+            client.unsubscribe(topic, (error) => (error ? reject(error) : resolve()));
+          });
           return;
         }
-        await new Promise<void>((resolve, reject) => {
-          client.unsubscribe(topic, (error) => (error ? reject(error) : resolve()));
-        });
-        return;
-      }
 
-      const server = await this.mqttServerRepository.findOneBy({ id: serverId });
-      // State may have changed while resolving the server or opening a connection.
-      if (this.subscriptions.get(serverId)?.get(topic) !== subscription) {
-        return;
-      }
-      const effectiveQos = this.effectiveQos(subscription, server?.defaultSubscribeQos as SubscriptionQos);
-      if (subscription.effectiveQos === effectiveQos || !client?.connected) {
-        return;
-      }
-      await this.externalCallTimer.time(
-        'mqtt',
-        'subscribe',
-        () =>
-          new Promise<void>((resolve, reject) => {
-            client.subscribe(topic, { qos: effectiveQos }, (error) => (error ? reject(error) : resolve()));
-          }),
-      );
-      if (version === (this.connectionVersions.get(serverId) ?? 0)) subscription.effectiveQos = effectiveQos;
-    });
+        const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+        // State may have changed while resolving the server or opening a connection.
+        if (this.subscriptions.get(serverId)?.get(topic) !== subscription) {
+          return;
+        }
+        const effectiveQos = this.effectiveQos(subscription, server?.defaultSubscribeQos as SubscriptionQos);
+        if (subscription.effectiveQos === effectiveQos || !client?.connected) {
+          return;
+        }
+        await this.externalCallTimer.time(
+          'mqtt',
+          'subscribe',
+          () =>
+            new Promise<void>((resolve, reject) => {
+              client.subscribe(topic, { qos: effectiveQos }, (error) => (error ? reject(error) : resolve()));
+            }),
+        );
+        if (version === (this.connectionVersions.get(serverId) ?? 0)) subscription.effectiveQos = effectiveQos;
+      });
     operations.set(topic, operation);
-    void operation.finally(() => {
-      if (operations.get(topic) !== operation) {
-        return;
-      }
-      operations.delete(topic);
-      if (operations.size === 0) {
-        this.subscriptionOperations.delete(serverId);
-      }
-    }).catch(() => undefined);
+    void operation
+      .finally(() => {
+        if (operations.get(topic) !== operation) {
+          return;
+        }
+        operations.delete(topic);
+        if (operations.size === 0) {
+          this.subscriptionOperations.delete(serverId);
+        }
+      })
+      .catch(() => undefined);
     return operation;
   }
 

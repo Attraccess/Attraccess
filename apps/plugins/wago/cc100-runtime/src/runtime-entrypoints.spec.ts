@@ -2,6 +2,9 @@ import { EventEmitter } from 'node:events';
 
 class FakeMqtt extends EventEmitter {
   connected = true;
+  outgoing = {};
+  stream = { destroy: jest.fn() };
+  removeOutgoingMessage = jest.fn();
   subscribe = jest.fn((_topic, _options, callback) => callback());
   publish = jest.fn((_topic, _payload, _options, callback) => callback());
   end = jest.fn((_force?, callback?) => callback?.());
@@ -235,6 +238,36 @@ test('production entrypoint drains connection states during startup and handles 
   expect(mockRuntime.retryCredentialRotationSubscription).toHaveBeenCalled();
   expect(mockRuntime.setConnected).toHaveBeenLastCalledWith(true);
   expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
+});
+
+test('production entrypoint retries interrupted startup after reconnect and installs telemetry timers once', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-rtu-v1';
+  delete process.env.WAGO_IO_PATHS;
+  mockState = { credentials: { username: 'permanent', password: 'persisted' } };
+  let failStartup!: (error: Error) => void;
+  mockRuntime.start.mockImplementationOnce(() => new Promise<void>((_resolve, reject) => (failStartup = reject)));
+  await import('./main');
+  await flush();
+  const client = mockClients[0];
+  client.emit('connect');
+  await flush();
+  client.connected = false;
+  client.emit('close');
+  await flush();
+  client.connected = true;
+  client.emit('connect');
+  await flush();
+  // Reconnect can arrive before slow disconnect handling has unwound startup.
+  failStartup(new Error('MQTT subscribe acknowledgment timed out'));
+  await flush();
+  expect(mockRuntime.start).toHaveBeenCalledTimes(2);
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(1);
+  client.emit('connect');
+  await flush();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.start).toHaveBeenCalledTimes(2);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(2);
 });
 
 test('boots after an SSH MQTT refresh using permanent state credentials and the recreated broker environment', async () => {

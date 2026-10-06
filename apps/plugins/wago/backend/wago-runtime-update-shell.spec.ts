@@ -132,6 +132,73 @@ describe('state-preserving update shell (isolated FW31 interfaces)', () => {
     success(stage());
   });
 
+  it('reclaims the retired image only after acceptance is durably acknowledged', () => {
+    const unrelatedImage = `sha256:${'e'.repeat(64)}`;
+    fixture.file('images.json', JSON.stringify([previousImageId, unrelatedImage]));
+    success(stage());
+    success(activate());
+    success(fixture.run(runtimeUpdateAcceptScript(token, profile, fixture.root)));
+    expect(JSON.parse(fixture.read('images.json'))).toContain(previousImageId);
+    success(acknowledge());
+    success(acknowledge());
+    expect(JSON.parse(fixture.read('images.json'))).toEqual([unrelatedImage, imageId]);
+    expect(fixture.containers()[0]).toMatchObject({ running: true, imageId });
+  });
+
+  it('reclaims a failed loaded candidate after rollback acknowledgement', () => {
+    success(stage());
+    success(activate());
+    success(rollback());
+    expect(JSON.parse(fixture.read('images.json'))).toContain(imageId);
+    success(acknowledge());
+    expect(JSON.parse(fixture.read('images.json'))).toEqual([previousImageId]);
+    expect(fixture.containers()[0]).toMatchObject({ running: true, imageId: previousImageId });
+  });
+
+  it('retains a retired image still referenced by an unrelated stopped container', () => {
+    success(stage());
+    success(activate());
+    fixture.setContainers([...fixture.containers(), {
+      id: 'unrelated', name: 'user-workload', running: false, restart: 'no', imageId: previousImageId,
+    }]);
+    success(fixture.run(runtimeUpdateAcceptScript(token, profile, fixture.root)));
+    success(acknowledge());
+    expect(JSON.parse(fixture.read('images.json'))).toContain(previousImageId);
+    expect(fixture.containers()).toHaveLength(2);
+    expect(fixture.read('docker.log')).not.toContain(`image rm ${previousImageId}`);
+  });
+
+  it('resumes acknowledgement after the unused image was removed but before the receipt was removed', () => {
+    success(stage());
+    success(rollback());
+    fixture.file('images.json', JSON.stringify([previousImageId]));
+    success(acknowledge());
+    expect(fixture.read('docker.log')).not.toContain(`image rm ${imageId}`);
+    expect(existsSync(join(fixture.root, tx))).toBe(false);
+  });
+
+  it('rejects malformed retired image metadata instead of issuing a Docker removal', () => {
+    success(stage());
+    success(rollback());
+    fixture.file(tx + '/image-id', '--force');
+    expect(acknowledge().status).not.toBe(0);
+    expect(fixture.read('docker.log')).not.toMatch(/^image rm /m);
+    expect(existsSync(join(fixture.root, tx))).toBe(true);
+  });
+
+  it.each(['image-remove-failed', 'image-list-failed', 'docker-list-failed', 'docker-inspect-failed'])(
+    'retains acknowledgement ownership on %s and retries image cleanup safely', (fault) => {
+      success(stage());
+      success(rollback());
+      const result = fixture.run(runtimeUpdateAcknowledgeScript(token, profile, fixture.root), fault);
+      expect(result.status).not.toBe(0);
+      expect(existsSync(join(fixture.root, tx))).toBe(true);
+      expect(JSON.parse(fixture.read('images.json'))).toEqual([previousImageId, imageId]);
+      success(acknowledge());
+      expect(JSON.parse(fixture.read('images.json'))).toEqual([previousImageId]);
+    },
+  );
+
   it('receives the verified bundle when FW31 head has no byte-count option', () => {
     rmSync(join(fixture.root, 'bin/head'));
     fixture.file('bin/head', '#!/bin/sh\necho "head: invalid option -- c" >&2\nexit 1\n', 0o700);

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { WAGO_DIN, WAGO_DOUT, wagoRuntimeBootScript } from '../wago-hardware-deployment';
 import { fw31Model, fw31OsRelease, fw31Revisions } from './fw31-identity';
@@ -390,7 +390,18 @@ if(args[0]==='container'&&args[1]==='ls'){
  const c=find(args.at(-1));if(!c)process.exit(1);if(fault!=='remove-stuck')state=state.filter(v=>v!==c);save();
 }else if(args[0]==='load'){
   if(!args.includes('-i'))fs.readFileSync(0);
-  console.log('Loaded image ID: '+(fs.existsSync(root+'/loaded-image-id')?fs.readFileSync(root+'/loaded-image-id','utf8'):'sha256:fixture'));if(fault==='load')process.exit(1);
+  const image=fs.existsSync(root+'/loaded-image-id')?fs.readFileSync(root+'/loaded-image-id','utf8'):'sha256:fixture';
+  const images=fs.existsSync(root+'/images.json')?JSON.parse(fs.readFileSync(root+'/images.json')):[];
+  fs.writeFileSync(root+'/images.json',JSON.stringify([...new Set([...images,image])]));
+  console.log('Loaded image ID: '+image);if(fault==='load')process.exit(1);
+}else if(args[0]==='image'&&args[1]==='ls'){
+  if(fault==='image-list-failed')process.exit(1);
+  console.log((fs.existsSync(root+'/images.json')?JSON.parse(fs.readFileSync(root+'/images.json')):[]).join('\\n'));
+}else if(args[0]==='image'&&args[1]==='rm'){
+  if(args.length!==3||fault==='image-remove-failed'||state.some(c=>c.imageId===args[2]))process.exit(1);
+  const images=JSON.parse(fs.readFileSync(root+'/images.json'));
+  if(!images.includes(args[2]))process.exit(1);
+  fs.writeFileSync(root+'/images.json',JSON.stringify(images.filter(image=>image!==args[2])));
 }else if(args[0]==='image'&&args[1]==='inspect'){
   if(fault==='inspect-image')process.exit(1);
   if(args.includes('--format'))console.log(args[3]==='{{.Id}}'?fs.readFileSync(root+'/loaded-image-id','utf8'):(fs.existsSync(root+'/loaded-image-platform')?fs.readFileSync(root+'/loaded-image-platform','utf8'):'linux/arm/v7'));
@@ -415,6 +426,8 @@ if(args[0]==='container'&&args[1]==='ls'){
     containers: () => JSON.parse(read('containers.json')) as FixtureContainer[],
     setContainers: (containers: FixtureContainer[]) => {
       file('containers.json', JSON.stringify(containers));
+      const images = existsSync(join(root, 'images.json')) ? JSON.parse(read('images.json')) as string[] : [];
+      file('images.json', JSON.stringify([...new Set([...images, ...containers.flatMap(c => c.imageId ? [c.imageId] : [])])]));
       for (const container of containers) {
         if (container.name !== 'attraccess-wago' || !container.running) continue;
         const path = `proc/${container.pid || 42}`;
