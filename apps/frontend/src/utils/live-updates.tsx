@@ -86,23 +86,37 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
   const client = useContext(Context);
   const queryClient = useQueryClient();
   const { topic, resourceId, enabled = true } = props;
-  const propsRef = useRef(props);
-  propsRef.current = props;
+  const latest = useRef({ props, client });
+  latest.current = { props, client };
   const unsubscribeRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!enabled || !client) return;
+    let active = true;
+    const matches = () =>
+      active &&
+      latest.current.client === client &&
+      latest.current.props.enabled !== false &&
+      latest.current.props.topic === topic &&
+      latest.current.props.resourceId === resourceId;
     const subscription = { topic, ...(resourceId !== undefined ? { resourceId } : {}) } as LiveSubscription;
     const unsubscribe = client.subscribe(
       subscription,
-      (payload) => propsRef.current.onUpdate(payload as LivePayloads[T]),
+      (payload) => {
+        if (matches()) latest.current.props.onUpdate(payload as LivePayloads[T]);
+      },
       () => {
-        propsRef.current.onReconnect?.();
+        if (matches()) latest.current.props.onReconnect?.();
       },
     );
-    unsubscribeRef.current = unsubscribe;
-    return () => {
+    const cleanup = () => {
+      if (!active) return;
+      active = false;
       unsubscribe();
-      if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
+    };
+    unsubscribeRef.current = cleanup;
+    return () => {
+      cleanup();
+      if (unsubscribeRef.current === cleanup) unsubscribeRef.current = null;
     };
   }, [client, topic, resourceId, enabled, queryClient]);
   return { abort: useCallback(() => unsubscribeRef.current?.(), []) };
