@@ -216,7 +216,7 @@
     "@vitest/coverage-istanbul": "4.1.11",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.10",
-    "autoprefixer": "10.5.4",
+    "autoprefixer": "10.6.1",
     "babel-jest": "30.4.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "buffer": "^6.0.3",
