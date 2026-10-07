@@ -47,16 +47,24 @@ function addDnsRecord() {
   const hostname = document.getElementById('new-hostname').value.trim();
   const ip = document.getElementById('new-ip').value.trim();
   if (!hostname || !ip) return;
-  request('POST', '/api/modules/dnsmasq/records', { hostname: hostname, ip: ip }).then(function () {
-    document.getElementById('new-hostname').value = '';
-    document.getElementById('new-ip').value = '';
-    loadDnsRecords();
-  });
+  request('POST', '/api/modules/dnsmasq/records', { hostname: hostname, ip: ip })
+    .then(function () {
+      document.getElementById('new-hostname').value = '';
+      document.getElementById('new-ip').value = '';
+      loadDnsRecords();
+    })
+    .catch(function (error) {
+      alert(error.message);
+    });
 }
 
 function deleteDnsRecord(id) {
   if (!confirm('Delete this DNS record?')) return;
-  request('DELETE', '/api/modules/dnsmasq/records/' + id).then(loadDnsRecords);
+  request('DELETE', '/api/modules/dnsmasq/records/' + id)
+    .then(loadDnsRecords)
+    .catch(function (error) {
+      alert(error.message);
+    });
 }
 
 function startDnsEdit(btn) {
@@ -78,7 +86,11 @@ function saveDnsEdit(btn) {
   const hostname = row.querySelector('.edit-hostname').value.trim();
   const ip = row.querySelector('.edit-ip').value.trim();
   if (!hostname || !ip) return;
-  request('PUT', '/api/modules/dnsmasq/records/' + id, { hostname: hostname, ip: ip }).then(loadDnsRecords);
+  request('PUT', '/api/modules/dnsmasq/records/' + id, { hostname: hostname, ip: ip })
+    .then(loadDnsRecords)
+    .catch(function (error) {
+      alert(error.message);
+    });
 }
 
 function loadDnsSettings() {
@@ -97,7 +109,11 @@ function saveDnsSettings() {
     localDomain: document.getElementById('dns-localDomain').value.trim(),
     logQueries: document.getElementById('dns-logQueries').checked,
   };
-  request('PUT', '/api/modules/dnsmasq/settings', data).then(loadDnsSettings);
+  request('PUT', '/api/modules/dnsmasq/settings', data)
+    .then(loadDnsSettings)
+    .catch(function (error) {
+      alert(error.message);
+    });
 }
 
 function checkDnsStatus() {

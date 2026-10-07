@@ -8,7 +8,10 @@ function request(method, url, body) {
     opts.body = JSON.stringify(body);
   }
   return fetch(API + url, opts).then(function (r) {
-    return r.json();
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    });
   });
 }
 

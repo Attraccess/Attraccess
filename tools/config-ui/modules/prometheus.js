@@ -4,6 +4,7 @@ const {
   loadSettings,
   resolveApiKey,
   writePrometheusConfig,
+  replacePrometheusConfig,
   publicSettings,
   saveSettings,
   getCurrentConfig,
@@ -93,9 +94,24 @@ const prometheusModule = {
       if (body.scrapeInterval !== undefined) settings.scrapeInterval = body.scrapeInterval;
       if (body.evaluationInterval !== undefined) settings.evaluationInterval = body.evaluationInterval;
       if (body.attraccessTarget !== undefined) settings.attraccessTarget = body.attraccessTarget;
-      saveSettings(settings);
       const apiKey = resolveApiKey(body.metricsApiKey);
-      writePrometheusConfig(settings, apiKey);
+      const previousConfig = getCurrentConfig();
+      if (!writePrometheusConfig(settings, apiKey)) {
+        helpers.sendJson(res, 500, { error: 'Failed to write Prometheus configuration. Settings were not saved.' });
+        return true;
+      }
+      try {
+        saveSettings(settings);
+      } catch (error) {
+        log(`failed to save settings: ${error.message}`);
+        const restored = replacePrometheusConfig(previousConfig);
+        helpers.sendJson(res, 500, {
+          error: restored
+            ? 'Failed to save Prometheus settings. Previous configuration restored.'
+            : 'Failed to save Prometheus settings and restore the configuration. Check storage before retrying.',
+        });
+        return true;
+      }
       reloadPrometheus();
       helpers.sendJson(res, 200, publicSettings(settings));
       return true;
@@ -103,7 +119,10 @@ const prometheusModule = {
 
     if (method === 'DELETE' && subPath === '/api-key') {
       const settings = loadSettings();
-      writePrometheusConfig(settings, '');
+      if (!writePrometheusConfig(settings, '')) {
+        helpers.sendJson(res, 500, { error: 'Failed to write Prometheus configuration. API key was not removed.' });
+        return true;
+      }
       reloadPrometheus();
       helpers.sendJson(res, 200, publicSettings(settings));
       return true;

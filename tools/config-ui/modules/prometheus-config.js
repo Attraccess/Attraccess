@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { writeAtomicFile } = require('./atomic-file.js');
 
 const DATA_DIR = process.env.PROMETHEUS_DATA_DIR || '/data';
 
@@ -13,6 +14,7 @@ const PRIVATE_FILE_MODE = 0o600;
 const SHARED_FILE_MODE = 0o644;
 
 function log(message) {
+  // eslint-disable-next-line no-console -- Standalone container logs go to stdout.
   console.log(`[prometheus] ${message}`);
 }
 
@@ -25,8 +27,7 @@ function loadJson(filePath, fallback) {
 }
 
 function saveJson(filePath, data) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: PRIVATE_FILE_MODE });
+  writeAtomicFile(filePath, JSON.stringify(data, null, 2), PRIVATE_FILE_MODE);
   try {
     fs.chmodSync(filePath, PRIVATE_FILE_MODE);
   } catch {
@@ -107,13 +108,10 @@ function generatePrometheusConfig(settings, apiKey) {
   return lines.join('\n') + '\n';
 }
 
-function writePrometheusConfig(settings, apiKey) {
+function replacePrometheusConfig(content) {
   try {
-    fs.mkdirSync(path.dirname(PROMETHEUS_CONFIG_PATH), { recursive: true });
-    fs.writeFileSync(PROMETHEUS_CONFIG_PATH, generatePrometheusConfig(settings, apiKey), {
-      encoding: 'utf-8',
-      mode: SHARED_FILE_MODE,
-    });
+    if (content === null) fs.unlinkSync(PROMETHEUS_CONFIG_PATH);
+    else writeAtomicFile(PROMETHEUS_CONFIG_PATH, content, SHARED_FILE_MODE);
     try {
       fs.chmodSync(PROMETHEUS_CONFIG_PATH, SHARED_FILE_MODE);
     } catch {
@@ -125,6 +123,10 @@ function writePrometheusConfig(settings, apiKey) {
     log(`failed to write config: ${err.message}`);
     return false;
   }
+}
+
+function writePrometheusConfig(settings, apiKey) {
+  return replacePrometheusConfig(generatePrometheusConfig(settings, apiKey));
 }
 
 function getCurrentConfig() {
@@ -160,6 +162,7 @@ module.exports = {
   resolveApiKey,
   generatePrometheusConfig,
   writePrometheusConfig,
+  replacePrometheusConfig,
   getCurrentConfig,
   publicSettings,
 };

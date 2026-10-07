@@ -20,10 +20,14 @@ function savePromSettings() {
     attraccessTarget: document.getElementById('prom-attraccessTarget').value.trim(),
   };
   if (keyInput.length > 0) data.metricsApiKey = keyInput;
-  request('PUT', '/api/modules/prometheus/settings', data).then(function () {
-    loadPromSettings();
-    loadPromConfig();
-  });
+  request('PUT', '/api/modules/prometheus/settings', data)
+    .then(function () {
+      loadPromSettings();
+      loadPromConfig();
+    })
+    .catch(function (error) {
+      alert(error.message);
+    });
 }
 
 function clearPromApiKey() {
@@ -33,10 +37,14 @@ function clearPromApiKey() {
     )
   )
     return;
-  request('DELETE', '/api/modules/prometheus/api-key').then(function () {
-    loadPromSettings();
-    loadPromConfig();
-  });
+  request('DELETE', '/api/modules/prometheus/api-key')
+    .then(function () {
+      loadPromSettings();
+      loadPromConfig();
+    })
+    .catch(function (error) {
+      alert(error.message);
+    });
 }
 
 function maskBearerToken(config) {
