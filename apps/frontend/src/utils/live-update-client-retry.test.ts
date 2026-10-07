@@ -4,6 +4,46 @@ import { flush, useLiveClientFixture } from './live-update-client.test-fixture';
 describe('bundled live client', () => {
   const fixture = useLiveClientFixture();
 
+  it('clears recovered outage state for quiet topics and reports the next outage', async () => {
+    const unavailable = vi.fn();
+    fixture.client.subscribe({ topic: 'billing' }, vi.fn(), undefined, unavailable);
+    await flush();
+    fixture.streams[0].send({ type: 'ready' });
+    await flush();
+    fixture.streams[0].end();
+    await flush();
+    expect(unavailable).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(501);
+    fixture.streams[1].send({ type: 'ready' });
+    await flush();
+    const lateUnavailable = vi.fn();
+    fixture.client.subscribe({ topic: 'billing' }, vi.fn(), undefined, lateUnavailable);
+    await flush();
+    expect(lateUnavailable).not.toHaveBeenCalled();
+    fixture.streams[1].end();
+    await flush();
+    expect(unavailable).toHaveBeenCalledTimes(2);
+    expect(lateUnavailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps rejected topics unavailable when the transport recovers', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    fixture.client.subscribe({ topic: 'billing' }, vi.fn());
+    await flush();
+    fixture.streams[0].send({ type: 'ready' });
+    fixture.streams[0].send({ type: 'rejected', subscription: { topic: 'billing' }, reason: 'Forbidden' });
+    await flush();
+    fixture.streams[0].end();
+    await flush();
+    await vi.advanceTimersByTimeAsync(501);
+    fixture.streams[1].send({ type: 'ready' });
+    await flush();
+    const unavailable = vi.fn();
+    fixture.client.subscribe({ topic: 'billing' }, vi.fn(), undefined, unavailable);
+    await flush();
+    expect(unavailable).toHaveBeenCalledTimes(1);
+  });
+
   it('restores only active topics after interruption and refreshes authoritative state once', async () => {
     fixture.client.subscribe({ topic: 'messaging' }, vi.fn());
     const remove = fixture.client.subscribe({ topic: 'resource', resourceId: 2 }, vi.fn());

@@ -124,6 +124,12 @@ export class LiveUpdateTopics {
     }
   }
 
+  recover(): void {
+    for (const entry of this.entries.values()) {
+      if (!entry.rejected) entry.unavailable = false;
+    }
+  }
+
   markUnavailable(entry: Entry): void {
     if (entry.unavailable) return;
     entry.unavailable = true;

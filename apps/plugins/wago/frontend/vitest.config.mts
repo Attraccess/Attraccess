@@ -24,8 +24,8 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 15_000,
     coverage: {
-      // Helpers in this directory contain hoisted mocks, not production code.
-      exclude: [...coverageConfigDefaults.exclude, 'apps/plugins/wago/frontend/tests/**'],
+      // Test helpers contain hoisted mocks that Istanbul's instrumentation breaks.
+      exclude: [...coverageConfigDefaults.exclude, 'apps/plugins/wago/frontend/tests/**', '**/*.test-fixture.{ts,tsx}'],
     },
   },
   esbuild: { jsx: 'automatic' },

@@ -87,6 +87,7 @@ export class LiveUpdateClient {
       sync: (current) => this.sync(current),
       ready: () => {
         this.interrupted = false;
+        this.topics.recover();
         if (this.connected) {
           invokeLiveCallback(this.recovered);
           this.topics.entries.forEach((entry) => entry.consumers.forEach((c) => invokeLiveCallback(c.restore)));
