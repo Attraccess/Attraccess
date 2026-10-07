@@ -1,5 +1,8 @@
 import { usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
-import { useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useQueryClient, type Query, type QueryKey, type QueryState } from '@tanstack/react-query';
+
+// Duplicate consumers share the query; only its latest live event may restore state.
+const liveStates = new WeakMap<Query, QueryState>();
 
 /** Initial reads/mutations remain REST; the host stream owns snapshots and reconnect refresh. */
 export function useWagoLiveQuery(queryKey: QueryKey, topic: string, identifier?: string, enabled = true) {
@@ -10,9 +13,7 @@ export function useWagoLiveQuery(queryKey: QueryKey, topic: string, identifier?:
     identifier,
     enabled,
     onUpdate: (event) => {
-      // Cancel synchronously before applying live state, so an older initial/reconnect
-      // REST read cannot overwrite it (even when its query function ignores the signal).
-      void client.cancelQueries({ queryKey, exact: true });
+      const cancellation = client.cancelQueries({ queryKey, exact: true });
       if (event.eventType === 'snapshot') {
         client.setQueryData(queryKey, event.value);
       } else {
@@ -25,6 +26,23 @@ export function useWagoLiveQuery(queryKey: QueryKey, topic: string, identifier?:
           errorUpdatedAt: Date.now(),
         });
       }
+      const query = client.getQueryCache().find({ queryKey, exact: true });
+      if (!query) return;
+      const state = query.state;
+      const pendingRead = query.promise;
+      liveStates.set(query, state);
+      // A settled retryer cannot be cancelled, but Query.fetch may still have its
+      // cache commit queued. Drain cancellation before restoring authoritative state.
+      return cancellation.then(() => {
+        if (
+          liveStates.get(query) === state &&
+          query.promise === pendingRead &&
+          client.getQueryCache().find({ queryKey, exact: true }) === query
+        ) {
+          liveStates.delete(query);
+          if (query.state !== state) query.setState({ ...state, fetchStatus: 'idle' });
+        }
+      });
     },
   });
 }
