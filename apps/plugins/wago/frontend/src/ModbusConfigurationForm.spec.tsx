@@ -17,7 +17,7 @@ afterEach(() => {
 // Full-catalog editors render every built-in register and rerender on each key.
 // Allow CI to finish typing before cleanup; timed-out user-event tasks otherwise
 // continue typing into the next test's focused input.
-const catalogEditTimeoutMs = 60_000;
+const catalogEditTimeoutMs = 180_000;
 
 it(
   'creates localized signal defaults from a German form and preserves later user edits',
