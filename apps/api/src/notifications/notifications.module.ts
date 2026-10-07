@@ -8,11 +8,24 @@ import { NotificationDispatchService } from './notification-dispatch.service';
 import { PushModule } from '../push/push.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { EmailModule } from '../email/email.module';
+import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { NotificationLiveTopicsProvider } from './notification-live-topics.provider';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([NotificationPreference]), PushModule, MetricsModule, EmailModule],
+  imports: [
+    TypeOrmModule.forFeature([NotificationPreference]),
+    PushModule,
+    MetricsModule,
+    EmailModule,
+    LiveTopicsModule,
+  ],
   controllers: [NotificationsController],
-  providers: [NotificationPreferenceService, NotificationLiveService, NotificationDispatchService],
-  exports: [NotificationPreferenceService, NotificationDispatchService],
+  providers: [
+    NotificationPreferenceService,
+    NotificationLiveService,
+    NotificationDispatchService,
+    NotificationLiveTopicsProvider,
+  ],
+  exports: [NotificationPreferenceService, NotificationDispatchService, NotificationLiveService],
 })
 export class NotificationsModule {}

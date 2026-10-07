@@ -1,13 +1,9 @@
 // Subscribes to per-user SSE stream and reports system notifications
 // FEATURE: System notification preferences
-import { useSSE } from '../../utils/sse';
+import { useLiveUpdates } from '../../utils/live-updates';
 
-export interface SystemNotificationLiveEvent {
-  category?: string;
-  title: string;
-  body?: string;
-  url?: string;
-}
+import { SystemNotificationLiveEvent } from '../../utils/live-update-types';
+export type { SystemNotificationLiveEvent } from '../../utils/live-update-types';
 
 interface Props {
   onNotification: (notification: SystemNotificationLiveEvent) => void;
@@ -17,8 +13,8 @@ interface Props {
 export function useSystemNotificationsLive(props: Props) {
   const { onNotification, enabled = true } = props;
 
-  return useSSE<SystemNotificationLiveEvent>({
-    path: '/api/notifications/live',
+  return useLiveUpdates({
+    topic: 'notifications',
     onUpdate: onNotification,
     enabled,
   });

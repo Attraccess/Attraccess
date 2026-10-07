@@ -104,7 +104,7 @@ export class PluginSandboxService {
       if (typeof value !== 'string' || !isPluginPermission(value)) {
         throw new Error(
           `Plugin "${pluginName}" declares unknown permission "${String(value)}". ` +
-            `Valid permissions are: ${Object.values(PluginPermission).join(', ')}.`
+            `Valid permissions are: ${Object.values(PluginPermission).join(', ')}.`,
         );
       }
       if (!result.includes(value)) {
@@ -136,6 +136,7 @@ export class PluginSandboxService {
     return {
       manifest: base.manifest,
       audit: base.audit,
+      liveUpdates: base.liveUpdates,
       logger: base.logger,
       mqtt: {
         subscribe(serverId, topicFilter, handler) {
@@ -195,7 +196,7 @@ export class PluginSandboxService {
   private static guardEvents(
     base: PluginContext,
     pluginName: string,
-    require: (permission: PluginPermission, capability: string) => void
+    require: (permission: PluginPermission, capability: string) => void,
   ): PluginContext['events'] {
     const holder: { proxy: PluginContext['events'] | null } = { proxy: null };
 
@@ -219,7 +220,7 @@ export class PluginSandboxService {
         const permission = EVENT_METHOD_PERMISSIONS.get(property);
         if (!permission) {
           throw new Error(
-            `Plugin "${pluginName}" attempted to use "events.${property}", which the plugin sandbox does not expose.`
+            `Plugin "${pluginName}" attempted to use "events.${property}", which the plugin sandbox does not expose.`,
           );
         }
 

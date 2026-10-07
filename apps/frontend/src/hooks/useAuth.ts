@@ -1,3 +1,4 @@
+import { resumeLiveUpdates, stopLiveUpdates } from '../utils/live-updates';
 import { useNavigate } from 'react-router-dom';
 import {
   OpenAPI,
@@ -22,6 +23,7 @@ export function useLogin() {
   const queryClient = useQueryClient();
   const login = useAuthenticationServiceCreateSession({
     onSuccess: () => {
+      resumeLiveUpdates();
       queryClient.invalidateQueries({
         queryKey: UseUsersServiceGetCurrentKeyFn(),
       });
@@ -47,6 +49,7 @@ export function useLogin() {
 }
 
 export function useAuth() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const [isInitialized, setIsInitialized] = useState(false);
@@ -90,8 +93,11 @@ export function useAuth() {
   });
 
   const logout = useCallback(() => {
+    stopLiveUpdates();
+    queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), null);
+    queryClient.clear();
     deleteSession();
-  }, [deleteSession]);
+  }, [deleteSession, queryClient]);
 
   return {
     user: currentUser ?? null,

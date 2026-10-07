@@ -822,3 +822,24 @@ so they share the workspace toolchain, caching and CI.
 - [Example plugin source](https://github.com/Attraccess/Attraccess/tree/main/examples/plugin-hello-world) — the `plugin-hello-world` walkthrough code
 - [Developer Guide](developer/overview.md) — Attraccess architecture and development
 - [API Reference](developer/api-reference.md) — Attraccess REST API
+
+## Live updates
+
+Use the backend SDK's `context.liveUpdates.register` and the frontend SDK's
+`usePluginLiveUpdates<T>` to share the host's authenticated live connection.
+Its optional `onUnavailable` callback reports topic rejection or transport
+interruption. Retain cached values as unavailable until a fresh snapshot arrives;
+do not start recurring REST polling. Cleanup and authentication ownership guard
+this callback in the same way as `onUpdate` and `onReconnect`.
+Declare plugin-local topics, validate identifiers and authorize every subscription
+on the backend; do not open a separate SSE or WebSocket for plugin UI updates.
+Authorization and source exceptions are redacted by the host. With
+`createSharedLiveSampler`, a pending read keeps its per-key guard until settlement
+even after final unsubscribe; recreated consumers receive fresh samples.
+The host recovers valid same-user credential rotation without clearing queries
+and retains the stream across same-batch cleanup/setup. Plugin event payloads
+have no local replay.
+See [Plugin live updates](../../development/live-updates.md#plugin-live-updates)
+for the contract and examples, including reconnection and cleanup.
+The [WAGO sampling schedule](../../development/live-updates.md#wago-sampling-schedule)
+lists the shared backend intervals for all nine WAGO topics.

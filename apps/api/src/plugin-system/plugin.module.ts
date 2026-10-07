@@ -43,6 +43,8 @@ import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-
 import { EncryptionService } from '../encryption/encryption.service';
 import { PLUGIN_AUDIT_HOST_PROVIDER, PluginAuditHostProvider } from '@attraccess/plugins-backend-sdk';
 import { createPluginAuditContext } from './plugin-audit-context';
+import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 
 @Global()
 @Module({})
@@ -86,7 +88,7 @@ export class PluginModule {
 
       return {
         module: PluginModule,
-        imports: [SettingsModule, MqttModule],
+        imports: [SettingsModule, MqttModule, LiveTopicsModule],
         providers: [
           PluginService,
           PluginSandboxService,
@@ -94,6 +96,7 @@ export class PluginModule {
           PluginMqttService,
           NpmPluginService,
           PluginClassificationService,
+          PluginLiveUpdatesService,
         ],
         exports: [PluginEventsService],
         controllers: [PluginController],
@@ -155,7 +158,7 @@ export class PluginModule {
 
     return {
       module: PluginModule,
-      imports: [SettingsModule, MqttModule, ...pluginModules],
+      imports: [SettingsModule, MqttModule, LiveTopicsModule, ...pluginModules],
       providers: [
         PluginService,
         PluginSandboxService,
@@ -163,6 +166,7 @@ export class PluginModule {
         PluginMqttService,
         NpmPluginService,
         PluginClassificationService,
+        PluginLiveUpdatesService,
       ],
       exports: [PluginEventsService],
       controllers: [PluginController],
@@ -234,7 +238,10 @@ export class PluginModule {
         {
           provide: `plugin-mqtt-cleanup:${manifest.id}`,
           useFactory: () => ({
-            onModuleDestroy: () => PluginModule.pluginMqtt().clearPlugin(manifest.id),
+            onModuleDestroy: () => {
+              PluginModule.pluginMqtt().clearPlugin(manifest.id);
+              PluginModule.pluginLiveUpdates().clearPlugin(manifest.id);
+            },
           }),
         },
       ],
@@ -286,6 +293,9 @@ export class PluginModule {
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      liveUpdates: {
+        register: (definition) => PluginModule.pluginLiveUpdates().register(manifest.id, manifest.name, definition),
+      },
       audit: createPluginAuditContext(manifest.id, () =>
         PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<PluginAuditHostProvider>(
           PLUGIN_AUDIT_HOST_PROVIDER,
@@ -402,6 +412,12 @@ export class PluginModule {
 
   private static pluginEvents(): PluginEventsService {
     return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(PluginEventsService, { strict: false });
+  }
+
+  private static pluginLiveUpdates(): PluginLiveUpdatesService {
+    return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(PluginLiveUpdatesService, {
+      strict: false,
+    });
   }
 
   private static pluginMqtt(): PluginMqttService {
