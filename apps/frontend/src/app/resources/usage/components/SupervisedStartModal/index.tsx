@@ -1,8 +1,8 @@
-import { DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { X } from 'lucide-react';
 import { Button } from '../../../../../components/button';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
-import { SupervisedStartModalProps } from './index.contracts';
+import { SupervisedStartModalProps } from './index.supervised-start-modal-props';
 import { useSupervisedStartModalState } from './useSupervisedStartModalState';
 
 export function SupervisedStartModal({
@@ -29,7 +29,7 @@ export function SupervisedStartModal({
     >
       <DrawerHeader>
         <div className="flex w-full items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
           <Button
             isIconOnly
             variant="ghost"
@@ -58,4 +58,4 @@ export function SupervisedStartModal({
   );
 }
 
-export { type SupervisedStartModalProps } from './index.contracts';
+export { type SupervisedStartModalProps } from './index.supervised-start-modal-props';

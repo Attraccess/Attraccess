@@ -1,12 +1,13 @@
 import { ResourceUsage } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { NotFoundException } from '@nestjs/common';
-import { EntityManager, FindOneOptions, In, IsNull } from 'typeorm';
+import { EntityManager, FindOneOptions, In } from 'typeorm';
 import { UsageDoorActionsImplementation } from './usage-door-actions';
+import { activeUsageWhere } from './active-usage';
+
 export abstract class UsageSessionQueriesImplementation extends UsageDoorActionsImplementation {
-  async getActiveSession(
+  public async getActiveSession(
     resourceId: number,
-    onlyFinalized: boolean,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceUsage | null> {
     const resourceUsageRepository = transactionalEntityManager
@@ -16,23 +17,24 @@ export abstract class UsageSessionQueriesImplementation extends UsageDoorActions
     return await resourceUsageRepository.findOne({
       where: {
         resourceId,
-        endTime: IsNull(),
-        isFinalized: onlyFinalized ? true : undefined,
-        lifecyclePending: false,
+        ...activeUsageWhere(),
       },
+      order: { startTime: 'DESC', id: 'DESC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
   }
 
-  async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage | null>> {
+  public async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage | null>> {
     const map = new Map<number, ResourceUsage | null>(resourceIds.map((id) => [id, null]));
     if (resourceIds.length === 0) return map;
     const sessions = await this.resourceUsageRepository.find({
-      where: { resourceId: In(resourceIds), endTime: IsNull(), isFinalized: true, lifecyclePending: false },
+      where: { resourceId: In(resourceIds), ...activeUsageWhere() },
+      order: { startTime: 'DESC', id: 'DESC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
     for (const session of sessions) {
-      map.set(session.resourceId, session);
+      // Legacy duplicates are retained for explicit resolution. Single and bulk reads agree.
+      if (!map.get(session.resourceId)) map.set(session.resourceId, session);
     }
     return map;
   }

@@ -1,37 +1,21 @@
-import { FILTER_KEYS } from './index.state';
-import { UserManagementAddFilter } from './UserManagementAddFilter';
-import { CloseButton } from '@heroui/react';
+import {
+  Button,
+  CloseButton,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
+} from '@heroui/react';
+import { PlusIcon } from 'lucide-react';
 import { Select } from '../../components/select';
-import { FilterKey } from './index.contracts';
-import { MultiValueCondition } from './index.contracts';
-import { MultiValueFilter } from './index.helpers';
+import { FilterKey } from './index.filter-key';
+import { MultiValueCondition } from './index.multi-value-condition';
+import { FILTER_KEYS } from './index.filter-keys';
+import { MultiValueFilter } from './index.multi-value-filter';
 import { SingleValueFilter } from './index.single-value-filter';
-import { useUserManagementPageState } from './useUserManagementPageState';
-type Props = Pick<
-  ReturnType<typeof useUserManagementPageState>,
-  | 't'
-  | 'activeFilters'
-  | 'replaceFilter'
-  | 'roleExcludes'
-  | 'roleMatch'
-  | 'setRoleCondition'
-  | 'roles'
-  | 'roleName'
-  | 'excludeRoleIds'
-  | 'roleIds'
-  | 'updateFilters'
-  | 'emailVerified'
-  | 'ssoProviderExcludes'
-  | 'ssoProviderMatch'
-  | 'setSsoProviderCondition'
-  | 'ssoProviders'
-  | 'ssoProviderNone'
-  | 'hasSsoProvider'
-  | 'excludeSsoProviderIds'
-  | 'ssoProviderIds'
-  | 'removeFilter'
-  | 'addFilter'
->;
+import { Props } from './UserManagementFilterProps';
+
 export function UserManagementPageFiltersLabel({
   t,
   activeFilters,
@@ -181,7 +165,25 @@ export function UserManagementPageFiltersLabel({
           />
         </div>
       ))}
-      <UserManagementAddFilter {...{ activeFilters, addFilter, t }} />
+      {activeFilters.length < FILTER_KEYS.length ? (
+        <Dropdown>
+          <DropdownTrigger>
+            <Button size="sm" variant="ghost" aria-label={t('filters.add')}>
+              <PlusIcon size={14} />
+              {activeFilters.length === 0 ? t('filters.add') : null}
+            </Button>
+          </DropdownTrigger>
+          <DropdownPopover>
+            <DropdownMenu aria-label={t('filters.add')}>
+              {FILTER_KEYS.filter((filter) => !activeFilters.includes(filter)).map((filter) => (
+                <DropdownItem key={filter} id={filter} onPress={() => addFilter(filter)}>
+                  {t(`filters.${filter}`)}
+                </DropdownItem>
+              ))}
+            </DropdownMenu>
+          </DropdownPopover>
+        </Dropdown>
+      ) : null}
     </div>
   );
 }

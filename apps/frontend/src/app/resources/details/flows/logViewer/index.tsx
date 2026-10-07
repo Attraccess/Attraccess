@@ -50,7 +50,7 @@ export function LogViewer(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen} dialogProps={{ 'aria-label': t('title') }}>
         <DrawerHeader>
           <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin />
         </DrawerHeader>

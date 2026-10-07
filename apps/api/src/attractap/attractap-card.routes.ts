@@ -16,13 +16,15 @@ export abstract class AttractapCardRoutes extends AttractapControllerRouteContex
     description: 'Enrollment initiated, continue on Reader',
     type: EnrollNfcCardResponseDto,
   })
-  async enrollNfcCard(
+  public async enrollNfcCard(
     @Body() enrollData: EnrollNfcCardDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<EnrollNfcCardResponseDto> {
+    const userId = await this.cardAccess.resolveUserId(req.user, enrollData.userId);
     await this.attractapGateway.startEnrollOfNewNfcCard({
       readerId: enrollData.readerId,
-      userId: req.user.id,
+      userId,
+      actorId: req.user.id,
       authenticationMethod: req.user.authenticationMethod ?? 'session',
       ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
     });
@@ -41,10 +43,11 @@ export abstract class AttractapCardRoutes extends AttractapControllerRouteContex
     description: 'Reset initiated, continue on Reader',
     type: ResetNfcCardResponseDto,
   })
-  async resetNfcCard(
+  public async resetNfcCard(
     @Body() resetData: ResetNfcCardDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResetNfcCardResponseDto> {
+    await this.cardAccess.getCardForManagement(resetData.cardId, req.user);
     await this.attractapGateway.startResetOfNfcCard({
       readerId: resetData.readerId,
       cardId: resetData.cardId,

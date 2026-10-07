@@ -34,6 +34,7 @@ export function useResourceTabsLayoutInnerState({
   const { t } = useTranslations({ en, de });
 
   const canUpdateResources = hasPermission('resources.update');
+  const canDeleteResources = hasPermission('resources.delete');
 
   const {
     data: resource,
@@ -57,6 +58,7 @@ export function useResourceTabsLayoutInnerState({
   }, [location.pathname, resourceId, tabs]);
 
   const handleDelete = async () => {
+    if (!canDeleteResources) return;
     try {
       await deleteResource.mutateAsync({ id: resourceId });
       success({
@@ -80,6 +82,7 @@ export function useResourceTabsLayoutInnerState({
     closeDeleteModal,
     t,
     canUpdateResources,
+    canDeleteResources,
     resource,
     isLoadingResource,
     resourceError,
@@ -89,5 +92,5 @@ export function useResourceTabsLayoutInnerState({
     handleDelete,
     resourceId,
     children,
-  } as const;
+  };
 }

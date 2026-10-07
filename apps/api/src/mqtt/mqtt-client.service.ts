@@ -70,17 +70,16 @@ export class MqttClientService extends MqttClientSubscriptionsImplementation imp
       }
     }
 
-    // If we already have a connected client, return it
-    if (this.clients.has(serverId)) {
-      const client = this.clients.get(serverId);
-      if (client && client.connected) {
-        return client;
-      }
-    }
+    const existing = this.clients.get(serverId);
+    if (existing?.connected) return existing;
 
     // Otherwise, create a new connection promise
     const version = this.connectionVersions.get(serverId) ?? 0;
-    const connectionPromise = this.createClient(serverId, keepTryingToConnect);
+    // An offline client still owns its identity and automatic reconnect loop.
+    // Creating another client here makes the broker kick them off in turn.
+    const connectionPromise = existing
+      ? this.waitForReconnect(serverId, existing)
+      : this.createClient(serverId, keepTryingToConnect);
     this.connectionPromises.set(serverId, connectionPromise);
 
     try {
@@ -91,5 +90,26 @@ export class MqttClientService extends MqttClientSubscriptionsImplementation imp
     } finally {
       if (this.connectionPromises.get(serverId) === connectionPromise) this.connectionPromises.delete(serverId);
     }
+  }
+
+  protected waitForReconnect(serverId: number, client: MqttClient): Promise<MqttClient> {
+    return new Promise((resolve, reject) => {
+      const cancellations = this.connectionCancellations.get(serverId) ?? new Set<() => void>();
+      this.connectionCancellations.set(serverId, cancellations);
+      const finish = (error?: Error) => {
+        clearTimeout(timeout);
+        client.removeListener('connect', onConnect);
+        client.removeListener('end', cancel);
+        cancellations.delete(cancel);
+        if (error) reject(error);
+        else resolve(client);
+      };
+      const onConnect = () => finish();
+      const cancel = () => finish(new Error('MQTT connection was replaced'));
+      const timeout = setTimeout(() => finish(new Error(`Timeout reconnecting to MQTT server ${serverId}`)), 10000);
+      cancellations.add(cancel);
+      client.once('connect', onConnect);
+      client.once('end', cancel);
+    });
   }
 }

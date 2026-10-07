@@ -1,6 +1,7 @@
+import { runtimeVersion } from '../manifest.json';
 import { MemoryDeviceAdapter } from './adapters';
 import { JsonStateStore, WagoRuntime, hash } from './runtime';
-import { TestTransport, snapshot, desired, createRuntimeFixture } from './runtime.test-utils';
+import { TestTransport, snapshot, desired, commands, createRuntimeFixture } from './runtime.test-utils';
 
 describe('WagoRuntime', () => {
   let transport: TestTransport;
@@ -29,7 +30,7 @@ describe('WagoRuntime', () => {
         pairingCode: '482931',
         enrollmentSecret: 'enrollment-secret',
         protocolVersion: '1.0.0',
-        runtimeVersion: '0.1.0',
+        runtimeVersion,
         capabilities: expect.arrayContaining(['claim', 'heartbeat', 'configuration-v1']),
         sequence: expect.any(Number),
       }),
@@ -87,7 +88,7 @@ describe('WagoRuntime', () => {
           hardwareId: 'cc100-1',
           pairingCode: '482931',
           protocolVersion: '1.0.0',
-          runtimeVersion: '0.1.0',
+          runtimeVersion,
         }),
       }),
     );
@@ -157,6 +158,27 @@ describe('WagoRuntime', () => {
     );
     release();
     await starting;
+  });
+
+  it('retries interrupted startup without reloading state or duplicating established subscriptions', async () => {
+    const subscribe = jest.spyOn(transport, 'subscribe');
+    subscribe.mockImplementationOnce(async (topic, listener) => {
+      transport.listeners.set(topic, listener);
+    });
+    subscribe.mockRejectedValueOnce(new Error('MQTT subscribe acknowledgment timed out'));
+    const load = jest.fn(async () => ({ outputs: {}, commandIds: [] }));
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store: { load, save: async () => undefined },
+      transport,
+      device,
+    });
+    await expect(runtime.start()).rejects.toThrow('timed out');
+    await runtime.start();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(subscribe.mock.calls.map(([topic]) => topic)).toEqual([desired, commands, commands]);
   });
 
   it('starts when reserving initial state telemetry fails', async () => {

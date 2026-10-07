@@ -72,6 +72,7 @@ jobs:
         build-companion,
         plugins,
         attractap-firmware-version,
+        wago-runtime-version,
         balena-compose-check,
         fail2ban-smoke,
         grafana-provisioning-smoke,
@@ -112,6 +113,20 @@ jobs:
         run: ./scripts/attractap-firmware-version-check.spec.sh
       - name: Ensure Attractap firmware version was bumped
         run: ./scripts/check-attractap-firmware-version.sh "${{ env.NX_AFFECTED_BASE }}"
+
+  wago-runtime-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Test CC100 runtime version check
+        run: node --test scripts/wago-runtime-version-check.test.mjs
+      - name: Ensure CC100 runtime version was increased
+        run: node scripts/check-wago-runtime-version.mjs "${{ env.NX_AFFECTED_BASE }}"
 
   lint-and-typecheck:
     runs-on: ubuntu-latest
@@ -222,6 +237,13 @@ jobs:
         uses: actions/checkout@v7
       - name: Test Grafana provisioning prepare (Pushover opt-in)
         run: ./scripts/grafana-provisioning-prepare.spec.sh
+      - name: Test managed Grafana provisioning sync
+        run: ./scripts/grafana-managed-sync.spec.sh
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Test legacy Pushover contact point cleanup
+        run: node --test scripts/grafana-pushover-cleanup.test.mjs
 
   balena-compose-check:
     runs-on: ubuntu-latest

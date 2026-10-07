@@ -1,3 +1,4 @@
+import { ResourceMeter } from '@attraccess/database-entities';
 import {
   FormSubmission,
   ResourceFormAction,
@@ -55,7 +56,7 @@ export abstract class UsageStartPreparationImplementation extends UsageResourceG
         throw new BadRequestException('Resource is not a machine');
       }
 
-      const existingActiveSession = await this.getActiveSession(resourceId, false, transactionalEntityManager);
+      const existingActiveSession = await this.getActiveSession(resourceId, transactionalEntityManager);
       if (existingActiveSession) {
         this.logger.debug(
           `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
@@ -96,7 +97,13 @@ export abstract class UsageStartPreparationImplementation extends UsageResourceG
       usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
       usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
       usageData.creditsPerUsage = billingConfiguration.creditsPerUsage;
-      usageData.energyCreditsPerKwh = billingConfiguration.creditsPerKwh;
+      usageData.meterRates = this.metering
+        ? (await transactionalEntityManager.find(ResourceMeter, { where: { resourceId } })).map((meter) => ({
+            meterId: meter.id,
+            name: meter.name,
+            creditsPerUnit: meter.creditsPerUnit,
+          }))
+        : [];
 
       if (supervisorUserId !== null) {
         usageData.supervisorUserId = supervisorUserId;

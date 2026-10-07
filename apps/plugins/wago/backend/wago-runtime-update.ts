@@ -1,4 +1,5 @@
-import type { BuildRuntimeArtifact } from './wago-build-runtime';
+import { advanceRuntimeRetry } from './wago-runtime-retry';
+import { BuildRuntimeArtifact } from './wago-build-runtime';
 import {
   ManagedRuntimeUpdateHost,
   RuntimeUpdateFailure,
@@ -10,6 +11,7 @@ import { RuntimeUpdateExisting } from './wago-runtime-update-existing';
 import { active } from './wago-runtime-update.active';
 import { RuntimeUpdateError } from './wago-runtime-update.errors';
 import { LEASE_MS } from './wago-runtime-update.lease-ms';
+import { runtimeTargetImageId } from './wago-runtime-target-image';
 
 export class WagoRuntimeUpdateCoordinator extends RuntimeUpdateExisting {
   constructor(
@@ -22,11 +24,8 @@ export class WagoRuntimeUpdateCoordinator extends RuntimeUpdateExisting {
   ) {
     super(store, desired, host, audit, now, concurrency);
   }
-
-  /** Call at startup, on desired/runtime-status changes, and on a bounded retry timer.
-   * Busy work is coalesced; callers retain/paginate their inventory rather than
-   * creating an unbounded in-memory queue. Retry deadlines survive server restart.
-   */
+  /** Coalesce startup, status-change and retry work; callers retain/paginate inventory.
+   * Concurrency is bounded and retry deadlines survive restarts. */
   async reconcile(
     controllerId: number,
     retry = false,
@@ -41,17 +40,7 @@ export class WagoRuntimeUpdateCoordinator extends RuntimeUpdateExisting {
       acquired = await this.store.acquire(controllerId, owner, this.now(), this.now() + LEASE_MS);
       if (!acquired) return 'busy';
       let record = await this.store.load(controllerId);
-      if (
-        retry &&
-        record &&
-        (['blocked', 'failed', 'recovery_required'].includes(record.phase) || record.cleanupRetryAt)
-      ) {
-        // Administrator retry only advances deadlines under the shared lease;
-        // retained rollback/acceptance receipts still run before new work.
-        record.retryAt = 0;
-        record.cleanupRetryAt = 0;
-        await persist(record);
-      }
+      await advanceRuntimeRetry(record, retry, persist);
       if (record && ['current', 'failed'].includes(record.phase) && record.token) {
         if (!(await acknowledge(record))) return 'deferred';
       }
@@ -85,7 +74,9 @@ export class WagoRuntimeUpdateCoordinator extends RuntimeUpdateExisting {
       const desired = await this.desired();
       assertOwned();
       const contradictedCurrent =
-        record?.phase === 'current' && observedImageId !== undefined && observedImageId !== desired.imageId;
+        record?.phase === 'current' &&
+        observedImageId !== undefined &&
+        observedImageId !== (record.currentImageId ?? record.desiredImageId);
       if (record && !contradictedCurrent && record.desiredImageId === desired.imageId && record.retryAt > this.now())
         return 'deferred';
       const attempt = (record?.desiredImageId === desired.imageId ? record.attempt : 0) + 1;
@@ -167,8 +158,18 @@ export class WagoRuntimeUpdateCoordinator extends RuntimeUpdateExisting {
           return 'settled';
         }
       }
-      if (inspection.imageId === desired.imageId)
-        return await this.verifyExisting(controllerId, desired, record, operation, assertOwned, persist, attempt);
+      const targetImageId = runtimeTargetImageId(desired, inspection);
+      if (inspection.imageId === targetImageId)
+        return await this.verifyExisting(
+          controllerId,
+          desired,
+          record,
+          operation,
+          assertOwned,
+          persist,
+          attempt,
+          targetImageId,
+        );
       return await this.applyRollout(
         controllerId,
         desired,
@@ -193,6 +194,6 @@ export class WagoRuntimeUpdateCoordinator extends RuntimeUpdateExisting {
     }
   }
 }
-
 export { RuntimeUpdateError } from './wago-runtime-update.errors';
 export * from './wago-runtime-update-contracts';
+export { runtimeTargetImageId } from './wago-runtime-target-image';

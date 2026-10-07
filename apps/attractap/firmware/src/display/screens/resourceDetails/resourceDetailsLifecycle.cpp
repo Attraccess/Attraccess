@@ -60,7 +60,7 @@ void ResourceDetailsScreen::destroy()
    this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
    this->usageStatsContainer = nullptr;
-   this->energyValue = nullptr;
+   this->meterValue = nullptr;
    this->operatingValue = nullptr;
 
    this->noIntroductionPanel = nullptr;

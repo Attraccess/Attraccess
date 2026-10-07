@@ -1,5 +1,5 @@
 import { PageHeader } from '../../components/pageHeader';
-import { DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { Button } from '../../components/button';
 import { BellIcon, KeyRoundIcon, LockKeyholeIcon, ShieldIcon, Trash2Icon, UserIcon } from 'lucide-react';
 import { StandardDrawer } from '../../components/standardDrawer';
@@ -52,77 +52,98 @@ export default function AccountPage() {
     {
       key: 'identity',
       label: t('groups.identity'),
-      items: [{
-        key: 'profile',
-        title: t('topics.profile.title'),
-        description: t('topics.profile.description'),
-        icon: <UserIcon size={19} />,
-        searchTerms: [t('searchTerms.email'), t('searchTerms.username')],
-        content: <div className="flex max-w-xl flex-col gap-6"><EmailForm /><UsernameForm /></div>,
-      }],
+      items: [
+        {
+          key: 'profile',
+          title: t('topics.profile.title'),
+          description: t('topics.profile.description'),
+          icon: <UserIcon size={19} />,
+          searchTerms: [t('searchTerms.email'), t('searchTerms.username')],
+          content: (
+            <div className="flex max-w-xl flex-col gap-6">
+              <EmailForm />
+              <UsernameForm />
+            </div>
+          ),
+        },
+      ],
     },
     {
       key: 'access',
       label: t('groups.access'),
-      items: me ? [
-        {
-          key: 'password',
-          title: t('topics.password.title'),
-          description: t('topics.password.description'),
-          icon: <LockKeyholeIcon size={19} />,
-          content: <div className="max-w-xl"><SetPasswordForm userId={me.id} username={me.username} /></div>,
-        },
-        {
-          key: 'twoFactor',
-          title: t('topics.twoFactor.title'),
-          description: t('topics.twoFactor.description'),
-          icon: <ShieldIcon size={19} />,
-          searchTerms: [t('searchTerms.authenticator')],
-          content: <TwoFactorCard />,
-        },
-        {
-          key: 'passkeys',
-          title: t('topics.passkeys.title'),
-          description: t('topics.passkeys.description'),
-          icon: <KeyRoundIcon size={19} />,
-          content: <PasskeysCard />,
-        },
-      ] : [],
+      items: me
+        ? [
+            {
+              key: 'password',
+              title: t('topics.password.title'),
+              description: t('topics.password.description'),
+              icon: <LockKeyholeIcon size={19} />,
+              content: (
+                <div className="max-w-xl">
+                  <SetPasswordForm userId={me.id} username={me.username} />
+                </div>
+              ),
+            },
+            {
+              key: 'twoFactor',
+              title: t('topics.twoFactor.title'),
+              description: t('topics.twoFactor.description'),
+              icon: <ShieldIcon size={19} />,
+              searchTerms: [t('searchTerms.authenticator')],
+              content: <TwoFactorCard />,
+            },
+            {
+              key: 'passkeys',
+              title: t('topics.passkeys.title'),
+              description: t('topics.passkeys.description'),
+              icon: <KeyRoundIcon size={19} />,
+              content: <PasskeysCard />,
+            },
+          ]
+        : [],
     },
     {
       key: 'preferences',
       label: t('groups.preferences'),
-      items: [{
-        key: 'notifications',
-        title: t('topics.notifications.title'),
-        description: t('topics.notifications.description'),
-        icon: <BellIcon size={19} />,
-        searchTerms: [t('searchTerms.push'), t('searchTerms.email')],
-        content: <NotificationPreferencesForm />,
-      }],
+      items: [
+        {
+          key: 'notifications',
+          title: t('topics.notifications.title'),
+          description: t('topics.notifications.description'),
+          icon: <BellIcon size={19} />,
+          searchTerms: [t('searchTerms.push'), t('searchTerms.email')],
+          content: <NotificationPreferencesForm />,
+        },
+      ],
     },
     {
       key: 'advanced',
       label: t('groups.advanced'),
       items: [
-        ...(me && hasPermission('users.api-tokens.manage') ? [{
-          key: 'tokens',
-          title: t('topics.tokens.title'),
-          description: t('topics.tokens.description'),
-          icon: <KeyRoundIcon size={19} />,
-          content: <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />,
-        }] : []),
+        ...(me && hasPermission('users.api-tokens.manage')
+          ? [
+              {
+                key: 'tokens',
+                title: t('topics.tokens.title'),
+                description: t('topics.tokens.description'),
+                icon: <KeyRoundIcon size={19} />,
+                content: <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />,
+              },
+            ]
+          : []),
         {
           key: 'delete',
           title: t('topics.delete.title'),
           description: t('topics.delete.description'),
           icon: <Trash2Icon size={19} className="text-danger" />,
-          content: <div className="flex flex-col items-start gap-4">
-            <p className="text-sm text-muted">{t('deleteAccount.description')}</p>
-            <Button variant="danger" onPress={open} data-cy="delete-account-open-modal">
-              {t('deleteAccount.actions.request')}
-            </Button>
-          </div>,
+          content: (
+            <div className="flex flex-col items-start gap-4">
+              <p className="text-sm text-muted">{t('deleteAccount.description')}</p>
+              <Button variant="danger" onPress={open} data-cy="delete-account-open-modal">
+                {t('deleteAccount.actions.request')}
+              </Button>
+            </div>
+          ),
         },
       ],
     },
@@ -135,7 +156,7 @@ export default function AccountPage() {
 
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('deleteAccount.modal.title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('deleteAccount.modal.title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>

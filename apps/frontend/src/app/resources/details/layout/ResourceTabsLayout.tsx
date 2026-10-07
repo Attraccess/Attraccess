@@ -33,6 +33,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
     closeDeleteModal,
     t,
     canUpdateResources,
+    canDeleteResources,
     resource,
     isLoadingResource,
     resourceError,
@@ -85,7 +86,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       label: t('actions.delete'),
       icon: <Trash className="w-4 h-4" />,
       variant: 'destructive',
-      isHidden: !canUpdateResources,
+      isHidden: !canDeleteResources,
       onPress: open,
       dataCy: 'delete-resource-button',
     },
@@ -150,23 +151,23 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
 
+      {canDeleteResources && (
+        <DeleteConfirmationModal
+          isOpen={isOpen}
+          onClose={closeDeleteModal}
+          onConfirm={handleDelete}
+          itemName={resource.name}
+          data-cy="delete-confirmation-modal"
+        />
+      )}
       {canUpdateResources && (
-        <>
-          <DeleteConfirmationModal
-            isOpen={isOpen}
-            onClose={closeDeleteModal}
-            onConfirm={handleDelete}
-            itemName={resource.name}
-            data-cy="delete-confirmation-modal"
-          />
-          <ResourceQrCode
-            resourceId={resourceId}
-            renderTrigger={(onOpen) => {
-              qrOpenRef.current = onOpen;
-              return null;
-            }}
-          />
-        </>
+        <ResourceQrCode
+          resourceId={resourceId}
+          renderTrigger={(onOpen) => {
+            qrOpenRef.current = onOpen;
+            return null;
+          }}
+        />
       )}
 
       {tabs.find((tab) => tab.key === activeTabKey) ? null : <Navigate to={`/resources/${resourceId}`} replace />}

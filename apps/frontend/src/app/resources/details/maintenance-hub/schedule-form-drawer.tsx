@@ -1,4 +1,4 @@
-import { DrawerHeader, DrawerBody } from '@heroui/react';
+import { DrawerHeader, DrawerHeading, DrawerBody } from '@heroui/react';
 import { StandardDrawer } from '../../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ScheduleForm } from './schedule-form';
@@ -24,18 +24,17 @@ export function ScheduleFormDrawer(props: Props) {
     { enabled: isOpen && scheduleId != null },
   );
 
-  const title =
-    scheduleId != null
-      ? t('form.titleEdit', { name: existing?.name ?? '…' })
-      : t('form.titleCreate');
+  const title = scheduleId != null ? t('form.titleEdit', { name: existing?.name ?? '…' }) : t('form.titleCreate');
 
   return (
     <StandardDrawer
       isOpen={isOpen}
-      onOpenChange={(open) => { if (!open) onClose(); }}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
       <DrawerHeader>
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <DrawerHeading className="text-lg font-semibold">{title}</DrawerHeading>
       </DrawerHeader>
       <DrawerBody>
         {isOpen && (

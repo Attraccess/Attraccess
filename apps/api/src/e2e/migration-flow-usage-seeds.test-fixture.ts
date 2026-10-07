@@ -11,13 +11,14 @@ import {
   ResourceFlowVariableScope,
   ResourceMeteringOperation,
   ResourceMeteringSession,
+  ResourceMeter,
   ResourceMeteringSessionStatus,
   ResourceUsage,
   ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { ensureEntity } from './migration-seed-storage.test-fixture';
 export async function migrationFlowUsageSeeds(
   dataSource: DataSource,
@@ -73,7 +74,8 @@ export async function migrationFlowUsageSeeds(
     projectId: project.id,
     startNotes: 'Seed usage',
     endNotes: null,
-    isFinalized: false,
+    isFinalized: true,
+    lifecyclePending: false,
     creditsPerUsage: 5,
     billingFactor: 50,
   }));
@@ -106,26 +108,36 @@ export async function migrationFlowUsageSeeds(
     );
   }
 
+  const meter = await ensureEntity(dataSource.getRepository(ResourceMeter), () => ({
+    resourceId: resource.id,
+    name: 'Energy (kWh)',
+    creditsPerUnit: 30,
+    lifetimeValue: '500000000',
+    counterValue: '1500000000',
+  }));
   const meteringSession = await ensureEntity(dataSource.getRepository(ResourceMeteringSession), () => ({
     id: `seed-metering-session-${seedTag}`,
     resourceId: resource.id,
     usageId: usage.id,
+    meterId: meter.id,
+    meterName: meter.name,
     status: ResourceMeteringSessionStatus.Active,
-    creditsPerKwh: 30,
-    baselineMicroWh: '1000000000',
-    latestMicroWh: '500000000',
+    creditsPerUnit: 30,
+    baselineValue: '1000000000',
+    latestValue: '500000000',
     latestObservedAt: new Date(),
   }));
 
   await ensureEntity(dataSource.getRepository(ResourceMeteringOperation), () => ({
     id: `seed-metering-operation-${seedTag}`,
     sessionId: meteringSession.id,
+    meterId: meter.id,
     resourceId: resource.id,
     kind: 'interim' as const,
     status: 'completed' as const,
     requestedAt: new Date(),
     completedAt: new Date(),
-    totalMicroWh: '500000000',
+    totalValue: '500000000',
     observedAt: new Date(),
   }));
 

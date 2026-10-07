@@ -136,5 +136,5 @@ export function useRoleFormDrawerState({ isOpen, onOpenChange, role }: Props) {
     isOpen,
     onOpenChange,
     role,
-  } as const;
+  };
 }

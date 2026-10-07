@@ -1,0 +1,9 @@
+import { defineAttractapCardHandlerTests } from './card.handler.spec.define-attractap-card-handler-tests.defineAttractapCardHandlerTests.test-fixture';
+export type AttractapCardHandlerTestScope = ReturnType<typeof defineAttractapCardHandlerTests>;
+export { defineAttractapCardHandlerTests } from './card.handler.spec.define-attractap-card-handler-tests.defineAttractapCardHandlerTests.test-fixture';
+export { defineHandleCardAuthenticationRequestTests } from './card.handler.spec.define-attractap-card-handler-tests.defineHandleCardAuthenticationRequestTests.test-fixture';
+export { defineOnEnrollNewCardTests } from './card.handler.spec.define-attractap-card-handler-tests.defineOnEnrollNewCardTests.test-fixture';
+export { defineStartResetOfNfcCardTests } from './card.handler.spec.define-attractap-card-handler-tests.defineStartResetOfNfcCardTests.test-fixture';
+export { defineOnEnrollNewCardRequestNfckeyTests } from './card.handler.spec.define-attractap-card-handler-tests.defineOnEnrollNewCardRequestNfckeyTests.test-fixture';
+export { defineOnResetNfcCardTests } from './card.handler.spec.define-attractap-card-handler-tests.defineOnResetNfcCardTests.test-fixture';
+export { defineStartEnrollOfNewNfcCardTests } from './card.handler.spec.define-attractap-card-handler-tests.defineStartEnrollOfNewNfcCardTests.test-fixture';

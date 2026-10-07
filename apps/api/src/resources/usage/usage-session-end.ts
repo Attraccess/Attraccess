@@ -38,7 +38,7 @@ export abstract class UsageSessionEndImplementation extends UsageStartNotificati
       this.resourceUsageRepository.manager,
       async (transactionalEntityManager) => {
         await this.assertLifecycleAvailable(transactionalEntityManager, resourceId);
-        activeSession = await this.getActiveSession(resourceId, true, transactionalEntityManager);
+        activeSession = await this.getActiveSession(resourceId, transactionalEntityManager);
         if (!activeSession) {
           throw new BadRequestException('No active session found');
         }

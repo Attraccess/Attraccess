@@ -1,7 +1,6 @@
 import { WagoManagedAccess } from './wago-managed-access.entity';
-import type { RuntimeUpdateRecord } from './wago-runtime-update';
+import { RuntimeUpdateRecord, runtimeTargetImageId } from './wago-runtime-update';
 import { WagoManagedRuntimeServiceSessionStatusOperation } from './wago-managed-runtime.wago-managed-runtime-service-session-status-operation';
-
 
 export abstract class WagoManagedRuntimeServicePublicStatusOperation extends WagoManagedRuntimeServiceSessionStatusOperation {
   protected async publicStatus(access: WagoManagedAccess | null, requestedControllerId?: number) {
@@ -48,7 +47,13 @@ export abstract class WagoManagedRuntimeServicePublicStatusOperation extends Wag
               runningVersion: controller.runtimeVersion,
               runningImageId: this.heartbeats.get(controller.id)?.imageId || null,
               desiredVersion: desired?.manifest.runtimeVersion ?? null,
-              desiredImageId: desired && 'imageId' in desired ? desired.imageId : null,
+              desiredImageId:
+                desired && 'imageId' in desired
+                  ? runtimeTargetImageId(desired, {
+                      imageId: this.heartbeats.get(controller.id)?.imageId ?? '',
+                      runtimeVersion: this.heartbeats.get(controller.id)?.runtimeVersion ?? controller.runtimeVersion,
+                    })
+                  : null,
             },
           }
         : {}),

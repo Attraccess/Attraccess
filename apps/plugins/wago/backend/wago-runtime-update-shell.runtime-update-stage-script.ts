@@ -1,13 +1,10 @@
 import type { BuildRuntimeArtifact } from './wago-build-runtime';
-import {
-  wagoHardwareDeploymentPreflightScript,
-  wagoRuntimeBootScript,
-} from './wago-hardware-deployment';
+import { wagoHardwareDeploymentPreflightScript, wagoRuntimeBootScript } from './wago-hardware-deployment';
 import { runtimeUpdateCapacityPreflightScript } from './wago-runtime-install';
-import { imageIdPattern } from "./wago-runtime-update-shell.image-id-pattern";
-import { quote } from "./wago-runtime-update-shell.quote";
-import { preamble } from "./wago-runtime-update-shell.preamble";
-import { boundedReceiver } from "./wago-runtime-update-shell.bounded-receiver";
+import { imageIdPattern } from './wago-runtime-update-shell.image-id-pattern';
+import { quote } from './wago-runtime-update-shell.quote';
+import { preamble } from './wago-runtime-update-shell.preamble';
+import { boundedReceiver } from './wago-runtime-update-shell.bounded-receiver';
 
 /** Bounded binary receiver. Load and verify the image before stopping the prior
  * runtime. A truncated stream, failed load or wrong config digest cannot activate.

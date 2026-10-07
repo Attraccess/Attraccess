@@ -67,7 +67,9 @@ export function AttraccessUser({
       <div className="flex flex-col">
         <div className="flex flex-row items-center gap-1">
           <span className="text-sm font-medium group-hover:underline">{isDeleted ? <del>{name}</del> : name}</span>
-          {isInteractive && <ChevronDownIcon className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" focusable="false" />}
+          {isInteractive && (
+            <ChevronDownIcon className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" focusable="false" />
+          )}
         </div>
         {description && (
           <span className="text-xs text-muted-foreground">{isDeleted ? <del>{description}</del> : description}</span>
@@ -88,7 +90,7 @@ export function AttraccessUser({
         {finalComponent}
       </Popover.Trigger>
       <Popover.Content>
-        <Popover.Dialog className="flex w-64 flex-col gap-3 p-4">
+        <Popover.Dialog aria-label={name} className="flex w-64 flex-col gap-3 p-4">
           {userInfoAndAvatar}
           {!isDeleted && (
             <Button variant="primary" size="sm" className="w-full" onPress={startDirectMessage}>

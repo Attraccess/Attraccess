@@ -4,6 +4,7 @@ export abstract class CardEnrollmentImplementation extends AttractapCardHandlerR
   public async startEnrollOfNewNfcCard(data: {
     readerId: number;
     userId: number;
+    actorId?: number;
     authenticationMethod?: 'session' | 'api-token';
     apiTokenId?: number;
   }) {
@@ -40,7 +41,7 @@ export abstract class CardEnrollmentImplementation extends AttractapCardHandlerR
       socket.state.enrollment = {
         userId: user.id,
         auditPrincipal: {
-          userId: user.id,
+          userId: data.actorId ?? user.id,
           authenticationMethod,
           ...(authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
         },
@@ -102,6 +103,7 @@ export abstract class CardEnrollmentImplementation extends AttractapCardHandlerR
     const keyString = this.attractapService.uint8ArrayToHexString(key);
 
     socket.state.enrollNewCardData = {
+      userId: enrollment.userId,
       keyNo,
       key: keyString,
       cardUID: uid,
@@ -137,7 +139,7 @@ export abstract class CardEnrollmentImplementation extends AttractapCardHandlerR
       return;
     }
 
-    const user = await this.usersService.findOne({ id: auditPrincipal.userId });
+    const user = await this.usersService.findOne({ id: cardData.userId });
     if (!user) {
       await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'USER_NOT_FOUND' }));
       return;

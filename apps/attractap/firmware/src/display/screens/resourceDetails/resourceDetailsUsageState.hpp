@@ -6,7 +6,7 @@ struct ResourceDetailsUsageState
 {
 protected:
     lv_obj_t *usageStatsContainer = nullptr;
-    lv_obj_t *energyValue = nullptr;
+    lv_obj_t *meterValue = nullptr;
     lv_obj_t *operatingValue = nullptr;
     API::UsageStats usageStats{};
     bool usageStatsValid = false;

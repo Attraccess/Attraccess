@@ -29,7 +29,7 @@ export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleId
   const navigate = useNavigate();
   const toast = useToastMessage();
   const { isOpen, open, setOpen } = useOverlayState();
-  const { user: me } = useAuth();
+  const { user: me, hasPermission } = useAuth();
 
   const { data: user } = useUsersServiceGetOneUserById({ id });
   const { data: license } = useLicenseServiceGetLicenseInformation();
@@ -136,10 +136,13 @@ export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleId
   });
   return {
     t,
+    navigate,
     isOpen,
     open,
     setOpen,
+    hasPermission,
     user,
+    license,
     providersById,
     ssoDetails,
     ssoManagedProviders,
@@ -149,5 +152,5 @@ export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleId
     isDeleting,
     id,
     roleIdToAssign,
-  } as const;
+  };
 }

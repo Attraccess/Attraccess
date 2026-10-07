@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { StandardDrawer } from '../standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { HeartHandshake, Share2 } from 'lucide-react';
@@ -143,7 +143,7 @@ export function DonationPrompt() {
       contentProps={{ placement: 'bottom' }}
     >
       <DrawerHeader className="flex flex-col gap-1">
-        <div className="text-base font-semibold">{t('title')}</div>
+        <DrawerHeading className="text-base font-semibold">{t('title')}</DrawerHeading>
         <div className="text-sm text-default-500">{t('subtitle')}</div>
       </DrawerHeader>
       <DrawerBody>

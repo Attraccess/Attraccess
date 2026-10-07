@@ -54,6 +54,7 @@ import { ApiTokenPermission } from './entities/api-token-permission.entity';
 import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
 import { ResourceMeteringSession, ResourceMeteringOperation } from './entities/resource-metering.entity';
+import { ResourceMeter } from './entities/resource-meter.entity';
 
 export const entities = {
   AuditLog,
@@ -116,4 +117,5 @@ export const entities = {
   ResourceUsageLifecycleAttempt,
   ResourceMeteringSession,
   ResourceMeteringOperation,
+  ResourceMeter,
 };

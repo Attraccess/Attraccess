@@ -1,6 +1,6 @@
 {
   "runtime": "attraccess-wago-cc100",
-  "runtimeVersion": "0.1.0",
+  "runtimeVersion": "0.2.3",
   "image": "ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>",
   "imageDigest": "Recorded by the publishing workflow as ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>@sha256:<digest>",
   "protocolVersion": "1.0.0",
@@ -19,14 +19,23 @@
     "fault",
     "acknowledgement"
   ],
-  "security": { "arbitraryCodeUpload": false, "safetyRated": false },
+  "security": {
+    "arbitraryCodeUpload": false,
+    "safetyRated": false
+  },
   "deployment": {
     "privileged": false,
     "hardwareProfile": "cc100-751-9301-fw31-digital-rtu-v1",
     "user": "10001",
     "capDrop": ["ALL"],
     "securityOpt": ["no-new-privileges"],
-    "devices": [{ "source": "/dev/ttySTM1", "target": "/dev/serial", "permissions": "rw" }],
+    "devices": [
+      {
+        "source": "/dev/ttySTM1",
+        "target": "/dev/serial",
+        "permissions": "rw"
+      }
+    ],
     "supplementaryGroups": ["Host dialout GID, verified by the installer"],
     "mounts": [
       {
@@ -34,7 +43,11 @@
         "target": "/run/attraccess-wago/io/din",
         "readOnly": true
       },
-      { "source": "/sys/kernel/dout_drv/DOUT_DATA", "target": "/run/attraccess-wago/io/dout", "readOnly": false },
+      {
+        "source": "/sys/kernel/dout_drv/DOUT_DATA",
+        "target": "/run/attraccess-wago/io/dout",
+        "readOnly": false
+      },
       {
         "source": "/sys/devices/platform/led/leds/run-green/brightness",
         "target": "/run/attraccess-wago/io/led-run-green",

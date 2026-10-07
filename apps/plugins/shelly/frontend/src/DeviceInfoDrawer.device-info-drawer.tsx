@@ -1,12 +1,12 @@
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, Skeleton } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Skeleton } from '@heroui/react';
 import { InfoIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { getDeviceInfo, type ShellyDevice, type ShellyDeviceInfo } from './api';
 import { StandardDrawer } from './drawer';
 import { StatusAlert } from './StatusAlert';
 import { useShellyTranslations } from './i18n';
-import { AuthProtectedForm } from './DeviceInfoDrawer.auth-protected-form.helpers';
-import { DeviceInfoCards } from './DeviceInfoDrawer.auth-protected-form.helpers';
+import { AuthProtectedForm } from './DeviceInfoDrawer.auth-protected-form';
+import { DeviceInfoCards } from './DeviceInfoDrawer.device-info-cards';
 
 export function DeviceInfoDrawer({
   device,
@@ -57,7 +57,7 @@ export function DeviceInfoDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <InfoIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">{device?.name ?? t('info.title')}</h2>
+              <DrawerHeading className="sh:text-lg sh:font-semibold">{device?.name ?? t('info.title')}</DrawerHeading>
             </div>
             {device && <p className="sh:text-sm sh:text-muted">{device.ipAddress}</p>}
           </div>

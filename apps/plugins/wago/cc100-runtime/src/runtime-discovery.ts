@@ -1,5 +1,6 @@
 import { RuntimeCredentials } from './runtime-credentials';
 import { CAPABILITIES, CREDENTIAL_EPOCH, DiscoveryClaim } from './runtime-protocol';
+import { runtimeVersion } from '../manifest.json';
 
 export abstract class RuntimeDiscovery extends RuntimeCredentials {
   async receiveDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
@@ -62,7 +63,7 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
     return credentials;
   }
 
-  publishDiscoveryAnnouncement(sequence = Date.now()): Promise<void> {
+  public publishDiscoveryAnnouncement(sequence = Date.now()): Promise<void> {
     return this.options.transport.publish(
       this.discoveryTopic(),
       {
@@ -70,7 +71,7 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
         pairingCode: this.options.pairingCode,
         enrollmentSecret: this.options.enrollmentSecret,
         protocolVersion: '1.0.0',
-        runtimeVersion: '0.1.0',
+        runtimeVersion,
         // Discovery proves enrollment reachability, not the permanent credential subscription.
         capabilities: CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
         sequence,

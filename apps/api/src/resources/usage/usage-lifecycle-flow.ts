@@ -5,7 +5,7 @@ import {
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
 import { ConflictException } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
 import { FlowExecutionError } from '../flows/errors/flow-execution.error';
@@ -48,7 +48,10 @@ export abstract class UsageLifecycleFlowImplementation extends ResourceUsageServ
   }
 
   protected async assertLifecycleAvailable(manager: EntityManager, resourceId: number): Promise<void> {
-    if (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) {
+    if (
+      (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) ||
+      (await manager.findOne(ResourceUsage, { where: { resourceId, endTime: IsNull(), lifecyclePending: true } }))
+    ) {
       throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
     }
   }

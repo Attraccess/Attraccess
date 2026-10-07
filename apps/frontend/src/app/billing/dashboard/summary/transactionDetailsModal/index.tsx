@@ -1,19 +1,12 @@
 import { Button, Chip, Separator, ModalBody, ModalHeader, ModalHeading } from '@heroui/react';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { StandardModal } from '../../../../../components/standardModal';
 import { RefundModal } from './refund';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 import { TransactionDetailsModalProps } from './index.transaction-details-modal-props';
 import { useTransactionDetailsModalState } from './useTransactionDetailsModalState';
 import { TransactionDetailsModalItemsTitle } from './TransactionDetailsModalItemsTitle';
-
-// energyMicroWh is transported as a string because it can exceed Number.MAX_SAFE_INTEGER.
-// Do the microWh->kWh division with BigInt so the integer part stays exact; only the final
-// display value is coerced to Number.
-// ponytail: Number() below still caps precision beyond ~9 quadrillion kWh (2^53) — no real
-// energy meter gets there, upgrade to a decimal/bignumber formatter if that ever changes.
 
 export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
   const {
@@ -27,10 +20,10 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
     transaction,
     error,
     refetch,
-    configuration,
     isUsageOpen,
     setUsageOpen,
-    formatNumber,
+    formatMeterValue,
+    formatCredits,
     statusColor,
     totalItemsAmount,
   } = useTransactionDetailsModalState(props);
@@ -104,7 +97,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                         className={transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'}
                       >
                         {transaction.amount > 0 && '+'}
-                        {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
+                        {formatCredits(transaction.amount)}
                       </div>
                     </div>
                     {transaction.initiator && (
@@ -147,7 +140,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
                   <Separator />
 
                   <TransactionDetailsModalItemsTitle
-                    {...{ t, transaction, tExists, formatNumber, configuration, totalItemsAmount }}
+                    {...{ t, transaction, formatMeterValue, tExists, formatCredits, totalItemsAmount }}
                   />
                 </div>
               )}

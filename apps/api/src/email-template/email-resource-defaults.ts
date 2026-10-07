@@ -16,6 +16,7 @@ export const emailResourceDefaults = {
       'items[].name',
       'items[].description',
       'items[].quantity',
+      'items[].isUnavailable',
       'items[].unitPrice',
       'items[].total',
       'items[].isFixedFee',

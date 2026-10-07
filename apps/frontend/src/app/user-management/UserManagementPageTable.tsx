@@ -1,4 +1,4 @@
-import type { User } from '@attraccess/react-query-client';
+import { UserWithAuthDetails } from './user-auth-details';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import {
   Chip,
@@ -15,9 +15,9 @@ import {
   TooltipTrigger,
 } from '@heroui/react';
 import { KeyIcon, ShieldCheckIcon, ShieldOffIcon } from 'lucide-react';
-import { UserRole } from '@attraccess/react-query-client';
+import { User, UserRole } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
-import { DEFAULT_ROLE_KEYS } from './index.state';
+import { DEFAULT_ROLE_KEYS } from './index.default-role-keys';
 import { useUserManagementPageState } from './useUserManagementPageState';
 type Props = Pick<
   ReturnType<typeof useUserManagementPageState>,
@@ -159,14 +159,3 @@ export function UserManagementPageTable({
     </Table>
   );
 }
-
-type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
-  authenticationDetails?: AuthenticationDetailSummary[];
-};
-
-type AuthenticationDetailSummary = {
-  providerId?: number | null;
-  providerType?: string | null;
-  ssoSubject?: string | null;
-  type?: string | null;
-};

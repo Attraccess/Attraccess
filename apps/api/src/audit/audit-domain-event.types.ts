@@ -19,6 +19,7 @@ export interface ResourceAuditEvent {
     | 'usage_session.started'
     | 'usage_session.ended'
     | 'energy_charge.waived'
+    | 'meter_charge.waived'
     | 'retraining.required'
     | 'retraining.cleared';
   operationId: string;

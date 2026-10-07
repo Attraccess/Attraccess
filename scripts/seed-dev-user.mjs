@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import sqlite3pkg from 'sqlite3';
 import { hasTable, run } from './seed-database.mjs';
 import { applyFixture, DEMO_FIXTURE, loadFixture } from './seed-fixtures.mjs';
+import { assertUsageIntegrity } from './usage-integrity.mjs';
 import { assignRole, upsertAdmin } from './seed-users.mjs';
 
 const sqlite3 = sqlite3pkg.verbose();
@@ -66,10 +67,11 @@ async function main() {
       await assignRole(db, username, 'demo-resource-user');
     }
     if (fixture) await applyFixture(db, fixture);
+    await assertUsageIntegrity(db);
     await run(db, 'COMMIT');
     console.log(`Seeded local admin user id=${userId}`);
     console.log(`  username: ${username}`);
-    console.log(`  password: ${password}`);
+    console.log('  password: supplied via command arguments or the documented development default');
     console.log(`  email:    ${email}`);
     if (args.demo) console.log('  demo fixture: applied');
     if (fixture) console.log(`  fixture: applied from ${args.fixture}`);

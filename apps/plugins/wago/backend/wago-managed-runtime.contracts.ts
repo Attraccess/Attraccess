@@ -1,4 +1,4 @@
-import type { CommissioningManagementRefresh } from './wago-commissioning-accept';
+import { CommissioningManagementRefresh } from './wago-commissioning-accept';
 export type Credentials = {
   sessionId: number;
   host: string;
@@ -10,6 +10,7 @@ export type Credentials = {
   installerPrivateKey: string;
 };
 export type LiveHeartbeat = {
+  runtimeVersion?: string;
   imageId: string;
   streamId: string;
   timestamp: number;

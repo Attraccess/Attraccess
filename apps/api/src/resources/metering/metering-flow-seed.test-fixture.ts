@@ -8,10 +8,15 @@ export async function seedFlowMeter(
 ) {
   const nodes = source.getRepository(ResourceFlowNode);
   await nodes.save([
-    { id: 'start', type: T.INPUT_METERING_START, resourceId: 1, data: startData },
-    { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, data: {} },
-    { id: 'collect', type: T.INPUT_METERING_COLLECT, resourceId: 1, data: collectData },
-    { id: 'report', type: T.OUTPUT_METERING_REPORT, resourceId: 1, data: { value: '1', unit: 'kWh' } },
+    { id: 'start', type: T.INPUT_METERING_START, resourceId: 1, data: { meterId: 1, ...startData } },
+    { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, data: { meterId: 1 } },
+    { id: 'collect', type: T.INPUT_METERING_COLLECT, resourceId: 1, data: { meterId: 1, ...collectData } },
+    {
+      id: 'report',
+      type: T.OUTPUT_METERING_REPORT,
+      resourceId: 1,
+      data: { meterId: 1, value: '1' },
+    },
   ]);
   await source.getRepository(ResourceFlowEdge).save([
     { id: 'e1', source: 'start', sourceHandle: 'output', target: 'ready', targetHandle: 'input', resourceId: 1 },

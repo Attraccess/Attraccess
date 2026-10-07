@@ -1,9 +1,10 @@
 import { CAPABILITIES } from './runtime-protocol';
 import { RuntimeStatePublication } from './runtime-state-publication';
 import { type ValidationError } from './runtime-types';
+import { runtimeVersion } from '../manifest.json';
 
 export abstract class RuntimeTelemetry extends RuntimeStatePublication {
-  async publishHeartbeat(ignoreStatePublicationFailure = false): Promise<void> {
+  public async publishHeartbeat(ignoreStatePublicationFailure = false): Promise<void> {
     if (this.heartbeatPublication) {
       this.heartbeatRefreshRequested = true;
       return this.heartbeatPublication;
@@ -17,7 +18,7 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
             hardwareId: this.options.hardwareId,
             pairingCode: this.options.pairingCode,
             protocolVersion: '1.0.0',
-            runtimeVersion: '0.1.0',
+            runtimeVersion,
             ...(this.options.runtimeImageId ? { runtimeImageId: this.options.runtimeImageId } : {}),
             runtimePolicyToken: this.runtimePolicyToken,
             capabilities:

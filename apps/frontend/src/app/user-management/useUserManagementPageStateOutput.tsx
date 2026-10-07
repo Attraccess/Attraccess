@@ -4,33 +4,10 @@ import {
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
-import { FilterKey } from './index.contracts';
-import { MultiValueCondition } from './index.contracts';
-import type { useUserManagementPageStateInputs } from './useUserManagementPageStateInputs';
-export function useUserManagementPageStateOutput(model: ReturnType<typeof useUserManagementPageStateInputs>) {
-  const replaceFilter = (current: FilterKey, next: FilterKey) => {
-    if (current === next || model.activeFilters.includes(next)) return;
-    model.updateFilters((params) => {
-      params.delete('filter');
-      model.activeFilters.map((key) => (key === current ? next : key)).forEach((key) => params.append('filter', key));
-      if (current === 'role') {
-        params.delete('roleId');
-        params.delete('excludeRoleId');
-        params.delete('roleMatch');
-        params.delete('roleOperator');
-      }
-      if (current === 'emailVerified') params.delete('emailVerified');
-      if (current === 'ssoProvider') {
-        params.delete('ssoProviderId');
-        params.delete('excludeSsoProviderId');
-        params.delete('ssoProviderNone');
-        params.delete('hasSsoProvider');
-        params.delete('ssoProviderMatch');
-        params.delete('ssoProviderOperator');
-      }
-    });
-  };
+import { MultiValueCondition } from './index.multi-value-condition';
+import { useUserManagementPageStateInputs } from './useUserManagementPageStateInputs';
 
+export function useUserManagementPageStateOutput(model: ReturnType<typeof useUserManagementPageStateInputs>) {
   const setRoleCondition = (condition: MultiValueCondition) =>
     model.updateFilters((params) => {
       const selectedIds = model.roleExcludes ? model.excludeRoleIds : model.roleIds;
@@ -93,6 +70,7 @@ export function useUserManagementPageStateOutput(model: ReturnType<typeof useUse
     () => new Map((ssoProviders ?? []).map((provider: SSOProvider) => [provider.id, provider])),
     [ssoProviders],
   );
+
   return {
     t: model.t,
     roleName: model.roleName,
@@ -119,12 +97,12 @@ export function useUserManagementPageStateOutput(model: ReturnType<typeof useUse
     updateFilters: model.updateFilters,
     addFilter: model.addFilter,
     removeFilter: model.removeFilter,
-    replaceFilter,
+    replaceFilter: model.replaceFilter,
     setRoleCondition,
     setSsoProviderCondition,
     startRoleAssignment,
     totalPages,
     ssoProviders,
     providersById,
-  } as const;
+  };
 }

@@ -20,6 +20,7 @@ export abstract class WebsocketPublicCommandsImplementation extends ReaderLvglSt
   public async startEnrollOfNewNfcCard(data: {
     readerId: number;
     userId: number;
+    actorId?: number;
     authenticationMethod?: 'session' | 'api-token';
     apiTokenId?: number;
   }) {

@@ -63,8 +63,12 @@ describe('CommunityLicenseButton', () => {
 
     await user.click(screen.getByRole('button', { name: /Use community \/ non-profit license/i }));
 
-    expect(await screen.findByText(/Confirm community \/ non-profit use/i)).toBeInTheDocument();
-    expect(screen.getByText(/Commercial use beyond the 30-day trial requires a paid license key\./i)).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Confirm community / non-profit use' })).toHaveAccessibleName(
+      'Confirm community / non-profit use',
+    );
+    expect(
+      screen.getByText(/Commercial use beyond the 30-day trial requires a paid license key\./i),
+    ).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /Prosperity Public License/i });
     expect(link).toHaveAttribute('href', LICENSE_URL);
     expect(link).toHaveAttribute('target', '_blank');

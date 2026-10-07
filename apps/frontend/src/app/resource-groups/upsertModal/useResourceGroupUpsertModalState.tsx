@@ -14,9 +14,9 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { useToastMessage } from '../../../components/toastProvider';
-import { FormData } from './resourceGroupUpsertModal.contracts';
-import { ApiValidationError } from './resourceGroupUpsertModal.contracts';
-import { Props } from './resourceGroupUpsertModal.contracts';
+import { FormData } from './resourceGroupUpsertModal.form-data';
+import { ApiValidationError } from './resourceGroupUpsertModal.api-validation-error';
+import { Props } from './resourceGroupUpsertModal.props';
 export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
   const { isOpen, open, setOpen, close: closeDisclosure } = useOverlayState();
   const { t } = useTranslations({
@@ -181,5 +181,5 @@ export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
     handleSubmit,
     getFieldError,
     props,
-  } as const;
+  };
 }

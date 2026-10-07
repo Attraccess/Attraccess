@@ -128,8 +128,10 @@ export abstract class ResourceSessionRoutes extends ResourceUsageControllerRoute
     status: 404,
     description: 'Resource not found',
   })
-  async getActiveSession(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<GetActiveUsageSessionDto> {
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId, true);
+  public async getActiveSession(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+  ): Promise<GetActiveUsageSessionDto> {
+    const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
     return { usage: activeSession || null };
   }
 

@@ -1,4 +1,4 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';

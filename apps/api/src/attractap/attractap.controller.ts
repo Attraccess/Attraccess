@@ -24,6 +24,7 @@ import { UpdateReaderDto } from './dtos/update-reader.dto';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { WebsocketService } from './websockets/websocket.service';
 import { installInheritedMethods } from '../common/inherited-implementation';
+import { CardAccessService } from './card-access.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
@@ -39,6 +40,7 @@ export class AttractapController extends AttractapCrashReportRoutes {
     protected readonly websocketService: WebsocketService,
     @Inject(AttractapService)
     protected readonly attractapService: AttractapService,
+    protected readonly cardAccess: CardAccessService,
   ) {
     super();
   }
@@ -108,7 +110,7 @@ export class AttractapController extends AttractapCrashReportRoutes {
   @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
   @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
-  async deleteReader(
+  public async deleteReader(
     @Param('readerId', ParseIntPipe) readerId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {

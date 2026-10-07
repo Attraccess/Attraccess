@@ -1,13 +1,13 @@
 // Firmware/OTA UI (ATT-501): shows the installed version, whatever the device
 // offers on the stable/beta channel, and runs the update while polling for the
 // device to come back.
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, Spinner } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner } from '@heroui/react';
 import { CpuIcon, DownloadIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { type ShellyDevice } from './api';
 import { PasswordFieldRow, StandardDrawer } from './drawer';
 import { StatusAlert } from './StatusAlert';
-import { shortVersion } from './FirmwareDrawer.helpers';
-import { FirmwareDetails } from './FirmwareDrawer.helpers';
+import { shortVersion } from './FirmwareDrawer.short-version';
+import { FirmwareDetails } from './FirmwareDrawer.firmware-details';
 import { useFirmwareDrawerState } from './useFirmwareDrawerState';
 
 // A Shelly OTA takes ~30-90s including the reboot; past this we stop claiming
@@ -46,7 +46,7 @@ export function FirmwareDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <CpuIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">{t('devices.firmware')}</h2>
+              <DrawerHeading className="sh:text-lg sh:font-semibold">{t('devices.firmware')}</DrawerHeading>
             </div>
             {device && (
               <p className="sh:text-sm sh:text-muted">
@@ -140,6 +140,6 @@ export function FirmwareDrawer({
   );
 }
 
-export { FirmwareCell } from './FirmwareDrawer.helpers';
-export { UpdateAvailableIndicator } from './FirmwareDrawer.helpers';
-export { FirmwareDetails } from './FirmwareDrawer.helpers';
+export { FirmwareCell } from './FirmwareDrawer.firmware-cell';
+export { UpdateAvailableIndicator } from './FirmwareDrawer.update-available-indicator';
+export { FirmwareDetails } from './FirmwareDrawer.firmware-details';

@@ -1,3 +1,4 @@
+import { ResourceMeteringModule } from '../metering/resource-metering.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
@@ -31,6 +32,7 @@ import { ResourceOperatingIntervalModule } from '../operating-intervals/resource
     ]),
     MqttModule,
     forwardRef(() => ResourceUsageModule),
+    forwardRef(() => ResourceMeteringModule),
     ResourceHealthModule,
     CompanionModule,
     ResourceOperatingIntervalModule,

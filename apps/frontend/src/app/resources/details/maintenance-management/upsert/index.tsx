@@ -7,6 +7,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   TextArea,
   useOverlayState,
@@ -118,7 +119,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         <DrawerHeader>
           <div className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">{t('title')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
           </div>
         </DrawerHeader>
 
@@ -132,9 +133,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
             {hasEndDate && <DatePicker value={endTime} isRequired hideTimeZone onChange={setEndTime} />}
 
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">
-                {t('inputs.reason.label')}
-              </label>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t('inputs.reason.label')}</label>
               {reason ? (
                 <p className="text-sm text-default-500 mb-2">
                   {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />

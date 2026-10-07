@@ -49,7 +49,7 @@ void ResourceDetailsScreen::rebuildProjectsList()
       return;
    }
 
-   for (uint8_t i = 0; i < this->projectsCache.count; i++)
+   for (uint16_t i = 0; i < this->projectsCache.count; i++)
    {
       const API::Project &project = this->projectsCache.items[i];
       lv_obj_t *btn = lv_button_create(this->projectsListContainer);

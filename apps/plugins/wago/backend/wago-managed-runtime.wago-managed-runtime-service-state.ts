@@ -1,23 +1,22 @@
 import { Inject } from '@nestjs/common';
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import type { Repository } from '@attraccess/plugins-backend-sdk';
+import { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoManagedAccess } from './wago-managed-access.entity';
 import { WagoRuntimeUpdateEntity } from './wago-managed-access.entity';
 import { WagoDeviceOperations } from './wago-device-operations';
 import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
 import { WagoRuntimeUpdateCoordinator } from './wago-runtime-update';
-import type { RuntimeUpdateFailure } from './wago-runtime-update';
+import { RuntimeUpdateFailure } from './wago-runtime-update';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoController } from './wago-controller.entity';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import { WagoService } from './wago.service';
-import type { DiagnosticStream } from './diagnostics-envelope';
+import { DiagnosticStream } from './diagnostics-envelope';
 import { RootAcceptance } from './wago-managed-runtime.contracts';
 import { RootProbe } from './wago-managed-runtime.contracts';
 import { LiveHeartbeat } from './wago-managed-runtime.contracts';
 import { ManagementSetup } from './wago-managed-runtime.contracts';
 import { WagoManagedRuntimeServiceOnApplicationBootstrapContract } from './wago-managed-runtime.wago-managed-runtime-service-on-application-bootstrap-contract';
-
 
 export abstract class WagoManagedRuntimeServiceState extends WagoManagedRuntimeServiceOnApplicationBootstrapContract {
   protected access!: Repository<WagoManagedAccess>;
@@ -36,7 +35,10 @@ export abstract class WagoManagedRuntimeServiceState extends WagoManagedRuntimeS
 
   protected readonly heartbeatStreams = new Map<number, DiagnosticStream>();
 
-  protected readonly previousBoots = new Map<string, string>();
+  protected readonly runtimeActivations = new Map<
+    string,
+    { imageId: string; startedAt: number; previousStreamId?: string }
+  >();
 
   protected readonly verifyingControllers = new Set<number>();
 

@@ -50,6 +50,7 @@ export interface RuntimeUpdateRecord {
   token: string | null;
   desiredImageId: string;
   desiredRuntimeVersion?: string;
+  currentImageId?: string;
   previousRuntimeVersion?: string | null;
   desiredDigest: string;
   buildId: string;
@@ -85,7 +86,7 @@ export interface RuntimeUpdateInspection {
   online: boolean;
 }
 
-import type { BuildRuntimeArtifact } from './wago-build-runtime';
+import { BuildRuntimeArtifact } from './wago-build-runtime';
 
 /** Privileged host transaction seam. Implementations must use a fixed scoped host
  * helper, take install.lock, verify host ownership/CODESYS/storage, retain a durable

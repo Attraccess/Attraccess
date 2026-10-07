@@ -1,13 +1,13 @@
 // Admin password drawer (ATT-498): set or change the admin password of a
 // Shelly device via the plugin backend.
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, Form } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form } from '@heroui/react';
 import { KeyRoundIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { setAdminPassword, type ShellyDevice } from './api';
 import { PasswordFieldRow, StandardDrawer } from './drawer';
 import { StatusAlert } from './StatusAlert';
 import { useShellyTranslations } from './i18n';
-import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 export function AdminPasswordDrawer({
   device,
@@ -69,7 +69,7 @@ export function AdminPasswordDrawer({
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
             <div className="sh:flex sh:items-center sh:gap-2">
               <KeyRoundIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
-              <h2 className="sh:text-lg sh:font-semibold">{t('password.title')}</h2>
+              <DrawerHeading className="sh:text-lg sh:font-semibold">{t('password.title')}</DrawerHeading>
             </div>
             {device && (
               <p className="sh:text-sm sh:text-muted">

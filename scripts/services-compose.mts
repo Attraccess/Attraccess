@@ -5,7 +5,7 @@ import path from 'path';
 import React, { useEffect, useState } from 'react';
 import { pathToFileURL } from 'url';
 import { handleAction, printUsage } from './services-actions.mts';
-import type { Action } from './services-config.mts';
+import { Action } from './services-config.mts';
 import { DEFAULT_SETS, composeFile } from './services-config.mts';
 import { ActionPicker, OutputScreen, SetPicker } from './services-pickers.mts';
 

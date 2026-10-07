@@ -166,3 +166,11 @@ set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
 set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 180)
+
+# Exercise the production beeper without playing sound on the developer's machine.
+set_property(TEST
+    attractap-desktop-tests
+    attractap-desktop-display-tests
+    attractap-reader-workflow-tests
+    attractap-reader-timeout-tests
+    APPEND PROPERTY ENVIRONMENT "SDL_AUDIO_DRIVER=dummy")

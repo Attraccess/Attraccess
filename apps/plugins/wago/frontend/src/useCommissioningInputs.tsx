@@ -1,8 +1,8 @@
-import { commissioningLoadingStatus } from './CommissioningModal.commissioning-live-status.helpers';
-import type { Key } from '@heroui/react';
+import { commissioningLoadingStatus } from './commissioningLoadingStatus';
+import { Key } from '@heroui/react';
 import { useEffect, useState } from 'react';
-import type { CommissioningSession } from './api';
-import type { RuntimeArtifactInfo } from './BundledRuntime';
+import { CommissioningSession } from './api';
+import { RuntimeArtifactInfo } from './BundledRuntime';
 import { useWagoTranslations } from './i18n';
 import {
   useCommissioningSessionsQuery,
@@ -14,10 +14,10 @@ import {
   useRemoveCommissioningSessionMutation,
   useSettingsQuery,
 } from './queries';
-import { CommissioningModalProps } from './CommissioningModal.contracts';
-import { DEFAULT_SSH } from './CommissioningModal.state';
-import { latestCommissioningSession } from './CommissioningModal.error-alert.helpers';
-import { sessionStep } from './CommissioningModal.recovery-fields.helpers';
+import { CommissioningModalProps } from './CommissioningModal.commissioning-modal-props';
+import { DEFAULT_SSH } from './CommissioningModal.default-ssh';
+import { latestCommissioningSession } from './CommissioningModal.latest-commissioning-session';
+import { sessionStep } from './CommissioningModal.session-step';
 
 export function useCommissioningInputs({
   isOpen,

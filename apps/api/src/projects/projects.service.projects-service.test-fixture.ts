@@ -14,7 +14,7 @@ const mockMetricsService = {
   projectsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
 };
 
-type MockQueryBuilder = {
+export type MockQueryBuilder = {
   leftJoinAndSelect: jest.Mock;
   leftJoin: jest.Mock;
   where: jest.Mock;

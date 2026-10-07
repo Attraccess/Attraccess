@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ResourceUsage } from '@attraccess/react-query-client';
+import { ResourceUsage } from '@attraccess/react-query-client';
 import { UsageNotesModal } from './index';
 import { TransactionDetailsModal } from '../../../../billing/dashboard/summary/transactionDetailsModal';
 
@@ -29,12 +29,16 @@ const state = vi.hoisted(() => ({
   retryBilling: vi.fn(),
   operatingDurationError: undefined as Error | undefined,
   retryOperatingDuration: vi.fn(),
+  fetchOperatingDuration: vi.fn(),
   canViewOperatingDuration: false,
 }));
 vi.mock('../../hooks/useUsageSessionProject', () => ({ useUsageSessionProject: () => ({ updatingSessionIds: {} }) }));
 vi.mock('../../../operatingDuration', () => ({
   useCanViewOperatingDuration: () => state.canViewOperatingDuration,
-  useOperatingDuration: () => ({ error: state.operatingDurationError, refetch: state.retryOperatingDuration }),
+  useOperatingDuration: (...args: unknown[]) => {
+    state.fetchOperatingDuration(...args);
+    return { error: state.operatingDurationError, refetch: state.retryOperatingDuration };
+  },
   attributedOperatingDurationForUsage: () => undefined,
 }));
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
@@ -156,4 +160,39 @@ it('keeps usage details visible while independently retrying failed operating du
   state.operatingDurationError = undefined;
   view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
   expect(screen.queryByText('Unable to load machine running time.')).toBeNull();
+});
+
+it('shows zero running time for a recovered session without requesting an empty interval', () => {
+  state.canViewOperatingDuration = true;
+  state.operatingDurationError = new Error('Invalid interval');
+  state.session = {
+    ...session,
+    isFinalized: false,
+    endTime: session.startTime,
+    endNotes:
+      'Original note\n[Recovery: cancelled orphan unfinalized session; no confirmed end time, no duration or charge inferred.]',
+  };
+  render(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+
+  expect(state.fetchOperatingDuration).toHaveBeenLastCalledWith(2, false, {
+    start: new Date(session.startTime),
+    end: new Date(session.startTime),
+  });
+  expect(screen.getByText('Machine running time during this session')).toBeTruthy();
+  expect(screen.getByText('0m')).toBeTruthy();
+  expect(screen.getByText(/Original note/)).toHaveTextContent('[Recovery: cancelled orphan unfinalized session');
+  expect(screen.queryByRole('button', { name: 'Retry machine running time' })).toBeNull();
+});
+
+it('continues requesting operating duration for completed and ongoing sessions', () => {
+  state.canViewOperatingDuration = true;
+  const view = render(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(state.fetchOperatingDuration).toHaveBeenLastCalledWith(2, true, {
+    start: new Date(session.startTime),
+    end: new Date('2026-09-01T11:00:00Z'),
+  });
+
+  state.session = { ...session, endTime: null };
+  view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
+  expect(state.fetchOperatingDuration).toHaveBeenLastCalledWith(2, true, undefined);
 });

@@ -3,6 +3,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Input,
   Label,
   Spinner,
@@ -103,7 +104,7 @@ export function CompanionSettingsPage() {
         }}
       >
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('devices.rename.title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('devices.rename.title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <TextField

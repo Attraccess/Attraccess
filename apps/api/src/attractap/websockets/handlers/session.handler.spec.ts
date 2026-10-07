@@ -1,12 +1,20 @@
-import { registerAttractapSessionHandlerSessionFlowButtonFixture } from './session.handler.attractap-session-handler-session-flow-button.test-fixture';
-import { registerHandleStartResourceUsageSessionCases } from './session.handler.attractap-session-handler-session-flow-button.handle-start-resource-usage-session.test-cases';
-import { registerHandleStopResourceUsageSessionCases } from './session.handler.attractap-session-handler-session-flow-button.handle-stop-resource-usage-session.test-cases';
-import { registerHandleTriggerFlowButtonCases } from './session.handler.attractap-session-handler-session-flow-button.handle-trigger-flow-button.test-cases';
-import { registerLiveUsageStatsCases } from './session.handler.attractap-session-handler-session-flow-button.live-usage-stats.test-cases';
+import { defineAttractapSessionHandlerSessionFlowButtonTests } from './session.handler.spec.define-attractap-session-handler-session-flow-button-tests';
 describe('AttractapSessionHandler – session + flow button', () => {
-  const fixture = registerAttractapSessionHandlerSessionFlowButtonFixture();
-  registerHandleStartResourceUsageSessionCases(fixture);
-  registerHandleStopResourceUsageSessionCases(fixture);
-  registerHandleTriggerFlowButtonCases(fixture);
-  registerLiveUsageStatsCases(fixture);
+  defineAttractapSessionHandlerSessionFlowButtonTests();
 });
+export {
+  defineAttractapSessionHandlerSessionFlowButtonTests,
+  AttractapSessionHandlerSessionFlowButtonTestScope,
+  defineLiveUsageStatsTests,
+  LiveUsageStatsTestScope,
+  defineHandleStartResourceUsageSessionTests,
+  HandleStartResourceUsageSessionTestScope,
+  defineHandleStopResourceUsageSessionTests,
+  defineReaderAccessWithTheActualResourceGuardTests,
+  defineHandleTriggerFlowButtonTests,
+  defineResourceInUseErrorHandlingTests,
+} from './session.handler.spec.define-attractap-session-handler-session-flow-button-tests';
+export { HandleStopResourceUsageSessionTestScope } from './session.handler.spec.handle-stop-resource-usage-session-test-scope';
+export { ReaderAccessWithTheActualResourceGuardTestScope } from './session.handler.spec.reader-access-with-the-actual-resource-guard-test-scope';
+export { HandleTriggerFlowButtonTestScope } from './session.handler.spec.handle-trigger-flow-button-test-scope';
+export { ResourceInUseErrorHandlingTestScope } from './session.handler.spec.resource-in-use-error-handling-test-scope';

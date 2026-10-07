@@ -7,11 +7,12 @@ import {
   ResourceUsage,
   Setting,
   User,
+  ResourceMeter,
 } from '@attraccess/database-entities';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, Repository, MoreThan } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -107,7 +108,12 @@ export class BillingService extends BillingUsageChargeImplementation {
       (usage?.creditsPerUsage ?? configuration.creditsPerUsage) > 0 ||
       (usage?.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute) > 0 ||
       (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0 ||
-      (usage?.energyCreditsPerKwh ?? configuration.creditsPerKwh) > 0
+      (usage?.meterRates
+        ? usage.meterRates.some((meter) => meter.creditsPerUnit > 0)
+        : (await (transactionalEntityManager ?? this.resourceBillingConfigurationRepository.manager).count(
+            ResourceMeter,
+            { where: { resourceId, creditsPerUnit: MoreThan(0) } },
+          )) > 0)
     ) {
       return true;
     }

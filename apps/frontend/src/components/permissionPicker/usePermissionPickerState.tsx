@@ -134,5 +134,5 @@ export function usePermissionPickerState({
     drawerEditLabel,
     drawerSelectCategoryLabel,
     drawerClearCategoryLabel,
-  } as const;
+  };
 }

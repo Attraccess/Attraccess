@@ -2,6 +2,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   ModalBody,
   ModalFooter,
   ModalHeader,
@@ -122,7 +123,7 @@ export function EmailLayoutPage() {
 
       <StandardDrawer isOpen={stylesOpen} onOpenChange={setStylesOpen} dialogProps={{ className: 'md:max-w-4xl' }}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('styles.title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('styles.title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <div className="flex flex-col gap-3 h-full">

@@ -57,6 +57,13 @@ const schemas = [
       startNotes: { type: String, nullable: true },
       endTime: { type: 'datetime', nullable: true },
       endNotes: { type: String, nullable: true },
+      usageInMinutes: {
+        type: Number,
+        generatedType: 'STORED',
+        insert: false,
+        update: false,
+        asExpression: `CASE WHEN endTime IS NULL THEN -1 ELSE (julianday(endTime) - julianday(startTime)) * 1440 END`,
+      },
       isFinalized: { type: Boolean, default: false },
       lifecyclePending: { type: Boolean, default: false },
       supervisorUserId: { type: Number, nullable: true },
@@ -73,6 +80,7 @@ const schemas = [
       supervisorUser: { type: 'many-to-one', target: 'User', joinColumn: { name: 'supervisorUserId' } },
       project: { type: 'many-to-one', target: 'Project', joinColumn: { name: 'projectId' } },
       billingTransaction: { type: 'one-to-one', target: 'BillingTransaction', inverseSide: 'resourceUsage' },
+      formSubmissions: { type: 'one-to-many', target: 'FormSubmission', inverseSide: 'resourceUsage' },
     },
   }),
   new EntitySchema<BillingTransaction>({
@@ -116,6 +124,17 @@ const schemas = [
       action: { type: String },
       data: { type: 'simple-json' },
     },
+    relations: {
+      resourceUsage: { type: 'many-to-one', target: 'ResourceUsage', joinColumn: { name: 'resourceUsageId' } },
+      form: { type: 'many-to-one', target: 'Form', joinColumn: { name: 'formId' } },
+      user: { type: 'many-to-one', target: 'User', joinColumn: { name: 'userId' } },
+    },
+  }),
+  new EntitySchema<Form>({
+    name: 'Form',
+    target: Form,
+    tableName: 'form',
+    columns: { id: { type: Number, primary: true }, name: { type: String } },
   }),
   new EntitySchema<ResourceUsageLifecycleAttempt>({
     name: 'ResourceUsageLifecycleAttempt',

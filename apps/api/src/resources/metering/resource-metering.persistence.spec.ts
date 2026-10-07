@@ -1,10 +1,27 @@
-import { registerFlowDefinedEnergyMeteringFixture } from './resource-metering.persistence.flow-defined-energy-metering.test-fixture';
-import { registerMeterDefinitionCases } from './resource-metering.persistence.flow-defined-energy-metering.meter-definition.test-cases';
-import { registerUsageLifecycleCases } from './resource-metering.persistence.flow-defined-energy-metering.usage-lifecycle.behaviors.test-cases';
-import { registerOperationsCases } from './resource-metering.persistence.flow-defined-energy-metering.operations.test-cases';
-describe('Flow-defined energy metering', () => {
-  const fixture = registerFlowDefinedEnergyMeteringFixture();
-  registerMeterDefinitionCases(fixture);
-  registerUsageLifecycleCases(fixture);
-  registerOperationsCases(fixture);
+import { defineFlowDefinedMeteringTests } from './resource-metering.persistence.spec.defineFlowDefinedMeteringTests.test-fixture';
+import { defineGenericMetersTests } from './resource-metering.persistence.spec.defineGenericMetersTests.test-fixture';
+import { defineUsageLifecycleTests } from './resource-metering.persistence.spec.defineUsageLifecycleTests.test-fixture';
+import { defineReconciliationTests } from './resource-metering.persistence.spec.defineReconciliationTests.test-fixture';
+import { defineTakeoverTests } from './resource-metering.persistence.spec.defineTakeoverTests.test-fixture';
+import { defineOperationsTests } from './resource-metering.persistence.spec.defineOperationsTests.test-fixture';
+import { defineMeterDefinitionTests } from './resource-metering.persistence.spec.defineMeterDefinitionTests.test-fixture';
+
+describe('Flow-defined metering', () => {
+  defineFlowDefinedMeteringTests();
 });
+export type FlowDefinedMeteringTestScope = ReturnType<typeof defineFlowDefinedMeteringTests>;
+export type GenericMetersTestScope = ReturnType<typeof defineGenericMetersTests>;
+export type UsageLifecycleTestScope = ReturnType<typeof defineUsageLifecycleTests>;
+export type ReconciliationTestScope = ReturnType<typeof defineReconciliationTests>;
+export type TakeoverTestScope = ReturnType<typeof defineTakeoverTests>;
+export type OperationsTestScope = ReturnType<typeof defineOperationsTests>;
+export type MeterDefinitionTestScope = ReturnType<typeof defineMeterDefinitionTests>;
+
+export { Handler } from './resource-metering.persistence.spec.handler';
+export { defineFlowDefinedMeteringTests } from './resource-metering.persistence.spec.defineFlowDefinedMeteringTests.test-fixture';
+export { defineGenericMetersTests } from './resource-metering.persistence.spec.defineGenericMetersTests.test-fixture';
+export { defineUsageLifecycleTests } from './resource-metering.persistence.spec.defineUsageLifecycleTests.test-fixture';
+export { defineReconciliationTests } from './resource-metering.persistence.spec.defineReconciliationTests.test-fixture';
+export { defineTakeoverTests } from './resource-metering.persistence.spec.defineTakeoverTests.test-fixture';
+export { defineOperationsTests } from './resource-metering.persistence.spec.defineOperationsTests.test-fixture';
+export { defineMeterDefinitionTests } from './resource-metering.persistence.spec.defineMeterDefinitionTests.test-fixture';

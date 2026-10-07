@@ -6,7 +6,7 @@ import {
   ResourceUsage,
   User,
 } from '@attraccess/database-entities';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { formatCredits, toExactCredits } from '@attraccess/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,7 +14,6 @@ import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 import { MetricsService } from '../metrics/metrics.service';
-import { formatKwh } from '../resources/metering/energy';
 import { SettingsService } from '../settings/settings.service';
 import { EmailSessionNotificationsImplementation } from './email-session-notifications';
 
@@ -62,7 +61,7 @@ export class EmailService extends EmailSessionNotificationsImplementation {
     await this.sendEmail(invitedUser, EmailTemplateType.PROJECT_INVITATION, context);
   }
 
-  async sendResourceUsageBillingSummaryEmail(
+  public async sendResourceUsageBillingSummaryEmail(
     user: User,
     transaction: BillingTransaction,
     usage: ResourceUsage,
@@ -73,7 +72,9 @@ export class EmailService extends EmailSessionNotificationsImplementation {
     }
 
     // Receipts describe the settled transaction, including its original rounding.
-    const roundedMinutes = transaction.items?.find((item) => item.name === 'PER_MINUTE')?.quantity;
+    const roundedMinutes = transaction.items?.find(
+      (item) => item.name === 'PER_MINUTE' && item.meterQuantity == null && item.meterCreditsPerUnit == null,
+    )?.quantity;
     const secondsFormatOptions = { maximumFractionDigits: 3 };
     let secondsFormatter: Intl.NumberFormat;
     try {
@@ -86,22 +87,33 @@ export class EmailService extends EmailSessionNotificationsImplementation {
     const items = (transaction.items ?? []).map((item) => ({
       name: item.name,
       description: item.description,
-      isEnergy: item.name === 'ENERGY',
-      energyKwh: item.energyMicroWh == null ? undefined : formatKwh(BigInt(item.energyMicroWh)),
-      quantity: item.quantity,
-      unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
-      total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
-      isFixedFee: item.name === 'PER_SESSION',
-      isSessionDuration: item.name === 'PER_MINUTE',
-      isOperatingDuration: item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
-      isBillingFactor: item.name === 'BILLING_FACTOR',
-      isDuration: item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      quantity:
+        item.meterCreditsPerUnit != null && item.meterQuantity == null ? '—' : (item.meterQuantity ?? item.quantity),
+      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null,
+      unitPrice:
+        item.meterCreditsPerUnit != null
+          ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
+          : formatCredits(item.unitPrice, currencyMinorUnit, { useGrouping: false }),
+      total: formatCredits(toExactCredits(item.unitPrice) * toExactCredits(item.quantity), currencyMinorUnit, {
+        useGrouping: false,
+      }),
+      isFixedFee: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_SESSION',
+      isSessionDuration: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_MINUTE',
+      isOperatingDuration:
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      isBillingFactor: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'BILLING_FACTOR',
+      isDuration:
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),
       durationMs: item.durationMs,
       hasDuration: item.durationMs != null,
       durationSeconds: item.durationMs == null ? undefined : secondsFormatter.format(item.durationMs / 1000),
     }));
 
-    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit);
+    const totalCredits = formatCredits(-transaction.amount, currencyMinorUnit, { useGrouping: false });
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -117,7 +129,7 @@ export class EmailService extends EmailSessionNotificationsImplementation {
       },
       items,
       totalCredits,
-      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit),
+      newBalance: formatCredits(user.creditBalance, currencyMinorUnit, { useGrouping: false }),
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);

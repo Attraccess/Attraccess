@@ -26,23 +26,12 @@ module.exports = [
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
     // Override or add rules here
     rules: {
+      '@nx/workspace-multiline-import-specifiers': 'error',
       '@nx/enforce-module-boundaries': [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: [
-            '^.*/eslint(\\.base)?\\.config\\.[cm]?js$',
-            // A plugin may be split into several nx projects inside its own directory
-            // (e.g. a device-runtime container built and shipped separately from the
-            // plugin server bundle). Those family projects share the parent plugin's
-            // contract modules through relative paths. Any cross-plugin or
-            // plugin-to-core path necessarily contains another project segment
-            // ("../../<other-plugin>/...", "../../api/...") and therefore never
-            // matches these patterns.
-            '^(\\.\\./)+(modbus|backend)/',
-            '^(\\.\\./)+(channel-behavior|measurement-contract)$',
-            '^(\\.\\./)+shared/hardware-profile$',
-          ],
+          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?js$'],
           depConstraints: [
             // Plugins are encapsulated, separately shipped products. They may build
             // only on the public plugin SDKs — never on core apps, core libs, or

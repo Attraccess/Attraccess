@@ -1,28 +1,7 @@
-import { registerUsageLifecyclePersistenceAroundExternalFlowsFixture } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.test-fixture';
-import { registerPreservesTheCompletePriceContractThroughAStartFlowTakeoverSCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.preserves-the-complete-price-contract-through-a-start-flow-takeover-s.behaviors.test-cases';
-import { registerDoesNotStartOrRunPhysicalFlowsIfItsPriceSnapshotCannotBePersistedCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerPublishesNeitherTheSessionNorItsBillIfPendingTransactionCreationFailsCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.preserves-the-complete-price-contract-through-a-start-flow-takeover-s.behaviors.test-cases';
-import { registerAbortsAFailedStartWithoutPublishingItsCandidateFormsOrBillAndKeepsAcceptCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerKeepsTheExistingSessionAndChargeUnchangedAfterAFailedStopWhilePreservingCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerKeepsTheOutgoingSessionIntactAndRemovesTheCandidateAfterAFailedTakeoverCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerRejectsSameUserTakeoverWhenTheOutgoingChargeLeavesTooLittleBalanceForRepCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.preserves-the-complete-price-contract-through-a-start-flow-takeover-s.behaviors.test-cases';
-import { registerDoesNotPublishAPendingStartAfterItsFlowHasTriggeredMaintenanceCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerDoesNotPublishATentativeStartWhenItsFlowEndsTheSessionCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerKeepsACanceledCandidateReservationUntilItsFlowSettlesCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerClaimsACandidateBeforeStoppedFlowEffectsSoConcurrentEndsRunThemOnceCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
-import { registerAbortsAnAbandonedTakeoverAtStartupWithoutReplayingFlowsOrDiscardingAccepteCases } from './resource-usage-lifecycle.persistence.usage-lifecycle-persistence-around-external-flows.aborts-a-failed-start-without-publishing-its-candidate-forms-or-bill-and-keeps-accept.behaviors.test-cases';
+import { defineUsageLifecyclePersistenceAroundExternalFlowsTests } from './resource-usage-lifecycle.persistence.spec.define-usage-lifecycle-persistence-around-external-flows-tests';
+// Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
 describe('Usage lifecycle persistence around external flows', () => {
-  const fixture = registerUsageLifecyclePersistenceAroundExternalFlowsFixture();
-  registerPreservesTheCompletePriceContractThroughAStartFlowTakeoverSCases(fixture);
-  registerDoesNotStartOrRunPhysicalFlowsIfItsPriceSnapshotCannotBePersistedCases(fixture);
-  registerPublishesNeitherTheSessionNorItsBillIfPendingTransactionCreationFailsCases(fixture);
-  registerAbortsAFailedStartWithoutPublishingItsCandidateFormsOrBillAndKeepsAcceptCases(fixture);
-  registerKeepsTheExistingSessionAndChargeUnchangedAfterAFailedStopWhilePreservingCases(fixture);
-  registerKeepsTheOutgoingSessionIntactAndRemovesTheCandidateAfterAFailedTakeoverCases(fixture);
-  registerRejectsSameUserTakeoverWhenTheOutgoingChargeLeavesTooLittleBalanceForRepCases(fixture);
-  registerDoesNotPublishAPendingStartAfterItsFlowHasTriggeredMaintenanceCases(fixture);
-  registerDoesNotPublishATentativeStartWhenItsFlowEndsTheSessionCases(fixture);
-  registerKeepsACanceledCandidateReservationUntilItsFlowSettlesCases(fixture);
-  registerClaimsACandidateBeforeStoppedFlowEffectsSoConcurrentEndsRunThemOnceCases(fixture);
-  registerAbortsAnAbandonedTakeoverAtStartupWithoutReplayingFlowsOrDiscardingAccepteCases(fixture);
+  defineUsageLifecyclePersistenceAroundExternalFlowsTests();
 });
+export { defineUsageLifecyclePersistenceAroundExternalFlowsTests } from './resource-usage-lifecycle.persistence.spec.define-usage-lifecycle-persistence-around-external-flows-tests';
+export { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from './resource-usage-lifecycle.persistence.spec.usage-lifecycle-persistence-around-external-flows-test-scope';

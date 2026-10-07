@@ -14,37 +14,25 @@ If all checks pass, access is granted.
 
 ## Managing RFID Cards
 
-### Viewing All Cards
-
-1. Navigate to **RFID-Cards** in the sidebar
-2. You see a list of all registered RFID cards with their assigned users
-
-<!-- TODO: Screenshot of the RFID Cards list -->
+Open **RFID Cards** in the sidebar to manage your own cards. The list shows each card's ID, UID, creation date, and last-seen time.
 
 ### Registering a New Card
 
-To register a new RFID card:
+1. Click **Enroll RFID Card**
+2. Select a connected Attractap that supports card enrollment
+3. Click **Enroll** and follow the instructions on the reader
 
-1. Navigate to **RFID-Cards** in the sidebar
-2. Click **Add RFID Card**
-3. Select the user who should receive the card
-4. Hold the new RFID card to any connected Attractap reader
-5. The card ID is automatically detected and registered
+### Activating and Deactivating Cards
 
-> [!TIP]
-> You can also register a card directly from the user's profile page.
-
-<!-- TODO: Screenshot of the Add RFID Card dialog -->
+Use **Activate** or **Deactivate** next to a card and confirm the action. Activating a card automatically deactivates your other cards, so only one card is active per user. Deactivate a lost card immediately to revoke its access without needing the physical card.
 
 ### Removing a Card
 
-1. Navigate to **RFID-Cards** in the sidebar
-2. Find the card you want to remove
-3. Click the **Delete** button
-4. Confirm the removal
+1. Click **Delete** next to the card
+2. Select a connected Attractap and confirm **Delete**
+3. Follow the instructions on the reader to reset the physical card
 
-> [!NOTE]
-> Removing a card immediately revokes access. The card can no longer be used at any reader.
+The card is removed from the account after the reader confirms the reset succeeded. The physical card is required; use **Deactivate** if it is unavailable.
 
 ## Multiple Cards Per User
 
@@ -70,12 +58,9 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 
 ## Administrator Features
 
-Administrators can:
+The `users.rfid-cards.manage` permission allows managing RFID cards for any user. The **Administrator** role includes it automatically; it can also be granted through a custom role.
 
-- View all registered cards across all users
-- Register cards on behalf of users
-- Remove cards from user accounts
-- See which reader last scanned a card
+Open **Users**, select a user, and click **Manage RFID Cards**. This screen supports the same enrollment, activation, deactivation, and deletion actions for the selected user. Accessing user details also requires `users.read`. Enrollment links the card to the selected user, and the audit log records the administrator who performed the action.
 
 ## See Also
 

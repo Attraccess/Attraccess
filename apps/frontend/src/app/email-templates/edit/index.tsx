@@ -3,6 +3,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -143,7 +144,7 @@ export function EditEmailTemplatePage() {
         dialogProps={{ className: 'md:max-w-4xl' }}
       >
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('sections.translations')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('sections.translations')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           {templateType && (

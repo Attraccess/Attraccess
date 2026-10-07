@@ -1,4 +1,15 @@
-import { Button, Chip, DrawerBody, DrawerFooter, DrawerHeader, Input, Label, TextArea, TextField } from '@heroui/react';
+import {
+  Button,
+  Chip,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerHeading,
+  Input,
+  Label,
+  TextArea,
+  TextField,
+} from '@heroui/react';
 import { LockIcon } from 'lucide-react';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { PermissionPicker } from '../../../components/permissionPicker';
@@ -30,9 +41,9 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   return (
     <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <h2 className="text-lg font-semibold" data-cy="role-form-drawer-title">
+        <DrawerHeading className="text-lg font-semibold" data-cy="role-form-drawer-title">
           {t(`title.${mode}`)}
-        </h2>
+        </DrawerHeading>
       </DrawerHeader>
       <DrawerBody>
         <div className="flex flex-col gap-4">

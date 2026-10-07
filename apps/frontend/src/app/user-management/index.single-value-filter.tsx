@@ -1,7 +1,7 @@
 import { Autocomplete, ListBox, SearchField, useFilter } from '@heroui/react';
-
-import type { FilterOption } from './index.contracts';
-import { MobileValueFilter } from './index.helpers';
+import { SearchIcon } from 'lucide-react';
+import { FilterOption } from './index.filter-option';
+import { MobileValueFilter } from './index.mobile-value-filter';
 
 export function SingleValueFilter({
   ariaLabel,

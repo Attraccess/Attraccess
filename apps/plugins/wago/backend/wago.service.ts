@@ -1,5 +1,5 @@
 import { Inject, Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { PLUGIN_CONTEXT } from './wago.state';
 import { WagoServiceScheduleSubscriptionRetryOperation } from './wago.wago-service-schedule-subscription-retry-operation';
 

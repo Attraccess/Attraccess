@@ -133,7 +133,18 @@ void API::onUsageStats(JsonObject data)
     if (usage["operatingDurationMs"].is<int64_t>() && usage["operatingDurationMs"].as<int64_t>() >= 0)
         stats.operatingDurationMs = usage["operatingDurationMs"].as<int64_t>();
     if (usage["isOperating"].is<bool>()) stats.isOperating = usage["isOperating"].as<bool>() ? 1 : 0;
-    const char *energy = usage["energyKwh"].as<const char *>();
-    if (energy) stats.energyKwh = energy;
+    for (auto meter : usage["meters"].as<JsonArray>()) {
+        const char *name = meter["name"].as<const char *>();
+        const char *value = meter["value"].as<const char *>();
+        if (name) {
+            UsageStats::MeterValue reading{};
+            reading.name = name;
+            reading.value = value ? value : "";
+            if (meter["creditsPerUnit"].is<int64_t>() && meter["creditsPerUnit"].as<int64_t>() >= 0)
+                reading.creditsPerUnit = meter["creditsPerUnit"].as<int64_t>();
+            reading.formattedRate = meter["formattedRate"] | "";
+            stats.meters.push_back(std::move(reading));
+        }
+    }
     usageStatsCallback(stats);
 }

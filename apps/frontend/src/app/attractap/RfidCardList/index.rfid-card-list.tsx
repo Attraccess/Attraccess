@@ -15,6 +15,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useAttractapServiceGetAllCards,
   NFCCard,
+  useUsersServiceGetOneUserById,
   useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -25,20 +26,28 @@ import { PlusIcon, ServerIcon } from 'lucide-react';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { EnrollNfcCard } from './index.state';
-import { NfcCardDeleteModal } from './index.state';
+import { EnrollNfcCard } from './index.enroll-nfc-card';
+import { NfcCardDeleteModal } from './index.nfc-card-delete-modal';
 import { NfcCardTableCell } from './index.nfc-card-table-cell';
 
-export function RfidCardList() {
+export function RfidCardList({ userId }: { userId?: number }) {
   const { t } = useTranslations({
     de,
     en,
   });
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { hasPermission } = useAuth();
+  const canReadUser = hasPermission('users.read');
+  const { data: owner } = useUsersServiceGetOneUserById({ id: userId }, undefined, {
+    enabled: userId !== undefined && canReadUser,
+  });
 
-  const { data: cards, error: cardsError } = useAttractapServiceGetAllCards(undefined, {
+  const { data: cards, error: cardsError } = useAttractapServiceGetAllCards({ userId }, undefined, {
     refetchInterval: 5000,
+    enabled:
+      (!license || license.modules.includes('attractap')) &&
+      (userId === undefined || hasPermission('users.rfid-cards.manage')),
   });
 
   const toast = useToastMessage();
@@ -60,7 +69,6 @@ export function RfidCardList() {
 
   const [cardToDeleteId, setCardToDeleteId] = useState<number | null>(null);
 
-  const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
   if (license && !license.modules.includes('attractap')) {
@@ -70,7 +78,8 @@ export function RfidCardList() {
   return (
     <>
       <PageHeader
-        title={t('nfcCards')}
+        title={userId === undefined ? t('nfcCards') : t('userCards', { username: owner?.username ?? `#${userId}` })}
+        backTo={userId === undefined ? undefined : canReadUser ? `/users/${userId}` : '/attractap/nfc-cards'}
         actions={
           [
             {
@@ -80,7 +89,9 @@ export function RfidCardList() {
               variant: 'primary',
               dataCy: 'enroll-nfc-card-button-trigger',
               renderTrigger: (triggerProps) => (
-                <EnrollNfcCard>{(onOpen) => <Button {...triggerProps} onPress={onOpen} />}</EnrollNfcCard>
+                <EnrollNfcCard userId={userId}>
+                  {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+                </EnrollNfcCard>
               ),
             },
             {

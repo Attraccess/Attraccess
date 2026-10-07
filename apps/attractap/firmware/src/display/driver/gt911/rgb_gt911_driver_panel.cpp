@@ -15,7 +15,7 @@
 
 bool RgbGt911Driver::begin()
 {
-    logger.infof("RgbGt911Driver::begin() starting at t=%lu ms", millis());
+    logger.infof("RgbGt911Driver::begin() starting at t=%lu ms", static_cast<unsigned long>(millis()));
 
     // === TOUCH INIT FIRST (before display, matching Waveshare V4 demo) ===
     // The GT911 is an I2C device independent of the display hardware.
@@ -49,7 +49,7 @@ bool RgbGt911Driver::begin()
 
     if (touchFound)
     {
-        logger.infof("GT911 touch init SUCCESS at t=%lu ms", millis());
+        logger.infof("GT911 touch init SUCCESS at t=%lu ms", static_cast<unsigned long>(millis()));
         touchInitialized = true;
     }
     else
@@ -58,7 +58,7 @@ bool RgbGt911Driver::begin()
     }
 
     // === DISPLAY INIT SECOND ===
-    logger.infof("Initializing ST7701 RGB display at t=%lu ms...", millis());
+    logger.infof("Initializing ST7701 RGB display at t=%lu ms...", static_cast<unsigned long>(millis()));
 
     // Panel init commands go over bit-banged 3-wire SPI on dedicated GPIOs
     // (the old Arduino_SWSPI bus).
@@ -155,7 +155,7 @@ bool RgbGt911Driver::begin()
     screenHeight = 480;
 
     logger.infof("Display init DONE at t=%lu ms: %ux%u",
-                 millis(), (unsigned)screenWidth, (unsigned)screenHeight);
+                 static_cast<unsigned long>(millis()), (unsigned)screenWidth, (unsigned)screenHeight);
 
     initialized = true;
     return true;

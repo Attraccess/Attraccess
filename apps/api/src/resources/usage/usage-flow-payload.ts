@@ -1,3 +1,4 @@
+import { ResourceUsage } from '@attraccess/database-entities';
 import { BillingTransaction, Project, Resource, ResourceUsageAction, User } from '@attraccess/database-entities';
 export type UsageFlowPayload = {
   resource: Partial<Resource>;
@@ -25,6 +26,6 @@ export type UsageFlowPayload = {
   operatingDurationCreditsPerMinute: number | null;
   creditsPerUsage: number | null;
   billingFactor: number | null;
-  energyCreditsPerKwh: number | null;
+  meterRates: ResourceUsage['meterRates'];
   attributedOperatingDurationInMinutes: number | null;
 };

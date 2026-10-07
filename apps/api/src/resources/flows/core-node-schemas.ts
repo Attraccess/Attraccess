@@ -80,7 +80,7 @@ const presentations: Record<ResourceFlowNodeType, NodePresentation> = {
   [ResourceFlowNodeType.INPUT_METERING_START]: { outputs: ['output'], resourceType: ResourceType.Machine },
   [ResourceFlowNodeType.INPUT_METERING_COLLECT]: { outputs: ['output'], resourceType: ResourceType.Machine },
   [ResourceFlowNodeType.OUTPUT_METERING_READY]: { inputs: ['input'], resourceType: ResourceType.Machine },
-  [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: { inputs: ['input'], resourceType: ResourceType.Machine },
+  [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: { inputs: ['input'] },
 };
 
 export function getCoreNodeSchemas(resourceType: ResourceType): ResourceFlowNodeSchemaDto[] {

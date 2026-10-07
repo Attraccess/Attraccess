@@ -9,7 +9,7 @@ protected:
     struct ProjectButtonEventData
     {
         ResourceDetailsScreen *self;
-        uint8_t index;
+        uint16_t index;
     };
 
     API::ProjectsOfUserResponse projectsCache;

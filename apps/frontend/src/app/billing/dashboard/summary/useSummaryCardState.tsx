@@ -1,4 +1,5 @@
-import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import de from './de.json';
 import en from './en.json';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -10,8 +11,7 @@ import {
   useBillingServiceGetBillingTransactions,
 } from '@attraccess/react-query-client';
 import { useCallback, useMemo, useState } from 'react';
-import type { Props } from './index';
-
+import { Props } from './index.props';
 export function useSummaryCardState(props: Props) {
   const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
@@ -121,7 +121,7 @@ export function useSummaryCardState(props: Props) {
     }
   }, []);
 
-  const formatNumber = useNumberFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const [openedTransactionId, setOpenedTransactionId] = useState<number | undefined>(undefined);
   const [isOpenDetails, setIsOpenDetails] = useState(false);
@@ -139,10 +139,10 @@ export function useSummaryCardState(props: Props) {
     transactions,
     getDetailsCellContent,
     statusColor,
-    formatNumber,
+    formatCredits,
     openedTransactionId,
     isOpenDetails,
     setIsOpenDetails,
     openDetails,
-  } as const;
+  };
 }

@@ -1,8 +1,12 @@
 import {
   Description,
+  FieldError,
+  Input,
+  TextField,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   Label,
   NumberField,
@@ -13,13 +17,11 @@ import {
 } from '@heroui/react';
 import { Button } from '../../../../../components/button';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
+import { MeterNameEditor } from '../../meters/MeterNameEditor';
 import { MeterSetupNotice } from '../metering/MeterNotices';
+import { formatCredits, parseCredits } from '@attraccess/shared';
+import { Props } from './index.props';
 import { useResourceBillingInfoEditorState } from './useResourceBillingInfoEditorState';
-
-export interface Props {
-  resourceId: number;
-  children: (onOpen: () => void) => React.ReactNode;
-}
 
 export function ResourceBillingInfoEditor(props: Props) {
   const {
@@ -36,8 +38,10 @@ export function ResourceBillingInfoEditor(props: Props) {
     setCreditsPerMinute,
     creditsPerOperatingMinute,
     setCreditsPerOperatingMinute,
-    creditsPerKwh,
-    setCreditsPerKwh,
+    meters,
+    ratesPending,
+    rates,
+    setRates,
     onSubmit,
     hasPermission,
   } = useResourceBillingInfoEditorState(props);
@@ -53,9 +57,9 @@ export function ResourceBillingInfoEditor(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+      <StandardDrawer dialogProps={{ 'aria-label': t('title') }} isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <Form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -98,26 +102,38 @@ export function ResourceBillingInfoEditor(props: Props) {
                 <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
               </NumberFieldGroup>
             </NumberField>
-            <NumberField
-              value={creditsPerKwh}
-              minValue={0}
-              onChange={(value) => setCreditsPerKwh(value)}
-              defaultValue={0}
-            >
-              <Label>{t('inputs.creditsPerKwh.label', { currency: configuration.currency })}</Label>
-              <NumberFieldGroup>
-                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                <NumberFieldInput />
-                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-              </NumberFieldGroup>
-              <Description>{t('inputs.creditsPerKwh.description')}</Description>
-            </NumberField>
-            <MeterSetupNotice resourceId={resourceId} energyBillingEnabled={creditsPerKwh > 0} />
+            {meters.map((meter) => {
+              const value =
+                rates[meter.id] ?? formatCredits(meter.creditsPerUnit, configuration.minorUnit, { useGrouping: false });
+              let invalid = false;
+              try {
+                parseCredits(value, configuration.minorUnit);
+              } catch {
+                invalid = true;
+              }
+              return (
+                <TextField
+                  key={meter.id}
+                  value={value}
+                  onChange={(value) => setRates((previous) => ({ ...previous, [meter.id]: value }))}
+                  isInvalid={invalid}
+                >
+                  <Label>
+                    {meter.name} — {t('inputs.meterRate.label', { currency: configuration.currency })}
+                  </Label>
+                  <Input inputMode="decimal" />
+                  <Description>{t('inputs.meterRate.description')}</Description>
+                  <FieldError>{t('inputs.meterRate.invalid', { digits: configuration.minorUnit })}</FieldError>
+                </TextField>
+              );
+            })}
+            <MeterNameEditor resourceId={resourceId} />
+            <MeterSetupNotice resourceId={resourceId} />
             <input hidden type="submit" />
           </Form>
         </DrawerBody>
         <DrawerFooter>
-          <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
+          <Button variant="primary" onPress={onSubmit} isPending={isSaving || ratesPending}>
             {t('actions.save')}
           </Button>
         </DrawerFooter>

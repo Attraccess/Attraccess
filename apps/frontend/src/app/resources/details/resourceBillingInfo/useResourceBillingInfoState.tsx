@@ -1,5 +1,6 @@
 import {
   useBillingServiceGetBillingBalance,
+  useResourceMeteringServiceListResourceMeters,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
   useLicenseServiceGetLicenseInformation,
@@ -11,8 +12,8 @@ import en from './en.json';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import type { Props } from './index';
-
+import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
+import { Props } from './index.props';
 export function useResourceBillingInfoState(props: Props) {
   const { resourceId, onExampleAmountChange, onVisibilityChange, className, ...htmlProps } = props;
 
@@ -23,6 +24,7 @@ export function useResourceBillingInfoState(props: Props) {
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const formatNumber = useNumberFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const { user: currentUser, hasPermission } = useAuth();
   const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 }, undefined, {
@@ -71,26 +73,21 @@ export function useResourceBillingInfoState(props: Props) {
     );
   }, [resourceBillingConfiguration, configuration]);
 
-  const creditsPerKwh = useMemo(() => {
-    if (!configuration) {
-      return 0;
-    }
-
-    return dbCurrencyToUserCurrency(
-      resourceBillingConfiguration?.configuration.creditsPerKwh ?? 0,
-      configuration.minorUnit,
-    );
-  }, [resourceBillingConfiguration, configuration]);
+  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId }, undefined, {
+    refetchInterval: 10_000,
+  });
+  const hasMeterRates = meters.some((meter) => meter.creditsPerUnit > 0);
+  const hasMeterSessions = meters.some((meter) => meter.session != null);
 
   const isFree = useMemo(() => {
     return (
       creditsPerUsage === 0 &&
       creditsPerMinute === 0 &&
       creditsPerOperatingMinute === 0 &&
-      creditsPerKwh === 0 &&
+      !hasMeterRates &&
       resourceBillingConfiguration?.additionalItems.length === 0
     );
-  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, creditsPerKwh, resourceBillingConfiguration]);
+  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, hasMeterRates, resourceBillingConfiguration]);
 
   const [exampleSessionMinutes, setExampleSessionMinutes] = useState(10);
   const [exampleOperatingMinutes, setExampleOperatingMinutes] = useState(10);
@@ -135,9 +132,9 @@ export function useResourceBillingInfoState(props: Props) {
     if (!license?.modules.includes('billing')) return false;
     if (!resourceBillingConfiguration) return false;
     if (resource?.type !== 'machine') return false;
-    if (isFree && !hasPermission('billing.manage')) return false;
+    if (isFree && !hasMeterSessions && !hasPermission('billing.manage')) return false;
     return true;
-  }, [license, resourceBillingConfiguration, resource, isFree, hasPermission]);
+  }, [license, resourceBillingConfiguration, resource, isFree, hasMeterSessions, hasPermission]);
 
   useEffect(() => {
     onVisibilityChange?.(isVisible);
@@ -152,12 +149,14 @@ export function useResourceBillingInfoState(props: Props) {
     resource,
     license,
     formatNumber,
+    formatCredits,
     hasPermission,
     adjustedBalance,
     creditsPerUsage,
     creditsPerMinute,
     creditsPerOperatingMinute,
-    creditsPerKwh,
+    meters,
+    hasMeterSessions,
     isFree,
     exampleSessionMinutes,
     setExampleSessionMinutes,
@@ -165,5 +164,5 @@ export function useResourceBillingInfoState(props: Props) {
     setExampleOperatingMinutes,
     exampleCost,
     exampleResultingBalance,
-  } as const;
+  };
 }

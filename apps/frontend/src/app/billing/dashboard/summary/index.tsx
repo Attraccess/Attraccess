@@ -17,17 +17,10 @@ import {
 import { PageHeader } from '../../../../components/pageHeader';
 import { EmptyState } from '../../../../components/emptyState';
 import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
 import { RefundModal } from './transactionDetailsModal/refund';
+import { Props } from './index.props';
 import { useSummaryCardState } from './useSummaryCardState';
-
-export interface Props {
-  className?: string;
-  transactionsPerPage?: number;
-  userId?: number;
-  isDisabled?: boolean;
-}
 
 export function SummaryCard(props: Props) {
   const {
@@ -39,7 +32,7 @@ export function SummaryCard(props: Props) {
     transactions,
     getDetailsCellContent,
     statusColor,
-    formatNumber,
+    formatCredits,
     openedTransactionId,
     isOpenDetails,
     setIsOpenDetails,
@@ -59,7 +52,7 @@ export function SummaryCard(props: Props) {
       ) : (
         <p className="text-2xl font-bold">
           {t('balance', {
-            balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
+            balance: formatCredits(balance?.value ?? 0),
             currency: configuration.currency,
           })}
         </p>
@@ -96,7 +89,7 @@ export function SummaryCard(props: Props) {
                   </TableCell>
                   <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                     {transaction.amount > 0 && '+'}
-                    {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
+                    {formatCredits(transaction.amount)}
                   </TableCell>
                   <TableCell>
                     <RefundModal transactionId={transaction.id}>

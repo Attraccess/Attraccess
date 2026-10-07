@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { StandardDrawer } from '../../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import { parseFieldOptions } from '../../details/forms/types';
 import en from '../translations/en.json';
 import de from '../translations/de.json';
-import type { ResourceFormsModalProps } from './ResourceFormsModal.contracts';
-import type { FieldValue } from './ResourceFormsModal.contracts';
-import { fieldHasValue } from './ResourceFormsModal.extract-select-options.helpers';
-import { extractSelectOptions } from './ResourceFormsModal.extract-select-options.helpers';
-import { normalizeValue } from './ResourceFormsModal.extract-select-options.helpers';
-import { renderFieldInput } from './ResourceFormsModal.extract-select-options.helpers';
+import { ResourceFormsModalProps } from './ResourceFormsModal.resource-forms-modal-props';
+import { FieldValue } from './ResourceFormsModal.field-value';
+import { fieldHasValue } from './ResourceFormsModal.field-has-value';
+import { extractSelectOptions } from './ResourceFormsModal.extract-select-options';
+import { normalizeValue } from './ResourceFormsModal.normalize-value';
+import { renderFieldInput } from './ResourceFormsModal.render-field-input';
 
 export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }: ResourceFormsModalProps) {
   const { t } = useTranslations({ en, de });
@@ -114,7 +114,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
       }}
     >
       <DrawerHeader className="flex flex-col gap-1">
-        <span>{modalTitle}</span>
+        <DrawerHeading>{modalTitle}</DrawerHeading>
         <span className="text-sm text-default-500">{t('modal.description')}</span>
       </DrawerHeader>
       <DrawerBody>

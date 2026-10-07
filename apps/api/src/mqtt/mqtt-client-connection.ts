@@ -49,6 +49,9 @@ export abstract class MqttClientConnectionImplementation extends MqttClientServi
       }
 
       const client = mqtt.connect(url, options);
+      // Track ownership before the first CONNACK, including attempts allowed to
+      // reconnect after their initial wait has timed out.
+      this.clients.set(serverId, client);
       let active = true;
       const cancellations = this.connectionCancellations.get(serverId) ?? new Set<() => void>();
       this.connectionCancellations.set(serverId, cancellations);
@@ -57,6 +60,7 @@ export abstract class MqttClientConnectionImplementation extends MqttClientServi
         active = false;
         clearTimeout(timeout);
         cancellations.delete(cancel);
+        if (this.clients.get(serverId) === client) this.clients.delete(serverId);
         client.end(true);
         reject(new Error('MQTT connection was replaced'));
       };

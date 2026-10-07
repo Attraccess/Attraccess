@@ -1,9 +1,9 @@
-import { PropertyInput } from './index';
 import { Button } from '@heroui/react';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { initializeValue } from './schema-values';
-import { Property } from './index.contracts';
-import { PropertyViewProps } from './index.contracts';
+import { Property } from './index.property';
+import { PropertyViewProps } from './index.property-view-props';
+import { PropertyInput } from './index';
 
 export function ArrayPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
   const { name, nodeType, schema, value, hideLabel, label, onChange, tNodeTranslations: t, tNodeExists } = props;

@@ -1,11 +1,8 @@
-import {
-  wagoHardwareDeploymentDockerArgs,
-  wagoHardwareDeploymentPreflightScript
-} from './wago-hardware-deployment';
+import { wagoHardwareDeploymentDockerArgs, wagoHardwareDeploymentPreflightScript } from './wago-hardware-deployment';
 import { wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 import { type Cc100HardwareProfile } from '../shared/hardware-profile';
-import { quote } from "./wago-runtime-update-shell.quote";
-import { preamble } from "./wago-runtime-update-shell.preamble";
+import { quote } from './wago-runtime-update-shell.quote';
+import { preamble } from './wago-runtime-update-shell.preamble';
 
 /** Preserve runtime.env, trust and enrolled state. Retain the old container and
  * checkpoint data only while stopped. No update path issues enrollment credentials.

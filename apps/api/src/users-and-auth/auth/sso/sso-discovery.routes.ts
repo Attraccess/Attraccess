@@ -92,7 +92,7 @@ export abstract class SsoDiscoveryRoutesImplementation extends SsoProviderRoutes
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or applicationName' })
   async discoverAuthentik(@Query('host') host: string, @Query('applicationName') applicationName: string) {
-    if (!host || !applicationName) {
+    if (typeof host !== 'string' || typeof applicationName !== 'string' || !host || !applicationName) {
       throw new BadRequestException('Missing required parameters');
     }
 
@@ -120,7 +120,7 @@ export abstract class SsoDiscoveryRoutesImplementation extends SsoProviderRoutes
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or realm' })
   async discoverKeycloak(@Query('host') host: string, @Query('realm') realm: string) {
-    if (!host || !realm) {
+    if (typeof host !== 'string' || typeof realm !== 'string' || !host || !realm) {
       throw new BadRequestException('Missing required parameters');
     }
 

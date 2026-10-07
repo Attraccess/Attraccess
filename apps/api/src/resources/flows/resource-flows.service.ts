@@ -25,7 +25,7 @@ export class ResourceFlowsService extends ResourceFlowWritingImplementation {
     super();
   }
 
-  async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
+  public async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
     // Verify resource exists
     const resource = await this.resourceRepository.findOne({
       where: { id: resourceId },
@@ -45,7 +45,7 @@ export class ResourceFlowsService extends ResourceFlowWritingImplementation {
       }),
     ]);
 
-    const validationContext = new Map<string, unknown>();
+    const validationContext = new Map<string, unknown>([['meterResourceId', resourceId]]);
     const validationErrors: ValidationError[] = [];
     // Plugin validators may query external state, so bound the fanout without serializing the whole flow.
     const validationConcurrency = 4;

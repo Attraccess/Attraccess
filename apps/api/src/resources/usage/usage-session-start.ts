@@ -44,15 +44,11 @@ export abstract class UsageSessionStartImplementation extends UsageStartPreparat
           })
         : { status: 'not-metered' };
       // A billed session must not start unless its meter acknowledged the start; nothing is energized yet.
-      if ((createdSession.energyCreditsPerKwh ?? 0) > 0) {
-        if (!this.metering) throw new Error('Energy billing requires the metering service');
-        await this.metering.initialize({
-          resourceId,
-          usageId: createdSession.id,
-          creditsPerKwh: createdSession.energyCreditsPerKwh as number,
-          supersedes: existingActiveSession?.id,
-        });
-      }
+      await this.metering?.initialize({
+        resourceId,
+        usageId: createdSession.id,
+        supersedes: existingActiveSession?.id,
+      });
       await this.runUsageFlow(
         undefined,
         resourceId,

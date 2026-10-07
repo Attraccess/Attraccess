@@ -28,6 +28,22 @@ Migration retains the previous broker association for credential cleanup. When t
 
 ### Build-owned assets and managed-update engineering status (ATT-1099)
 
+`apps/plugins/wago/cc100-runtime/manifest.json` is the manually maintained
+runtime version file. Increase `runtimeVersion` (currently `0.2.1`) when changing
+runtime source, shared runtime contracts, image dependencies or deployment code.
+Discovery, permanent heartbeats and packaged assets all use this version. The
+required `wago-runtime-version` CI job rejects runtime changes without a strictly
+higher stable `major.minor.patch` version. Documentation, tests and simulator-only
+changes do not require a bump. Dependency/lockfile changes are checked conservatively
+because they can change the bundled runtime or its build tools.
+
+Managed updates keep an installed runtime of the same version, even if rebuilding
+the Docker image changes its config digest. They still refresh the signed management
+helper and require fresh readiness for the installed image. A version change triggers
+the normal state-preserving rollout, with checksum and Docker identity verification.
+All historical `0.1.0` images upgrade to `0.2.0` once; their version did not distinguish
+runtime source changes. Server commit SHAs remain build provenance, not runtime versions.
+
 The ATT-1099 draft supplies `release.json`, `wago-cc100-runtime.tar` and its
 `.sha256` file with the server image under `/app/share/cc100-runtime`. These
 assets are built from the checked-out source by
@@ -59,7 +75,7 @@ descriptor identifies the checked-out build, platform/profile/protocol compatibi
 transport checksum,
 and Docker **config digest** (`imageId`). Its offline image reference is pinned
 by that config digest and is not a registry-pull reference. Recompression or a
-different tag/build ID with the same config digest does not constitute an upgrade.
+different tag/build ID does not constitute an upgrade when the runtime version is unchanged.
 Managed launch supplies this identity as `WAGO_RUNTIME_IMAGE_ID`; fresh permanent
 heartbeats report it as `runtimeImageId`. Legacy heartbeats may omit the field.
 
@@ -102,6 +118,20 @@ data root, and 16 MiB headroom per filesystem; shared filesystems sum these
 requirements. The Docker reserve is an admission policy rather than a guaranteed
 image expansion bound. Activation separately checks checkpoint space. Unused
 commissioning upload paths, including `/tmp`, do not affect update admission.
+
+A managed runtime update can replace a stalled MQTT runtime through its verified
+SSH identity and staged transaction. Activation does not require a heartbeat from
+the old process. Acceptance still requires the selected image's heartbeat and
+ready state from the same boot, both newer than activation. A known old boot is
+rejected even when its last heartbeat is stale; missing old telemetry does not
+bypass image, freshness or readiness verification.
+
+After durable server acknowledgement, OTA removes the retired predecessor image
+on success or the failed candidate image after rollback. Cleanup is limited to
+the exact image recorded in that update's journal and preserves images referenced
+by any running or stopped container. It never forces removal or runs a Docker
+prune. Failed Docker inventory/removal keeps the journal for the coordinator's
+existing cleanup retry, without undoing an accepted update.
 
 The scoped read-only helper operation `storage-status <management-token>` reports
 each storage path, available/required KiB, filesystem and mountpoint, followed by
@@ -410,6 +440,15 @@ docker inspect --format '{{.State.Status}} {{.RestartCount}}' attraccess-wago-cc
 ```
 
 Runtime callback failures are written to container stderr, so `docker logs` is the primary log collection command. Add the output of `docker inspect`, `docker logs`, firmware version, and non-secret configuration metadata to a support bundle. Never include `/etc/attraccess-wago/runtime.env` or `state.json` without removing credentials.
+
+Runtime MQTT publications and subscriptions wait at most 10 seconds for the
+broker acknowledgement. A timeout rejects pending operations and closes the
+socket to trigger automatic reconnect and the configured disconnect policy.
+Socket closure also releases pending operations. Unacknowledged publications are
+discarded rather than replayed after reconnect; fresh heartbeat, state and
+measurements resume through their normal publishers. This prevents a missing
+PUBACK from permanently blocking a measurement or heartbeat loop while MQTT
+keepalive still succeeds.
 
 ## Enrollment and credentials
 

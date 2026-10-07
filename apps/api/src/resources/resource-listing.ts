@@ -2,8 +2,10 @@ import { Resource } from '@attraccess/database-entities';
 import { Brackets } from 'typeorm';
 import { PaginatedResponse } from '../types/response';
 import { ResourceWritingImplementation } from './resource-writing';
+import { activeUsageSql } from './usage/active-usage';
+
 export abstract class ResourceListingImplementation extends ResourceWritingImplementation {
-  async listResources(options?: {
+  public async listResources(options?: {
     page?: number;
     limit?: number;
     search?: string;
@@ -42,9 +44,9 @@ export abstract class ResourceListingImplementation extends ResourceWritingImple
 
     if (onlyInUse || onlyInUseByUserId !== undefined || returnUsingUser) {
       if (returnUsingUser) {
-        queryBuilder.leftJoinAndSelect('resource.usages', 'usage', 'usage.lifecyclePending = FALSE');
+        queryBuilder.leftJoinAndSelect('resource.usages', 'usage', activeUsageSql('usage'));
       } else {
-        queryBuilder.leftJoin('resource.usages', 'usage', 'usage.endTime IS NULL AND usage.lifecyclePending = FALSE');
+        queryBuilder.leftJoin('resource.usages', 'usage', activeUsageSql('usage'));
       }
     }
 

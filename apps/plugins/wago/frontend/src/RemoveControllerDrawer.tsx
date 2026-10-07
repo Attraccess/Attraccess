@@ -1,5 +1,5 @@
-import { Alert, Button, DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
-import type { WagoController } from './api';
+import { Alert, Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
+import { WagoController } from './api';
 import { StandardDrawer } from './drawer';
 import { useRemoveControllerMutation } from './queries';
 import { useWagoTranslations } from './i18n';
@@ -18,7 +18,7 @@ export function RemoveControllerDrawer({
   return (
     <StandardDrawer ariaLabel={t('remove.title')} isOpen={controller !== null} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <h2 className="wg:text-xl wg:font-semibold">{t('remove.title')}</h2>
+        <DrawerHeading className="wg:text-xl wg:font-semibold">{t('remove.title')}</DrawerHeading>
       </DrawerHeader>
       <DrawerBody>
         <div className="wg:space-y-4">

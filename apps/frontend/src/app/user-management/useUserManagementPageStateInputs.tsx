@@ -9,8 +9,9 @@ import en from './en.json';
 import de from './de.json';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
-import { FilterKey } from './index.contracts';
-import { FILTER_KEYS } from './index.state';
+import { FilterKey } from './index.filter-key';
+import { FILTER_KEYS } from './index.filter-keys';
+
 export function useUserManagementPageStateInputs() {
   const { t } = useTranslations({ en, de });
   const { roleName } = useRbacCatalogTranslations();
@@ -92,6 +93,29 @@ export function useUserManagementPageStateInputs() {
         params.delete('ssoProviderOperator');
       }
     });
+
+  const replaceFilter = (current: FilterKey, next: FilterKey) => {
+    if (current === next || activeFilters.includes(next)) return;
+    updateFilters((params) => {
+      params.delete('filter');
+      activeFilters.map((key) => (key === current ? next : key)).forEach((key) => params.append('filter', key));
+      if (current === 'role') {
+        params.delete('roleId');
+        params.delete('excludeRoleId');
+        params.delete('roleMatch');
+        params.delete('roleOperator');
+      }
+      if (current === 'emailVerified') params.delete('emailVerified');
+      if (current === 'ssoProvider') {
+        params.delete('ssoProviderId');
+        params.delete('excludeSsoProviderId');
+        params.delete('ssoProviderNone');
+        params.delete('hasSsoProvider');
+        params.delete('ssoProviderMatch');
+        params.delete('ssoProviderOperator');
+      }
+    });
+  };
   return {
     t,
     roleName,
@@ -122,5 +146,6 @@ export function useUserManagementPageStateInputs() {
     updateFilters,
     addFilter,
     removeFilter,
+    replaceFilter,
   } as const;
 }

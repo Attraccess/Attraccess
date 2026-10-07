@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { setupFw31OperatingSystem } from './setupFw31OperatingSystem';
 import { setupFw31PrivilegeTools } from './setupFw31PrivilegeTools';
@@ -50,6 +50,11 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     containers: () => JSON.parse(read('containers.json')) as FixtureContainer[],
     setContainers: (containers: FixtureContainer[]) => {
       file('containers.json', JSON.stringify(containers));
+      const images = existsSync(join(root, 'images.json')) ? (JSON.parse(read('images.json')) as string[]) : [];
+      file(
+        'images.json',
+        JSON.stringify([...new Set([...images, ...containers.flatMap((c) => (c.imageId ? [c.imageId] : []))])]),
+      );
       for (const container of containers) {
         if (container.name !== 'attraccess-wago' || !container.running) continue;
         const path = `proc/${container.pid || 42}`;

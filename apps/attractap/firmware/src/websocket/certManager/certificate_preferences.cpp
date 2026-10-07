@@ -70,7 +70,7 @@ void AdaptiveCertManager::saveSuccessfulCertIndexToPreferences(int certIndex)
 
     if (bytesWritten > 0)
     {
-        logger.infof("Successfully saved certificate: index %d (%d bytes)",
+        logger.infof("Successfully saved certificate: index %d (%zu bytes)",
                      certIndex, bytesWritten);
     }
     else

@@ -8,11 +8,17 @@ import { ResourceOperatingAttributionService } from '../../../resources/operatin
 import { SupervisionService } from '../../../resources/supervision/supervision.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../websocket.types';
+import {
+  AttractapEvent,
+  AttractapEventType,
+  AuthenticatedWebSocket,
+  ResourceUsageStatsPayload,
+} from '../websocket.types';
 import { AttractapFormsHandler } from './forms.handler';
 import { ReaderDoorActionsImplementation } from './reader-door-actions';
 import { ResourceActionGuard } from './resource-action.guard';
 import { ResourceListService } from './resource-list.service';
+import { formatCredits } from '@attraccess/shared';
 
 @Injectable()
 export class AttractapSessionHandler extends ReaderDoorActionsImplementation {
@@ -65,16 +71,17 @@ export class AttractapSessionHandler extends ReaderDoorActionsImplementation {
       return;
 
     try {
-      const usage = await this.resourceUsageService.getActiveSession(resourceId, false);
+      const usage = await this.resourceUsageService.getActiveSession(resourceId);
       // Live session readings belong to the current user, just like the active-session web UI.
       if (!usage || usage.userId !== userId) {
         await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
         return;
       }
       const asOf = new Date();
-      const [meter, operating] = await Promise.all([
+      const [meter, operating, billingConfiguration] = await Promise.all([
         this.meteringService.getLive(resourceId),
         this.operatingAttributionService.getForResource(resourceId, asOf, usage.startTime),
+        this.billingService.getConfiguration(),
       ]);
       if (socket.state.lastAuthenticatedUserId !== userId) return;
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, {
@@ -88,10 +95,19 @@ export class AttractapSessionHandler extends ReaderDoorActionsImplementation {
               )
             : null,
           isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
+          // Catalog entries include captured terms with unavailable values for skipped free meters.
           // Never attach a new session's meter reading to an earlier usage snapshot.
-          energyKwh: meter.session?.usageId === usage.id ? meter.session.latestKwh : null,
+          meters: meter.meters
+            .filter((entry) => entry.session?.usageId === usage.id)
+            .map((entry) => ({
+              id: entry.id,
+              name: entry.session.meterName,
+              creditsPerUnit: entry.session.creditsPerUnit,
+              formattedRate: this.formatMeterRate(entry.session.creditsPerUnit, billingConfiguration),
+              value: entry.session.latestValue,
+            })),
         },
-      });
+      } satisfies ResourceUsageStatsPayload);
     } catch (error) {
       this.logger.warn(`Failed to load live usage stats: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
@@ -118,5 +134,12 @@ export class AttractapSessionHandler extends ReaderDoorActionsImplementation {
       return error.message.replace(/^FLOW_EXECUTION_ERROR:\s*/, '');
     }
     return error instanceof Error ? error.message : String(error);
+  }
+
+  protected formatMeterRate(creditsPerUnit: number, configuration: { minorUnit: number; currency: string }): string {
+    return `${formatCredits(creditsPerUnit, configuration.minorUnit, {
+      locale: 'de-DE',
+      minimumFractionDigits: configuration.minorUnit,
+    })} ${configuration.currency}`;
   }
 }

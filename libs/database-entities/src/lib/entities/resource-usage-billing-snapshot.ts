@@ -35,13 +35,13 @@ export abstract class ResourceUsageBillingSnapshot {
   })
   billingFactor!: number | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   @ApiProperty({
-    description: 'Energy rate per kWh snapshotted at session start; null or 0 when energy is not billed',
+    type: [Object],
     nullable: true,
     required: false,
   })
-  energyCreditsPerKwh!: number | null;
+  meterRates!: { meterId: number; name: string; creditsPerUnit: number }[] | null;
 
   @Column({ type: 'float', nullable: true })
   @ApiProperty({

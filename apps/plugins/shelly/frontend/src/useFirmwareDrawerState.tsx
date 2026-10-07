@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFirmware, startFirmwareUpdate, type FirmwareStage, type FirmwareStatus, type ShellyDevice } from './api';
 import { useShellyTranslations } from './i18n';
-import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
-import { POLL_INTERVAL_MS } from './FirmwareDrawer.state';
-import { UPDATE_TIMEOUT_MS } from './FirmwareDrawer.state';
+import { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { POLL_INTERVAL_MS } from './FirmwareDrawer.poll-interval-ms';
+import { UPDATE_TIMEOUT_MS } from './FirmwareDrawer.update-timeout-ms';
 
 export function useFirmwareDrawerState({
   device,
@@ -129,5 +129,5 @@ export function useFirmwareDrawerState({
     stages,
     device,
     onOpenChange,
-  } as const;
+  };
 }

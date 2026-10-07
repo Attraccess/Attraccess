@@ -61,7 +61,7 @@ describe('EndUsageSessionExecutor', () => {
     const node = createNode({ resourceId: 42 });
     await executor.execute(node, {}, ctx);
 
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(42, false, txManager);
+    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(42, txManager);
   });
 
   it('runs the stopped flow before cancelling a tentative session in a usage lifecycle flow', async () => {

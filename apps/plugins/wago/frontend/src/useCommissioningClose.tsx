@@ -1,8 +1,8 @@
-import { DEFAULT_SSH } from './CommissioningModal.state';
-import { canInstall } from './CommissioningModal.activity-log.helpers';
-import { canRecover } from './CommissioningModal.activity-log.helpers';
-import { sessionStep } from './CommissioningModal.recovery-fields.helpers';
-import type { useCommissioningInputs } from './useCommissioningInputs';
+import { DEFAULT_SSH } from './CommissioningModal.default-ssh';
+import { canInstall } from './CommissioningModal.can-install';
+import { canRecover } from './CommissioningModal.can-recover';
+import { sessionStep } from './CommissioningModal.session-step';
+import { useCommissioningInputs } from './useCommissioningInputs';
 
 export function useCommissioningClose(model: ReturnType<typeof useCommissioningInputs>) {
   function close() {

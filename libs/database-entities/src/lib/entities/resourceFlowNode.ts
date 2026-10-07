@@ -1,7 +1,59 @@
-import { Column, Entity, PrimaryColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceFlowNodeType } from './resource-flow-node-type';
 import { Resource } from './resource.entity';
+import { ResourceFlowNodeType } from './resource-flow-node/node-type';
+
+export { ResourceFlowNodeType } from './resource-flow-node/node-type';
+export {
+  ExternalEffectFailureBehaviorSchema,
+  ExternalEffectPolicySchema,
+} from './resource-flow-node/external-effect-policy';
+export type { ExternalEffectFailureBehavior } from './resource-flow-node/external-effect-policy';
+export { HttpRequestNodeDataSchema } from './resource-flow-node/http-schema';
+export {
+  MqttSendMessageNodeDataSchema,
+  MqttMessageReceivedNodeDataSchema,
+  MqttWaitForMessageNodeDataSchema,
+} from './resource-flow-node/mqtt-schemas';
+export {
+  NodeWithoutDataSchema,
+  ButtonNodeDataSchema,
+  WaitNodeDataSchema,
+  IfNodeDataSchema,
+  SetPayloadNodeDataSchema,
+  ErrorNodeDataSchema,
+} from './resource-flow-node/processing-schemas';
+export {
+  BillingTransactionItemCreateSchema,
+  ResourceActivityTrackActivityNodeDataSchema,
+  ResourceOperatingTransitionNodeDataSchema,
+  InputResourceActivityNoActivityNodeDataSchema,
+  ResourceUsageEndSessionNodeDataSchema,
+} from './resource-flow-node/resource-schemas';
+export {
+  VariableScopeSchema,
+  SetVariablesNodeDataSchema,
+  GetVariablesNodeDataSchema,
+  VariableChangedNodeDataSchema,
+} from './resource-flow-node/variable-schemas';
+export {
+  HealthStateOptionEnum,
+  ResourceHealthHeartbeatNodeDataSchema,
+  ResourceHealthSetNodeDataSchema,
+} from './resource-flow-node/health-schemas';
+export {
+  CompanionLockNodeDataSchema,
+  CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
+} from './resource-flow-node/companion-schemas';
+export {
+  MeteringStartNodeDataSchema,
+  MeteringCollectNodeDataSchema,
+  MeteringReadyNodeDataSchema,
+  MeteringReportNodeDataSchema,
+} from './resource-flow-node/metering-schemas';
+export { getNodeDataSchema, getExternalEffectFailureBehavior } from './resource-flow-node/schema-registry';
 
 export class ResourceFlowNodePosition {
   @Column({ type: 'integer' })
@@ -90,52 +142,3 @@ export class ResourceFlowNode {
   })
   resource!: Resource;
 }
-
-export { ResourceFlowNodeType } from './resource-flow-node-type';
-export {
-  ExternalEffectFailureBehaviorSchema,
-  ExternalEffectPolicySchema,
-  ExternalEffectFailureBehavior,
-} from './resource-flow-external-effect';
-export {
-  HttpRequestNodeDataSchema,
-  MqttSendMessageNodeDataSchema,
-  MqttMessageReceivedNodeDataSchema,
-  MqttWaitForMessageNodeDataSchema,
-  ResourceUsageEndSessionNodeDataSchema,
-  getExternalEffectFailureBehavior,
-} from './resource-flow-network-schemas';
-export {
-  VariableScopeSchema,
-  SetVariablesNodeDataSchema,
-  GetVariablesNodeDataSchema,
-  VariableChangedNodeDataSchema,
-  SetPayloadNodeDataSchema,
-} from './resource-flow-variable-schemas';
-export {
-  NodeWithoutDataSchema,
-  ButtonNodeDataSchema,
-  WaitNodeDataSchema,
-  IfNodeDataSchema,
-  BillingTransactionItemCreateSchema,
-  ResourceActivityTrackActivityNodeDataSchema,
-  ResourceOperatingTransitionNodeDataSchema,
-  InputResourceActivityNoActivityNodeDataSchema,
-  ErrorNodeDataSchema,
-  HealthStateOptionEnum,
-  ResourceHealthHeartbeatNodeDataSchema,
-  ResourceHealthSetNodeDataSchema,
-} from './resource-flow-resource-schemas';
-export {
-  CompanionLockNodeDataSchema,
-  CompanionIdleActiveNodeDataSchema,
-  CompanionForegroundAppNodeDataSchema,
-  CompanionUsbDeviceNodeDataSchema,
-} from './resource-flow-companion-schemas';
-export {
-  MeteringStartNodeDataSchema,
-  MeteringCollectNodeDataSchema,
-  MeteringReadyNodeDataSchema,
-  MeteringReportNodeDataSchema,
-} from './resource-flow-metering-schemas';
-export { getNodeDataSchema } from './resource-flow-schema-registry';

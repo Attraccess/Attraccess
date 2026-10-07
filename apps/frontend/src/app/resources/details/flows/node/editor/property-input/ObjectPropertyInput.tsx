@@ -1,7 +1,7 @@
-import { PropertyInput } from './index';
 import { Button, Description, Input, TextField } from '@heroui/react';
 import { PlusIcon, XIcon } from 'lucide-react';
-import { PropertyViewProps } from './index.contracts';
+import { PropertyViewProps } from './index.property-view-props';
+import { PropertyInput } from './index';
 
 export function ObjectPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
   const {

@@ -129,5 +129,5 @@ export class QueuedModbusTransport implements ModbusTransport {
 }
 
 export { serialExchange } from './serial-exchange';
-export { ModbusTransport, SerialExchange } from './transport-contracts';
+export { type ModbusTransport, type SerialExchange } from './transport-contracts';
 export { ModbusTransportError } from './transport-errors';

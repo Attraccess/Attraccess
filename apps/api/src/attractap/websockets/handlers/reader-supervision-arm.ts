@@ -39,7 +39,7 @@ export abstract class ReaderSupervisionArmImplementation extends AttractapSuperv
     // between the socket check and the assignment would let two concurrent arms of the same reader
     // both pass and the second silently overwrite the first.
     for (const linkedResource of reader.resources ?? []) {
-      if (await this.resourceUsageService.getActiveSession(linkedResource.id, false)) {
+      if (await this.resourceUsageService.getActiveSession(linkedResource.id)) {
         throw new ConflictException('The selected reader has a session in progress');
       }
     }

@@ -1,3 +1,4 @@
+export { ResourceMeter } from './entities/resource-meter.entity';
 export {
   LifecycleBillingItem,
   ResourceUsageLifecycleAttempt,

@@ -1,32 +1,27 @@
-import { registerEmailServiceFixture } from './email.service.email-service.test-fixture';
-import { registerSendsUsernameChangedEmailWithResolvedVariablesCases } from './email.service.email-service.sends-username-changed-email-with-resolved-variables.test-cases';
-import { registerSendsVerificationEmailWithCorrectUrlCases } from './email.service.email-service.sends-verification-email-with-correct-url.test-cases';
-import { registerSendsPasswordResetEmailWithCorrectUrlCases } from './email.service.email-service.sends-password-reset-email-with-correct-url.test-cases';
-import { registerBubblesUpErrorsWhenSendingFailsCases } from './email.service.email-service.bubbles-up-errors-when-sending-fails.test-cases';
-import { registerSendsBillingTransactionSummaryEmailWithExpectedContextCases } from './email.service.email-service.sends-billing-transaction-summary-email-with-expected-context.test-cases';
-import { registerShippedUsageReceiptCases } from './email.service.email-service.shipped-usage-receipt.test-cases';
-import { registerSendsResourceTakeoverEmailWithExpectedContextCases } from './email.service.email-service.sends-resource-takeover-email-with-expected-context.test-cases';
-import { registerSendsAccessChangeEmailWithTitleBodyAndResolvedUrlCases } from './email.service.email-service.sends-access-change-email-with-title-body-and-resolved-url.test-cases';
-import { registerLoadsAFullRecipientBeforeSendingAccessChangeEmailForIdOnlyNotificationReCases } from './email.service.email-service.loads-a-full-recipient-before-sending-access-change-email-for-id-only-notification-re.test-cases';
-import { registerSendsResourceSessionEndedEmailWithResourceUrlAndActorContextCases } from './email.service.email-service.sends-resource-session-ended-email-with-resource-url-and-actor-context.test-cases';
-import { registerSendResourceHealthChangedEmailCases } from './email.service.email-service.send-resource-health-changed-email.test-cases';
-import { registerSendUserRetrainingEmailCases } from './email.service.email-service.send-user-retraining-email.test-cases';
-import { registerSendResourceUsageNoteEmailCases } from './email.service.email-service.send-resource-usage-note-email.test-cases';
-import { registerTHandlebarsHelperCases } from './email.service.email-service.t-handlebars-helper.test-cases';
+import { defineEmailServiceTests } from './email.service.spec.defineEmailServiceTests.test-fixture';
+import { defineShippedUsageReceiptTests } from './email.service.spec.defineShippedUsageReceiptTests.test-fixture';
+import { defineTHandlebarsHelperTests } from './email.service.spec.defineTHandlebarsHelperTests.test-fixture';
+import { defineSendResourceHealthChangedEmailTests } from './email.service.spec.defineSendResourceHealthChangedEmailTests.test-fixture';
+import { defineSendUserRetrainingEmailTests } from './email.service.spec.defineSendUserRetrainingEmailTests.test-fixture';
+import { defineSendResourceUsageNoteEmailTests } from './email.service.spec.defineSendResourceUsageNoteEmailTests.test-fixture';
+
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn(),
+}));
+
 describe('EmailService', () => {
-  const fixture = registerEmailServiceFixture();
-  registerSendsUsernameChangedEmailWithResolvedVariablesCases(fixture);
-  registerSendsVerificationEmailWithCorrectUrlCases(fixture);
-  registerSendsPasswordResetEmailWithCorrectUrlCases(fixture);
-  registerBubblesUpErrorsWhenSendingFailsCases(fixture);
-  registerSendsBillingTransactionSummaryEmailWithExpectedContextCases(fixture);
-  registerShippedUsageReceiptCases(fixture);
-  registerSendsResourceTakeoverEmailWithExpectedContextCases(fixture);
-  registerSendsAccessChangeEmailWithTitleBodyAndResolvedUrlCases(fixture);
-  registerLoadsAFullRecipientBeforeSendingAccessChangeEmailForIdOnlyNotificationReCases(fixture);
-  registerSendsResourceSessionEndedEmailWithResourceUrlAndActorContextCases(fixture);
-  registerSendResourceHealthChangedEmailCases(fixture);
-  registerSendUserRetrainingEmailCases(fixture);
-  registerSendResourceUsageNoteEmailCases(fixture);
-  registerTHandlebarsHelperCases(fixture);
+  defineEmailServiceTests();
 });
+export type EmailServiceTestScope = ReturnType<typeof defineEmailServiceTests>;
+export type ShippedUsageReceiptTestScope = ReturnType<typeof defineShippedUsageReceiptTests>;
+export type THandlebarsHelperTestScope = ReturnType<typeof defineTHandlebarsHelperTests>;
+export type SendResourceHealthChangedEmailTestScope = ReturnType<typeof defineSendResourceHealthChangedEmailTests>;
+export type SendUserRetrainingEmailTestScope = ReturnType<typeof defineSendUserRetrainingEmailTests>;
+export type SendResourceUsageNoteEmailTestScope = ReturnType<typeof defineSendResourceUsageNoteEmailTests>;
+
+export { defineEmailServiceTests } from './email.service.spec.defineEmailServiceTests.test-fixture';
+export { defineShippedUsageReceiptTests } from './email.service.spec.defineShippedUsageReceiptTests.test-fixture';
+export { defineTHandlebarsHelperTests } from './email.service.spec.defineTHandlebarsHelperTests.test-fixture';
+export { defineSendResourceHealthChangedEmailTests } from './email.service.spec.defineSendResourceHealthChangedEmailTests.test-fixture';
+export { defineSendUserRetrainingEmailTests } from './email.service.spec.defineSendUserRetrainingEmailTests.test-fixture';
+export { defineSendResourceUsageNoteEmailTests } from './email.service.spec.defineSendResourceUsageNoteEmailTests.test-fixture';

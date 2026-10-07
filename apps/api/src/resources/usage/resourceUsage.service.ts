@@ -2,7 +2,7 @@ import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Redis } from 'ioredis';
+import { Redis } from 'ioredis';
 import { Repository } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { BillingService } from '../../billing/billing.service';

@@ -4,13 +4,8 @@ import { isWellFormedXml } from './mjmlLayout';
 import { splitHead } from './mjmlLayout';
 import { wrapFragment } from './mjmlLayout';
 import grapesJSMJMLModule from 'grapesjs-mjml';
-export // GrapesJS canvases are unsandboxed iframes; script tags in mj-raw content
-// would execute in the editing admin's browser session. Strip them from the
-// canvas seed so the visual editor is safe regardless of template content.
-// Templates that rely on scripts must use the code editor tab.
-const SCRIPT_TAG_RE = /<script\b[^>]*>[\s\S]*?<\/script>/gi;
-
-export const stripScripts = (mjml: string) => mjml.replace(SCRIPT_TAG_RE, '');
+import { stripScripts } from './strip-preview-scripts';
+export { stripScripts } from './strip-preview-scripts';
 
 export // Pure analysis of the initial value, shared between the mount effect (parser
 // selection) and render (warning banners).

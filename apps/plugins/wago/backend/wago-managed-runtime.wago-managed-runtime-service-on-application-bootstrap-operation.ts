@@ -1,18 +1,13 @@
-import { WagoManagedAccess } from './wago-managed-access.entity';
-import { WagoRuntimeUpdateEntity } from './wago-managed-access.entity';
-import { WagoDeviceOperation } from './wago-managed-access.entity';
+import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './wago-managed-access.entity';
 import { WagoDeviceOperations } from './wago-device-operations';
-import { WagoRuntimeUpdateCoordinator } from './wago-runtime-update';
-import { RuntimeUpdateError } from './wago-runtime-update';
+import { WagoRuntimeUpdateCoordinator, RuntimeUpdateError } from './wago-runtime-update';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoController } from './wago-controller.entity';
-import { admitEnvelope } from './diagnostics-envelope';
-import { emptyStream } from './diagnostics-envelope';
+import { admitEnvelope, emptyStream } from './diagnostics-envelope';
 import { WagoManagedRuntimeServiceState } from './wago-managed-runtime.wago-managed-runtime-service-state';
 
-
 export abstract class WagoManagedRuntimeServiceOnApplicationBootstrapOperation extends WagoManagedRuntimeServiceState {
-  onApplicationBootstrap(): void {
+  public onApplicationBootstrap(): void {
     this.access = this.context.getRepository(WagoManagedAccess);
     this.updates = this.context.getRepository(WagoRuntimeUpdateEntity);
     this.sessions = this.context.getRepository(WagoCommissioningSession);
@@ -51,6 +46,7 @@ export abstract class WagoManagedRuntimeServiceOnApplicationBootstrapOperation e
         previous.runtimePolicyToken !== heartbeat.runtimePolicyToken ||
         previous.streamId !== heartbeat.streamId ||
         previous.imageId !== heartbeat.imageId ||
+        previous.runtimeVersion !== heartbeat.runtimeVersion ||
         heartbeat.receivedAt - previous.receivedAt > 90_000
       ) {
         this.wago.blockRuntime?.(id);

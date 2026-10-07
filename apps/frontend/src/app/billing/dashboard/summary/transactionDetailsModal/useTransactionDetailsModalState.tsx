@@ -1,3 +1,5 @@
+import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormatter';
+import { useCreditsFormatter } from '../../../../../hooks/useCreditsFormatter';
 import { useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
@@ -8,10 +10,9 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransaction,
 } from '@attraccess/react-query-client';
-import { useNumberFormatter } from '@attraccess/plugins-frontend-ui';
+import { toExactCredits } from '@attraccess/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { TransactionDetailsModalProps } from './index.transaction-details-modal-props';
-
 export function useTransactionDetailsModalState(props: TransactionDetailsModalProps) {
   const { children, transactionId, isOpen: isOpenProp, onClose: onCloseProp } = props;
 
@@ -48,7 +49,8 @@ export function useTransactionDetailsModalState(props: TransactionDetailsModalPr
     if (!isOpen) setUsageOpen(false);
   }, [isOpen]);
 
-  const formatNumber = useNumberFormatter();
+  const formatMeterValue = useMeterValueFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const statusColor = (status: BillingTransaction['status']) => {
     switch (status) {
@@ -64,9 +66,9 @@ export function useTransactionDetailsModalState(props: TransactionDetailsModalPr
   };
 
   const totalItemsAmount = useMemo(() => {
-    if (!transaction?.items) return 0;
+    if (!transaction?.items) return BigInt(0);
     const items = Array.isArray(transaction.items) ? transaction.items : [transaction.items];
-    return items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    return items.reduce((sum, item) => sum + toExactCredits(item.unitPrice) * toExactCredits(item.quantity), BigInt(0));
   }, [transaction]);
   return {
     children,
@@ -79,11 +81,11 @@ export function useTransactionDetailsModalState(props: TransactionDetailsModalPr
     transaction,
     error,
     refetch,
-    configuration,
     isUsageOpen,
     setUsageOpen,
-    formatNumber,
+    formatMeterValue,
+    formatCredits,
     statusColor,
     totalItemsAmount,
-  } as const;
+  };
 }

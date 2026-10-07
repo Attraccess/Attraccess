@@ -1,13 +1,13 @@
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
 import { isCc100HardwareProfile, type Cc100HardwareProfile } from '../shared/hardware-profile';
-import { quote } from "./wago-runtime-update-shell.quote";
+import { quote } from './wago-runtime-update-shell.quote';
 
-export /** These server-generated scripts are a separate state-preserving transaction.
+/** These server-generated scripts are a separate state-preserving transaction.
  * They are not the destructive commissioning delivery/recovery scripts. A future
  * qualified management helper must expose only these fixed operations, never a
  * management-account arbitrary sudo executor.
  */
-function preamble(token: string, profile: Cc100HardwareProfile, testRoot: string, helperParameters = false) {
+export function preamble(token: string, profile: Cc100HardwareProfile, testRoot: string, helperParameters = false) {
   if (!/^[a-f0-9]{32}$/.test(token) || !isCc100HardwareProfile(profile)) throw new Error('Invalid update ownership');
   if (testRoot && (!testRoot.startsWith('/') || testRoot === '/' || /[\n,]/.test(testRoot)))
     throw new Error('Invalid isolated root');

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { SummaryCard } from './index';
 const state = vi.hoisted(() => ({
   configuration: { currency: 'EUR', minorUnit: 2 } as { currency: string; minorUnit: number } | undefined,
@@ -22,6 +22,7 @@ const state = vi.hoisted(() => ({
   transactionsQuery: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
+  useTranslationState: () => ({ language: 'en' }),
   useTranslations: () => ({
     t: (
       key: string,
@@ -128,7 +129,7 @@ it('labels usage, manual, top-up, missing originals and nested refunds and opens
   const rows = screen.getAllByRole('row');
   expect(within(rows[1]).getByText('transactions.table.cells.details.resourceUsage')).toBeTruthy();
   expect(within(rows[2]).getByText('transactions.table.cells.details.manual')).toBeTruthy();
-  expect(within(rows[2]).getByText('+5.00')).toBeTruthy();
+  expect(within(rows[2]).getByText('+5')).toBeTruthy();
   expect(within(rows[3]).getByText('transactions.table.cells.details.sumup:topup')).toBeTruthy();
   expect(
     within(rows[5]).getByText(
@@ -142,4 +143,14 @@ it('labels usage, manual, top-up, missing originals and nested refunds and opens
   expect(screen.getByRole('button', { name: 'Details #1' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Details #1' }));
   expect(screen.queryByRole('button', { name: 'Details #1' })).toBeNull();
+});
+
+it('preserves every minor currency unit in settled transaction rows and balances', () => {
+  state.balance = Number.MAX_SAFE_INTEGER;
+  state.transactions = [
+    { id: 1, amount: -Number.MAX_SAFE_INTEGER, status: 'completed', createdAt: '2026-09-01', resourceUsageId: 5 },
+  ];
+  open();
+  expect(screen.getByText('EUR 90,071,992,547,409.91')).toBeTruthy();
+  expect(screen.getByText('-90,071,992,547,409.91')).toBeTruthy();
 });

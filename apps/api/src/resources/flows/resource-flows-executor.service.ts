@@ -1,66 +1,63 @@
-import {
-  BillingTransactionItem,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-} from '@attraccess/database-entities';
-import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import { ResourceFlowNode, ResourceFlowEdge, Resource, BillingTransactionItem } from '@attraccess/database-entities';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceFlowVariablesService } from './resource-flow-variables.service';
+import { FlowLogRecorderService } from './flow-log-recorder.service';
+import { MqttClientService } from '../../mqtt/mqtt-client.service';
+import { ResourceUsageService } from '../usage/resourceUsage.service';
+import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
-import { MqttClientService } from '../../mqtt/mqtt-client.service';
-import { ResourceHealthService } from '../health/resource-health.service';
 import { ResourceOperatingIntervalService } from '../operating-intervals/resource-operating-interval.service';
-import { ResourceUsageService } from '../usage/resourceUsage.service';
-import { FlowCompanionInputImplementation } from './flow-companion-input';
-import { FlowLogRecorderService } from './flow-log-recorder.service';
-import { NodeExecutor, TemplateVariables } from './node-executors';
-import { ResourceFlowVariablesService } from './resource-flow-variables.service';
+import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import { ResourceMeteringService } from '../metering/resource-metering.service';
+import { ResourceFlowsExecutorServicePressButtonOperation } from './resource-flows-executor.service.resource-flows-executor-service-press-button-operation';
 
 @Injectable()
-export class ResourceFlowsExecutorService extends FlowCompanionInputImplementation implements OnModuleInit {
-  protected readonly logger = new Logger(ResourceFlowsExecutorService.name);
-
-  protected readonly resourceActivity: Map<Resource['id'], Date> = new Map();
-  protected readonly heartbeatLastSeen: Map<string, Date> = new Map();
-  /** Preserve event lookup order without serializing the flow runs they launch. */
-  protected pluginFlowLookupQueue: Promise<void> = Promise.resolve();
-
-  protected readonly templateVariables = new WeakMap<object, TemplateVariables>();
-
-  /**
-   * Registry mapping every flow node type to its executor strategy. Declaring it
-   * as a `Record` keyed by the enum keeps node-type coverage exhaustive at
-   * compile time (a missing type is a type error).
-   */
-  protected readonly nodeExecutors: Record<ResourceFlowNodeType, NodeExecutor>;
-
+export class ResourceFlowsExecutorService
+  extends ResourceFlowsExecutorServicePressButtonOperation
+  implements OnModuleInit
+{
   constructor(
     @InjectRepository(ResourceFlowNode)
-    protected readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    flowNodeRepository: Repository<ResourceFlowNode>,
     @InjectRepository(ResourceFlowEdge)
-    protected readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
+    flowEdgeRepository: Repository<ResourceFlowEdge>,
     @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    protected readonly flowLogs: FlowLogRecorderService,
-    protected readonly mqttClientService: MqttClientService,
+    resourceRepository: Repository<Resource>,
+    flowLogs: FlowLogRecorderService,
+    mqttClientService: MqttClientService,
     @Inject(forwardRef(() => ResourceUsageService))
-    protected readonly resourceUsageService: ResourceUsageService,
+    resourceUsageService: ResourceUsageService,
     @InjectRepository(BillingTransactionItem)
-    protected readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
-    protected readonly eventEmitter: EventEmitter2,
-    protected readonly resourceHealthService: ResourceHealthService,
-    protected readonly variablesService: ResourceFlowVariablesService,
-    protected readonly cronTimer: CronTimer,
-    protected readonly flowTimer: FlowTimer,
-    protected readonly companionGatewayService: CompanionGatewayService,
-    protected readonly operatingIntervals: ResourceOperatingIntervalService,
+    billingTransactionItemRepository: Repository<BillingTransactionItem>,
+    eventEmitter: EventEmitter2,
+    resourceHealthService: ResourceHealthService,
+    variablesService: ResourceFlowVariablesService,
+    cronTimer: CronTimer,
+    flowTimer: FlowTimer,
+    companionGatewayService: CompanionGatewayService,
+    operatingIntervals: ResourceOperatingIntervalService,
+    @Inject(forwardRef(() => ResourceMeteringService)) metering: ResourceMeteringService,
   ) {
-    super();
-    this.nodeExecutors = this.buildNodeExecutorRegistry();
+    super(
+      flowNodeRepository,
+      flowEdgeRepository,
+      resourceRepository,
+      flowLogs,
+      mqttClientService,
+      resourceUsageService,
+      billingTransactionItemRepository,
+      eventEmitter,
+      resourceHealthService,
+      variablesService,
+      cronTimer,
+      flowTimer,
+      companionGatewayService,
+      operatingIntervals,
+      metering,
+    );
   }
 }

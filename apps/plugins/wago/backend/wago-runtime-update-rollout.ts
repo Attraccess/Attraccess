@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { BuildRuntimeArtifact } from './wago-build-runtime';
+import { BuildRuntimeArtifact } from './wago-build-runtime';
 import { RuntimeUpdateInspection, RuntimeUpdateRecord } from './wago-runtime-update-contracts';
 import { CURRENT_RECHECK_MS } from './wago-runtime-update.current-recheck-ms';
 import { RuntimeUpdateError } from './wago-runtime-update.errors';
@@ -52,6 +52,7 @@ export abstract class RuntimeUpdateRollout extends RuntimeUpdateLease {
       await persist(record);
       await this.host.accept(controllerId, record.token, operation.signal);
       record.phase = 'current';
+      record.currentImageId = desired.imageId;
       record.attempt = 0;
       record.retryAt = this.now() + CURRENT_RECHECK_MS;
       await persist(record);

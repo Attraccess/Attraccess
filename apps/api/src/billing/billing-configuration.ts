@@ -61,7 +61,7 @@ export abstract class BillingConfigurationImplementation extends BillingServiceR
     };
   }
 
-  async getResourceBillingConfiguration(
+  public async getResourceBillingConfiguration(
     resourceId: number,
     transactionManager?: EntityManager,
   ): Promise<ResourceBillingConfiguration> {
@@ -76,14 +76,13 @@ export abstract class BillingConfigurationImplementation extends BillingServiceR
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-        creditsPerKwh: 0,
       });
       configuration = await repository.save(configuration);
     }
     return configuration;
   }
 
-  async updateResourceBillingConfiguration(
+  public async updateResourceBillingConfiguration(
     resourceId: number,
     data: UpdateResourceBillingConfigurationDto,
   ): Promise<ResourceBillingConfiguration> {
@@ -133,19 +132,6 @@ export abstract class BillingConfigurationImplementation extends BillingServiceR
       throw new BadRequestException(
         'Credits per operating minute must be an integer (multiply by currency minor unit)',
       );
-    }
-
-    if (data.creditsPerKwh === null) {
-      data.creditsPerKwh = 0;
-    }
-    if (data.creditsPerKwh !== undefined) {
-      if (data.creditsPerKwh < 0) {
-        throw new BadRequestException('Credits per kWh cannot be negative');
-      }
-      if (data.creditsPerKwh % 1 !== 0) {
-        throw new BadRequestException('Credits per kWh must be an integer (multiply by currency minor unit)');
-      }
-      configuration.creditsPerKwh = data.creditsPerKwh;
     }
 
     const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);

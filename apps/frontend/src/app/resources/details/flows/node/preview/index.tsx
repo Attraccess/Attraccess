@@ -1,24 +1,33 @@
 import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { TFunction, useTranslationState } from '@attraccess/plugins-frontend-ui';
-import { ResourceFlowNodeType, ResourceFlowsService } from '@attraccess/react-query-client';
+import {
+  ResourceFlowNodeType,
+  ResourceFlowsService,
+  useResourceMeteringServiceListResourceMeters,
+} from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Props } from './index.contracts';
-import type { NodePreviewEntryField } from './index.contracts';
-import type { NodePreviewRow } from './index.contracts';
-import { NodePreviewData } from './index.contracts';
-import { PreviewNode } from './index.contracts';
-import { PreviewBuilder } from './index.contracts';
-import { basicPreviewBuilders } from './basicPreviewBuilders';
-import { outputPreviewBuilders } from './outputPreviewBuilders';
-import { statePreviewBuilders } from './statePreviewBuilders';
+import { Props } from './index.props';
+import { NodePreviewEntryField } from './index.node-preview-entry-field';
+import { NodePreviewRow } from './index.node-preview-row';
+import { NodePreviewData } from './index.node-preview-data';
+import { PreviewNode } from './index.preview-node';
+import { PreviewBuilder } from './index.preview-builder';
+import { previewBuilderGroup0 } from './previewBuilderGroup0';
+import { previewBuilderGroup1 } from './previewBuilderGroup1';
+import { previewBuilderGroup2 } from './previewBuilderGroup2';
+import { previewBuilderGroup3 } from './previewBuilderGroup3';
 
 export function useNodePreviewRows(props: Props): NodePreviewData {
   const { tNodeTranslations: t, schema, resourceId } = props;
   const locale = useTranslationState((state) => state.language);
   const nodeId = useNodeId();
   const nodeData = useNodesData(nodeId as string);
+  const isMeterNode = schema.type.includes('.resource.metering.');
+  const { data: meters } = useResourceMeteringServiceListResourceMeters({ resourceId: resourceId ?? 0 }, undefined, {
+    enabled: isMeterNode && !!resourceId,
+  });
   const resolvePreview = Boolean(
     nodeId &&
     nodeData &&
@@ -54,20 +63,27 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         { label: t('preview.configuration'), value: t(resolved.isError ? 'preview.unavailable' : 'preview.loading') },
       ];
     }
-    return getNodePreviewRows(
+    const rows = getNodePreviewRows(
       schema.type,
       t,
       nodeData,
       resolvePreview ? resolved.data?.configSchema : schema.configSchema,
       locale,
     );
-  }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError, locale]);
+    if (isMeterNode)
+      rows.unshift({
+        label: t('nodes.' + schema.type + '.config.meterId.label'),
+        value: meters?.find((meter) => meter.id === nodeData?.data.meterId)?.name ?? '-',
+      });
+    return rows;
+  }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError, locale, isMeterNode, meters]);
 }
 
 const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
-  ...basicPreviewBuilders,
-  ...outputPreviewBuilders,
-  ...statePreviewBuilders,
+  ...previewBuilderGroup0,
+  ...previewBuilderGroup1,
+  ...previewBuilderGroup2,
+  ...previewBuilderGroup3,
 };
 
 export function getNodePreviewRows(
@@ -102,6 +118,6 @@ export function getNodePreviewRows(
   return previewBuilders[type as ResourceFlowNodeType](t, nodeData);
 }
 
-export { type NodePreviewEntryField };
-export { type NodePreviewRow };
-export { type NodePreviewData } from './index.contracts';
+export { type NodePreviewEntryField } from './index.node-preview-entry-field';
+export { type NodePreviewRow } from './index.node-preview-row';
+export { type NodePreviewData } from './index.node-preview-data';

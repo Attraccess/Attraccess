@@ -11,6 +11,8 @@ import { EntityManager, IsNull } from 'typeorm';
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 import { ResourceUsageLifecycleAbortedEvent } from './events/resource-usage.events';
 import { UsageLifecycleFlowImplementation } from './usage-lifecycle-flow';
+import { recoverOrphanedUsages } from '../../database/resource-usage-integrity';
+
 export abstract class UsageLifecycleDraftsImplementation extends UsageLifecycleFlowImplementation {
   protected async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
     for (const submission of attempt.formSubmissions) {
@@ -102,8 +104,11 @@ export abstract class UsageLifecycleDraftsImplementation extends UsageLifecycleF
   }
 
   /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
-  async recoverInterruptedLifecycles(): Promise<void> {
+  public async recoverInterruptedLifecycles(): Promise<void> {
     const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const recovered = await recoverOrphanedUsages(manager);
+      if (recovered)
+        this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
       const attempts = await manager.find(ResourceUsageLifecycleAttempt);
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {

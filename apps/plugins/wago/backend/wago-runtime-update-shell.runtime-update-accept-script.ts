@@ -1,5 +1,5 @@
 import { type Cc100HardwareProfile } from '../shared/hardware-profile';
-import { preamble } from "./wago-runtime-update-shell.preamble";
+import { preamble } from './wago-runtime-update-shell.preamble';
 
 export function runtimeUpdateAcceptScript(
   token: string,

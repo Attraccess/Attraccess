@@ -228,6 +228,22 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
 
+  grafana-contactpoints-cleanup:
+    image: node:24.19.0-alpine
+    restart: 'no'
+    entrypoint: ['node', '/src/cleanup-legacy-pushover.mjs']
+    environment:
+      - GRAFANA_URL=http://grafana:3001
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-attraccess}
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+    depends_on:
+      grafana:
+        condition: service_started
+    volumes:
+      - ./monitoring/grafana:/src:ro
+
 volumes:
   authentik-database:
     driver: local

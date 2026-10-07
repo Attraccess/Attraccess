@@ -1,11 +1,9 @@
-import {
-  wagoHardwareDeploymentPreflightScript
-} from './wago-hardware-deployment';
+import { wagoHardwareDeploymentPreflightScript } from './wago-hardware-deployment';
 import { wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 import { type Cc100HardwareProfile } from '../shared/hardware-profile';
-import { imageIdPattern } from "./wago-runtime-update-shell.image-id-pattern";
-import { quote } from "./wago-runtime-update-shell.quote";
-import { preamble } from "./wago-runtime-update-shell.preamble";
+import { imageIdPattern } from './wago-runtime-update-shell.image-id-pattern';
+import { quote } from './wago-runtime-update-shell.quote';
+import { preamble } from './wago-runtime-update-shell.preamble';
 
 export function runtimeUpdateRollbackScript(
   token: string,

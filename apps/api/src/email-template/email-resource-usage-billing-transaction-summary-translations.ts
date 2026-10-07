@@ -106,8 +106,8 @@ export const resourceUsageBillingTransactionSummaryTranslations: ShippedTranslat
   {
     templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
     locale: 'de',
-    key: 'item_energy',
-    value: 'Energie',
+    key: 'meter_unavailable',
+    value: 'Endwert nicht verfügbar; keine Zählergebühr enthalten.',
   },
   {
     templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
@@ -132,5 +132,11 @@ export const resourceUsageBillingTransactionSummaryTranslations: ShippedTranslat
     locale: 'de',
     key: 'col_rate',
     value: 'Preis',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'quantity_unavailable',
+    value: 'Nicht verfügbar',
   },
 ];

@@ -6,7 +6,7 @@ import en from './en.json';
 import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, Trash2Icon, XIcon } from 'lucide-react';
-import type { NfcCardTableCellProps } from './index.contracts';
+import { NfcCardTableCellProps } from './index.nfc-card-table-cell-props';
 
 export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   const { t } = useTranslations({

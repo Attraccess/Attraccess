@@ -57,6 +57,7 @@ export abstract class WagoServiceOnHeartbeatOperation extends WagoServiceOnDisco
     ) {
       this.runtimeStatusHandler?.(controller.id, {
         imageId: heartbeat.runtimeImageId ?? '',
+        runtimeVersion: heartbeat.runtimeVersion,
         streamId: rawHeartbeat.streamId,
         timestamp: Date.parse(rawHeartbeat.timestamp),
         receivedAt: Date.now(),

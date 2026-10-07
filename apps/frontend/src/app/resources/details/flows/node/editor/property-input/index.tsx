@@ -1,19 +1,16 @@
 import { useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
 import { Description, Input, Label, TextArea, TextField } from '@heroui/react';
 import { CompanionDeviceSelect } from '../../../../../../../components/companionDeviceSelect';
-
 import { useCallback, useMemo } from 'react';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
-
-import type { Property } from './index.contracts';
-import { EnumValue } from './index.contracts';
-import { Props } from './index.contracts';
-
-import { propertyDescription } from './index.property-description.helpers';
-import { StringPropertyInput } from './index.property-description.helpers';
-import { NumberPropertyInput } from './index.boolean-property-input.helpers';
-import { BooleanPropertyInput } from './index.boolean-property-input.helpers';
-import { MqttPropertyInput } from './index.boolean-property-input.helpers';
+import { Property } from './index.property';
+import { EnumValue } from './index.enum-value';
+import { Props } from './index.props';
+import { propertyDescription } from './index.property-description';
+import { StringPropertyInput } from './index.string-property-input';
+import { NumberPropertyInput } from './index.number-property-input';
+import { BooleanPropertyInput } from './index.boolean-property-input';
+import { MqttPropertyInput } from './index.mqtt-property-input';
 import { ObjectPropertyInput } from './ObjectPropertyInput';
 import { ArrayPropertyInput } from './ArrayPropertyInput';
 
@@ -122,4 +119,4 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
   throw new Error('Unsupported property type: ' + schema.type);
 }
 
-export { type Property };
+export { type Property } from './index.property';

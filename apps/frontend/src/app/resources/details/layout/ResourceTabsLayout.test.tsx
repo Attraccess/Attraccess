@@ -1,12 +1,13 @@
-import type { ComponentProps } from 'react';
+import { ComponentProps } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceTabsLayout } from './ResourceTabsLayout';
 import { createMockResource } from '../../../../test-utils/fixtures';
-import type { ResourceQrCode } from '../qrcode';
+import { ResourceQrCode } from '../qrcode';
 const state = vi.hoisted(() => ({
   update: true,
+  canDelete: true,
   resource: undefined as unknown,
   loading: false,
   error: undefined as Error | undefined,
@@ -19,7 +20,8 @@ const state = vi.hoisted(() => ({
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 1 },
-    hasPermission: (permission: string) => state.update && permission === 'resources.update',
+    hasPermission: (permission: string) =>
+      (state.update && permission === 'resources.update') || (state.canDelete && permission === 'resources.delete'),
   }),
 }));
 vi.mock('../../../../components/toastProvider', () => ({
@@ -42,6 +44,7 @@ vi.mock('../qrcode', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   state.update = true;
+  state.canDelete = true;
   state.resource = createMockResource({ id: 7, name: 'Printer' });
   state.loading = false;
   state.error = undefined;
@@ -103,10 +106,25 @@ it('navigates to settings, opens QR actions and confirms resource deletion with 
 });
 it('limits ordinary viewers to overview and history and hides management actions', () => {
   state.update = false;
+  state.canDelete = false;
   state.resource = createMockResource({ id: 7, name: 'Printer', imageFilename: null });
   mount();
   expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'History']);
   expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
+});
+it('hides deletion from an editor without delete permission', async () => {
+  state.canDelete = false;
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  expect(await screen.findByRole('menuitem', { name: 'Settings' })).toBeTruthy();
+  expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull();
+});
+it('shows deletion to a user with delete permission without exposing settings', async () => {
+  state.update = false;
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  expect(await screen.findByRole('menuitem', { name: 'Delete' })).toBeTruthy();
+  expect(screen.queryByRole('menuitem', { name: 'Settings' })).toBeNull();
 });
 it('redirects invalid ids and offers recovery from missing resources', () => {
   let view = mount('/resources/invalid');

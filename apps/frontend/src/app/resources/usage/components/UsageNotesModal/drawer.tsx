@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Alert, DrawerBody, DrawerHeader, Button, Spinner } from '@heroui/react';
+import { Alert, DrawerBody, DrawerHeader, DrawerHeading, Button, Spinner } from '@heroui/react';
 import { ResourceUsageAction } from '@attraccess/react-query-client';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
@@ -10,10 +10,10 @@ import { X } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { UsageNotesDrawerProps } from './drawer.contracts';
-import { NotesField } from './drawer.helpers';
-import { hasRenderableFormSubmissions } from './drawer.helpers';
-import { renderFormSubmissions } from './drawer.helpers';
+import { UsageNotesDrawerProps } from './drawer.usage-notes-drawer-props';
+import { NotesField } from './drawer.notes-field';
+import { hasRenderableFormSubmissions } from './drawer.has-renderable-form-submissions';
+import { renderFormSubmissions } from './drawer.render-form-submissions';
 export const UsageNotesDrawer = memo(
   ({
     isOpen,
@@ -57,7 +57,7 @@ export const UsageNotesDrawer = memo(
         <DrawerHeader>
           <div className="flex w-full items-start justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-semibold">{t('sessionNotes')}</h2>
+              <DrawerHeading className="text-lg font-semibold">{t('sessionNotes')}</DrawerHeading>
               {session && (
                 <div className="text-xs text-default-500 space-y-0.5">
                   <p>
@@ -188,4 +188,4 @@ export const UsageNotesDrawer = memo(
 );
 
 UsageNotesDrawer.displayName = 'UsageNotesDrawer';
-export { type UsageNotesDrawerProps } from './drawer.contracts';
+export { type UsageNotesDrawerProps } from './drawer.usage-notes-drawer-props';

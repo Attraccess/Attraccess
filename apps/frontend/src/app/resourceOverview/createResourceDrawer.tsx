@@ -4,6 +4,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   FieldError,
   Input,
   Label,
@@ -102,7 +103,7 @@ export function CreateResourceDrawer({
       }}
     >
       <DrawerHeader>
-        <h2 className="text-lg font-semibold">{t('title')}</h2>
+        <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
       </DrawerHeader>
       <DrawerBody className="flex flex-col gap-6">
         <TextField
@@ -137,7 +138,9 @@ export function CreateResourceDrawer({
             selectionMode="single"
             disallowEmptySelection
             selectedKeys={[type]}
-            onSelectionChange={(keys) => setType(keys.has(ResourceType.DOOR) ? ResourceType.DOOR : ResourceType.MACHINE)}
+            onSelectionChange={(keys) =>
+              setType(keys.has(ResourceType.DOOR) ? ResourceType.DOOR : ResourceType.MACHINE)
+            }
             isDisabled={createResource.isPending}
             fullWidth
             isDetached
@@ -145,10 +148,7 @@ export function CreateResourceDrawer({
             {([ResourceType.MACHINE, ResourceType.DOOR] as const).map((option) => {
               const Icon = option === ResourceType.MACHINE ? Shapes : DoorOpen;
               return (
-                <ToggleButton
-                  key={option}
-                  id={option}
-                >
+                <ToggleButton key={option} id={option}>
                   <Icon size={20} />
                   {t(option === ResourceType.MACHINE ? 'machine' : 'door')}
                 </ToggleButton>

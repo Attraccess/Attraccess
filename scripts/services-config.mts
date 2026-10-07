@@ -13,7 +13,7 @@ export const SETS: Record<string, string[]> = {
   'webhook-site': ['webhook-site'],
   rabbitmq: ['rabbitmq'],
   zigbee2mqtt: ['zigbee2mqtt'],
-  monitoring: ['prometheus', 'grafana'],
+  monitoring: ['prometheus', 'grafana', 'grafana-contactpoints-cleanup'],
 };
 
 export const DEFAULT_SETS = ['mailpit'];

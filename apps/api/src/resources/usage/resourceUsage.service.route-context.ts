@@ -10,7 +10,7 @@ import {
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { Redis } from 'ioredis';
+import { Redis } from 'ioredis';
 import { EntityManager, Repository } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { BillingService } from '../../billing/billing.service';
@@ -31,7 +31,7 @@ import { ResourceOperatingAttributionService } from '../operating-intervals/reso
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
-import type { ResourceUsageService } from './resourceUsage.service';
+import { ResourceUsageService } from './resourceUsage.service';
 import { EndSessionOptions, StartSessionOptions } from './resourceUsage.service.feature-definitions';
 import { UsageFlowPayload } from './usage-flow-payload';
 
@@ -135,7 +135,6 @@ export abstract class ResourceUsageServiceRouteContext {
   ): Promise<void>;
   public abstract getActiveSession(
     resourceId: number,
-    onlyFinalized: boolean,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceUsage | null>;
   protected abstract readonly billingService: BillingService;

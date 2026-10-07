@@ -1,4 +1,4 @@
-import { DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { Button } from '../../../../components/button';
 import { StandardDrawer } from '../../../../components/standardDrawer';
 import de from './de.json';
@@ -30,7 +30,7 @@ export function NfcCardActivateModal(props: Props) {
 
   const { mutate, isPending } = useAttractapServiceToggleCardActive({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetAllCardsKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetAllCardsKeyFn({}, []) });
       close();
     },
   });
@@ -47,7 +47,7 @@ export function NfcCardActivateModal(props: Props) {
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen} dialogProps={{ 'aria-label': t('title') }}>
         <div data-cy="nfc-card-activate-modal" className="contents">
           <DrawerHeader>
-            <h2 className="text-lg font-semibold">{t('title')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
           </DrawerHeader>
           <DrawerBody>{t('description')}</DrawerBody>
           <DrawerFooter>

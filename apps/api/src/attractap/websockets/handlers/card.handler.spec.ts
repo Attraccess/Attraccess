@@ -1,24 +1,20 @@
-import { registerFixture0 } from './card.handler.attractap-card-handler.test-fixture';
-import { registerCases0_0 } from './card.handler.attractap-card-handler.start-enroll-of-new-nfc-card.test-cases';
-import { registerCases0_1 } from './card.handler.attractap-card-handler.does-not-clear-a-newer-enrollment-when-the-previous-send-fails-late.behaviors.test-cases';
-import { registerCases0_2 } from './card.handler.attractap-card-handler.does-not-clear-a-newer-enrollment-when-the-previous-send-fails-late.behaviors.test-cases';
-import { registerCases0_3 } from './card.handler.attractap-card-handler.on-enroll-new-card-request-nfckey.test-cases';
-import { registerCases0_4 } from './card.handler.attractap-card-handler.on-enroll-new-card.test-cases';
-import { registerCases0_5 } from './card.handler.attractap-card-handler.does-not-clear-a-newer-enrollment-when-the-previous-send-fails-late.behaviors.test-cases';
-import { registerCases0_6 } from './card.handler.attractap-card-handler.does-not-clear-a-newer-enrollment-when-the-previous-send-fails-late.behaviors.test-cases';
-import { registerCases0_7 } from './card.handler.attractap-card-handler.does-not-clear-a-newer-enrollment-when-the-previous-send-fails-late.behaviors.test-cases';
-import { registerCases0_8 } from './card.handler.attractap-card-handler.start-reset-of-nfc-card.test-cases';
-import { registerCases0_9 } from './card.handler.attractap-card-handler.handle-card-authentication-request.test-cases';
+import { defineAttractapCardHandlerTests } from './card.handler.spec.define-attractap-card-handler-tests';
 describe('AttractapCardHandler', () => {
-  const fixture = registerFixture0();
-  registerCases0_0(fixture);
-  registerCases0_1(fixture);
-  registerCases0_2(fixture);
-  registerCases0_3(fixture);
-  registerCases0_4(fixture);
-  registerCases0_5(fixture);
-  registerCases0_6(fixture);
-  registerCases0_7(fixture);
-  registerCases0_8(fixture);
-  registerCases0_9(fixture);
+  defineAttractapCardHandlerTests();
 });
+export {
+  defineAttractapCardHandlerTests,
+  AttractapCardHandlerTestScope,
+  defineHandleCardAuthenticationRequestTests,
+  defineOnEnrollNewCardTests,
+  defineStartResetOfNfcCardTests,
+  defineOnEnrollNewCardRequestNfckeyTests,
+  defineOnResetNfcCardTests,
+  defineStartEnrollOfNewNfcCardTests,
+} from './card.handler.spec.define-attractap-card-handler-tests';
+export { HandleCardAuthenticationRequestTestScope } from './card.handler.spec.handle-card-authentication-request-test-scope';
+export { OnEnrollNewCardTestScope } from './card.handler.spec.on-enroll-new-card-test-scope';
+export { StartResetOfNfcCardTestScope } from './card.handler.spec.start-reset-of-nfc-card-test-scope';
+export { OnEnrollNewCardRequestNfckeyTestScope } from './card.handler.spec.on-enroll-new-card-request-nfckey-test-scope';
+export { OnResetNfcCardTestScope } from './card.handler.spec.on-reset-nfc-card-test-scope';
+export { StartEnrollOfNewNfcCardTestScope } from './card.handler.spec.start-enroll-of-new-nfc-card-test-scope';

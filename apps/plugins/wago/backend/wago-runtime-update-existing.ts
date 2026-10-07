@@ -12,16 +12,17 @@ export abstract class RuntimeUpdateExisting extends RuntimeUpdateRollout {
     assertOwned: () => void,
     persist: (record: RuntimeUpdateRecord) => Promise<void>,
     attempt: number,
+    targetImageId: string,
   ): Promise<'settled'> {
     // Read-only proof permits the existing boot, but requires a recent
     // permanent heartbeat and matching readiness. No restart or staging.
     const since = record.startedAt;
     try {
-      const proof = await this.host.verify(controllerId, null, desired.imageId, since, operation.signal);
+      const proof = await this.host.verify(controllerId, null, targetImageId, since, operation.signal);
       if (
         !proof.permanent ||
         !proof.ready ||
-        proof.imageId !== desired.imageId ||
+        proof.imageId !== targetImageId ||
         !Number.isSafeInteger(proof.observedAt) ||
         proof.observedAt <= since ||
         proof.observedAt > this.now()
@@ -37,6 +38,7 @@ export abstract class RuntimeUpdateExisting extends RuntimeUpdateRollout {
       return 'settled';
     }
     record.phase = 'current';
+    record.currentImageId = targetImageId;
     record.attempt = 0;
     record.retryAt = this.now() + CURRENT_RECHECK_MS;
     await persist(record);

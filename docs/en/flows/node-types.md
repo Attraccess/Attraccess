@@ -125,24 +125,25 @@ Select a **Companion device** and optional decimal **Vendor ID / Product ID** fi
 
 ### Metering Start
 
-Type: `input.resource.metering.start` · Machines · Billing
+Type: `input.resource.metering.start` · Machines
 
-Runs to prepare the meter before a billed session starts or is taken over. **Timeout (seconds)** is 1–600, default **30**. The branch must reach **Metering Ready** or the session does not start.
+Select a predefined **Meter**, or create one with a name. Prepares that meter before a tracked session starts or is taken over. **Timeout (seconds)** is 1–600, default **30**. The branch must reach **Metering Ready**. A priced meter that cannot initialize prevents the session from starting.
 
-Payload contains `metering: { sessionId, operationId, resourceId, usageId, kind, requestedAt }`, with `kind: "start"`. Example: read a lifetime counter with HTTP, then submit its baseline. See [Energy Metering](flows/energy-metering.md).
+Payload contains `metering: { sessionId, meterId, operationId, resourceId, usageId, kind, requestedAt }`, with `kind: "start"`. Example: read a lifetime counter with HTTP, then submit its baseline. See [Meters](flows/energy-metering.md).
 
 ### Metering Collection
 
-Type: `input.resource.metering.collect` · Machines · Billing
+Type: `input.resource.metering.collect` · Machines
 
-| Setting                         | Range / default                               |
-| ------------------------------- | --------------------------------------------- |
-| **Timeout (seconds)**           | 1–600 / **30**                                |
-| **Interim interval (minutes)**  | 0–1440 / **1**; `0` disables interim readings |
-| **Final attempts**              | 1–10 / **3**                                  |
-| **Final retry delay (seconds)** | 0–120 / **5**                                 |
+| Setting | Range / default |
+| --- | --- |
+| **Meter** | Select a predefined meter, or create one |
+| **Timeout (seconds)** | 1–600 / **30** |
+| **Interim interval (minutes)** | 0–1440 / **1**; `0` disables periodic readings |
+| **Final attempts** | 1–10 / **3** |
+| **Final retry delay (seconds)** | 0–120 / **5** |
 
-Runs for live interim readings and final readings at session end. Payload has the same metering fields as **Metering Start**, with `kind: "interim"` or `"final"`. The branch must reach **Report Energy**. Interim readings are never billed. See [Energy Metering](flows/energy-metering.md) for freshness and pending charges.
+Runs for periodic readings, including while idle, and final readings at session end. Payload has the same metering fields as **Metering Start**, with `kind: "interim"` or `"final"`. While idle, `sessionId` and `usageId` are null. Connect the branch to **Report Meter** for the same meter. Periodic readings update lifetime and active-session totals; only session consumption is billed. See [Meters](flows/energy-metering.md) for freshness and pending charges.
 
 ## Processing Nodes
 
@@ -358,36 +359,38 @@ Select a literal **Companion device**. Sends an unlock-screen command and saves 
 
 ### Metering Ready
 
-Type: `output.resource.metering.ready` · Machines · Billing
+Type: `output.resource.metering.ready` · Machines
 
-| Setting                            | Description                                                               |
-| ---------------------------------- | ------------------------------------------------------------------------- |
-| **Baseline value / Baseline unit** | Optional templates for a lifetime counter's current total and energy unit |
-| **Source**                         | Optional template naming the physical meter                               |
+| Setting | Description |
+| --- | --- |
+| **Meter** | Select the meter matching the start request |
+| **Baseline value** | Optional template for a cumulative counter's current total |
+| **Source** | Optional template naming the physical meter |
 
-Completes a **Metering Start** operation. Fails outside a start branch. Leave the baseline empty for resettable counters; a configured baseline that renders empty fails. The catalog exposes no outgoing connection.
+Completes a **Metering Start** operation. Fails outside a start branch. Leave the baseline empty after resetting the source to zero; a configured baseline that renders empty fails. The catalog exposes no outgoing connection.
 
-Example after HTTP returning `{"energy_wh":1500}`: baseline `{{energy_wh}}`, unit `Wh`. See [Energy Metering](flows/energy-metering.md).
+Example after HTTP returning `{"counter":1500}`: baseline `{{counter}}`. No unit is required. See [Meters](flows/energy-metering.md).
 
-### Report Energy
+### Report Meter
 
-Type: `output.resource.metering.report` · Machines · Billing
+Type: `output.resource.metering.report`
 
-| Setting         | Description                                                                                              |
-| --------------- | -------------------------------------------------------------------------------------------------------- |
-| **Value**       | Required template for total energy since metering start, or current lifetime total when using a baseline |
-| **Unit**        | Required template: `Wh`, `kWh`, `MWh`, `mWh`, `J`, `kJ`, `MJ`, or supported long-form energy unit        |
-| **Observed at** | Optional ISO timestamp template; defaults to reporting time                                              |
-| **Source**      | Optional template naming the meter                                                                       |
+| Setting | Description |
+| --- | --- |
+| **Meter** | Select a predefined meter, or create one with a name |
+| **Mode** | **total** for a cumulative counter; **increment** for an increase |
+| **Value** | Required non-negative numeric value or template |
+| **Observed at** | Optional ISO timestamp template; defaults to reporting time |
+| **Source** | Optional template naming the meter |
 
-Completes a **Metering Collection** operation; fails outside a collection branch. Reports energy, not power or an increment. Power units (`W`, `kW`, etc.) are rejected. A configured observed-at template that renders empty fails; final readings must be fresh. The catalog exposes no outgoing connection.
+Reports values in collection branches and ordinary flows, including outside sessions. A reply in a collection branch must match the requested meter. No unit is required. The first unsolicited cumulative reading establishes a baseline; subsequent increases update lifetime consumption. Increments directly increase consumption. During an active session, accepted increases also update that session's total. A configured observed-at template that renders empty fails; final readings must be fresh. The catalog exposes no outgoing connection.
 
-Example after **Wait for MQTT Message** returning `{"energy_wh":1500}` in its content: value `{{payload.energy_wh}}`, unit `Wh`. See [Energy Metering](flows/energy-metering.md) for baselines, units and retries.
+Example after **Wait for MQTT Message** returning `{"heartbeats":1500}` in its content: choose **Heartbeats**, mode **total**, value `{{payload.heartbeats}}`. See [Meters](flows/energy-metering.md) for baselines and retries.
 
 ## See Also
 
 - [Payloads, Variables & Templates](flows/payloads-variables-templates.md) — Data paths and worked examples
 - [Flow Editor](flows/flow-editor.md) — Place and connect nodes
 - [MQTT & IoT](devices/mqtt/overview.md) — Configure MQTT servers
-- [Energy Metering](flows/energy-metering.md) — Bill electricity per kWh
+- [Meters](flows/energy-metering.md) — Record and bill arbitrary consumption
 - [Billing](billing/overview.md) — Billing system details

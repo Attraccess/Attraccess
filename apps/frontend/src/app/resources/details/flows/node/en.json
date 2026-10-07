@@ -62,34 +62,46 @@
         "metering": {
           "start": {
             "title": "Metering start",
-            "description": "Runs when a billed session begins. Reset or read the meter here, then connect Metering ready.",
-            "outputs": { "output": "Output" },
+            "description": "Runs when a session starts. Prepare the selected meter, then acknowledge with Metering ready.",
+            "outputs": {
+              "output": "Output"
+            },
             "config": {
               "timeoutSeconds": {
                 "label": "Timeout (seconds)",
-                "helpText": "Maximum time to wait for Metering ready. A session that cannot start its meter does not start."
+                "helpText": "Maximum time to wait for Metering ready. Billed meters must acknowledge before the session starts. Failed zero-rate meters are skipped and the session can still start."
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
               }
             }
           },
           "collect": {
             "title": "Metering collection",
-            "description": "Runs to read the meter: periodically for the live value and once when a session ends for the final bill. Connect Report energy.",
-            "outputs": { "output": "Output" },
+            "description": "Read the selected meter periodically, including outside sessions, and once at session end.",
+            "outputs": {
+              "output": "Output"
+            },
             "config": {
               "timeoutSeconds": {
                 "label": "Timeout (seconds)",
-                "helpText": "Maximum time to wait for Report energy."
+                "helpText": "Maximum time to wait for Report meter."
               },
               "interimIntervalMinutes": {
                 "label": "Interim interval (minutes)",
-                "helpText": "How often the running session's meter value is refreshed. Live readings are shown but never billed. 0 disables them."
+                "helpText": "Minutes between readings, including outside sessions. 0 disables periodic collection."
               },
               "finalAttempts": {
                 "label": "Final attempts",
-                "helpText": "Attempts to obtain a fresh final total when a session ends before the energy charge is left pending."
+                "helpText": "Attempts to obtain a fresh final total when a session ends before the meter charge is left pending."
               },
               "finalRetryDelaySeconds": {
                 "label": "Final retry delay (seconds)"
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
               }
             }
           }
@@ -706,20 +718,22 @@
         "metering": {
           "ready": {
             "title": "Metering ready",
-            "description": "Confirms the meter is initialized. Sessions only start once this is reached.",
-            "inputs": { "input": "Input" },
+            "description": "Confirms the meter is initialized. Billed meters require this acknowledgement before the session starts. Failed zero-rate meters are skipped and the session can still start.",
+            "inputs": {
+              "input": "Input"
+            },
             "config": {
               "baselineValue": {
                 "label": "Baseline value",
                 "helpText": "Only for meters that cannot be reset: the counter's current total (templates allowed). Consumption is counted from it. Leave empty when the meter was reset."
               },
-              "baselineUnit": {
-                "label": "Baseline unit",
-                "helpText": "Energy unit of the counter reading, e.g. kWh or Wh."
-              },
               "source": {
                 "label": "Source",
                 "helpText": "Optional name of the physical meter (templates allowed)."
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
               }
             },
             "preview": {
@@ -728,17 +742,15 @@
             }
           },
           "report": {
-            "title": "Report energy",
-            "description": "Reports the total energy consumed since Metering start. Not power, not an increment.",
-            "inputs": { "input": "Input" },
+            "title": "Report meter",
+            "description": "Report a cumulative counter value or add an increment. Works with or without a running session.",
+            "inputs": {
+              "input": "Input"
+            },
             "config": {
               "value": {
                 "label": "Value",
-                "helpText": "Templates allowed, e.g. {{reading.total}}. Must be energy (Wh, kWh, ...), never a power sample."
-              },
-              "unit": {
-                "label": "Unit",
-                "helpText": "Wh, kWh, MWh, mWh, J, kJ or MJ (templates allowed). Power units such as W or kW are rejected."
+                "helpText": "Non-negative numeric value (templates allowed). No unit conversion."
               },
               "observedAt": {
                 "label": "Observed at",
@@ -747,11 +759,20 @@
               "source": {
                 "label": "Source",
                 "helpText": "Optional name of the physical meter (templates allowed)."
+              },
+              "meterId": {
+                "label": "Meter",
+                "helpText": "Choose a named meter on this resource."
+              },
+              "mode": {
+                "enum": { "total": "Cumulative total", "increment": "Increment" },
+                "label": "Reporting mode",
+                "helpText": "total: cumulative reading; increment: add this amount."
               }
             },
             "preview": {
               "value": "Value",
-              "unit": "Unit"
+              "mode": "Reporting mode"
             }
           }
         },

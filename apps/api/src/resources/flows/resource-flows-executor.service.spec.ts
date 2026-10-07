@@ -1,82 +1,25 @@
-import { registerResourceFlowsExecutorServiceRunFlowFixture } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.test-fixture';
-import { registerSubscribesValidMqttTriggersAndWaitsPreservingQoSAndToleratingAFailedSubsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.subscribes-valid-mqtt-triggers-and-waits-preserving-qo-s-and-tolerating-a-failed-subs.test-cases';
-import { registerMatchesCompanionUsbSFiltersBeforeStartingFlowsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.matches-companion-usb-s-filters-before-starting-flows.test-cases';
-import { registerAllowsFlowButtonsOnlyForTheActiveSessionOwnerAndRejectsMissingButtonsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.allows-flow-buttons-only-for-the-active-session-owner-and-rejects-missing-buttons.test-cases';
-import { registerRecordsUsefulDescriptionsForPluginErrorsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.records-useful-descriptions-for-plugin-errors.test-cases';
-import { registerPreservesAnExternalEffectFailureWhenAnotherBranchRejectsFirstCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.preserves-an-external-effect-failure-when-another-branch-rejects-first.test-cases';
-import { registerRecordsTheSameExecutionIdentityOnOperatingTransitionsAndFlowLogsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.records-the-same-execution-identity-on-operating-transitions-and-flow-logs.test-cases';
-import { registerRoutesAMeteringStartAndCollectionBranchToTheReplyChannelOfItsOperationCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.routes-a-metering-start-and-collection-branch-to-the-reply-channel-of-its-operation.test-cases';
-import { registerCarriesLifecycleStagingIdentityThroughDownstreamFlowNodesCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.carries-lifecycle-staging-identity-through-downstream-flow-nodes.test-cases';
-import { registerReturnsEmptyArrayWhenNoTriggerNodesAreFoundCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.returns-empty-array-when-no-trigger-nodes-are-found.test-cases';
-import { registerStartsEveryMatchingPluginTriggerWhileIsolatingMatcherFailuresCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.starts-every-matching-plugin-trigger-while-isolating-matcher-failures.test-cases';
-import { registerPagesPluginTriggerNodesAndLimitsConcurrentFlowRunsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.pages-plugin-trigger-nodes-and-limits-concurrent-flow-runs.test-cases';
-import { registerEvaluatesConcurrentPluginTriggersInOrderWithoutWaitingForEarlierFlowRunsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.evaluates-concurrent-plugin-triggers-in-order-without-waiting-for-earlier-flow-runs.test-cases';
-import { registerRejectsAPluginAttemptingToTriggerANodeOwnedByAnotherPluginCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.rejects-a-plugin-attempting-to-trigger-a-node-owned-by-another-plugin.test-cases';
-import { registerRejectsAPluginTriggerTypeThatCollidesWithABuiltInFlowNodeCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.rejects-a-plugin-trigger-type-that-collides-with-a-built-in-flow-node.test-cases';
-import { registerContinuesStartingMatchingPluginFlowsAfterAFlowFailsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.continues-starting-matching-plugin-flows-after-a-flow-fails.test-cases';
-import { registerReturnsInitialDataWhenASingleInputNodeHasNoOutgoingEdgesTerminalCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.returns-initial-data-when-a-single-input-node-has-no-outgoing-edges-terminal.test-cases';
-import { registerHandlesASimpleLinearPathAndReturnsTheLastNodePayloadCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.handles-a-simple-linear-path-and-returns-the-last-node-payload.test-cases';
-import { registerUsesResourceMetadataInTemplatedMqttTopicsCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.uses-resource-metadata-in-templated-mqtt-topics.test-cases';
-import { registerEvaluatesIfNodesUsingResourceMetadataInPayloadCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.evaluates-if-nodes-using-resource-metadata-in-payload.test-cases';
-import { registerFanOutsWhenANodeHasMultipleOutgoingEdgesWithTheSameHandleAndReturnsAllCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.fan-outs-when-a-node-has-multiple-outgoing-edges-with-the-same-handle-and-returns-all.test-cases';
-import { registerRoutesAnExternalEffectFailureThroughItsFailureOutputCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.routes-an-external-effect-failure-through-its-failure-output.test-cases';
-import { registerRoutesALoggedExternalEffectFailureThroughItsNormalOutputCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.routes-a-logged-external-effect-failure-through-its-normal-output.test-cases';
-import { registerPreservesTheLegacyFlowFailureBehaviorWhenNoPolicyWasSavedCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.preserves-the-legacy-flow-failure-behavior-when-no-policy-was-saved.test-cases';
-import { registerWaitsForStartedSiblingSBeforeRejectingAFlowCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.waits-for-started-sibling-s-before-rejecting-a-flow.test-cases';
-import { registerPreservesNoPolicyExternalEffectFailuresForTheSLifecycleFlowCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.preserves-no-policy-external-effect-failures-for-the-s-lifecycle-flow.test-cases';
-import { registerPropagatesAnExternalEffectFailureWhenConfiguredToFailTheFlowCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.propagates-an-external-effect-failure-when-configured-to-fail-the-flow.test-cases';
-import { registerEndsTheActiveUsageSessionWithTemplatedNotesAndPassesPayloadThroughCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.ends-the-active-usage-session-with-templated-notes-and-passes-payload-through.test-cases';
-import { registerPropagatesExplicitTerminationFailuresFromTheSLifecycleFlowCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.propagates-explicit-termination-failures-from-the-s-lifecycle-flow.test-cases';
-import { registerUpdatesResourceActivityWhenTrackActivityNodeExecutesAndPassesPayloadThrougCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.updates-resource-activity-when-track-activity-node-executes-and-passes-payload-throug.test-cases';
-import { registerTriggersInactivityFlowWhenResourceExceedsConfiguredInactivityMinutesCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.triggers-inactivity-flow-when-resource-exceeds-configured-inactivity-minutes.test-cases';
-import { registerHealthNodesCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.health-nodes.test-cases';
-import { registerArithmeticTemplatesCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.arithmetic-templates.test-cases';
-import { registerVariableNodesCases } from './resource-flows-executor.service.resource-flows-executor-service-run-flow.variable-nodes.test-cases';
-import { registerResourceFlowsExecutorServiceMqttFixture } from './resource-flows-executor.service.resource-flows-executor-service-mqtt.test-fixture';
-import { registerMatchesInputMqttMessageReceivedNodesUsingWildcardsCases } from './resource-flows-executor.service.resource-flows-executor-service-mqtt.matches-input-mqtt-message-received-nodes-using-wildcards.test-cases';
-import { registerProcessingMqttWaitForMessageResolvesWithTopicPayloadBeforeTimeoutCases } from './resource-flows-executor.service.resource-flows-executor-service-mqtt.processing-mqtt-wait-for-message-resolves-with-topic-payload-before-timeout.test-cases';
-import { registerProcessingMqttWaitForMessageTimesOutAndThrowsErrorCases } from './resource-flows-executor.service.resource-flows-executor-service-mqtt.processing-mqtt-wait-for-message-times-out-and-throws-error.test-cases';
-import { registerRecordsMqttContextWhenPublishingRejectsWithoutAnErrorMessageCases } from './resource-flows-executor.service.resource-flows-executor-service-mqtt.records-mqtt-context-when-publishing-rejects-without-an-error-message.test-cases';
+import { defineResourceFlowsExecutorServiceRunFlowTests } from './resource-flows-executor.service.spec.define-resource-flows-executor-service-run-flow-tests';
+import { defineResourceFlowsExecutorServiceMqttTests } from './resource-flows-executor.service.spec.define-resource-flows-executor-service-mqtt-tests';
+jest.mock('axios');
+
+// Minimal edge shape for our mocks
+// Helper to create a node
 describe('ResourceFlowsExecutorService.runFlow', () => {
-  const fixture = registerResourceFlowsExecutorServiceRunFlowFixture();
-  registerSubscribesValidMqttTriggersAndWaitsPreservingQoSAndToleratingAFailedSubsCases(fixture);
-  registerMatchesCompanionUsbSFiltersBeforeStartingFlowsCases(fixture);
-  registerAllowsFlowButtonsOnlyForTheActiveSessionOwnerAndRejectsMissingButtonsCases(fixture);
-  registerRecordsUsefulDescriptionsForPluginErrorsCases(fixture);
-  registerPreservesAnExternalEffectFailureWhenAnotherBranchRejectsFirstCases(fixture);
-  registerRecordsTheSameExecutionIdentityOnOperatingTransitionsAndFlowLogsCases(fixture);
-  registerRoutesAMeteringStartAndCollectionBranchToTheReplyChannelOfItsOperationCases(fixture);
-  registerCarriesLifecycleStagingIdentityThroughDownstreamFlowNodesCases(fixture);
-  registerReturnsEmptyArrayWhenNoTriggerNodesAreFoundCases(fixture);
-  registerStartsEveryMatchingPluginTriggerWhileIsolatingMatcherFailuresCases(fixture);
-  registerPagesPluginTriggerNodesAndLimitsConcurrentFlowRunsCases(fixture);
-  registerEvaluatesConcurrentPluginTriggersInOrderWithoutWaitingForEarlierFlowRunsCases(fixture);
-  registerRejectsAPluginAttemptingToTriggerANodeOwnedByAnotherPluginCases(fixture);
-  registerRejectsAPluginTriggerTypeThatCollidesWithABuiltInFlowNodeCases(fixture);
-  registerContinuesStartingMatchingPluginFlowsAfterAFlowFailsCases(fixture);
-  registerReturnsInitialDataWhenASingleInputNodeHasNoOutgoingEdgesTerminalCases(fixture);
-  registerHandlesASimpleLinearPathAndReturnsTheLastNodePayloadCases(fixture);
-  registerUsesResourceMetadataInTemplatedMqttTopicsCases(fixture);
-  registerEvaluatesIfNodesUsingResourceMetadataInPayloadCases(fixture);
-  registerFanOutsWhenANodeHasMultipleOutgoingEdgesWithTheSameHandleAndReturnsAllCases(fixture);
-  registerRoutesAnExternalEffectFailureThroughItsFailureOutputCases(fixture);
-  registerRoutesALoggedExternalEffectFailureThroughItsNormalOutputCases(fixture);
-  registerPreservesTheLegacyFlowFailureBehaviorWhenNoPolicyWasSavedCases(fixture);
-  registerWaitsForStartedSiblingSBeforeRejectingAFlowCases(fixture);
-  registerPreservesNoPolicyExternalEffectFailuresForTheSLifecycleFlowCases(fixture);
-  registerPropagatesAnExternalEffectFailureWhenConfiguredToFailTheFlowCases(fixture);
-  registerEndsTheActiveUsageSessionWithTemplatedNotesAndPassesPayloadThroughCases(fixture);
-  registerPropagatesExplicitTerminationFailuresFromTheSLifecycleFlowCases(fixture);
-  registerUpdatesResourceActivityWhenTrackActivityNodeExecutesAndPassesPayloadThrougCases(fixture);
-  registerTriggersInactivityFlowWhenResourceExceedsConfiguredInactivityMinutesCases(fixture);
-  registerHealthNodesCases(fixture);
-  registerArithmeticTemplatesCases(fixture);
-  registerVariableNodesCases(fixture);
+  defineResourceFlowsExecutorServiceRunFlowTests();
 });
+
 describe('ResourceFlowsExecutorService MQTT', () => {
-  const fixture = registerResourceFlowsExecutorServiceMqttFixture();
-  registerMatchesInputMqttMessageReceivedNodesUsingWildcardsCases(fixture);
-  registerProcessingMqttWaitForMessageResolvesWithTopicPayloadBeforeTimeoutCases(fixture);
-  registerProcessingMqttWaitForMessageTimesOutAndThrowsErrorCases(fixture);
-  registerRecordsMqttContextWhenPublishingRejectsWithoutAnErrorMessageCases(fixture);
+  defineResourceFlowsExecutorServiceMqttTests();
 });
+export {
+  defineResourceFlowsExecutorServiceRunFlowTests,
+  ResourceFlowsExecutorServiceRunFlowTestScope,
+  defineHealthNodesTests,
+  defineVariableNodesTests,
+  defineArithmeticTemplatesTests,
+} from './resource-flows-executor.service.spec.define-resource-flows-executor-service-run-flow-tests';
+export { HealthNodesTestScope } from './resource-flows-executor.service.spec.health-nodes-test-scope';
+export { defineResourceFlowsExecutorServiceMqttTests } from './resource-flows-executor.service.spec.define-resource-flows-executor-service-mqtt-tests';
+export { ResourceFlowsExecutorServiceMqttTestScope } from './resource-flows-executor.service.spec.resource-flows-executor-service-mqtt-test-scope';
+export { VariableNodesTestScope } from './resource-flows-executor.service.spec.variable-nodes-test-scope';
+export { ArithmeticTemplatesTestScope } from './resource-flows-executor.service.spec.arithmetic-templates-test-scope';

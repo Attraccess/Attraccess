@@ -1,5 +1,5 @@
 import { ConflictException, Inject } from '@nestjs/common';
-import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
+import { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoController } from './wago-controller.entity';
 import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
@@ -48,6 +48,7 @@ export abstract class WagoServiceState extends WagoServiceConnectivityContract {
         id: number,
         heartbeat: {
           imageId: string;
+          runtimeVersion?: string;
           streamId: string;
           timestamp: number;
           receivedAt: number;
