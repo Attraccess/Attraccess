@@ -322,6 +322,50 @@ describe('WAGO shared live queries', () => {
 });
 
 describe('WAGO REST settlement ordering', () => {
+  it.each([false, true])(
+    'retains the latest snapshot when unavailable interleaves with a REST commit (reconnect=%s)',
+    async (reconnect) => {
+      let resolve!: (value: unknown) => void;
+      const pending = new Promise((done) => {
+        resolve = done;
+      });
+      const { hook, queryClient, queryKey, consumers } = setup(reconnect ? undefined : () => pending);
+      if (reconnect) {
+        await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+        await act(async () => {
+          consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 6 } }));
+        });
+        const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+        if (!query) throw new Error('Missing live query');
+        await act(async () => {
+          void query.fetch({ ...query.options, queryFn: () => pending });
+        });
+      }
+      await waitFor(() => expect(consumers.size).toBe(2));
+      let updatedAt: number | undefined;
+      await act(async () => {
+        resolve({ revision: 7 });
+        await Promise.resolve();
+        consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 8 } }));
+        updatedAt = queryClient.getQueryState(queryKey)?.dataUpdatedAt;
+        // The older REST result commits before the snapshot's deferred restoration.
+        await Promise.resolve();
+        consumers.forEach((consumer) => consumer.update({ eventType: 'unavailable' }));
+      });
+      await waitFor(() => expect(hook.result.current.isError).toBe(true));
+      expect(hook.result.current.data).toEqual({ revision: 8 });
+      expect(queryClient.getQueryState(queryKey)?.dataUpdatedAt).toBe(updatedAt);
+      expect(queryClient.getQueryState(queryKey)?.fetchStatus).toBe('idle');
+      await act(async () => {
+        consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 9 } }));
+      });
+      await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+      expect(hook.result.current.data).toEqual({ revision: 9 });
+      hook.unmount();
+      queryClient.clear();
+    },
+  );
+
   it.each(['snapshot', 'unavailable'] as const)(
     'preserves %s between retryer settlement and cache commit',
     async (eventType) => {
