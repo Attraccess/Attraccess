@@ -6,6 +6,9 @@ import { defineTakeoverTests } from './resource-metering.persistence.spec.define
 import { defineOperationsTests } from './resource-metering.persistence.spec.defineOperationsTests.test-fixture';
 import { defineMeterDefinitionTests } from './resource-metering.persistence.spec.defineMeterDefinitionTests.test-fixture';
 
+// This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
+jest.setTimeout(30_000);
+
 describe('Flow-defined metering', () => {
   defineFlowDefinedMeteringTests();
 });
