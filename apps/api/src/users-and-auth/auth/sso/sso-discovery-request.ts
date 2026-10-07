@@ -32,16 +32,16 @@ export function discoveryUrl(host: string, path: string): URL {
   }
 }
 
-// Validation is performed in the socket's lookup callback. The exact checked
-// answer is used for the connection, so DNS rebinding cannot trigger a second,
-// unchecked resolution. Disable address-family racing to use this single answer.
-export const discoveryLookup: LookupFunction = (hostname, _options, callback) => {
+// Validate every answer before returning the exact list to the socket. Node can
+// try alternate addresses without a second, unchecked DNS resolution.
+export const discoveryLookup: LookupFunction = (hostname, options, callback) => {
   dns.lookup(hostname, { all: true, verbatim: true }).then(
     (answers) => {
       try {
         if (!answers.length) throw new Error('Discovery host has no addresses');
         answers.forEach(({ address }) => assertDiscoveryAddress(address));
-        callback(null, answers[0].address, answers[0].family);
+        if (options.all) callback(null, answers);
+        else callback(null, answers[0].address, answers[0].family);
       } catch (error) {
         callback(error as Error, '', 0);
       }
@@ -53,11 +53,11 @@ export const discoveryLookup: LookupFunction = (hostname, _options, callback) =>
 export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024 * 1024): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const get = url.protocol === 'https:' ? httpsGet : httpGet;
-    // HTTP forwards this socket option, but the workspace's Node typings omit
-    // it from RequestOptions. Keep the single-address lookup contract explicit.
-    const options: RequestOptions & { autoSelectFamily: false } = {
+    // HTTP forwards this socket option, but RequestOptions omits it. Enable
+    // fallback across the validated list while retaining one request deadline.
+    const options: RequestOptions & { autoSelectFamily: true } = {
       agent: false,
-      autoSelectFamily: false,
+      autoSelectFamily: true,
       lookup: discoveryLookup,
       signal: AbortSignal.timeout(timeoutMs),
       headers: { Accept: 'application/json' },

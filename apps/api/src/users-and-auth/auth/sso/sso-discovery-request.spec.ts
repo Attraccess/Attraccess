@@ -100,8 +100,22 @@ describe('SSO discovery HTTP boundaries', () => {
     expect(paths).toEqual(['/discovery']);
   });
 
+  it.each([
+    { address: '::1', family: 6 },
+    { address: '127.0.0.2', family: 4 },
+  ])('falls back from an unreachable validated address: $address', async (unreachable) => {
+    const lookup = jest.spyOn(dns, 'lookup').mockResolvedValueOnce([unreachable, { address: '127.0.0.1', family: 4 }]);
+    const url = discoveryUrl(origin.replace('127.0.0.1', 'idp.example'), '/discovery');
+    await expect(requestDiscoveryJson(url)).resolves.toEqual({ issuer: 'http://local-idp' });
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(paths).toEqual(['/discovery']);
+  });
+
   it('rejects metadata DNS results before connecting', async () => {
-    jest.spyOn(dns, 'lookup').mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
+    jest.spyOn(dns, 'lookup').mockResolvedValue([
+      { address: '127.0.0.1', family: 4 },
+      { address: '169.254.169.254', family: 4 },
+    ]);
     const url = discoveryUrl(origin.replace('127.0.0.1', 'idp.example'), '/discovery');
     await expect(requestDiscoveryJson(url)).rejects.toThrow('Invalid discovery destination');
     expect(paths).toEqual([]);
