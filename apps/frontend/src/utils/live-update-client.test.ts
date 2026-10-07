@@ -63,6 +63,61 @@ describe('bundled live client', () => {
     vi.restoreAllMocks();
   });
 
+  it.each([false, true])(
+    'keeps new topics unavailable until replacement readiness (previously ready: %s)',
+    async (ready) => {
+      client.subscribe({ topic: 'billing' }, vi.fn());
+      await flush();
+      if (ready) {
+        streams[0].send({ type: 'ready' });
+        await flush();
+      }
+      streams[0].end();
+      await flush();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(streams).toHaveLength(2);
+      const subscription = { topic: 'plugin:wago:diagnostics', identifier: '2' } as const;
+      const unavailable = vi.fn();
+      const update = vi.fn();
+      client.subscribe(subscription, update, undefined, unavailable);
+      await flush();
+      expect(unavailable).toHaveBeenCalledTimes(1);
+      // A second failed attempt is still the same outage.
+      streams[1].end();
+      await flush();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(unavailable).toHaveBeenCalledTimes(1);
+      streams[2].send({ type: 'ready' });
+      await flush();
+      expect(controls.at(-1)?.subscriptions).toEqual([{ topic: 'billing' }, subscription]);
+      const healthy = vi.fn();
+      client.subscribe({ ...subscription, identifier: '3' }, vi.fn(), undefined, healthy);
+      await flush();
+      expect(healthy).not.toHaveBeenCalled();
+      streams[2].send({ type: 'event', event: { ...subscription, eventType: 'snapshot', payload: { value: 8 } } });
+      await flush();
+      expect(update).toHaveBeenCalledWith({ value: 8 });
+      streams[2].end();
+      await flush();
+      expect(unavailable).toHaveBeenCalledTimes(2);
+      expect(healthy).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('clears outage state after final unsubscribe before a new connection', async () => {
+    const remove = client.subscribe({ topic: 'billing' }, vi.fn());
+    await flush();
+    streams[0].end();
+    await flush();
+    remove();
+    await flush();
+    const unavailable = vi.fn();
+    client.subscribe({ topic: 'plugin:wago:diagnostics', identifier: '2' }, vi.fn(), undefined, unavailable);
+    await flush();
+    expect(streams).toHaveLength(2);
+    expect(unavailable).not.toHaveBeenCalled();
+  });
+
   it('reports rejection only to matching consumers, including late subscribers', async () => {
     const diagnostics = { topic: 'plugin:wago:diagnostics', identifier: '1' } as const;
     const first = vi.fn();

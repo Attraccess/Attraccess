@@ -41,6 +41,7 @@ export class LiveUpdateClient {
   private failures = 0;
   private disposed = false;
   private connected = false;
+  private interrupted = false;
   private reconciliationPending = false;
   private readonly visibilityChange = () => {
     const transport = this.transport;
@@ -66,7 +67,7 @@ export class LiveUpdateClient {
     let entry = this.topics.get(key);
     const isNewTopic = !entry?.consumers.size;
     if (!entry) {
-      entry = { subscription, consumers: new Set(), unavailable: !!this.retry };
+      entry = { subscription, consumers: new Set(), unavailable: this.interrupted };
       this.topics.set(key, entry);
     }
     const consumer = { update, restore, unavailable, hasResourceState: false };
@@ -248,6 +249,7 @@ export class LiveUpdateClient {
           transport.ready = true;
           await this.sync(transport);
           if (!this.isCurrent(transport)) return;
+          this.interrupted = false;
           if (this.connected) {
             this.invoke(this.recovered);
             this.topics.forEach((entry) => entry.consumers.forEach((c) => this.invoke(c.restore)));
@@ -274,6 +276,8 @@ export class LiveUpdateClient {
     if (this.transport !== transport) return;
     this.stopTransport();
     if (!this.disposed && this.hasConsumers()) {
+      // Keep outage state through backoff and replacement-stream startup.
+      this.interrupted = true;
       this.topics.forEach((entry) => this.markUnavailable(entry));
       if (this.disposed || !this.hasConsumers()) return;
       const delay = Math.min(30_000, 500 * 2 ** Math.min(this.failures++, 6)) * (0.75 + Math.random() * 0.25);
@@ -354,6 +358,7 @@ export class LiveUpdateClient {
     this.retry = undefined;
     this.stopTransport();
     this.failures = 0;
+    this.interrupted = false;
   }
 
   private expire(): void {
