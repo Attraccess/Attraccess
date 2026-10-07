@@ -9,7 +9,7 @@ import {
   UseUsersServiceGetCurrentKeyFn,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useQueryClient } from '@tanstack/react-query';
 import { type SystemPermission } from '@attraccess/shared';
 
 interface LoginCredentials {
@@ -18,6 +18,8 @@ interface LoginCredentials {
   twoFactorCode?: string;
   tokenLocation: 'cookie' | 'body';
 }
+
+const logoutMutationKey = ['end-session'];
 
 export function useLogin() {
   const queryClient = useQueryClient();
@@ -51,6 +53,9 @@ export function useLogin() {
 export function useAuth() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  // All hook instances must ignore the old session while its cookie is
+  // still valid on the server, including late current-user responses.
+  const isLoggingOut = useIsMutating({ mutationKey: logoutMutationKey }) > 0;
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -74,11 +79,12 @@ export function useAuth() {
 
   // Check authentication status by trying to fetch current user
   // This will work with cookies automatically
-  const { data: currentUser } = useUsersServiceGetCurrent(undefined, {
+  const { data: fetchedUser } = useUsersServiceGetCurrent(undefined, {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     retry: false,
-    enabled: isInitialized, // Only fetch when initialized
+    enabled: isInitialized && !isLoggingOut,
   });
+  const currentUser = isLoggingOut ? null : fetchedUser;
 
   const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } =
     useTwoFactorAuthenticationServiceGetTwoFactorStatus(undefined, {
@@ -86,6 +92,7 @@ export function useAuth() {
     });
 
   const { mutate: deleteSession } = useAuthenticationServiceEndSession({
+    mutationKey: logoutMutationKey,
     onSuccess: async () => {
       navigate('/', { replace: true });
       window.location.reload();
