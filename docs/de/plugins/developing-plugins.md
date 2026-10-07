@@ -295,3 +295,5 @@ behält sie bei Abmelden/Anmelden im selben React-Batch. Plugin-Ereignisse werde
 lokal nicht erneut zugestellt.
 Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
 beschreibt auch Wiederverbindung und Freigabe von Abonnements.
+Die [WAGO-Abfrageintervalle](../../development/live-updates.md#wago-sampling-schedule)
+listen die gemeinsamen Backend-Intervalle für alle neun WAGO-Themen auf.

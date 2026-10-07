@@ -841,3 +841,5 @@ and retains the stream across same-batch cleanup/setup. Plugin event payloads
 have no local replay.
 See [Plugin live updates](../../development/live-updates.md#plugin-live-updates)
 for the contract and examples, including reconnection and cleanup.
+The [WAGO sampling schedule](../../development/live-updates.md#wago-sampling-schedule)
+lists the shared backend intervals for all nine WAGO topics.

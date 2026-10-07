@@ -217,7 +217,7 @@ configuration baseline/revisions, runtime/managed-access and network-change
 status now receive snapshots through these topics. Shelly firmware progress also
 uses the shared stream. Initial reads and mutations remain REST. Since these
 device/status services have no push completion signal, backend adapters sample
-them at their existing intervals (diagnostics use the front panel's two seconds),
+them at their existing intervals, listed below for WAGO,
 sharing one sampler per active topic/identifier across tabs and stopping it when
 the last subscriber leaves. Slow reads do not overlap; transient failures allow
 later recovery. WAGO preserves the REST routes' permission requirements.
@@ -227,3 +227,20 @@ each browser. A later shared snapshot clears the error and restores success.
 Shelly firmware credentials remain server-side for at most five minutes after an
 update command and are never serialized in events or subscription controls. Its
 frontend timeout still ends progress when the device or connection is offline.
+
+### WAGO sampling schedule
+
+These intervals apply to each active topic/identifier's shared backend sampler
+in `WagoLiveUpdatesService`, rather than to a separate poll in each browser.
+
+| Topic                        | Interval   |
+| ---------------------------- | ---------- |
+| `controllers`                | 10 seconds |
+| `commissioning-sessions`     | 2 seconds  |
+| `diagnostics`                | 2 seconds  |
+| `configuration-baseline`     | 2 seconds  |
+| `configuration-revisions`    | 2 seconds  |
+| `commissioning-verification` | 5 seconds  |
+| `runtime-update`             | 5 seconds  |
+| `managed-access`             | 5 seconds  |
+| `network-change`             | 2 seconds  |

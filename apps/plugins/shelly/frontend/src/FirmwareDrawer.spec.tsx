@@ -177,6 +177,7 @@ describe('FirmwareDrawer live install progress', () => {
       { topic: 'plugin:shelly:firmware', identifier: '1' },
       expect.any(Function),
       expect.any(Function),
+      expect.any(Function),
     );
     await act(async () => {
       callbacks.forEach((callback) =>
