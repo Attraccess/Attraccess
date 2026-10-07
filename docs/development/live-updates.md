@@ -224,6 +224,16 @@ later recovery. WAGO preserves the REST routes' permission requirements.
 Unavailable samples retain the last cached snapshot and mark its query as errored
 so the UI shows that status is unavailable. They do not trigger a REST read in
 each browser. A later shared snapshot clears the error and restores success.
+
+On the WAGO configuration page, a diagnostics-only outage retains the front-panel
+cards and disables live controls. A configuration-baseline outage instead hides
+the panel and displays “Could not load controller configuration.” Cached data is
+still retained. A transport interruption marks both topics unavailable, including
+while the replacement stream is waiting for readiness, so that reconnect state
+shows the configuration load alert rather than retained cards. Visual checks
+should capture this actual state; use a diagnostics-only unavailable event to
+check retained cards and disabled controls separately.
+
 Shelly firmware credentials remain server-side for at most five minutes after an
 update command and are never serialized in events or subscription controls. Its
 frontend timeout still ends progress when the device or connection is offline.
