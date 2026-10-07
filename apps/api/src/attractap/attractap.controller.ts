@@ -1,100 +1,46 @@
+import { Attractap, Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import {
+  Body,
+  ClassSerializerInterceptor,
   Controller,
+  Delete,
   Get,
   Inject,
+  Logger,
+  NotFoundException,
   Param,
   ParseIntPipe,
-  Post,
-  Req,
   Patch,
-  Body,
-  NotFoundException,
-  Logger,
-  ClassSerializerInterceptor,
+  Req,
   UseInterceptors,
-  Delete,
-  StreamableFile,
 } from '@nestjs/common';
-import { AttractapGateway } from './websockets/websocket.gateway';
-import { AuthenticatedRequest, Auth, Attractap } from '@attraccess/plugins-backend-sdk';
-import { ApiOperation, ApiResponse, ApiParam, ApiTags, ApiBody, ApiProduces } from '@nestjs/swagger';
-import { WebsocketService } from './websockets/websocket.service';
-import { AttractapService } from './attractap.service';
-import { EnrollNfcCardDto } from './dtos/enroll-rfid-card.dto';
-import { ResetNfcCardDto } from './dtos/reset-rfid-card.dto';
-import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
-import { EnrollNfcCardResponseDto } from './dtos/enroll-rfid-card-response.dto';
-import { ResetNfcCardResponseDto } from './dtos/reset-rfid-card-response.dto';
-import { UpdateReaderDto } from './dtos/update-reader.dto';
-import { AttractapCrashReportDto } from './dtos/crash-report.dto';
-import { RequiresLicense } from '../license/require-license.decorator';
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LicenseModuleType } from '../license/license.service';
+import { RequiresLicense } from '../license/require-license.decorator';
+import { AttractapCrashReportRoutes } from './attractap-crash-report.routes';
+import { AttractapService } from './attractap.service';
+import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
+import { UpdateReaderDto } from './dtos/update-reader.dto';
+import { AttractapGateway } from './websockets/websocket.gateway';
+import { WebsocketService } from './websockets/websocket.service';
+import { installInheritedMethods } from '../common/inherited-implementation';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
 @UseInterceptors(ClassSerializerInterceptor)
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
-export class AttractapController {
-  private readonly logger = new Logger(AttractapController.name);
+export class AttractapController extends AttractapCrashReportRoutes {
+  protected readonly logger = new Logger(AttractapController.name);
 
   public constructor(
     @Inject(AttractapGateway)
-    private readonly attractapGateway: AttractapGateway,
+    protected readonly attractapGateway: AttractapGateway,
     @Inject(WebsocketService)
-    private readonly websocketService: WebsocketService,
+    protected readonly websocketService: WebsocketService,
     @Inject(AttractapService)
-    private readonly attractapService: AttractapService,
-  ) {}
-
-  @Post('enroll-nfc-card')
-  @Auth()
-  @ApiOperation({ summary: 'Enroll a new NFC card', operationId: 'enrollNfcCard' })
-  @ApiBody({ type: EnrollNfcCardDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Enrollment initiated, continue on Reader',
-    type: EnrollNfcCardResponseDto,
-  })
-  async enrollNfcCard(
-    @Body() enrollData: EnrollNfcCardDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<EnrollNfcCardResponseDto> {
-    await this.attractapGateway.startEnrollOfNewNfcCard({
-      readerId: enrollData.readerId,
-      userId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod ?? 'session',
-      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
-    });
-
-    return {
-      message: 'Enrollment initiated, continue on Reader',
-    };
-  }
-
-  @Post('reset-nfc-card')
-  @Auth()
-  @ApiOperation({ summary: 'Reset an NFC card', operationId: 'resetNfcCard' })
-  @ApiBody({ type: ResetNfcCardDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Reset initiated, continue on Reader',
-    type: ResetNfcCardResponseDto,
-  })
-  async resetNfcCard(
-    @Body() resetData: ResetNfcCardDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<ResetNfcCardResponseDto> {
-    await this.attractapGateway.startResetOfNfcCard({
-      readerId: resetData.readerId,
-      cardId: resetData.cardId,
-      userId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod ?? 'session',
-      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
-    });
-
-    return {
-      message: 'Reset initiated, continue on Reader',
-    };
+    protected readonly attractapService: AttractapService,
+  ) {
+    super();
   }
 
   @Patch(':readerId')
@@ -157,52 +103,15 @@ export class AttractapController {
     return await this.attractapService.findReaderById(readerId);
   }
 
-  @Get(':readerId/crash-reports')
-  @Auth('resources.update')
-  @ApiOperation({ summary: 'Get crash reports for a reader', operationId: 'getReaderCrashReports' })
-  @ApiParam({ name: 'readerId', description: 'The ID of the reader', example: 1 })
-  @ApiResponse({
-    status: 200,
-    description: 'The list of crash reports for the reader, newest first',
-    type: [AttractapCrashReportDto],
-  })
-  async getReaderCrashReports(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCrashReportDto[]> {
-    return await this.attractapService.getCrashReportsForReader(readerId);
-  }
-
-  @Get(':readerId/crash-reports/:reportId/coredump')
-  @Auth('resources.update')
-  @ApiOperation({
-    summary: 'Download the coredump blob of a crash report',
-    operationId: 'getReaderCrashReportCoredump',
-  })
-  @ApiParam({ name: 'readerId', description: 'The ID of the reader', example: 1 })
-  @ApiParam({ name: 'reportId', description: 'The ID of the crash report', example: 1 })
-  @ApiProduces('application/octet-stream')
-  @ApiResponse({ status: 200, description: 'The coredump binary blob' })
-  @ApiResponse({ status: 404, description: 'Crash report or coredump not found' })
-  async getReaderCrashReportCoredump(
-    @Param('readerId', ParseIntPipe) readerId: number,
-    @Param('reportId', ParseIntPipe) reportId: number,
-  ): Promise<StreamableFile> {
-    const result = await this.attractapService.getCrashReportCoredump(readerId, reportId);
-
-    if (!result) {
-      throw new NotFoundException(`No coredump found for crash report ${reportId} of reader ${readerId}`);
-    }
-
-    return new StreamableFile(result.coredump, {
-      type: 'application/octet-stream',
-      disposition: `attachment; filename="${result.filename}"`,
-    });
-  }
-
   @Delete(':readerId')
   @Auth('resources.delete')
   @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
   @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
-  async deleteReader(@Param('readerId', ParseIntPipe) readerId: number, @Req() req: AuthenticatedRequest): Promise<void> {
+  async deleteReader(
+    @Param('readerId', ParseIntPipe) readerId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<void> {
     const deleted = await this.attractapService.deleteReader(readerId);
     if (deleted) {
       await this.attractapService.recordReaderDeregistration(readerId, {
@@ -213,3 +122,13 @@ export class AttractapController {
     }
   }
 }
+installInheritedMethods(AttractapController, [
+  'enrollNfcCard',
+  'resetNfcCard',
+  'updateReader',
+  'getReaders',
+  'getReaderById',
+  'getReaderCrashReports',
+  'getReaderCrashReportCoredump',
+  'deleteReader',
+]);

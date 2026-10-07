@@ -1,67 +1,46 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
 import {
-  IntroductionHistoryAction,
   Resource,
   ResourceGroup,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
   ResourceUsage,
 } from '@attraccess/database-entities';
-import { ResourceGroupsService } from '../groups/resourceGroups.service';
-import { EmailService } from '../../email/email.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
-
-export interface RetrainingPolicy {
-  retrainingMaxAgeDays: number | null;
-  retrainingMaxInactivityDays: number | null;
-  retrainingBlocksAccess: boolean;
-}
-
-export type RetrainingReason = 'age' | 'inactivity' | null;
-
-export interface RetrainingEvaluation {
-  applies: boolean;
-  isDue: boolean;
-  blocksAccess: boolean;
-  dueAt: Date | null;
-  reason: RetrainingReason;
-}
-
-export interface ResourceRetrainingStatus extends RetrainingEvaluation {
-  hasIntroduction: boolean;
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const EMPTY_EVALUATION: RetrainingEvaluation = {
-  applies: false,
-  isDue: false,
-  blocksAccess: false,
-  dueAt: null,
-  reason: null,
-};
+import { EmailService } from '../../email/email.service';
+import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import { ResourceRetrainingPolicyImplementation } from './resource-retraining-policy';
+import {
+  EMPTY_EVALUATION,
+  ResourceRetrainingStatus,
+  RetrainingEvaluation,
+  RetrainingPolicy,
+  RetrainingReason,
+} from './resourceRetraining.service.feature-definitions';
 
 @Injectable()
-export class ResourceRetrainingService {
-  private readonly logger = new Logger(ResourceRetrainingService.name);
+export class ResourceRetrainingService extends ResourceRetrainingPolicyImplementation {
+  protected readonly logger = new Logger(ResourceRetrainingService.name);
 
   constructor(
     @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    protected readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceGroup)
-    private readonly resourceGroupRepository: Repository<ResourceGroup>,
+    protected readonly resourceGroupRepository: Repository<ResourceGroup>,
     @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    protected readonly resourceUsageRepository: Repository<ResourceUsage>,
     @InjectRepository(ResourceIntroduction)
-    private readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
+    protected readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
     @InjectRepository(ResourceIntroductionHistoryItem)
-    private readonly historyRepository: Repository<ResourceIntroductionHistoryItem>,
-    private readonly resourceGroupsService: ResourceGroupsService,
-    private readonly emailService: EmailService,
-    private readonly audit: AuditService,
-  ) {}
+    protected readonly historyRepository: Repository<ResourceIntroductionHistoryItem>,
+    protected readonly resourceGroupsService: ResourceGroupsService,
+    protected readonly emailService: EmailService,
+    protected readonly audit: AuditService,
+  ) {
+    super();
+  }
 
   public evaluate(
     policy: RetrainingPolicy,
@@ -135,225 +114,11 @@ export class ResourceRetrainingService {
     const evaluation = await this.evaluateGroupIntroduction(groupId, userId, new Date());
     return Boolean(evaluation && evaluation.applies && evaluation.isDue && evaluation.blocksAccess);
   }
-
-  @Cron('0 3 * * *')
-  public async evaluateAndNotify(): Promise<void> {
-    const now = new Date();
-    const introductions = await this.resourceIntroductionRepository
-      .createQueryBuilder('introduction')
-      .leftJoinAndSelect('introduction.receiverUser', 'receiverUser')
-      .leftJoin('introduction.resource', 'resource')
-      .leftJoin('introduction.resourceGroup', 'resourceGroup')
-      .where('resource.retrainingMaxAgeDays IS NOT NULL')
-      .orWhere('resource.retrainingMaxInactivityDays IS NOT NULL')
-      .orWhere('resourceGroup.retrainingMaxAgeDays IS NOT NULL')
-      .orWhere('resourceGroup.retrainingMaxInactivityDays IS NOT NULL')
-      .getMany();
-
-    for (const introduction of introductions) {
-      try {
-        await this.notifyIfDue(introduction, now);
-      } catch (error) {
-        this.logger.error(`Failed to evaluate retraining for introduction ${introduction.id}`, (error as Error).stack);
-      }
-    }
-  }
-
-  private async notifyIfDue(introduction: ResourceIntroduction, now: Date): Promise<void> {
-    if (!(await this.isValid(introduction.id))) {
-      return;
-    }
-    const trainedAt = await this.getTrainedAt(introduction);
-    if (!trainedAt) {
-      return;
-    }
-
-    const policyTarget = await this.getIntroductionPolicyTarget(introduction);
-    if (!policyTarget) {
-      return;
-    }
-
-    const lastUsedAt = introduction.resourceId
-      ? await this.getResourceLastUsedAt(introduction.resourceId, introduction.receiverUserId)
-      : await this.getGroupLastUsedAt(introduction.resourceGroupId, introduction.receiverUserId);
-
-    const evaluation = this.evaluate(policyTarget.policy, trainedAt, lastUsedAt, now);
-    if (!evaluation.applies || !evaluation.isDue) {
-      return;
-    }
-
-    // This marker survives audit retention but is reset by a newer training cycle.
-    if (!introduction.retrainingRequiredAuditedAt || introduction.retrainingRequiredAuditedAt < trainedAt) {
-      const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
-      const recorded = await this.audit.recordResource({
-        action: 'retraining.required',
-        actorId: null,
-        subjectId,
-        ...(introduction.resourceId ? {} : { subjectType: 'resource_group' }),
-        details: {
-          introductionId: introduction.id,
-          usageUserId: introduction.receiverUserId,
-          retrainingReason: evaluation.reason ?? 'unknown',
-        },
-      });
-      if (recorded) {
-        await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
-      }
-    }
-    if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
-      return;
-    }
-    if (introduction.receiverUser?.email) {
-      await this.emailService.sendUserRetrainingEmail(
-        introduction.receiverUser,
-        { id: policyTarget.id, name: policyTarget.name, isGroup: policyTarget.isGroup },
-        { reason: evaluation.reason, blocksAccess: evaluation.blocksAccess },
-      );
-    }
-    // A failed delivery must remain eligible for the next scheduled retry.
-    await this.resourceIntroductionRepository.update(introduction.id, { retrainingNotifiedAt: now });
-  }
-
-  public async getIntroductionRetrainingStatus(introductionId: number): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({ where: { id: introductionId } });
-    if (!introduction || !(await this.isValid(introduction.id))) return null;
-    const trainedAt = await this.getTrainedAt(introduction);
-    if (!trainedAt) return null;
-    const target = await this.getIntroductionPolicyTarget(introduction);
-    if (!target) return null;
-    const lastUsedAt = introduction.resourceId
-      ? await this.getResourceLastUsedAt(introduction.resourceId, introduction.receiverUserId)
-      : await this.getGroupLastUsedAt(introduction.resourceGroupId, introduction.receiverUserId);
-    return this.evaluate(target.policy, trainedAt, lastUsedAt);
-  }
-
-  private async evaluateResourceIntroduction(
-    resourceId: number,
-    userId: number,
-    now: Date,
-  ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({
-      where: { resource: { id: resourceId }, receiverUser: { id: userId } },
-    });
-    if (!introduction || !(await this.isValid(introduction.id))) {
-      return null;
-    }
-
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) {
-      return null;
-    }
-
-    const trainedAt = await this.getTrainedAt(introduction);
-    const lastUsedAt = await this.getResourceLastUsedAt(resourceId, userId);
-    return this.evaluate(resource, trainedAt, lastUsedAt, now);
-  }
-
-  private async evaluateGroupIntroduction(
-    groupId: number,
-    userId: number,
-    now: Date,
-  ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({
-      where: { resourceGroup: { id: groupId }, receiverUser: { id: userId } },
-    });
-    if (!introduction || !(await this.isValid(introduction.id))) {
-      return null;
-    }
-
-    const group = await this.resourceGroupRepository.findOne({ where: { id: groupId } });
-    if (!group) {
-      return null;
-    }
-
-    const trainedAt = await this.getTrainedAt(introduction);
-    const lastUsedAt = await this.getGroupLastUsedAt(groupId, userId);
-    return this.evaluate(group, trainedAt, lastUsedAt, now);
-  }
-
-  private combine(evaluations: RetrainingEvaluation[]): RetrainingEvaluation {
-    const applicable = evaluations.filter((evaluation) => evaluation.applies);
-    if (applicable.length === 0) {
-      return { ...EMPTY_EVALUATION };
-    }
-
-    const hasOpenPath = evaluations.some(
-      (evaluation) => !(evaluation.applies && evaluation.isDue && evaluation.blocksAccess),
-    );
-    const hasFreshApplicable = applicable.some((evaluation) => !evaluation.isDue);
-    const isDue = !hasFreshApplicable;
-
-    const soonest = applicable
-      .filter((evaluation) => evaluation.dueAt)
-      .reduce(
-        (a, b) => (a && a.dueAt.getTime() <= b.dueAt.getTime() ? a : b),
-        null as RetrainingEvaluation | null,
-      );
-
-    return {
-      applies: true,
-      isDue,
-      blocksAccess: !hasOpenPath || (isDue && applicable.some((evaluation) => evaluation.blocksAccess)),
-      dueAt: soonest?.dueAt ?? null,
-      reason: soonest?.reason ?? null,
-    };
-  }
-
-  private async getIntroductionPolicyTarget(
-    introduction: ResourceIntroduction,
-  ): Promise<{ id: number; name: string; isGroup: boolean; policy: RetrainingPolicy } | null> {
-    if (introduction.resourceId) {
-      const resource = await this.resourceRepository.findOne({ where: { id: introduction.resourceId } });
-      return resource ? { id: resource.id, name: resource.name, isGroup: false, policy: resource } : null;
-    }
-
-    if (introduction.resourceGroupId) {
-      const group = await this.resourceGroupRepository.findOne({ where: { id: introduction.resourceGroupId } });
-      return group ? { id: group.id, name: group.name, isGroup: true, policy: group } : null;
-    }
-
-    return null;
-  }
-
-  private async getTrainedAt(introduction: ResourceIntroduction): Promise<Date | null> {
-    const latestGrant = await this.historyRepository.findOne({
-      where: { introduction: { id: introduction.id }, action: IntroductionHistoryAction.GRANT },
-      order: { createdAt: 'DESC' },
-    });
-    return latestGrant?.createdAt ?? introduction.completedAt ?? introduction.createdAt ?? null;
-  }
-
-  private async isValid(introductionId: number): Promise<boolean> {
-    const lastHistoryItem = await this.historyRepository.findOne({
-      where: { introduction: { id: introductionId } },
-      order: { createdAt: 'DESC' },
-    });
-    return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
-  }
-
-  private async getResourceLastUsedAt(resourceId: number, userId: number): Promise<Date | null> {
-    const lastUsage = await this.resourceUsageRepository.findOne({
-      where: { resourceId, userId, endTime: Not(IsNull()) },
-      order: { endTime: 'DESC' },
-    });
-    return lastUsage?.endTime ?? null;
-  }
-
-  private async getGroupLastUsedAt(groupId: number, userId: number): Promise<Date | null> {
-    const group = await this.resourceGroupRepository.findOne({ where: { id: groupId }, relations: ['resources'] });
-    const resourceIds = (group?.resources ?? []).map((resource) => resource.id);
-    if (resourceIds.length === 0) {
-      return null;
-    }
-
-    const lastUsage = await this.resourceUsageRepository.findOne({
-      where: { resourceId: In(resourceIds), userId, endTime: Not(IsNull()) },
-      order: { endTime: 'DESC' },
-    });
-    return lastUsage?.endTime ?? null;
-  }
-
-  private addDays(date: Date, days: number): Date {
-    return new Date(date.getTime() + days * DAY_MS);
-  }
 }
+
+export {
+  ResourceRetrainingStatus,
+  RetrainingEvaluation,
+  RetrainingPolicy,
+  RetrainingReason,
+} from './resourceRetraining.service.feature-definitions';

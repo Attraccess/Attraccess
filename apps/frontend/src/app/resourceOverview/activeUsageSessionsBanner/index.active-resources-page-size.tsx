@@ -1,0 +1,1 @@
+export const ACTIVE_RESOURCES_PAGE_SIZE = 50;

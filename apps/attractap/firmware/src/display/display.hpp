@@ -90,6 +90,8 @@ public:
     static void asyncCall(lv_async_cb_t cb, void *user_data);
 
 private:
+    static void setupFramebuffer();
+    static bool touchWarningPending;
     static void showMessagePopup(const std::string &title, const std::string &message, bool error);
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer

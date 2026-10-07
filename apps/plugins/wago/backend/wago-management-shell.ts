@@ -1,8 +1,8 @@
 import { assertManagementPublicKey } from './wago-management-key';
+import { managementShellHelpers } from './wago-management-shell-helpers';
+import { ManagementShellAction } from './wago-management-shell.management-shell-action';
+import { quote } from './wago-management-shell.quote';
 import { wagoShellStat } from './wago-shell-stat';
-
-export type ManagementShellAction = 'prepare' | 'arm' | 'install' | 'commit' | 'rollback' | 'watchdog';
-const quote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
 
 /** Additive OpenSSH / source-identified Dropbear authorized_keys transaction for a NON-ROOT account.
  * Standard Linux stat/flock/timeout/nohup are checked, never installed. No WAGO-specific service
@@ -27,44 +27,7 @@ export function managementKeyCommand(
   // OpenSSH authorized_keys(5) and bundled Dropbear 2025.88 svr-authpubkeyoptions.c.
   // These limit the new key only. Shell access still has the existing account's privileges.
   const entry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${selectedKey}`;
-  const helpers = String.raw`set -eu
-${wagoShellStat()}
-now() {
-  IFS='. ' read -r whole fraction idle < /proc/uptime
-  case "$whole" in *[!0-9]*|'') exit 1;; esac
-  case "$fraction" in [0-9][0-9]) ;; *) exit 1;; esac
-  uptime=$((whole * 100 + (100$fraction % 100)))
-}
-unexpired() {
-  test "$(cat /proc/sys/kernel/random/boot_id)" = "$(cat "$tx/boot-id")"
-  read -r deadline < "$tx/deadline"
-  case "$deadline" in *[!0-9]*|'') exit 1;; esac
-  now
-  remaining=$((deadline - uptime))
-  test "$remaining" -gt 0
-  delay=$(printf '%s.%02d' "$((remaining / 100))" "$((remaining % 100))")
-  test ! -e "$tx/expired"
-}
-safe_keys() {
-  test ! -L authorized_keys
-  if [ -e authorized_keys ]; then
-    test -f authorized_keys
-    test "$(stat -c '%u:%a:%h' authorized_keys)" = "$uid:600:1"
-    test "$(wc -c < authorized_keys)" -le 65536
-  fi
-}
-owned() {
-  test -d "$tx" && test "$(stat -c '%u:%a' "$tx")" = "$uid:700"
-  test -f "$tx/token" && test ! -L "$tx/token"
-  test "$(cat "$tx/token")" = "$token"
-}
-active() {
-  owned
-  test ! -e "$tx/committed" && test ! -e "$tx/recovered"
-  test -f "$tx/armed"
-  unexpired
-}
-`;
+  const helpers = managementShellHelpers();
   const script = String.raw`set -eu
 ${wagoShellStat()}
 umask 077
@@ -213,3 +176,5 @@ done`
     .replace('ACTION', body);
   return `timeout -s KILL ${action === 'watchdog' ? 75 : 15} sh -c ${quote(command)}`;
 }
+
+export { type ManagementShellAction } from './wago-management-shell.management-shell-action';

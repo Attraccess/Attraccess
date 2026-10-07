@@ -1,35 +1,11 @@
-import { useState, useCallback } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
-import {
-  useResourcesServiceResourceUsageStartSession,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  UseResourcesServiceResourceUsageGetHistoryKeyFn,
-  useResourcesServiceUnlockDoor,
-  useResourcesServiceGetOneResourceById,
-  StartUsageSessionDto,
-  useResourcesServiceUnlatchDoor,
-  useResourcesServiceLockDoor,
-  ApiError,
-  ResourceType,
-  FormSubmissionRequestDto,
-  SupervisionMode,
-} from '@attraccess/react-query-client';
-import { useQueryClient } from '@tanstack/react-query';
-import en from './translations/en.json';
-import de from './translations/de.json';
-import { getTranslationKeyForApiError } from '../../../../../utils/apiError';
 import { InsufficientBalanceModal } from './insufficientBalanceModal';
-import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
-import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
-import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
-import { ResourceFormAction } from '../../../details/forms/types';
 import { DoorControls } from './DoorControls';
 import { MachineStartControls } from './MachineStartControls';
 import { SupervisedStartModal } from '../SupervisedStartModal';
+import { useStartSessionControlsState } from './useStartSessionControlsState';
 
-interface StartSessionControlsProps {
+export interface StartSessionControlsProps {
   resourceId: number;
   insufficientBalanceDesiredAmount?: number;
   /**
@@ -45,234 +21,32 @@ interface StartSessionControlsProps {
 export function StartSessionControls(
   props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
 ) {
-  const { resourceId, insufficientBalanceDesiredAmount, requiresSupervision, ...divProps } = props;
-
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-
-  // supervision_required forbids a solo start for everyone, introduced or not — the backend rejects
-  // it outright. Deciding that here rather than at the call sites means no caller can forget it:
-  // the maintenance view renders these controls too, with no knowledge of supervision (ATT-815).
-  const needsSupervisor =
-    (requiresSupervision ?? false) || resource?.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
-
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
-    },
-    de: {
-      ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
-    },
-  });
-  const queryClient = useQueryClient();
-  const toast = useToastMessage();
-
-  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
-  const [isInsufficientBalance, setIsInsufficientBalance] = useState(false);
-  const [supervisedRequestBody, setSupervisedRequestBody] = useState<StartUsageSessionDto | null>(null);
-
-  const onStartSuccess = useCallback(() => {
-    setIsNotesModalOpen(false);
-
-    // Invalidate the active session query to refetch data
-    queryClient.invalidateQueries({
-      queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
-    });
-    // Invalidate all history queries for this resource (regardless of pagination/user filters)
-    queryClient.invalidateQueries({
-      predicate: (query) => {
-        const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
-        return (
-          query.queryKey[0] === baseHistoryKey[0] &&
-          query.queryKey.length > 1 &&
-          JSON.stringify(query.queryKey[1]).includes(`"resourceId":${resourceId}`)
-        );
-      },
-    });
-
-    if (!resource) {
-      return;
-    }
-
-    switch (resource.type) {
-      case ResourceType.MACHINE:
-        toast.success({
-          title: t('machine.sessionStarted'),
-          description: t('machine.sessionStartedDescription'),
-        });
-        break;
-
-      case ResourceType.DOOR:
-        toast.success({
-          title: t('door.success.title'),
-          description: t('door.success.description'),
-        });
-        break;
-
-      default: {
-        const exhaustiveCheck: never = resource?.type;
-        throw new Error(`Unknown resource type: ${exhaustiveCheck}`);
-      }
-    }
-  }, [resourceId, t, queryClient, toast, resource]);
-
-  const onStartError = useCallback(
-    (error: ApiError) => {
-      if (!resource) {
-        return;
-      }
-
-      const { errorMessage } = getTranslationKeyForApiError({
-        error,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-      });
-
-      if (errorMessage === 'INSUFFICIENT_BALANCE') {
-        setIsInsufficientBalance(true);
-      }
-
-      toast.apiError({
-        error,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-      });
-
-      console.error('Failed to start session:', JSON.stringify(error));
-    },
-    [t, toast, resource, tExists],
-  );
-
-  const { mutate: startUsageSessionMutate, isPending: startUsageSessionIsPending } =
-    useResourcesServiceResourceUsageStartSession({
-      onSuccess: onStartSuccess,
-      onError: (error) => {
-        onStartError(error as ApiError);
-      },
-    });
-
-  const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
-    onSuccess: onStartSuccess,
-    onError: (error) => {
-      onStartError(error as ApiError);
-    },
-  });
-
-  const { mutate: lockDoorMutate, isPending: lockDoorIsPending } = useResourcesServiceLockDoor({
-    onSuccess: onStartSuccess,
-    onError: (error) => {
-      onStartError(error as ApiError);
-    },
-  });
-
-  const { mutate: unlatchDoorMutate, isPending: unlatchDoorIsPending } = useResourcesServiceUnlatchDoor({
-    onSuccess: onStartSuccess,
-    onError: (error) => {
-      onStartError(error as ApiError);
-    },
-  });
-
-  const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined);
-
-  const { requestForms, modal: formsModal } = useResourceFormsSubmission(resourceId);
-
-  const isFormsMissingError = useCallback((error: unknown) => {
-    if (!(error instanceof ApiError)) {
-      return false;
-    }
-
-    if (error.status !== 400) {
-      return false;
-    }
-
-    const rawMessage = (error.body as { message?: string | string[] })?.message ?? error.message;
-    const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
-
-    return (
-      typeof message === 'string' && message.toLowerCase().includes('form') && message.toLowerCase().includes('submit')
-    );
-  }, []);
-
-  const gatherFormSubmissions = useCallback(
-    async (action: ResourceFormAction): Promise<FormSubmissionRequestDto[] | null> => {
-      try {
-        return await requestForms(action);
-      } catch (error) {
-        if ((error as Error).message === 'user_cancelled_forms') {
-          return null;
-        }
-        throw error;
-      }
-    },
-    [requestForms],
-  );
-
-  const submitStartSessionWithRetry = useCallback(
-    (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
-      startUsageSessionMutate(
-        { resourceId, requestBody },
-        {
-          onError: async (error) => {
-            if (!isFormsMissingError(error)) {
-              return;
-            }
-
-            const retrySubmissions = await gatherFormSubmissions(action);
-            if (!retrySubmissions) {
-              return;
-            }
-
-            startUsageSessionMutate({
-              resourceId,
-              requestBody: {
-                ...requestBody,
-                formSubmissions: retrySubmissions,
-              },
-            });
-          },
-        },
-      );
-    },
-    [gatherFormSubmissions, isFormsMissingError, resourceId, startUsageSessionMutate],
-  );
-
-  const handleStartSession = useCallback(
-    async (opts?: StartUsageSessionDto) => {
-      const action: ResourceFormAction = opts?.forceTakeOver ? 'takeover' : 'start';
-      const formSubmissions = await gatherFormSubmissions(action);
-      if (formSubmissions === null) {
-        return;
-      }
-
-      const requestBody: StartUsageSessionDto = {
-        ...(opts ?? {}),
-        projectId: selectedProjectId,
-        formSubmissions,
-      };
-
-      // Not introduced but supervision is allowed: defer to supervisor approval
-      // instead of starting directly. The user-facing start flow is unchanged.
-      if (needsSupervisor) {
-        setIsNotesModalOpen(false);
-        setSupervisedRequestBody(requestBody);
-        return;
-      }
-
-      submitStartSessionWithRetry(action, requestBody);
-    },
-    [gatherFormSubmissions, needsSupervisor, selectedProjectId, submitStartSessionWithRetry],
-  );
-
-  const handleOpenStartSessionModal = () => {
-    setIsNotesModalOpen(true);
-  };
-
-  const handleLockDoor = useCallback(() => lockDoorMutate({ resourceId }), [lockDoorMutate, resourceId]);
-  const handleUnlockDoor = useCallback(() => unlockDoorMutate({ resourceId }), [resourceId, unlockDoorMutate]);
-  const handleUnlatchDoor = useCallback(() => unlatchDoorMutate({ resourceId }), [resourceId, unlatchDoorMutate]);
+  const {
+    resourceId,
+    insufficientBalanceDesiredAmount,
+    divProps,
+    resource,
+    t,
+    isNotesModalOpen,
+    setIsNotesModalOpen,
+    isInsufficientBalance,
+    setIsInsufficientBalance,
+    supervisedRequestBody,
+    setSupervisedRequestBody,
+    onStartSuccess,
+    startUsageSessionIsPending,
+    unlockDoorIsPending,
+    lockDoorIsPending,
+    unlatchDoorIsPending,
+    selectedProjectId,
+    setSelectedProjectId,
+    formsModal,
+    handleStartSession,
+    handleOpenStartSessionModal,
+    handleLockDoor,
+    handleUnlockDoor,
+    handleUnlatchDoor,
+  } = useStartSessionControlsState(props);
 
   return (
     <div {...divProps}>

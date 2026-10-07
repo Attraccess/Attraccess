@@ -1,84 +1,20 @@
-import { createServer, type Server, type Socket } from 'node:net';
-// The fixture exercises the same pure configuration model as the plugin.
-import {
-  BUILTIN_MODBUS_PROFILES,
-  duplicateProfile,
-  type ModbusConfiguration,
-  type ModbusConnection,
-  type ModbusAction,
-  validateModbus,
-} from '../../../modbus/model';
-import { CumulativeCounter, ModbusDeviceRouter } from './adapter';
-import { crc16, decodeRaw, encode, readPdu, rtuFrame, writePdu } from './protocol';
-import { QueuedModbusTransport } from './transports';
+import { decodeRaw, readPdu, writePdu } from './protocol';
 
-const format = {
-  address: 12,
-  addressBase: 1 as const,
-  dataType: 'uint32' as const,
-  byteOrder: 'big' as const,
-  wordOrder: 'big' as const,
-  scale: 1,
-  offset: 0,
-};
-const serial: ModbusConnection = {
-  id: 'bus',
-  transport: 'rtu',
-  path: '/dev/serial',
-  baudRate: 19200,
-  parity: 'even',
-  stopBits: 1,
-  timeoutMs: 50,
-  reconnectMs: 0,
-  queueLimit: 2,
-};
+import { ModbusProtocolFixture, format } from './modbus.test-utils';
 describe('Modbus protocol fixtures (no hardware)', () => {
-  let busNumber = 0;
+  let fixture: ModbusProtocolFixture;
   beforeEach(() => {
-    serial.path = `/dev/fixture-protocol-${++busNumber}`;
+    fixture = new ModbusProtocolFixture();
+    fixture.setup();
   });
-  let server: Server;
-  const sockets = new Set<Socket>();
   afterEach(async () => {
-    for (const socket of sockets) socket.destroy();
-    sockets.clear();
-    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+    await fixture.cleanup();
   });
-  async function fixture(reply: (request: Buffer, socket: Socket) => void) {
-    server = createServer((socket) => {
-      sockets.add(socket);
-      let buffer = Buffer.alloc(0);
-      socket.on('data', (chunk: Buffer) => {
-        buffer = Buffer.concat([buffer, chunk]);
-        if (buffer.length >= 7 && buffer.length >= buffer.readUInt16BE(4) + 6) reply(buffer, socket);
-      });
-    });
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(0, '127.0.0.1', resolve);
-    });
-    const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('fixture address');
-    return new QueuedModbusTransport({
-      id: 'tcp',
-      transport: 'tcp',
-      host: '127.0.0.1',
-      port: address.port,
-      timeoutMs: 100,
-      reconnectMs: 5,
-      queueLimit: 2,
-    });
-  }
-  function response(request: Buffer, pdu: Buffer) {
-    const h = Buffer.from(request.subarray(0, 7));
-    h.writeUInt16BE(pdu.length + 1, 4);
-    return Buffer.concat([h, pdu]);
-  }
   it('reads fragmented FC03/04 responses with transaction and multiple unit routing', async () => {
     const units: number[] = [];
-    const transport = await fixture((request, socket) => {
+    const transport = await fixture.fixture((request, socket) => {
       units.push(request[6]);
-      const r = response(request, Buffer.from([request[7], 4, 0, 0, 0, request[6]]));
+      const r = fixture.response(request, Buffer.from([request[7], 4, 0, 0, 0, request[6]]));
       socket.write(r.subarray(0, 5));
       setTimeout(() => socket.end(r.subarray(5)), 2);
     });
@@ -89,11 +25,12 @@ describe('Modbus protocol fixtures (no hardware)', () => {
     expect(values.map((b) => decodeRaw(b, format))).toEqual([1, 7]);
     expect(units).toEqual([1, 7]);
   });
+
   it.each(['transaction', 'protocol', 'unit', 'function', 'count', 'length'])(
     'rejects corrupt TCP %s',
     async (field) => {
-      const transport = await fixture((request, socket) => {
-        const r = response(request, Buffer.from([3, 4, 0, 0, 0, 1]));
+      const transport = await fixture.fixture((request, socket) => {
+        const r = fixture.response(request, Buffer.from([3, 4, 0, 0, 0, 1]));
         if (field === 'transaction') r[1] ^= 1;
         if (field === 'protocol') r[3] = 1;
         if (field === 'unit') r[6] = 9;
@@ -105,18 +42,20 @@ describe('Modbus protocol fixtures (no hardware)', () => {
       await expect(transport.request(1, readPdu(3, format))).rejects.toThrow();
     },
   );
+
   it('reports protocol exceptions then reconnects for next request', async () => {
     let calls = 0;
-    const transport = await fixture((request, socket) =>
-      socket.end(response(request, ++calls === 1 ? Buffer.from([0x83, 2]) : Buffer.from([3, 4, 0, 0, 0, 9]))),
+    const transport = await fixture.fixture((request, socket) =>
+      socket.end(fixture.response(request, ++calls === 1 ? Buffer.from([0x83, 2]) : Buffer.from([3, 4, 0, 0, 0, 9]))),
     );
     await expect(transport.request(1, readPdu(3, format))).rejects.toThrow('exception 2');
     await expect(transport.request(1, readPdu(3, format))).resolves.toEqual(Buffer.from([0, 0, 0, 9]));
   });
+
   it('bounds a stalled queue and reconnects after timeout without replay', async () => {
     let calls = 0;
-    const transport = await fixture((request, socket) => {
-      if (++calls > 1) socket.end(response(request, Buffer.from([3, 4, 0, 0, 0, 1])));
+    const transport = await fixture.fixture((request, socket) => {
+      if (++calls > 1) socket.end(fixture.response(request, Buffer.from([3, 4, 0, 0, 0, 1])));
     });
     const first = transport.request(1, readPdu(3, format));
     const second = transport.request(2, readPdu(3, format));
@@ -125,12 +64,13 @@ describe('Modbus protocol fixtures (no hardware)', () => {
     await expect(second).resolves.toBeDefined();
     expect(calls).toBe(2);
   });
+
   it.each([5, 6, 16] as const)('validates FC%s write echo', async (fc) => {
     let corrupt = false;
-    const transport = await fixture((request, socket) => {
+    const transport = await fixture.fixture((request, socket) => {
       const echo = Buffer.from(request.subarray(7, 12));
       if (corrupt) echo[4] ^= 1;
-      socket.end(response(request, echo));
+      socket.end(fixture.response(request, echo));
     });
     const f = { ...format, dataType: fc === 16 ? ('uint32' as const) : ('uint16' as const) };
     const pdu = writePdu(fc, f, 1);
@@ -138,285 +78,4 @@ describe('Modbus protocol fixtures (no hardware)', () => {
     corrupt = true;
     await expect(transport.request(1, pdu)).rejects.toThrow('echo');
   });
-  it('uses full RTU CRC frames, unit ID, and exception validation', async () => {
-    expect(crc16(Buffer.from('01030000000a', 'hex'))).toBe(0xcdc5);
-    const exchange = jest.fn(async (_c, request: Buffer) => {
-      expect(crc16(request.subarray(0, -2))).toBe(request.readUInt16LE(request.length - 2));
-      return rtuFrame(request[0], Buffer.from([3, 4, 0, 0, 0, 8]));
-    });
-    const transport = new QueuedModbusTransport(serial, exchange);
-    await expect(transport.request(17, readPdu(3, format))).resolves.toEqual(Buffer.from([0, 0, 0, 8]));
-    const bad = new QueuedModbusTransport({ ...serial, path: `${serial.path}-crc` }, async () => {
-      const r = rtuFrame(17, Buffer.from([3, 4, 0, 0, 0, 8]));
-      r[4] ^= 1;
-      return r;
-    });
-    await expect(bad.request(17, readPdu(3, format))).rejects.toThrow('CRC');
-    await expect(
-      new QueuedModbusTransport({ ...serial, path: `${serial.path}-unit` }, async () =>
-        rtuFrame(18, Buffer.from([3, 4, 0, 0, 0, 8])),
-      ).request(17, readPdu(3, format)),
-    ).rejects.toThrow('unit');
-    await expect(
-      new QueuedModbusTransport(serial, async () => rtuFrame(17, Buffer.from([0x83, 3]))).request(
-        17,
-        readPdu(3, format),
-      ),
-    ).rejects.toThrow('exception 3');
-  });
-  it.each([5, 6, 16] as const)('RTU write FC%s checks echoed address/value/count', async (fc) => {
-    const f = { ...format, dataType: 'uint16' as const };
-    const pdu = writePdu(fc, f, 1);
-    const transport = new QueuedModbusTransport(serial, async (_c, r) => rtuFrame(r[0], r.subarray(1, 6)));
-    await expect(transport.request(3, pdu)).resolves.toEqual(pdu.subarray(0, 5));
-  });
-  it('times out injected serial fixtures and bounds acquisition', async () => {
-    const transport = new QueuedModbusTransport(serial, () => new Promise(() => undefined));
-    await expect(transport.request(1, readPdu(3, format))).rejects.toThrow('timed out');
-  });
-  it('RTU serializes multiple units and replacement transports on the same bus', async () => {
-    let active = 0;
-    let maximum = 0;
-    const units: number[] = [];
-    const exchange = async (_c: ModbusConnection, r: Buffer) => {
-      active++;
-      maximum = Math.max(maximum, active);
-      units.push(r[0]);
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      active--;
-      return rtuFrame(r[0], Buffer.from([3, 4, 0, 0, 0, r[0]]));
-    };
-    const first = new QueuedModbusTransport(serial, exchange);
-    const replacement = new QueuedModbusTransport(serial, exchange);
-    const a = first.request(1, readPdu(3, format));
-    const b = replacement.request(2, readPdu(3, format));
-    await expect(replacement.request(3, readPdu(3, format))).rejects.toThrow('queue full');
-    await Promise.all([a, b]);
-    expect(maximum).toBe(1);
-    expect(units).toEqual([1, 2]);
-  });
-  it('RTU rejects malformed requests before exchange and recovers after exceptions without write replay', async () => {
-    let calls = 0;
-    const transport = new QueuedModbusTransport(serial, async (_c, r) => {
-      calls++;
-      if (calls === 1) return rtuFrame(r[0], Buffer.from([0x85, 4]));
-      return rtuFrame(r[0], r.subarray(1, 6));
-    });
-    await expect(transport.request(0, readPdu(3, format))).rejects.toThrow('unit');
-    await expect(transport.request(1, Buffer.from([2, 0, 0, 0, 1]))).rejects.toThrow('function');
-    await expect(transport.request(1, Buffer.from([3, 0, 0, 0, 0]))).rejects.toThrow('quantity');
-    expect(calls).toBe(0);
-    const request = writePdu(5, { ...format, dataType: 'uint16' }, 1);
-    await expect(transport.request(1, request)).rejects.toThrow('exception 4');
-    await expect(transport.request(2, request)).resolves.toEqual(request);
-    expect(calls).toBe(2);
-  });
-  it('RTU discards queued writes from a superseded configuration', async () => {
-    let release: (response: Buffer) => void = () => undefined;
-    const exchange = jest.fn(
-      () =>
-        new Promise<Buffer>((resolve) => {
-          release = resolve;
-        }),
-    );
-    const transport = new QueuedModbusTransport(serial, exchange);
-    let current = true;
-    const reading = transport.request(1, readPdu(3, format));
-    const writing = transport.request(2, writePdu(5, { ...format, dataType: 'uint16' }, 1), () => current);
-    await Promise.resolve();
-    current = false;
-    release(rtuFrame(1, Buffer.from([3, 4, 0, 0, 0, 1])));
-    await reading;
-    await expect(writing).rejects.toThrow('configuration changed');
-    expect(exchange).toHaveBeenCalledTimes(1);
-  });
-  it.each(['uint16', 'int16', 'uint32', 'int32', 'float32'] as const)(
-    'round trips %s byte and word order with physical scaling',
-    (dataType) => {
-      for (const byteOrder of ['big', 'little'] as const)
-        for (const wordOrder of ['big', 'little'] as const) {
-          const f = { ...format, dataType, byteOrder, wordOrder, scale: 0.5, offset: 7 };
-          expect(decodeRaw(encode(1234.5, f), f) * f.scale + f.offset).toBe(1234.5);
-          expect(readPdu(3, f).readUInt16BE(1)).toBe(11);
-        }
-    },
-  );
-  it('does not infer rollover; recognizes only explicit boundary crossing', () => {
-    const counter = new CumulativeCounter();
-    expect(counter.update(95, 100)).toBe(95);
-    expect(counter.update(3, 100)).toBe(103);
-    expect(counter.update(7, 100)).toBe(107);
-    expect(() => counter.update(0, 100)).toThrow('reset');
-    const unknown = new CumulativeCounter();
-    unknown.update(99);
-    expect(() => unknown.update(1)).toThrow('without documented');
-  });
-  it('validates profiles and routes named measurements/actions, bounded duplicate acquisition', async () => {
-    const meter = BUILTIN_MODBUS_PROFILES.find((profile) => profile.id === 'wago-879-3020');
-    if (!meter) throw new Error('Missing 879-3020 profile');
-    const profile = duplicateProfile(meter, 'custom');
-    // Custom integer counter fixture, independent of the meter's float kWh map.
-    const energy = profile.measurements.find((measurement) => measurement.id === 'import-energy');
-    if (!energy) throw new Error('Missing imported energy fixture');
-    energy.dataType = 'uint32';
-    energy.scale = 1;
-    const config: ModbusConfiguration = {
-      connections: [serial],
-      profiles: [profile],
-      devices: [{ id: 'meter', name: 'Meter', connectionId: 'bus', unitId: 7, profileId: 'custom', profileVersion: 1 }],
-    };
-    expect(validateModbus(config)).toEqual([]);
-    let release: (b: Buffer) => void = () => undefined;
-    const transport = {
-      request: jest.fn(
-        () =>
-          new Promise<Buffer>((resolve) => {
-            release = resolve;
-          }),
-      ),
-    };
-    const onboard = { read: jest.fn(), write: jest.fn() };
-    const router = new ModbusDeviceRouter(onboard, () => transport);
-    router.configure({ version: 1, physicalPoints: [], logicalChannels: [], modbus: config });
-    const point = {
-      id: 'p',
-      channel: 0,
-      hardwareProfile: '879-1300' as const,
-      modbus: { deviceId: 'meter', measurementId: 'import-energy' },
-    };
-    const reading = router.read(point);
-    await expect(router.read(point)).rejects.toThrow('already in progress');
-    release(Buffer.from([0, 0, 0, 12]));
-    await expect(reading).resolves.toBe(12);
-    await expect(router.write(point, true)).rejects.toThrow('read-only');
-    expect(onboard.read).not.toHaveBeenCalled();
-    expect(router.shouldPoll(point, 100)).toBe(true);
-    expect(router.shouldPoll(point, 101)).toBe(false);
-    expect(validateModbus({ ...config, profiles: [BUILTIN_MODBUS_PROFILES[0]] }).length).toBeGreaterThan(0);
-  });
-});
-
-// Front panel readback must reflect physical state and share the configured polling budget.
-describe('Modbus switch readback', () => {
-  const action = {
-    id: 'switch',
-    name: 'Switch',
-    functionCode: 6 as const,
-    address: 12,
-    addressBase: 1 as const,
-    dataType: 'uint16' as const,
-    byteOrder: 'big' as const,
-    wordOrder: 'big' as const,
-    scale: 2,
-    offset: 3,
-    onValue: 5,
-    offValue: 3,
-  };
-  const point = {
-    id: 'switch-point',
-    hardwareProfile: 'modbus' as const,
-    channel: 0,
-    modbus: { deviceId: 'relay', actionId: 'switch' },
-  };
-  function routerFor(register: ModbusAction, request: jest.Mock) {
-    const router = new ModbusDeviceRouter({ read: async () => false, write: async () => undefined }, () => ({
-      request,
-    }));
-    router.configure({
-      version: 1,
-      physicalPoints: [point],
-      logicalChannels: [],
-      modbus: {
-        connections: [serial],
-        devices: [
-          {
-            id: 'relay',
-            name: 'Relay',
-            connectionId: serial.id,
-            unitId: 7,
-            profileId: 'relay-profile',
-            profileVersion: 1,
-            pollIntervalMs: 1000,
-          },
-        ],
-        profiles: [{ id: 'relay-profile', name: 'Relay', version: 1, measurements: [], actions: [register] }],
-      },
-    });
-    return router;
-  }
-  it.each([5, 6, 16] as const)(
-    'reads physical FC%s switches and invalidates readback after a command',
-    async (functionCode) => {
-      const register = {
-        ...action,
-        functionCode,
-        ...(functionCode === 5 ? { scale: 1, offset: 0, onValue: 1, offValue: 0 } : {}),
-      };
-      let actual = true;
-      const request = jest.fn(async (_unit: number, pdu: Buffer) => {
-        if ([1, 3].includes(pdu[0]))
-          return functionCode === 5
-            ? Buffer.from([Number(actual)])
-            : encode(actual ? register.onValue : register.offValue, register);
-        return pdu.subarray(0, 5);
-      });
-      const router = routerFor(register, request);
-      expect(await router.readOutput(point)).toBe(true);
-      expect(request.mock.calls[0][1]).toEqual(readPdu(functionCode === 5 ? 1 : 3, register));
-      expect(await router.readOutput(point)).toBe(true);
-      expect(request).toHaveBeenCalledTimes(1);
-      await router.write(point, true);
-      actual = false; // A command acknowledgement is not a physical state reading.
-      expect(await router.readOutput(point)).toBe(false);
-      expect(request).toHaveBeenCalledTimes(3);
-    },
-  );
-  it('limits failed read retries to the configured interval', async () => {
-    const request = jest.fn().mockRejectedValue(new Error('No response'));
-    const router = routerFor(action, request);
-    await expect(router.readOutput(point)).rejects.toThrow('No response');
-    await expect(router.readOutput(point)).rejects.toThrow('No response');
-    expect(request).toHaveBeenCalledTimes(1);
-  });
-  it('fails closed when distinct switch values collapse to the same float32 representation', async () => {
-    const register = {
-      ...action,
-      functionCode: 16 as const,
-      dataType: 'float32' as const,
-      scale: 1,
-      offset: 0,
-      onValue: 0.1,
-      offValue: 0.1000000001,
-    };
-    const request = jest.fn(async () => encode(register.offValue, register));
-    const router = routerFor(register, request);
-    await expect(router.readOutput(point)).rejects.toThrow('indistinguishable on/off values');
-  });
-  it.each(['big', 'little'] as const)(
-    'recognizes encoded float32 switch values with %s word order',
-    async (wordOrder) => {
-      const register = {
-        ...action,
-        functionCode: 16 as const,
-        dataType: 'float32' as const,
-        wordOrder,
-        scale: 2,
-        offset: 3,
-        onValue: 3.2,
-        offValue: 3.4,
-      };
-      let actual = register.onValue;
-      const request = jest.fn(async (_unit: number, pdu: Buffer) =>
-        pdu[0] === 3 ? encode(actual, register) : pdu.subarray(0, 5),
-      );
-      const router = routerFor(register, request);
-      expect(await router.readOutput(point)).toBe(true);
-      await router.write(point, false);
-      actual = register.offValue;
-      expect(await router.readOutput(point)).toBe(false);
-      await router.write(point, true);
-      actual = 4;
-      await expect(router.readOutput(point)).rejects.toThrow('unknown state');
-    },
-  );
 });

@@ -1,33 +1,33 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  OneToMany,
-  DeleteDateColumn,
-  Index,
-} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  Index,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { ApiToken } from './api-token.entity';
+import { AuthenticationDetail } from './authenticationDetail.entity';
+import { BillingTransaction } from './billing-transaction.entity';
+import { FormSubmission } from './form';
+import { Project } from './project';
+import { ProjectInvitation } from './project-invitation.entity';
+import { ProjectMember } from './project-member.entity';
+import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { ResourceUsage } from './resourceUsage.entity';
-import { AuthenticationDetail } from './authenticationDetail.entity';
-import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { NFCCard } from './rfidCard.entity';
 import { Session } from './session.entity';
-import { BillingTransaction } from './billing-transaction.entity';
-import { Project } from './project';
-import { ProjectMember } from './project-member.entity';
-import { ProjectInvitation } from './project-invitation.entity';
-import { FormSubmission } from './form';
 import { UserRole } from './user-role.entity';
-import { ApiToken } from './api-token.entity';
-
+import { UserSecurityState } from './user-security-state';
 
 @Index('IDX_user_deleteAccountToken', ['deleteAccountToken'])
 @Entity()
-export class User {
+export class User extends UserSecurityState {
   @PrimaryGeneratedColumn()
   @ApiProperty({
     description: 'The unique identifier of the user',
@@ -65,23 +65,6 @@ export class User {
 
   @Column({ default: false, type: 'boolean' })
   isDisabled!: boolean;
-
-  @Column({ type: 'text', nullable: true })
-  @Exclude()
-  emailVerificationToken!: string | null;
-
-  @Column({ type: 'datetime', nullable: true })
-  @Exclude()
-  emailVerificationTokenExpiresAt!: Date | null;
-
-  @Column({ type: 'text', nullable: true })
-  @Exclude()
-  passwordResetToken!: string | null;
-
-  @Column({ type: 'datetime', nullable: true })
-  @Exclude()
-  passwordResetTokenExpiresAt!: Date | null;
-
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the user was created',
@@ -100,35 +83,6 @@ export class User {
     required: false,
   })
   deletedAt?: Date | null;
-
-  @Column({ type: 'datetime', nullable: true })
-  @Exclude()
-  lastUsernameChangeAt!: Date | null;
-
-  @Column({ type: 'datetime', nullable: true })
-  @Exclude()
-  lockedUntil!: Date | null;
-
-  @Column({ type: 'integer', default: 0 })
-  @Exclude()
-  failedLoginAttempts!: number;
-
-  @Column({ type: 'datetime', nullable: true })
-  @Exclude()
-  firstFailedLoginAt!: Date | null;
-
-  @Column({ type: 'text', nullable: true })
-  @Exclude()
-  deleteAccountToken!: string | null;
-
-  @Column({ type: 'datetime', nullable: true })
-  @Exclude()
-  deleteAccountTokenExpiresAt!: Date | null;
-
-  @Column({ type: 'datetime', nullable: true })
-  @Exclude()
-  deleteAccountRequestedAt!: Date | null;
-
   @OneToMany(() => ResourceIntroduction, (introduction) => introduction.receiverUser, {
     onDelete: 'CASCADE',
   })
@@ -167,11 +121,6 @@ export class User {
     onDelete: 'CASCADE',
   })
   nfcCards!: NFCCard[];
-
-  @Column({ type: 'text', nullable: true })
-  @Exclude()
-  nfcKeySeedToken!: string | null;
-
   @OneToMany(() => Session, (session) => session.user, {
     onDelete: 'CASCADE',
   })

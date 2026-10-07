@@ -1,50 +1,47 @@
 // SumUp payment integration service for billing and reader management
 // FEATURE: Billing SumUp integration
 
-import { BillingTransaction, Setting, BillingTransactionStatus } from '@attraccess/database-entities';
+import { BillingTransaction, Setting } from '@attraccess/database-entities';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository } from 'typeorm';
 import { SumUp } from '@sumup/sdk';
+import { Repository } from 'typeorm';
+import { AuditService } from '../audit/audit.service';
 import { EncryptionService } from '../encryption/encryption.service';
-import { SumUpMerchantDto } from './dto/sumup/sumup-merchant.dto';
-import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
-import { SettingsService } from '../settings/settings.service';
-import { SumupTransactionCallbackDto, SumupTransactionEventType } from './dto/sumup/sumup-transaction-callback.dto';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { LiveNotificationsService } from './liveNotificationsService';
-import { BillingService } from './billing.service';
 import { CronTimer } from '../metrics/instrumentation/cron/cron.helper';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
-import { AuditService } from '../audit/audit.service';
-
-export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
+import { SettingsService } from '../settings/settings.service';
+import { BillingService } from './billing.service';
+import { SumUpMerchantDto } from './dto/sumup/sumup-merchant.dto';
+import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
+import { LiveNotificationsService } from './liveNotificationsService';
+import { SumupPaymentProcessingImplementation } from './sumup-payment-processing';
 
 @Injectable()
-export class SumUpService {
-  private readonly logger = new Logger(SumUpService.name);
-  private hasPendingTransactions = true;
+export class SumUpService extends SumupPaymentProcessingImplementation {
+  protected readonly logger = new Logger(SumUpService.name);
+  protected hasPendingTransactions = true;
 
   constructor(
     @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
-    private readonly encryptionService: EncryptionService,
-    private readonly settingsService: SettingsService,
+    protected readonly settingRepository: Repository<Setting>,
+    protected readonly encryptionService: EncryptionService,
+    protected readonly settingsService: SettingsService,
     @InjectRepository(BillingTransaction)
-    private readonly billingTransactionRepository: Repository<BillingTransaction>,
-    private readonly liveNotificationsService: LiveNotificationsService,
-    private readonly billingService: BillingService,
-    private readonly cronTimer: CronTimer,
-    private readonly externalCallTimer: ExternalCallTimer,
-    private readonly auditService: AuditService,
-  ) {}
+    protected readonly billingTransactionRepository: Repository<BillingTransaction>,
+    protected readonly liveNotificationsService: LiveNotificationsService,
+    protected readonly billingService: BillingService,
+    protected readonly cronTimer: CronTimer,
+    protected readonly externalCallTimer: ExternalCallTimer,
+    protected readonly auditService: AuditService,
+  ) {
+    super();
+  }
 
   async setApiKey(token: string): Promise<void> {
     const sumUp = new SumUp({ apiKey: token });
     const me = await this.externalCallTimer
-      .time('sumup', 'me', () =>
-        sumUp.get<{ merchant_profile?: { merchant_code?: string } }>({ path: '/v0.1/me' }),
-      )
+      .time('sumup', 'me', () => sumUp.get<{ merchant_profile?: { merchant_code?: string } }>({ path: '/v0.1/me' }))
       .catch((error) => {
         this.logger.error('Invalid API key', { error });
         throw new BadRequestException('Invalid API key');
@@ -89,7 +86,7 @@ export class SumUpService {
     }
   }
 
-  private async getSumUp(): Promise<SumUp> {
+  protected async getSumUp(): Promise<SumUp> {
     const apiKeySetting = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
     const apiKeyEncrypted = apiKeySetting?.value;
     if (!apiKeyEncrypted) {
@@ -100,7 +97,7 @@ export class SumUpService {
     return new SumUp({ apiKey });
   }
 
-  private async getMerchantCode(): Promise<string> {
+  protected async getMerchantCode(): Promise<string> {
     const setting = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'merchantCode' });
     if (!setting?.value) {
       throw new BadRequestException('SumUp merchant code not found');
@@ -119,9 +116,7 @@ export class SumUpService {
   async getReaders(): Promise<SumUpReaderDto[]> {
     const sumUp = await this.getSumUp();
     const merchantCode = await this.getMerchantCode();
-    const response = await this.externalCallTimer.time('sumup', 'readers_list', () =>
-      sumUp.readers.list(merchantCode),
-    );
+    const response = await this.externalCallTimer.time('sumup', 'readers_list', () => sumUp.readers.list(merchantCode));
     return response.items as unknown as SumUpReaderDto[];
   }
 
@@ -154,184 +149,6 @@ export class SumUpService {
       }
     });
   }
-
-  async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransaction> {
-    if (amount % 1 !== 0) {
-      throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
-    }
-
-    const { currency, minorUnit } = await this.billingService.getConfiguration();
-
-    const sumUp = await this.getSumUp();
-    const merchantCode = await this.getMerchantCode();
-
-    let returnUrl: string | undefined;
-    const publicInternetUrl = await this.settingsService.getPublicInternetUrl();
-    if (publicInternetUrl?.startsWith('https://')) {
-      returnUrl = publicInternetUrl + '/api/billing/top-up/sumup/callback';
-      this.logger.debug('setting returl_url for sumup checkout', { returnUrl });
-    }
-
-    try {
-      const checkout = await this.externalCallTimer.time('sumup', 'checkout', () =>
-        sumUp.readers.createCheckout(merchantCode, readerId, {
-          description: 'Attraccess Top-up',
-          total_amount: {
-            currency,
-            value: amount,
-            minor_unit: minorUnit,
-          },
-          ...(returnUrl ? { return_url: returnUrl } : {}),
-        }),
-      );
-
-      const transaction = await this.billingTransactionRepository.save({
-        userId,
-        amount: amount,
-        externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:${checkout.data.client_transaction_id}`,
-        status: BillingTransactionStatus.Pending,
-      });
-      this.hasPendingTransactions = true;
-
-      this.liveNotificationsService.notifyTransactionUpdate(transaction);
-      void this.auditService.recordBillingTransaction({
-        transactionId: transaction.id,
-        userId: transaction.userId,
-        amount: transaction.amount,
-        status: transaction.status,
-        source: 'sumup-topup',
-      });
-
-      return transaction;
-    } catch (error) {
-      if (error.error.errors.detail === 'Not Found' && error.status === 404) {
-        throw new BadRequestException('READER_NOT_FOUND');
-      }
-
-      throw error;
-    }
-  }
-
-  async handleTransactionCallback(data: DeepPartial<SumupTransactionCallbackDto>): Promise<void> {
-    if (data.event_type !== SumupTransactionEventType.SoloTransactionUpdated) {
-      this.logger.warn('Received unknown sumup webhook event', { eventType: data.event_type, fullEvent: data });
-      return;
-    }
-
-    const transactionId = data.payload?.client_transaction_id;
-    if (!transactionId) {
-      this.logger.warn('Received sumup webhook event with no transaction id', { fullEvent: data });
-      return;
-    }
-
-    await this.updateTransactionStatusBySumupServer(transactionId);
-  }
-
-  private async updateTransactionStatusBySumupServer(sumupTransactionId: string): Promise<void> {
-    const transaction = await this.billingTransactionRepository.findOneBy({
-      externalReference: `sumup_topup_transaction:${sumupTransactionId}`,
-    });
-
-    if (!transaction) {
-      this.logger.error(`updateTransactionStatusBySumupServer: Sumup transaction not found, ${sumupTransactionId}`);
-      throw new BadRequestException('Sumup transaction not found');
-    }
-
-    const sumup = await this.getSumUp();
-    const merchantCode = await this.getMerchantCode();
-    const sumUpTransactionData = await this.externalCallTimer.time('sumup', 'transactions', () =>
-      sumup.transactions.get(merchantCode, {
-        client_transaction_id: sumupTransactionId,
-      }),
-    );
-
-    const previousStatus = transaction.status;
-    switch (sumUpTransactionData.status) {
-      case 'CANCELLED':
-      case 'FAILED':
-      case 'REFUNDED':
-        transaction.status = BillingTransactionStatus.Failed;
-        break;
-
-      case 'PENDING':
-        transaction.status = BillingTransactionStatus.Pending;
-        break;
-
-      case 'SUCCESSFUL':
-        transaction.status = BillingTransactionStatus.Completed;
-        break;
-
-      default: {
-        const exhaustiveCheck: never = sumUpTransactionData.status;
-        throw new Error(`Unknown sumup transaction status: ${exhaustiveCheck}`);
-      }
-    }
-
-    if (transaction.status === previousStatus) return;
-
-    this.logger.debug(
-      `updateTransactionStatusBySumupServer: Updating transaction status of ${sumupTransactionId} to ${transaction.status}`,
-    );
-    const updatedTransaction = await this.billingTransactionRepository.save(transaction);
-    this.hasPendingTransactions = true;
-    this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
-    void this.auditService.recordBillingTransaction({
-      transactionId: updatedTransaction.id,
-      userId: updatedTransaction.userId,
-      amount: updatedTransaction.amount,
-      status: updatedTransaction.status,
-      previousStatus,
-      source: 'sumup-topup',
-    });
-
-    this.logger.debug(
-      `updateTransactionStatusBySumupServer: Transaction status updated of ${sumupTransactionId} to ${transaction.status}`,
-    );
-  }
-
-  @Cron(CronExpression.EVERY_30_SECONDS)
-  async processPendingTransactions(): Promise<void> {
-    await this.cronTimer.time('sumup_poll', async () => {
-      if (!this.hasPendingTransactions) {
-        return;
-      }
-
-      this.logger.debug('processPendingTransactions: starting');
-
-      const transactions = await this.billingTransactionRepository.findBy({
-        status: BillingTransactionStatus.Pending,
-      });
-
-      this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
-
-      const consideredTransactions = transactions.filter((transaction) =>
-        transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX),
-      );
-
-      this.hasPendingTransactions = consideredTransactions.length > 0;
-
-      for (const transaction of consideredTransactions) {
-        const transactionId = transaction.externalReference.split(':')[1];
-        if (!transactionId) {
-          this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
-          transaction.status = BillingTransactionStatus.Failed;
-          const updatedTransaction = await this.billingTransactionRepository.save(transaction);
-          this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
-          void this.auditService.recordBillingTransaction({
-            transactionId: updatedTransaction.id,
-            userId: updatedTransaction.userId,
-            amount: updatedTransaction.amount,
-            status: updatedTransaction.status,
-            previousStatus: BillingTransactionStatus.Pending,
-            source: 'sumup-topup',
-          });
-          continue;
-        }
-
-        await this.updateTransactionStatusBySumupServer(transactionId);
-      }
-
-      this.logger.debug('processPendingTransactions: finished');
-    });
-  }
 }
+
+export { SUMUP_TOPUP_TRANSACTION_PREFIX } from './sumup.service.route-context';

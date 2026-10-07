@@ -1,55 +1,21 @@
-import { useCallback, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
   InputGroup,
   ModalBody,
   ModalFooter,
   ModalHeader,
   ModalHeading,
-  NumberField,
-  NumberFieldDecrementButton,
-  NumberFieldGroup,
-  NumberFieldIncrementButton,
-  NumberFieldInput,
   Spinner,
   TextField,
   Tooltip,
   TooltipContent,
 } from '@heroui/react';
-import { ClipboardCopyIcon, RefreshCwIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  MessagingRateLimitSettingsDto,
-  usePushServicePushGetVapidConfig,
-  UsePushServicePushGetVapidConfigKeyFn,
-  usePushServicePushReplaceVapidKeys,
-  useSettingsServiceGetMessagingRateLimitSettings,
-  UseSettingsServiceGetMessagingRateLimitSettingsKeyFn,
-  useSettingsServiceUpdateMessagingRateLimitSettings,
-} from '@attraccess/react-query-client';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
+import { ClipboardCopyIcon } from 'lucide-react';
 import { SettingsSection } from '../../components/SettingsSection';
-import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
 import { Button } from '../../../../components/button';
 import { StandardModal } from '../../../../components/standardModal';
-import { useToastMessage } from '../../../../components/toastProvider';
-import en from './en.json';
-import de from './de.json';
-
-type LimitKey = keyof MessagingRateLimitSettingsDto;
-
-const LIMIT_KEYS: LimitKey[] = [
-  'sendMaxPerWindow',
-  'sendWindowSeconds',
-  'contactMaxPerWindow',
-  'contactWindowSeconds',
-];
-
-type ConfirmStep = 'warning' | 'final' | null;
+import { useMessagingSectionState } from './useMessagingSectionState';
+import { MessagingSectionLimitsLoadFailed } from './MessagingSectionLimitsLoadFailed';
 
 /**
  * Messaging limits and the push transport.
@@ -59,80 +25,29 @@ type ConfirmStep = 'warning' | 'final' | null;
  * it keeps its own two-step confirmation instead of riding along on Save.
  */
 export function MessagingSection() {
-  const { t } = useTranslations({ en, de });
-  const toast = useToastMessage();
-  const queryClient = useQueryClient();
-
-  const { data: limits, isLoading } = useSettingsServiceGetMessagingRateLimitSettings();
-  // Derived draft: an untouched field falls back to the server's value, so a background refetch
-  // cannot overwrite an unsaved edit (ATT-868).
-  const [draft, setDraft] = useState<Partial<Record<LimitKey, number>>>({});
-
-  const [confirmStep, setConfirmStep] = useState<ConfirmStep>(null);
-  const [customPublicKey, setCustomPublicKey] = useState('');
-  const [customPrivateKey, setCustomPrivateKey] = useState('');
-  const [pendingOverride, setPendingOverride] = useState<{ publicKey: string; privateKey: string } | undefined>();
-
-  const { data: vapidConfig } = usePushServicePushGetVapidConfig();
-
-  const { mutate: saveLimits, isPending: isSaving } = useSettingsServiceUpdateMessagingRateLimitSettings({
-    onSuccess(data) {
-      // Prime from the response and release the pin in the same tick — see MonitoringSection.
-      queryClient.setQueryData(UseSettingsServiceGetMessagingRateLimitSettingsKeyFn(), data);
-      setDraft({});
-      toast.success({ title: t('saved.title'), description: t('saved.description') });
-    },
-    onError() {
-      toast.error({ title: t('error.title'), description: t('error.description') });
-    },
-  });
-
-  const { mutate: replaceKeys, isPending: isReplacing } = usePushServicePushReplaceVapidKeys({
-    onSuccess(data) {
-      queryClient.invalidateQueries({ queryKey: UsePushServicePushGetVapidConfigKeyFn() });
-      setConfirmStep(null);
-      setPendingOverride(undefined);
-      setCustomPublicKey('');
-      setCustomPrivateKey('');
-      toast.success({
-        title: t('keysReplaced.title'),
-        description: t('keysReplaced.description', { count: data.deletedSubscriptions }),
-      });
-    },
-    onError() {
-      toast.error({ title: t('errors.replaceFailed') });
-    },
-  });
-
-  const copyPublicKey = useCallback(async () => {
-    if (!vapidConfig?.publicKey || !navigator?.clipboard?.writeText) {
-      toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(vapidConfig.publicKey);
-      toast.success({ title: t('copied.title'), description: t('copied.description') });
-    } catch {
-      toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
-    }
-  }, [toast, t, vapidConfig?.publicKey]);
-
-  // Loading and failure both land here: the query is settled and returned nothing usable. Without
-  // this, `valueOf` falls back to NaN for every key, `Object.is(NaN, undefined)` is false, and the
-  // section paints an "unsaved changes" bar over four blank fields with no edit behind it — Save
-  // disabled because NaN is not an integer, Discard powerless because the draft is already empty.
-  const areLimitsReady = limits !== undefined;
-
-  // NaN is React Aria's value for a cleared NumberField, and it keeps the field controlled.
-  const valueOf = (key: LimitKey) => draft[key] ?? limits?.[key] ?? NaN;
-  // A cleared field is still a departure from the saved value: the bar must stay mounted so Discard
-  // is reachable, but Save has to be blocked. Treating NaN as "not dirty" would unmount the bar and
-  // strand the operator with an empty field and no way back.
-  const isDirty = areLimitsReady && LIMIT_KEYS.some((key) => !Object.is(valueOf(key), limits?.[key]));
-  const isSavable = LIMIT_KEYS.every((key) => {
-    const value = valueOf(key);
-    return Number.isInteger(value) && value >= 1;
-  });
+  const {
+    t,
+    isLoading,
+    setDraft,
+    confirmStep,
+    setConfirmStep,
+    customPublicKey,
+    setCustomPublicKey,
+    customPrivateKey,
+    setCustomPrivateKey,
+    pendingOverride,
+    setPendingOverride,
+    vapidConfig,
+    saveLimits,
+    isSaving,
+    replaceKeys,
+    isReplacing,
+    copyPublicKey,
+    areLimitsReady,
+    valueOf,
+    isDirty,
+    isSavable,
+  } = useMessagingSectionState();
 
   if (isLoading) {
     return (
@@ -165,86 +80,20 @@ export function MessagingSection() {
 
   return (
     <SettingsSection title={t('title')} description={t('description')} aside={aside}>
-      <div className="flex flex-col">
-        {!areLimitsReady ? (
-          // The limits are unknown, not zero. The VAPID controls below are a separate query and
-          // stay usable, so this replaces only the four rows it actually covers.
-          <Alert status="danger" data-testid="messaging-limits-load-failed">
-            <AlertStatusIcon status="danger" />
-            <AlertContent>
-              <AlertDescription>{t('limits.loadFailed')}</AlertDescription>
-            </AlertContent>
-          </Alert>
-        ) : (
-          LIMIT_KEYS.map((key) => (
-            <SettingsRow
-              key={key}
-              data-testid={`messaging-limit-row-${key}`}
-              label={t(`fields.${key}.label`)}
-              hint={t(`fields.${key}.description`)}
-            >
-              <NumberField
-                aria-label={t(`fields.${key}.label`)}
-                value={valueOf(key)}
-                minValue={1}
-                onChange={(next) => setDraft((current) => ({ ...current, [key]: next }))}
-              >
-                <NumberFieldGroup>
-                  <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                  <NumberFieldInput />
-                  <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                </NumberFieldGroup>
-              </NumberField>
-            </SettingsRow>
-          ))
-        )}
-
-        <SettingsRow label={t('push.regenerateLabel')} hint={t('push.regenerateHint')}>
-          <Button
-            variant="tertiary"
-            size="sm"
-            onPress={() => {
-              setPendingOverride(undefined);
-              setConfirmStep('warning');
-            }}
-          >
-            <RefreshCwIcon size={16} />
-            {t('regenerateButton')}
-          </Button>
-        </SettingsRow>
-
-        <SettingsRow stacked label={t('overrideTitle')} hint={t('overrideDescription')}>
-          <div className="flex w-full flex-col gap-2">
-            <TextField value={customPublicKey} onChange={setCustomPublicKey} aria-label={t('publicKeyInputLabel')}>
-              <InputGroup>
-                <InputGroup.Input className="font-mono text-sm" placeholder={t('publicKeyInputLabel')} />
-              </InputGroup>
-            </TextField>
-            <TextField value={customPrivateKey} onChange={setCustomPrivateKey} aria-label={t('privateKeyInputLabel')}>
-              <InputGroup>
-                <InputGroup.Input
-                  className="font-mono text-sm"
-                  type="password"
-                  placeholder={t('privateKeyInputLabel')}
-                />
-              </InputGroup>
-            </TextField>
-            <div className="flex">
-              <Button
-                variant="secondary"
-                size="sm"
-                isDisabled={!customPublicKey.trim() || !customPrivateKey.trim()}
-                onPress={() => {
-                  setPendingOverride({ publicKey: customPublicKey.trim(), privateKey: customPrivateKey.trim() });
-                  setConfirmStep('warning');
-                }}
-              >
-                {t('applyCustomButton')}
-              </Button>
-            </div>
-          </div>
-        </SettingsRow>
-      </div>
+      <MessagingSectionLimitsLoadFailed
+        {...{
+          areLimitsReady,
+          t,
+          valueOf,
+          setDraft,
+          setPendingOverride,
+          setConfirmStep,
+          customPublicKey,
+          setCustomPublicKey,
+          customPrivateKey,
+          setCustomPrivateKey,
+        }}
+      />
 
       <SettingsSaveBar
         isDirty={isDirty}

@@ -20,7 +20,8 @@
         "{projectRoot}/version.txt",
         "{projectRoot}/partitions.csv",
         "{projectRoot}/include/**/*",
-        "{projectRoot}/build_firmwares.py",
+        "{projectRoot}/*.py",
+        "{projectRoot}/tools/**/*",
         "{projectRoot}/src/**/*"
       ],
       "cache": true

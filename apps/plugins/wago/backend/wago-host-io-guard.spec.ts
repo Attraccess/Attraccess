@@ -1,8 +1,17 @@
 import { spawnSync } from 'node:child_process';
-import { linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
+import { registerDoesNotSpawnMetadataParsersForASDescriptor } from './wago-host-io-guard.test-cases';
+import { registerRejectsHostIdentityOwnershipInS } from './wago-host-io-guard.test-cases';
+import { registerRejectsEveryRealEffectiveSavedAndFilesystemSCollision } from './wago-host-io-guard.test-cases';
+import { registerFailsClosedForAnUnobservableHostAccountDatabaseOrAlternateNssSource } from './wago-host-io-guard.test-cases';
+import { registerPermitsReadOnlyDescriptorsAndUnrelatedWritableFiles } from './wago-host-io-guard.test-cases';
+import { registerFailsClosedWhenALiveOutputDescriptorHasMissingOrAmbiguousAccessFlags } from './wago-host-io-guard.test-cases';
+import { registerChecksOwnershipOnlyWhenGrantingAnExemptionWhileStillObservingEveryProcessAndDescriptor } from './wago-host-io-guard.test-cases';
+import { registerPermitsVerifiedContainerDescendantsAndCgroupV1DockerMembership } from './wago-host-io-guard.test-cases';
+import { registerRevalidatesIdentityOwnershipAndNewDirectWritersOnSubsequentGates } from './wago-host-io-guard.test-cases';
 
 const containerId = 'a'.repeat(64);
 
@@ -96,6 +105,10 @@ else process.exit(99);`,
 }
 
 describe('host digital output and identity guard', () => {
+  defineHostDigitalOutputAndIdentityGuardTests();
+});
+
+export function defineHostDigitalOutputAndIdentityGuardTests() {
   let host: ReturnType<typeof fixture>;
   beforeEach(() => (host = fixture()));
   afterEach(() => host.dispose());
@@ -112,49 +125,36 @@ describe('host digital output and identity guard', () => {
   it('admits an unused numeric identity with no direct output writers', () => {
     expect(host.run().status).toBe(0);
   });
+  const scope = {
+    get host() {
+      return host;
+    },
+    set host(value: typeof host) {
+      host = value;
+    },
+    get rejected() {
+      return rejected;
+    },
+    get owned() {
+      return owned;
+    },
+    get containerId() {
+      return containerId;
+    },
+  };
 
-  it.each(['directory', 'pipe'])('does not spawn metadata parsers for a %s descriptor', (kind) => {
-    host.processRecord(22);
-    if (kind === 'pipe') expect(spawnSync('mkfifo', [join(host.root, 'pipe')]).status).toBe(0);
-    host.fd(22, '0100001', kind === 'directory' ? 'proc' : 'pipe');
-    // Any external stat of this FD fails. Its kernel file type already proves
-    // it cannot alias the regular sysfs DOUT register, so no parser is needed.
-    expect(host.run(false, 'fd-unreadable').status).toBe(0);
-  });
+  registerDoesNotSpawnMetadataParsersForASDescriptor(scope);
 
-  it.each([
-    ['etc/passwd', 'unrelated:x:10001:20000::/:/bin/sh\n'],
-    ['etc/passwd', 'unrelated:x:20000:10001::/:/bin/sh\n'],
-    ['etc/group', 'unrelated:x:10001:\n'],
-  ])('rejects host identity ownership in %s', (path, content) => {
-    host.file(path, content);
-    rejected('runtime-identity-conflict');
-  });
+  registerRejectsHostIdentityOwnershipInS(scope);
 
-  it.each(['Uid', 'Gid'])('rejects every real, effective, saved and filesystem %s collision', (field) => {
-    for (let index = 0; index < 4; index++) {
-      const values = Array(4).fill('0');
-      values[index] = '10001';
-      host.processRecord(
-        22,
-        `Uid: ${field === 'Uid' ? values.join(' ') : '0 0 0 0'}\nGid: ${field === 'Gid' ? values.join(' ') : '0 0 0 0'}\nGroups: 0\n`,
-      );
-      rejected('runtime-identity-conflict');
-    }
-  });
+  registerRejectsEveryRealEffectiveSavedAndFilesystemSCollision(scope);
 
   it('rejects a supplementary group collision', () => {
     host.processRecord(22, 'Uid: 50 50 50 50\nGid: 50 50 50 50\nGroups: 50 10001\n');
     rejected('runtime-identity-conflict');
   });
 
-  it('fails closed for an unobservable host account database or alternate NSS source', () => {
-    host.file('etc/nsswitch.conf', 'passwd: files ldap\ngroup: files\n');
-    rejected('host-io-observation-failed');
-    rmSync(join(host.root, 'etc/nsswitch.conf'));
-    rmSync(join(host.root, 'etc/group'));
-    rejected('host-io-observation-failed');
-  });
+  registerFailsClosedForAnUnobservableHostAccountDatabaseOrAlternateNssSource(scope);
 
   it.each(['name=userns', 'name=rootless'])('rejects Docker identity translation %s', (security) => {
     host.state({ security: [security] });
@@ -179,14 +179,7 @@ describe('host digital output and identity guard', () => {
     rejected('output-host-process-conflict');
   });
 
-  it('permits read-only descriptors and unrelated writable files', () => {
-    host.processRecord(22);
-    host.fd(22, '0100000');
-    host.file('other-file', '');
-    host.processRecord(23);
-    host.fd(23, '0100002', 'other-file');
-    expect(host.run().status).toBe(0);
-  });
+  registerPermitsReadOnlyDescriptorsAndUnrelatedWritableFiles(scope);
 
   it.each(['8', 'invalid', '0100003'])('fails closed for invalid output descriptor flags %s', (flags) => {
     host.processRecord(22);
@@ -200,14 +193,7 @@ describe('host digital output and identity guard', () => {
     rejected('host-io-observation-failed', false, 'fd-unreadable');
   });
 
-  it('fails closed when a live output descriptor has missing or ambiguous access flags', () => {
-    host.processRecord(22);
-    host.fd(22, '0100001');
-    host.file('proc/22/fdinfo/5', 'pos: 0\n');
-    rejected('host-io-observation-failed');
-    host.file('proc/22/fdinfo/5', 'flags: 0100000\nflags: 0100001\n');
-    rejected('host-io-observation-failed');
-  });
+  registerFailsClosedWhenALiveOutputDescriptorHasMissingOrAmbiguousAccessFlags(scope);
 
   it('allows a descriptor that closed during observation after proving its absence', () => {
     host.processRecord(22);
@@ -241,35 +227,9 @@ describe('host digital output and identity guard', () => {
     rejected('runtime-identity-conflict');
   });
 
-  it('checks ownership only when granting an exemption, while still observing every process and descriptor', () => {
-    owned();
-    host.processRecord(23);
-    host.fd(23, '0100000');
-    host.processRecord(24);
-    host.file('unrelated-file', '');
-    host.fd(24, '0100002', 'unrelated-file');
-    expect(host.run(true).status).toBe(0);
-    const observations = readFileSync(join(host.root, 'observations'), 'utf8').trim().split('\n');
-    for (const pid of [1, 23, 24]) {
-      expect(observations.filter((path) => path === `/proc/${pid}/stat`)).toHaveLength(2);
-      expect(observations).toContain(`/proc/${pid}/status`);
-      expect(observations).not.toContain(`/proc/${pid}/uid_map`);
-      expect(observations).not.toContain(`/proc/${pid}/cgroup`);
-    }
-    expect(observations).toContain('/proc/23/fdinfo/5');
-    expect(observations.filter((path) => path === '/proc/22/cgroup')).toHaveLength(2);
-  });
+  registerChecksOwnershipOnlyWhenGrantingAnExemptionWhileStillObservingEveryProcessAndDescriptor(scope);
 
-  it('permits verified container descendants and cgroup-v1 Docker membership', () => {
-    owned(`11:memory:/docker/${containerId}\n10:cpu,cpuacct:/docker/${containerId}\n`);
-    host.processRecord(
-      23,
-      'Uid: 10001 10001 10001 10001\nGid: 10001 10001 10001 10001\nGroups:\n',
-      `11:memory:/docker/${containerId}/child\n10:cpu,cpuacct:/docker/${containerId}/child\n`,
-    );
-    host.fd(23, '0100001');
-    expect(host.run(true).status).toBe(0);
-  });
+  registerPermitsVerifiedContainerDescendantsAndCgroupV1DockerMembership(scope);
 
   it('does not exempt another host process when the owned runtime exists', () => {
     owned();
@@ -298,14 +258,11 @@ describe('host digital output and identity guard', () => {
     rejected('runtime-identity-conflict', true);
   });
 
-  it('revalidates identity ownership and new direct writers on subsequent gates', () => {
-    owned();
-    expect(host.run(true).status).toBe(0);
-    host.file('etc/group', 'unrelated:x:10001:\n');
-    rejected('runtime-identity-conflict', true);
-    host.file('etc/group', 'root:x:0:\n');
-    host.processRecord(23);
-    host.fd(23, '0100001');
-    rejected('output-host-process-conflict', true);
-  });
-});
+  registerRevalidatesIdentityOwnershipAndNewDirectWritersOnSubsequentGates(scope);
+
+  return scope;
+}
+
+export type HostDigitalOutputAndIdentityGuardTestScope = ReturnType<
+  typeof defineHostDigitalOutputAndIdentityGuardTests
+>;

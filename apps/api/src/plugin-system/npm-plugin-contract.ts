@@ -1,5 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from './plugin-dependencies';

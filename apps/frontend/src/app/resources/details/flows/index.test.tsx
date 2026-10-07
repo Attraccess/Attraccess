@@ -1,9 +1,18 @@
 import { useState, type Dispatch, type SetStateAction, type ReactNode } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Node, Edge } from '@xyflow/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 import FlowsPage from './index';
+import { registerLoadsSavedNodesAndValidationDisablesSavingUnchangedGraphsAndRestoresPullToRefreshOnUn } from './index.test-cases';
+import { registerDetectsChangedNodeSAndSavesTheGraph } from './index.test-cases';
+import { registerDetectsChangedEdgeS } from './index.test-cases';
+import { registerSupportsKeyboardCopyCutPasteSelectAllWithoutHijackingTextInputs } from './index.test-cases';
+import { registerAddsCatalogAndDroppedNodesSwitchesCanvasModeAndLaysOutTheGraph } from './index.test-cases';
+import { registerAutoAlignsUsingMeasuredHandlesAndPreservesPositionsDataAndConnectionsThroughSaveAndRel } from './index.test-cases';
+import { registerKeepsConfettiOffUntilEnabledDistinguishesFailuresAndClearsAnimationsWhenDisabled } from './index.test-cases';
+import { registerShowsLoadingAndErrorsAndRoutesImportExportActions } from './index.test-cases';
+
 const state = vi.hoisted(() => ({
   original: undefined as
     undefined | { nodes: Node[]; edges: Edge[]; validationErrors?: { nodeId: string; message: string }[] },
@@ -172,207 +181,34 @@ beforeEach(() => {
   });
 });
 afterEach(cleanup);
-it('loads saved nodes and validation, disables saving unchanged graphs and restores pull-to-refresh on unmount', () => {
-  state.original!.validationErrors = [{ nodeId: 'one', message: 'Missing config' }];
-  const view = show();
-  expect(state.nodes).toEqual(state.original?.nodes);
-  expect(state.validation).toHaveBeenCalledWith([{ nodeId: 'one', message: 'Missing config' }]);
-  expect(saveButton()).toBeDisabled();
-  expect(state.refresh).toHaveBeenCalledWith(false);
-  view.unmount();
-  expect(state.refresh).toHaveBeenLastCalledWith(true);
-  expect(state.remove).toHaveBeenCalledWith(state.live);
-});
-it.each(['type', 'position', 'data', 'identity', 'count'] as const)(
-  'detects changed node %s and saves the graph',
-  (change) => {
-    show();
-    act(() =>
-      state.setNodes((previous) =>
-        change === 'count'
-          ? previous.slice(1)
-          : previous.map((node, index) =>
-              index
-                ? node
-                : {
-                    ...node,
-                    ...(change === 'type'
-                      ? { type: 'other' }
-                      : change === 'position'
-                        ? { position: { x: 30, y: 10 } }
-                        : change === 'data'
-                          ? { data: { value: true } }
-                          : { id: 'new' }),
-                  },
-            ),
-      ),
-    );
-    expect(saveButton()).toBeEnabled();
-    fireEvent.click(saveButton());
-    expect(state.save).toHaveBeenCalledWith({ resourceId: 7, requestBody: { nodes: state.nodes, edges: state.edges } });
-    act(() => state.options.onSuccess());
-    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['flow', 7] });
-  },
-);
-it.each(['source', 'target', 'identity', 'count'] as const)('detects changed edge %s', (change) => {
-  show();
-  act(() =>
-    state.setEdges((previous) =>
-      change === 'count'
-        ? []
-        : previous.map((edge) => ({
-            ...edge,
-            ...(change === 'source' ? { source: 'two' } : change === 'target' ? { target: 'one' } : { id: 'other' }),
-          })),
-    ),
-  );
-  expect(saveButton()).toBeEnabled();
-});
-it('supports keyboard copy/cut/paste/select-all without hijacking text inputs', () => {
-  show();
-  fireEvent.keyDown(document.body, { key: 'c', ctrlKey: true });
-  fireEvent.keyDown(document.body, { key: 'x', metaKey: true });
-  fireEvent.mouseMove(screen.getByTestId('canvas'), { clientX: 200, clientY: 300 });
-  fireEvent.keyDown(document.body, { key: 'v', ctrlKey: true });
-  expect(state.copy).toHaveBeenCalledOnce();
-  expect(state.cut).toHaveBeenCalledOnce();
-  expect(state.paste).toHaveBeenCalledWith({ x: 190, y: 280 });
-  fireEvent.keyDown(document.body, { key: 'a', ctrlKey: true });
-  expect(state.nodes.every((node) => node.selected)).toBe(true);
-  const input = document.createElement('input');
-  document.body.append(input);
-  fireEvent.keyDown(input, { key: 'c', ctrlKey: true });
-  expect(state.copy).toHaveBeenCalledOnce();
-  input.remove();
-});
-it('adds catalog and dropped nodes, switches canvas mode and lays out the graph', () => {
-  show();
-  fireEvent.click(screen.getByText('Insert trigger'));
-  expect(state.add).toHaveBeenCalledWith(expect.objectContaining({ type: 'trigger', position: { x: 400, y: 0 } }));
-  act(() =>
-    state.flowProps.onDrop({
-      preventDefault: vi.fn(),
-      dataTransfer: { getData: () => 'action' },
-      clientX: 50,
-      clientY: 100,
-    }),
-  );
-  expect(state.add).toHaveBeenLastCalledWith(
-    expect.objectContaining({ type: 'action', position: { x: 40, y: 80 }, data: { __centerOnDrop: true } }),
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'actions.modePan' }));
-  expect(state.flowProps.panOnDrag).toBe(true);
-  fireEvent.click(screen.getByRole('button', { name: 'actions.modeSelect' }));
-  expect(state.flowProps.selectionOnDrag).toBe(true);
-  fireEvent.click(document.querySelector('svg.lucide-layout-grid')?.closest('button') as HTMLButtonElement);
-  expect(state.fit).toHaveBeenCalled();
-  expect(state.nodes.every((node) => Number.isFinite(node.position.x))).toBe(true);
-});
-it('auto-aligns using measured handles and preserves positions, data and connections through save and reload', () => {
-  state.original = {
-    nodes: ['if', 'left', 'right'].map((id) => ({
-      id,
-      data: { label: id, custom: { retained: true } },
-      position: { x: 0, y: 0 },
-      measured: { width: 256, height: 100 },
-    })),
-    edges: [
-      { id: 'left-edge', source: 'if', target: 'left', sourceHandle: 'yes', targetHandle: 'input' },
-      { id: 'right-edge', source: 'if', target: 'right', sourceHandle: 'no', targetHandle: 'input' },
-    ],
+defineRootTestRegistrationsTests();
+
+export function defineRootTestRegistrationsTests() {
+  const scope = {
+    get state() {
+      return state;
+    },
+    show,
+    saveButton,
   };
-  state.internalNode.mockImplementation((id: string) =>
-    id === 'if'
-      ? {
-          internals: {
-            handleBounds: {
-              source: [
-                { id: 'no', x: 256 },
-                { id: 'yes', x: 0 },
-              ],
-            },
-          },
-        }
-      : undefined,
-  );
-  const original = state.original;
-  const view = show();
-  fireEvent.click(document.querySelector('svg.lucide-layout-grid')?.closest('button') as HTMLButtonElement);
-  const byId = Object.fromEntries(state.nodes.map((node) => [node.id, node]));
-  expect(byId.left.position.x).toBeLessThan(byId.right.position.x);
-  expect(state.edges).toEqual(state.original.edges);
 
-  // Model a server round trip with serialized data and a fresh page mount.
-  state.save.mockImplementationOnce(({ requestBody }: { requestBody: { nodes: Node[]; edges: Edge[] } }) => {
-    state.original = JSON.parse(JSON.stringify(requestBody));
-  });
-  const aligned = structuredClone({ nodes: state.nodes, edges: state.edges });
-  fireEvent.click(saveButton());
-  expect(state.save).toHaveBeenCalledWith({ resourceId: 7, requestBody: aligned });
-  view.unmount();
-  show();
-  expect(state.nodes).toEqual(aligned.nodes);
-  expect(state.nodes.map((node) => node.data)).toEqual(original.nodes.map((node) => node.data));
-  expect(state.edges).toEqual(original.edges);
-  expect(saveButton()).toBeDisabled();
-});
+  registerLoadsSavedNodesAndValidationDisablesSavingUnchangedGraphsAndRestoresPullToRefreshOnUn(scope);
 
-it('keeps confetti off until enabled, distinguishes failures and clears animations when disabled', () => {
-  const view = show();
-  expect(screen.getByRole('checkbox', { name: 'Confetti' })).not.toBeChecked();
-  expect(state.createConfetti).not.toHaveBeenCalled();
-  act(() => state.live?.({ type: 'flow.start' }));
-  expect(state.flowProps.edges[0].animated).toBe(true);
-  act(() => state.live?.({ type: 'flow.completed' }));
-  expect(state.flowProps.edges[0].animated).toBe(false);
-  expect(state.confetti).not.toHaveBeenCalled();
-  act(() => {
-    state.live?.({ type: 'node.processing.failed' });
-    state.live?.({ type: 'flow.completed' });
-  });
-  expect(state.confetti).not.toHaveBeenCalled();
+  registerDetectsChangedNodeSAndSavesTheGraph(scope);
 
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Confetti' }));
-  expect(state.createConfetti).toHaveBeenCalledOnce();
-  act(() => state.live?.({ type: 'flow.completed' }));
-  expect(state.confetti).toHaveBeenCalledWith();
-  act(() => {
-    state.live?.({ type: 'flow.start' });
-    state.live?.({ type: 'node.processing.failed' });
-  });
-  act(() => state.live?.({ type: 'flow.completed' }));
-  expect(state.confetti).toHaveBeenLastCalledWith(expect.objectContaining({ confettiNumber: 2 }));
+  registerDetectsChangedEdgeS(scope);
 
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Confetti' }));
-  expect(state.clearConfetti).toHaveBeenCalledOnce();
-  expect(state.destroyConfetti).toHaveBeenCalledOnce();
-  state.confetti.mockClear();
-  act(() => state.live?.({ type: 'flow.completed' }));
-  expect(state.confetti).not.toHaveBeenCalled();
+  registerSupportsKeyboardCopyCutPasteSelectAllWithoutHijackingTextInputs(scope);
 
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Confetti' }));
-  view.unmount();
-  expect(state.clearConfetti).toHaveBeenCalledTimes(2);
-  expect(state.destroyConfetti).toHaveBeenCalledTimes(2);
-  show();
-  expect(screen.getByRole('checkbox', { name: 'Confetti' })).not.toBeChecked();
-});
-it('shows loading and errors and routes import/export actions', () => {
-  state.original = undefined;
-  state.fetching = true;
-  const view = show();
-  expect(screen.getByRole('status', { name: 'loading' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'actions.import' })).toBeDisabled();
-  view.unmount();
-  state.fetching = false;
-  state.failed = true;
-  show();
-  expect(screen.getByRole('alert', { name: 'loadError' })).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'actions.import' }));
-  fireEvent.click(screen.getByRole('button', { name: 'actions.export' }));
-  expect(state.imported).toHaveBeenCalledOnce();
-  expect(state.exported).toHaveBeenCalledOnce();
-  const error = new Error('Denied');
-  act(() => state.options.onError(error));
-  expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));
-});
+  registerAddsCatalogAndDroppedNodesSwitchesCanvasModeAndLaysOutTheGraph(scope);
+
+  registerAutoAlignsUsingMeasuredHandlesAndPreservesPositionsDataAndConnectionsThroughSaveAndRel(scope);
+
+  registerKeepsConfettiOffUntilEnabledDistinguishesFailuresAndClearsAnimationsWhenDisabled(scope);
+
+  registerShowsLoadingAndErrorsAndRoutesImportExportActions(scope);
+
+  return scope;
+}
+
+export type RootTestRegistrationsTestScope = ReturnType<typeof defineRootTestRegistrationsTests>;

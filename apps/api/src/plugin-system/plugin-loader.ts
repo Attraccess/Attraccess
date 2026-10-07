@@ -1,8 +1,8 @@
-import { createRequire, Module as NodeModuleClass } from 'module';
-import { readFileSync } from 'fs';
-import { runInThisContext } from 'vm';
-import { dirname, isAbsolute } from 'path';
 import * as pluginsBackendSdk from '@attraccess/plugins-backend-sdk';
+import { readFileSync } from 'fs';
+import { createRequire, Module as NodeModuleClass } from 'module';
+import { dirname, isAbsolute } from 'path';
+import { runInThisContext } from 'vm';
 
 // Host-internal workspace libraries a plugin externalizes (to share the host's
 // single instance for DI-token / decorator-metadata identity) but which — unlike
@@ -49,7 +49,10 @@ export function loadPluginEntryExports(entryFile: string): Record<string, unknow
   const NodeModule = NodeModuleClass as unknown as {
     wrap(script: string): string;
     _nodeModulePaths(from: string): string[];
-    new (id: string, parent?: unknown): {
+    new (
+      id: string,
+      parent?: unknown,
+    ): {
       filename: string;
       paths: string[];
       exports: Record<string, unknown> & { default?: unknown };

@@ -7,7 +7,7 @@ const point: Snapshot['physicalPoints'][number] = { id: 'input', hardwareProfile
 describe('ModbusTcpAdapter', () => {
   it('completes a request when a complete response frame arrives', async () => {
     const server = createServer((socket) => {
-      socket.once('data', (request) => {
+      socket.once('data', (request: Buffer) => {
         const response = Buffer.alloc(10);
         request.copy(response, 0, 0, 2);
         response.writeUInt16BE(0, 2);
@@ -29,7 +29,7 @@ describe('ModbusTcpAdapter', () => {
 
   it('rejects a truncated response when the server closes the connection', async () => {
     const server = createServer((socket) => {
-      socket.once('data', (request) => {
+      socket.once('data', (request: Buffer) => {
         const response = Buffer.alloc(10);
         request.copy(response, 0, 0, 2);
         response.writeUInt16BE(0, 2);

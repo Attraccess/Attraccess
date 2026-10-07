@@ -1,15 +1,10 @@
+import { AutoIntroductionTarget, ResourceType, SupervisionMode } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, MinLength, IsEnum, IsUrl, ValidateIf, IsBoolean, IsObject, IsInt, Min } from 'class-validator';
-import { FileUpload } from '../../common/types/file-upload.types';
-import {
-  AutoIntroductionTarget,
-  DocumentationType,
-  ResourceType,
-  SupervisionMode,
-} from '@attraccess/database-entities';
+import { IsBoolean, IsEnum, IsInt, IsObject, IsOptional, IsString, Min, MinLength, ValidateIf } from 'class-validator';
 import { ToBoolean, ToJson, ToNumber } from '../../common/request-transformers';
+import { CreateResourceDtoDocumentation } from './createResourceDocumentation.dto';
 
-export class CreateResourceDto {
+export class CreateResourceDto extends CreateResourceDtoDocumentation {
   @ApiProperty({
     description: 'The name of the resource',
     example: '3D Printer',
@@ -46,46 +41,6 @@ export class CreateResourceDto {
   @IsString()
   @IsOptional()
   description?: string;
-
-  @ApiProperty({
-    description: 'Resource image file',
-    required: false,
-    type: 'string',
-    format: 'binary',
-  })
-  image?: FileUpload;
-
-  @ApiProperty({
-    description: 'The type of documentation (markdown or url)',
-    enum: DocumentationType,
-    required: false,
-    example: DocumentationType.MARKDOWN,
-    enumName: 'DocumentationType',
-  })
-  @IsEnum(DocumentationType)
-  @IsOptional()
-  documentationType?: DocumentationType;
-
-  @ApiProperty({
-    description: 'Markdown content for resource documentation',
-    required: false,
-    example: '# Resource Documentation\n\nThis is a markdown documentation for the resource.',
-  })
-  @IsString()
-  @ValidateIf((o) => o.documentationType === DocumentationType.MARKDOWN)
-  @IsOptional()
-  documentationMarkdown?: string;
-
-  @ApiProperty({
-    description: 'URL to external documentation',
-    required: false,
-    example: 'https://example.com/documentation',
-  })
-  @IsUrl()
-  @ValidateIf((o) => o.documentationType === DocumentationType.URL)
-  @IsOptional()
-  documentationUrl?: string;
-
   @ApiProperty({
     description: 'Custom metadata key-value pairs configured for this resource',
     required: false,

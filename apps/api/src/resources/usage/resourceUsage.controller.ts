@@ -1,123 +1,19 @@
-import { Controller, Post, Put, Get, Param, Body, Query, ParseIntPipe, Req, ForbiddenException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ResourceUsageService } from './resourceUsage.service';
 import { ResourceUsage } from '@attraccess/database-entities';
-import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
-import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
-import { UpdateUsageSessionProjectDto } from './dtos/updateUsageSessionProject.dto';
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CanControlResponseDto } from './dtos/canControl.response.dto';
 import { GetResourceHistoryQueryDto } from './dtos/getResourceHistoryQuery.dto';
 import { GetResourceHistoryResponseDto } from './dtos/GetResourceHistoryResponse.dto';
-import { GetActiveUsageSessionDto } from './dtos/getActiveUsageSession.dto';
-import { CanControlResponseDto } from './dtos/canControl.response.dto';
+import { ResourceSessionRoutes } from './resource-session.routes';
+import { ResourceUsageService } from './resourceUsage.service';
+import { installInheritedMethods } from '../../common/inherited-implementation';
 
 @ApiTags('Resources')
 @Controller('resources/:resourceId/usage')
-export class ResourceUsageController {
-  constructor(private readonly resourceUsageService: ResourceUsageService) {}
-
-  @Post('start')
-  @Auth()
-  @ApiOperation({ summary: 'Start a resource usage session', operationId: 'resourceUsageStartSession' })
-  @ApiResponse({
-    status: 201,
-    description: 'Usage session started successfully.',
-    type: ResourceUsage,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad Request - Invalid input data',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Resource not found',
-  })
-  async startSession(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() dto: StartUsageSessionDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return this.resourceUsageService.startSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
-    });
-  }
-
-  @Put('end')
-  @Auth()
-  @ApiOperation({ summary: 'End a resource usage session', operationId: 'resourceUsageEndSession' })
-  @ApiResponse({
-    status: 200,
-    description: 'Usage session ended successfully.',
-    type: ResourceUsage,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad Request - Invalid input data or no active session',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Resource or session not found',
-  })
-  async endSession(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() dto: EndUsageSessionDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return this.resourceUsageService.endSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
-    });
-  }
-
-  @Put('sessions/:usageId/project')
-  @Auth()
-  @ApiOperation({
-    summary: 'Update usage session project assignment',
-    operationId: 'resourceUsageUpdateSessionProject',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Usage session project updated successfully.',
-    type: ResourceUsage,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad Request - Invalid input data or session is active',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User is not authorized to update this session',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Resource or session not found',
-  })
-  async updateSessionProject(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('usageId', ParseIntPipe) usageId: number,
-    @Body() dto: UpdateUsageSessionProjectDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto);
+export class ResourceUsageController extends ResourceSessionRoutes {
+  constructor(protected readonly resourceUsageService: ResourceUsageService) {
+    super();
   }
 
   @Post('lock')
@@ -255,27 +151,6 @@ export class ResourceUsageController {
     };
   }
 
-  @Get('active')
-  @Auth()
-  @ApiOperation({ summary: 'Get active usage session for current user', operationId: 'resourceUsageGetActiveSession' })
-  @ApiResponse({
-    status: 200,
-    description: 'Active session retrieved successfully.',
-    type: GetActiveUsageSessionDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Resource not found',
-  })
-  async getActiveSession(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<GetActiveUsageSessionDto> {
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId, true);
-    return { usage: activeSession || null };
-  }
-
   @Get('can-control')
   @Auth()
   @ApiOperation({ summary: 'Check if the current user can control a resource', operationId: 'resourceUsageCanControl' })
@@ -292,17 +167,16 @@ export class ResourceUsageController {
       canControl: await this.resourceUsageService.canControllResource(resourceId, req.user),
     } as CanControlResponseDto;
   }
-
-  @Get(':usageId')
-  @Auth()
-  @ApiOperation({ summary: 'Get a resource usage session', operationId: 'resourceUsageGetSession' })
-  @ApiResponse({ status: 200, description: 'The usage session details.', type: ResourceUsage })
-  @ApiResponse({ status: 404, description: 'Usage session not found or not accessible.' })
-  async getSession(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('usageId', ParseIntPipe) usageId: number,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
-  }
 }
+installInheritedMethods(ResourceUsageController, [
+  'startSession',
+  'endSession',
+  'updateSessionProject',
+  'lockDoor',
+  'unlockDoor',
+  'unlatchDoor',
+  'getHistory',
+  'getActiveSession',
+  'canControl',
+  'getSession',
+]);

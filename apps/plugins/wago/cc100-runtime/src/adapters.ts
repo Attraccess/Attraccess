@@ -1,11 +1,11 @@
 import { constants } from 'node:fs';
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { connect as connectSocket } from 'node:net';
+import { key } from './adapters.key';
+import { Point } from './adapters.point';
+import { CC100_DIGITAL_PROFILE } from './onboard-profile';
 import type { DeviceAdapter, Snapshot } from './runtime';
 import type { ValidationError } from './runtime-types';
-import { CC100_DIGITAL_PROFILE } from './onboard-profile';
-
-type Point = Snapshot['physicalPoints'][number];
 
 export class Cc100OnboardIoAdapter implements DeviceAdapter {
   private writes: Promise<void> = Promise.resolve();
@@ -193,8 +193,4 @@ export class MemoryDeviceAdapter implements DeviceAdapter {
   async read(point: Point): Promise<boolean | number> {
     return this.values.get(key(point)) ?? false;
   }
-}
-
-function key(point: Point): string {
-  return `${point.hardwareProfile}:${point.channel}`;
 }

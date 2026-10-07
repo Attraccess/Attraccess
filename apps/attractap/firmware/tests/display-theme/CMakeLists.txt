@@ -41,6 +41,12 @@ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
 
 add_executable(display-theme-host
     main.cpp
+    theme_surfaces.cpp
+    theme_widgets.cpp
+    boot_and_connection.cpp
+    card_flows.cpp
+    background_and_list.cpp
+    resource_details.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"
     "${FIRMWARE_DIR}/src/display/theme.cpp"
@@ -57,6 +63,37 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjects.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsForms.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsActionFeedback.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/init/initscreen_createNetworkRows.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/init/initscreen_createConnectionDetails.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/init/initscreen_refresh.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/init/initscreen_status.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/init/initscreen_createApiRows.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen_status.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen_status.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen_status.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormModal.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormSelect.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjectModal.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormEditorLayout.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjectEvents.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen_createDoorControls.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen_createSessionDetails.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen_createStatusPanels.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsLifecycle.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsResourceUpdate.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormBusy.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormField.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormBreadcrumb.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen_createResourceHeader.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjectList.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormEditor.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormText.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen_createSessionControls.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsAccess.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormSelectLayout.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormNavigation.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormEditorEvents.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsFormValues.cpp"
     ${ATTRACTAP_LATIN1_FONTS}
     "${FIRMWARE_DIR}/src/display/shared/pinInput/pinInputPage.cpp")
 target_include_directories(display-theme-host PRIVATE shims "${FIRMWARE_DIR}/src")

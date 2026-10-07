@@ -1,25 +1,22 @@
-import { Controller, Get, Post, Param, Body, Query, ParseIntPipe, Req, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { ResourceMaintenanceService } from './maintenance.service';
-import {
-  CreateMaintenanceDto,
-  ListMaintenancesDto,
-  PaginatedMaintenanceResponse,
-  CanManageMaintenanceResponseDto,
-  FinishMaintenanceDto,
-} from './dtos';
 import { ResourceMaintenance } from '@attraccess/database-entities';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { CanManageMaintenance } from './canManageMaintenance.decorator';
+import { Controller, Get, NotFoundException, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
+import { CanManageMaintenanceResponseDto, ListMaintenancesDto, PaginatedMaintenanceResponse } from './dtos';
+import { MaintenanceManagementRoutes } from './maintenance-management.routes';
+import { ResourceMaintenanceService } from './maintenance.service';
+import { installInheritedMethods } from '../../common/inherited-implementation';
 
 @RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenances')
 @Controller('resources/:resourceId/maintenances')
 @Auth()
-export class ResourceMaintenanceController {
-  constructor(private readonly maintenanceService: ResourceMaintenanceService) { }
+export class ResourceMaintenanceController extends MaintenanceManagementRoutes {
+  constructor(protected readonly maintenanceService: ResourceMaintenanceService) {
+    super();
+  }
 
   @Get('can-manage')
   @ApiOperation({
@@ -47,7 +44,7 @@ export class ResourceMaintenanceController {
   })
   async canManageMaintenance(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Req() request: AuthenticatedRequest
+    @Req() request: AuthenticatedRequest,
   ): Promise<CanManageMaintenanceResponseDto> {
     const canManage = await this.maintenanceService.canManageMaintenance(request.user, resourceId);
 
@@ -55,47 +52,6 @@ export class ResourceMaintenanceController {
       canManage,
       resourceId,
     };
-  }
-
-  @Post()
-  @CanManageMaintenance()
-  @ApiOperation({
-    summary: 'Create a maintenance for a resource',
-    description: 'Create a new maintenance schedule for a specific resource',
-    operationId: 'createMaintenance',
-  })
-  @ApiParam({
-    name: 'resourceId',
-    description: 'The ID of the resource',
-    type: Number,
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Maintenance created successfully',
-    type: ResourceMaintenance,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - invalid maintenance data',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage maintenances for this resource',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Resource not found',
-  })
-  async createMaintenance(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() dto: CreateMaintenanceDto,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<ResourceMaintenance> {
-    return await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id);
   }
 
   @Get()
@@ -159,7 +115,7 @@ export class ResourceMaintenanceController {
   })
   async getMaintenances(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Query() query: ListMaintenancesDto
+    @Query() query: ListMaintenancesDto,
   ): Promise<PaginatedMaintenanceResponse> {
     return await this.maintenanceService.findMaintenances(resourceId, query);
   }
@@ -195,7 +151,7 @@ export class ResourceMaintenanceController {
   })
   async getMaintenance(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('maintenanceId', ParseIntPipe) maintenanceId: number
+    @Param('maintenanceId', ParseIntPipe) maintenanceId: number,
   ): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
 
@@ -205,61 +161,11 @@ export class ResourceMaintenanceController {
 
     return maintenance;
   }
-
-  @Post(':maintenanceId/finish')
-  @CanManageMaintenance()
-  @ApiOperation({
-    summary: 'Mark a maintenance as done',
-    description:
-      'Finish an active maintenance (set end time, completedAt, completedBy). Only maintenance users can call this.',
-    operationId: 'finishMaintenance',
-  })
-  @ApiParam({
-    name: 'resourceId',
-    description: 'The ID of the resource',
-    type: Number,
-  })
-  @ApiParam({
-    name: 'maintenanceId',
-    description: 'The ID of the maintenance',
-    type: Number,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Maintenance marked as done successfully',
-    type: ResourceMaintenance,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - maintenance is already finished',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage maintenances for this resource',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Maintenance not found',
-  })
-  async finishMaintenance(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('maintenanceId', ParseIntPipe) maintenanceId: number,
-    @Body() dto: FinishMaintenanceDto,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<ResourceMaintenance> {
-    const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
-
-    if (maintenance.resourceId !== Number(resourceId)) {
-      throw new NotFoundException('Maintenance not found');
-    }
-
-    return await this.maintenanceService.finishMaintenance(maintenanceId, {
-      userId: request.user?.id,
-      notes: dto?.notes,
-    });
-  }
 }
+installInheritedMethods(ResourceMaintenanceController, [
+  'canManageMaintenance',
+  'createMaintenance',
+  'getMaintenances',
+  'getMaintenance',
+  'finishMaintenance',
+]);

@@ -1,100 +1,20 @@
 'use strict';
+const { readBody, sendJson, loadJson, saveJson, checkAuth, send401, isWeakPassword } = require('./http-helpers.js');
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 
 const ADMIN_PORT = Number(process.env.CONFIG_UI_PORT) || 5380;
-const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
 
 function log(message) {
   console.log(`[config-ui] ${message}`);
-}
-
-function timingSafeEqual(a, b) {
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
-}
-
-function checkAuth(req) {
-  const password = process.env.CONFIG_UI_PASSWORD || '';
-  if (!password) return false;
-
-  const username = process.env.CONFIG_UI_USERNAME || 'admin';
-  const authHeader = req.headers['authorization'] || '';
-  if (!authHeader.startsWith('Basic ')) return false;
-
-  const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
-  const [user, pass] = decoded.split(':');
-  return timingSafeEqual(user, username) && timingSafeEqual(pass, password);
-}
-
-function sendJson(res, statusCode, data) {
-  const body = JSON.stringify(data);
-  res.writeHead(statusCode, {
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(body),
-  });
-  res.end(body);
-}
-
-function send401(res) {
-  res.writeHead(401, {
-    'WWW-Authenticate': 'Basic realm="Config UI"',
-    'Content-Type': 'text/plain',
-  });
-  res.end('Unauthorized');
-}
-
-const MAX_BODY_SIZE = 64 * 1024;
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    req.on('data', (chunk) => {
-      size += chunk.length;
-      if (size > MAX_BODY_SIZE) {
-        req.destroy();
-        reject(new Error('body too large'));
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on('end', () => {
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8')));
-      } catch (err) {
-        reject(err);
-      }
-    });
-    req.on('error', reject);
-  });
 }
 
 function parseRoute(url) {
   const [pathname] = url.split('?');
   const parts = pathname.split('/').filter(Boolean);
   return { pathname, parts };
-}
-
-function loadJson(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  } catch {
-    return fallback;
-  }
-}
-
-function saveJson(filePath, data) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
 const modules = [];
@@ -126,11 +46,20 @@ async function handleRequest(req, res) {
   const { pathname, parts } = parseRoute(req.url);
   const method = req.method;
 
-  if (method === 'GET' && pathname === '/') {
+  const assets = {
+    '/': ['index.html', 'text/html; charset=utf-8'],
+    '/style.css': ['style.css', 'text/css; charset=utf-8'],
+    '/controls.css': ['controls.css', 'text/css; charset=utf-8'],
+    '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
+    '/dns.js': ['dns.js', 'text/javascript; charset=utf-8'],
+    '/prometheus.js': ['prometheus.js', 'text/javascript; charset=utf-8'],
+  };
+  if (method === 'GET' && Object.hasOwn(assets, pathname)) {
+    const [file, contentType] = assets[pathname];
     try {
-      const html = fs.readFileSync(INDEX_HTML_PATH, 'utf-8');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      const content = fs.readFileSync(path.join(__dirname, 'public', file), 'utf-8');
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
     } catch {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Admin UI not found');
@@ -148,22 +77,6 @@ async function handleRequest(req, res) {
   sendJson(res, 404, { error: 'not found' });
 }
 
-const WEAK_PASSWORDS = new Set([
-  'admin',
-  'attraccess',
-  'change-me',
-  'change-me-before-deploying',
-  'changeme',
-  'password',
-  'root',
-]);
-
-function isWeakPassword(value) {
-  if (typeof value !== 'string' || value.length === 0) return true;
-  if (value.length < 12) return true;
-  return WEAK_PASSWORDS.has(value.toLowerCase());
-}
-
 function main() {
   if (!process.env.CONFIG_UI_PASSWORD) {
     log('refusing to start: CONFIG_UI_PASSWORD is not set');
@@ -171,7 +84,9 @@ function main() {
   }
   if (isWeakPassword(process.env.CONFIG_UI_PASSWORD) && process.env.CONFIG_UI_ALLOW_WEAK_PASSWORD !== 'true') {
     log('refusing to start: CONFIG_UI_PASSWORD is too short or a well-known default.');
-    log('Set a password of at least 12 characters, or explicitly set CONFIG_UI_ALLOW_WEAK_PASSWORD=true to override (not recommended outside ephemeral dev).');
+    log(
+      'Set a password of at least 12 characters, or explicitly set CONFIG_UI_ALLOW_WEAK_PASSWORD=true to override (not recommended outside ephemeral dev).',
+    );
     process.exit(1);
   }
 
@@ -197,7 +112,9 @@ function main() {
 
   const shutdown = (signal) => {
     log(`received ${signal}, shutting down`);
-    modules.forEach((m) => { if (m.shutdown) m.shutdown(); });
+    modules.forEach((m) => {
+      if (m.shutdown) m.shutdown();
+    });
     server.close();
     process.exit(0);
   };

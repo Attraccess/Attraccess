@@ -1,208 +1,59 @@
-// Import entities
-import { AuditLog } from './entities/audit-log.entity';
-import { EmailTemplate } from './entities/email-template.entity';
-import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
-import { AuthenticationDetail } from './entities/authenticationDetail.entity';
-import { MqttServer } from './entities/mqttServer.entity';
-import { NFCCard } from './entities/rfidCard.entity';
-import { Resource } from './entities/resource.entity';
-import { ResourceType } from './entities/resource.type';
-import { ResourceGroup } from './entities/resourceGroup.entity';
-import { ResourceIntroduction } from './entities/resourceIntroduction.entity';
-import {
-  ResourceIntroductionHistoryItem,
-  IntroductionHistoryAction,
-} from './entities/resourceIntroductionHistoryItem.entity';
-import { ResourceIntroducer, ResourceIntroducerType } from './entities/resourceIntroducer.entity';
-import { ResourceUsage } from './entities/resourceUsage.entity';
-import { SupervisionMode, AutoIntroductionTarget } from './entities/resource.supervision';
-import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
-import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
-import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
-import { User } from './entities/user.entity';
-import { Session } from './entities/session.entity';
-import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
-import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
-import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  getNodeDataSchema,
-  NodeWithoutDataSchema,
-  HttpRequestNodeDataSchema,
-  MqttSendMessageNodeDataSchema,
-  WaitNodeDataSchema,
-  ButtonNodeDataSchema,
-  IfNodeDataSchema,
-  BillingTransactionItemCreateSchema,
-  SetPayloadNodeDataSchema,
-  MqttMessageReceivedNodeDataSchema,
-  MqttWaitForMessageNodeDataSchema,
-  ResourceUsageEndSessionNodeDataSchema,
-  ErrorNodeDataSchema,
-  InputResourceActivityNoActivityNodeDataSchema,
-  ResourceActivityTrackActivityNodeDataSchema,
-  ResourceOperatingTransitionNodeDataSchema,
-  ResourceHealthHeartbeatNodeDataSchema,
-  ResourceHealthSetNodeDataSchema,
-  HealthStateOptionEnum,
-  SetVariablesNodeDataSchema,
-  GetVariablesNodeDataSchema,
-  VariableChangedNodeDataSchema,
-  VariableScopeSchema,
-  CompanionLockNodeDataSchema,
-  CompanionIdleActiveNodeDataSchema,
-  CompanionForegroundAppNodeDataSchema,
-  CompanionUsbDeviceNodeDataSchema,
-  MeteringStartNodeDataSchema,
-  MeteringCollectNodeDataSchema,
-  MeteringReadyNodeDataSchema,
-  MeteringReportNodeDataSchema,
-  getExternalEffectFailureBehavior,
-} from './entities/resourceFlowNode';
-import { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from './entities/resourceHealthState.entity';
-import { ResourceFlowEdge } from './entities/resourceFlowEdge';
-import { ResourceMaintenance } from './entities/resource.maintenance';
-import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
-import {
-  ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleDurationBasis,
-  ResourceMaintenanceScheduleTriggerType,
-} from './entities/resource-maintenance-schedule.entity';
-import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
-import { UsageDurationUnit } from './types/usageDurationUnit.enum';
-import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
-import { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
-import { ResourceUsageAction } from './entities/resourceUsage.type';
-import { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
-import { ResourceBillingConfiguration } from './entities/resource-billing-configuration.entity';
-import { Setting } from './entities/setting.entity';
-import { BillingTransactionItem } from './entities/billing-transaction-item.entity';
-import { Project } from './entities/project';
-import { ProjectMember, ProjectMemberRole } from './entities/project-member.entity';
-import { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
-import { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } from './entities/form';
-import {
-  ResourceFlowVariable,
-  ResourceFlowVariableScope,
-  type ResourceFlowVariableValueType,
-} from './entities/resourceFlowVariable';
-import { PasswordPolicy, PASSWORD_POLICY_SINGLETON_ID } from './entities/password-policy.entity';
-import { PasswordHistory } from './entities/password-history.entity';
-import {
-  PasswordPolicyOverride,
-  PasswordPolicyRole,
-  PASSWORD_POLICY_ROLES,
-} from './entities/password-policy-override.entity';
-import { Conversation } from './entities/conversation.entity';
-import { ConversationParticipant } from './entities/conversation-participant.entity';
-import { Message, MessageReferenceType } from './entities/message.entity';
-import { NotificationPreference } from './entities/notification-preference.entity';
-import { PushSubscription } from './entities/push-subscription.entity';
-import { Passkey, PasskeyChallenge } from './entities/passkey.entity';
-import { CompanionDevice } from './entities/companion-device.entity';
-import { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
-import { Permission } from './entities/permission.entity';
-import { Role } from './entities/role.entity';
-import { RolePermission } from './entities/role-permission.entity';
-import { UserRole, UserRoleSource } from './entities/user-role.entity';
-import { ApiToken } from './entities/api-token.entity';
-import { ApiTokenPermission } from './entities/api-token-permission.entity';
-import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
-import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
-export type { LifecycleBillingItem } from './entities/resource-usage-lifecycle-attempt.entity';
-import {
+export {
+  LifecycleBillingItem,
+  ResourceUsageLifecycleAttempt,
+} from './entities/resource-usage-lifecycle-attempt.entity';
+export {
+  ResourceMeteringOperationKind,
+  ResourceMeteringOperationStatus,
   ResourceMeteringSession,
   ResourceMeteringOperation,
   ResourceMeteringSessionStatus,
 } from './entities/resource-metering.entity';
-export type {
-  ResourceMeteringOperationKind,
-  ResourceMeteringOperationStatus,
-} from './entities/resource-metering.entity';
-
-// Export all entities individually
+export { AuditLog } from './entities/audit-log.entity';
+export { AuthenticationDetail } from './entities/authenticationDetail.entity';
+export { MqttServer } from './entities/mqttServer.entity';
+export { Resource } from './entities/resource.entity';
+export { ResourceGroup } from './entities/resourceGroup.entity';
+export { ResourceIntroduction } from './entities/resourceIntroduction.entity';
 export {
-  AuditLog,
-  AuthenticationDetail,
-  MqttServer,
-  Resource,
-  ResourceGroup,
-  ResourceIntroduction,
   ResourceIntroductionHistoryItem,
   IntroductionHistoryAction,
-  ResourceIntroducer,
-  ResourceIntroducerType,
-  ResourceUsage,
-  SSOProvider,
-  SSOProviderType,
-  SSOProviderOIDCConfiguration,
-  SSOProviderSAMLConfiguration,
-  User,
-  Session,
-  NFCCard,
-  Attractap,
-  AttractapCrashReport,
-  EmailTemplate,
-  EmailTemplateTranslation,
+} from './entities/resourceIntroductionHistoryItem.entity';
+export { ResourceIntroducer, ResourceIntroducerType } from './entities/resourceIntroducer.entity';
+export { ResourceUsage } from './entities/resourceUsage.entity';
+export { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
+export { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
+export { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
+export { User } from './entities/user.entity';
+export { Session } from './entities/session.entity';
+export { NFCCard } from './entities/rfidCard.entity';
+export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
+export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
+export { EmailTemplate } from './entities/email-template.entity';
+export { EmailTemplateTranslation } from './entities/email-template-translation.entity';
+export {
   ResourceFlowNode,
   ResourceFlowNodeType,
-  ResourceFlowEdge,
   getNodeDataSchema,
   NodeWithoutDataSchema as EventNodeDataSchema,
   HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
-  AttractapFirmwareVersion,
-  ResourceMaintenance,
-  ResourceMaintenanceRequest,
-  MaintenanceRequestStatus,
-  ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleDurationBasis,
-  ResourceMaintenanceScheduleTriggerType,
-  ResourceMaintenanceScheduleUsageHoursConfig,
-  UsageDurationUnit,
-  ResourceMaintenanceScheduleUsageCountConfig,
-  ResourceMaintenanceScheduleTimeIntervalConfig,
-  ResourceType,
-  SupervisionMode,
-  AutoIntroductionTarget,
-  ResourceUsageAction,
   ButtonNodeDataSchema,
   IfNodeDataSchema,
   SetPayloadNodeDataSchema,
-  BillingTransaction,
-  ResourceBillingConfiguration,
-  Setting,
-  BillingTransactionStatus,
-  BillingTransactionItem,
   BillingTransactionItemCreateSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
   getExternalEffectFailureBehavior,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
-  Project,
-  ProjectMember,
-  ProjectMemberRole,
-  ProjectInvitation,
-  ProjectInvitationStatus,
-  Form,
-  FormField,
-  FormSubmission,
-  FormFieldType,
-  ResourceFormAction,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
   ResourceOperatingTransitionNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   HealthStateOptionEnum,
-  ResourceHealthState,
-  ResourceHealthStatus,
-  ResourceHealthSource,
-  ResourceFlowVariable,
-  ResourceFlowVariableScope,
-  type ResourceFlowVariableValueType,
   SetVariablesNodeDataSchema,
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
@@ -215,97 +66,56 @@ export {
   MeteringCollectNodeDataSchema,
   MeteringReadyNodeDataSchema,
   MeteringReportNodeDataSchema,
-  PasswordPolicy,
-  PASSWORD_POLICY_SINGLETON_ID,
-  PasswordHistory,
+} from './entities/resourceFlowNode';
+export { ResourceFlowEdge } from './entities/resourceFlowEdge';
+export { ResourceMaintenance } from './entities/resource.maintenance';
+export { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
+export {
+  ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
+  ResourceMaintenanceScheduleTriggerType,
+} from './entities/resource-maintenance-schedule.entity';
+export { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
+export { UsageDurationUnit } from './types/usageDurationUnit.enum';
+export { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
+export { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
+export { ResourceType } from './entities/resource.type';
+export { SupervisionMode, AutoIntroductionTarget } from './entities/resource.supervision';
+export { ResourceUsageAction } from './entities/resourceUsage.type';
+export { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
+export { ResourceBillingConfiguration } from './entities/resource-billing-configuration.entity';
+export { Setting } from './entities/setting.entity';
+export { BillingTransactionItem } from './entities/billing-transaction-item.entity';
+export { Project } from './entities/project';
+export { ProjectMember, ProjectMemberRole } from './entities/project-member.entity';
+export { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
+export { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } from './entities/form';
+export { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from './entities/resourceHealthState.entity';
+export {
+  ResourceFlowVariable,
+  ResourceFlowVariableScope,
+  type ResourceFlowVariableValueType,
+} from './entities/resourceFlowVariable';
+export { PasswordPolicy, PASSWORD_POLICY_SINGLETON_ID } from './entities/password-policy.entity';
+export { PasswordHistory } from './entities/password-history.entity';
+export {
   PasswordPolicyOverride,
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
-  Conversation,
-  ConversationParticipant,
-  Message,
-  MessageReferenceType,
-  NotificationPreference,
-  PushSubscription,
-  Passkey,
-  PasskeyChallenge,
-  CompanionDevice,
-  EmailLayout,
-  EMAIL_LAYOUT_SINGLETON_ID,
-  Permission,
-  Role,
-  RolePermission,
-  UserRole,
-  UserRoleSource,
-  ApiToken,
-  ApiTokenPermission,
-  ResourceOperatingInterval,
-  ResourceUsageLifecycleAttempt,
-  ResourceMeteringSession,
-  ResourceMeteringOperation,
-  ResourceMeteringSessionStatus,
-};
-
-// Export the entities object
-export const entities = {
-  AuditLog,
-  User,
-  AuthenticationDetail,
-  Session,
-  Resource,
-  ResourceGroup,
-  ResourceUsage,
-  ResourceIntroduction,
-  ResourceIntroducer,
-  ResourceIntroductionHistoryItem,
-  MqttServer,
-  SSOProvider,
-  SSOProviderOIDCConfiguration,
-  SSOProviderSAMLConfiguration,
-  NFCCard,
-  Attractap,
-  AttractapCrashReport,
-  EmailTemplate,
-  EmailTemplateTranslation,
-  ResourceFlowNode,
-  ResourceFlowEdge,
-  ResourceMaintenance,
-  ResourceMaintenanceRequest,
-  ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleUsageHoursConfig,
-  ResourceMaintenanceScheduleUsageCountConfig,
-  ResourceMaintenanceScheduleTimeIntervalConfig,
-  BillingTransaction,
-  ResourceBillingConfiguration,
-  Setting,
-  BillingTransactionItem,
-  Project,
-  ProjectMember,
-  ProjectInvitation,
-  Form,
-  FormField,
-  FormSubmission,
-  ResourceHealthState,
-  ResourceFlowVariable,
-  PasswordPolicy,
-  PasswordHistory,
-  PasswordPolicyOverride,
-  Conversation,
-  ConversationParticipant,
-  Message,
-  NotificationPreference,
-  PushSubscription,
-  Passkey,
-  PasskeyChallenge,
-  CompanionDevice,
-  Permission,
-  Role,
-  RolePermission,
-  UserRole,
-  ApiToken,
-  ApiTokenPermission,
-  ResourceOperatingInterval,
-  ResourceUsageLifecycleAttempt,
-  ResourceMeteringSession,
-  ResourceMeteringOperation,
-};
+} from './entities/password-policy-override.entity';
+export { Conversation } from './entities/conversation.entity';
+export { ConversationParticipant } from './entities/conversation-participant.entity';
+export { Message, MessageReferenceType } from './entities/message.entity';
+export { NotificationPreference } from './entities/notification-preference.entity';
+export { PushSubscription } from './entities/push-subscription.entity';
+export { Passkey, PasskeyChallenge } from './entities/passkey.entity';
+export { CompanionDevice } from './entities/companion-device.entity';
+export { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
+export { Permission } from './entities/permission.entity';
+export { Role } from './entities/role.entity';
+export { RolePermission } from './entities/role-permission.entity';
+export { UserRole, UserRoleSource } from './entities/user-role.entity';
+export { ApiToken } from './entities/api-token.entity';
+export { ApiTokenPermission } from './entities/api-token-permission.entity';
+export { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
+export { entities } from './entities-registry';

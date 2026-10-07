@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   DrawerBody,
   DrawerFooter,
@@ -11,140 +9,46 @@ import {
   Spinner,
 } from '@heroui/react';
 import { ArrowLeft, Palette, RotateCcw } from 'lucide-react';
-import Editor, { type OnMount } from '@monaco-editor/react';
+import Editor from '@monaco-editor/react';
 import { Button } from '../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useAppTheme } from '@attraccess/ui';
-import { useToastMessage } from '../../components/toastProvider';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { StandardModal } from '../../components/standardModal';
 import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
-import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
-import {
-  useEmailLayoutServiceEmailLayoutControllerFindGlobal,
-  useEmailLayoutServiceEmailLayoutControllerUpdate,
-  useEmailLayoutServiceEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
-} from '@attraccess/react-query-client';
-
-import en from './en.json';
-import de from './de.json';
-
-const PLACEHOLDER_CLASS = 'layout-content-placeholder';
+import { PLACEHOLDER_CLASS } from './EmailLayoutPage.state';
+import { useEmailLayoutPageState } from './useEmailLayoutPageState';
 
 // The stored layout is a full <mjml> document with a raw {{content}} token in
 // mj-body. GrapesJS would drop that bare text node, so for editing we swap it
 // for a locked, visibly-marked section and swap back on save. The mj-head is
 // split off too (GrapesJS has no mj-attributes component) and carried through
 // verbatim; MjmlVisualEditor injects it into the canvas so styles still render.
-const placeholderSection = (label: string) =>
-  `<mj-section css-class="${PLACEHOLDER_CLASS}" background-color="#F1F5F9" border="2px dashed #94A3B8">` +
-  `<mj-column><mj-text align="center" color="#64748B" font-size="14px">${label}</mj-text></mj-column>` +
-  `</mj-section>`;
-
-const toEditable = (body: string, label: string) => body.replace(CONTENT_PLACEHOLDER, () => placeholderSection(label));
-
-const toStorable = (editedDoc: string, head: string) =>
-  editedDoc
-    .replace(
-      new RegExp(`<mj-section[^>]*css-class="[^"]*${PLACEHOLDER_CLASS}[^"]*"[\\s\\S]*?</mj-section>`),
-      () => CONTENT_PLACEHOLDER,
-    )
-    // Tolerate attributes on the root tag (<mjml owa="desktop" lang="de">…) —
-    // a literal '<mjml>' match would silently drop the head for such layouts.
-    .replace(/<mjml([^>]*)>/, (_match, attrs) => `<mjml${attrs}>${head}`);
 
 export function EmailLayoutPage() {
-  const navigate = useNavigate();
-  const basePath = '/settings/email';
-  const { t, language } = useTranslations({ en, de });
-  const { resolvedTheme } = useAppTheme();
-  const toast = useToastMessage();
-
-  const layout = useEmailLayoutServiceEmailLayoutControllerFindGlobal();
-
-  // Same uncontrolled-canvas setup as the template editor: the canvas reads its
-  // initial value once per seed and reports edits into a ref, so typing never
-  // re-renders the page. Reseed (first load, reset, style changes) via editorSeed.
-  const headRef = useRef('');
-  const docRef = useRef<string | null>(null);
-  const [editorSeed, setEditorSeed] = useState(0);
-
-  const seedFromStored = useCallback(
-    (storedBody: string) => {
-      const { head, body } = splitHead(storedBody);
-      headRef.current = head;
-      docRef.current = toEditable(body, t('placeholder.canvasLabel'));
-      setEditorSeed((seed) => seed + 1);
-    },
-    [t],
-  );
-
-  useEffect(() => {
-    if (layout.data && docRef.current === null) {
-      seedFromStored(layout.data.body);
-    }
-  }, [layout.data, seedFromStored]);
-
-  const handleDocChange = useCallback((mjml: string) => {
-    docRef.current = mjml;
-  }, []);
-
-  const updateLayout = useEmailLayoutServiceEmailLayoutControllerUpdate();
-  const onSave = useCallback(() => {
-    const body = toStorable(docRef.current ?? '', headRef.current);
-    if (!body.includes(CONTENT_PLACEHOLDER)) {
-      toast.error({ title: t('toast.missingPlaceholder') });
-      return;
-    }
-    updateLayout.mutate(
-      { requestBody: { body } },
-      {
-        onSuccess: () => toast.success({ title: t('toast.saveSuccess') }),
-        onError: (error) => {
-          const responseBody = (error as { body?: { message?: string | string[] } })?.body;
-          const message = Array.isArray(responseBody?.message) ? responseBody?.message[0] : responseBody?.message;
-          toast.error({ title: t('toast.saveError'), description: message });
-        },
-      },
-    );
-  }, [updateLayout, toast, t]);
-
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const resetLayout = useResetLayoutToDefault();
-  const onResetConfirm = useCallback(() => {
-    resetLayout.mutate(undefined, {
-      onSuccess: (data) => {
-        seedFromStored(data.body);
-        setResetConfirmOpen(false);
-        toast.success({ title: t('toast.resetSuccess') });
-      },
-      onError: () => toast.error({ title: t('toast.resetError') }),
-    });
-  }, [resetLayout, seedFromStored, toast, t]);
-
-  // The mj-head (global fonts/colors via mj-attributes, mj-style) has no visual
-  // representation in the canvas, so it stays editable as code in a drawer.
-  const [stylesOpen, setStylesOpen] = useState(false);
-  const [headDraft, setHeadDraft] = useState('');
-  const openStyles = useCallback(() => {
-    setHeadDraft(headRef.current);
-    setStylesOpen(true);
-  }, []);
-  const applyStyles = useCallback(() => {
-    headRef.current = headDraft;
-    setEditorSeed((seed) => seed + 1);
-    setStylesOpen(false);
-  }, [headDraft]);
-
-  const handleMonacoMount = useCallback<OnMount>((editor, monaco) => {
-    if (!monaco.languages.getLanguages().some((l) => l.id === 'mjml')) {
-      monaco.languages.register({ id: 'mjml', extensions: ['.mjml'], aliases: ['MJML', 'mjml'] });
-    }
-    const model = editor.getModel();
-    if (model && model.getLanguageId() !== 'mjml') {
-      monaco.editor.setModelLanguage(model, 'mjml');
-    }
-  }, []);
+  const {
+    navigate,
+    basePath,
+    t,
+    language,
+    resolvedTheme,
+    layout,
+    headRef,
+    docRef,
+    editorSeed,
+    handleDocChange,
+    updateLayout,
+    onSave,
+    resetConfirmOpen,
+    setResetConfirmOpen,
+    resetLayout,
+    onResetConfirm,
+    stylesOpen,
+    setStylesOpen,
+    headDraft,
+    setHeadDraft,
+    openStyles,
+    applyStyles,
+    handleMonacoMount,
+  } = useEmailLayoutPageState();
 
   return (
     <div className="h-full flex flex-col gap-3" data-cy="email-layout-page">

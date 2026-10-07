@@ -1,23 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AttractapFirmware } from './dtos/firmware.dto';
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
-
-interface FirmwareSymbolEntry {
-  firmware: AttractapFirmware;
-  elfPath: string;
-}
+import { AttractapFirmware } from './dtos/firmware.dto';
+import { FirmwareDownloadImplementation } from './firmware-download';
+import { FirmwareSymbolEntry } from './firmware.service.route-context';
 
 @Injectable()
-export class AttractapFirmwareService {
-  private readonly firmwareAssetsDirectory: string;
-  private readonly firmwareSymbolDirectory: string;
-  private readonly logger = new Logger(AttractapFirmwareService.name);
+export class AttractapFirmwareService extends FirmwareDownloadImplementation {
+  protected readonly firmwareAssetsDirectory: string;
+  protected readonly firmwareSymbolDirectory: string;
+  protected readonly logger = new Logger(AttractapFirmwareService.name);
 
-  private firmwares: AttractapFirmware[] = [];
-  private symbolFirmwares: FirmwareSymbolEntry[] = [];
+  protected firmwares: AttractapFirmware[] = [];
+  protected symbolFirmwares: FirmwareSymbolEntry[] = [];
 
   public constructor() {
+    super();
     this.firmwareAssetsDirectory = join(__dirname, 'assets', 'attractap-firmwares');
     this.firmwareSymbolDirectory = join(
       process.env.STORAGE_ROOT || join(process.cwd(), 'storage'),
@@ -149,7 +147,7 @@ export class AttractapFirmwareService {
     return !!buildId && !!this.getSymbolEntryByBuildId(buildId);
   }
 
-  private getSymbolEntryByBuildId(buildId: string): FirmwareSymbolEntry | undefined {
+  protected getSymbolEntryByBuildId(buildId: string): FirmwareSymbolEntry | undefined {
     const normalized = buildId.trim().toLowerCase();
     if (!normalized) {
       return undefined;
@@ -160,171 +158,5 @@ export class AttractapFirmwareService {
     });
   }
 
-  private buildBundledSymbolIndex(): FirmwareSymbolEntry[] {
-    return this.firmwares
-      .map((firmware) => this.buildBundledSymbolEntry(firmware))
-      .filter((entry): entry is FirmwareSymbolEntry => !!entry);
-  }
-
-  private buildBundledSymbolEntry(firmware: AttractapFirmware): FirmwareSymbolEntry | null {
-    if (!firmware.elfFilename) {
-      return null;
-    }
-    return {
-      firmware,
-      elfPath: join(this.firmwareAssetsDirectory, firmware.elfFilename),
-    };
-  }
-
-  private archiveBundledSymbols(): void {
-    const archiveEntries = this.readArchivedFirmwareEntries();
-    let changed = false;
-
-    for (const firmware of this.firmwares) {
-      if (!firmware.buildId || !firmware.elfFilename) {
-        continue;
-      }
-
-      const bundledElf = join(this.firmwareAssetsDirectory, firmware.elfFilename);
-      if (!existsSync(bundledElf)) {
-        continue;
-      }
-
-      mkdirSync(this.firmwareSymbolDirectory, { recursive: true });
-      const archivedElfFilename = `${firmware.buildId.toLowerCase()}-${firmware.elfFilename}`;
-      const archivedElfPath = join(this.firmwareSymbolDirectory, archivedElfFilename);
-      if (!existsSync(archivedElfPath)) {
-        copyFileSync(bundledElf, archivedElfPath);
-      }
-
-      if (!archiveEntries.some((entry) => entry.buildId?.toLowerCase() === firmware.buildId?.toLowerCase())) {
-        archiveEntries.push({ ...firmware, elfFilename: archivedElfFilename });
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      writeFileSync(
-        join(this.firmwareSymbolDirectory, 'firmwares.json'),
-        JSON.stringify({ firmwares: archiveEntries }, null, 2),
-      );
-    }
-  }
-
-  private loadArchivedSymbols(): void {
-    const archiveEntries = this.readArchivedFirmwareEntries();
-    for (const firmware of archiveEntries) {
-      if (!firmware.elfFilename || !firmware.buildId) {
-        continue;
-      }
-      const elfPath = join(this.firmwareSymbolDirectory, firmware.elfFilename);
-      if (!existsSync(elfPath)) {
-        continue;
-      }
-      if (this.getSymbolEntryByBuildId(firmware.buildId)) {
-        continue;
-      }
-      this.symbolFirmwares.push({ firmware, elfPath });
-    }
-  }
-
-  private readArchivedFirmwareEntries(): AttractapFirmware[] {
-    const archiveManifest = join(this.firmwareSymbolDirectory, 'firmwares.json');
-    if (!existsSync(archiveManifest)) {
-      return [];
-    }
-
-    try {
-      const parsed = JSON.parse(readFileSync(archiveManifest, 'utf8')) as { firmwares?: AttractapFirmware[] };
-      return Array.isArray(parsed.firmwares) ? parsed.firmwares : [];
-    } catch (error) {
-      this.logger.error(`Failed to read archived firmware symbols manifest: ${(error as Error).message}`);
-      return [];
-    }
-  }
-
-  public getFirmwareDownloadUrl(firmwareName: string, variantName: string): string {
-    // Return path only; devices will prepend their configured host/scheme/port
-    const path = `/api/attractap/firmwares/${firmwareName}/variants/${variantName}`;
-    this.logger.debug(`Generated firmware download path: ${path}`);
-    return path;
-  }
-
-  /**
-   * Get OTA file info (stream, size, filename) preferring OTA-specific file when available
-   */
-  public getOtaFile(
-    firmwareName: string,
-    variantName: string,
-  ): { stream: NodeJS.ReadableStream; size: number; filename: string } {
-    const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
-    if (!firmwareDefinition) {
-      this.logger.error(`Firmware definition not found for: ${firmwareName}, variant: ${variantName}`);
-      throw new Error('Firmware definition not found');
-    }
-
-    const otaFilename = firmwareDefinition.filenameOTA || firmwareDefinition.filename;
-    const firmwarePath = join(this.firmwareAssetsDirectory, otaFilename);
-
-    if (!existsSync(firmwarePath)) {
-      this.logger.error(`OTA firmware binary file does not exist: ${firmwarePath}`);
-      throw new Error('OTA firmware binary not found');
-    }
-
-    const stats = statSync(firmwarePath);
-    const stream = createReadStream(firmwarePath, { highWaterMark: 1024 });
-
-    return { stream, size: stats.size, filename: otaFilename };
-  }
-
   // WebSocket firmware update methods - use OTA-specific firmware
-  public getFirmwareStream(firmwareName: string, variantName: string): NodeJS.ReadableStream {
-    this.logger.debug(`Getting firmware stream for OTA: ${firmwareName}, variant: ${variantName}`);
-
-    const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
-    if (!firmwareDefinition) {
-      this.logger.error(`Firmware definition not found for: ${firmwareName}, variant: ${variantName}`);
-      throw new Error('Firmware definition not found');
-    }
-
-    // Use OTA-specific firmware file if available, otherwise fall back to main firmware
-    const otaFilename = firmwareDefinition.filenameOTA || firmwareDefinition.filename;
-    const firmwarePath = join(this.firmwareAssetsDirectory, otaFilename);
-
-    this.logger.debug(`Using firmware file for OTA: ${otaFilename}`);
-    this.logger.debug(`Checking OTA firmware path: ${firmwarePath}`);
-
-    if (!existsSync(firmwarePath)) {
-      this.logger.error(`OTA firmware binary file does not exist: ${firmwarePath}`);
-      throw new Error('OTA firmware binary not found');
-    }
-
-    this.logger.debug(`Creating read stream for OTA firmware: ${firmwarePath}`);
-    return createReadStream(firmwarePath, {
-      highWaterMark: 1024, // 1KB chunks for ESP32 compatibility
-    });
-  }
-
-  public getFirmwareStats(firmwareName: string, variantName: string): { size: number } {
-    this.logger.debug(`Getting firmware stats for OTA: ${firmwareName}, variant: ${variantName}`);
-
-    const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
-    if (!firmwareDefinition) {
-      this.logger.error(`Firmware definition not found for: ${firmwareName}, variant: ${variantName}`);
-      throw new Error('Firmware definition not found');
-    }
-
-    // Use OTA-specific firmware file if available, otherwise fall back to main firmware
-    const otaFilename = firmwareDefinition.filenameOTA || firmwareDefinition.filename;
-    const firmwarePath = join(this.firmwareAssetsDirectory, otaFilename);
-
-    if (!existsSync(firmwarePath)) {
-      this.logger.error(`OTA firmware binary file does not exist: ${firmwarePath}`);
-      throw new Error('OTA firmware binary not found');
-    }
-
-    const stats = statSync(firmwarePath);
-    this.logger.debug(`OTA firmware size: ${stats.size} bytes (file: ${otaFilename})`);
-    return { size: stats.size };
-  }
 }

@@ -128,36 +128,27 @@ test('LF, CRLF, CR, blank lines, comments, and missing final newlines count cons
   fails(check(), '"source.ts": 200 lines');
 });
 
-test('legacy oversized code and tests may stay unchanged or shrink, but cannot grow', (t) => {
-  const { write, check } = repository(t, { 'code.ts': lines(250), 'code.test.ts': lines(350) });
-  succeeds(check());
+test('all committed code and tests fail until reduced below their limits in both views', (t) => {
+  const { git, write, check } = repository(t, { 'code.ts': lines(250), 'code.test.ts': lines(350) });
+  for (const mode of [[], ['--staged']]) {
+    fails(check(...mode), '"code.ts": 250 lines (maximum 199)');
+    fails(check(...mode), '"code.test.ts": 350 lines (maximum 299)');
+  }
   write('code.ts', lines(220));
   write('code.test.ts', lines(320));
-  succeeds(check());
-  write('code.ts', lines(251));
-  write('code.test.ts', lines(351));
-  const result = check();
-  fails(result, 'existing file cannot grow beyond 250');
-  fails(result, 'existing file cannot grow beyond 350');
-});
-
-test('merged reductions ratchet the allowance down and restore the normal limit', (t) => {
-  const { git, write, commit, check } = repository(t, { 'code.ts': lines(250) });
-  write('code.ts', lines(220));
-  commit();
-  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
-  write('code.ts', lines(221));
-  fails(check(), 'existing file cannot grow beyond 220');
-  write('code.ts', lines(190));
-  commit();
-  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  git('add', '.');
+  for (const mode of [[], ['--staged']]) {
+    fails(check(...mode), '"code.ts": 220 lines (maximum 199)');
+    fails(check(...mode), '"code.test.ts": 320 lines (maximum 299)');
+  }
   write('code.ts', lines(199));
+  write('code.test.ts', lines(299));
+  git('add', '.');
   succeeds(check());
-  write('code.ts', lines(200));
-  fails(check(), 'maximum 199');
+  succeeds(check('--staged'));
 });
 
-test('new tracked and untracked files cannot acquire legacy allowances from branch commits', (t) => {
+test('new tracked and untracked files fail even after being committed', (t) => {
   const { git, write, commit, check } = repository(t);
   write('new.ts', lines(200));
   fails(check(), '"new.ts": 200 lines');
@@ -176,7 +167,7 @@ test('partially staged oversized content cannot hide behind a smaller working co
   fails(check('--staged'), '"code.ts": 200 lines');
 });
 
-test('deletions pass and renamed oversized files are treated as new paths', (t) => {
+test('deletions pass and unchanged renames must meet the universal limit', (t) => {
   const { cwd, git, check } = repository(t, { 'code.ts': lines(250) });
   renameSync(path.join(cwd, 'code.ts'), path.join(cwd, 'renamed.ts'));
   fails(check(), '"renamed.ts": 250 lines');
@@ -224,27 +215,32 @@ test('spaces, tabs, Unicode, and newlines in filenames work in working-tree and 
   fails(check('--staged'), JSON.stringify(file));
 });
 
-test('the merge base preserves legacy allowances when the target branch advances', (t) => {
+test('target branch advancement cannot exempt unchanged oversized files', (t) => {
   const { git, write, commit, check } = repository(t, { 'code.ts': lines(250) });
   const original = git('rev-parse', 'HEAD');
-  write('code.ts', lines(220));
+  write('code.ts', lines(199));
   commit();
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
   git('checkout', '--quiet', '-b', 'topic', original);
-  succeeds(check());
-  write('code.ts', lines(251));
-  fails(check(), 'existing file cannot grow beyond 250');
+  fails(check(), '"code.ts": 250 lines (maximum 199)');
+  fails(check('--staged'), '"code.ts": 250 lines (maximum 199)');
 });
 
-test('alternate bases work and missing refs or invalid arguments fail closed', (t) => {
+test('missing target refs and Nx base variables have no effect; unsupported arguments fail', (t) => {
   const { git, check, checkFromCi } = repository(t);
   git('update-ref', '-d', 'refs/remotes/origin/main');
-  fails(check(), 'File size check failed');
-  succeeds(check('--base', 'HEAD'));
-  succeeds(checkFromCi('HEAD'));
-  fails(checkFromCi('missing-ref'), 'File size check failed');
-  succeeds(checkFromCi('missing-ref', '--base', 'HEAD'));
-  fails(check('--base', 'missing-ref'), 'File size check failed');
+  succeeds(check());
+  succeeds(check('--staged'));
+  succeeds(checkFromCi('missing-ref'));
+  succeeds(checkFromCi('missing-ref', '--staged'));
+  fails(check('--base', 'HEAD'), 'Usage:');
   fails(check('--base'), 'Usage:');
   fails(check('--unknown'), 'Usage:');
+});
+
+test('an oversized working copy fails even when the index is compliant', (t) => {
+  const { write, check } = repository(t, { 'code.ts': lines(199) });
+  write('code.ts', lines(200));
+  fails(check(), '"code.ts": 200 lines (maximum 199)');
+  succeeds(check('--staged'));
 });

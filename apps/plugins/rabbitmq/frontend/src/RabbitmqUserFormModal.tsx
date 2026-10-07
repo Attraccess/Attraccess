@@ -25,30 +25,9 @@ import {
   ModalHeading,
   TextField,
 } from '@heroui/react';
-import { useEffect, useState } from 'react';
-import { DEFAULT_MQTT_PERMISSIONS, upsertUser, type RabbitmqUser, type UpsertRabbitmqUserBody } from './users-api';
-
-export interface RabbitmqUserFormModalProps {
-  mqttServerId: number;
-  isOpen: boolean;
-  // The user being edited; null means create.
-  user: RabbitmqUser | null;
-  // Known vhosts, used as a hint for the default-permissions vhost field.
-  vhosts: string[];
-  onClose: () => void;
-  // Called after a successful save so the panel can reload the list.
-  onSaved: () => void;
-}
-
-import { useRabbitmqTranslations } from './i18n';
-import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
-
-function parseTags(value: string): string[] {
-  return value
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0);
-}
+import { DEFAULT_MQTT_PERMISSIONS } from './users-api';
+import { RabbitmqUserFormModalProps } from './RabbitmqUserFormModal.rabbitmq-user-form-modal-props';
+import { useRabbitmqUserFormModalState } from './useRabbitmqUserFormModalState';
 
 export function RabbitmqUserFormModal({
   mqttServerId,
@@ -58,63 +37,24 @@ export function RabbitmqUserFormModal({
   onClose,
   onSaved,
 }: RabbitmqUserFormModalProps) {
-  const { t, tMessage } = useRabbitmqTranslations();
-  const isEdit = user !== null;
-
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [tags, setTags] = useState('');
-  const [grantMqttDefaults, setGrantMqttDefaults] = useState(true);
-  const [vhost, setVhost] = useState('/');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | TranslationMessage | null>(null);
-
-  // Re-seed the form whenever it opens (for another user, or again after a
-  // cancel) — modal state outlives a single open/close cycle.
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    setUsername(user?.name ?? '');
-    setPassword('');
-    setTags(user?.tags.join(', ') ?? '');
-    setGrantMqttDefaults(true);
-    setVhost(vhosts.includes('/') || vhosts.length === 0 ? '/' : vhosts[0]);
-    setError(null);
-  }, [isOpen, user, vhosts]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = username.trim();
-    if (name.length === 0) {
-      setError({ key: 'form.usernameRequired' });
-      return;
-    }
-    if (!isEdit && password.length === 0) {
-      setError({ key: 'form.passwordRequired' });
-      return;
-    }
-
-    const body: UpsertRabbitmqUserBody = { tags: parseTags(tags) };
-    if (password.length > 0) {
-      body.password = password;
-    }
-    if (!isEdit && grantMqttDefaults && vhost.trim().length > 0) {
-      body.permissions = [{ vhost: vhost.trim(), ...DEFAULT_MQTT_PERMISSIONS }];
-    }
-
-    setSaving(true);
-    setError(null);
-    try {
-      await upsertUser(mqttServerId, name, body);
-      onSaved();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : { key: 'form.saveError' });
-    } finally {
-      setSaving(false);
-    }
-  };
+  const {
+    t,
+    tMessage,
+    isEdit,
+    username,
+    setUsername,
+    password,
+    setPassword,
+    tags,
+    setTags,
+    grantMqttDefaults,
+    setGrantMqttDefaults,
+    vhost,
+    setVhost,
+    saving,
+    error,
+    handleSubmit,
+  } = useRabbitmqUserFormModalState({ mqttServerId, isOpen, user, vhosts, onClose, onSaved });
 
   return (
     <Modal
@@ -217,3 +157,5 @@ export function RabbitmqUserFormModal({
     </Modal>
   );
 }
+
+export { type RabbitmqUserFormModalProps } from './RabbitmqUserFormModal.rabbitmq-user-form-modal-props';

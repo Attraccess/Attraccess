@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import * as fs from 'fs';
 import * as path from 'path';
+import { registerDockerWorkflowCases } from './node-version-workflows.test-utils';
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 
@@ -51,15 +52,11 @@ describe('Node.js version consistency', () => {
     });
 
     it('should use NODE_VERSION in builder stage FROM', () => {
-      expect(dockerfileContent).toContain(
-        'FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder'
-      );
+      expect(dockerfileContent).toContain('FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder');
     });
 
     it('should use NODE_VERSION in final stage FROM', () => {
-      const fromLines = dockerfileContent
-        .split('\n')
-        .filter((l) => l.startsWith('FROM node:'));
+      const fromLines = dockerfileContent.split('\n').filter((l) => l.startsWith('FROM node:'));
       expect(fromLines.length).toBeGreaterThanOrEqual(2);
       fromLines.forEach((line) => {
         expect(line).toContain('${NODE_VERSION}');
@@ -68,10 +65,7 @@ describe('Node.js version consistency', () => {
 
     it('should not hardcode any other Node.js version', () => {
       const lines = dockerfileContent.split('\n');
-      const hardcoded = lines.filter(
-        (l) =>
-          /node:\d+\.\d+/.test(l) && !l.includes('${NODE_VERSION}')
-      );
+      const hardcoded = lines.filter((l) => /node:\d+\.\d+/.test(l) && !l.includes('${NODE_VERSION}'));
       expect(hardcoded).toHaveLength(0);
     });
   });
@@ -98,9 +92,7 @@ describe('Node.js version consistency', () => {
     });
 
     it('should not reference an older Node.js major version in comments', () => {
-      const olderMajorRefs = dockerfileContent.match(
-        /Node\s+(1[0-9]|2[0-3])\+/g
-      );
+      const olderMajorRefs = dockerfileContent.match(/Node\s+(1[0-9]|2[0-3])\+/g);
       expect(olderMajorRefs).toBeNull();
     });
   });
@@ -123,9 +115,7 @@ describe('Node.js version consistency', () => {
     });
 
     it('should not reference an older Node.js major version', () => {
-      const olderMajorRefs = dockerfileContent.match(
-        /node:(18|20|22)\.\d+\.\d+/gi
-      );
+      const olderMajorRefs = dockerfileContent.match(/node:(18|20|22)\.\d+\.\d+/gi);
       expect(olderMajorRefs).toBeNull();
     });
   });
@@ -179,83 +169,13 @@ describe('Node.js version consistency', () => {
     it('should not hardcode a node-version value', () => {
       const lines = actionContent.split('\n');
       const hardcodedVersion = lines.filter(
-        (l) =>
-          /node-version:\s*['"]?\d+/.test(l) &&
-          !l.includes('node-version-file')
+        (l) => /node-version:\s*['"]?\d+/.test(l) && !l.includes('node-version-file'),
       );
       expect(hardcodedVersion).toHaveLength(0);
     });
   });
 
-  describe('GitHub Actions Docker builds read Node.js version from .nvmrc', () => {
-    describe('docker-build-push composite action', () => {
-      let content: string;
-
-      beforeAll(() => {
-        content = readFile('.github/actions/docker-build-push/action.yml');
-      });
-
-      it('should read NODE_VERSION from .nvmrc', () => {
-        expect(content).toContain('cat .nvmrc');
-      });
-
-      it('should pass NODE_VERSION as a Docker build-arg', () => {
-        expect(content).toContain(
-          'NODE_VERSION=${{ steps.node-version.outputs.value }}'
-        );
-      });
-
-      it('should not hardcode a Node.js version in build-args', () => {
-        const buildArgLines = content
-          .split('\n')
-          .filter(
-            (l) =>
-              l.includes('NODE_VERSION=') &&
-              !l.includes('${{') &&
-              !l.includes('cat .nvmrc')
-          );
-        const hardcodedVersionArgs = buildArgLines.filter((l) =>
-          /NODE_VERSION=\d+/.test(l)
-        );
-        expect(hardcodedVersionArgs).toHaveLength(0);
-      });
-    });
-
-    const workflowsWithDocker = [
-      'docker-nightly-latest.yml',
-      'pull-requests.yml',
-      'release.yml',
-    ];
-
-    workflowsWithDocker.forEach((workflowFile) => {
-      describe(workflowFile, () => {
-        let content: string;
-
-        beforeAll(() => {
-          content = readFile(`.github/workflows/${workflowFile}`);
-        });
-
-        it('should build Docker images via the docker-build-push action', () => {
-          expect(content).toContain('./.github/actions/docker-build-push');
-        });
-
-        it('should not hardcode a Node.js version in build-args', () => {
-          const buildArgLines = content
-            .split('\n')
-            .filter(
-              (l) =>
-                l.includes('NODE_VERSION=') &&
-                !l.includes('${{') &&
-                !l.includes('cat .nvmrc')
-            );
-          const hardcodedVersionArgs = buildArgLines.filter((l) =>
-            /NODE_VERSION=\d+/.test(l)
-          );
-          expect(hardcodedVersionArgs).toHaveLength(0);
-        });
-      });
-    });
-  });
+  registerDockerWorkflowCases(readFile);
 
   describe('no stale Node.js version references', () => {
     const filesToCheck = [
@@ -272,9 +192,7 @@ describe('Node.js version consistency', () => {
     filesToCheck.forEach((filePath) => {
       it(`${filePath} should not reference Node.js 18.x or 20.x or 22.x`, () => {
         const content = readFile(filePath);
-        const staleRefs = content.match(
-          /node:(18|20|22)\.\d+\.\d+/gi
-        );
+        const staleRefs = content.match(/node:(18|20|22)\.\d+\.\d+/gi);
         expect(staleRefs).toBeNull();
       });
     });

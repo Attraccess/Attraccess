@@ -1,35 +1,23 @@
-import { Profile, Strategy } from 'passport-openidconnect';
-import { get } from 'lodash-es';
-import { PassportStrategy } from '@nestjs/passport';
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
-import { UsersService } from '../../../users/users.service';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
-import { AuthService } from '../../auth.service';
-import { resolveSsoRoleAssignments } from '../permission-mapping';
-import { RbacService } from '../../../rbac/rbac.service';
-import { SSOService } from '../sso.service';
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
-import { ssoAuditSnapshot } from '../sso-audit-snapshot';
-import { randomUUID } from 'node:crypto';
-import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
+import { Profile, Strategy } from 'passport-openidconnect';
 import { MetricsService } from '../../../../metrics/metrics.service';
+import { UsersService } from '../../../users/users.service';
+import { AuthService } from '../../auth.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-
-/** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
-export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
-
-/** Request key set by SSOOIDCGuard for login route: state to pass to OIDC (e.g. { redirectTo }). */
-export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
+import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
+import { OidcCookieStateStore } from './oidc-cookie-state-store';
+import { OidcRoleProvisioningImplementation } from './oidc-role-provisioning';
+import { SSO_OIDC_CALLBACK_URL_REQUEST_KEY, SSO_OIDC_STATE_REQUEST_KEY } from './oidc.strategy.route-context';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true) {
-  private readonly logger = new Logger(SSOOIDCStrategy.name);
-  private readonly config: SSOProviderOIDCConfiguration;
+export class SSOOIDCStrategy extends OidcRoleProvisioningImplementation {
+  protected readonly logger = new Logger(SSOOIDCStrategy.name);
+  protected readonly config: SSOProviderOIDCConfiguration;
 
   constructor(
-    private moduleRef: ModuleRef,
+    protected moduleRef: ModuleRef,
     config: SSOProviderOIDCConfiguration,
     callbackURL: string,
     stateStore: OidcCookieStateStore,
@@ -78,27 +66,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     super.authenticate(req, opts);
   }
 
-  private isOIDCAppState(value: unknown): value is OIDCAppState {
-    return (
-      value !== null &&
-      typeof value === 'object' &&
-      (!('redirectTo' in value) || typeof (value as OIDCAppState).redirectTo === 'string')
-    );
-  }
-
-  private firstNonEmptyStringFromPaths(paths: string[], sources: unknown[]): string | undefined {
-    for (const p of paths) {
-      for (const src of sources) {
-        const value = get(src, p);
-        if (typeof value === 'string' && value.trim().length > 0) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private recordFailure(error: unknown): void {
+  protected recordFailure(error: unknown): void {
     try {
       const metricsService = this.moduleRef.get(MetricsService, { strict: false });
       recordSsoLoginFailure(metricsService, SSOProviderType.OIDC, classifySsoFailureReason(error), this.logger);
@@ -107,28 +75,6 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
       this.logger.warn(
         `Failed to resolve MetricsService for SSO login failure metric: ${metricsError instanceof Error ? metricsError.message : String(metricsError)}`,
       );
-    }
-  }
-
-  private parseIdTokenClaims(idToken?: string): Record<string, unknown> | undefined {
-    if (!idToken) {
-      return undefined;
-    }
-
-    const parts = idToken.split('.');
-    if (parts.length < 2) {
-      this.logger.warn('OIDC id_token format invalid; skipping claim extraction');
-      return undefined;
-    }
-
-    try {
-      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-      const payload = Buffer.from(padded, 'base64').toString('utf8');
-      return JSON.parse(payload) as Record<string, unknown>;
-    } catch (error) {
-      this.logger.warn(`Failed to parse id_token claims: ${String(error)}`);
-      return undefined;
     }
   }
 
@@ -240,122 +186,6 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
     return await this.syncPermissionsFromClaims(user, claimSources);
   }
-
-  private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
-    const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
-    if (this.config.clientId) {
-      paths.push(`resource_access.${this.config.clientId}.roles`);
-    }
-
-    const values: unknown[] = [];
-    for (const path of paths) {
-      for (const source of claimSources) {
-        const value = get(source, path);
-        if (value !== undefined && value !== null) {
-          values.push(value);
-        }
-      }
-    }
-
-    return values;
-  }
-
-  private resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
-    const roleNames: string[] = [];
-
-    for (const value of claimValues) {
-      if (Array.isArray(value)) {
-        for (const entry of value) {
-          if (typeof entry === 'string') roleNames.push(entry);
-        }
-        continue;
-      }
-      if (typeof value === 'string') {
-        roleNames.push(value);
-        continue;
-      }
-      if (value && typeof value === 'object') {
-        for (const entry of Object.values(value)) {
-          if (typeof entry === 'string') roleNames.push(entry);
-          else if (Array.isArray(entry)) {
-            for (const item of entry) {
-              if (typeof item === 'string') roleNames.push(item);
-            }
-          }
-        }
-      }
-    }
-
-    this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
-    return roleNames;
-  }
-
-  private async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {
-    const claimValues = this.getPermissionClaimValues(claimSources);
-    this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
-    const roleNames = this.resolveRoleNamesFromClaims(claimValues);
-    const roleAssignments = resolveSsoRoleAssignments(roleNames, this.config.roleMappings);
-    this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify(roleAssignments.map((r) => r.roleKey))}`);
-
-    const rbacService = this.moduleRef.get(RbacService, { strict: false });
-    let changes: { added: string[]; removed: string[]; updated: string[] } | undefined;
-    if (!rbacService) {
-      this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
-    } else if (claimValues.length > 0) {
-      // Only sync when the token contained at least one role/group claim key. A present-but-empty
-      // claim (e.g. groups: []) is authoritative and revokes this provider's SSO-managed roles; a
-      // wholly absent claim (missing scope, transient IdP omission) must not silently revoke
-      // anything. Intentionally not gated on a configured mapping: a cleared mapping must still
-      // sync (with zero assignments) so roles granted under the old mapping get revoked.
-      changes = await rbacService.syncSsoRoles(
-        user.id,
-        roleAssignments,
-        SSOProviderType.OIDC,
-        this.config.ssoProviderId,
-      );
-    }
-    await this.recordProvisioningAudit(user.id, userCreated, changes);
-    return user;
-  }
-
-  private async recordProvisioningAudit(
-    userId: number,
-    userCreated: boolean,
-    changes?: { added: string[]; removed: string[]; updated: string[] },
-  ): Promise<void> {
-    try {
-      const ssoService = this.moduleRef.get(SSOService, { strict: false });
-      const audit = this.moduleRef.get(SsoAuditService, { strict: false });
-      const provider = await ssoService?.getProviderByTypeAndIdWithConfiguration(
-        SSOProviderType.OIDC,
-        this.config.ssoProviderId,
-      );
-      if (!audit || !provider) return;
-      const details = { provider: ssoAuditSnapshot(provider) };
-      if (userCreated) {
-        await audit.record({
-          action: 'sso.provisioning.user_created',
-          operationId: randomUUID(),
-          actorId: null,
-          authenticationMethod: null,
-          subject: { type: 'user', id: userId },
-          details: { ...details, changes: JSON.stringify({ userCreated: true }) },
-        });
-      }
-      if (changes) {
-        await audit.record({
-          action: 'sso.provisioning.permissions_synced',
-          operationId: randomUUID(),
-          actorId: null,
-          authenticationMethod: null,
-          subject: { type: 'user', id: userId },
-          details: { ...details, changes: JSON.stringify(changes) },
-        });
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to record committed OIDC provisioning audit: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
 }
+
+export { SSO_OIDC_CALLBACK_URL_REQUEST_KEY, SSO_OIDC_STATE_REQUEST_KEY } from './oidc.strategy.route-context';

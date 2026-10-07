@@ -1,32 +1,34 @@
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { AuthenticationType, User } from '@attraccess/database-entities';
-import { EntityManager } from 'typeorm';
-import { UsersService } from './users.service';
-import { AuthService } from '../auth/auth.service';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { EmailService } from '../../email/email.service';
-import { PasswordPolicyService } from '../password-policy/password-policy.service';
+import { AuthService } from '../auth/auth.service';
 import { PasswordPolicyViolationException } from '../password-policy/password-policy.errors';
-import { SignupDomainService } from './signup-domain.service';
-import { CreateUserDto } from './dtos/createUser.dto';
+import { PasswordPolicyService } from '../password-policy/password-policy.service';
 import { AcceptInvitationDto } from './dtos/acceptInvitation.dto';
+import { CreateUserDto } from './dtos/createUser.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { SignupDomainService } from './signup-domain.service';
+import { UserAccountRegistrationImplementation } from './user-account-registration';
+import { UsersService } from './users.service';
 
 /**
  * Self-service registration, email verification and invitation acceptance flows.
  */
 @Injectable()
-export class UserRegistrationService {
-  private readonly logger = new Logger(UserRegistrationService.name);
-  private firstTimeSetupOverwriteLock = Promise.resolve();
+export class UserRegistrationService extends UserAccountRegistrationImplementation {
+  protected readonly logger = new Logger(UserRegistrationService.name);
+  protected firstTimeSetupOverwriteLock = Promise.resolve();
 
   constructor(
-    private readonly usersService: UsersService,
+    protected readonly usersService: UsersService,
     @Inject(forwardRef(() => AuthService))
-    private readonly authService: AuthService,
-    private readonly emailService: EmailService,
-    private readonly passwordPolicyService: PasswordPolicyService,
-    private readonly signupDomainService: SignupDomainService,
-  ) {}
+    protected readonly authService: AuthService,
+    protected readonly emailService: EmailService,
+    protected readonly passwordPolicyService: PasswordPolicyService,
+    protected readonly signupDomainService: SignupDomainService,
+  ) {
+    super();
+  }
 
   public async createOne(body: CreateUserDto, locale?: string): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
@@ -54,113 +56,6 @@ export class UserRegistrationService {
 
     const register = () => this.registerUser(body, locale, hashedPassword, body.overwriteFirstTimeAdmin);
     return body.overwriteFirstTimeAdmin ? await this.withFirstTimeSetupOverwriteLock(register) : await register();
-  }
-
-  private async registerUser(
-    body: CreateUserDto,
-    locale: string | undefined,
-    hashedPassword: string | undefined,
-    overwriteFirstTimeAdmin: boolean | undefined,
-  ): Promise<User> {
-    let existingAdmin: User | undefined;
-
-    const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
-      existingAdmin = overwriteFirstTimeAdmin
-        ? await this.usersService.releaseFirstTimeSetupAdminIdentifiers(manager)
-        : undefined;
-      const user = await this.usersService.createOne(
-        {
-          username: body.username,
-          email: body.email,
-          externalIdentifier: null,
-          locale,
-          isFirstTimeSetupAdmin: !!existingAdmin,
-        },
-        manager,
-        { excludedUserIdFromLicenseUsage: existingAdmin?.id },
-      );
-      this.logger.debug(`User created with ID: ${user.id}`);
-
-      this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
-      const authenticationDetails = await this.authService.addAuthenticationDetails(
-        user.id,
-        {
-          type: body.strategy,
-          details: {
-            password: body.password,
-          },
-        },
-        manager,
-        hashedPassword,
-      );
-      this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
-
-      this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
-      const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
-      return { user, verificationToken };
-    });
-
-    try {
-      this.logger.debug(`Sending verification email to user ID: ${user.id}`);
-      await this.emailService.sendVerificationEmail(user, verificationToken);
-      this.logger.debug(`Verification email sent to user ID: ${user.id}`);
-    } catch (error) {
-      this.logger.error(
-        `Error sending verification email for ${body.email}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-      try {
-        if (existingAdmin) {
-          await this.usersService.rollbackFirstTimeSetupAdminReplacement(user.id, existingAdmin);
-        } else {
-          await this.usersService.rollbackFailedRegistration(user.id);
-        }
-      } catch (rollbackError) {
-        this.logger.error(
-          `Error rolling back failed registration for user ID: ${user.id}`,
-          rollbackError instanceof Error ? rollbackError.stack : String(rollbackError),
-        );
-        throw rollbackError;
-      }
-      throw mapEmailSendError(error);
-    }
-
-    if (existingAdmin) {
-      this.logger.debug(`Overwriting first-time-setup admin with ID: ${existingAdmin.id}`);
-      try {
-        await this.usersService.deleteOne(existingAdmin.id);
-      } catch (error) {
-        try {
-          await this.usersService.rollbackFirstTimeSetupAdminReplacement(user.id, existingAdmin);
-        } catch (rollbackError) {
-          this.logger.error(
-            `Error rolling back failed first-time-setup replacement for user ID: ${user.id}`,
-            rollbackError instanceof Error ? rollbackError.stack : String(rollbackError),
-          );
-          throw rollbackError;
-        }
-        throw error;
-      }
-    }
-
-    this.usersService.recordCreatedUser(user);
-    this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
-    return user;
-  }
-
-  private async withFirstTimeSetupOverwriteLock<T>(handler: () => Promise<T>): Promise<T> {
-    const previous = this.firstTimeSetupOverwriteLock;
-    let release!: () => void;
-    this.firstTimeSetupOverwriteLock = new Promise((resolve) => {
-      release = resolve;
-    });
-
-    await previous;
-    try {
-      return await handler();
-    } finally {
-      release();
-    }
   }
 
   public async verifyEmail(email: string, token: string): Promise<void> {

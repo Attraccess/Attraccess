@@ -1,31 +1,7 @@
 import { useParams } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Background,
-  BackgroundVariant,
-  Controls,
-  ReactFlow,
-  Node,
-  Panel,
-  Edge,
-  useReactFlow,
-  SelectionMode,
-} from '@xyflow/react';
+import { Background, BackgroundVariant, Controls, ReactFlow, Panel, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ButtonGroup, Spinner } from '@heroui/react';
-import {
-  ApiError,
-  ResourceFlowEdgeDto,
-  ResourceFlowLog,
-  ResourceFlowNodeDto,
-  useResourceFlowsServiceGetResourceFlow,
-  UseResourceFlowsServiceGetResourceFlowKeyFn,
-  useResourceFlowsServiceSaveResourceFlow,
-} from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAppTheme } from '@attraccess/ui';
-import { usePtrStore } from '../../../../stores/ptr.store';
-import { getLayoutedElements } from './flowLayout';
 import { Button } from '../../../../components/button';
 import {
   BoxSelectIcon,
@@ -38,381 +14,31 @@ import {
   SaveIcon,
   UploadIcon,
 } from 'lucide-react';
-import { nanoid } from 'nanoid';
-import { NodeCatalogHandle, NodeCatalogPanel } from './nodeCatalog';
-import { FlowProvider, useFlowContext } from './flowContext';
-import { useFlowImportExport } from './flowImportExport';
-import { useQueryClient } from '@tanstack/react-query';
-import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
-import JSConfetti from 'js-confetti';
+import { NodeCatalogPanel } from './nodeCatalog';
+import { FlowProvider } from './flowContext';
 import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
-import de from './de.json';
-import en from './en.json';
-import nodesDeTranslations from './node/de.json';
-import nodesEnTranslations from './node/en.json';
-import { useToastMessage } from '../../../../components/toastProvider';
-import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
-import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
+import { useFlowsPageInnerState } from './useFlowsPageInnerState';
 
 // Efficient comparison functions to replace expensive JSON.stringify operations
-function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNodeDto | Node): boolean {
-  return (
-    node1.id === node2.id &&
-    node1.type === node2.type &&
-    node1.position.x === node2.position.x &&
-    node1.position.y === node2.position.y &&
-    JSON.stringify(node1.data) === JSON.stringify(node2.data) // Only stringify the smaller data object
-  );
-}
-
-function areEdgesEqual(edge1: ResourceFlowEdgeDto | Edge, edge2: ResourceFlowEdgeDto | Edge): boolean {
-  return edge1.id === edge2.id && edge1.source === edge2.source && edge1.target === edge2.target;
-}
 
 function FlowsPageInner() {
-  const { id: resourceId } = useParams();
-  const { resolvedTheme } = useAppTheme();
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
-    },
-    de: {
-      ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
-    },
-  });
-  const { t: tNodeTranslations } = useTranslations({
-    de: nodesDeTranslations,
-    en: nodesEnTranslations,
-  });
-  const { setPullToRefreshIsEnabled } = usePtrStore();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    setPullToRefreshIsEnabled(false);
-    return () => {
-      setPullToRefreshIsEnabled(true);
-    };
-  }, [setPullToRefreshIsEnabled]);
-
-  const {
-    data: originalFlowData,
-    isFetching: isFlowFetching,
-    isError: isFlowError,
-  } = useResourceFlowsServiceGetResourceFlow({ resourceId: Number(resourceId) }, undefined, {
-    enabled: !!resourceId,
-  });
-  const isFlowLoading = !originalFlowData && isFlowFetching;
-
-  const toast = useToastMessage();
-
-  const {
-    mutate: saveFlow,
-    isError: saveFailed,
-    isPending: isSaving,
-  } = useResourceFlowsServiceSaveResourceFlow({
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: UseResourceFlowsServiceGetResourceFlowKeyFn({ resourceId: Number(resourceId) }),
-      });
-    },
-    onError: (error) => {
-      toast.apiError({
-        error: error as ApiError,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-      });
-    },
-  });
-
-  const { fitView, screenToFlowPosition, getInternalNode } = useReactFlow();
-  const mousePosRef = useRef<{ x: number; y: number } | null>(null);
-  const nodeCatalogRef = useRef<NodeCatalogHandle>(null);
-  const {
-    nodes,
-    edges,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    setNodes,
-    setEdges,
-    addNode,
-    addLiveLogReceiver,
-    removeLiveLogReceiver,
-    flowNodeTypes,
-    setValidationErrors,
-    copySelectedNodes,
-    cutSelectedNodes,
-    pasteNodes,
-  } = useFlowContext();
-
-  const { handleExport, handleImportClick } = useFlowImportExport({
-    nodes,
-    edges,
-    setNodes,
-    setEdges,
-    resourceId: Number(resourceId),
-    t,
-  });
-
-  useEffect(() => {
-    if (originalFlowData) {
-      setNodes(originalFlowData.nodes);
-      setEdges(originalFlowData.edges);
-      setValidationErrors(
-        (originalFlowData as unknown as { validationErrors?: Array<{ nodeId: string; message: string }> })
-          .validationErrors ?? [],
-      );
-    }
-  }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
-
-  const nodesHaveChanged = useMemo(() => {
-    const originalNodes = originalFlowData?.nodes ?? [];
-
-    if (originalNodes.length !== nodes.length) {
-      return true;
-    }
-
-    // More efficient comparison without JSON.stringify on entire arrays
-    for (let i = 0; i < originalNodes.length; i++) {
-      const originalNode = originalNodes[i];
-      const currentNode = nodes.find((n) => n.id === originalNode.id);
-
-      if (!currentNode || !areNodesEqual(originalNode, currentNode)) {
-        return true;
-      }
-    }
-
-    return false;
-  }, [nodes, originalFlowData?.nodes]);
-
-  const edgesHaveChanged = useMemo(() => {
-    const originalEdges = originalFlowData?.edges ?? [];
-
-    if (originalEdges.length !== edges.length) {
-      return true;
-    }
-
-    // More efficient comparison without JSON.stringify on entire arrays
-    for (let i = 0; i < originalEdges.length; i++) {
-      const originalEdge = originalEdges[i];
-      const currentEdge = edges.find((e) => e.id === originalEdge.id);
-
-      if (!currentEdge || !areEdgesEqual(originalEdge, currentEdge)) {
-        return true;
-      }
-    }
-
-    return false;
-  }, [edges, originalFlowData?.edges]);
-
-  const flowHasChanged = useMemo(() => {
-    return nodesHaveChanged || edgesHaveChanged;
-  }, [nodesHaveChanged, edgesHaveChanged]);
-
-  const save = useCallback(() => {
-    saveFlow({
-      resourceId: Number(resourceId),
-      requestBody: {
-        nodes: nodes as ResourceFlowNodeDto[],
-        edges: edges as ResourceFlowEdgeDto[],
-      },
-    });
-  }, [nodes, edges, saveFlow, resourceId]);
-
-  const layout = useCallback(() => {
-    const sourceHandles = new Map(
-      nodes.map((node) => [
-        node.id,
-        [...(getInternalNode(node.id)?.internals.handleBounds?.source ?? [])]
-          .sort((a, b) => a.x - b.x)
-          .flatMap((handle) => (handle.id == null ? [] : [handle.id])),
-      ]),
-    );
-    const layouted = getLayoutedElements(nodes, edges, sourceHandles);
-    setNodes([...layouted.nodes]);
-    setEdges([...layouted.edges]);
-    fitView();
-  }, [nodes, edges, fitView, setNodes, setEdges, getInternalNode]);
-
-  const addStartNode = useCallback(
-    (nodeType: string) => {
-      let maxX = 0;
-      nodes.forEach((node) => {
-        maxX = Math.max(maxX, node.position.x);
-      });
-      const newNode: Node = {
-        id: nanoid(),
-        position: { x: maxX + 300, y: 0 },
-        type: nodeType,
-        data: {},
-      };
-      addNode(newNode);
-
-      fitView({ nodes: [newNode], duration: 1000, maxZoom: 0.9 });
-    },
-    [addNode, nodes, fitView],
-  );
-
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const onDropNode = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      const nodeType = event.dataTransfer.getData('application/reactflow');
-      if (!nodeType) return;
-      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      addNode({ id: nanoid(), position, type: nodeType, data: { __centerOnDrop: true } });
-    },
-    [addNode, screenToFlowPosition],
-  );
-
-  useEffect(() => {
-    const pending = nodes.find((n) => {
-      const flagged = (n.data as { __centerOnDrop?: boolean })?.__centerOnDrop === true;
-      return flagged && n.measured?.width != null && n.measured?.height != null;
-    });
-    if (!pending) return;
-    const w = pending.measured?.width ?? 0;
-    const h = pending.measured?.height ?? 0;
-    setNodes((prev) =>
-      prev.map((n) => {
-        if (n.id !== pending.id) return n;
-        const nextData = { ...(n.data as Record<string, unknown>) };
-        delete nextData.__centerOnDrop;
-        return {
-          ...n,
-          position: { x: n.position.x - w / 2, y: n.position.y - h / 2 },
-          data: nextData,
-        };
-      }),
-    );
-  }, [nodes, setNodes]);
-
-  const [flowIsRunning, setFlowIsRunning] = useState(false);
-  const flowExecutionHadError = useRef(false);
-  const [confettiEnabled, setConfettiEnabled] = useState(false);
-  const confettiRef = useRef<JSConfetti | null>(null);
-
-  useEffect(() => {
-    if (!confettiEnabled) return;
-
-    const confetti = new JSConfetti();
-    confettiRef.current = confetti;
-    return () => {
-      confettiRef.current = null;
-      confetti.clearCanvas();
-      confetti.destroyCanvas();
-    };
-  }, [confettiEnabled]);
-
-  const isCoarsePointer = useMemo(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return false;
-    }
-    return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-  }, []);
-  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() => (isCoarsePointer ? 'pan' : 'select'));
-  // @xyflow/react's mouse-button array in panOnDrag doesn't apply to touch, so for select mode on touch we must disable pan entirely.
-  const panOnDrag = interactionMode === 'pan' ? true : isCoarsePointer ? false : [1, 2];
-  const selectionOnDrag = interactionMode === 'select';
-
-  const onLiveLog = useCallback(
-    (log: ResourceFlowLog) => {
-      if (log.type === 'node.processing.failed') {
-        flowExecutionHadError.current = true;
-        return;
-      }
-
-      if (log.type === 'flow.start') {
-        setFlowIsRunning(true);
-        return;
-      }
-
-      if (log.type === 'flow.completed') {
-        setFlowIsRunning(false);
-
-        if (!flowExecutionHadError.current) {
-          confettiRef.current?.addConfetti();
-        } else {
-          confettiRef.current?.addConfetti({
-            emojis: ['❌', '😢', '💔', '😭', '🚫', '⚠️', '💥', '👎'],
-            emojiSize: 100,
-            confettiNumber: 2,
-          });
-        }
-
-        flowExecutionHadError.current = false;
-      }
-    },
-    [setFlowIsRunning],
-  );
-
-  useEffect(() => {
-    addLiveLogReceiver(onLiveLog);
-    return () => {
-      removeLiveLogReceiver(onLiveLog);
-    };
-  }, [addLiveLogReceiver, removeLiveLogReceiver, onLiveLog]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.isContentEditable || target?.closest('input, textarea, select, [contenteditable="true"]')) {
-        return;
-      }
-      const isMod = e.metaKey || e.ctrlKey;
-      if (isMod && e.key === 'c') {
-        copySelectedNodes();
-      } else if (isMod && e.key === 'x') {
-        cutSelectedNodes();
-      } else if (isMod && e.key === 'v') {
-        const targetFlowPosition = mousePosRef.current ? screenToFlowPosition(mousePosRef.current) : undefined;
-        pasteNodes(targetFlowPosition);
-      } else if (isMod && e.key === 'a') {
-        e.preventDefault();
-        setNodes((prev) => prev.map((n) => ({ ...n, selected: true })));
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [copySelectedNodes, cutSelectedNodes, pasteNodes, setNodes, screenToFlowPosition]);
-
-  const edgesWithCorrectType = useMemo(() => {
-    return edges.map((edge) => ({
-      ...edge,
-      type: edge.type ?? 'attraccess-edge',
-      animated: flowIsRunning,
-    }));
-  }, [edges, flowIsRunning]);
-
-  const edgeTypes = useMemo(
-    () => ({
-      'attraccess-edge': EdgeWithDeleteButton,
-    }),
-    [],
-  );
+  const model = useFlowsPageInnerState();
 
   return (
     <div className="h-full w-full flex flex-col">
       <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-border">
         <NodeCatalogPanel
-          ref={nodeCatalogRef}
-          resourceId={Number(resourceId)}
-          onSelect={addStartNode}
-          tNodeTranslations={tNodeTranslations}
+          ref={model.nodeCatalogRef}
+          resourceId={Number(model.resourceId)}
+          onSelect={model.addStartNode}
+          tNodeTranslations={model.tNodeTranslations}
         />
         <div
           className="flex-1 h-full relative"
           onMouseMove={(e) => {
-            mousePosRef.current = { x: e.clientX, y: e.clientY };
+            model.mousePosRef.current = { x: e.clientX, y: e.clientY };
           }}
         >
           <ReactFlow
@@ -424,19 +50,19 @@ function FlowsPageInner() {
               [--xy-controls-button-color:var(--foreground)] [--xy-controls-button-color-hover:var(--foreground)]
               [--xy-controls-button-border-color:var(--border)] [--xy-controls-box-shadow:var(--surface-shadow)]
               [--xy-selection-background-color:var(--accent-soft)] [--xy-selection-border:1px_dotted_var(--accent)]"
-            nodes={nodes}
-            edges={edgesWithCorrectType}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onDrop={onDropNode}
-            onDragOver={onDragOver}
-            selectionOnDrag={selectionOnDrag}
-            panOnDrag={panOnDrag}
+            nodes={model.nodes}
+            edges={model.edgesWithCorrectType}
+            onNodesChange={model.onNodesChange}
+            onEdgesChange={model.onEdgesChange}
+            onConnect={model.onConnect}
+            onDrop={model.onDropNode}
+            onDragOver={model.onDragOver}
+            selectionOnDrag={model.selectionOnDrag}
+            panOnDrag={model.panOnDrag}
             selectionMode={SelectionMode.Partial}
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
-            colorMode={resolvedTheme}
+            colorMode={model.resolvedTheme}
             fitView
             // ponytail: fixed floor, derive it from the graph bounding box if 0.02 ever bites.
             // React Flow's default minZoom of 0.5 clamps fitView on flows taller than the pane,
@@ -444,99 +70,104 @@ function FlowsPageInner() {
             // nodes - the canvas looks empty even though every node is rendered.
             minZoom={0.02}
             defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
-            nodeTypes={flowNodeTypes}
-            edgeTypes={edgeTypes}
+            nodeTypes={model.flowNodeTypes}
+            edgeTypes={model.edgeTypes}
           >
             <Controls />
-            <FlowNodeQuerySelection key={resourceId} nodes={nodes} setNodes={setNodes} />
+            <FlowNodeQuerySelection key={model.resourceId} nodes={model.nodes} setNodes={model.setNodes} />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
               <ButtonGroup>
                 <Button
                   isIconOnly
-                  variant={interactionMode === 'pan' ? 'primary' : 'ghost'}
-                  onPress={() => setInteractionMode('pan')}
-                  aria-label={t('actions.modePan')}
-                  aria-pressed={interactionMode === 'pan'}
+                  variant={model.interactionMode === 'pan' ? 'primary' : 'ghost'}
+                  onPress={() => model.setInteractionMode('pan')}
+                  aria-label={model.t('actions.modePan')}
+                  aria-pressed={model.interactionMode === 'pan'}
                 >
                   <HandIcon />
                 </Button>
                 <Button
                   isIconOnly
-                  variant={interactionMode === 'select' ? 'primary' : 'ghost'}
-                  onPress={() => setInteractionMode('select')}
-                  aria-label={t('actions.modeSelect')}
-                  aria-pressed={interactionMode === 'select'}
+                  variant={model.interactionMode === 'select' ? 'primary' : 'ghost'}
+                  onPress={() => model.setInteractionMode('select')}
+                  aria-label={model.t('actions.modeSelect')}
+                  aria-pressed={model.interactionMode === 'select'}
                 >
                   <BoxSelectIcon />
                 </Button>
               </ButtonGroup>
               <Button
                 isIconOnly
-                isPending={isSaving}
-                onPress={save}
-                isDisabled={!flowHasChanged}
-                variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'secondary'}
+                isPending={model.isSaving}
+                onPress={model.save}
+                isDisabled={!model.flowHasChanged}
+                variant={model.saveFailed ? 'danger-soft' : model.flowHasChanged ? 'primary' : 'secondary'}
               >
                 <SaveIcon />
               </Button>
               <Button
                 isIconOnly
-                onPress={handleImportClick}
-                aria-label={t('actions.import')}
-                isDisabled={isFlowLoading}
+                onPress={model.handleImportClick}
+                aria-label={model.t('actions.import')}
+                isDisabled={model.isFlowLoading}
               >
                 <UploadIcon />
               </Button>
-              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>
+              <Button
+                isIconOnly
+                onPress={model.handleExport}
+                aria-label={model.t('actions.export')}
+                isDisabled={model.isFlowLoading}
+              >
                 <DownloadIcon />
               </Button>
               <LogViewer
-                resourceId={Number(resourceId)}
-                confettiEnabled={confettiEnabled}
-                onConfettiEnabledChange={setConfettiEnabled}
+                resourceId={Number(model.resourceId)}
+                confettiEnabled={model.confettiEnabled}
+                onConfettiEnabledChange={model.setConfettiEnabled}
               >
                 {(open) => (
-                  <Button isIconOnly onPress={open} aria-label={t('actions.logs')}>
+                  <Button isIconOnly onPress={open} aria-label={model.t('actions.logs')}>
                     <LogsIcon />
                   </Button>
                 )}
               </LogViewer>
 
-              <VariablesModal resourceId={Number(resourceId)}>
+              <VariablesModal resourceId={Number(model.resourceId)}>
                 {(open) => (
-                  <Button isIconOnly onPress={open} aria-label={t('actions.variables')}>
+                  <Button isIconOnly onPress={open} aria-label={model.t('actions.variables')}>
                     <BracesIcon />
                   </Button>
                 )}
               </VariablesModal>
 
-              <Button isIconOnly onPress={layout} isDisabled={isFlowLoading}>
+              <Button isIconOnly onPress={model.layout} isDisabled={model.isFlowLoading}>
                 <LayoutGridIcon />
               </Button>
               <Button
                 isIconOnly
                 variant="primary"
-                onPress={() => nodeCatalogRef.current?.open()}
-                aria-label={t('actions.addNode')}
+                onPress={() => model.nodeCatalogRef.current?.open()}
+                aria-label={model.t('actions.addNode')}
                 className="md:hidden"
-                isDisabled={isFlowLoading}
+                isDisabled={model.isFlowLoading}
               >
                 <PlusIcon />
               </Button>
             </Panel>
           </ReactFlow>
-          {(isFlowLoading || (isFlowError && !originalFlowData)) && (
+          {(model.isFlowLoading || (model.isFlowError && !model.originalFlowData)) && (
             <div
               className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm"
-              role={isFlowError ? 'alert' : 'status'}
+              role={model.isFlowError ? 'alert' : 'status'}
               aria-live="polite"
-              aria-label={isFlowError ? t('loadError') : t('loading')}
-              aria-busy={isFlowLoading}
+              aria-label={model.isFlowError ? model.t('loadError') : model.t('loading')}
+              aria-busy={model.isFlowLoading}
             >
-              {isFlowError ? (
-                <p className="text-danger text-sm text-center px-4">{t('loadError')}</p>
+              {model.isFlowError ? (
+                <p className="text-danger text-sm text-center px-4">{model.t('loadError')}</p>
               ) : (
                 <Spinner size="lg" />
               )}

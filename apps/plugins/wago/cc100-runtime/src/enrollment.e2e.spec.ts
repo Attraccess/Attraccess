@@ -128,7 +128,7 @@ async function connect(
 ): Promise<MqttClient> {
   const client = mqtt.connect(url, { username, password, clientId, reconnectPeriod: 0 });
   await new Promise<void>((resolve, reject) => {
-    client.once('connect', resolve);
+    client.once('connect', () => resolve());
     client.once('error', reject);
   });
   return client;

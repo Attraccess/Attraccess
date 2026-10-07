@@ -1,0 +1,17 @@
+export const WAGO_AUDIT_ACTIONS = [
+  'claim',
+  'unclaim',
+  'credential_rotation',
+  'network_change',
+  'network_credential_retirement',
+  'manual_credential_fallback',
+  'publication',
+  'forced_publication',
+  'rollback',
+  'rejection_acknowledgement',
+  'preset_application',
+  'preset_reapplication',
+  'profile_creation',
+  'profile_change',
+  'manual_command',
+] as const;

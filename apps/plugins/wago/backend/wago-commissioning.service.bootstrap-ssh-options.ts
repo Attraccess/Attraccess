@@ -1,0 +1,16 @@
+export const BOOTSTRAP_SSH_OPTIONS = [
+  '-F',
+  '/dev/null',
+  '-o',
+  'IdentityAgent=none',
+  '-o',
+  'PubkeyAuthentication=no',
+  '-o',
+  'PreferredAuthentications=password',
+  '-o',
+  'KbdInteractiveAuthentication=no',
+  '-o',
+  'ControlPath=none',
+  '-o',
+  'GlobalKnownHostsFile=/dev/null',
+];

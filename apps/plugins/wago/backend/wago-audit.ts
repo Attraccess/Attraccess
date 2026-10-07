@@ -1,137 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import type {
   AuthenticatedRequest,
   PluginAuditPrincipal,
   PluginAuditReceipt,
   PluginContext,
 } from '@attraccess/plugins-backend-sdk';
-import { WAGO_PRESETS } from './configuration';
-
-export const WAGO_AUDIT_ACTIONS = [
-  'claim',
-  'unclaim',
-  'credential_rotation',
-  'network_change',
-  'network_credential_retirement',
-  'manual_credential_fallback',
-  'publication',
-  'forced_publication',
-  'rollback',
-  'rejection_acknowledgement',
-  'preset_application',
-  'preset_reapplication',
-  'profile_creation',
-  'profile_change',
-  'manual_command',
-] as const;
-export type WagoAuditAction = (typeof WAGO_AUDIT_ACTIONS)[number];
-
-export interface WagoAuditSummary {
-  physicalPointCount: number;
-  logicalChannelCount: number;
-}
-
-/** IDs refer to validated, persisted domain objects; no names, values, snapshots or errors. */
-export interface WagoAuditDetails {
-  revision?: number;
-  sourceRevision?: number;
-  profileId?: string;
-  profileVersion?: number;
-  presetId?: (typeof WAGO_PRESETS)[number]['id'];
-  channelId?: string;
-  commandId?: string;
-  operation?: 'set' | 'pulse' | 'release';
-  result?: 'dispatched' | 'acknowledged' | 'rejected' | 'timeout' | 'transport_failure';
-  before?: WagoAuditSummary;
-  after?: WagoAuditSummary;
-}
-
-/** Integration return contracts for operations implemented by other owners. */
-export interface WagoRevisionAuditResult {
-  revision: number;
-}
-
-export interface WagoPresetAuditResult {
-  presetId: NonNullable<WagoAuditDetails['presetId']>;
-  channelId: string;
-  before: WagoAuditSummary;
-  after: WagoAuditSummary;
-}
-
-export interface WagoProfileAuditResult {
-  /** Validated domain identity: trim-nonempty, at most 160 UTF-16 code units; preserved verbatim. */
-  profileId: string;
-  /** Safe integer in the persisted Modbus range 1..1000000. */
-  profileVersion: number;
-  before: WagoAuditSummary;
-  after: WagoAuditSummary;
-}
-
-export interface WagoManualCommandAuditResult {
-  commandId: string;
-  channelId: string;
-  operation: NonNullable<WagoAuditDetails['operation']>;
-  result: NonNullable<WagoAuditDetails['result']>;
-}
-
-export interface WagoAuditLifecycle {
-  readonly operationId: string;
-  attempt(): Promise<PluginAuditReceipt>;
-  finish(outcome: 'succeeded' | 'failed', details?: WagoAuditDetails): Promise<PluginAuditReceipt>;
-}
-
-/** Call only with the Nest guard-authenticated request, never a body-supplied actor. */
-export function wagoAuditPrincipal(request: Pick<AuthenticatedRequest, 'user'>): PluginAuditPrincipal {
-  const user = request?.user;
-  if (!positiveInteger(user?.id)) throw new UnauthorizedException();
-  const authenticationMethod = user.authenticationMethod ?? 'session';
-  if (!['session', 'api-token'].includes(authenticationMethod)) throw new UnauthorizedException();
-  if (authenticationMethod === 'api-token' && !positiveInteger(user.apiTokenId)) throw new UnauthorizedException();
-  return {
-    userId: user.id,
-    authenticationMethod,
-    ...(authenticationMethod === 'api-token' ? { apiTokenId: user.apiTokenId } : {}),
-  };
-}
-
-export function wagoAuditSummary(snapshot: unknown): WagoAuditSummary {
-  const value = snapshot as { physicalPoints?: unknown; logicalChannels?: unknown } | null;
-  return {
-    physicalPointCount: Array.isArray(value?.physicalPoints) ? value.physicalPoints.length : 0,
-    logicalChannelCount: Array.isArray(value?.logicalChannels) ? value.logicalChannels.length : 0,
-  };
-}
-
-/** Projection is also enforced at runtime: TypeScript types alone do not redact JSON. */
-export function wagoAuditDetails(input: WagoAuditDetails): Record<string, string | number> {
-  const details: Record<string, string | number> = {};
-  for (const key of ['revision', 'sourceRevision'] as const) {
-    if (positiveInteger(input[key])) details[key] = input[key];
-  }
-  if (typeof input.profileId === 'string' && input.profileId.length <= 160 && input.profileId.trim())
-    details.profileId = input.profileId;
-  if (positiveInteger(input.profileVersion) && input.profileVersion <= 1_000_000)
-    details.profileVersion = input.profileVersion;
-  if (WAGO_PRESETS.some((preset) => preset.id === input.presetId)) details.presetId = input.presetId;
-  if (typeof input.channelId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(input.channelId))
-    details.channelId = input.channelId;
-  if (
-    typeof input.commandId === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.commandId)
-  )
-    details.commandId = input.commandId;
-  if (['set', 'pulse', 'release'].includes(input.operation)) details.operation = input.operation;
-  if (['dispatched', 'acknowledged', 'rejected', 'timeout', 'transport_failure'].includes(input.result))
-    details.result = input.result;
-  for (const side of ['before', 'after'] as const) {
-    for (const key of ['physicalPointCount', 'logicalChannelCount'] as const) {
-      const count = input[side]?.[key];
-      if (Number.isSafeInteger(count) && count >= 0) details[`${side}.${key}`] = count;
-    }
-  }
-  return details;
-}
+import { WAGO_AUDIT_ACTIONS } from './wago-audit.wago-audit-actions';
+import { WagoAuditAction } from './wago-audit.contracts';
+import { WagoAuditDetails } from './wago-audit.wago-audit-details';
+import { WagoAuditLifecycle } from './wago-audit.contracts';
+import { wagoAuditPrincipal } from './wago-audit.helpers';
+import { wagoAuditDetails } from './wago-audit.wago-audit-details';
+import { positiveInteger } from './wago-audit.helpers';
 
 /** A lifecycle belongs to one authenticated administration operation, not a telemetry report. */
 export class WagoAudit {
@@ -211,6 +92,15 @@ export class WagoAudit {
   }
 }
 
-function positiveInteger(value: unknown): value is number {
-  return Number.isSafeInteger(value) && (value as number) > 0;
-}
+export { WAGO_AUDIT_ACTIONS } from './wago-audit.wago-audit-actions';
+export { type WagoAuditAction } from './wago-audit.contracts';
+export { type WagoAuditSummary } from './wago-audit.wago-audit-summary';
+export { type WagoAuditDetails } from './wago-audit.wago-audit-details';
+export { type WagoRevisionAuditResult } from './wago-audit.contracts';
+export { type WagoPresetAuditResult } from './wago-audit.contracts';
+export { type WagoProfileAuditResult } from './wago-audit.contracts';
+export { type WagoManualCommandAuditResult } from './wago-audit.contracts';
+export { type WagoAuditLifecycle } from './wago-audit.contracts';
+export { wagoAuditPrincipal } from './wago-audit.helpers';
+export { wagoAuditSummary } from './wago-audit.wago-audit-summary';
+export { wagoAuditDetails } from './wago-audit.wago-audit-details';

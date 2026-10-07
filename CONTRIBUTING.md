@@ -12,17 +12,10 @@ files. Both run before the existing `pnpm precommit` and `pnpm precommit:all`
 checks. The PR and merge-queue workflow runs the check in the required
 `lint-and-typecheck` job, independently of Nx's affected-project selection.
 
-Existing oversized files are grandfathered at their line count in the merge base
-with `origin/main`. They may stay unchanged or shrink, but cannot grow. Once a
-reduction lands on the target branch, that smaller count becomes the allowance;
-once a file meets the limit, the regular limit applies. New paths (including
-renamed files) must meet the regular limit. No oversized files need to be split
-just to enable this check.
-
-For another target branch, run `pnpm lint:files --base origin/<branch>`.
-`NX_AFFECTED_BASE` supplies the target in CI; otherwise the default is
-`origin/main`. Missing refs fail the check: fetch the target branch before running
-it. The Git merge base keeps unrelated target-branch changes out of the comparison.
+The limits apply to every covered file, including unchanged files and renames.
+Split oversized files into cohesive modules while preserving behavior and test
+coverage. There are no historical allowances, and checking sizes does not require
+a target branch or merge base. `NX_AFFECTED_BASE` does not affect these checks.
 
 The check covers JS/TS (including module variants and declaration files), C/C++
 and Objective-C, Python, shell scripts, SQL, OpenSCAD, stylesheets, and HTML/MJML

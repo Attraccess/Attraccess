@@ -1,0 +1,30 @@
+import { BillingTransaction, Project, Resource, ResourceUsageAction, User } from '@attraccess/database-entities';
+export type UsageFlowPayload = {
+  resource: Partial<Resource>;
+  user: Partial<User> & Pick<User, 'id'>;
+  formSubmissions: {
+    [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
+  };
+  id: number;
+  usageAction: ResourceUsageAction;
+  resourceId: number;
+  userId: number | null;
+  startTime: Date;
+  startNotes: string | null;
+  endTime: Date | null;
+  endNotes: string | null;
+  usageInMinutes: number;
+  billingTransaction: BillingTransaction | null;
+  projectId: number | null;
+  project: Project | null;
+  isFinalized: boolean;
+  lifecyclePending: boolean;
+  supervisorUserId: number | null;
+  supervisorUser: User | null;
+  sessionDurationCreditsPerMinute: number | null;
+  operatingDurationCreditsPerMinute: number | null;
+  creditsPerUsage: number | null;
+  billingFactor: number | null;
+  energyCreditsPerKwh: number | null;
+  attributedOperatingDurationInMinutes: number | null;
+};

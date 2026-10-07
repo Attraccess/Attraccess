@@ -1,134 +1,9 @@
 import { createHash } from 'crypto';
-import { EmailTemplateType } from '@attraccess/database-entities';
-import { valid, validRange } from 'semver';
+import { count, flag, identifier, locale, positive, text } from './audit-administration-checks';
+import { mqtt, pkg, policy, registry, rules, template } from './audit-administration-rules';
+import { safeAuditHost, safeAuditOrigin, safeAuditSender } from './audit-administration-safe-values';
+import { AdministrationAuditEvent, PreviousAuditSettings } from './audit-administration-types';
 
-export interface AdministrationAuditEvent {
-  action: string;
-  operationId?: string;
-  actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
-  apiTokenId?: number;
-  subjectType: string;
-  subjectId: number;
-  outcome?: 'succeeded' | 'failed';
-  details: Record<string, string | number>;
-}
-
-type Check = (value: unknown) => boolean;
-const text: Check = (v) =>
-  typeof v === 'string' && v.length <= 256 && Array.from(v).every((character) => character.charCodeAt(0) >= 32);
-const flag: Check = (v) => v === 0 || v === 1;
-const enumeration =
-  (...values: string[]): Check =>
-  (v) =>
-    typeof v === 'string' && values.includes(v);
-const identifier: Check = (v) => typeof v === 'string' && /^[a-zA-Z0-9_.@/-]{1,214}$/.test(v);
-const exactVersion: Check = (v) => typeof v === 'string' && v.length <= 100 && !!valid(v);
-const spec: Check = (v) => typeof v === 'string' && v === safeRequestedSpec(v);
-const origin: Check = (v) => typeof v === 'string' && v === safeAuditOrigin(v);
-const count: Check = (v) => Number.isSafeInteger(v) && (v as number) >= 0;
-const positive: Check = (v) => count(v) && (v as number) > 0;
-const permissions: Check = (v) => {
-  if (typeof v !== 'string' || v.length > 4096) return false;
-  try {
-    const values = JSON.parse(v);
-    return (
-      Array.isArray(values) &&
-      values.length <= 100 &&
-      values.every((value) => typeof value === 'string' && /^[a-zA-Z0-9_.*:-]{1,120}$/.test(value))
-    );
-  } catch {
-    return false;
-  }
-};
-
-export const SETTING_KEYS = [
-  'app.url',
-  'app.publicInternetUrl',
-  'app.licenseKeyConfigured',
-  'app.licenseKeyChanged',
-  'smtp.service',
-  'smtp.host',
-  'smtp.port',
-  'smtp.secure',
-  'smtp.from',
-  'smtp.userConfigured',
-  'smtp.userChanged',
-  'smtp.passConfigured',
-  'smtp.passwordChanged',
-  'audit.enabled',
-  'audit.domains',
-  'audit.plugin_domains_disabled',
-  'audit.retention_days',
-  'metrics.apiKeyConfigured',
-  'metrics.slowQueryThresholdSeconds',
-  ...['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'].map((key) => `metrics.toggles.${key}`),
-  ...['maxAttempts', 'windowSeconds', 'lockoutDurationSeconds', 'exponentialBackoff', 'backoffMultiplier'].map(
-    (key) => `auth.rateLimit.${key}`,
-  ),
-  ...['sendMaxPerWindow', 'sendWindowSeconds', 'contactMaxPerWindow', 'contactWindowSeconds'].map(
-    (key) => `messaging.rateLimit.${key}`,
-  ),
-];
-
-const settings = { settingKey: enumeration(...SETTING_KEYS), before: text, after: text };
-const template = { templateType: enumeration(...Object.values(EmailTemplateType)) };
-const locale: Check = (v) => typeof v === 'string' && /^[a-z]{2,3}(-[A-Z]{2,3})?$/.test(v);
-const mqtt = {
-  serverName: text,
-  host: (v: unknown) => typeof v === 'string' && v === safeAuditHost(v),
-  port: count,
-  managementPort: count,
-  usernameConfigured: flag,
-  passwordChanged: flag,
-  useTls: flag,
-  caCertConfigured: flag,
-  tlsInsecure: flag,
-  tlsServername: (v: unknown) => typeof v === 'string' && v === safeAuditHost(v),
-  defaultPublishQos: count,
-  defaultPublishRetain: flag,
-  defaultSubscribeQos: count,
-};
-const registry = { registryId: identifier, registryName: text, registryUrl: origin };
-const policy = {
-  checksEnabled: flag,
-  updateMode: enumeration('off', 'patch', 'minor', 'follow'),
-  maintenanceStartMinute: count,
-  maintenanceDurationMinutes: count,
-  prerelease: flag,
-};
-const pkg = {
-  packageName: identifier,
-  oldVersion: exactVersion,
-  newVersion: exactVersion,
-  requestedSpec: spec,
-  registryId: identifier,
-  registryUrl: origin,
-  integrity: (v: unknown) => typeof v === 'string' && /^(sha1|sha256|sha384|sha512)-[A-Za-z0-9+/=]{1,160}$/.test(v),
-  integrityResult: enumeration('verified', 'not-checked'),
-  provenanceResult: enumeration('not-verified'),
-  classification: enumeration('official', 'community'),
-  permissionAdditions: permissions,
-  permissionRemovals: permissions,
-  migrationOutcome: enumeration('pending-restart', 'not-run', 'not-applicable', 'succeeded', 'failed'),
-  activationOutcome: enumeration('restart-requested', 'quarantined', 'removed', 'not-attempted', 'failed', 'succeeded'),
-  restartRequested: flag,
-  rollbackOutcome: enumeration('not-needed', 'succeeded', 'failed', 'unknown'),
-  updateOverride: enumeration('inherit', 'off', 'patch', 'minor', 'follow'),
-  candidate: (v: unknown) => v === '' || exactVersion(v),
-  checkState: enumeration('up-to-date', 'available', 'blocked', 'failed'),
-};
-const rules: Record<string, { subject: string; fields: Record<string, Check> }> = {
-  'settings.updated': { subject: 'setting', fields: settings },
-  'settings.api_key.generated': {
-    subject: 'setting',
-    fields: { settingKey: enumeration('metrics.apiKeyConfigured'), configured: flag },
-  },
-  'settings.api_key.deleted': {
-    subject: 'setting',
-    fields: { settingKey: enumeration('metrics.apiKeyConfigured'), configured: flag },
-  },
-};
 for (const action of ['updated', 'reset']) {
   rules[`email_template.${action}`] = { subject: 'email-template', fields: template };
   rules[`email_layout.${action}`] = { subject: 'email-layout', fields: {} };
@@ -165,8 +40,6 @@ rules['plugin.retry_requested'] = {
 };
 
 export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules);
-
-export type PreviousAuditSettings = { enabled: boolean; domains: readonly string[] };
 
 /** Numeric grouping key for public string-keyed subjects; retain the original key in event details.
  * This persisted identifier hash is never a password hash; changing it would split audit history. */
@@ -252,37 +125,6 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditEvent)
   }
 }
 
-/** URLs may carry credentials, query tokens or private paths: record the origin only. */
-export function safeAuditOrigin(value: string): string {
-  if (!value) return '';
-  try {
-    const url = new URL(value);
-    return ['https:', 'http:'].includes(url.protocol) ? url.origin : 'custom-source';
-  } catch {
-    return 'custom-source';
-  }
-}
-
-export function safeRequestedSpec(value: string): string {
-  if (value === 'custom-source') return value;
-  if (typeof value !== 'string' || value.length > 100) return 'custom-source';
-  return validRange(value) || /^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(value) ? value : 'custom-source';
-}
-
-export function safeAuditHost(value: string): string {
-  if (!value || value === 'configured') return value;
-  return /^[a-zA-Z0-9_.:[\]-]{1,253}$/.test(value) ? value : 'configured';
-}
-
-export function safeAuditSender(value: string): string {
-  const address = value.match(/(?:<|^)([^<>\s]+@[^<>\s]+)(?:>|$)/)?.[1];
-  return address && /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+$/.test(address)
-    ? address
-    : value
-      ? 'configured'
-      : '';
-}
-
 function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
   if (value === '') return true;
@@ -313,3 +155,7 @@ export async function recordAdministrationSafely(
     /* Never log exception payloads or request data. */
   }
 }
+
+export { SETTING_KEYS } from './audit-administration-rules';
+export { safeAuditHost, safeAuditOrigin, safeAuditSender, safeRequestedSpec } from './audit-administration-safe-values';
+export { AdministrationAuditEvent, PreviousAuditSettings } from './audit-administration-types';

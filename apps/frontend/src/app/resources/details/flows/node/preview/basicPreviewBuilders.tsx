@@ -1,0 +1,77 @@
+import { ResourceFlowNodeType } from '@attraccess/react-query-client';
+import { PreviewBuilder } from './index.contracts';
+export const basicPreviewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
+  [ResourceFlowNodeType.INPUT_BUTTON]: (t, nodeData) => {
+    return [
+      {
+        label: t('nodes.input.button.preview.label'),
+        value: nodeData?.data.label as string,
+      },
+    ];
+  },
+  [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY]: (t, nodeData) => {
+    return [
+      {
+        label: t('nodes.input.resource.activity.no-activity.preview.minInactivityMinutes'),
+        value: nodeData?.data.minInactivityMinutes as string,
+      },
+    ];
+  },
+  [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED]: (t, nodeData) => {
+    return [
+      {
+        label: t('nodes.input.mqtt.message.received.preview.topic'),
+        value: nodeData?.data.topic as string,
+      },
+    ];
+  },
+  [ResourceFlowNodeType.PROCESSING_WAIT]: (t, nodeData) => {
+    return [
+      {
+        label: t('nodes.processing.wait.preview.duration'),
+        value: `${nodeData?.data.duration ?? 0} ${t('nodes.processing.wait.config.unit.enum.' + (nodeData?.data.unit ?? 'seconds'))}`,
+      },
+    ];
+  },
+  [ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE]: (t, nodeData) => {
+    return [
+      {
+        label: t('nodes.processing.mqtt.waitForMessage.preview.topic'),
+        value: nodeData?.data.topic as string,
+      },
+      {
+        label: t('nodes.processing.mqtt.waitForMessage.preview.timeoutSeconds'),
+        value: String(nodeData?.data.timeoutSeconds ?? ''),
+      },
+    ];
+  },
+  [ResourceFlowNodeType.PROCESSING_ERROR]: (t, nodeData) => {
+    return [
+      {
+        label: t('nodes.processing.error.preview.message'),
+        value: nodeData?.data.message as string,
+      },
+    ];
+  },
+  [ResourceFlowNodeType.PROCESSING_IF]: (t, nodeData) => {
+    return [
+      {
+        label: t('nodes.processing.if.preview.summary'),
+        value: `${nodeData?.data.path ?? '-'} ${nodeData?.data.comparisonOperator} ${nodeData?.data.comparisonValue ?? '-'}`,
+      },
+    ];
+  },
+  [ResourceFlowNodeType.PROCESSING_SET_PAYLOAD]: (t, nodeData) => {
+    const entries = (nodeData?.data.entries as Array<{ key: string; value: string }>) ?? [];
+    const preview = entries
+      .slice(0, 3)
+      .map((e) => `${e?.key ?? ''} = ${e?.value ?? ''}`)
+      .join(', ');
+    return [
+      {
+        label: t('nodes.processing.set-payload.preview.mappings'),
+        value: preview,
+      },
+    ];
+  },
+};

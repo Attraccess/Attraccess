@@ -47,6 +47,7 @@ export function useFormatedDuration(minutes: number) {
         // Fallback if not supported
         throw new Error('Intl.DurationFormat not supported');
       } catch (error) {
+        // eslint-disable-next-line no-console -- Preserve the browser compatibility diagnostic.
         console.warn('Intl.DurationFormat not supported', error);
 
         // Fallback for browsers that don't support Intl.DurationFormat

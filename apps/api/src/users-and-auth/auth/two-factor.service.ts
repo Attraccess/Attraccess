@@ -1,32 +1,33 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
-import { TwoFactorPolicy } from './two-factor.dto';
-import { SettingsService } from '../../settings/settings.service';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { MetricsService } from '../../metrics/metrics.service';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { SettingsService } from '../../settings/settings.service';
+import { TwoFactorPolicyImplementation } from './two-factor-policy';
+import { TwoFactorPolicy } from './two-factor.dto';
 
 @Injectable()
-export class TwoFactorService {
-  private readonly logger = new Logger(TwoFactorService.name);
-  private readonly policyParent = 'auth';
-  private readonly policyKey = 'two_factor_policy';
-  private otplibPromise: Promise<typeof import('otplib')> | null = null;
+export class TwoFactorService extends TwoFactorPolicyImplementation {
+  protected readonly logger = new Logger(TwoFactorService.name);
+  protected readonly policyParent = 'auth';
+  protected readonly policyKey = 'two_factor_policy';
+  protected otplibPromise: Promise<typeof import('otplib')> | null = null;
 
   constructor(
     @InjectRepository(AuthenticationDetail)
-    private readonly authenticationDetailRepository: Repository<AuthenticationDetail>,
+    protected readonly authenticationDetailRepository: Repository<AuthenticationDetail>,
     @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
-    private readonly settingsService: SettingsService,
-    private readonly encryptionService: EncryptionService,
-    private readonly metricsService: MetricsService,
+    protected readonly settingRepository: Repository<Setting>,
+    protected readonly settingsService: SettingsService,
+    protected readonly encryptionService: EncryptionService,
+    protected readonly metricsService: MetricsService,
   ) {
+    super();
   }
 
-  private async resolveIssuer(): Promise<string> {
+  protected async resolveIssuer(): Promise<string> {
     const appUrl = await this.settingsService.getUrl();
     if (!appUrl) {
       return 'Attraccess';
@@ -41,39 +42,6 @@ export class TwoFactorService {
     }
   }
 
-  async getPolicy(): Promise<TwoFactorPolicy> {
-    const setting = await this.settingRepository.findOneBy({
-      parent: this.policyParent,
-      key: this.policyKey,
-    });
-
-    if (setting?.value && Object.values(TwoFactorPolicy).includes(setting.value as TwoFactorPolicy)) {
-      return setting.value as TwoFactorPolicy;
-    }
-
-    return TwoFactorPolicy.OPTIONAL;
-  }
-
-  async setPolicy(policy: TwoFactorPolicy): Promise<void> {
-    const existing = await this.settingRepository.findOneBy({
-      parent: this.policyParent,
-      key: this.policyKey,
-    });
-
-    if (existing) {
-      await this.settingRepository.update(existing.id, {
-        value: policy,
-      });
-      return;
-    }
-
-    await this.settingRepository.insert({
-      parent: this.policyParent,
-      key: this.policyKey,
-      value: policy,
-    });
-  }
-
   async getStatus(user: User): Promise<{ enabled: boolean; required: boolean; policy: TwoFactorPolicy }> {
     const [policy, detail] = await Promise.all([this.getPolicy(), this.getTwoFactorDetail(user.id)]);
     const enabled = !!detail?.totpEnabledAt;
@@ -83,75 +51,6 @@ export class TwoFactorService {
       policy,
       required: this.isPolicyRequiredForUser(policy, user),
     };
-  }
-
-  async createSetup(user: User): Promise<{ secret: string; otpauthUrl: string }> {
-    const existing = await this.getTwoFactorDetail(user.id);
-    if (existing?.totpEnabledAt) {
-      throw new BadRequestException('TwoFactorAlreadyEnabled');
-    }
-
-    const { generateSecret, generateURI } = await this.loadOtplib();
-    const issuer = await this.resolveIssuer();
-    const secret = generateSecret();
-    const encryptedSecret = this.encryptionService.encrypt(secret);
-    const accountName = user.email ?? user.username;
-    const otpauthUrl = generateURI({
-      secret,
-      label: accountName,
-      issuer,
-      strategy: 'totp',
-    });
-
-    if (existing) {
-      existing.totpSecret = encryptedSecret;
-      existing.totpEnabledAt = null;
-      await this.authenticationDetailRepository.save(existing);
-    } else {
-      const detail = new AuthenticationDetail();
-      detail.userId = user.id;
-      detail.type = AuthenticationType.TOTP;
-      detail.totpSecret = encryptedSecret;
-      detail.totpEnabledAt = null;
-      await this.authenticationDetailRepository.save(detail);
-    }
-
-    this.metricsService.auth2faUsageTotal.inc({ action: 'setup' });
-    return { secret, otpauthUrl };
-  }
-
-  async enable(user: User, code: string): Promise<void> {
-    const detail = await this.getTwoFactorDetail(user.id);
-    if (!detail?.totpSecret) {
-      throw new BadRequestException('TwoFactorNotInitialized');
-    }
-    if (detail.totpEnabledAt) {
-      throw new BadRequestException('TwoFactorAlreadyEnabled');
-    }
-
-    const secret = this.resolveTotpSecret(detail);
-    if (!secret || !(await this.isCodeValid(secret, code))) {
-      throw new UnauthorizedException('TwoFactorInvalidCode');
-    }
-
-    detail.totpEnabledAt = new Date();
-    await this.authenticationDetailRepository.save(detail);
-    this.metricsService.auth2faUsageTotal.inc({ action: 'enable' });
-  }
-
-  async disable(user: User, code: string): Promise<void> {
-    const detail = await this.getTwoFactorDetail(user.id);
-    if (!detail?.totpSecret || !detail.totpEnabledAt) {
-      throw new BadRequestException('TwoFactorNotEnabled');
-    }
-
-    const secret = this.resolveTotpSecret(detail);
-    if (!secret || !(await this.isCodeValid(secret, code))) {
-      throw new UnauthorizedException('TwoFactorInvalidCode');
-    }
-
-    await this.authenticationDetailRepository.delete(detail.id);
-    this.metricsService.auth2faUsageTotal.inc({ action: 'disable' });
   }
 
   async assertTwoFactorForLogin(user: User, code: string | undefined): Promise<void> {
@@ -174,7 +73,7 @@ export class TwoFactorService {
     }
   }
 
-  private async getTwoFactorDetail(userId: number): Promise<AuthenticationDetail | null> {
+  protected async getTwoFactorDetail(userId: number): Promise<AuthenticationDetail | null> {
     return this.authenticationDetailRepository.findOne({
       where: { userId, type: AuthenticationType.TOTP },
     });
@@ -184,40 +83,14 @@ export class TwoFactorService {
    * Returns the TOTP secret for verification. Assumes stored values are already
    * encrypted (see migration EncryptSensitiveData).
    */
-  private resolveTotpSecret(detail: AuthenticationDetail): string | null {
+  protected resolveTotpSecret(detail: AuthenticationDetail): string | null {
     if (!detail.totpSecret) {
       return null;
     }
-    return (
-      this.encryptionService.decryptIfEncrypted(detail.totpSecret) ?? detail.totpSecret
-    );
+    return this.encryptionService.decryptIfEncrypted(detail.totpSecret) ?? detail.totpSecret;
   }
 
-  private isPolicyRequiredForUser(policy: TwoFactorPolicy, user: User): boolean {
-    if (policy === TwoFactorPolicy.REQUIRED_FOR_ALL) {
-      return true;
-    }
-
-    if (policy === TwoFactorPolicy.REQUIRED_FOR_PRIVILEGED) {
-      return this.isPrivilegedUser(user);
-    }
-
-    return false;
-  }
-
-  private isPrivilegedUser(user: User): boolean {
-    const effectivePerms = (user as AuthenticatedUser).effectivePermissions;
-    if (!effectivePerms) {
-      this.logger.warn(`isPrivilegedUser: effectivePermissions missing for user ${user.id} — treating as not privileged`);
-      return false;
-    }
-    if (effectivePerms.size === 0) return false;
-    // privileged = holds any permission outside the basic resources.* namespace
-    // (avoids coupling to seed-data assumptions about which permissions the default role carries)
-    return [...effectivePerms].some((p) => !p.startsWith('resources.'));
-  }
-
-  private async isCodeValid(secret: string, code: string): Promise<boolean> {
+  protected async isCodeValid(secret: string, code: string): Promise<boolean> {
     const trimmed = this.normalizeCode(code);
     const { verify } = await this.loadOtplib();
     const result = await verify({
@@ -229,14 +102,14 @@ export class TwoFactorService {
     return typeof result === 'boolean' ? result : result.valid;
   }
 
-  private async loadOtplib(): Promise<typeof import('otplib')> {
+  protected async loadOtplib(): Promise<typeof import('otplib')> {
     if (!this.otplibPromise) {
       this.otplibPromise = import('otplib');
     }
     return this.otplibPromise;
   }
 
-  private normalizeCode(code: string): string {
+  protected normalizeCode(code: string): string {
     return (code ?? '').replace(/\s+/g, '');
   }
 }

@@ -1,33 +1,31 @@
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Body, Controller, ForbiddenException, Get, Patch, Post, Req } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
-  recordAdministrationSafely,
   auditSubjectKeyId,
   PreviousAuditSettings,
+  recordAdministrationSafely,
+  SETTING_KEYS,
 } from '../audit/audit-administration-policy';
-import { AuditSettingsDto, UpdateAuditSettingsDto } from './dto/audit-settings.dto';
-import { Body, Controller, Delete, ForbiddenException, Get, Patch, Post, Req } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { AuditService } from '../audit/audit.service';
-import { safeAuditOrigin, safeAuditHost, safeAuditSender, SETTING_KEYS } from '../audit/audit-administration-policy';
-import { SettingsService } from './settings.service';
+import { installInheritedMethods } from '../common/inherited-implementation';
+import { AuditSettingsDto, UpdateAuditSettingsDto } from './dto/audit-settings.dto';
 import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
-import { MetricsSettingsDto } from './dto/metrics-settings.dto';
-import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
-import { GenerateMetricsApiKeyResponseDto } from './dto/generate-metrics-api-key-response.dto';
-import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
-import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
-import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settings.dto';
-import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
+import { SettingsMetricsRoutes } from './settings-metrics.routes';
+import { SettingsService } from './settings.service';
+import { systemSettingChanges } from './system-setting-changes';
 
 @ApiTags('Settings')
 @Controller('settings')
-export class SettingsController {
+export class SettingsController extends SettingsMetricsRoutes {
   constructor(
-    private readonly settingsService: SettingsService,
-    private readonly audit: AuditService,
-  ) {}
+    protected readonly settingsService: SettingsService,
+    protected readonly audit: AuditService,
+  ) {
+    super();
+  }
 
   @Get('audit')
   @Auth('system.settings.manage')
@@ -92,117 +90,7 @@ export class SettingsController {
     return this.settingsService.getFirstTimeSetupStatus();
   }
 
-  @Get('metrics')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
-  @ApiResponse({ status: 200, description: 'Current metrics settings.', type: MetricsSettingsDto })
-  async getMetricsSettings(): Promise<MetricsSettingsDto> {
-    return this.buildMetricsSettings();
-  }
-
-  @Patch('metrics')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Update metrics settings', operationId: 'updateMetricsSettings' })
-  @ApiResponse({ status: 200, description: 'Metrics settings updated.', type: MetricsSettingsDto })
-  async updateMetricsSettings(
-    @Body() body: UpdateMetricsSettingsDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<MetricsSettingsDto> {
-    const before = await this.buildMetricsSettings();
-    if (body.toggles) {
-      await this.settingsService.updateMetricsToggles(body.toggles);
-    }
-    if (body.slowQueryThresholdSeconds !== undefined) {
-      await this.settingsService.setMetricsSlowQueryThresholdSeconds(body.slowQueryThresholdSeconds);
-    }
-    const after = await this.buildMetricsSettings();
-    await this.recordChanges(req, 'metrics', before, after);
-    await this.recordChanges(req, 'metrics.toggles', before.toggles, after.toggles);
-    return after;
-  }
-
-  @Post('metrics/generate-api-key')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Generate a new metrics API key', operationId: 'generateMetricsApiKey' })
-  @ApiResponse({ status: 201, description: 'Metrics API key generated.', type: GenerateMetricsApiKeyResponseDto })
-  async generateMetricsApiKey(@Req() req: AuthenticatedRequest): Promise<GenerateMetricsApiKeyResponseDto> {
-    const { apiKey } = await this.settingsService.generateMetricsApiKey();
-    await this.recordKey(req, 'settings.api_key.generated', 1);
-    return { apiKeyConfigured: true, apiKey };
-  }
-
-  @Delete('metrics/api-key')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Remove the metrics API key', operationId: 'deleteMetricsApiKey' })
-  @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
-  async deleteMetricsApiKey(@Req() req: AuthenticatedRequest): Promise<MetricsSettingsDto> {
-    await this.settingsService.setMetricsApiKey(null);
-    await this.recordKey(req, 'settings.api_key.deleted', 0);
-    return this.buildMetricsSettings();
-  }
-
-  private async buildMetricsSettings(): Promise<MetricsSettingsDto> {
-    const [{ configured }, toggles, slowQueryThresholdSeconds] = await Promise.all([
-      this.settingsService.getMetricsApiKey(),
-      this.settingsService.getMetricsToggles(),
-      this.settingsService.getMetricsSlowQueryThresholdSeconds(),
-    ]);
-    return { apiKeyConfigured: configured, toggles, slowQueryThresholdSeconds };
-  }
-
-  @Get('auth/rate-limit')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Get auth rate-limit settings', operationId: 'getAuthRateLimitSettings' })
-  @ApiResponse({ status: 200, description: 'Current auth rate-limit settings.', type: AuthRateLimitSettingsDto })
-  async getAuthRateLimitSettings(): Promise<AuthRateLimitSettingsDto> {
-    return this.settingsService.getAuthRateLimitSettings();
-  }
-
-  @Patch('auth/rate-limit')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Update auth rate-limit settings', operationId: 'updateAuthRateLimitSettings' })
-  @ApiResponse({ status: 200, description: 'Auth rate-limit settings updated.', type: AuthRateLimitSettingsDto })
-  async updateAuthRateLimitSettings(
-    @Body() body: UpdateAuthRateLimitSettingsDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<AuthRateLimitSettingsDto> {
-    const before = await this.settingsService.getAuthRateLimitSettings();
-    const after = await this.settingsService.updateAuthRateLimitSettings(body);
-    await this.recordChanges(req, 'auth.rateLimit', before, after);
-    return after;
-  }
-
-  @Get('messaging/rate-limit')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Get messaging rate-limit settings', operationId: 'getMessagingRateLimitSettings' })
-  @ApiResponse({
-    status: 200,
-    description: 'Current messaging rate-limit settings.',
-    type: MessagingRateLimitSettingsDto,
-  })
-  async getMessagingRateLimitSettings(): Promise<MessagingRateLimitSettingsDto> {
-    return this.settingsService.getMessagingRateLimitSettings();
-  }
-
-  @Patch('messaging/rate-limit')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Update messaging rate-limit settings', operationId: 'updateMessagingRateLimitSettings' })
-  @ApiResponse({
-    status: 200,
-    description: 'Messaging rate-limit settings updated.',
-    type: MessagingRateLimitSettingsDto,
-  })
-  async updateMessagingRateLimitSettings(
-    @Body() body: UpdateMessagingRateLimitSettingsDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<MessagingRateLimitSettingsDto> {
-    const before = await this.settingsService.getMessagingRateLimitSettings();
-    const after = await this.settingsService.updateMessagingRateLimitSettings(body);
-    await this.recordChanges(req, 'messaging.rateLimit', before, after);
-    return after;
-  }
-
-  private async recordChanges(
+  protected async recordChanges(
     req: AuthenticatedRequest,
     prefix: string,
     before: object,
@@ -221,7 +109,7 @@ export class SettingsController {
     }
   }
 
-  private async recordSetting(
+  protected async recordSetting(
     req: AuthenticatedRequest,
     key: string,
     before: string,
@@ -243,7 +131,7 @@ export class SettingsController {
     );
   }
 
-  private async recordKey(req: AuthenticatedRequest, action: string, configured: number) {
+  protected async recordKey(req: AuthenticatedRequest, action: string, configured: number) {
     await recordAdministrationSafely(this.audit, {
       action,
       actorId: req.user.id,
@@ -268,29 +156,23 @@ export class SettingsController {
   }
 }
 
-function systemSettingChanges(before: SystemSettingsDto, after: SystemSettingsDto): Array<[string, string, string]> {
-  const values = [
-    ['app.url', safeAuditOrigin(before.app.url ?? ''), safeAuditOrigin(after.app.url ?? '')],
-    [
-      'app.publicInternetUrl',
-      safeAuditOrigin(before.app.publicInternetUrl ?? ''),
-      safeAuditOrigin(after.app.publicInternetUrl ?? ''),
-    ],
-    ['app.licenseKeyConfigured', before.app.licenseKeyConfigured, after.app.licenseKeyConfigured],
-    ['smtp.service', before.smtp.service, after.smtp.service],
-    ['smtp.host', safeAuditHost(before.smtp.host ?? ''), safeAuditHost(after.smtp.host ?? '')],
-    ['smtp.port', before.smtp.port, after.smtp.port],
-    ['smtp.secure', before.smtp.secure, after.smtp.secure],
-    ['smtp.from', safeAuditSender(before.smtp.from ?? ''), safeAuditSender(after.smtp.from ?? '')],
-    ['smtp.userConfigured', !!before.smtp.user, !!after.smtp.user],
-    ['smtp.passConfigured', before.smtp.passConfigured, after.smtp.passConfigured],
-  ] as const;
-  return values
-    .filter(
-      ([key, oldValue, newValue]) =>
-        oldValue !== newValue ||
-        (key === 'app.url' && before.app.url !== after.app.url) ||
-        (key === 'app.publicInternetUrl' && before.app.publicInternetUrl !== after.app.publicInternetUrl),
-    )
-    .map(([key, oldValue, newValue]) => [key, String(oldValue ?? ''), String(newValue ?? '')]);
-}
+installInheritedMethods(SettingsController, [
+  'getAuditSettings',
+  'updateAuditSettings',
+  'getSystemSettings',
+  'updateSystemSettings',
+  'getFirstTimeSetupStatus',
+  'getMetricsSettings',
+  'updateMetricsSettings',
+  'generateMetricsApiKey',
+  'deleteMetricsApiKey',
+  'buildMetricsSettings',
+  'getAuthRateLimitSettings',
+  'updateAuthRateLimitSettings',
+  'getMessagingRateLimitSettings',
+  'updateMessagingRateLimitSettings',
+  'recordChanges',
+  'recordSetting',
+  'recordKey',
+  'applyFirstTimeSetupSettings',
+]);

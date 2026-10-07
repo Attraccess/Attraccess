@@ -1,71 +1,39 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
-import filesystem from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
-import { Readable } from 'node:stream';
-import { execFile, spawn } from 'node:child_process';
-import { once } from 'node:events';
+import { join, resolve } from 'node:path';
+import { image, manifest, tarMember, bundle, upload } from './runtime-artifact-fixtures.test-utils';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { gunzipSync, gzipSync } from 'node:zlib';
 import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
-import { Test } from '@nestjs/testing';
-import { WagoArtifactsController } from './wago-artifacts.controller';
 import { WagoBuildRuntimeCatalog, sameRuntimeImage } from './wago-build-runtime';
-
-const image = `ghcr.io/attraccess/wago-cc100-runtime@sha256:${'a'.repeat(64)}`;
-const manifest = {
-  schemaVersion: 1,
-  runtime: 'attraccess-wago-cc100',
-  runtimeVersion: '0.1.0',
-  protocolVersion: '1.0.0',
-  image,
-  hardware: {
-    model: '751-9301',
-    platform: 'linux/arm/v7',
-    firmwareBaseline: '31',
-    profile: 'cc100-751-9301-fw31-digital-v1',
-  },
-};
-function tarMember(name: string, data: string | Buffer, type = '0') {
-  const bytes = Buffer.from(data);
-  const header = Buffer.alloc(512);
-  header.write(name);
-  for (const [offset, width, value] of [
-    [100, 8, 420],
-    [108, 8, 0],
-    [116, 8, 0],
-    [124, 12, bytes.length],
-    [136, 12, 0],
-  ])
-    header.write(value.toString(8).padStart(width - 1, '0') + '\0', offset);
-  header.fill(32, 148, 156);
-  header.write(type, 156);
-  header.write('ustar\0', 257);
-  header.write('00', 263);
-  header.write(
-    header
-      .reduce((sum, byte) => sum + byte, 0)
-      .toString(8)
-      .padStart(6, '0') + '\0 ',
-    148,
-  );
-  return Buffer.concat([header, bytes, Buffer.alloc((512 - (bytes.length % 512)) % 512)]);
-}
-function bundle(value: unknown = manifest, reference = image, extra = Buffer.alloc(0)) {
-  return Buffer.concat([
-    tarMember('image.tar', 'isolated image fixture'),
-    tarMember('image-reference', `${reference}\n`),
-    tarMember('manifest.json', JSON.stringify(value)),
-    extra,
-    Buffer.alloc(1024),
-  ]);
-}
-function upload(data = bundle(), checksum = createHash('sha256').update(data).digest('hex')) {
-  return { bundle: Readable.from([data]), checksum: Readable.from([checksum]) };
-}
+import { registerIgnoresALegacyImportedReleaseWhenLocalBuildAssetsHaveNotBeenInstalled } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerRequiresBundledRuntimeAssetsWhenStartingInProduction } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
+import { registerUsesExactlyCwdStorageWhenTheExistingApplicationSettingIsAbsent } from './wago-runtime-artifacts.uses-exactly-cwd-storage-when-the-existing-application-setting-is-absent.test-cases';
+import { registerReconcilesKilledOwnersOnAccessWhileRetainingActiveOwnersImmutableObjectsAndUnknownEntri } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
+import { registerBoundsStartupReconciliationAndContinuesBeyondRetainedEntriesOnLaterAccesses } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerRetainsRemoteOwnersAndMalformedOwnershipMarkers } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
+import { registerDoesNotLetTheManifestCopyTaskCacheAndRestoreStaleRuntimeFrontendBundles } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerUsesExistingStorageRootWithoutAccessingThePluginContextOrHostModuleRef } from './wago-runtime-artifacts.uses-exactly-cwd-storage-when-the-existing-application-setting-is-absent.test-cases';
+import { registerPersistsImmutableVerifiedMetadataAndExposesOnlyNonsecretApiMetadata } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerVerifiedlyBackfillsMetadataForCatalogObjectsWrittenBeforeMetadataPersistence } from './wago-runtime-artifacts.uses-exactly-cwd-storage-when-the-existing-application-setting-is-absent.test-cases';
+import { registerAtomicallyBackfillsMetadataForConcurrentReaders } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerLeavesNoPartialMetadataWhenBackfillPublicationIsInterrupted } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerRetainsOldBundlesAcrossConcurrentImportsAndSnapshotsSurviveActivation } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
+import { registerValidatesASelectedCatalogArtifactWithoutCreatingADeliverySnapshot } from './wago-runtime-artifacts.uses-exactly-cwd-storage-when-the-existing-application-setting-is-absent.test-cases';
+import { registerBoundsConcurrentImportsAndReleasesRejectedInputStreams } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerRejectsSWithoutChangingCurrentOrLeavingTemporaryFiles } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
+import { registerBoundsTarAndSidecarWritesAndCleansUpStreamErrors } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerRejectsSymlinkStorageTraversalAndAlteredPersistedData } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
+import { registerRoundTripsTheCompressedPackagingCliChecksumAndCatalogImport } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
+import { registerPackagesAFixedBuildOwnedDescriptorAndVerifiesItWithoutAManualImport } from './wago-runtime-artifacts.atomically-backfills-metadata-for-concurrent-readers.test-cases';
+import { registerRedactsFilesystemFailuresFromTheReadOnlyRuntimeController } from './wago-runtime-artifacts.reconciles-killed-owners-on-access-while-retaining-active-owners-immutable-objects-and-unknown-entri.test-cases';
 
 describe('runtime artifact catalog (isolated disk)', () => {
+  defineRuntimeArtifactCatalogIsolatedDiskTests();
+});
+
+export function defineRuntimeArtifactCatalogIsolatedDiskTests() {
   let root: string;
   let catalog: WagoRuntimeArtifactCatalog;
   beforeEach(async () => {
@@ -78,39 +46,33 @@ describe('runtime artifact catalog (isolated disk)', () => {
     await rm(root, { recursive: true, force: true });
     jest.restoreAllMocks();
   });
+  const scope = {
+    get root() {
+      return root;
+    },
+    set root(value: typeof root) {
+      root = value;
+    },
+    get catalog() {
+      return catalog;
+    },
+    set catalog(value: typeof catalog) {
+      catalog = value;
+    },
+    upload,
+    bundle,
+    get manifest() {
+      return manifest;
+    },
+    get image() {
+      return image;
+    },
+    tarMember,
+  };
 
-  it('ignores a legacy imported release when local build assets have not been installed', async () => {
-    process.env.STORAGE_ROOT = root;
-    delete process.env.WAGO_CC100_BUILD_ASSETS_PATH;
-    process.env.NODE_ENV = 'development';
-    await catalog.import(upload());
-    const service = new WagoRuntimeArtifactsService();
-    try {
-      expect(await service.current()).toBeNull();
-      expect(await service.list()).toEqual([]);
-      expect(await service.has()).toBe(false);
-      await expect(service.acquire()).rejects.toThrow('Build');
-      const source = upload();
-      await expect(service.import(source)).rejects.toThrow('server build owns');
-      expect(source.bundle.destroyed).toBe(true);
-    } finally {
-      await service.onModuleDestroy();
-    }
-  });
+  registerIgnoresALegacyImportedReleaseWhenLocalBuildAssetsHaveNotBeenInstalled(scope);
 
-  it('requires bundled runtime assets when starting in production', async () => {
-    process.env.STORAGE_ROOT = root;
-    delete process.env.WAGO_CC100_BUILD_ASSETS_PATH;
-    process.env.NODE_ENV = 'production';
-    await catalog.import(upload());
-    const service = new WagoRuntimeArtifactsService();
-    try {
-      await expect(service.onModuleInit()).rejects.toThrow();
-      expect(await service.has()).toBe(false);
-    } finally {
-      await service.onModuleDestroy();
-    }
-  });
+  registerRequiresBundledRuntimeAssetsWhenStartingInProduction(scope);
 
   describe('build-owned assets outside the plugin archive', () => {
     const imageId = `sha256:${'b'.repeat(64)}`;
@@ -225,416 +187,36 @@ describe('runtime artifact catalog (isolated disk)', () => {
       expect(sameRuntimeImage({ image, imageId }, { image, imageId: `sha256:${'d'.repeat(64)}` })).toBe(false);
     });
   });
-  it('uses exactly cwd/storage when the existing application setting is absent', async () => {
-    const previous = process.env.STORAGE_ROOT;
-    delete process.env.STORAGE_ROOT;
-    const cwd = jest.spyOn(process, 'cwd').mockReturnValue(root);
-    try {
-      const service = new WagoRuntimeArtifactsService();
-      expect(await service.root()).toBe(await realpath(join(root, 'storage', 'wago-runtime-artifacts')));
-      await service.onModuleDestroy();
-    } finally {
-      cwd.mockRestore();
-      if (previous !== undefined) process.env.STORAGE_ROOT = previous;
-    }
-  });
-  it('reconciles killed owners on access while retaining active owners, immutable objects, and unknown entries', async () => {
-    const metadata = await catalog.import(upload());
-    const snapshot = await catalog.acquire();
-    const activeUpload = await catalog.createUploadDirectory();
-    const catalogRoot = await catalog.root();
-    const owner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-    await once(owner, 'spawn');
-    const name = (kind: string) =>
-      basename(activeUpload).replace('upload-', `${kind}-`).replace(`-${process.pid}-`, `-${owner.pid}-`);
-    const abandonedUpload = join(catalogRoot, 'staging', name('upload'));
-    const abandonedSnapshot = join(catalogRoot, 'snapshots', name('delivery'));
-    const pointer = join(catalogRoot, name('current'));
-    const unknown = join(catalogRoot, 'staging', 'upload-unknown');
-    try {
-      await mkdir(abandonedUpload);
-      await writeFile(join(abandonedUpload, 'partial'), 'partial upload');
-      await mkdir(abandonedSnapshot);
-      await writeFile(pointer, metadata.digest);
-      await mkdir(unknown);
-      // A live owner must survive regardless of another catalog's startup.
-      const restarted = new WagoRuntimeArtifactCatalog(root);
-      await restarted.current();
-      await restarted.onModuleDestroy();
-      expect((await lstat(abandonedUpload)).isDirectory()).toBe(true);
-      expect((await lstat(abandonedSnapshot)).isDirectory()).toBe(true);
-      expect(await readFile(pointer, 'utf8')).toBe(metadata.digest);
-      const exited = once(owner, 'exit');
-      owner.kill('SIGKILL');
-      await exited;
-      await catalog.current();
-      for (const path of [abandonedUpload, abandonedSnapshot, pointer])
-        await expect(lstat(path)).rejects.toMatchObject({ code: 'ENOENT' });
-      expect((await lstat(activeUpload)).isDirectory()).toBe(true);
-      expect((await lstat(unknown)).isDirectory()).toBe(true);
-      expect(await readFile(snapshot.path)).toEqual(bundle());
-      expect(await catalog.current()).toEqual(metadata);
-      expect(await catalog.list()).toEqual([metadata]);
-      // Dead-owner names still cannot authorize following a symlink.
-      await symlink(snapshot.directory, abandonedUpload);
-      await symlink(snapshot.path, pointer);
-      await catalog.current();
-      expect((await lstat(abandonedUpload)).isSymbolicLink()).toBe(true);
-      expect((await lstat(pointer)).isSymbolicLink()).toBe(true);
-      expect(await readFile(snapshot.path)).toEqual(bundle());
-    } finally {
-      if (owner.exitCode === null && owner.signalCode === null) owner.kill('SIGKILL');
-      await snapshot.cleanup();
-    }
-  });
-  it('bounds startup reconciliation and continues beyond retained entries on later accesses', async () => {
-    const active = await catalog.createUploadDirectory();
-    const staging = join(await catalog.root(), 'staging');
-    const owner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-    await once(owner, 'spawn');
-    const restarted = new WagoRuntimeArtifactCatalog(root);
-    try {
-      // Force the cursor to encounter more entries than a single bounded pass.
-      for (let i = 0; i < 40; i++) await mkdir(join(staging, `unowned-${i}`));
-      for (let i = 0; i < 40; i++) {
-        const name = basename(active)
-          .replace(`-${process.pid}-`, `-${owner.pid}-`)
-          .replace(/[a-f0-9-]{36}$/, randomUUID());
-        await mkdir(join(staging, name));
-      }
-      const exited = once(owner, 'exit');
-      owner.kill('SIGKILL');
-      await exited;
-      await restarted.onModuleInit();
-      expect((await readdir(staging)).length).toBeGreaterThanOrEqual(49);
-      for (let i = 0; i < 4; i++) await restarted.root();
-      const retained = await readdir(staging);
-      expect(retained).toHaveLength(41);
-      expect(retained).toContain(basename(active));
-    } finally {
-      if (owner.exitCode === null && owner.signalCode === null) owner.kill('SIGKILL');
-      await restarted.onModuleDestroy();
-    }
-  });
-  it('retains remote owners and malformed ownership markers', async () => {
-    const active = await catalog.createUploadDirectory();
-    const staging = join(await catalog.root(), 'staging');
-    const remote = basename(active).replace(/-v1-[a-f0-9]{64}-/, `-v1-${'0'.repeat(64)}-`);
-    const malformed = basename(active).replace('-v1-', '-v0-');
-    await mkdir(join(staging, remote));
-    await mkdir(join(staging, malformed));
-    await catalog.root();
-    expect(await readdir(staging)).toEqual(expect.arrayContaining([basename(active), remote, malformed]));
-  });
-  it('does not let the manifest-copy task cache and restore stale runtime/frontend bundles', async () => {
-    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
-    expect(project.targets.build.outputs).toEqual([
-      '{projectRoot}/package/package.json',
-      '{projectRoot}/package/plugin.json',
-    ]);
-  });
+  registerUsesExactlyCwdStorageWhenTheExistingApplicationSettingIsAbsent(scope);
+  registerReconcilesKilledOwnersOnAccessWhileRetainingActiveOwnersImmutableObjectsAndUnknownEntri(scope);
+  registerBoundsStartupReconciliationAndContinuesBeyondRetainedEntriesOnLaterAccesses(scope);
+  registerRetainsRemoteOwnersAndMalformedOwnershipMarkers(scope);
+  registerDoesNotLetTheManifestCopyTaskCacheAndRestoreStaleRuntimeFrontendBundles(scope);
 
   it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {
     const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
     for (const target of ['pack', 'pack-test', 'zip']) expect(project.targets[target].cache).toBe(false);
   });
-  it('uses existing STORAGE_ROOT without accessing the plugin context or host ModuleRef', async () => {
-    const previous = process.env.STORAGE_ROOT;
-    process.env.STORAGE_ROOT = root;
-    const get = jest.fn(() => {
-      throw new Error('Host ModuleRef is not ready');
-    });
-    try {
-      const module = await Test.createTestingModule({
-        providers: [
-          WagoRuntimeArtifactsService,
-          { provide: Symbol.for('attraccess.plugin.context'), useValue: { get } },
-        ],
-      }).compile();
-      expect(await module.get(WagoRuntimeArtifactsService).has()).toBe(false);
-      expect(get).not.toHaveBeenCalled();
-      expect(await readdir(root)).toEqual([]);
-      await module.close();
-    } finally {
-      if (previous === undefined) delete process.env.STORAGE_ROOT;
-      else process.env.STORAGE_ROOT = previous;
-    }
-  });
-  it('persists immutable verified metadata and exposes only nonsecret API metadata', async () => {
-    expect(await catalog.has()).toBe(false);
-    const imported = await catalog.import(upload());
-    expect(imported.manifest).toEqual(manifest);
-    expect(Object.isFrozen(imported.manifest.hardware)).toBe(true);
-    expect(Object.keys(imported).sort()).toEqual(['bytes', 'digest', 'image', 'manifest']);
-    const restarted = new WagoRuntimeArtifactCatalog(root);
-    expect(await restarted.current()).toEqual(imported);
-    expect(await restarted.has()).toBe(true);
-  });
-  it('verifiedly backfills metadata for catalog objects written before metadata persistence', async () => {
-    const imported = await catalog.import(upload());
-    const metadataPath = join(await catalog.root(), 'objects', imported.digest, 'metadata.json');
-    await rm(metadataPath);
-
-    // Reimporting the same release must repair the existing object rather than discard staged metadata.
-    await catalog.import(upload());
-    const restarted = new WagoRuntimeArtifactCatalog(root);
-    expect(await restarted.current()).toEqual(imported);
-    expect(await restarted.list()).toEqual([imported]);
-    expect(await restarted.has()).toBe(true);
-    expect(JSON.parse(await readFile(metadataPath, 'utf8'))).toEqual(imported);
-    await restarted.onModuleDestroy();
-  });
-  it('atomically backfills metadata for concurrent readers', async () => {
-    const imported = await catalog.import(upload());
-    const directory = join(await catalog.root(), 'objects', imported.digest);
-    const metadataPath = join(directory, 'metadata.json');
-    await rm(metadataPath);
-    const originalRename = filesystem.rename;
-    let metadataRenames = 0;
-    let release!: () => void;
-    const published = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const rename = jest.spyOn(filesystem, 'rename').mockImplementation(async (from, to) => {
-      if (to === metadataPath) {
-        metadataRenames++;
-        if (metadataRenames === 2) release();
-        await published;
-      }
-      return originalRename(from, to);
-    });
-    try {
-      await expect(Promise.all([catalog.current(), catalog.list()])).resolves.toEqual([imported, [imported]]);
-      expect(metadataRenames).toBe(2);
-      expect(JSON.parse(await readFile(metadataPath, 'utf8'))).toEqual(imported);
-    } finally {
-      rename.mockRestore();
-    }
-  });
-  it('leaves no partial metadata when backfill publication is interrupted', async () => {
-    const imported = await catalog.import(upload());
-    const directory = join(await catalog.root(), 'objects', imported.digest);
-    const metadataPath = join(directory, 'metadata.json');
-    await rm(metadataPath);
-    const originalRename = filesystem.rename;
-    const rename = jest.spyOn(filesystem, 'rename').mockImplementation(async (from, to) => {
-      if (to === metadataPath) throw new Error('interrupted publication');
-      return originalRename(from, to);
-    });
-    try {
-      await expect(catalog.current()).rejects.toThrow('interrupted publication');
-      await expect(lstat(metadataPath)).rejects.toMatchObject({ code: 'ENOENT' });
-      expect((await readdir(directory)).some((name) => name.startsWith('.metadata-'))).toBe(false);
-    } finally {
-      rename.mockRestore();
-    }
-    await expect(catalog.current()).resolves.toEqual(imported);
-  });
-  it('retains old bundles across concurrent imports and snapshots survive activation', async () => {
-    const first = await catalog.import(upload());
-    const snapshot = await catalog.acquire();
-    const second = bundle({ ...manifest, runtimeVersion: '0.2.0' });
-    await Promise.all([catalog.import(upload(second)), catalog.import(upload(second))]);
-    expect(await readFile(snapshot.path)).toEqual(bundle());
-    expect(snapshot.digest).toBe(first.digest);
-    expect(await catalog.list()).toHaveLength(2);
-    expect((await catalog.current())?.manifest.runtimeVersion).toBe('0.2.0');
-    const old = await catalog.acquire(first.digest);
-    await old.cleanup();
-    await snapshot.cleanup();
-    await snapshot.cleanup();
-    expect(await readdir(join(await catalog.root(), 'snapshots'))).toEqual([]);
-    expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
-  });
-  it('validates a selected catalog artifact without creating a delivery snapshot', async () => {
-    const imported = await catalog.import(upload());
-
-    expect(await catalog.get(imported.digest)).toEqual(imported);
-    expect(await readdir(join(await catalog.root(), 'snapshots'))).toEqual([]);
-    await rm(join(await catalog.root(), 'objects', imported.digest, 'runtime.tar'));
-    await expect(catalog.get(imported.digest)).rejects.toThrow();
-  });
+  registerUsesExistingStorageRootWithoutAccessingThePluginContextOrHostModuleRef(scope);
+  registerPersistsImmutableVerifiedMetadataAndExposesOnlyNonsecretApiMetadata(scope);
+  registerVerifiedlyBackfillsMetadataForCatalogObjectsWrittenBeforeMetadataPersistence(scope);
+  registerAtomicallyBackfillsMetadataForConcurrentReaders(scope);
+  registerLeavesNoPartialMetadataWhenBackfillPublicationIsInterrupted(scope);
+  registerRetainsOldBundlesAcrossConcurrentImportsAndSnapshotsSurviveActivation(scope);
+  registerValidatesASelectedCatalogArtifactWithoutCreatingADeliverySnapshot(scope);
   it('lists bounded metadata without revalidating retained bundles', async () => {
     const imported = await catalog.import(upload());
     await rm(join(await catalog.root(), 'objects', imported.digest, 'runtime.tar'));
     expect(await catalog.list()).toEqual([imported]);
     await expect(catalog.acquire()).rejects.toThrow();
   });
-  it('bounds concurrent imports and releases rejected input streams', async () => {
-    const first = catalog.import(upload());
-    const second = catalog.import(upload());
-    const rejected = upload();
-    await expect(catalog.import(rejected)).rejects.toThrow('Another runtime import');
-    expect(Object.values(rejected).every((stream) => stream.destroyed)).toBe(true);
-    await Promise.all([first, second]);
-    expect(await catalog.list()).toHaveLength(1);
-  });
-  it.each([
-    ['checksum', () => upload(bundle(), '0'.repeat(64))],
-    ['manifest schema', () => upload(bundle({ ...manifest, schemaVersion: 2 }))],
-    ['mutable image', () => upload(bundle({ ...manifest, image: 'latest' }))],
-    ['hardware', () => upload(bundle({ ...manifest, hardware: { ...manifest.hardware, model: 'other' } }))],
-    ['hardware profile', () => upload(bundle({ ...manifest, hardware: { ...manifest.hardware, profile: 'other' } }))],
-    ['image mismatch', () => upload(bundle(manifest, image.replace('aaaa', 'bbbb')))],
-    ['traversal', () => upload(bundle(manifest, image, tarMember('../escape', 'evil')))],
-    ['symlink', () => upload(bundle(manifest, image, tarMember('evil', 'target', '2')))],
-    ['duplicate', () => upload(bundle(manifest, image, tarMember('image.tar', 'duplicate')))],
-    [
-      'missing manifest',
-      () =>
-        upload(Buffer.concat([tarMember('image.tar', 'x'), tarMember('image-reference', image), Buffer.alloc(1024)])),
-    ],
-    [
-      'malformed JSON',
-      () =>
-        upload(
-          Buffer.concat([
-            tarMember('image.tar', 'x'),
-            tarMember('image-reference', image),
-            tarMember('manifest.json', '{'),
-            Buffer.alloc(1024),
-          ]),
-        ),
-    ],
-    ['truncated tar', () => upload(bundle().subarray(0, -512))],
-  ])('rejects %s without changing current or leaving temporary files', async (_name, fixture) => {
-    const previous = await catalog.import(upload());
-    await expect(catalog.import(fixture())).rejects.toThrow('Runtime import failed');
-    expect(await catalog.current()).toEqual(previous);
-    expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
-  });
-  it('bounds tar and sidecar writes and cleans up stream errors', async () => {
-    await expect(new WagoRuntimeArtifactCatalog(root, 100).import(upload())).rejects.toThrow();
-    await expect(catalog.import(upload(bundle(), 'x'.repeat(4097)))).rejects.toThrow();
-    const failed = upload();
-    failed.bundle = Readable.from(
-      (async function* () {
-        yield 'start';
-        throw new Error('private internal detail');
-      })(),
-    );
-    await expect(catalog.import(failed)).rejects.toThrow('Runtime import failed');
-    expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
-  });
-  it('rejects symlink storage traversal and altered persisted data', async () => {
-    await symlink(root, join(root, 'wago-runtime-artifacts'));
-    await expect(catalog.root()).rejects.toThrow('Invalid artifact storage');
-    await rm(join(root, 'wago-runtime-artifacts'));
-    const imported = await catalog.import(upload());
-    const path = join(await catalog.root(), 'objects', imported.digest, 'runtime.tar');
-    await rm(path);
-    await symlink(join(root, 'outside'), path);
-    await writeFile(join(root, 'outside'), bundle());
-    await expect(catalog.acquire()).rejects.toThrow();
-    expect(await catalog.has()).toBe(false);
-    await expect(catalog.acquire('../outside')).rejects.toThrow();
-  });
-  it('round-trips the compressed packaging CLI, checksum and catalog import', async () => {
-    const exec = promisify(execFile);
-    const inner = Buffer.concat([tarMember('fixture', 'isolated image fixture'), Buffer.alloc(1024)]);
-    await writeFile(join(root, 'image.tar'), inner);
-    await exec(process.execPath, [
-      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
-      '--image-archive',
-      join(root, 'image.tar'),
-      '--image',
-      image,
-      '--version',
-      '0.3.0',
-      '--out',
-      join(root, 'releases'),
-    ]);
-    const release = join(root, 'releases', (await readdir(join(root, 'releases')))[0]);
-    expect((await readdir(release)).sort()).toEqual(['wago-cc100-runtime.tar', 'wago-cc100-runtime.tar.sha256']);
-    const data = await readFile(join(release, 'wago-cc100-runtime.tar'));
-    const imageHeader = data.subarray(0, 512);
-    const compressedBytes = parseInt(imageHeader.subarray(124, 136).toString('ascii'), 8);
-    const compressedImage = data.subarray(512, 512 + compressedBytes);
-    expect(compressedImage.subarray(0, 2)).toEqual(Buffer.from([0x1f, 0x8b]));
-    expect(compressedImage.subarray(4, 8)).toEqual(Buffer.alloc(4)); // no gzip timestamp
-    expect(gunzipSync(compressedImage)).toEqual(inner);
-    const fixtureCatalog = new WagoRuntimeArtifactCatalog(root);
-    const result = await fixtureCatalog.import(
-      upload(data, await readFile(join(release, 'wago-cc100-runtime.tar.sha256'), 'utf8')),
-    );
-    expect(result.manifest.runtimeVersion).toBe('0.3.0');
-    expect(result.manifest.hardware.profile).toBe(manifest.hardware.profile);
-    await exec(process.execPath, [
-      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
-      '--image-archive',
-      join(root, 'image.tar'),
-      '--image',
-      image,
-      '--version',
-      '0.3.0',
-      '--out',
-      join(root, 'releases'),
-    ]);
-    const releases = await readdir(join(root, 'releases'));
-    const secondRelease = releases.find((name) => name !== basename(release));
-    expect(secondRelease).toBeDefined();
-    expect(await readFile(join(root, 'releases', secondRelease ?? '', 'wago-cc100-runtime.tar'))).toEqual(data);
-    await writeFile(join(root, 'compressed-image.tar'), gzipSync(inner));
-    await expect(
-      exec(process.execPath, [
-        resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
-        '--image-archive',
-        join(root, 'compressed-image.tar'),
-        '--image',
-        image,
-        '--version',
-        '0.3.1',
-        '--out',
-        join(root, 'releases'),
-      ]),
-    ).rejects.toThrow();
-    expect(await readdir(join(root, 'releases'))).toHaveLength(2);
-  });
+  registerBoundsConcurrentImportsAndReleasesRejectedInputStreams(scope);
+  registerRejectsSWithoutChangingCurrentOrLeavingTemporaryFiles(scope);
+  registerBoundsTarAndSidecarWritesAndCleansUpStreamErrors(scope);
+  registerRejectsSymlinkStorageTraversalAndAlteredPersistedData(scope);
+  registerRoundTripsTheCompressedPackagingCliChecksumAndCatalogImport(scope);
 
-  it('packages a fixed build-owned descriptor and verifies it without a manual import', async () => {
-    const exec = promisify(execFile);
-    await writeFile(
-      join(root, 'image.tar'),
-      Buffer.concat([tarMember('fixture', 'image fixture'), Buffer.alloc(1024)]),
-    );
-    const args = [
-      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
-      '--image-archive',
-      join(root, 'image.tar'),
-      '--image',
-      image,
-      '--version',
-      '0.1.0',
-      '--build-id',
-      'a'.repeat(40),
-      '--image-id',
-      `sha256:${'b'.repeat(64)}`,
-      '--out',
-      join(root, 'build-assets'),
-    ];
-    await exec(process.execPath, args);
-    const directory = join(root, 'build-assets/cc100-build');
-    const owned = new WagoBuildRuntimeCatalog(root, directory);
-    try {
-      await owned.onModuleInit();
-      expect(await owned.current()).toMatchObject({ buildId: 'a'.repeat(40), imageId: `sha256:${'b'.repeat(64)}` });
-      // Explicit rebuilds publish fresh assets, while running catalogs retain
-      // their selected release until the server is restarted.
-      const nextArgs = [...args];
-      nextArgs[nextArgs.indexOf('--version') + 1] = '0.2.0';
-      await exec(process.execPath, nextArgs);
-      expect((await owned.current()).manifest.runtimeVersion).toBe('0.1.0');
-      const restarted = new WagoBuildRuntimeCatalog(root, directory);
-      try {
-        expect((await restarted.current()).manifest.runtimeVersion).toBe('0.2.0');
-      } finally {
-        await restarted.onModuleDestroy();
-      }
-      expect(await readdir(join(root, 'build-assets'))).toEqual(['cc100-build']);
-    } finally {
-      await owned.onModuleDestroy();
-    }
-  });
+  registerPackagesAFixedBuildOwnedDescriptorAndVerifiesItWithoutAManualImport(scope);
   const dockerImage = process.env.WAGO_DOCKER_TEST_IMAGE;
   (dockerImage ? it : it.skip)(
     'loads the packaged release image member with a real Docker daemon',
@@ -670,14 +252,11 @@ describe('runtime artifact catalog (isolated disk)', () => {
     },
     120000,
   );
-  it('redacts filesystem failures from the read-only runtime controller', async () => {
-    const controller = new WagoArtifactsController(catalog as WagoRuntimeArtifactsService);
-    const source = join(root, 'private-source', 'runtime.tar');
-    const rawError = new Error(`EACCES: permission denied, open '${source}'`);
-    for (const method of ['list', 'current'] as const) {
-      const spy = jest.spyOn(catalog, method).mockRejectedValueOnce(rawError);
-      await expect(controller[method]()).rejects.toMatchObject({ message: expect.not.stringContaining(root) });
-      spy.mockRestore();
-    }
-  });
-});
+  registerRedactsFilesystemFailuresFromTheReadOnlyRuntimeController(scope);
+
+  return scope;
+}
+
+export type RuntimeArtifactCatalogIsolatedDiskTestScope = ReturnType<
+  typeof defineRuntimeArtifactCatalogIsolatedDiskTests
+>;

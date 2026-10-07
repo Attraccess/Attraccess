@@ -1,7 +1,7 @@
+import { UserSearchTrigger } from './UserSearchTrigger';
 // Address-book style user picker: a "Choose user" button that opens a searchable,
 // alphabetically grouped, infinitely scrolling modal of all users.
 // FEATURE: User selection via a phone-address-book modal
-import { HTMLAttributes, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Header,
@@ -21,32 +21,16 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { SearchIcon, UserPlusIcon, XIcon } from 'lucide-react';
-import { InfiniteData } from '@tanstack/react-query';
+import { SearchIcon } from 'lucide-react';
+import { useId } from 'react';
 import { useTranslations } from '../../i18n';
-import { useDebounce } from '../../hooks/useDebounce';
-import { AttraccessUser, type UserIdentity } from '../attraccess-user/AttraccessUser';
-import { groupUsersByLetter } from './UserSearch.utils';
-import { PaginatedUsersResponseDto, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
+import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 
-import en from './en.json';
 import de from './de.json';
+import en from './en.json';
 
-interface UserSearchProps {
-  label?: string;
-  placeholder?: string;
-  size?: 'sm' | 'md' | 'lg';
-  /** Clears the current selection and search whenever this value changes identity
-   * (e.g. pass a drawer's isOpen so the picker resets on every open/close). */
-  resetSignal?: unknown;
-  onSelectionChange?: (user: UserIdentity | null) => void;
-  wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
-  afterAutocomplete?: React.ReactNode;
-  afterSelection?: React.ReactNode;
-}
-
-const PAGE_SIZE = 50;
-const SEARCH_DEBOUNCE_MS = 300;
+import type { UserSearchProps } from './UserSearch.types';
+import { useUserSearch } from './useUserSearch';
 
 // Mirrors the app's StandardModal chrome (bg-surface-secondary + field-contrast
 // vars) so fields inside this modal match every other modal in the app. The lib
@@ -68,111 +52,24 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const triggerId = useId();
 
   const { isOpen, open, close } = useOverlayState();
-  const [selectedUser, setSelectedUser] = useState<UserIdentity | null>(null);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
-
-  // Reset selection and search when the caller's reset signal changes (skipping the
-  // initial render), replacing the per-consumer key-remount workaround.
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    setSelectedUser(null);
-    setSearch('');
-  }, [resetSignal]);
-
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching, isLoading, isError, refetch } =
-    useUsersServiceFindManyInfinite<InfiniteData<PaginatedUsersResponseDto>>(
-      // Gate on the picker being open AND the live input being non-empty: closing
-      // resets `search` synchronously while the debounced copy lags ~300ms, so
-      // without the live check a quick close+reopen could briefly refetch (or flash
-      // cached results for) the previous filter.
-      {
-        limit: PAGE_SIZE,
-        search: isOpen && search.trim() ? debouncedSearch.trim() || undefined : undefined,
-      },
-      undefined,
-      {
-        // Only fetch while the picker is actually open. The generated options type
-        // marks initialPageParam/getNextPageParam as required (they are not Omit-ed),
-        // so `enabled` cannot be passed alone — mirror the hook's own values verbatim.
-        // The cast matches the generated hook: at runtime lastPage is the raw
-        // PaginatedUsersResponseDto even though the type parameter says otherwise.
-        enabled: isOpen,
-        initialPageParam: 1,
-        getNextPageParam: (lastPage) => (lastPage as unknown as { nextPage?: number }).nextPage,
-      },
-    );
-
-  // De-duplicate by id: pagination is offset-based, so a user created or renamed
-  // between page fetches can shift the window and repeat (or skip) a row.
-  const users = useMemo(() => {
-    const seen = new Map<number, UserIdentity>();
-    for (const page of data?.pages ?? []) {
-      for (const user of page.data) {
-        seen.set(user.id, user);
-      }
-    }
-    return [...seen.values()];
-  }, [data]);
-  const groups = useMemo(() => groupUsersByLetter(users), [users]);
-
-  useEffect(() => {
-    onSelectionChange?.(selectedUser);
-  }, [selectedUser, onSelectionChange]);
-
-  const handleSelect = useCallback(
-    (user: UserIdentity) => {
-      setSelectedUser(user);
-      setSearch('');
-      close();
-    },
-    [close],
-  );
-
-  const handleOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      if (nextOpen) {
-        open();
-      } else {
-        setSearch('');
-        close();
-      }
-    },
-    [open, close],
-  );
-
-  // Infinite scroll: load more when the sentinel near the bottom of the scrollable
-  // list becomes visible. The list itself is the scroll root (see inline style below).
-  // A single observer lives for the whole time the picker is open; the fetch state is
-  // read through refs so pagination changes don't tear the observer down.
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const pagingRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
-  useEffect(() => {
-    pagingRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
-  });
-  useEffect(() => {
-    const el = sentinelRef.current;
-    const root = listRef.current;
-    if (!el || !root || !isOpen) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const paging = pagingRef.current;
-        if (entries[0]?.isIntersecting && paging.hasNextPage && !paging.isFetchingNextPage) {
-          paging.fetchNextPage();
-        }
-      },
-      { root, rootMargin: '200px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-    // isError is a dependency because the sentinel unmounts while errored; when a
-    // retry clears the error, the effect must re-run to observe the fresh sentinel.
-  }, [isOpen, isError]);
+  const {
+    selectedUser,
+    setSelectedUser,
+    search,
+    setSearch,
+    users,
+    groups,
+    handleSelect,
+    handleOpenChange,
+    listRef,
+    sentinelRef,
+    isError,
+    isLoading,
+    isFetching,
+    refetch,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useUserSearch({ isOpen, open, close, resetSignal, onSelectionChange });
 
   return (
     <div {...wrapperProps}>
@@ -180,48 +77,17 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
         {label ?? t('label')}
       </Label>
 
-      <div className="flex gap-2 items-center">
-        {selectedUser ? (
-          <>
-            <Button
-              variant="ghost"
-              size={size}
-              onPress={open}
-              className="justify-start px-2"
-              id={triggerId}
-              aria-labelledby={`${labelId} ${triggerId}`}
-              data-cy="user-picker-selected"
-            >
-              <AttraccessUser user={selectedUser} interactive={false} />
-            </Button>
-            <Button
-              variant="ghost"
-              size={size ?? 'sm'}
-              isIconOnly
-              onPress={() => setSelectedUser(null)}
-              aria-label={t('clear')}
-              data-cy="user-picker-clear"
-            >
-              <XIcon className="w-4 h-4" />
-            </Button>
-          </>
-        ) : (
-          <Button
-            variant="secondary"
-            size={size}
-            onPress={open}
-            className="flex-1 justify-start"
-            id={triggerId}
-            aria-labelledby={`${labelId} ${triggerId}`}
-            data-cy="user-picker-open"
-          >
-            <UserPlusIcon className="w-4 h-4" />
-            {t('chooseUser')}
-          </Button>
-        )}
-        {afterAutocomplete}
-        {afterSelection}
-      </div>
+      <UserSearchTrigger
+        selectedUser={selectedUser}
+        size={size}
+        open={open}
+        setSelectedUser={setSelectedUser}
+        labelId={labelId}
+        triggerId={triggerId}
+        t={t}
+        afterAutocomplete={afterAutocomplete}
+        afterSelection={afterSelection}
+      />
 
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
         <ModalBackdrop>
@@ -294,7 +160,12 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                     // retry instead of discarding the list for the full error screen.
                     <div className="flex items-center justify-center gap-3 py-3" data-cy="user-picker-load-more-error">
                       <p className="text-sm text-muted">{t('loadError')}</p>
-                      <Button variant="secondary" size="sm" isPending={isFetchingNextPage} onPress={() => fetchNextPage()}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        isPending={isFetchingNextPage}
+                        onPress={() => fetchNextPage()}
+                      >
                         {t('retry')}
                       </Button>
                     </div>

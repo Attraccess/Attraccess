@@ -1,12 +1,10 @@
-import { DynamicModule, LoggerService, Type } from '@nestjs/common';
-import type { PluginFlowNodeDefinition } from './plugin-flow-node';
+import { LoggerService, Type } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
-import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
-import type { PluginEntityClass } from './entity';
-import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
-import type { PluginAuditContext, PluginAuditDomainDeclaration } from './plugin-audit';
+import type { PluginAuditContext } from './plugin-audit';
+import { MqttServerConnectionConfig, PluginMqttClient } from './plugin-mqtt-context';
+import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -25,94 +23,17 @@ export interface PluginManifestInfo {
   readonly pluginDirectory: string;
 }
 
-/**
- * DI token under which the host registers its MqttServerHostProvider
- * implementation. The plugin context resolves the provider through this token;
- * plugins never reference it directly — they call getMqttServerConfig instead.
- */
-export const MQTT_SERVER_HOST_PROVIDER = Symbol.for('attraccess.plugin.mqttServerHostProvider');
-
-/**
- * Connection configuration for a single MQTT server, including its resolved
- * (decrypted) credentials. A generic, broker-agnostic shape carrying only the
- * fields a plugin needs to open a connection or call a server's management API.
- */
-export interface MqttServerConnectionConfig {
-  readonly id: number;
-  readonly name: string;
-  readonly host: string;
-  readonly port: number;
-  /** Management API port on the same host (1-65535). Null/omitted uses the provider default. */
-  readonly managementPort?: number | null;
-  readonly useTls: boolean;
-  /** PEM trust anchors for private PKI. Omitted by older hosts. */
-  readonly caCert?: string | null;
-  /** Integrations requiring authenticated TLS must reject this setting. */
-  readonly tlsInsecure?: boolean;
-  readonly tlsServername?: string | null;
-  readonly username: string | null;
-  /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
-  readonly password: string | null;
-  readonly clientId: string | null;
-}
-
-/**
- * Host-side provider that resolves an MQTT server's connection config. The core
- * application implements this — all credential decryption stays core-side — and
- * registers it under MQTT_SERVER_HOST_PROVIDER. Plugins reach it only through
- * PluginContext.getMqttServerConfig, gated by the ACCESS_MQTT_SERVERS permission.
- */
-export interface MqttServerHostProvider {
-  getServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
-}
-
-/** A message delivered to a plugin's MQTT subscription. */
-export interface PluginMqttMessage {
-  readonly serverId: number;
-  readonly topic: string;
-  readonly payload: Buffer;
-}
-
-/** Handle returned from an MQTT subscription. */
-export interface PluginMqttSubscription {
-  unsubscribe(): void;
-}
-
-export interface PluginMqttClient {
-  /**
-   * Subscribe through the host's shared MQTT connection. MQTT wildcards `+`
-   * and `#` are supported. Resolves after the broker acknowledges the
-   * subscription. Handlers run serially; each subscription buffers up to 100
-   * messages and drops new messages while full. The returned handle detaches
-   * the handler.
-   */
-  subscribe(
-    serverId: number,
-    topicFilter: string,
-    handler: (message: PluginMqttMessage) => void | Promise<void>,
-  ): Promise<PluginMqttSubscription>;
-
-  /** Publish through the host's shared MQTT connection. */
-  publish(
-    serverId: number,
-    topic: string,
-    payload: string | Buffer,
-    options?: { qos?: 0 | 1 | 2; retain?: boolean },
-  ): Promise<void>;
-
-  /** Reconnect using current configured settings and restore shared topic
-   * registrations. Optional for compatibility with older host runtimes.
-   */
-  refreshConnection?(serverId: number): Promise<void>;
-}
-
 /** Host flow functionality available to plugins with the TRIGGER_FLOWS permission. */
 export interface PluginFlowsContext {
   /**
    * Starts a flow from every persisted trigger node of nodeType whose saved
    * configuration matches the supplied external event.
    */
-  trigger(nodeType: string, matches: (config: Record<string, unknown>, nodeId: string) => boolean, payload: object): Promise<void>;
+  trigger(
+    nodeType: string,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
+    payload: object,
+  ): Promise<void>;
 }
 
 /** Host-managed encryption for secret material owned by this plugin. */
@@ -185,42 +106,12 @@ export interface PluginContext {
   readonly secrets: PluginSecretsContext;
 }
 
-/**
- * Shape every backend plugin's default export must satisfy. The host calls
- * register(context) at load time to obtain the plugin's Nest module definition.
- */
-export interface PluginBackendModule {
-  register(context: PluginContext): DynamicModule;
-
-  /**
-   * Optional TypeORM entity classes this plugin owns. The host registers their
-   * metadata into the shared DataSource at load time so the plugin can query
-   * them through {@link PluginContext.getRepository}. The schema itself is owned
-   * by the plugin's migrations (the host runs with `synchronize: false`), so an
-   * entity here describes an existing table rather than creating one. Requires
-   * the DATABASE_ACCESS permission. See `docs/en/plugins/database-migrations.md`.
-   */
-  entities?: PluginEntityClass[];
-
-  /**
-   * Optional custom flow node types this plugin contributes. The host registers
-   * them into the flow engine so they appear in the frontend node catalog and
-   * can be executed like built-in node types. No extra permission is required.
-   *
-   * Type naming convention: "plugin.<pluginName>.<nodeName>".
-   */
-  flowNodes?: PluginFlowNodeDefinition[] | ((context: PluginContext) => PluginFlowNodeDefinition[]);
-
-  /**
-   * Optional audit domains this plugin contributes. The host registers the
-   * declarations at load time and enforces them on every event the plugin
-   * records through {@link PluginContext.audit}: only declared actions, subject
-   * types and detail fields are accepted, and events are stored under the
-   * declared domain. Domains must not collide with host domains or with other
-   * plugins. No extra permission is required.
-   */
-  auditDomains?: PluginAuditDomainDeclaration[] | ((context: PluginContext) => PluginAuditDomainDeclaration[]);
-
-  /** Optional broker credential provider offered to other integrations by this plugin. */
-  credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;
-}
+export { PluginBackendModule } from './plugin-backend-module';
+export {
+  MQTT_SERVER_HOST_PROVIDER,
+  MqttServerConnectionConfig,
+  MqttServerHostProvider,
+  PluginMqttClient,
+  PluginMqttMessage,
+  PluginMqttSubscription,
+} from './plugin-mqtt-context';

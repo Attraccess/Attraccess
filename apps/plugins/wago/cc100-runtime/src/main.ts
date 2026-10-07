@@ -1,6 +1,6 @@
 import { connect, type MqttClient } from 'mqtt';
-import { Cc100OnboardIoAdapter } from './adapters';
 import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } from '../../shared/hardware-profile';
+import { Cc100OnboardIoAdapter } from './adapters';
 import { ModbusDeviceRouter } from './modbus/adapter';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
 import { RunLed } from './status-led';

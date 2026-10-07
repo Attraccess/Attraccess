@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
-  Chip,
   Table,
   TableBody,
   TableCell,
@@ -12,104 +10,27 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { ActivityIcon, ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { EmptyState } from '../../../components/emptyState';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
-import {
-  Attractap,
-  useAttractapServiceGetFirmwares,
-  useAttractapServiceGetReaders,
-  useLicenseServiceGetLicenseInformation,
-} from '@attraccess/react-query-client';
-import { useToastMessage } from '../../../components/toastProvider';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
-import { useNow } from '../../../hooks/useNow';
-
-import de from './de.json';
-import en from './en.json';
 import { AttractapDeleteModal } from './delete';
+import { useAttractapListState } from './useAttractapListState';
 
 export function AttractapList() {
-  const { t } = useTranslations({
-    de,
-    en,
-  });
-
-  const { data: license } = useLicenseServiceGetLicenseInformation();
-
-  const { data: firmwares } = useAttractapServiceGetFirmwares();
-
-  const { data: allReaders, error: readersError } = useAttractapServiceGetReaders(undefined, {
-    refetchInterval: 5000,
-  });
-
-  const toast = useToastMessage();
-  const navigate = useNavigate();
-
-  const [openedReaderEditor, setOpenedReaderEditor] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (readersError) {
-      toast.error({
-        title: t('error.fetchReaders'),
-        description: (readersError as Error).message,
-      });
-    }
-  }, [readersError, t, toast]);
-
-  const formatDateTime = useDateTimeFormatter();
-
-  const now = useNow();
-
-  const { stale: staleReaders, active: activeReaders } = useMemo(() => {
-    const stale = [];
-    const active = [];
-    for (const reader of allReaders ?? []) {
-      const lastConnection = new Date(reader.lastConnection);
-      const isStale = lastConnection.getTime() < now.getTime() - 24 * 60 * 60 * 1000;
-      if (isStale) {
-        stale.push(reader);
-      } else {
-        active.push(reader);
-      }
-    }
-
-    active.sort((a, b) => a.name.localeCompare(b.name));
-    stale.sort((a, b) => {
-      const aLastConnection = new Date(a.lastConnection);
-      const bLastConnection = new Date(b.lastConnection);
-      return bLastConnection.getTime() - aLastConnection.getTime();
-    });
-
-    return { stale, active };
-  }, [allReaders, now]);
-
-  const firmwareUpdateChip = useCallback(
-    (reader: Attractap) => {
-      const latestFirmware = firmwares?.find((firmware) => {
-        return firmware.name === reader.firmware.name && firmware.variant === reader.firmware.variant;
-      });
-
-      const isSame = reader.firmware.version === latestFirmware?.version;
-
-      if (isSame || !latestFirmware) {
-        return <Chip>v{reader.firmware.version}</Chip>;
-      }
-
-      return (
-        <Chip color="warning">
-          <span className="whitespace-nowrap">
-            v{reader.firmware.version} <ArrowRightIcon size={14} className="inline" /> v{latestFirmware.version}
-          </span>
-        </Chip>
-      );
-    },
-    [firmwares],
-  );
+  const {
+    t,
+    license,
+    navigate,
+    openedReaderEditor,
+    setOpenedReaderEditor,
+    formatDateTime,
+    staleReaders,
+    activeReaders,
+    firmwareUpdateChip,
+  } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
     return null;

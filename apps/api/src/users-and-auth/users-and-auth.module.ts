@@ -1,87 +1,79 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { PassportModule } from '@nestjs/passport';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Services and Controllers
-import { UsersService } from './users/users.service';
-import { UsersRegistrationController } from './users/users-registration.controller';
-import { UserInvitationsController } from './users/user-invitations.controller';
-import { UserProfileController } from './users/user-profile.controller';
-import { UsersAdminController } from './users/users-admin.controller';
-import { UserPermissionsController } from './users/user-permissions.controller';
-import { SignupDomainService } from './users/signup-domain.service';
-import { UserRegistrationService } from './users/user-registration.service';
-import { UserPasswordService } from './users/user-password.service';
-import { UserInvitationService } from './users/user-invitation.service';
-import { UserPermissionsService } from './users/user-permissions.service';
-import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
-import { TwoFactorController } from './auth/two-factor.controller';
+import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
-import { SESSION_STORE, SessionStore } from './auth/session-store/session-store';
-import { SqliteSessionStore } from './auth/session-store/sqlite.session-store';
-import { ValkeySessionStore } from './auth/session-store/valkey.session-store';
-import { VALKEY_CLIENT } from '../valkey/valkey.module';
-import { TokenHashService } from '../encryption/token-hash.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import type { Redis } from 'ioredis';
+import { TwoFactorController } from './auth/two-factor.controller';
+import { SignupDomainService } from './users/signup-domain.service';
+import { UserInvitationService } from './users/user-invitation.service';
+import { UserInvitationsController } from './users/user-invitations.controller';
+import { UserPasswordService } from './users/user-password.service';
+import { UserPermissionsController } from './users/user-permissions.controller';
+import { UserPermissionsService } from './users/user-permissions.service';
+import { UserProfileController } from './users/user-profile.controller';
+import { UserRegistrationService } from './users/user-registration.service';
+import { UsersAdminController } from './users/users-admin.controller';
+import { UsersRegistrationController } from './users/users-registration.controller';
+import { UsersService } from './users/users.service';
 
 // Strategies
 import { LocalStrategy } from './strategies/local.strategy';
 import { SessionStrategy } from './strategies/session.strategy';
-
-import { RbacModule } from './rbac/rbac.module';
 import { RbacController } from './rbac/rbac.controller';
+import { RbacModule } from './rbac/rbac.module';
 
 // Constants and Entities
 
 import {
-  User,
-  AuthenticationDetail,
-  SSOProviderOIDCConfiguration,
-  SSOProviderSAMLConfiguration,
-  SSOProvider,
-  Session,
-  ResourceUsage,
-  Setting,
-  Passkey,
-  PasskeyChallenge,
   ApiToken,
   ApiTokenPermission,
+  AuthenticationDetail,
+  Passkey,
+  PasskeyChallenge,
   Permission,
+  ResourceUsage,
+  SSOProvider,
+  SSOProviderOIDCConfiguration,
+  SSOProviderSAMLConfiguration,
+  Session,
+  Setting,
+  User,
 } from '@attraccess/database-entities';
-import { EmailModule } from '../email/email.module';
-import { SSOService } from './auth/sso/sso.service';
-import { SSOOIDCStrategy } from './auth/sso/oidc/oidc.strategy';
 import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
-import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
-import { LicenseModule } from '../license/license.module';
-import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
-import { SSOOIDCPassportGuard } from './auth/sso/oidc/oidc-passport.guard';
-import { OidcCookieStateStore } from './auth/sso/oidc/oidc-cookie-state-store';
-import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
-import { SSOSamlPassportGuard } from './auth/sso/saml/saml-passport.guard';
-import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
+import { EmailModule } from '../email/email.module';
 import { EncryptionModule } from '../encryption/encryption.module';
-import { SSOLinkTokenService } from './auth/sso/link-token.service';
-import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
-import { TwoFactorService } from './auth/two-factor.service';
-import { PasskeyService } from './auth/passkey/passkey.service';
-import { PasskeyController } from './auth/passkey/passkey.controller';
+import { LicenseModule } from '../license/license.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
-import { BruteForceProtectionService } from './rate-limiting/brute-force.service';
+import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-request-rate-limit.interceptor';
+import { ApiTokenRequestRateLimitService } from './auth/api-token/api-token-request-rate-limit.service';
+import { ApiTokenController } from './auth/api-token/api-token.controller';
+import { ApiTokenService } from './auth/api-token/api-token.service';
+import { PasskeyController } from './auth/passkey/passkey.controller';
+import { PasskeyService } from './auth/passkey/passkey.service';
+import { SSOLinkTokenService } from './auth/sso/link-token.service';
+import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
+import { OidcCookieStateStore } from './auth/sso/oidc/oidc-cookie-state-store';
+import { SSOOIDCPassportGuard } from './auth/sso/oidc/oidc-passport.guard';
+import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
+import { SSOOIDCStrategy } from './auth/sso/oidc/oidc.strategy';
+import { SSOSamlPassportGuard } from './auth/sso/saml/saml-passport.guard';
+import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
+import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
+import { SSOController } from './auth/sso/sso.controller';
+import { SSOService } from './auth/sso/sso.service';
+import { TwoFactorService } from './auth/two-factor.service';
+import { PasswordPolicyModule } from './password-policy/password-policy.module';
 import { AuthAuditLogger } from './rate-limiting/auth-audit.logger';
 import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interceptor';
+import { BruteForceProtectionService } from './rate-limiting/brute-force.service';
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
-import { PasswordPolicyModule } from './password-policy/password-policy.module';
-import { NotificationsModule } from '../notifications/notifications.module';
-import { ApiTokenService } from './auth/api-token/api-token.service';
-import { ApiTokenController } from './auth/api-token/api-token.controller';
-import { ApiTokenRequestRateLimitService } from './auth/api-token/api-token-request-rate-limit.service';
-import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-request-rate-limit.interceptor';
+import { sessionStoreProvider } from './session-store.provider';
 
 @Module({
   imports: [
@@ -110,26 +102,7 @@ import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-
     RbacModule,
   ],
   providers: [
-    {
-      provide: SESSION_STORE,
-      inject: [
-        { token: VALKEY_CLIENT, optional: true },
-        getRepositoryToken(Session),
-        getRepositoryToken(User),
-        TokenHashService,
-      ],
-      useFactory: (
-        valkeyClient: Redis | null,
-        sessionRepo: Repository<Session>,
-        userRepo: Repository<User>,
-        tokenHashService: TokenHashService,
-      ): SessionStore => {
-        if (valkeyClient) {
-          return new ValkeySessionStore(valkeyClient, userRepo, tokenHashService);
-        }
-        return new SqliteSessionStore(sessionRepo, tokenHashService);
-      },
-    },
+    sessionStoreProvider,
     UsersService,
     SignupDomainService,
     UserRegistrationService,

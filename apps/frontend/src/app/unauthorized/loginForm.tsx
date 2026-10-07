@@ -1,28 +1,33 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { isValidEmail } from '../../utils/email';
-import { ArrowRight, LogInIcon } from 'lucide-react';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Input, Label, Skeleton, TextField } from '@heroui/react';
+import { LogInIcon } from 'lucide-react';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionPanel,
+  AccordionBody,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+  Input,
+  Label,
+  Skeleton,
+  TextField,
+} from '@heroui/react';
 import { Button } from '../../components/button';
 import { OneTimeCodeInput } from '../../components/OneTimeCodeInput';
 import { Alert } from '@heroui/react';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
-import { useLogin } from '../../hooks/useAuth';
 import en from './loginForm.en.json';
 import de from './loginForm.de.json';
-import {
-  ApiError,
-  useUsersServiceIsLocalSignupEnabled,
-  useUsersServiceResendVerificationEmail,
-} from '@attraccess/react-query-client';
+import { useUsersServiceIsLocalSignupEnabled } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
-import { getTranslationKeyForApiError } from '../../utils/apiError';
-
-interface LoginFormProps {
-  onNeedsAccount: (() => void) | null;
-  onForgotPassword: () => void;
-}
+import { LoginFormProps } from './loginForm.login-form-props';
+import { LoginFormHeader } from './loginForm.login-form-header';
+import { useLoginFormContentState } from './useLoginFormContentState';
 
 export function LoginForm(props: LoginFormProps) {
   const { data: isLocalSignupEnabled, isLoading } = useUsersServiceIsLocalSignupEnabled();
@@ -57,198 +62,105 @@ export function LoginForm(props: LoginFormProps) {
       <Accordion variant="default" className="w-full">
         <AccordionItem className="bg-default-100">
           <AccordionHeading>
-            <AccordionTrigger><LogInIcon className="mr-2" />{t('accordion.title')}</AccordionTrigger>
+            <AccordionTrigger>
+              <LogInIcon className="mr-2" />
+              {t('accordion.title')}
+            </AccordionTrigger>
           </AccordionHeading>
-          <AccordionPanel><AccordionBody>
-            <LoginFormContent {...props} t={t} tExists={tExists} />
-          </AccordionBody></AccordionPanel>
+          <AccordionPanel>
+            <AccordionBody>
+              <LoginFormContent {...props} t={t} tExists={tExists} />
+            </AccordionBody>
+          </AccordionPanel>
         </AccordionItem>
       </Accordion>
     </>
   );
 }
 
-function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean; t: TFunction }) {
-  const { onNeedsAccount, isLocalSignupEnabled, t } = props;
-
-  return (
-    <div>
-      <h2 className="text-3xl font-bold">{t('title')}</h2>
-      {isLocalSignupEnabled && onNeedsAccount && (
-          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-600 dark:text-gray-300">
-            <span>{t('noAccount')}</span>
-            <Button variant="secondary" onPress={onNeedsAccount} data-cy="login-form-sign-up-button">
-              {t('signUpButton')}
-            </Button>
-        </p>
-      )}
-    </div>
-  );
-}
-
 function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
-  const { onForgotPassword, t, tExists } = props;
-
-  const { mutate: login, isPending, error } = useLogin();
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [resendEmail, setResendEmail] = useState('');
-  const [resendSuccess, setResendSuccess] = useState(false);
-  const [resendError, setResendError] = useState<{ title: string; description: string } | null>(null);
-
-  const isEmailNotVerified = useMemo(() => {
-    if (!error) return false;
-    const apiError = error as ApiError;
-    const body = apiError?.body as Record<string, unknown> | undefined;
-    return body?.message === 'UserEmailNotVerifiedException';
-  }, [error]);
-
-  useEffect(() => {
-    setResendSuccess(false);
-    setResendError(null);
-    setResendEmail('');
-  }, [error]);
-
-  const resendVerification = useUsersServiceResendVerificationEmail({
-    onSuccess: () => {
-      setResendError(null);
-      setResendSuccess(true);
-    },
-    onError: (mutationError) => {
-      setResendSuccess(false);
-      const { key } = getTranslationKeyForApiError({
-        error: mutationError as ApiError,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-        fallbackKey: 'generic',
-      });
-      setResendError({
-        title: t(key + '.title', { error: mutationError }),
-        description: t(key + '.description', { error: mutationError }),
-      });
-    },
-  });
-
-  const { errorTitle, errorDescription } = useMemo(() => {
-    if (!error) {
-      return {
-        errorTitle: null,
-        errorDescription: null,
-      };
-    }
-
-    const { key } = getTranslationKeyForApiError({
-      error: error as ApiError,
-      t,
-      tExists,
-      baseTranslationKey: 'api',
-      fallbackKey: 'generic',
-    });
-
-    return {
-      errorTitle: t(key + '.title', { error }),
-      errorDescription: t(key + '.description', {
-        error,
-      }),
-    };
-  }, [error, t, tExists]);
-
-  const handleSubmit: React.FormEventHandler = useCallback(
-    async (event) => {
-      event.preventDefault();
-      const formData = new FormData(event.currentTarget as HTMLFormElement);
-      const username = formData.get('username');
-      const password = formData.get('password');
-
-      if (typeof username !== 'string' || typeof password !== 'string') {
-        return;
-      }
-
-      setResendSuccess(false);
-      setResendError(null);
-
-      login({
-        username,
-        password,
-        twoFactorCode: twoFactorCode.trim() || undefined,
-        tokenLocation: 'cookie',
-      });
-    },
-    [login, twoFactorCode],
-  );
-
-  const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
+  const model = useLoginFormContentState(props);
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
-      <TextField isDisabled={isPending}>
-        <Label>{t('username')}</Label>
-        <Input id="username" name="username" type="text" required autoComplete="username" data-cy="login-form-username-input" />
+    <form className="space-y-6" onSubmit={model.handleSubmit} data-cy="login-form">
+      <TextField isDisabled={model.isPending}>
+        <Label>{model.t('username')}</Label>
+        <Input
+          id="username"
+          name="username"
+          type="text"
+          required
+          autoComplete="username"
+          data-cy="login-form-username-input"
+        />
       </TextField>
       <PasswordInput
         id="password"
         name="password"
-        label={t('password')}
+        label={model.t('password')}
         required
-        isDisabled={isPending}
+        isDisabled={model.isPending}
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
       {/* Value sourced purely from React state (twoFactorCode), not FormData. */}
       <OneTimeCodeInput
-        label={t('twoFactorCode')}
-        description={t('twoFactorHelper')}
-        value={twoFactorCode}
-        onChange={setTwoFactorCode}
-        isDisabled={isPending}
+        label={model.t('twoFactorCode')}
+        description={model.t('twoFactorHelper')}
+        value={model.twoFactorCode}
+        onChange={model.setTwoFactorCode}
+        isDisabled={model.isPending}
         data-cy="login-form-two-factor-input"
       />
       <div className="flex items-center justify-between">
-        <Button variant="secondary"
-          onPress={onForgotPassword}
-          isDisabled={isPending}
+        <Button
+          variant="secondary"
+          onPress={model.onForgotPassword}
+          isDisabled={model.isPending}
           data-cy="login-form-forgot-password-button"
         >
-          {t('forgotPassword')}
+          {model.t('forgotPassword')}
         </Button>
       </div>
-      <Button variant="primary"
+      <Button
+        variant="primary"
         type="submit"
         className="w-full"
-        isPending={isPending}
-        isDisabled={isPending}
+        isPending={model.isPending}
+        isDisabled={model.isPending}
         data-cy="login-form-sign-in-button"
       >
-        {isPending ? t('signingIn') : t('signInButton')}
-        {arrowRight}</Button>
+        {model.isPending ? model.t('signingIn') : model.t('signInButton')}
+        {model.arrowRight}
+      </Button>
 
-      {errorTitle && (
-        <Alert status="danger" data-cy="login-form-error-alert" >
+      {model.errorTitle && (
+        <Alert status="danger" data-cy="login-form-error-alert">
           <AlertContent>
-            <AlertTitle>{errorTitle}</AlertTitle>
-            <AlertDescription>{errorDescription}</AlertDescription>
+            <AlertTitle>{model.errorTitle}</AlertTitle>
+            <AlertDescription>{model.errorDescription}</AlertDescription>
           </AlertContent>
         </Alert>
       )}
 
-      {isEmailNotVerified && !resendSuccess && (
+      {model.isEmailNotVerified && !model.resendSuccess && (
         <div className="space-y-2" data-testid="resend-verification-section">
-          <p className="text-sm text-gray-600 dark:text-gray-400">{t('resendVerification.prompt')}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{model.t('resendVerification.prompt')}</p>
           <TextField
-            value={resendEmail}
+            value={model.resendEmail}
             onChange={(value) => {
-              setResendEmail(value);
-              setResendError(null);
+              model.setResendEmail(value);
+              model.setResendError(null);
             }}
           >
-            <Label>{t('resendVerification.emailLabel')}</Label>
+            <Label>{model.t('resendVerification.emailLabel')}</Label>
             <Input type="email" data-testid="resend-email-input" />
           </TextField>
-          {resendError && (
+          {model.resendError && (
             <Alert status="danger" data-testid="resend-error-alert">
               <AlertContent>
-                <AlertTitle>{resendError.title}</AlertTitle>
-                <AlertDescription>{resendError.description}</AlertDescription>
+                <AlertTitle>{model.resendError.title}</AlertTitle>
+                <AlertDescription>{model.resendError.description}</AlertDescription>
               </AlertContent>
             </Alert>
           )}
@@ -256,26 +168,26 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
             variant="secondary"
             className="w-full"
             onPress={() => {
-              const trimmed = resendEmail.trim();
+              const trimmed = model.resendEmail.trim();
               if (!isValidEmail(trimmed)) {
                 return;
               }
-              resendVerification.mutate({ requestBody: { email: trimmed } });
+              model.resendVerification.mutate({ requestBody: { email: trimmed } });
             }}
-            isPending={resendVerification.isPending}
-            isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
+            isPending={model.resendVerification.isPending}
+            isDisabled={!isValidEmail(model.resendEmail.trim()) || model.resendVerification.isPending}
             data-testid="resend-verification-button"
           >
-            {t('resendVerification.button')}
+            {model.t('resendVerification.button')}
           </Button>
         </div>
       )}
 
-      {resendSuccess && (
+      {model.resendSuccess && (
         <Alert status="success" data-testid="resend-success-alert">
           <AlertContent>
-            <AlertTitle>{t('resendVerification.successTitle')}</AlertTitle>
-            <AlertDescription>{t('resendVerification.successMessage')}</AlertDescription>
+            <AlertTitle>{model.t('resendVerification.successTitle')}</AlertTitle>
+            <AlertDescription>{model.t('resendVerification.successMessage')}</AlertDescription>
           </AlertContent>
         </Alert>
       )}

@@ -1,101 +1,17 @@
-import {
-  ApiError,
-  SSOProvider,
-  SSOProviderType,
-  User,
-  useAuthenticationServiceGetAllSsoProviders,
-  useLicenseServiceGetLicenseInformation,
-  useRbacServiceListPermissions,
-  useRbacServiceListRoles,
-  useUsersServiceDeleteUser,
-  useUsersServiceGetOneUserById,
-  useUsersServiceGetUserRoleAssignments,
-} from '@attraccess/react-query-client';
-
 import { PageHeader } from '../../../components/pageHeader';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { UserPermissionForm } from './components/permissionsForm';
 import { SetPasswordForm } from './components/setPasswordForm';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ChangeUsernameForm } from './components/changeUsername';
 import { ChangeEmailForm } from './components/changeEmail';
-
-import en from './en.json';
-import de from './de.json';
-import { Chip, ModalBody, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
+import { Chip, ModalBody, ModalFooter, ModalHeader, Separator } from '@heroui/react';
 import { AlertTriangleIcon, KeyRoundIcon, LinkIcon, ListChecksIcon, ShieldIcon, UserIcon } from 'lucide-react';
 import { FlatSection } from '../../../components/flatSection';
 import { Button } from '../../../components/button';
 import { StandardModal } from '../../../components/standardModal';
-import { useToastMessage } from '../../../components/toastProvider';
-import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
-import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
-import { useAuth } from '../../../hooks/useAuth';
-import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
-import { useMemo } from 'react';
-import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
 import { NotFound } from '../../not-found';
-
-function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnType<typeof useTranslations>['t'] }) {
-  const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
-  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
-  const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
-  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
-
-  const effectivePermKeys = useMemo(() => {
-    if (!allRoles || !userRoles) return new Set<string>();
-    const assignedRoleIds = new Set(userRoles.map((ur) => ur.roleId));
-    const keys = new Set<string>();
-    for (const role of allRoles) {
-      if (!assignedRoleIds.has(role.id)) continue;
-      for (const rp of role.rolePermissions ?? []) {
-        keys.add(rp.permissionKey);
-      }
-    }
-    return keys;
-  }, [allRoles, userRoles]);
-
-  // Group effective permissions by category using the full permission list
-  const permsByCategory = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; description: string }[]>();
-    for (const perm of allPermissions ?? []) {
-      if (!effectivePermKeys.has(perm.key)) continue;
-      const cat = perm.category || t('effectivePermissions.uncategorized');
-      const bucket = map.get(cat) ?? [];
-      bucket.push(perm);
-      map.set(cat, bucket);
-    }
-    return map;
-  }, [allPermissions, effectivePermKeys, t]);
-
-  if (isLoadingRoles || isLoadingPerms || isLoadingUserRoles) {
-    return <p className="text-sm text-default-400">{t('effectivePermissions.loading')}</p>;
-  }
-
-  if (effectivePermKeys.size === 0) {
-    return <p className="text-sm text-default-400">{t('effectivePermissions.empty')}</p>;
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      {[...permsByCategory.entries()].map(([category, perms], idx, arr) => (
-        <div key={category} className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">
-            {permissionCategory(category)}
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {perms.map((p) => (
-              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={permissionDescription(p)}>
-                {permissionLabel(p)}
-              </Chip>
-            ))}
-          </div>
-          {idx < arr.length - 1 ? <Separator className="mt-1" /> : null}
-        </div>
-      ))}
-    </div>
-  );
-}
+import { EffectivePermissionsSection } from './index.effective-permissions-section';
+import { useUserDetailsState } from './useUserDetailsState';
 
 // `/users/:id` also matches paths like `/users/security`, which used to render a detail page for a
 // user that cannot exist — heading `(ID: )`, empty body. A non-numeric segment is not a user (ATT-869).
@@ -111,119 +27,20 @@ export function UserManagementDetailsPage() {
 }
 
 function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
-  const { t, tExists } = useTranslations({
-    en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
-  });
-
-  const navigate = useNavigate();
-  const toast = useToastMessage();
-  const { isOpen, open, setOpen } = useOverlayState();
-  const { user: me } = useAuth();
-
-  const { data: user } = useUsersServiceGetOneUserById({ id });
-  const { data: license } = useLicenseServiceGetLicenseInformation();
-  const { data: ssoProviders } = useAuthenticationServiceGetAllSsoProviders(undefined, {
-    enabled: license?.modules.includes('sso'),
-  });
-
-  const providersById = useMemo(
-    () => new Map((ssoProviders ?? []).map((provider: SSOProvider) => [provider.id, provider])),
-    [ssoProviders],
-  );
-  type AuthenticationDetailSummary = {
-    providerId?: number | null;
-    providerType?: string | null;
-    ssoSubject?: string | null;
-    type?: string | null;
-  };
-  type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
-    authenticationDetails?: AuthenticationDetailSummary[];
-  };
-  const ssoDetails = useMemo(
-    () =>
-      (user as UserWithAuthDetails | undefined)?.authenticationDetails?.filter(
-        (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
-      ) ?? [],
-    [user],
-  );
-
-  const ssoManagedProviders = useMemo(() => {
-    if (ssoDetails.length === 0) {
-      return [];
-    }
-
-    const labels = new Set<string>();
-
-    ssoDetails.forEach((detail) => {
-      if (!detail.providerId || !detail.providerType) {
-        return;
-      }
-
-      const provider = providersById.get(detail.providerId);
-      if (!provider) {
-        return;
-      }
-
-      const roleMappings =
-        detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.roleMappings
-          : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.roleMappings
-            : undefined;
-
-      if (hasConfiguredPermissionMapping(roleMappings)) {
-        labels.add(provider.name ?? `${detail.providerType} #${detail.providerId}`);
-      }
-    });
-
-    return Array.from(labels);
-  }, [providersById, ssoDetails]);
-
-  const ssoManagedPermissionKeys = useMemo(() => {
-    const keys = new Set<string>();
-
-    ssoDetails.forEach((detail) => {
-      if (!detail.providerId || !detail.providerType) {
-        return;
-      }
-
-      const provider = providersById.get(detail.providerId);
-      if (!provider) {
-        return;
-      }
-
-      const roleMappings =
-        detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.roleMappings
-          : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.roleMappings
-            : undefined;
-
-      getSsoManagedPermissionKeys(roleMappings).forEach((key) => keys.add(key));
-    });
-
-    return keys;
-  }, [providersById, ssoDetails]);
-
-  const isSelf = !!me && !!user && me.id === user.id;
-  const { mutate: deleteUser, isPending: isDeleting } = useUsersServiceDeleteUser({
-    onSuccess: () => {
-      toast.success({
-        title: t('delete.success.title'),
-        description: t('delete.success.description', { username: user?.username ?? '' }),
-      });
-      navigate('/users');
-    },
-    onError: (error) => {
-      toast.apiError({
-        error: error as ApiError,
-        t,
-        tExists,
-        baseTranslationKey: 'apiErrors',
-      });
-    },
-  });
+  const {
+    t,
+    isOpen,
+    open,
+    setOpen,
+    user,
+    providersById,
+    ssoDetails,
+    ssoManagedProviders,
+    ssoManagedPermissionKeys,
+    isSelf,
+    deleteUser,
+    isDeleting,
+  } = useUserDetailsState({ id, roleIdToAssign });
 
   return (
     <div>

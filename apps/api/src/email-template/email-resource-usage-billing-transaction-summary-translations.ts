@@ -1,0 +1,136 @@
+import { EmailTemplateType } from '@attraccess/database-entities';
+import { ShippedTranslation } from './email-defaults';
+export const resourceUsageBillingTransactionSummaryTranslations: ShippedTranslation[] = [
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'greeting',
+    value: 'Hallo {name},',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'body',
+    value: 'Deine Sitzung auf <strong>{resource}</strong> ist beendet. Hier ist dein Beleg:',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'start_label',
+    value: 'Start: {time}',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'end_label',
+    value: 'Ende: {time}',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'duration_label',
+    value: 'Dauer: {minutes} min',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'col_item',
+    value: 'Posten',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'col_qty',
+    value: 'Anz.',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'col_unit',
+    value: 'Einheit',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'col_total',
+    value: 'Gesamt',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'total_credits',
+    value: 'Gesamtkosten',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'new_balance',
+    value: 'Neues Guthaben',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'subject',
+    value: 'Dein Nutzungsbeleg für {resource}',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'billing_factor_applied',
+    value: 'Angewendeter Abrechnungsfaktor: {factor}',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'item_session_duration',
+    value: 'Sitzungszeit',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'item_operating_duration',
+    value: 'Zugeordnete Betriebszeit',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'item_fixed_fee',
+    value: 'Feste Sitzungsgebühr',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'item_billing_factor',
+    value: 'Anpassung durch Abrechnungsfaktor',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'item_energy',
+    value: 'Energie',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'duration_measured',
+    value: 'Gemessen: {seconds} s',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'duration_billed',
+    value: 'Abgerechnet: {minutes} min',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'duration_rate',
+    value: '{credits} Credits/min',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'col_rate',
+    value: 'Preis',
+  },
+];

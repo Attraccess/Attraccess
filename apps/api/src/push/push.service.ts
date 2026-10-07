@@ -1,36 +1,27 @@
 // Generic Web Push (VAPID) sender. VAPID keys live in the settings table and are
 // auto-generated on first use; admins can override them (which invalidates all subscriptions).
 // FEATURE: Push notification foundation
+import { PushSubscription } from '@attraccess/database-entities';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PushSubscription } from '@attraccess/database-entities';
 import * as webpush from 'web-push';
+import { PUSH_KEYS, PUSH_PARENT } from '../settings/constants';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
-import { PUSH_KEYS, PUSH_PARENT } from '../settings/constants';
 import { CreatePushSubscriptionDto } from './dtos/createPushSubscription.dto';
-
-export interface PushNotificationPayload {
-  title: string;
-  body: string;
-  url?: string;
-  tag?: string;
-  icon?: string;
-}
-
-export interface VapidKeys {
-  publicKey: string;
-  privateKey: string;
-}
+import { sendToSubscription as sendToSubscriptionImplementation } from './push-delivery';
+import {
+  DEFAULT_VAPID_SUBJECT,
+  PushNotificationPayload,
+  VAPID_PRIVATE_KEY_BYTES,
+  VAPID_PUBLIC_KEY_BYTES,
+  VapidKeys,
+} from './push.service.definitions';
 
 // Fallback VAPID subject when no app URL is configured. The subject is contact
 // information for push-service operators, not a functional endpoint.
-const DEFAULT_VAPID_SUBJECT = 'mailto:admin@localhost';
-
 // Uncompressed P-256 public key (0x04 prefix + 2x32 bytes) and 32-byte private scalar.
-const VAPID_PUBLIC_KEY_BYTES = 65;
-const VAPID_PRIVATE_KEY_BYTES = 32;
 
 @Injectable()
 export class PushService {
@@ -181,31 +172,23 @@ export class PushService {
     serializedPayload: string,
     vapidDetails: { subject: string; publicKey: string; privateKey: string },
   ): Promise<void> {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          keys: {
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          },
-        },
-        serializedPayload,
-        { vapidDetails },
-      );
-    } catch (error) {
-      const statusCode = (error as { statusCode?: number }).statusCode;
-
-      // 404/410 mean the subscription is gone (browser unsubscribed / expired) - prune it.
-      if (statusCode === 404 || statusCode === 410) {
-        this.logger.debug(`Pruning stale push subscription ${subscription.id} (status ${statusCode})`);
-        await this.subscriptionRepository.delete({ id: subscription.id });
-        return;
-      }
-
-      this.logger.error(
-        `Failed to send push notification to subscription ${subscription.id}: ${(error as Error).message}`,
-      );
-    }
+    const getContextOwner = () => this;
+    return sendToSubscriptionImplementation(
+      {
+        logger: getContextOwner().logger,
+        subscriptionRepository: getContextOwner().subscriptionRepository,
+      },
+      subscription,
+      serializedPayload,
+      vapidDetails,
+    );
   }
 }
+
+export {
+  DEFAULT_VAPID_SUBJECT,
+  PushNotificationPayload,
+  VAPID_PRIVATE_KEY_BYTES,
+  VAPID_PUBLIC_KEY_BYTES,
+  VapidKeys,
+} from './push.service.definitions';

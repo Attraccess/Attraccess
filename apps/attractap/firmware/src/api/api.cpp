@@ -11,7 +11,6 @@
 #include <memory>
 #include <string>
 
-constexpr size_t API::MAX_PROJECTS_PER_PAGE;
 
 void API::updateSateInfo()
 {
@@ -61,238 +60,6 @@ void API::loop()
     this->firmware.tick();
 }
 
-void API::processIncomingMessage(const char *buf, size_t len)
-{
-    // Parse into persistent inboundDoc to avoid deep stack usage in websocket task (no filter; server sends only needed fields)
-    inboundDoc.clear();
-    auto err = deserializeJson(inboundDoc, buf, len);
-    if (err)
-    {
-        logger.error((std::string("JSON parse error: ") + err.c_str()).c_str());
-        return;
-    }
-
-    const char *topLevelEvent = inboundDoc["event"].as<const char *>();
-    if (topLevelEvent && strcmp(topLevelEvent, "HEARTBEAT") == 0)
-    {
-        return;
-    }
-
-    const char *eventType = inboundDoc["data"]["type"].as<const char *>();
-    if (!eventType)
-    {
-        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
-        return;
-    }
-
-    const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
-        strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
-        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
-    const bool isActionFormRequest = strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0;
-    const uint32_t requestId = inboundDoc["data"]["payload"]["requestId"] | 0u;
-    // A cancelled/timed-out request must not complete a later action, even on
-    // the same resource. Untagged replies remain compatible with older APIs.
-    if ((isActionResponse || isActionFormRequest) && !isCurrentResourceAction(requestId)) {
-        this->sendAck(eventType);
-        return;
-    }
-
-    // Crash-report responses carry their own error codes (e.g. INVALID_CRASH_REPORT)
-    // that must not surface as a user-facing error dialog; route them to the handler.
-    bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
-
-    // Enrollment key-request errors (e.g. CARD_ALREADY_ENROLLED) must reach the
-    // enrollment handler so it can show the in-screen message and re-arm card
-    // detection. The generic interceptor would otherwise pop a generic dialog
-    // and return before recovery runs, wedging the reader with detection off
-    // until enrollment times out (ATT-503).
-    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
-
-    // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
-    // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
-    // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
-    bool isSupervisionEvent = strcmp(eventType, "SUPERVISION_REQUEST") == 0 ||
-                              strcmp(eventType, "SUPERVISION_START") == 0 ||
-                              strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
-                              strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
-
-    // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    // Background stats failures must not interrupt start/stop controls with a popup.
-    const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
-    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
-        inboundDoc["data"]["payload"].is<JsonObject>())
-    {
-        JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
-        if (payload["error"].is<const char *>())
-        {
-            std::string err = payload["error"].as<std::string>();
-            if (err.length() > 0)
-            {
-                if (isActionResponse && this->actionResultCallback) {
-                    this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
-                    this->sendAck(eventType);
-                    return;
-                }
-                // Special-case insufficient balance: propagate sumUpEnabled flag if present
-                if (err == "INSUFFICIENT_BALANCE")
-                {
-                    bool sumUpEnabled = payload["sumUpEnabled"].is<bool>() ? payload["sumUpEnabled"].as<bool>() : false;
-                    if (this->insufficientBalanceCallback)
-                    {
-                        this->insufficientBalanceCallback(sumUpEnabled);
-                    }
-                }
-                else
-                {
-                    if (this->errorCallback)
-                    {
-                        this->errorCallback("Fehler", translateReaderError(err).c_str());
-                    }
-                }
-                // Do not process further
-                this->sendAck(eventType);
-                return;
-            }
-        }
-    }
-
-    this->sendAck(eventType);
-
-    if (strcmp(eventType, "READER_REGISTER") == 0)
-    {
-        this->onRegistrationData(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "READER_UNAUTHORIZED") == 0)
-    {
-        this->onUnauthorized(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "READER_AUTHENTICATED") == 0)
-    {
-        this->onReaderAuthenticated(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
-    {
-        this->sendAuthenticationRequest();
-    }
-    else if (strcmp(eventType, "RESOURCE_USAGE_STATS") == 0)
-    {
-        this->onUsageStats(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "RESOURCE_LIST") == 0)
-    {
-        this->onResourceList(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "CARD_AUTHENTICATION_DATA") == 0)
-    {
-        this->onCardAuthenticationDetailsResponse(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "SUPERVISION_REQUEST") == 0)
-    {
-        this->onSupervisionRequestResult(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "SUPERVISION_START") == 0)
-    {
-        this->onSupervisionStart(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0)
-    {
-        this->onSupervisorCardAuthenticationData(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "SUPERVISION_RESOLVED") == 0)
-    {
-        this->onSupervisionResolved(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO") == 0)
-    {
-        this->onEnrollNewCardGetAvailableKeyNo(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "ENROLL_NEW_CARD") == 0)
-    {
-        this->onEnrollNewCard(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0)
-    {
-        // The server only sends us this event to report an error; the happy
-        // path responds with ENROLL_NEW_CARD instead.
-        this->onEnrollNewCardRequestNFCKeyError(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "RESET_NFC_CARD") == 0)
-    {
-        this->onResetNfcCard(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (
-        strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(eventType, "LOCK_DOOR") == 0 ||
-        strcmp(eventType, "UNLOCK_DOOR") == 0 ||
-        strcmp(eventType, "UNLATCH_DOOR") == 0 ||
-        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0)
-    {
-        // Generic action result handling
-        bool success = false;
-        if (inboundDoc["data"]["payload"].is<JsonObject>())
-        {
-            JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
-            if (payload["success"].is<bool>())
-            {
-                success = payload["success"].as<bool>();
-            }
-        }
-        if (this->actionResultCallback)
-        {
-            ActionResult result{eventType, success, requestId, {}, false};
-            JsonObject summary = inboundDoc["data"]["payload"]["billingSummary"].as<JsonObject>();
-            if (success && strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 &&
-                summary["amount"].is<int64_t>() && summary["amount"].as<int64_t>() != 0 &&
-                summary["total"].is<const char *>())
-                result.billingTotal = summary["total"].as<std::string>();
-            this->actionResultCallback(result);
-        }
-    }
-    else if (strcmp(eventType, "READER_FIRMWARE_UPDATE_REQUIRED") == 0)
-    {
-#ifdef ATTRACTAP_HOST
-        // The simulator deliberately cannot alter firmware, flash, or boot state.
-        logger.error("Firmware updates are unsupported by the desktop simulator");
-        if (this->errorCallback)
-            this->errorCallback("Firmware update", "Firmware updates are not available in the desktop simulator.");
-#else
-        // Initialize OTA from metadata and request first chunk
-        JsonObject fw = inboundDoc["data"]["payload"]["available"].as<JsonObject>();
-        if (fw.isNull())
-        {
-            logger.error("Firmware update required event missing available firmware payload");
-            return;
-        }
-        this->firmware.begin(fw);
-#endif
-    }
-    else if (strcmp(eventType, "PROJECTS_OF_USER") == 0)
-    {
-        this->onProjectsOfUserResponse(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "READER_CRASH_REPORT") == 0)
-    {
-        this->onCrashReportResponse(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0)
-    {
-        this->onResourceUsageFormRequest(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "RESOURCE_USAGE_FORM_FIELDS") == 0)
-    {
-        this->onResourceUsageFormFields(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "RESOURCE_USAGE_FORM_PAGE_RESULT") == 0)
-    {
-        this->onResourceUsageFormPageResult(inboundDoc["data"].as<JsonObject>());
-    }
-    else
-    {
-        logger.error((std::string("Unknown event type: ") + eventType).c_str());
-    }
-}
 
 void API::setErrorCallback(std::function<void(const char *title, const char *message)> callback)
 {
@@ -364,34 +131,6 @@ bool API::sendMessage(const char *type, JsonObject payload)
     return this->transport.sendMessage(json.get(), n);
 }
 
-void API::sendHeartbeat()
-{
-    // send every 5 seconds
-    if (this->firmware.inProgress())
-    {
-        // Suppress heartbeats during OTA to avoid websocket contention
-        return;
-    }
-    if (this->heartbeat_sent_at != 0 && millis() - this->heartbeat_sent_at < (1000 * 5))
-    {
-        return;
-    }
-
-    JsonDocument event;
-    event["event"] = "HEARTBEAT";
-
-    char json[JSON_OUTBUF_SMALL];
-    size_t n = serializeJson(event, json, sizeof(json));
-    if (n == 0)
-    {
-        this->logger.error("Failed to serialize heartbeat");
-        return;
-    }
-    this->logger.info("Sending reader heartbeat");
-    this->transport.sendHeartbeat(json, n);
-
-    this->heartbeat_sent_at = millis();
-}
 
 void API::disableConnectionAttempts()
 {
@@ -408,3 +147,15 @@ void API::resetCertificateTrust()
 {
     this->transport.resetCertificateTrust();
 }
+
+API::API(IReaderTransport &transport) : logger("API"),
+             transport(transport),
+            firmware(
+                logger,
+                [this](const char *type, JsonObject payload)
+                { return this->sendMessage(type, payload); },
+                [this](const char *reason)
+                { this->transport.forceReconnect(reason); },
+                firmwareUpdateProgressCallback,
+                firmwareUpdateMetaCallback,
+                errorCallback) {}

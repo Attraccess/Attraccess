@@ -18,16 +18,7 @@ import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-error
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
 import de from './de.json';
-
-/** Mirrors the API's `@IsUrl()`: a full absolute URL, scheme included. */
-const isAbsoluteUrl = (value: string) => {
-  try {
-    const { protocol } = new URL(value);
-    return protocol === 'http:' || protocol === 'https:';
-  } catch {
-    return false;
-  }
-};
+import { isAbsoluteUrl } from './index.is-absolute-url';
 
 export function GeneralSection() {
   const { t, tExists } = useTranslations({
@@ -187,12 +178,7 @@ export function GeneralSection() {
         <input type="submit" hidden />
       </Form>
 
-      <SettingsSaveBar
-        isDirty={isDirty}
-        isSaving={isSaving}
-        onSave={handleSave}
-        onDiscard={() => setDraft({})}
-      />
+      <SettingsSaveBar isDirty={isDirty} isSaving={isSaving} onSave={handleSave} onDiscard={() => setDraft({})} />
     </SettingsSection>
   );
 }

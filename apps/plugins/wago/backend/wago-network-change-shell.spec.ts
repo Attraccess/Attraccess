@@ -2,12 +2,21 @@ import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
-import { networkChangeDeviceProgram, networkChangeShell } from './wago-network-change-shell';
+import { networkChangeDeviceProgram } from './wago-network-change-shell';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
+import { registerRecreatesTheInstalledImageWithPersistentCredentialsPreservingStateHardwareMountsTlsAndR } from './wago-network-change-shell.recreates-the-installed-image-with-persistent-credentials-preserving-state-hardware-mounts-tls-and-r.test-cases';
+import { registerRollsForwardAfterInterruptionBetweenContainerDeletionAndRecreation } from './wago-network-change-shell.rolls-forward-after-interruption-between-container-deletion-and-recreation.test-cases';
+import { registerMakesThePublicBrokerCaReadableByTheNonRootRuntimeWhileKeepingCredentialsPrivate } from './wago-network-change-shell.makes-the-public-broker-ca-readable-by-the-non-root-runtime-while-keeping-credentials-private.test-cases';
+import { registerRejectsAStateFileSymlinkWithoutModifyingItsTargetOrRecreatingAContainer } from './wago-network-change-shell.rejects-a-state-file-symlink-without-modifying-its-target-or-recreating-a-container.test-cases';
+import { registerAcquiresTheInstallationLockVerifiesPayloadIntegrityBeforeStoppingAndStartsViaTheExistin } from './wago-network-change-shell.acquires-the-installation-lock-verifies-payload-integrity-before-stopping-and-starts-via-the-existin.test-cases';
+import { registerReleasesOnlyTheSupersededJournalAndPreservesAnInterruptedReplacementOnEveryRetry } from './wago-network-change-shell.releases-only-the-superseded-journal-and-preserves-an-interrupted-replacement-on-every-retry.test-cases';
+import { registerExecutesTheCompleteStreamedHelperTransactionAndSupervisorHandoffThenAcknowledgesIdempoten } from './wago-network-change-shell.executes-the-complete-streamed-helper-transaction-and-supervisor-handoff-then-acknowledges-idempoten.test-cases';
 
 describe('fixed MQTT recreation program and durable state', () => {
+  defineFixedMqttRecreationProgramAndDurableStateTests();
+});
+
+export function defineFixedMqttRecreationProgramAndDurableStateTests() {
   let fixture: ReturnType<typeof fw31ShellFixture>;
   let original: Record<string, unknown>, current: typeof original | null, created: typeof original | null;
   let requests: string[], interruptCreate: boolean;
@@ -157,240 +166,74 @@ describe('fixed MQTT recreation program and durable state', () => {
     runInNewContext(code, sandbox);
     await sandbox.result;
   }
+  const scope = {
+    get run() {
+      return run;
+    },
+    get fixture() {
+      return fixture;
+    },
+    set fixture(value: typeof fixture) {
+      fixture = value;
+    },
+    get state() {
+      return state;
+    },
+    get payload() {
+      return payload;
+    },
+    get created() {
+      return created;
+    },
+    set created(value: typeof created) {
+      created = value;
+    },
+    get image() {
+      return image;
+    },
+    get original() {
+      return original;
+    },
+    set original(value: typeof original) {
+      original = value;
+    },
+    get requests() {
+      return requests;
+    },
+    set requests(value: typeof requests) {
+      requests = value;
+    },
+    get interruptCreate() {
+      return interruptCreate;
+    },
+    set interruptCreate(value: typeof interruptCreate) {
+      interruptCreate = value;
+    },
+    get current() {
+      return current;
+    },
+    set current(value: typeof current) {
+      current = value;
+    },
+  };
 
-  it('recreates the installed image with persistent credentials, preserving state, hardware, mounts, TLS and required environment', async () => {
-    await run();
-    const saved = JSON.parse(fixture.read('var/lib/attraccess-wago/state.json'));
-    expect(saved).toEqual({
-      ...state,
-      credentials: { ...state.credentials, password: payload.password, credentialEpoch: payload.credentialEpoch },
-      credentialRotation: { revision: 1, token: payload.token },
-    });
-    const spec = created as {
-      Image: string;
-      Env: string[];
-      HostConfig: Record<string, unknown>;
-      Cmd: string[];
-      Labels: Record<string, string>;
-    };
-    expect(spec.Image).toBe(image);
-    expect(spec.Cmd).toEqual(['node', 'main.cjs']);
-    expect(spec.Labels).toMatchObject({
-      installed: 'original',
-      'io.attraccess.wago.network-token': payload.operationToken,
-    });
-    expect(spec.HostConfig).toEqual({
-      ...(original.HostConfig as object),
-      Binds: [
-        '/var/lib/attraccess-wago:/var/lib/attraccess-wago',
-        '/custom/cert:/custom/cert:ro',
-        '/etc/attraccess-wago/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro',
-      ],
-    });
-    expect(spec.Env).toEqual(
-      expect.arrayContaining([
-        'WAGO_ENROLLMENT_SECRET=preserved-secret',
-        'WAGO_PAIRING_CODE=123456',
-        'EXTRA=keep-me',
-        `WAGO_MQTT_URL=${payload.url}`,
-        `WAGO_MQTT_PASSWORD=${payload.password}`,
-        'WAGO_MQTT_TLS_SERVERNAME=broker.internal',
-        'WAGO_MQTT_USE_ENV_CREDENTIALS=false',
-      ]),
-    );
-    expect(fixture.read('etc/attraccess-wago/runtime.env')).toContain(`WAGO_MQTT_URL=${payload.url}\n`);
-    expect(fixture.read('etc/attraccess-wago/runtime-ca.pem')).toBe(payload.caCert);
-    expect(requests.map((request) => request.split(' ')[0])).toEqual(['GET', 'DELETE', 'POST']);
-    // A reboot/recreation reads permanent credentials from this same persisted
-    // state rather than reverting to the earlier environment's enrollment login.
-    await run();
-    expect(requests.filter((request) => request.startsWith('POST'))).toHaveLength(1);
-    const rebooted = JSON.parse(fixture.read('var/lib/attraccess-wago/state.json'));
-    expect(rebooted.credentials).toEqual({
-      ...state.credentials,
-      password: payload.password,
-      credentialEpoch: payload.credentialEpoch,
-    });
-    expect(rebooted.accepted).toEqual(state.accepted);
-  });
+  registerRecreatesTheInstalledImageWithPersistentCredentialsPreservingStateHardwareMountsTlsAndR(scope);
 
-  it('rolls forward after interruption between container deletion and recreation', async () => {
-    interruptCreate = true;
-    await expect(run()).rejects.toThrow('interrupted');
-    expect(current).toBeNull();
-    expect(JSON.parse(fixture.read('var/lib/attraccess-wago/state.json')).credentials.password).toBe(payload.password);
-    interruptCreate = false;
-    await run();
-    expect(created).toMatchObject({ Image: image, HostConfig: { RestartPolicy: { Name: 'no' } } });
-    expect(JSON.parse(fixture.read('var/lib/attraccess-wago/state.json')).accepted).toEqual(state.accepted);
-  });
+  registerRollsForwardAfterInterruptionBetweenContainerDeletionAndRecreation(scope);
 
-  it('makes the public broker CA readable by the non-root runtime while keeping credentials private', async () => {
-    await run();
-    const mode = (path: string) => fs.statSync(join(fixture.root, path)).mode & 0o777;
-    expect(mode('etc/attraccess-wago/runtime-ca.pem')).toBe(0o444);
-    expect(mode('etc/attraccess-wago/runtime.env')).toBe(0o600);
-    expect(mode('var/lib/attraccess-wago/state.json')).toBe(0o600);
-  });
+  registerMakesThePublicBrokerCaReadableByTheNonRootRuntimeWhileKeepingCredentialsPrivate(scope);
 
-  it('rejects a state-file symlink without modifying its target or recreating a container', async () => {
-    const statePath = join(fixture.root, 'var/lib/attraccess-wago/state.json');
-    fs.renameSync(statePath, statePath + '.saved');
-    fs.symlinkSync(statePath + '.saved', statePath);
-    await expect(run()).rejects.toThrow();
-    expect(JSON.parse(fs.readFileSync(statePath + '.saved', 'utf8'))).toEqual(state);
-    expect(requests).toEqual([]);
-  });
+  registerRejectsAStateFileSymlinkWithoutModifyingItsTargetOrRecreatingAContainer(scope);
 
-  it('acquires the installation lock, verifies payload integrity before stopping, and starts via the existing supervisor', () => {
-    fs.rmSync(join(fixture.root, 'var/lib/attraccess-wago-network-transaction'), { recursive: true });
-    fixture.file('etc/attraccess-wago/install.lock', '');
-    fixture.file('etc/attraccess-wago-management/token', 'a'.repeat(32));
-    const input = Buffer.from(JSON.stringify(payload)),
-      digest = createHash('sha256').update(input).digest('hex');
-    const script =
-      `token=${'a'.repeat(32)}; digest=${digest}; bytes=${input.length};\n` + networkChangeShell('apply', fixture.root);
-    expect(spawnSync('/bin/sh', ['-n'], { input: script }).status).toBe(0);
-    const result = fixture.run(script, '', Buffer.from('invalid'));
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('MQTT payload size mismatch');
-    expect(fs.existsSync(join(fixture.root, 'docker.log'))).toBe(false);
-    expect(script).toContain('timeout -k 5 310 flock 9');
-    expect(script).toContain('launch_runtime_supervisor');
-    expect(script).not.toContain('docker restart');
-  });
+  registerAcquiresTheInstallationLockVerifiesPayloadIntegrityBeforeStoppingAndStartsViaTheExistin(scope);
 
-  it('releases only the superseded journal and preserves an interrupted replacement on every retry', () => {
-    const journal = 'var/lib/attraccess-wago-network-transaction';
-    fixture.file('etc/attraccess-wago/install.lock', '');
-    fixture.file('etc/attraccess-wago-management/token', 'a'.repeat(32));
-    const previous = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
-    const nextPayload = JSON.stringify({
-      ...payload,
-      operationToken: 'e'.repeat(32),
-      url: 'mqtt://corrected.test:1883',
-    });
-    const next = createHash('sha256').update(nextPayload).digest('hex');
-    fixture.file(`${journal}/digest`, previous);
-    const release =
-      `token=${'a'.repeat(32)}; digest=${previous}; bytes=${next};\n` + networkChangeShell('release', fixture.root);
-    for (let i = 0; i < 2; i++) {
-      const result = fixture.run(release);
-      expect({ status: result.status, stderr: result.stderr, stdout: result.stdout }).toEqual({
-        status: 0,
-        stderr: '',
-        stdout: 'OK\n',
-      });
-      expect(fs.existsSync(join(fixture.root, journal))).toBe(false);
-    }
-    for (const [field, content] of Object.entries({
-      digest: next,
-      payload: nextPayload,
-      'container.json': JSON.stringify([original]),
-      'ca-source': '/etc/attraccess-wago/runtime-ca.pem\n',
-    }))
-      fixture.file(`${journal}/${field}`, content);
-    for (let i = 0; i < 2; i++) {
-      const result = fixture.run(release);
-      expect({ status: result.status, stderr: result.stderr, stdout: result.stdout }).toEqual({
-        status: 0,
-        stderr: '',
-        stdout: 'OK\n',
-      });
-      expect(fixture.read(`${journal}/payload`)).toBe(nextPayload);
-    }
-    fixture.file(`${journal}/digest`, 'f'.repeat(64));
-    expect(fixture.run(release).status).not.toBe(0);
-    expect(fixture.read(`${journal}/payload`)).toBe(nextPayload);
-  });
+  registerReleasesOnlyTheSupersededJournalAndPreservesAnInterruptedReplacementOnEveryRetry(scope);
 
-  it('executes the complete streamed helper transaction and supervisor handoff, then acknowledges idempotently', () => {
-    const journal = 'var/lib/attraccess-wago-network-transaction';
-    fs.rmSync(join(fixture.root, journal), { recursive: true });
-    fixture.file('etc/attraccess-wago/install.lock', '');
-    fixture.file('etc/attraccess-wago-management/token', 'a'.repeat(32));
-    fixture.file('etc/attraccess-wago/runtime-enabled', '');
-    fixture.file(
-      'owners.json',
-      JSON.stringify({ ...JSON.parse(fixture.read('owners.json')), '/var/lib/attraccess-wago': '10001:10001' }),
-    );
-    fixture.setContainers([{ id: 'old-id', name: 'attraccess-wago', running: true, restart: 'no', imageId: image }]);
-    original.Id = Buffer.from('old-id').toString('hex').padEnd(64, '0');
-    fixture.file('network-container.json', JSON.stringify(original));
-    fixture.file(
-      'bin/nohup',
-      fixture
-        .read('bin/nohup')
-        .replace(
-          'config="$FIXTURE_ROOT/etc/attraccess-wago"',
-          '"$1" cycle >/dev/null\nconfig="$FIXTURE_ROOT/etc/attraccess-wago"',
-        ),
-      0o700,
-    );
-    fs.renameSync(join(fixture.root, 'bin/docker'), join(fixture.root, 'bin/docker.original'));
-    // Execute the fixed production Node program with isolated files and a
-    // synthetic Docker API. All other CLI and supervisor checks use FW31 shims.
-    fixture.file(
-      'bin/docker',
-      `#!${process.execPath}
-const fs = require('node:fs'), cp = require('node:child_process'), root = process.env.FIXTURE_ROOT, args = process.argv.slice(2);
-if (args[2] === 'inspect' && !args.includes('--format')) {
-  process.stdout.write(JSON.stringify([JSON.parse(fs.readFileSync(root + '/network-container.json'))]));
-} else if (args[2] === 'run' && args.includes('--entrypoint')) {
-  const program = fs.readFileSync(0, 'utf8').replace("const tx = '/transaction', config = '/configuration', data = '/data';",
-    'const tx=' + JSON.stringify(root + '/${journal}') + ', config=' + JSON.stringify(root + '/etc/attraccess-wago') + ', data=' + JSON.stringify(root + '/var/lib/attraccess-wago') + ';');
-  const prelude = ${JSON.stringify(String.raw`
-const fixtureFs = require('node:fs'), fixtureHttp = require('node:http'), fixtureEvents = require('node:events');
-const fixtureRoot = process.env.FIXTURE_ROOT;
-fixtureFs.fchownSync = () => {};
-fixtureHttp.request = (options, callback) => {
-  const req = new fixtureEvents.EventEmitter(); req.setTimeout = () => {}; req.destroy = () => {};
-  req.end = body => {
-    const path = fixtureRoot + '/containers.json', containers = JSON.parse(fixtureFs.readFileSync(path)), original = JSON.parse(fixtureFs.readFileSync(fixtureRoot + '/network-container.json'));
-    const c = containers.find(c => c.name === 'attraccess-wago'); let code = 0, output = null;
-    if (options.method === 'GET') {
-      code = c ? 200 : 404;
-      if (c) output = { ...original, Id: Buffer.from(c.id).toString('hex').padEnd(64, '0'), State: { Running: c.running },
-        Config: c.networkToken ? JSON.parse(fixtureFs.readFileSync(fixtureRoot + '/network-create-spec.json')) : original.Config };
-    }
-    if (options.method === 'DELETE') { code = 204; fixtureFs.writeFileSync(path, '[]'); }
-    if (options.method === 'POST') {
-      const spec = JSON.parse(body); code = 201; output = { Id: 'new-id' };
-      fixtureFs.writeFileSync(fixtureRoot + '/network-create-spec.json', body);
-      fixtureFs.writeFileSync(path, JSON.stringify([{ id: 'new-id', name: 'attraccess-wago', imageId: spec.Image, running: false, restart: 'no', networkToken: spec.Labels['io.attraccess.wago.network-token'] }]));
-    }
-    setImmediate(() => { const res = Object.assign(new fixtureEvents.EventEmitter(), { statusCode: code }); callback(res);
-      if (output) res.emit('data', Buffer.from(JSON.stringify(output))); res.emit('end'); });
-  }; return req;
-};
-`)};
-  const result = cp.spawnSync(process.execPath, ['-e', prelude + program], { env: process.env, stdio: 'inherit' });
-  process.exitCode = result.status;
-} else {
-  const result = cp.spawnSync(root + '/bin/docker.original', args, { env: process.env, stdio: 'inherit' }); process.exitCode = result.status;
+  registerExecutesTheCompleteStreamedHelperTransactionAndSupervisorHandoffThenAcknowledgesIdempoten(scope);
+
+  return scope;
 }
-`,
-      0o700,
-    );
-    const input = Buffer.from(JSON.stringify(payload)),
-      digest = createHash('sha256').update(input).digest('hex');
-    const vars = `token=${'a'.repeat(32)}; digest=${digest}; bytes=${input.length};\n`;
-    const result = fixture.run(vars + networkChangeShell('apply', fixture.root), '', input);
-    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
-    expect(result.stdout).toBe('OK\n');
-    expect(fixture.containers()).toEqual([
-      expect.objectContaining({ name: 'attraccess-wago', imageId: image, running: true, restart: 'no' }),
-    ]);
-    expect(JSON.parse(fixture.read('var/lib/attraccess-wago/state.json')).credentials.password).toBe(payload.password);
-    expect(fixture.read('supervisor.log')).toContain('supervise');
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const ack = fixture.run(vars + networkChangeShell('ack', fixture.root));
-      expect({ status: ack.status, stderr: ack.stderr, stdout: ack.stdout }).toEqual({
-        status: 0,
-        stderr: '',
-        stdout: 'OK\n',
-      });
-    }
-    expect(fs.existsSync(join(fixture.root, journal))).toBe(false);
-  });
-});
+
+export type FixedMqttRecreationProgramAndDurableStateTestScope = ReturnType<
+  typeof defineFixedMqttRecreationProgramAndDurableStateTests
+>;

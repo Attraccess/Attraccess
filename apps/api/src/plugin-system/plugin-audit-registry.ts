@@ -12,8 +12,8 @@
  */
 
 import {
-  PluginAuditDomainDeclaration,
   PLUGIN_AUDIT_DOMAIN_PATTERN,
+  PluginAuditDomainDeclaration,
   validatePluginAuditDomainDeclaration,
 } from '@attraccess/plugins-backend-sdk';
 import { CORE_AUDIT_DOMAINS } from '../audit/audit-domains';

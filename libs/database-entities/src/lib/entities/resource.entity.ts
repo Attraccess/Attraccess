@@ -1,36 +1,34 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  OneToMany,
-  ManyToMany,
-  ManyToOne,
-  JoinColumn,
-  JoinTable,
   DeleteDateColumn,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { DocumentationType } from '../types/documentationType.enum';
+import { Attractap } from './attractap.entity';
+import { Form } from './form';
+import { ResourceAccessPolicy } from './resource-access-policy';
+import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
+import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
+import { ResourceOperatingInterval } from './resource-operating-interval.entity';
+import { ResourceMaintenance } from './resource.maintenance';
+import { ResourceType } from './resource.type';
+import { ResourceFlowEdge } from './resourceFlowEdge';
+import { ResourceFlowNode } from './resourceFlowNode';
+import { ResourceFlowVariable } from './resourceFlowVariable';
+import { ResourceGroup } from './resourceGroup.entity';
+import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { ResourceUsage } from './resourceUsage.entity';
-import { ResourceIntroducer } from './resourceIntroducer.entity';
-import { ResourceGroup } from './resourceGroup.entity';
-import { DocumentationType } from '../types/documentationType.enum';
-import { ResourceFlowNode } from './resourceFlowNode';
-import { ResourceFlowEdge } from './resourceFlowEdge';
-import { ResourceFlowVariable } from './resourceFlowVariable';
-import { Attractap } from './attractap.entity';
-import { ResourceMaintenance } from './resource.maintenance';
-import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
-import { ResourceType } from './resource.type';
-import { SupervisionMode, AutoIntroductionTarget } from './resource.supervision';
-import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
-import { Form } from './form';
-import { ResourceOperatingInterval } from './resource-operating-interval.entity';
 
 @Entity()
-export class Resource {
+export class Resource extends ResourceAccessPolicy {
   @PrimaryGeneratedColumn()
   @ApiProperty({
     description: 'The unique identifier of the resource',
@@ -103,97 +101,6 @@ export class Resource {
     example: 'https://example.com/documentation',
   })
   documentationUrl!: string | null;
-
-  @Column({ type: 'boolean', default: false })
-  @ApiProperty({
-    description: 'Whether this resource allows overtaking by the next user without the prior user ending their session',
-    example: false,
-    default: false,
-  })
-  allowTakeOver!: boolean;
-
-  @Column({ type: 'integer', nullable: true })
-  @ApiProperty({
-    description:
-      'Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.',
-    example: 365,
-    required: false,
-    nullable: true,
-  })
-  retrainingMaxAgeDays!: number | null;
-
-  @Column({ type: 'integer', nullable: true })
-  @ApiProperty({
-    description:
-      'Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.',
-    example: 180,
-    required: false,
-    nullable: true,
-  })
-  retrainingMaxInactivityDays!: number | null;
-
-  @Column({ type: 'boolean', default: false })
-  @ApiProperty({
-    description: 'Whether to block resource access once retraining is due until the user is retrained',
-    example: false,
-    default: false,
-  })
-  retrainingBlocksAccess!: boolean;
-
-  @Column({
-    type: 'simple-enum',
-    enum: SupervisionMode,
-    default: SupervisionMode.INTRODUCTION_REQUIRED,
-  })
-  @ApiProperty({
-    description: 'Controls who may start a usage session on this resource',
-    enum: SupervisionMode,
-    enumName: 'SupervisionMode',
-    example: SupervisionMode.INTRODUCTION_REQUIRED,
-    default: SupervisionMode.INTRODUCTION_REQUIRED,
-  })
-  supervisionMode!: SupervisionMode;
-
-  @Column({ type: 'integer', nullable: true })
-  @ApiProperty({
-    description:
-      'Automatically create an introduction after this many supervised sessions. Null disables auto-promotion.',
-    example: 3,
-    required: false,
-    nullable: true,
-  })
-  supervisedUsagesUntilIntroduction!: number | null;
-
-  @Column({ type: 'simple-enum', enum: AutoIntroductionTarget, nullable: true })
-  @ApiProperty({
-    description: 'Target of the auto-created introduction once the supervised-usage threshold is reached',
-    enum: AutoIntroductionTarget,
-    enumName: 'AutoIntroductionTarget',
-    example: AutoIntroductionTarget.RESOURCE,
-    required: false,
-    nullable: true,
-  })
-  autoIntroductionTarget!: AutoIntroductionTarget | null;
-
-  @Column({ type: 'integer', nullable: true })
-  @ApiProperty({
-    description: 'The group the auto-introduction targets when autoIntroductionTarget is GROUP',
-    example: 1,
-    required: false,
-    nullable: true,
-  })
-  autoIntroductionGroupId!: number | null;
-
-  @ManyToOne(() => ResourceGroup, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'autoIntroductionGroupId' })
-  @ApiProperty({
-    description: 'The group the auto-introduction targets when autoIntroductionTarget is GROUP',
-    type: () => ResourceGroup,
-    required: false,
-    nullable: true,
-  })
-  autoIntroductionGroup!: ResourceGroup | null;
-
   @Column({ type: 'json', nullable: true })
   @ApiProperty({
     description: 'Custom metadata key-value pairs configured for this resource',
@@ -243,7 +150,6 @@ export class Resource {
 
   @OneToMany(() => ResourceFlowVariable, (variable) => variable.resource)
   flowVariables!: ResourceFlowVariable[];
-
 
   @OneToMany(() => ResourceIntroducer, (introducer) => introducer.resource)
   introducers!: ResourceIntroducer[];

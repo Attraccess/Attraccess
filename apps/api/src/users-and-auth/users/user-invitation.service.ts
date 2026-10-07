@@ -1,34 +1,31 @@
-import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { User } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-import { parse as parseCsv } from 'csv-parse';
-import { Readable } from 'stream';
-import { plainToInstance } from 'class-transformer';
-import { validate, isEmail } from 'class-validator';
-import { UsersService } from './users.service';
-import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
+import { AuthService } from '../auth/auth.service';
 import { InviteUserDto } from './dtos/inviteUser.dto';
-import { CsvInviteConfigDto, CsvInviteRowErrorDto } from './dtos/csvInvite.dto';
-import { FileUpload } from '../../common/types/file-upload.types';
 import { mapEmailSendError } from './email-send-error.util';
+import { InvitationCsvImportImplementation } from './invitation-csv-import';
+import { UsersService } from './users.service';
 
 /**
  * Single and bulk (CSV) user invitations, including CSV parsing/validation and
  * the transactional create-and-invite flow.
  */
 @Injectable()
-export class UserInvitationService {
-  private readonly logger = new Logger(UserInvitationService.name);
+export class UserInvitationService extends InvitationCsvImportImplementation {
+  protected readonly logger = new Logger(UserInvitationService.name);
 
   constructor(
-    private readonly usersService: UsersService,
+    protected readonly usersService: UsersService,
     @Inject(forwardRef(() => AuthService))
-    private readonly authService: AuthService,
-    private readonly emailService: EmailService,
-  ) {}
+    protected readonly authService: AuthService,
+    protected readonly emailService: EmailService,
+  ) {
+    super();
+  }
 
-  private async inviteUsersTransactional(
+  protected async inviteUsersTransactional(
     candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
   ): Promise<User[]> {
@@ -52,161 +49,6 @@ export class UserInvitationService {
       .catch((error) => mapEmailSendError(error));
   }
 
-  public async parseCsvFile(
-    file: FileUpload | undefined,
-    config: CsvInviteConfigDto,
-  ): Promise<{
-    candidates: Array<{ username: string; email: string; row: number }>;
-    errors: CsvInviteRowErrorDto[];
-    emailRowMap: Map<string, number[]>;
-    usernameRowMap: Map<string, number[]>;
-  }> {
-    if (!file) {
-      throw new BadRequestException('CSV file is required');
-    }
-
-    const inputStream = file.buffer ? Readable.from(file.buffer) : undefined;
-    if (!inputStream) {
-      throw new BadRequestException('Unable to read CSV file');
-    }
-
-    const parser = parseCsv({
-      bom: true,
-      columns: true,
-      relax_column_count: true,
-      skip_empty_lines: false,
-      trim: true,
-    });
-
-    let header: string[] | null = null;
-    const candidates: Array<{
-      username: string;
-      email: string;
-      row: number;
-      roleKey?: string;
-    }> = [];
-    const errors: CsvInviteRowErrorDto[] = [];
-    const ignoredRows = new Set(config.ignoredRows ?? []);
-    const seenEmails = new Set<string>();
-    const seenUsernames = new Set<string>();
-    const emailRowMap = new Map<string, number[]>();
-    const usernameRowMap = new Map<string, number[]>();
-
-    let dataRowIndex = 0;
-
-    try {
-      for await (const record of inputStream.pipe(parser)) {
-        header = header ?? Object.keys(record ?? {});
-
-        dataRowIndex += 1;
-        const rowNumber = dataRowIndex;
-
-        if (ignoredRows.has(rowNumber)) {
-          continue;
-        }
-
-        const rowData: Record<string, string> = {};
-        (header ?? []).forEach((headerLabel) => {
-          const rawValue = record?.[headerLabel];
-          rowData[headerLabel] = rawValue == null ? '' : String(rawValue).trim();
-        });
-
-        const isEmptyRow = Object.values(rowData).every((value) => value === '');
-        if (isEmptyRow) {
-          errors.push({ row: rowNumber, message: 'Row is empty' });
-          continue;
-        }
-
-        const rowErrors: CsvInviteRowErrorDto[] = [];
-
-        const { email, normalizedUsername } = this.validateCsvIdentity(rowData, config, rowNumber, rowErrors);
-
-        const emailKey = email.toLowerCase();
-        if (email && seenEmails.has(emailKey)) {
-          rowErrors.push({ row: rowNumber, field: 'email', message: 'DUPLICATE_IN_CSV', value: email });
-        } else if (email) {
-          seenEmails.add(emailKey);
-          emailRowMap.set(emailKey, [...(emailRowMap.get(emailKey) ?? []), rowNumber]);
-        }
-
-        if (normalizedUsername && seenUsernames.has(normalizedUsername)) {
-          rowErrors.push({
-            row: rowNumber,
-            field: 'username',
-            message: 'DUPLICATE_IN_CSV',
-            value: normalizedUsername,
-          });
-        } else if (normalizedUsername) {
-          seenUsernames.add(normalizedUsername);
-          usernameRowMap.set(normalizedUsername, [...(usernameRowMap.get(normalizedUsername) ?? []), rowNumber]);
-        }
-
-        if (rowErrors.length) {
-          errors.push(...rowErrors);
-          continue;
-        }
-
-        const roleKey = config.roleKeyColumn ? (rowData[config.roleKeyColumn] ?? '').trim() || undefined : undefined;
-        candidates.push({
-          username: normalizedUsername,
-          email,
-          row: rowNumber,
-          roleKey,
-        });
-      }
-    } catch (error) {
-      this.logger.error('Failed to parse CSV', error as Error);
-      throw new BadRequestException('Invalid CSV file');
-    }
-
-    if (!header || header.every((value) => `${value}`.trim() === '')) {
-      throw new BadRequestException('MISSING_HEADER_ROW');
-    }
-
-    const requiredColumns = new Set([config.emailKey, config.usernameKey]);
-
-    requiredColumns.forEach((column) => {
-      if (column && !header?.includes(column)) {
-        errors.push({ row: 0, field: column, message: 'REQUIRED' });
-      }
-    });
-
-    return { candidates, errors, emailRowMap, usernameRowMap };
-  }
-
-  private validateCsvIdentity(
-    rowData: Record<string, string>,
-    config: CsvInviteConfigDto,
-    rowNumber: number,
-    rowErrors: CsvInviteRowErrorDto[],
-  ): { email: string; normalizedUsername: string } {
-    const email = (rowData[config.emailKey] ?? '').trim();
-    if (!email) {
-      rowErrors.push({ row: rowNumber, field: 'email', message: 'REQUIRED' });
-    } else if (!isEmail(email)) {
-      rowErrors.push({ row: rowNumber, field: 'email', message: 'INVALID', value: email });
-    }
-
-    const usernameOriginal = (rowData[config.usernameKey] ?? '').trim();
-    let normalizedUsername = '';
-    if (!usernameOriginal) {
-      rowErrors.push({ row: rowNumber, field: 'username', message: 'REQUIRED' });
-    } else {
-      normalizedUsername = this.usersService.cleanupUsername(usernameOriginal);
-      try {
-        this.usersService.validateUsernameOrThrow(normalizedUsername);
-      } catch (error) {
-        rowErrors.push({
-          row: rowNumber,
-          field: 'username',
-          message: (error as Error).message ?? 'INVALID',
-          value: usernameOriginal,
-        });
-      }
-    }
-    return { email, normalizedUsername };
-  }
-
   public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
     try {
       const [invited] = await this.inviteUsersTransactional(
@@ -215,79 +57,6 @@ export class UserInvitationService {
       );
 
       return invited;
-    } catch (error) {
-      throw mapEmailSendError(error);
-    }
-  }
-
-  public async inviteUsersFromCsv(
-    file: FileUpload | undefined,
-    rawConfig: string | CsvInviteConfigDto,
-    adminLocale?: string,
-    actorId?: number,
-  ): Promise<User[]> {
-    let configPayload: CsvInviteConfigDto | string;
-    try {
-      configPayload = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
-    } catch {
-      throw new BadRequestException('Invalid config payload');
-    }
-    const config = plainToInstance(CsvInviteConfigDto, configPayload);
-    const validationErrors = await validate(config, { whitelist: true, forbidNonWhitelisted: true });
-    if (validationErrors.length) {
-      throw new BadRequestException(validationErrors);
-    }
-
-    const { candidates, errors, emailRowMap, usernameRowMap } = await this.parseCsvFile(file, config);
-    if (errors.length) {
-      throw new BadRequestException({
-        message: 'INVALID_CSV',
-        errors,
-      });
-    }
-
-    if (candidates.length === 0) {
-      throw new BadRequestException({
-        message: 'NO_CANDIDATES_IN_CSV',
-        errors: [{ row: 0, message: 'NO_VALID_ROWS_FOUND_IN_CSV' }],
-      });
-    }
-
-    const existingUsers = await this.usersService.findByEmailsOrUsernames(
-      candidates.map((candidate) => candidate.email),
-      candidates.map((candidate) => candidate.username),
-    );
-
-    const duplicateErrors: CsvInviteRowErrorDto[] = [];
-    existingUsers.forEach((user) => {
-      const emailRows = emailRowMap.get(user.email.trim().toLowerCase());
-      if (emailRows?.length) {
-        emailRows.forEach((row) =>
-          duplicateErrors.push({ row, field: 'email', message: 'DUPLICATE_IN_DB', value: user.email }),
-        );
-      }
-
-      const usernameRows = usernameRowMap.get(user.username.trim().toLowerCase());
-      if (usernameRows?.length) {
-        usernameRows.forEach((row) =>
-          duplicateErrors.push({ row, field: 'username', message: 'DUPLICATE_IN_DB', value: user.username }),
-        );
-      }
-    });
-
-    if (duplicateErrors.length) {
-      throw new BadRequestException({
-        message: 'DUPLICATE_IN_DB',
-        errors: duplicateErrors,
-      });
-    }
-
-    try {
-      const invitedUsers = await this.inviteUsersTransactional(
-        candidates.map((c) => ({ ...c, locale: adminLocale })),
-        { grantAllPermissionsToFirst: true, actorId },
-      );
-      return invitedUsers;
     } catch (error) {
       throw mapEmailSendError(error);
     }

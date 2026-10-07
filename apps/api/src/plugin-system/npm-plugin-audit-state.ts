@@ -1,7 +1,7 @@
+import { randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import { readFile, rename, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
 
 export interface PendingNpmPluginAudit {
   operationId: string;

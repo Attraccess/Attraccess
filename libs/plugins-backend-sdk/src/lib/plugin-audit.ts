@@ -1,3 +1,12 @@
+import { isPlainRecord, validateFieldPolicy } from './plugin-audit-field-validation';
+import {
+  PLUGIN_AUDIT_DOMAIN_PATTERN,
+  PLUGIN_AUDIT_FIELD_PATTERN,
+  PLUGIN_AUDIT_LIMITS,
+  PLUGIN_AUDIT_SEGMENT_PATTERN,
+  PluginAuditDomainDeclaration,
+} from './plugin-audit-policy';
+
 /** Implemented by the generic audit foundation, not by individual plugins. */
 export const PLUGIN_AUDIT_HOST_PROVIDER = Symbol.for('attraccess.plugin.auditHostProvider');
 
@@ -28,134 +37,11 @@ export interface PluginAuditHostProvider {
   record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditReceipt>;
 }
 
-/**
- * Declarative audit policy a plugin contributes through `PluginBackendModule.auditDomains`.
- * The host registers the declaration, then enforces it on every event the plugin records:
- * only declared actions, subject types and detail fields are accepted, so a plugin can
- * never write arbitrary JSON into the audit log. The host additionally applies generic
- * bounds (identifier shapes, detail size) and rejects events whose pluginId does not own
- * the domain.
- */
-
-/** Domain identifiers are lowercase snake_case and prefix every action and subject type. */
-export const PLUGIN_AUDIT_DOMAIN_PATTERN = /^[a-z][a-z_]{0,31}$/;
-/** One dot-separated segment of an action or subject type name. */
-export const PLUGIN_AUDIT_SEGMENT_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
-/** Detail field name: camelCase segments, optionally dot-prefixed (e.g. `before.count`). */
-export const PLUGIN_AUDIT_FIELD_PATTERN = /^[a-z][a-zA-Z0-9]*(?:\.[a-z][a-zA-Z0-9]*)*$/;
-
-export const PLUGIN_AUDIT_LIMITS = {
-  domainsPerPlugin: 4,
-  actionsPerDomain: 64,
-  subjectTypesPerAction: 8,
-  fieldsPerAction: 32,
-  oneOfEntries: 64,
-  patternLength: 512,
-  maxLengthCeiling: 4096,
-  labelLocales: 8,
-  labelLength: 120,
-  actionLength: 128,
-} as const;
-
-export interface PluginAuditFieldPolicy {
-  readonly type: 'string' | 'number' | 'boolean';
-  /** Full-match regex source; the host anchors it. Strings only. */
-  readonly pattern?: string;
-  /** Closed value set; entries must match `type`. */
-  readonly oneOf?: readonly (string | number)[];
-  /** Inclusive numeric bounds. Numbers only. */
-  readonly min?: number;
-  readonly max?: number;
-  /** Reject non-integers. Numbers only. */
-  readonly integer?: boolean;
-  /** Inclusive UTF-16 code-unit bound. Strings only. */
-  readonly maxLength?: number;
-}
-
-export interface PluginAuditActionPolicy {
-  /** Full action name; must start with `${domain}.`. */
-  readonly action: string;
-  /** Subject types accepted for this action; each must start with `${domain}.`. */
-  readonly subjectTypes: readonly string[];
-  /** Allowed detail fields. Events carrying any other field are rejected. */
-  readonly details?: Readonly<Record<string, PluginAuditFieldPolicy>>;
-}
-
-export interface PluginAuditDomainDeclaration {
-  /** Lowercase identifier; becomes the audit domain and the action/subject-type prefix. */
-  readonly domain: string;
-  /** Optional human-readable domain labels keyed by locale (e.g. `{ en: 'Demo devices' }`). */
-  readonly labels?: Readonly<Record<string, string>>;
-  readonly actions: readonly PluginAuditActionPolicy[];
-}
-
-const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-};
-
 const dottedName = (prefix: string, value: unknown, maxLength: number): boolean => {
   if (typeof value !== 'string' || value.length > maxLength || !value.startsWith(`${prefix}.`)) return false;
   const segments = value.slice(prefix.length + 1).split('.');
   return segments.length > 0 && segments.every((segment) => PLUGIN_AUDIT_SEGMENT_PATTERN.test(segment));
 };
-
-function validateFieldChoices(path: string, policy: Record<string, unknown>, declared: string): void {
-  if (policy.pattern !== undefined) {
-    if (declared !== 'string') throw new Error(`${path}: pattern requires type 'string'`);
-    if (typeof policy.pattern !== 'string' || policy.pattern.length > PLUGIN_AUDIT_LIMITS.patternLength)
-      throw new Error(`${path}: pattern must be a string of at most ${PLUGIN_AUDIT_LIMITS.patternLength} characters`);
-    try {
-      new RegExp(policy.pattern);
-    } catch {
-      throw new Error(`${path}: pattern is not a valid regular expression`);
-    }
-  }
-  if (policy.oneOf !== undefined) {
-    const entries = policy.oneOf;
-    if (
-      !Array.isArray(entries) ||
-      entries.length === 0 ||
-      entries.length > PLUGIN_AUDIT_LIMITS.oneOfEntries ||
-      entries.some((entry) => typeof entry !== declared)
-    )
-      throw new Error(`${path}: oneOf must be 1-${PLUGIN_AUDIT_LIMITS.oneOfEntries} values of type '${declared}'`);
-  }
-}
-
-function validateFieldPolicy(path: string, policy: unknown): void {
-  if (!isPlainRecord(policy)) throw new Error(`${path}: field policy must be a plain object`);
-  const declared = policy.type;
-  if (declared !== 'string' && declared !== 'number' && declared !== 'boolean')
-    throw new Error(`${path}: field type must be 'string', 'number' or 'boolean'`);
-  const keys = Object.keys(policy);
-  for (const key of keys)
-    if (!['type', 'pattern', 'oneOf', 'min', 'max', 'integer', 'maxLength'].includes(key))
-      throw new Error(`${path}: unknown field policy property "${key}"`);
-  validateFieldChoices(path, policy, declared);
-  for (const bound of ['min', 'max'] as const)
-    if (policy[bound] !== undefined) {
-      if (declared !== 'number' || typeof policy[bound] !== 'number' || !Number.isFinite(policy[bound] as number))
-        throw new Error(`${path}: ${bound} requires a finite number and type 'number'`);
-    }
-  if (policy.integer !== undefined) {
-    if (declared !== 'number' || typeof policy.integer !== 'boolean')
-      throw new Error(`${path}: integer requires a boolean and type 'number'`);
-  }
-  if (policy.maxLength !== undefined) {
-    if (
-      declared !== 'string' ||
-      typeof policy.maxLength !== 'number' ||
-      !Number.isSafeInteger(policy.maxLength) ||
-      policy.maxLength < 1 ||
-      policy.maxLength > PLUGIN_AUDIT_LIMITS.maxLengthCeiling
-    )
-      throw new Error(
-        `${path}: maxLength requires an integer 1-${PLUGIN_AUDIT_LIMITS.maxLengthCeiling} and type 'string'`,
-      );
-  }
-}
 
 function validateDomainLabels(declaration: PluginAuditDomainDeclaration, prefix: string): void {
   if (declaration.labels !== undefined) {
@@ -238,3 +124,13 @@ export function validatePluginAuditDomainDeclaration<T extends PluginAuditDomain
   }
   return declaration;
 }
+
+export {
+  PLUGIN_AUDIT_DOMAIN_PATTERN,
+  PLUGIN_AUDIT_FIELD_PATTERN,
+  PLUGIN_AUDIT_LIMITS,
+  PLUGIN_AUDIT_SEGMENT_PATTERN,
+  PluginAuditActionPolicy,
+  PluginAuditDomainDeclaration,
+  PluginAuditFieldPolicy,
+} from './plugin-audit-policy';

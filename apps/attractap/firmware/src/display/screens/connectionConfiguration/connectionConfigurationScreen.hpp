@@ -40,6 +40,9 @@ public:
     void enablePinLock();
 
 private:
+    void createWifiTab(const NetworkConfig &networkConfig);
+    void createApiTab(const AttraccessApiConfig &apiConfig);
+    void createDeviceTab(const DeviceConfig &deviceConfig);
     std::function<void(const ConnectionConfig &)> onSaveCallback;
     std::function<void()> onResetCertificateCallback;
 #ifdef HAS_POWER_BUTTON

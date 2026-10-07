@@ -28,7 +28,7 @@ async function snapshot(ref, label, directories) {
   })
     .trim()
     .split('\n');
-  for (const path of paths.filter((path) => path.endsWith('.ts'))) {
+  for (const path of paths.filter((path) => /\.(?:ts|json)$/.test(path))) {
     const target = join(destination, path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, execFileSync('git', ['show', `${commit}:${path}`], { cwd: root }));
@@ -39,21 +39,31 @@ try {
   const backend = 'apps/plugins/wago/backend';
   const measurementContract = 'apps/plugins/wago/measurement-contract.ts';
   const runtime = 'apps/plugins/wago/cc100-runtime';
-  const flowRoot = argument('flow-ref')
-    ? await snapshot(argument('flow-ref'), 'flow', [backend, measurementContract])
-    : root;
-  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [
-    runtime,
-    backend,
+  const contracts = [
     measurementContract,
-  ]);
+    'apps/plugins/wago/channel-behavior.ts',
+    'apps/plugins/wago/modbus',
+    'apps/plugins/wago/shared',
+  ];
+  const flowRoot = argument('flow-ref') ? await snapshot(argument('flow-ref'), 'flow', [backend, ...contracts]) : root;
+  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [runtime, backend, ...contracts]);
   const runtimeRoot = argument('runtime-ref')
-    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, measurementContract])
+    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, ...contracts])
     : root;
   for (const stagedRoot of [mainRoot, ...(runtimeRoot !== root ? [runtimeRoot] : [])]) {
     await symlink(join(root, 'node_modules'), join(stagedRoot, 'node_modules'), 'dir');
-    // Only the owned entrypoint/device are overlaid. Runtime modules are exact git blobs.
-    for (const file of ['simulator.ts', 'simulator-device.ts'])
+    // Overlay the owned simulator and its extracted helpers. Production runtime
+    // modules remain exact git blobs from the selected source revision.
+    for (const file of [
+      'simulator.ts',
+      'simulator-device.ts',
+      'simulator-identity.ts',
+      'simulator-inspection.ts',
+      'simulator-mqtt.ts',
+      'simulator-settings.ts',
+      'simulator-state.ts',
+      'simulator-transport.ts',
+    ])
       await writeFile(join(stagedRoot, runtime, 'src', file), await readFile(join(root, runtime, 'src', file)));
     const config = join(stagedRoot, 'tsconfig.simulator.json');
     await writeFile(
@@ -87,6 +97,8 @@ try {
       platform: 'node',
       target: 'node24',
       nodePaths: [join(root, 'node_modules')],
+      tsconfig:
+        sourceRoot === root ? join(root, runtime, 'tsconfig.json') : join(sourceRoot, 'tsconfig.simulator.json'),
     });
   run(
     'pnpm',

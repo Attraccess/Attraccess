@@ -1,112 +1,39 @@
-import {
-  Button,
-  Chip,
-  Separator,
-  ModalBody,
-  ModalHeader,
-  ModalHeading,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableScrollContainer,
-  TableRow,
-  useOverlayState,
-} from '@heroui/react';
-import de from './de.json';
-import en from './en.json';
-import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  BillingTransaction,
-  BillingTransactionStatus,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransaction,
-} from '@attraccess/react-query-client';
-import { DateTimeDisplay, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
+import { Button, Chip, Separator, ModalBody, ModalHeader, ModalHeading } from '@heroui/react';
+import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { useEffect, useMemo, useState } from 'react';
 import { StandardModal } from '../../../../../components/standardModal';
 import { RefundModal } from './refund';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
-
-export interface TransactionDetailsModalProps {
-  children?: (onOpen: () => void) => React.ReactNode;
-  transactionId: number;
-  isOpen?: boolean;
-  onClose?: () => unknown;
-}
+import { TransactionDetailsModalProps } from './index.transaction-details-modal-props';
+import { useTransactionDetailsModalState } from './useTransactionDetailsModalState';
+import { TransactionDetailsModalItemsTitle } from './TransactionDetailsModalItemsTitle';
 
 // energyMicroWh is transported as a string because it can exceed Number.MAX_SAFE_INTEGER.
 // Do the microWh->kWh division with BigInt so the integer part stays exact; only the final
 // display value is coerced to Number.
 // ponytail: Number() below still caps precision beyond ~9 quadrillion kWh (2^53) — no real
 // energy meter gets there, upgrade to a decimal/bignumber formatter if that ever changes.
-function microWhToKwh(microWh: string): number {
-  const value = BigInt(microWh);
-  const perKwh = BigInt(1_000_000_000);
-  const whole = value / perKwh;
-  const fraction = (value % perKwh).toString().padStart(9, '0');
-  return Number(`${whole}.${fraction}`);
-}
 
 export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
-  const { children, transactionId, isOpen: isOpenProp, onClose: onCloseProp } = props;
-
-  const { t, tExists } = useTranslations({ en, de });
-
-  const { open, isOpen, setOpen, close } = useOverlayState({
-    onOpenChange: (o) => {
-      if (!o) onCloseProp?.();
-    },
-  });
-
-  useEffect(() => {
-    if (isOpenProp === undefined) {
-      return;
-    }
-
-    if (isOpenProp) {
-      open();
-    } else {
-      close();
-    }
-  }, [isOpenProp, open, close]);
-
   const {
-    data: transaction,
+    children,
+    transactionId,
+    t,
+    tExists,
+    open,
+    isOpen,
+    setOpen,
+    transaction,
     error,
     refetch,
-  } = useBillingServiceGetBillingTransaction({ transactionId }, undefined, { enabled: isOpen });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration(undefined, { enabled: isOpen });
-
-  const [isUsageOpen, setUsageOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) setUsageOpen(false);
-  }, [isOpen]);
-
-  const formatNumber = useNumberFormatter();
-
-  const statusColor = (status: BillingTransaction['status']) => {
-    switch (status) {
-      case BillingTransactionStatus.PENDING:
-        return 'warning';
-      case BillingTransactionStatus.COMPLETED:
-        return 'success';
-      case BillingTransactionStatus.FAILED:
-        return 'danger';
-      default:
-        return 'default';
-    }
-  };
-
-  const totalItemsAmount = useMemo(() => {
-    if (!transaction?.items) return 0;
-    const items = Array.isArray(transaction.items) ? transaction.items : [transaction.items];
-    return items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  }, [transaction]);
+    configuration,
+    isUsageOpen,
+    setUsageOpen,
+    formatNumber,
+    statusColor,
+    totalItemsAmount,
+  } = useTransactionDetailsModalState(props);
 
   return (
     <>
@@ -219,80 +146,9 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
 
                   <Separator />
 
-                  <div>
-                    <div className="mb-2 font-semibold">{t('items.title')}</div>
-                    <Table>
-                      <TableScrollContainer>
-                        <TableContent aria-label="Transaction items">
-                          <TableHeader>
-                            <TableColumn isRowHeader>{t('items.columns.name')}</TableColumn>
-                            <TableColumn>{t('items.columns.description')}</TableColumn>
-                            <TableColumn>{t('items.columns.quantity')}</TableColumn>
-                            <TableColumn>{t('items.columns.unitPrice')}</TableColumn>
-                            <TableColumn>{t('items.columns.subtotal')}</TableColumn>
-                          </TableHeader>
-                          <TableBody renderEmptyState={() => t('items.empty')}>
-                            {(transaction.items ?? []).map((item) => (
-                              <TableRow key={item.id} id={item.id}>
-                                <TableCell>
-                                  <div className="font-medium">
-                                    {tExists('items.system.' + item.name) ? t('items.system.' + item.name) : item.name}
-                                  </div>
-                                  {item.externalReference && (
-                                    <div className="text-tiny text-default-400">{item.externalReference}</div>
-                                  )}
-                                </TableCell>
-                                <TableCell className="max-w-[28ch] truncate">
-                                  {item.name === 'ENERGY' && item.energyMicroWh != null
-                                    ? t('items.energyDescription', {
-                                        kwh: formatNumber(microWhToKwh(item.energyMicroWh)),
-                                        rate: formatNumber(
-                                          dbCurrencyToUserCurrency(
-                                            item.energyCreditsPerKwh ?? 0,
-                                            configuration?.minorUnit ?? 2,
-                                          ),
-                                        ),
-                                      })
-                                    : item.description}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {item.name === 'ENERGY' && item.energyMicroWh != null
-                                    ? formatNumber(microWhToKwh(item.energyMicroWh))
-                                    : item.quantity}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {formatNumber(
-                                    dbCurrencyToUserCurrency(
-                                      item.name === 'ENERGY' && item.energyCreditsPerKwh != null
-                                        ? item.energyCreditsPerKwh
-                                        : item.unitPrice,
-                                      configuration?.minorUnit ?? 2,
-                                    ),
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {formatNumber(
-                                    dbCurrencyToUserCurrency(
-                                      item.unitPrice * item.quantity,
-                                      configuration?.minorUnit ?? 2,
-                                    ),
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </TableContent>
-                      </TableScrollContainer>
-                    </Table>
-                    <div className="mt-2 flex justify-end text-small text-default-500">
-                      <div>
-                        {t('items.total')}:{' '}
-                        <span className="font-semibold text-foreground">
-                          {formatNumber(dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <TransactionDetailsModalItemsTitle
+                    {...{ t, transaction, tExists, formatNumber, configuration, totalItemsAmount }}
+                  />
                 </div>
               )}
             </ModalBody>
@@ -311,3 +167,5 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
     </>
   );
 }
+
+export { type TransactionDetailsModalProps } from './index.transaction-details-modal-props';

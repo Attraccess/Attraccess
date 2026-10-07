@@ -1,22 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  ResourceFlowNodeType,
-  ResourceHealthStatus,
-  ResourceIntroducerType,
-  SupervisionMode,
-} from '@attraccess/database-entities';
-import { UsersService } from '../../../users-and-auth/users/users.service';
-import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
-import { WebsocketService } from '../websocket.service';
-import { AttractapService } from '../../attractap.service';
-import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
-import { ResourceMaintenanceService } from '../../../resources/maintenances/maintenance.service';
-import { ResourceHealthService } from '../../../resources/health/resource-health.service';
 import { ResourceFlowsService } from '../../../resources/flows/resource-flows.service';
+import { ResourceHealthService } from '../../../resources/health/resource-health.service';
 import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
-
-const DEBOUNCE_MS = 200;
+import { ResourceMaintenanceService } from '../../../resources/maintenances/maintenance.service';
+import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
+import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
+import { UsersService } from '../../../users-and-auth/users/users.service';
+import { AttractapService } from '../../attractap.service';
+import { WebsocketService } from '../websocket.service';
+import { AuthenticatedWebSocket } from '../websocket.types';
+import { sendResourceListToSockets as sendResourceListToSocketsImplementation } from './resource-list-payload';
+import { DEBOUNCE_MS } from './resource-list.service.definitions';
 
 @Injectable()
 export class ResourceListService {
@@ -110,113 +104,68 @@ export class ResourceListService {
     sockets: AuthenticatedWebSocket[],
     onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
   ) {
-    const revision = ++this.resourceListRevision;
-    const reader = await this.attractapService.findReaderById(sockets[0].readerId);
-    if (!reader) {
-      throw new Error(`Reader not found: ${sockets[0].readerId}`);
-    }
-
-    const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
-
-    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds;
-    if (resourceIdsToMatch?.size) {
-      if (!resources.some((resource) => resourceIdsToMatch.has(resource.id))) {
-        return;
-      }
-    }
-
-    const resourceIds = resources.map((resource) => resource.id);
-    const [introducersByResourceId, healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap] =
-      await Promise.all([
-        this.resourceIntroducersService.getManyForResources(resourceIds, ResourceIntroducerType.INTRODUCER),
-        this.resourceHealthService.listForResources(resourceIds),
-        this.resourceUsageService.getActiveSessions(resourceIds),
-        this.resourceMaintenanceService.getActiveMaintenanceResourceIds(resourceIds),
-        this.resourceFlowsService.getNodesForResources(resourceIds, ResourceFlowNodeType.INPUT_BUTTON),
-      ]);
-
-    const requestId = onlyIfResourceMatches?.requestId;
-    const resourceListPayload = {
-      revision,
-      ...(Number.isSafeInteger(requestId) && requestId > 0 ? { requestId } : {}),
-      readerName: reader.name,
-      ledBrightness: reader.ledBrightness,
-      resources: resources.map((resource) => {
-        const healthEntries = healthMap.get(resource.id) ?? [];
-        const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
-        const activeUsageSession = activeSessionMap.get(resource.id) ?? null;
-        const flowNodes = flowButtonMap.get(resource.id) ?? [];
-
-        return {
-          id: resource.id,
-          name: resource.name,
-          type: resource.type,
-          separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
-          description: resource.description,
-          allowTakeOver: resource.allowTakeOver,
-          introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
-            introducer.user ? [introducer.user.username] : [],
-          ),
-          isUnderMaintenance: activeMaintenanceIds.has(resource.id),
-          isHealthy: unhealthyEntries.length === 0,
-          healthReason: this.buildHealthReason(unhealthyEntries),
-          activeUsageSession: activeUsageSession
-            ? {
-                id: activeUsageSession.id,
-                user: {
-                  username: activeUsageSession.user.username,
-                },
-                startTime: activeUsageSession.startTime.toISOString(),
-                // Offset (minutes east of UTC) of the API's effective timezone for this
-                // specific instant, so the reader can render local wall-clock time without
-                // a tz database. Computed per-timestamp, so it stays DST-correct.
-                startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
-              }
-            : null,
-          flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
-        };
-      }),
-    };
-    // Share the expensive list queries, but never share one user's access with
-    // another socket. Reuse the existing authorization cache/retraining rules.
-    const payloadsByUser = new Map<number, Promise<typeof resourceListPayload & { authenticatedUsername: string }>>();
-    const forUser = async (userId: number) => {
-      const user = await this.usersService.findOne({ id: userId });
-      if (!user) return { ...resourceListPayload, authenticatedUsername: '' };
-      const permissions = await this.rbacService.getEffectivePermissions(userId);
-      const maintenanceManagedResourceIds = await this.resourceMaintenanceService.getMaintenanceManagedResourceIds(
-        user,
-        resourceIds,
-        permissions,
-      );
-      const personalized = await Promise.all(
-        resources.map(async (resource, index) => {
-          const hasIntroduction = await this.resourceUsageService.canControllResource(resource.id, user);
-          return {
-            ...resourceListPayload.resources[index],
-            hasIntroduction,
-            canManageMaintenance: maintenanceManagedResourceIds.has(resource.id),
-            isIntroducer: (introducersByResourceId.get(resource.id) ?? []).some((role) => role.userId === userId),
-            canManageResource: permissions.has('resources.update'),
-            requiresSupervisor:
-              resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
-              (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction),
-          };
-        }),
-      );
-      return { ...resourceListPayload, authenticatedUsername: user.username, resources: personalized };
-    };
-    await Promise.all(
-      sockets.map(async (socket) => {
-        const userId = socket.state.lastAuthenticatedUserId;
-        if (userId != null && !payloadsByUser.has(userId)) payloadsByUser.set(userId, forUser(userId));
-        const payload = userId == null ? resourceListPayload : await payloadsByUser.get(userId);
-        // A different card may have been presented while the queries were pending.
-        if (socket.state.lastAuthenticatedUserId !== userId) return;
-        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, payload);
-        this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
-        await socket.sendMessage(resourceListResponse);
-      }),
+    const getContextOwner = () => this;
+    return sendResourceListToSocketsImplementation(
+      {
+        get resourceListRevision() {
+          return getContextOwner().resourceListRevision;
+        },
+        set resourceListRevision(value: ResourceListService['resourceListRevision']) {
+          getContextOwner().resourceListRevision = value;
+        },
+        get attractapService() {
+          return getContextOwner().attractapService;
+        },
+        set attractapService(value: ResourceListService['attractapService']) {
+          getContextOwner().attractapService = value;
+        },
+        get resourceIntroducersService() {
+          return getContextOwner().resourceIntroducersService;
+        },
+        set resourceIntroducersService(value: ResourceListService['resourceIntroducersService']) {
+          getContextOwner().resourceIntroducersService = value;
+        },
+        get resourceHealthService() {
+          return getContextOwner().resourceHealthService;
+        },
+        set resourceHealthService(value: ResourceListService['resourceHealthService']) {
+          getContextOwner().resourceHealthService = value;
+        },
+        get resourceUsageService() {
+          return getContextOwner().resourceUsageService;
+        },
+        set resourceUsageService(value: ResourceListService['resourceUsageService']) {
+          getContextOwner().resourceUsageService = value;
+        },
+        get resourceMaintenanceService() {
+          return getContextOwner().resourceMaintenanceService;
+        },
+        set resourceMaintenanceService(value: ResourceListService['resourceMaintenanceService']) {
+          getContextOwner().resourceMaintenanceService = value;
+        },
+        get resourceFlowsService() {
+          return getContextOwner().resourceFlowsService;
+        },
+        set resourceFlowsService(value: ResourceListService['resourceFlowsService']) {
+          getContextOwner().resourceFlowsService = value;
+        },
+        buildHealthReason: getContextOwner().buildHealthReason.bind(getContextOwner()),
+        get usersService() {
+          return getContextOwner().usersService;
+        },
+        set usersService(value: ResourceListService['usersService']) {
+          getContextOwner().usersService = value;
+        },
+        get rbacService() {
+          return getContextOwner().rbacService;
+        },
+        set rbacService(value: ResourceListService['rbacService']) {
+          getContextOwner().rbacService = value;
+        },
+        logger: getContextOwner().logger,
+      },
+      sockets,
+      onlyIfResourceMatches,
     );
   }
 
@@ -230,3 +179,5 @@ export class ResourceListService {
       .join('\n');
   }
 }
+
+export { DEBOUNCE_MS } from './resource-list.service.definitions';

@@ -15,38 +15,15 @@ import type {
   SetRabbitmqPermissionDto,
   UpsertRabbitmqUserDto,
 } from './rabbitmq-users.types';
-
-const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
+import { PLUGIN_CONTEXT } from './rabbitmq-users.service.plugin-context';
+import { RawUser } from './rabbitmq-users.contracts';
+import { RawPermission } from './rabbitmq-users.contracts';
+import { RawVhost } from './rabbitmq-users.contracts';
+import { PutUserBody } from './rabbitmq-users.contracts';
 
 // Raw shapes returned by the RabbitMQ management API. Only the fields we read.
-interface RawUser {
-  name: string;
-  // Array on RabbitMQ >= 3.9, comma-separated string on older brokers.
-  tags?: string[] | string;
-  password_hash?: string;
-  hashing_algorithm?: string;
-}
-
-interface RawPermission {
-  user: string;
-  vhost: string;
-  configure: string;
-  write: string;
-  read: string;
-}
-
-interface RawVhost {
-  name: string;
-}
-
 // Body of PUT /api/users/:name. RabbitMQ replaces the whole user record, so an
 // update that should keep the password re-sends the stored hash.
-interface PutUserBody {
-  tags: string;
-  password?: string;
-  password_hash?: string;
-  hashing_algorithm?: string;
-}
 
 @Injectable()
 export class RabbitmqUsersService {

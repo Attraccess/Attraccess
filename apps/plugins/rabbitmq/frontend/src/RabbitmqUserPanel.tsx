@@ -13,13 +13,6 @@ import {
   Card,
   Chip,
   Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Spinner,
   Table,
   TableBody,
@@ -30,14 +23,14 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { KeyRoundIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon, UsersIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useDetection } from './detection';
-import { deleteUser, fetchUsers, type RabbitmqUser, type RabbitmqUserList } from './users-api';
+import { KeyRoundIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { type RabbitmqUser } from './users-api';
 import { RabbitmqPermissionsModal } from './RabbitmqPermissionsModal';
 import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
 import { useRabbitmqTranslations } from './i18n';
-import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { useRabbitmqUserPanelState } from './useRabbitmqUserPanelState';
+import { RabbitmqUserPanelCardHeader } from './RabbitmqUserPanelCardHeader';
+import { RabbitmqUserPanelModalBackdrop } from './RabbitmqUserPanelModalBackdrop';
 
 function PermissionChips({ user }: { user: RabbitmqUser }) {
   const { t } = useRabbitmqTranslations();
@@ -56,154 +49,61 @@ function PermissionChips({ user }: { user: RabbitmqUser }) {
 }
 
 export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
-  const { t, tMessage, language } = useRabbitmqTranslations();
-  const { result } = useDetection(mqttServerId);
-
-  const [data, setData] = useState<RabbitmqUserList | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | TranslationMessage | null>(null);
-
-  // Modal state. `formUser` doubles as the mode flag (null = create).
-  const [formOpen, setFormOpen] = useState(false);
-  const [formUser, setFormUser] = useState<RabbitmqUser | null>(null);
-  const [permissionsUser, setPermissionsUser] = useState<RabbitmqUser | null>(null);
-  const [userToDelete, setUserToDelete] = useState<RabbitmqUser | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | TranslationMessage | null>(null);
-
-  // The panel can unmount while a fetch is in flight (navigation away) — drop
-  // the result instead of calling setState on an unmounted component.
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const list = await fetchUsers(mqttServerId);
-      if (mounted.current) {
-        setData(list);
-        // Keep the permissions modal's user in sync after edits.
-        setPermissionsUser((current) =>
-          current ? (list.users.find((user) => user.name === current.name) ?? current) : null,
-        );
-      }
-    } catch (err) {
-      if (mounted.current) {
-        setLoadError(err instanceof Error ? err.message : { key: 'users.loadError' });
-      }
-    } finally {
-      if (mounted.current) {
-        setLoading(false);
-      }
-    }
-  }, [mqttServerId]);
-
-  const manageable = result?.isRabbitMQ === true && result.authOk;
-
-  useEffect(() => {
-    if (manageable) {
-      void reload();
-    }
-  }, [manageable, reload]);
+  const model = useRabbitmqUserPanelState({ mqttServerId });
 
   // Render nothing unless the server is positively detected as RabbitMQ with
   // working management credentials — the status panel already explains
   // detection / auth problems.
-  if (!manageable) {
+  if (!model.manageable) {
     return null;
   }
-
-  const confirmDelete = async () => {
-    if (!userToDelete) {
-      return;
-    }
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      await deleteUser(mqttServerId, userToDelete.name);
-      setUserToDelete(null);
-      void reload();
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : { key: 'users.deleteError' });
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   return (
     <Card
       data-cy={`rabbitmq-user-panel-${mqttServerId}`}
       className="rmq:w-full rmq:border rmq:border-default-200 rmq:dark:border-default-100"
     >
-      <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
-        <div className="rmq:flex rmq:items-center rmq:gap-2">
-          <UsersIcon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
-          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('users.title')}</p>
-        </div>
-        <div className="rmq:flex rmq:items-center rmq:gap-2">
-          <Button
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            aria-label={t('users.reload')}
-            onPress={() => void reload()}
-            isDisabled={loading}
-            data-cy={`rabbitmq-user-panel-reload-${mqttServerId}`}
-          >
-            {loading ? <Spinner size="sm" /> : <RefreshCwIcon className="rmq:w-4 rmq:h-4" />}
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            onPress={() => {
-              setFormUser(null);
-              setFormOpen(true);
-            }}
-            data-cy={`rabbitmq-user-panel-create-button-${mqttServerId}`}
-          >
-            <PlusIcon className="rmq:w-4 rmq:h-4" />
-            {t('users.add')}
-          </Button>
-        </div>
-      </Card.Header>
+      <RabbitmqUserPanelCardHeader
+        {...{
+          t: model.t,
+          reload: model.reload,
+          loading: model.loading,
+          mqttServerId,
+          setFormUser: model.setFormUser,
+          setFormOpen: model.setFormOpen,
+        }}
+      />
       <Card.Content className="rmq:flex rmq:flex-col rmq:gap-3">
-        {loadError && (
+        {model.loadError && (
           <Alert status="danger" data-cy="rabbitmq-user-panel-error-alert">
             <AlertContent>
-              <AlertDescription>{tMessage(loadError)}</AlertDescription>
+              <AlertDescription>{model.tMessage(model.loadError)}</AlertDescription>
             </AlertContent>
           </Alert>
         )}
 
-        {!data && !loadError && (
+        {!model.data && !model.loadError && (
           <div className="rmq:flex rmq:items-center rmq:justify-center rmq:p-4">
             <Spinner data-cy="rabbitmq-user-panel-loading-spinner" />
           </div>
         )}
 
-        {data && (
+        {model.data && (
           <Table data-cy="rabbitmq-user-panel-table">
             <TableScrollContainer>
-              <TableContent aria-label={t('users.title')}>
+              <TableContent aria-label={model.t('users.title')}>
                 <TableHeader>
-                  <TableColumn isRowHeader>{t('users.username')}</TableColumn>
-                  <TableColumn>{t('users.tags')}</TableColumn>
-                  <TableColumn>{t('users.access')}</TableColumn>
-                  <TableColumn>{t('users.actions')}</TableColumn>
+                  <TableColumn isRowHeader>{model.t('users.username')}</TableColumn>
+                  <TableColumn>{model.t('users.tags')}</TableColumn>
+                  <TableColumn>{model.t('users.access')}</TableColumn>
+                  <TableColumn>{model.t('users.actions')}</TableColumn>
                 </TableHeader>
-                <TableBody items={data.users} dependencies={[language]}>
+                <TableBody items={model.data.users} dependencies={[model.language]}>
                   {(user) => (
                     <TableRow key={user.name} id={user.name}>
                       <TableCell className="rmq:whitespace-nowrap rmq:font-medium">{user.name}</TableCell>
                       <TableCell>
                         {user.tags.length === 0 ? (
-                          <span className="rmq:text-xs rmq:text-default-400">{t('users.none')}</span>
+                          <span className="rmq:text-xs rmq:text-default-400">{model.t('users.none')}</span>
                         ) : (
                           <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
                             {user.tags.map((tag) => (
@@ -223,10 +123,10 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             isIconOnly
                             size="sm"
                             variant="ghost"
-                            aria-label={t('users.edit', { name: user.name })}
+                            aria-label={model.t('users.edit', { name: user.name })}
                             onPress={() => {
-                              setFormUser(user);
-                              setFormOpen(true);
+                              model.setFormUser(user);
+                              model.setFormOpen(true);
                             }}
                             data-cy={`rabbitmq-user-edit-button-${user.name}`}
                           >
@@ -236,8 +136,8 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             isIconOnly
                             size="sm"
                             variant="ghost"
-                            aria-label={t('users.permissions', { name: user.name })}
-                            onPress={() => setPermissionsUser(user)}
+                            aria-label={model.t('users.permissions', { name: user.name })}
+                            onPress={() => model.setPermissionsUser(user)}
                             data-cy={`rabbitmq-user-permissions-button-${user.name}`}
                           >
                             <KeyRoundIcon className="rmq:w-4 rmq:h-4" />
@@ -246,10 +146,10 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             isIconOnly
                             size="sm"
                             variant="ghost"
-                            aria-label={t('users.delete', { name: user.name })}
+                            aria-label={model.t('users.delete', { name: user.name })}
                             onPress={() => {
-                              setDeleteError(null);
-                              setUserToDelete(user);
+                              model.setDeleteError(null);
+                              model.setUserToDelete(user);
                             }}
                             data-cy={`rabbitmq-user-delete-button-${user.name}`}
                           >
@@ -268,65 +168,30 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
 
       <RabbitmqUserFormModal
         mqttServerId={mqttServerId}
-        isOpen={formOpen}
-        user={formUser}
-        vhosts={data?.vhosts ?? []}
-        onClose={() => setFormOpen(false)}
-        onSaved={() => void reload()}
+        isOpen={model.formOpen}
+        user={model.formUser}
+        vhosts={model.data?.vhosts ?? []}
+        onClose={() => model.setFormOpen(false)}
+        onSaved={() => void model.reload()}
       />
 
       <RabbitmqPermissionsModal
         mqttServerId={mqttServerId}
-        isOpen={permissionsUser !== null}
-        user={permissionsUser}
-        vhosts={data?.vhosts ?? []}
-        onClose={() => setPermissionsUser(null)}
-        onSaved={() => void reload()}
+        isOpen={model.permissionsUser !== null}
+        user={model.permissionsUser}
+        vhosts={model.data?.vhosts ?? []}
+        onClose={() => model.setPermissionsUser(null)}
+        onSaved={() => void model.reload()}
       />
 
       <Modal
-        isOpen={userToDelete !== null}
+        isOpen={model.userToDelete !== null}
         onOpenChange={(open) => {
-          if (!open) setUserToDelete(null);
+          if (!open) model.setUserToDelete(null);
         }}
         data-cy={`rabbitmq-user-delete-modal-${mqttServerId}`}
       >
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('users.deleteTitle')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody className="rmq:flex rmq:flex-col rmq:gap-3">
-                    <p>{t('users.deleteDescription', { name: userToDelete?.name })}</p>
-                    {deleteError && (
-                      <Alert status="danger" data-cy="rabbitmq-user-delete-error-alert">
-                        <AlertContent>
-                          <AlertDescription>{tMessage(deleteError)}</AlertDescription>
-                        </AlertContent>
-                      </Alert>
-                    )}
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="secondary" onPress={close} data-cy="rabbitmq-user-delete-cancel-button">
-                      {t('common.cancel')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onPress={() => void confirmDelete()}
-                      isPending={deleting}
-                      data-cy="rabbitmq-user-delete-confirm-button"
-                    >
-                      {t('common.delete')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
+        <RabbitmqUserPanelModalBackdrop {...model} />
       </Modal>
     </Card>
   );

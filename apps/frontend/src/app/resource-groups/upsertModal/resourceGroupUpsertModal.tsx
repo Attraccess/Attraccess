@@ -1,199 +1,28 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
-import {
-  Form,
-  TextField,
-  Label,
-  Input,
-  FieldError,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  useOverlayState,
-} from '@heroui/react';
+import { Form, TextField, Label, Input, FieldError, DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { StandardDrawer } from '../../../components/standardDrawer';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import en from './resourceGroupUpsertModal.en.json';
-import de from './resourceGroupUpsertModal.de.json';
-import {
-  ResourceGroup,
-  useResourcesServiceResourceGroupsCreateOne,
-  CreateResourceGroupDto,
-  useResourcesServiceResourceGroupsUpdateOne,
-  UpdateResourceGroupDto,
-  useResourcesServiceResourceGroupsGetManyKey,
-} from '@attraccess/react-query-client';
-import { useQueryClient } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
-import { useToastMessage } from '../../../components/toastProvider';
-
-type FormData = CreateResourceGroupDto | UpdateResourceGroupDto;
+import { Props } from './resourceGroupUpsertModal.contracts';
+import { useResourceGroupUpsertModalState } from './useResourceGroupUpsertModalState';
 
 // Define a more specific type for the expected error structure from the API
-interface ApiValidationError {
-  errors?: {
-    [key: string]: string[];
-  };
-  message?: string; // General error message field
-}
-
-interface Props {
-  children: (onOpen: () => void) => React.ReactNode;
-  /** If provided, the modal will be in edit mode */
-  resourceGroup?: ResourceGroup;
-  onUpserted?: (resourceGroup: ResourceGroup) => void;
-}
 
 export function ResourceGroupUpsertModal(props: Readonly<Props>) {
-  const { isOpen, open, setOpen, close: closeDisclosure } = useOverlayState();
-  const { t } = useTranslations({
-    en,
-    de,
-  });
-
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    description: '',
-    retrainingMaxAgeDays: null,
-    retrainingMaxInactivityDays: null,
-    retrainingBlocksAccess: false,
-    isHidden: false,
-  });
-  const [apiErrors, setApiErrors] = useState<{ [key: string]: string[] | undefined }>({});
-
-  const { success, error: showErrorToast } = useToastMessage();
-  const queryClient = useQueryClient();
-  const isEditMode = !!props.resourceGroup;
-
-  const handleSuccess = (createdOrUpdatedGroup: ResourceGroup) => {
-    success({
-      title: isEditMode ? t('successTitleUpdate') : t('successTitleCreate'),
-      description: isEditMode
-        ? t('successDescriptionUpdate', { name: createdOrUpdatedGroup.name })
-        : t('successDescriptionCreate', { name: createdOrUpdatedGroup.name }),
-    });
-
-    queryClient.invalidateQueries({
-      queryKey: [useResourcesServiceResourceGroupsGetManyKey],
-    });
-
-    if (!isEditMode) {
-      setFormData({ name: '', description: '' });
-    }
-    setApiErrors({});
-    closeDisclosure();
-
-    if (typeof props.onUpserted === 'function') {
-      props.onUpserted(createdOrUpdatedGroup);
-    }
-  };
-
-  const handleError = (error: AxiosError<ApiValidationError>) => {
-    console.error('Failed to upsert resource group:', error);
-    const responseData = error.response?.data;
-    const fieldErrors = responseData?.errors;
-
-    if (fieldErrors && Object.keys(fieldErrors).length > 0) {
-      setApiErrors(fieldErrors);
-      showErrorToast({
-        title: isEditMode ? t('errorTitleUpdate') : t('errorTitleCreate'),
-        // Consider adding a specific translation for validation errors
-        description: t('fieldValidationError') ?? 'Please check the form for errors.',
-      });
-    } else {
-      setApiErrors({});
-      showErrorToast({
-        title: isEditMode ? t('errorTitleUpdate') : t('errorTitleCreate'),
-        description: responseData?.message || (isEditMode ? t('errorDescriptionUpdate') : t('errorDescriptionCreate')),
-      });
-    }
-  };
-
-  // Pass onSuccess and onError directly to the hook options
-  const createMutation = useResourcesServiceResourceGroupsCreateOne({
-    onSuccess: (data) => {
-      handleSuccess(data);
-    },
-    onError: handleError,
-  });
-
-  const updateMutation = useResourcesServiceResourceGroupsUpdateOne({
-    onSuccess: handleSuccess,
-    onError: handleError,
-  });
-
-  const mutation = isEditMode ? updateMutation : createMutation;
-
-  useEffect(() => {
-    if (isOpen) {
-      if (isEditMode && props.resourceGroup) {
-        setFormData({
-          name: props.resourceGroup.name,
-          description: props.resourceGroup.description ?? '',
-          retrainingMaxAgeDays: props.resourceGroup.retrainingMaxAgeDays ?? null,
-          retrainingMaxInactivityDays: props.resourceGroup.retrainingMaxInactivityDays ?? null,
-          retrainingBlocksAccess: props.resourceGroup.retrainingBlocksAccess ?? false,
-          isHidden: props.resourceGroup.isHidden ?? false,
-        });
-      } else {
-        // Reset form for create mode or when no resource group is provided
-        setFormData({
-          name: '',
-          description: '',
-          retrainingMaxAgeDays: null,
-          retrainingMaxInactivityDays: null,
-          retrainingBlocksAccess: false,
-          isHidden: false,
-        });
-      }
-      setApiErrors({}); // Clear errors when modal opens
-    }
-  }, [isEditMode, props.resourceGroup, isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      nameInputRef.current?.focus();
-    }
-  }, [isOpen]);
-
-  const handleSubmit = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setApiErrors({});
-
-      // Prepare the data in the format expected by the mutation
-      const requestBody = {
-        name: formData.name,
-        description: formData.description,
-        retrainingMaxAgeDays: formData.retrainingMaxAgeDays,
-        retrainingMaxInactivityDays: formData.retrainingMaxInactivityDays,
-        retrainingBlocksAccess: formData.retrainingBlocksAccess,
-        isHidden: formData.isHidden,
-      };
-
-      if (isEditMode && props.resourceGroup) {
-        // Ensure types match for update mutation
-        updateMutation.mutate({
-          id: props.resourceGroup.id,
-          requestBody: requestBody as UpdateResourceGroupDto,
-        });
-      } else {
-        // Ensure types match for create mutation
-        createMutation.mutate({
-          requestBody: requestBody as CreateResourceGroupDto,
-        });
-      }
-    },
-    // Dependencies should include the specific mutations if used directly
-    [isEditMode, props.resourceGroup, formData, createMutation, updateMutation],
-  );
-
-  const getFieldError = (fieldName: keyof FormData) => {
-    return apiErrors[fieldName]?.[0];
-  };
+  const {
+    isOpen,
+    open,
+    setOpen,
+    closeDisclosure,
+    t,
+    nameInputRef,
+    formData,
+    setFormData,
+    setApiErrors,
+    isEditMode,
+    mutation,
+    handleSubmit,
+    getFieldError,
+  } = useResourceGroupUpsertModalState(props);
 
   return (
     <>
@@ -289,11 +118,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
           </DrawerBody>
 
           <DrawerFooter>
-            <Button
-              variant="secondary"
-              onPress={closeDisclosure}
-              data-cy="resource-group-upsert-modal-cancel-button"
-            >
+            <Button variant="secondary" onPress={closeDisclosure} data-cy="resource-group-upsert-modal-cancel-button">
               {t('cancelButton')}
             </Button>
             <Button

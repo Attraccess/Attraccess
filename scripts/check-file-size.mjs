@@ -62,17 +62,14 @@ function blobLines(files) {
 }
 
 function check() {
-  let base = process.env.NX_AFFECTED_BASE || 'origin/main';
   let staged = false;
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--staged') staged = true;
-    else if (args[i] === '--base' && args[i + 1]) base = args[++i];
-    else throw new Error('Usage: node scripts/check-file-size.mjs [--base <ref>] [--staged]');
+    else throw new Error('Usage: node scripts/check-file-size.mjs [--staged]');
   }
   const root = git(['rev-parse', '--show-toplevel']).trim();
   process.chdir(root);
-  const baseline = git(['merge-base', 'HEAD', base]).trim();
   const current = staged ? blobLines(entries(git(['ls-files', '--stage', '-z']), true)) : new Map();
   if (!staged) {
     const files = new Set(
@@ -87,24 +84,15 @@ function check() {
       }
     }
   }
-  const oversized = [...current].filter(([file, lines]) => lines > limitFor(file));
-  const wanted = new Set(oversized.map(([file]) => file));
-  const previous = blobLines(entries(git(['ls-tree', '-r', '-z', baseline])).filter(({ file }) => wanted.has(file)));
-  const violations = oversized.filter(([file, lines]) => lines > (previous.get(file) ?? 0));
+  const violations = [...current].filter(([file, lines]) => lines > limitFor(file));
   for (const [file, lines] of violations.sort(([a], [b]) => a.localeCompare(b))) {
-    const old = previous.get(file);
-    const allowance = old > limitFor(file) ? `; existing file cannot grow beyond ${old}` : '';
-    console.error(`${JSON.stringify(file)}: ${lines} lines (maximum ${limitFor(file)}${allowance}).`);
+    console.error(`${JSON.stringify(file)}: ${lines} lines (maximum ${limitFor(file)}).`);
   }
   if (violations.length) {
-    console.error(
-      'Split new oversized files or remove added lines from existing oversized files. See CONTRIBUTING.md.',
-    );
+    console.error('Split or refactor oversized files. See CONTRIBUTING.md.');
     process.exitCode = 1;
   } else {
-    console.log(
-      `File size check passed (${current.size} files; ${oversized.length} existing oversized files allowed).`,
-    );
+    console.log(`File size check passed (${current.size} files).`);
   }
 }
 
