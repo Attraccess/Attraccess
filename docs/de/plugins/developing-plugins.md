@@ -273,3 +273,27 @@ würde einen separaten Sprachzustand erzeugen. Die gemeinsame Konfiguration
 Bibliothek als Peer-Abhängigkeit und setze `attraccess.host` beziehungsweise
 `attraccessVersion.min` auf mindestens Version **1.11.0**, da ältere Hosts diese
 Bibliothek noch nicht teilen.
+
+## Live-Updates
+
+Mit `context.liveUpdates.register` im Backend-SDK und `usePluginLiveUpdates<T>`
+im Frontend-SDK nutzen Plugins dieselbe authentifizierte Live-Verbindung wie der
+Host. Themen werden pro Plugin registriert; Kennungen und Berechtigungen müssen
+im Backend bei jeder Anmeldung und Erneuerung geprüft werden. Für UI-Updates ist
+keine eigene SSE- oder WebSocket-Verbindung nötig.
+Der optionale Callback `onUnavailable` meldet eine Themenablehnung oder eine
+Transportunterbrechung. Vorhandene Werte bleiben bis zum nächsten Snapshot als
+nicht verfügbar im Cache; wiederkehrendes REST-Polling ist nicht erforderlich.
+Der Callback wird wie `onUpdate` und `onReconnect` bei Bereinigung und Wechsel
+des Authentifizierungskontexts geschützt.
+Der Host gibt Ausnahmen aus Autorisierung und Quellen nicht an den Browser weiter.
+Bei `createSharedLiveSampler` bleibt die Sperre pro Kennung bis zum Abschluss
+einer laufenden Abfrage bestehen, auch nach dem letzten Abmelden; neue Verbraucher
+erhalten frische Werte. Der Host stellt die Verbindung bei gültigem
+Sitzungswechsel desselben Benutzers ohne Löschen des Abfragecaches wieder her und
+behält sie bei Abmelden/Anmelden im selben React-Batch. Plugin-Ereignisse werden
+lokal nicht erneut zugestellt.
+Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
+beschreibt auch Wiederverbindung und Freigabe von Abonnements.
+Die [WAGO-Abfrageintervalle](../../development/live-updates.md#wago-sampling-schedule)
+listen die gemeinsamen Backend-Intervalle für alle neun WAGO-Themen auf.

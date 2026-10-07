@@ -1,5 +1,6 @@
 import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useWagoLiveQuery } from './live-updates';
 import {
   claimController,
   confirmCommissioningHostKey,
@@ -46,19 +47,18 @@ const queryKeys = {
 };
 
 export function useControllersQuery() {
+  useWagoLiveQuery(queryKeys.controllers, 'controllers');
   return useQuery({
     queryKey: queryKeys.controllers,
     queryFn: listControllers,
-    refetchInterval: 10_000,
   });
 }
 
 export function useCommissioningSessionsQuery() {
+  useWagoLiveQuery(queryKeys.commissioningSessions, 'commissioning-sessions');
   return useQuery({
     queryKey: queryKeys.commissioningSessions,
     queryFn: ({ signal }) => listCommissioningSessions(100, 0, signal),
-    refetchInterval: 2_000,
-    refetchIntervalInBackground: true,
   });
 }
 
@@ -202,6 +202,12 @@ export function useDraftQuery(controllerId: number | null) {
 }
 
 export function useConfigurationBaselineQuery(controllerId: number, enabled: boolean) {
+  useWagoLiveQuery(
+    ['wago', 'configuration-baseline', controllerId],
+    'configuration-baseline',
+    String(controllerId),
+    enabled,
+  );
   return useQuery({
     queryKey: ['wago', 'configuration-baseline', controllerId],
     queryFn: () => getConfigurationBaseline(controllerId),
@@ -260,10 +266,14 @@ export function useApplyPresetMutation() {
 }
 
 export function useConfigurationRevisionsQuery(controllerId: number, offset: number) {
+  useWagoLiveQuery(
+    [...queryKeys.revisions(controllerId), offset],
+    'configuration-revisions',
+    `${controllerId}:${offset}`,
+  );
   return useQuery({
     queryKey: [...queryKeys.revisions(controllerId), offset],
     queryFn: () => listConfigurationRevisions(controllerId, offset),
-    refetchInterval: 2_000,
   });
 }
 

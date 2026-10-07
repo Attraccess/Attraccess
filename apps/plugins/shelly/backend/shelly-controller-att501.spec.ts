@@ -36,6 +36,7 @@ describe('ShellyController ATT-501 firmware', () => {
     expect(firmware.startUpdate).toHaveBeenCalledWith(
       { ipAddress: '192.168.1.10', generation: 2, username: undefined, currentPassword: undefined },
       'stable',
+      1,
     );
   });
 

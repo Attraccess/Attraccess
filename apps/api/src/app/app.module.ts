@@ -1,3 +1,4 @@
+import { LiveUpdatesModule } from '../live-updates/live-updates.module';
 import { AppController } from './app.controller';
 import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
@@ -129,6 +130,7 @@ const logger = new Logger('AppModule');
     MessagingModule,
     PushModule,
     NotificationsModule,
+    LiveUpdatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -4,6 +4,7 @@
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner, Tooltip } from '@heroui/react';
 import { ArrowUpCircleIcon, CpuIcon, DownloadIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
 import {
   getFirmware,
   startFirmwareUpdate,
@@ -17,7 +18,6 @@ import { StatusAlert } from './StatusAlert';
 import { useShellyTranslations } from './i18n';
 import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
-const POLL_INTERVAL_MS = 5000;
 // A Shelly OTA takes ~30-90s including the reboot; past this we stop claiming
 // progress and let the operator re-check manually.
 const UPDATE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -194,44 +194,36 @@ export function FirmwareDrawer({
     [currentPassword, device, status],
   );
 
-  // While an update runs the device reboots and stops answering — failed polls
-  // are expected, so they are swallowed. The deadline is checked on every tick,
-  // not just on failure: a device that stays reachable but never reports the
-  // target version (silent rollback, or a version string that doesn't match
-  // byte-for-byte) would otherwise leave "Installing…" spinning forever.
+  usePluginLiveUpdates<{ eventType: 'snapshot'; value: FirmwareStatus } | { eventType: 'unavailable' }>({
+    plugin: 'shelly',
+    topic: 'firmware',
+    identifier: String(device?.id),
+    enabled: !!installing && !!device,
+    onUpdate: (event) => {
+      if (event.eventType !== 'snapshot') return;
+      const next = event.value;
+      setStatus(next);
+      const done = targetVersion.current ? next.currentVersion === targetVersion.current : !next.hasUpdate;
+      if (done && next.state !== 'updating' && next.state !== 'pending') {
+        setInstalling(null);
+        setInstalledVersion(next.currentVersion);
+        onUpdated();
+      }
+    },
+  });
+
+  // The deadline must still fire if the stream/device is offline or silently rolls back.
   useEffect(() => {
     if (!installing || !device) return;
-    let cancelled = false;
-
-    const poll = async () => {
-      if (cancelled) return;
-      if (Date.now() > deadline.current) {
+    const timeout = setTimeout(
+      () => {
         setInstalling(null);
         setError({ key: 'firmware.timeout' });
-        return;
-      }
-      try {
-        const next = await fetchStatus();
-        if (cancelled || !next) return;
-        setStatus(next);
-        const done = targetVersion.current ? next.currentVersion === targetVersion.current : !next.hasUpdate;
-        if (done && next.state !== 'updating' && next.state !== 'pending') {
-          setInstalling(null);
-          setInstalledVersion(next.currentVersion);
-          onUpdated();
-        }
-      } catch {
-        // Expected while the device reboots; the deadline check above is the
-        // only exit condition that doesn't depend on the device answering.
-      }
-    };
-
-    const timer = setInterval(poll, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [installing, device, fetchStatus, onUpdated]);
+      },
+      Math.max(0, deadline.current - Date.now()),
+    );
+    return () => clearTimeout(timeout);
+  }, [installing, device]);
 
   const stages: FirmwareStage[] = ['stable', 'beta'];
 

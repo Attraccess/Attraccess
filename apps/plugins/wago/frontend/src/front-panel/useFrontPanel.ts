@@ -19,6 +19,7 @@ import { useWagoDiagnostics } from '../diagnostics';
 import { useDraftQuery } from '../queries';
 import { outputBehavior } from '../../../channel-behavior';
 import { type Channel, type PanelConfiguration } from './model';
+import { useWagoLiveQuery } from '../live-updates';
 
 interface WorkingCopy {
   configuration: PanelConfiguration;
@@ -42,12 +43,12 @@ export function useFrontPanel(controllerId: number) {
   const key = ['wago', 'front-panel-working-copy', controllerId];
   const [restored] = useState(() => client.getQueryData<WorkingCopy>(key));
   const draft = useDraftQuery(controllerId);
+  useWagoLiveQuery(['wago', 'configuration-baseline', controllerId], 'configuration-baseline', String(controllerId));
   const baseline = useQuery({
     queryKey: ['wago', 'configuration-baseline', controllerId],
     queryFn: () => getConfigurationBaseline(controllerId),
-    refetchInterval: 2000,
   });
-  const diagnostics = useWagoDiagnostics(controllerId, 2000);
+  const diagnostics = useWagoDiagnostics(controllerId);
   const [configuration, setConfiguration] = useState<PanelConfiguration | null>(restored?.configuration ?? null);
   const loadedDraft = useRef<WagoConfigurationDraft | null>(restored?.loadedDraft ?? null);
   const [editing, setEditing] = useState(Boolean(restored));

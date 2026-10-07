@@ -20,7 +20,7 @@ export class SupervisionLiveService {
   }
 
   public emitToSupervisor(userId: number, event: SupervisionLiveEventDto): void {
-    this.getSupervisorSubject(userId).next({ data: event });
+    this.subjects.get(userId)?.next({ data: event });
   }
 
   public deleteSubjectIfUnobserved(userId: number): void {
