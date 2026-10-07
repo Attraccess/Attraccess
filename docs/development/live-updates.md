@@ -11,11 +11,21 @@ limits differ; this is not a universal six-connection WebSocket limit.
 
 `LiveUpdatesProvider` owns the transport. Components call `useLiveUpdates` with
 `topic`, `resourceId` for resource topics, `onUpdate`, optional `enabled` and
-`onReconnect`. The returned `abort` and effect cleanup are idempotent. The client
+`onReconnect` and `onUnavailable`. The returned `abort` and effect cleanup are idempotent.
+The returned `owner` identity scopes accumulated feature state to the current
+authentication context; flow logs reset immediately when it or the resource changes. The client
 reference-counts consumers and isolates callback failures. Resource payloads,
 flow logs, billing transactions, messages, system notifications and supervision
 requests retain their domain shapes inside a shared typed topic/event envelope.
-Heartbeat, readiness and rejection packets never enter feature callbacks.
+Heartbeat, readiness and rejection packets never enter `onUpdate`.
+The optional `onUnavailable` callback reports a rejection only to that topic's
+consumers, and interruption to every active topic on the connection. It fires
+once per outage, including for consumers joining during that outage, and resets
+after a new event. It does not fire on intentional unsubscribe or logout.
+Like update/reconnect callbacks, it is isolated and guarded against obsolete owners.
+The plugin SDK exposes the same callback. WAGO uses it to retain cached snapshots
+while marking exact queries unavailable and disabling dependent controls, without
+per-browser REST fallback; subsequent shared snapshots restore success.
 
 Departing callbacks are removed immediately. Subscription reconciliation and
 final-consumer teardown share a microtask boundary, so cleanup/setup within the

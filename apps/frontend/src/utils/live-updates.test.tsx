@@ -3,26 +3,27 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveUpdatesProvider, resumeLiveUpdates, stopLiveUpdates, useLiveUpdates } from './live-updates';
+import { useLiveLogs } from '../app/resources/details/flows/liveLogs';
 import { PluginLiveUpdatesProvider, usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
 
 const state = vi.hoisted(() => ({
   clients: [] as {
     callbacks: Set<(data: unknown) => void>;
-    subscriptions: { onUpdate: (data: unknown) => void; onReconnect: () => void }[];
+    subscriptions: { onUpdate: (data: unknown) => void; onReconnect: () => void; onUnavailable: () => void }[];
     dispose: ReturnType<typeof vi.fn>;
   }[],
 }));
 vi.mock('./live-update-client', () => ({
   LiveUpdateClient: class {
     callbacks = new Set<(data: unknown) => void>();
-    subscriptions: { onUpdate: (data: unknown) => void; onReconnect: () => void }[] = [];
+    subscriptions: { onUpdate: (data: unknown) => void; onReconnect: () => void; onUnavailable: () => void }[] = [];
     dispose = vi.fn(() => this.callbacks.clear());
     constructor() {
       state.clients.push(this);
     }
-    subscribe(_topic: unknown, callback: (data: unknown) => void, onReconnect: () => void) {
+    subscribe(_topic: unknown, callback: (data: unknown) => void, onReconnect: () => void, onUnavailable: () => void) {
       this.callbacks.add(callback);
-      this.subscriptions.push({ onUpdate: callback, onReconnect });
+      this.subscriptions.push({ onUpdate: callback, onReconnect, onUnavailable });
       return () => this.callbacks.delete(callback);
     }
   },
@@ -34,22 +35,81 @@ afterEach(() => {
 });
 
 describe('live topic React lifecycle', () => {
+  it.each(['resource', 'user', 'login', 'logout'] as const)(
+    'flow logs reset immediately on %s changes and ignore obsolete delivery',
+    (change) => {
+      const queryClient = new QueryClient();
+      let userId = 1;
+      const onUpdate = vi.fn();
+      const committedLogs: number[][] = [];
+      const hook = renderHook(
+        ({ resourceId }) => {
+          const result = useLiveLogs({ resourceId, onUpdate });
+          useLayoutEffect(() => {
+            committedLogs.push(result.liveLogs.map((log) => log.id));
+          });
+          return result;
+        },
+        {
+          initialProps: { resourceId: 1 },
+          wrapper: ({ children }) => (
+            <QueryClientProvider client={queryClient}>
+              <LiveUpdatesProvider userId={userId}>{children}</LiveUpdatesProvider>
+            </QueryClientProvider>
+          ),
+        },
+      );
+      const old = state.clients[0].subscriptions[0];
+      act(() => old.onUpdate({ id: 1, resourceId: 1 }));
+      expect(hook.result.current.liveLogs.map((log) => log.id)).toEqual([1]);
+      committedLogs.length = 0;
+      if (change === 'resource') hook.rerender({ resourceId: 2 });
+      if (change === 'user') {
+        userId = 2;
+        hook.rerender({ resourceId: 1 });
+      }
+      if (change === 'login') act(() => resumeLiveUpdates());
+      if (change === 'logout') act(() => stopLiveUpdates());
+      expect(committedLogs.every((logs) => logs.length === 0)).toBe(true);
+      expect(hook.result.current.liveLogs).toEqual([]);
+      act(() => old.onUpdate({ id: 99, resourceId: 1 }));
+      expect(hook.result.current.liveLogs).toEqual([]);
+      expect(onUpdate).toHaveBeenCalledTimes(1);
+      if (change === 'logout') act(() => resumeLiveUpdates());
+      const current = state.clients.at(-1)?.subscriptions.at(-1);
+      act(() => current?.onUpdate({ id: 2, resourceId: change === 'resource' ? 2 : 1 }));
+      expect(hook.result.current.liveLogs.map((log) => log.id)).toEqual([2]);
+      if (change === 'resource') {
+        hook.rerender({ resourceId: 1 });
+        expect(hook.result.current.liveLogs).toEqual([]);
+      }
+      hook.result.current.abort();
+      act(() => current?.onUpdate({ id: 3 }));
+      expect(onUpdate).toHaveBeenCalledTimes(2);
+      hook.unmount();
+    },
+  );
+
   it.each(['resource', 'topic', 'disable', 'client'] as const)(
     'core callbacks reject obsolete ownership during %s replacement before passive cleanup',
     (replacement) => {
       const queryClient = new QueryClient();
       let userId = 1;
-      let obsolete: { onUpdate: (data: unknown) => void; onReconnect: () => void } | undefined = undefined;
+      let obsolete:
+        { onUpdate: (data: unknown) => void; onReconnect: () => void; onUnavailable: () => void } | undefined =
+        undefined;
       const firstUpdate = vi.fn();
       const firstReconnect = vi.fn();
       const nextUpdate = vi.fn();
       const nextReconnect = vi.fn();
+      const unavailable = vi.fn();
       const initialProps = {
         topic: 'resource' as 'resource' | 'flow-logs',
         resourceId: 1,
         enabled: true,
         onUpdate: firstUpdate,
         onReconnect: firstReconnect,
+        onUnavailable: unavailable,
       };
       const hook = renderHook(
         (props) => {
@@ -58,6 +118,7 @@ describe('live topic React lifecycle', () => {
           useLayoutEffect(() => {
             obsolete?.onUpdate({ inUse: true });
             obsolete?.onReconnect();
+            obsolete?.onUnavailable();
           });
           return result;
         },
@@ -84,26 +145,73 @@ describe('live topic React lifecycle', () => {
       expect(firstReconnect).not.toHaveBeenCalled();
       expect(nextUpdate).not.toHaveBeenCalled();
       expect(nextReconnect).not.toHaveBeenCalled();
+      expect(unavailable).not.toHaveBeenCalled();
       if (replacement !== 'disable') {
         const current = state.clients.at(-1)?.subscriptions.at(-1);
         current?.onUpdate({ inUse: false });
         current?.onReconnect();
+        current?.onUnavailable();
         expect(nextUpdate).toHaveBeenCalledTimes(1);
         expect(nextReconnect).toHaveBeenCalledTimes(1);
+        expect(unavailable).toHaveBeenCalledTimes(1);
         hook.result.current.abort();
         hook.result.current.abort();
         current?.onUpdate({ inUse: true });
         current?.onReconnect();
+        current?.onUnavailable();
         expect(nextUpdate).toHaveBeenCalledTimes(1);
         expect(nextReconnect).toHaveBeenCalledTimes(1);
+        expect(unavailable).toHaveBeenCalledTimes(1);
         hook.unmount();
         current?.onUpdate({ inUse: true });
         current?.onReconnect();
+        current?.onUnavailable();
         expect(nextUpdate).toHaveBeenCalledTimes(1);
         expect(nextReconnect).toHaveBeenCalledTimes(1);
+        expect(unavailable).toHaveBeenCalledTimes(1);
       } else hook.unmount();
     },
   );
+  it('plugin unavailable callbacks follow ownership, abort and unmount guards', () => {
+    const failures: Array<() => void> = [];
+    const client = {
+      subscribe: vi.fn((_subscription, _update, _restore, unavailable: () => void) => {
+        failures.push(unavailable);
+        return vi.fn();
+      }),
+    };
+    const onUnavailable = vi.fn();
+    const hook = renderHook(
+      ({ identifier, enabled }) =>
+        usePluginLiveUpdates({
+          plugin: 'wago',
+          topic: 'diagnostics',
+          identifier,
+          enabled,
+          onUpdate: vi.fn(),
+          onUnavailable,
+        }),
+      {
+        initialProps: { identifier: '1', enabled: true },
+        wrapper: ({ children }) => <PluginLiveUpdatesProvider client={client}>{children}</PluginLiveUpdatesProvider>,
+      },
+    );
+    hook.rerender({ identifier: '2', enabled: true });
+    failures[0]();
+    expect(onUnavailable).not.toHaveBeenCalled();
+    failures[1]();
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    hook.rerender({ identifier: '2', enabled: false });
+    failures[1]();
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    hook.rerender({ identifier: '2', enabled: true });
+    hook.result.current.abort();
+    failures[2]();
+    hook.unmount();
+    failures[2]();
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+  });
+
   it('late plugin packets cannot update a replacement identifier or an aborted consumer', () => {
     const callbacks: Array<(payload: unknown) => void> = [];
     const client = {

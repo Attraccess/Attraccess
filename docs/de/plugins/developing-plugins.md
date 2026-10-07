@@ -281,6 +281,11 @@ im Frontend-SDK nutzen Plugins dieselbe authentifizierte Live-Verbindung wie der
 Host. Themen werden pro Plugin registriert; Kennungen und Berechtigungen müssen
 im Backend bei jeder Anmeldung und Erneuerung geprüft werden. Für UI-Updates ist
 keine eigene SSE- oder WebSocket-Verbindung nötig.
+Der optionale Callback `onUnavailable` meldet eine Themenablehnung oder eine
+Transportunterbrechung. Vorhandene Werte bleiben bis zum nächsten Snapshot als
+nicht verfügbar im Cache; wiederkehrendes REST-Polling ist nicht erforderlich.
+Der Callback wird wie `onUpdate` und `onReconnect` bei Bereinigung und Wechsel
+des Authentifizierungskontexts geschützt.
 Der Host gibt Ausnahmen aus Autorisierung und Quellen nicht an den Browser weiter.
 Bei `createSharedLiveSampler` bleibt die Sperre pro Kennung bis zum Abschluss
 einer laufenden Abfrage bestehen, auch nach dem letzten Abmelden; neue Verbraucher

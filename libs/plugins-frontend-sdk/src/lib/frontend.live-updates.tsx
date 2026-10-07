@@ -10,6 +10,7 @@ export interface PluginLiveUpdatesClient {
     subscription: PluginLiveSubscription,
     onUpdate: (payload: unknown) => void,
     onReconnect?: () => void,
+    onUnavailable?: () => void,
   ): () => void;
 }
 
@@ -37,6 +38,8 @@ export function usePluginLiveUpdates<T>(props: {
   enabled?: boolean;
   onUpdate: (payload: T) => void;
   onReconnect?: () => void;
+  /** Topic rejection or transport interruption; cached values may now be stale. */
+  onUnavailable?: () => void;
 }) {
   const client = useContext(LiveContext);
   const latest = useRef({ props, client });
@@ -60,6 +63,9 @@ export function usePluginLiveUpdates<T>(props: {
       },
       () => {
         if (matches()) return latest.current.props.onReconnect?.();
+      },
+      () => {
+        if (matches()) return latest.current.props.onUnavailable?.();
       },
     );
     const cleanup = () => {

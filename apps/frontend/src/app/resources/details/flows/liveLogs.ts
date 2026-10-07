@@ -9,19 +9,31 @@ interface Props {
 
 export function useLiveLogs(props: Props) {
   const { resourceId, onUpdate } = props;
-  const [liveLogs, setLiveLogs] = useState<ResourceFlowLog[]>([]);
+  const [state, setState] = useState<{
+    resourceId: number;
+    owner: object | null;
+    logs: ResourceFlowLog[];
+  } | null>(null);
 
-  const { abort } = useLiveUpdates({
+  const { abort, owner } = useLiveUpdates({
     topic: 'flow-logs',
     resourceId,
     onUpdate: (data) => {
-      setLiveLogs((prev) => [...prev, data]);
+      setState((prev) => ({
+        resourceId,
+        owner,
+        logs: [...(prev?.resourceId === resourceId && prev.owner === owner ? prev.logs : []), data],
+      }));
       onUpdate(data);
     },
   });
 
+  // Reset during render so consumers never commit the previous owner's logs.
+  // Clearing also prevents an A -> B -> A navigation from reviving old entries.
+  if (state && (state.resourceId !== resourceId || state.owner !== owner)) setState(null);
+
   return {
-    liveLogs,
+    liveLogs: state?.logs ?? [],
     abort,
   };
 }

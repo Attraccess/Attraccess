@@ -80,6 +80,7 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
   props: { topic: T } & TopicSubscription<T> & {
       onUpdate: (payload: LivePayloads[T]) => void;
       onReconnect?: () => void;
+      onUnavailable?: () => void;
       enabled?: boolean;
     },
 ) {
@@ -107,6 +108,9 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
       () => {
         if (matches()) return latest.current.props.onReconnect?.();
       },
+      () => {
+        if (matches()) return latest.current.props.onUnavailable?.();
+      },
     );
     const cleanup = () => {
       if (!active) return;
@@ -119,5 +123,6 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
       if (unsubscribeRef.current === cleanup) unsubscribeRef.current = null;
     };
   }, [client, topic, resourceId, enabled, queryClient]);
-  return { abort: useCallback(() => unsubscribeRef.current?.(), []) };
+  // Feature state can use this identity to reset on authentication-context changes.
+  return { abort: useCallback(() => unsubscribeRef.current?.(), []), owner: client };
 }

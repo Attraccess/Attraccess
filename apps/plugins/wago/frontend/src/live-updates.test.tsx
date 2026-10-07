@@ -19,10 +19,10 @@ afterEach(cleanup);
 function setup(queryFn?: () => Promise<unknown>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   const queryKey = ['wago', 'diagnostics', 1];
-  const consumers = new Set<{ update: (payload: unknown) => void; reconnect?: () => void }>();
+  const consumers = new Set<{ update: (payload: unknown) => void; reconnect?: () => void; unavailable?: () => void }>();
   const liveClient: PluginLiveUpdatesClient = {
-    subscribe: (_subscription, update, reconnect) => {
-      const consumer = { update, reconnect };
+    subscribe: (_subscription, update, reconnect, unavailable) => {
+      const consumer = { update, reconnect, unavailable };
       consumers.add(consumer);
       return () => consumers.delete(consumer);
     },
@@ -83,9 +83,11 @@ function setupFrontPanel() {
   panelApi.baseline.mockReset().mockResolvedValue(baseline);
   panelApi.manual.mockReset();
   const consumers = new Map<string, (payload: unknown) => void>();
+  const failures = new Map<string, () => void>();
   const liveClient: PluginLiveUpdatesClient = {
-    subscribe: ({ topic }, update) => {
+    subscribe: ({ topic }, update, _reconnect, unavailable) => {
       consumers.set(topic, update);
+      if (unavailable) failures.set(topic, unavailable);
       return () => consumers.delete(topic);
     },
   };
@@ -101,10 +103,51 @@ function setupFrontPanel() {
     if (!update) throw new Error(`No subscriber for ${topic}`);
     await act(async () => update(payload));
   };
-  return { hook, queryClient, baseline, diagnostics, baselineKey, diagnosticsKey, send };
+  return { hook, queryClient, baseline, diagnostics, baselineKey, diagnosticsKey, send, failures };
 }
 
 describe('WAGO shared live queries', () => {
+  it('transport failures retain data, cancel pending reads and recover without REST fallback', async () => {
+    const { hook, queryClient, consumers, read } = setup();
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+    await act(async () =>
+      consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 8 } })),
+    );
+    const neighborKey = ['wago', 'diagnostics', 2];
+    queryClient.setQueryData(neighborKey, { revision: 10 });
+    await act(async () => consumers.forEach((consumer) => consumer.unavailable?.()));
+    await waitFor(() => expect(hook.result.current.isError).toBe(true));
+    expect(hook.result.current.data).toEqual({ revision: 8 });
+    expect(queryClient.getQueryState(neighborKey)?.status).toBe('success');
+    expect(read).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      consumers.forEach((consumer) => consumer.update({ eventType: 'snapshot', value: { revision: 9 } })),
+    );
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+    expect(hook.result.current.data).toEqual({ revision: 9 });
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['diagnostics', 'configuration-baseline'] as const)(
+    '%s subscription failure makes front-panel controls unavailable and preserves snapshots',
+    async (topic) => {
+      const { hook, queryClient, baselineKey, diagnosticsKey, failures, send, diagnostics, baseline } =
+        setupFrontPanel();
+      await waitFor(() => expect(hook.result.current.ready).toBe(true));
+      const key = topic === 'diagnostics' ? diagnosticsKey : baselineKey;
+      const otherKey = topic === 'diagnostics' ? baselineKey : diagnosticsKey;
+      const data = queryClient.getQueryData(key);
+      await act(async () => failures.get(`plugin:wago:${topic}`)?.());
+      await waitFor(() => expect(queryClient.getQueryState(key)?.status).toBe('error'));
+      expect(queryClient.getQueryData(key)).toEqual(data);
+      expect(queryClient.getQueryState(otherKey)?.status).toBe('success');
+      if (topic === 'diagnostics') expect(hook.result.current.live.enabled).toBe(false);
+      if (topic === 'configuration-baseline') expect(hook.result.current.ready).toBe(false);
+      await send(topic, { eventType: 'snapshot', value: topic === 'diagnostics' ? diagnostics : baseline });
+      await waitFor(() => expect(hook.result.current.live.enabled).toBe(true));
+    },
+  );
+
   it.each(['snapshot', 'unavailable'] as const)(
     'keeps a streamed %s authoritative when the initial REST read settles later',
     async (eventType) => {

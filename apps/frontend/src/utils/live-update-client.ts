@@ -8,9 +8,20 @@ import {
 import { events } from 'fetch-event-stream';
 import { v4 as uuidv4 } from 'uuid';
 
-type Consumer = { update: (payload: unknown) => void; restore?: () => void; hasResourceState: boolean };
+type Consumer = {
+  update: (payload: unknown) => void;
+  restore?: () => void;
+  unavailable?: () => void;
+  hasResourceState: boolean;
+};
 type ResourceState = { resourceId: number; inUse: boolean; timestamp?: string };
-type Entry = { subscription: LiveSubscription; consumers: Set<Consumer>; snapshot?: ResourceState; rejected?: boolean };
+type Entry = {
+  subscription: LiveSubscription;
+  consumers: Set<Consumer>;
+  snapshot?: ResourceState;
+  rejected?: boolean;
+  unavailable?: boolean;
+};
 interface Transport {
   id: string;
   abort: AbortController;
@@ -44,18 +55,35 @@ export class LiveUpdateClient {
     private readonly recovered: () => void = () => undefined,
   ) {}
 
-  subscribe(subscription: LiveSubscription, update: Consumer['update'], restore?: Consumer['restore']): () => void {
+  subscribe(
+    subscription: LiveSubscription,
+    update: Consumer['update'],
+    restore?: Consumer['restore'],
+    unavailable?: Consumer['unavailable'],
+  ): () => void {
     if (this.disposed) return () => undefined;
     const key = liveSubscriptionKey(subscription);
     let entry = this.topics.get(key);
     const isNewTopic = !entry?.consumers.size;
     if (!entry) {
-      entry = { subscription, consumers: new Set() };
+      entry = { subscription, consumers: new Set(), unavailable: !!this.retry };
       this.topics.set(key, entry);
     }
-    const consumer = { update, restore, hasResourceState: false };
+    const consumer = { update, restore, unavailable, hasResourceState: false };
     entry.consumers.add(consumer);
     this.replay(entry, consumer);
+    if (entry.unavailable) {
+      const currentEntry = entry;
+      queueMicrotask(() => {
+        if (
+          !this.disposed &&
+          this.topics.get(key) === currentEntry &&
+          currentEntry.unavailable &&
+          currentEntry.consumers.has(consumer)
+        )
+          this.invoke(consumer.unavailable);
+      });
+    }
     if (isNewTopic || entry.rejected) this.changed();
     let removed = false;
     return () => {
@@ -116,6 +144,7 @@ export class LiveUpdateClient {
     const entry = this.topics.get(liveSubscriptionKey(event));
     if (!entry?.consumers.size) return;
     entry.rejected = false;
+    entry.unavailable = false;
     const payload = event.payload;
     let isResourceState = false;
     if (
@@ -152,6 +181,16 @@ export class LiveUpdateClient {
     if (entry) {
       entry.snapshot = undefined;
       entry.rejected = true;
+      this.markUnavailable(entry);
+    }
+  }
+
+  private markUnavailable(entry: Entry): void {
+    if (entry.unavailable) return;
+    entry.unavailable = true;
+    // Snapshot the set so subscriptions added by a callback use their queued notification.
+    for (const consumer of [...entry.consumers]) {
+      if (!this.disposed && entry.consumers.has(consumer)) this.invoke(consumer.unavailable);
     }
   }
 
@@ -235,6 +274,8 @@ export class LiveUpdateClient {
     if (this.transport !== transport) return;
     this.stopTransport();
     if (!this.disposed && this.hasConsumers()) {
+      this.topics.forEach((entry) => this.markUnavailable(entry));
+      if (this.disposed || !this.hasConsumers()) return;
       const delay = Math.min(30_000, 500 * 2 ** Math.min(this.failures++, 6)) * (0.75 + Math.random() * 0.25);
       this.retry = setTimeout(() => {
         this.retry = undefined;

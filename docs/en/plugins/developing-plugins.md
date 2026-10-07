@@ -827,6 +827,10 @@ so they share the workspace toolchain, caching and CI.
 
 Use the backend SDK's `context.liveUpdates.register` and the frontend SDK's
 `usePluginLiveUpdates<T>` to share the host's authenticated live connection.
+Its optional `onUnavailable` callback reports topic rejection or transport
+interruption. Retain cached values as unavailable until a fresh snapshot arrives;
+do not start recurring REST polling. Cleanup and authentication ownership guard
+this callback in the same way as `onUpdate` and `onReconnect`.
 Declare plugin-local topics, validate identifiers and authorize every subscription
 on the backend; do not open a separate SSE or WebSocket for plugin UI updates.
 Authorization and source exceptions are redacted by the host. With
