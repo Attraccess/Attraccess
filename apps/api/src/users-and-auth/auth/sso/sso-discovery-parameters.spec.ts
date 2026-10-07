@@ -1,11 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
+import * as discovery from './sso-discovery-request';
 import { SsoDiscoveryRoutesImplementation } from './sso-discovery.routes';
 
 describe('SSO discovery parameters', () => {
   const routes: Pick<SsoDiscoveryRoutesImplementation, 'discoverAuthentik' | 'discoverKeycloak'> = Object.create(
     SsoDiscoveryRoutesImplementation.prototype,
   );
-  const fetchMock = jest.spyOn(globalThis, 'fetch');
+  const fetchMock = jest.spyOn(discovery, 'requestDiscoveryJson');
 
   afterEach(() => fetchMock.mockReset());
   afterAll(() => fetchMock.mockRestore());
@@ -27,10 +28,10 @@ describe('SSO discovery parameters', () => {
   });
 
   it('retains discovery for the documented local identity providers', async () => {
-    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ issuer: 'fixture' }) } as Response);
+    fetchMock.mockResolvedValue({ issuer: 'fixture' });
     await routes.discoverAuthentik('http://localhost:9000/', 'application');
     await routes.discoverKeycloak('http://localhost:8080/', 'realm');
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+    expect(fetchMock.mock.calls.map(([url]) => url.toString())).toEqual([
       'http://localhost:9000/application/o/application/.well-known/openid-configuration',
       'http://localhost:8080/realms/realm/.well-known/openid-configuration',
     ]);

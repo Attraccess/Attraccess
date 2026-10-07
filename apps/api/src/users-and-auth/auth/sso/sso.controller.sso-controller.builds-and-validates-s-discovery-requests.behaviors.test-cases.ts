@@ -1,3 +1,4 @@
+import * as discovery from './sso-discovery-request';
 import { registerSsoControllerFixture } from './sso.controller.sso-controller.test-fixture';
 import { SSOProviderType } from '@attraccess/database-entities';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
@@ -11,23 +12,21 @@ export function registerBuildsAndValidatesSDiscoveryRequestsCases(
     'builds and validates %s discovery requests',
     async (method) => {
       const fetchMock = jest
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue({ ok: true, json: async () => ({ issuer: 'https://idp.example' }) } as never);
+        .spyOn(discovery, 'requestDiscoveryJson')
+        .mockResolvedValue({ issuer: 'https://idp.example' });
       try {
         expect(await fixture.controller[method]('idp.example/', 'team name')).toEqual({
           issuer: 'https://idp.example',
         });
         const route = method === 'discoverAuthentik' ? 'application/o' : 'realms';
         expect(fetchMock).toHaveBeenCalledWith(
-          `http://idp.example/${route}/team%20name/.well-known/openid-configuration`,
-          { headers: { Accept: 'application/json' } },
+          new URL(`http://idp.example/${route}/team%20name/.well-known/openid-configuration`),
         );
         await fixture.controller[method]('https://idp.example', 'team');
         expect(fetchMock).toHaveBeenLastCalledWith(
-          `https://idp.example/${route}/team/.well-known/openid-configuration`,
-          expect.any(Object),
+          new URL(`https://idp.example/${route}/team/.well-known/openid-configuration`),
         );
-        fetchMock.mockResolvedValue({ ok: false, status: 503, statusText: 'Unavailable' } as never);
+        fetchMock.mockRejectedValue(new Error('503 Unavailable'));
         await expect(fixture.controller[method]('https://idp.example', 'team')).rejects.toThrow('503 Unavailable');
         await expect(fixture.controller[method]('', 'team')).rejects.toThrow('Missing required');
         await expect(fixture.controller[method]('idp.example', '')).rejects.toThrow('Missing required');

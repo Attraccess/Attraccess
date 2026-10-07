@@ -21,7 +21,6 @@ import { registerShouldNotRunConcurrentEvaluationsWhenLockIsHeldPart17Cases } fr
 import { registerShouldSkipOrphanedSchedulesWithoutIssuingAnInvalidEmptyPPart4Cases } from './maintenance-schedule-evaluator.service.evaluateall.should-not-create-maintenance-when-usage-hours-threshold-not-met.behaviors.test-cases';
 import { registerShouldSkipResourcesThatAlreadyHaveActiveMaintenancePart6Cases } from './maintenance-schedule-evaluator.service.evaluateall.should-not-create-maintenance-when-usage-hours-threshold-not-met.behaviors.test-cases';
 import { registerShouldUseLastDoneMaintenanceEndtimeAsBaselineNotResourcePart16Cases } from './maintenance-schedule-evaluator.service.evaluateall.should-not-create-maintenance-when-usage-hours-threshold-not-met.behaviors.test-cases';
-import { registerShouldWriteDueSchedulesInBoundedTransactionsPart1Cases } from './maintenance-schedule-evaluator.service.evaluateall.should-write-due-schedules-in-bounded-transactions.behaviors.test-cases';
 import { registerMaintenanceScheduleEvaluatorServiceFixture } from './maintenance-schedule-evaluator.service.maintenance-schedule-evaluator-service.test-fixture';
 
 export function registerShouldWriteDueSchedulesInBoundedTransactionsPart1Cases(

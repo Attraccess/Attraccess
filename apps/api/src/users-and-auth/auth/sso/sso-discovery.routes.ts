@@ -5,6 +5,7 @@ import { ApiBadRequestResponse, ApiOperation, ApiQuery, ApiResponse } from '@nes
 import { SkipLicenseCheck } from '../../../license/require-license.decorator';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { SsoProviderRoutesImplementation } from './sso-provider.routes';
+import { discoveryUrl, requestDiscoveryJson } from './sso-discovery-request';
 export abstract class SsoDiscoveryRoutesImplementation extends SsoProviderRoutesImplementation {
   @Post('/link-account')
   @SkipLicenseCheck()
@@ -96,20 +97,12 @@ export abstract class SsoDiscoveryRoutesImplementation extends SsoProviderRoutes
       throw new BadRequestException('Missing required parameters');
     }
 
-    const trimmedHost = host.endsWith('/') ? host.slice(0, -1) : host;
-    const hasProtocol = /^https?:\/\//i.test(trimmedHost);
-    const origin = hasProtocol ? trimmedHost : `http://${trimmedHost}`;
-    const targetUrl = `${origin}/application/o/${encodeURIComponent(applicationName)}/.well-known/openid-configuration`;
-
-    const response = await fetch(targetUrl, {
-      headers: { Accept: 'application/json' },
-    });
-
-    if (!response.ok) {
-      throw new UnauthorizedException(`Failed to fetch discovery: ${response.status} ${response.statusText}`);
-    }
-
-    return response.json();
+    if (['.', '..'].includes(applicationName)) throw new BadRequestException('Invalid discovery path');
+    const target = discoveryUrl(
+      host,
+      `/application/o/${encodeURIComponent(applicationName)}/.well-known/openid-configuration`,
+    );
+    return requestDiscoveryJson(target);
   }
 
   @Get('discovery/keycloak')
@@ -124,19 +117,8 @@ export abstract class SsoDiscoveryRoutesImplementation extends SsoProviderRoutes
       throw new BadRequestException('Missing required parameters');
     }
 
-    const trimmedHost = host.endsWith('/') ? host.slice(0, -1) : host;
-    const hasProtocol = /^https?:\/\//i.test(trimmedHost);
-    const origin = hasProtocol ? trimmedHost : `http://${trimmedHost}`;
-    const targetUrl = `${origin}/realms/${encodeURIComponent(realm)}/.well-known/openid-configuration`;
-
-    const response = await fetch(targetUrl, {
-      headers: { Accept: 'application/json' },
-    });
-
-    if (!response.ok) {
-      throw new UnauthorizedException(`Failed to fetch discovery: ${response.status} ${response.statusText}`);
-    }
-
-    return response.json();
+    if (['.', '..'].includes(realm)) throw new BadRequestException('Invalid discovery path');
+    const target = discoveryUrl(host, `/realms/${encodeURIComponent(realm)}/.well-known/openid-configuration`);
+    return requestDiscoveryJson(target);
   }
 }

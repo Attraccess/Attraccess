@@ -95,7 +95,7 @@ describe('ShellyDeviceApiService', () => {
         body: JSON.stringify({
           user: 'admin',
           realm: 'shellyplus1pm-aabbcc',
-          ha1: 'f18bfc7a82bc27bd078d10b0a1da0a1d',
+          ha1: '959bd1eedea16f1fe2cf785b32db9bf357d50b2954e36e45f1e7965c98ba1f61',
         }),
       }),
     );

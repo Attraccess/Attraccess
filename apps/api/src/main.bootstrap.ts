@@ -150,12 +150,7 @@ export async function bootstrap() {
     }
   }
 
-  const { globalPrefix, documentFactory } = await configureBootstrapApi(
-    app,
-    appConfig,
-    skipDatabaseMigrations,
-    bootstrapLogger,
-  );
+  const { globalPrefix, documentFactory } = await configureBootstrapApi(app, appConfig, bootstrapLogger);
 
   const port = appConfig.PORT;
   // Listening and related logging will be handled by startListening function

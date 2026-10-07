@@ -1,7 +1,7 @@
 // Live device calls for status/config and admin credentials. Transport (timeouts,
 // Basic/Digest auth replay) lives in ShellyHttpClient.
 import { Inject, Injectable } from '@nestjs/common';
-import { md5, ShellyHttpClient, type DeviceCredentials } from './shelly-http.client';
+import { sha256, ShellyHttpClient, type DeviceCredentials } from './shelly-http.client';
 
 export type { DeviceCredentials } from './shelly-http.client';
 
@@ -65,7 +65,7 @@ export class ShellyDeviceApiService {
       {
         user: username,
         realm,
-        ha1: md5(`${username}:${realm}:${input.password}`),
+        ha1: sha256(`${username}:${realm}:${input.password}`),
       },
       input,
     );

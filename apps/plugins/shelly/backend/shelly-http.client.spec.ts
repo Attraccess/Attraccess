@@ -31,7 +31,7 @@ describe('Shelly HTTP authentication', () => {
       }),
     ]);
   });
-  it.each(['SHA-256', 'MD5'])(
+  it.each(['SHA-256', ' SHA-256 '])(
     'answers a %s digest challenge for the exact requested method and URI',
     async (algorithm) => {
       fetchMock
@@ -48,7 +48,8 @@ describe('Shelly HTTP authentication', () => {
       const authorization = fetchMock.mock.calls[1][1].headers.Authorization as string;
       const cnonce = /cnonce="([a-f0-9]+)"/.exec(authorization)?.[1];
       expect(cnonce).toMatch(/^[a-f0-9]{16}$/);
-      const hash = (value: string) => createHash(algorithm.toLowerCase().replace('-', '')).update(value).digest('hex');
+      const hash = (value: string) =>
+        createHash(algorithm.trim().toLowerCase().replace('-', '')).update(value).digest('hex');
       const expected = hash(
         `${hash('admin:shelly:secret')}:server-nonce:00000001:${cnonce}:auth:${hash('GET:/rpc/Switch.Set?id=0')}`,
       );
@@ -57,24 +58,29 @@ describe('Shelly HTTP authentication', () => {
       expect(authorization).toContain('qop=auth, nc=00000001');
     },
   );
-  it('supports legacy digest without qop and falls back for incomplete challenges', async () => {
+  it('supports SHA-256 digest without qop', async () => {
     fetchMock
       .mockResolvedValueOnce(
-        new Response('', { status: 401, headers: { 'WWW-Authenticate': 'Digest realm="shelly", nonce="nonce"' } }),
+        new Response('', {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': 'Digest realm="shelly", nonce="nonce", algorithm=SHA-256',
+          },
+        }),
       )
       .mockResolvedValueOnce(Response.json({}));
     await client.getJson(url, { currentPassword: 'secret' });
     expect(fetchMock.mock.calls[1][1].headers.Authorization).not.toContain('qop=');
-    fetchMock
-      .mockClear()
-      .mockResolvedValueOnce(
-        new Response('', { status: 401, headers: { 'WWW-Authenticate': 'Digest realm="shelly"' } }),
-      )
-      .mockResolvedValueOnce(Response.json({}));
-    await client.getJson(url, { currentPassword: 'secret' });
-    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe(
-      `Basic ${Buffer.from('admin:secret').toString('base64')}`,
-    );
+  });
+  it.each([
+    'Digest realm="shelly", nonce="nonce", algorithm=MD5',
+    'Digest realm="shelly", nonce="nonce"',
+    'Digest realm="shelly", algorithm=SHA-256',
+    'Bearer token',
+  ])('rejects unsupported/incomplete challenges without sending credentials: %s', async (challenge) => {
+    fetchMock.mockResolvedValue(new Response('', { status: 401, headers: { 'WWW-Authenticate': challenge } }));
+    await expect(client.getJson(url, { currentPassword: 'secret' })).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('does not retry unauthenticated failures without a password', async () => {
     fetchMock.mockResolvedValue(new Response('', { status: 401 }));

@@ -7,6 +7,7 @@
 //
 // The presence of a numeric `gen` field is the discriminator between the two.
 import { Injectable } from '@nestjs/common';
+import { validateShellyAddress } from './shelly-address';
 import type { AuthState, ProbeResult } from './types';
 
 const PROBE_TIMEOUT_MS = 5000;
@@ -32,10 +33,11 @@ export class ShellyProbeService {
    * a non-OK / non-JSON response.
    */
   async probe(ipAddress: string, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<ProbeResult> {
-    const url = `http://${ipAddress}/shelly`;
+    const url = `http://${validateShellyAddress(ipAddress)}/shelly`;
     let json: ShellyInfoResponse;
     try {
       const res = await fetch(url, {
+        redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
         headers: { Accept: 'application/json' },
       });

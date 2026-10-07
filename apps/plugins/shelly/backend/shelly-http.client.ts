@@ -8,6 +8,7 @@
 // header when the device asks for one.
 import { createHash, randomBytes } from 'crypto';
 import { Injectable } from '@nestjs/common';
+import { validateShellyUrl } from './shelly-address';
 
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -30,6 +31,7 @@ export class ShellyHttpClient {
     url: string,
     options: { method: 'GET' | 'POST'; body?: unknown; credentials: DeviceCredentials },
   ): Promise<unknown> {
+    validateShellyUrl(url);
     const requestOptions = this.buildFetchOptions(options.method, options.body);
     let response = await fetch(url, requestOptions);
 
@@ -56,6 +58,7 @@ export class ShellyHttpClient {
     }
     return {
       method,
+      redirect: 'error',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -71,9 +74,10 @@ export class ShellyHttpClient {
     const username = credentials.username?.trim() || 'admin';
     const password = credentials.currentPassword ?? '';
     const challenge = response.headers.get('www-authenticate') ?? response.headers.get('WWW-Authenticate') ?? '';
-    if (!challenge.toLowerCase().startsWith('digest ')) {
+    if (challenge.toLowerCase().startsWith('basic ')) {
       return { Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}` };
     }
+    if (!challenge.toLowerCase().startsWith('digest ')) throw new Error('Unsupported Shelly authentication challenge');
     return { Authorization: buildDigestAuthorization(challenge, url, method, username, password) };
   }
 }
@@ -93,12 +97,13 @@ function buildDigestAuthorization(
   password: string,
 ): string {
   const params = parseDigestChallenge(challenge);
-  const algorithm = (params.algorithm ?? 'MD5').toUpperCase();
-  const hash = algorithm.includes('SHA-256') ? sha256 : md5;
+  const algorithm = params.algorithm?.trim().toUpperCase();
+  if (algorithm !== 'SHA-256') throw new Error('Shelly Digest requires SHA-256');
+  const hash = sha256;
   const nonce = params.nonce;
   const realm = params.realm;
   if (!nonce || !realm) {
-    return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
+    throw new Error('Incomplete Shelly Digest challenge');
   }
 
   const requestUrl = new URL(url);
@@ -136,10 +141,7 @@ function parseDigestChallenge(challenge: string): Record<string, string> {
   return params;
 }
 
-export function md5(value: string): string {
-  return createHash('md5').update(value).digest('hex');
-}
-
-function sha256(value: string): string {
+/** Shelly Gen2+ protocol hash, never used for application password storage. */
+export function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }

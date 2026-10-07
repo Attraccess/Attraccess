@@ -7,10 +7,7 @@ import { registerShouldFilterByEmailVerificationStatusPart10Cases } from './user
 import { registerShouldFilterUsersByRoleAssignmentPart2Cases } from './users.service.findmany.should-combine-selected-sso-providers-with-no-sso-users-for-an-an.behaviors.test-cases';
 import { registerShouldOrderUsersByUsernameAscendingPart1Cases } from './users.service.findmany.should-combine-selected-sso-providers-with-no-sso-users-for-an-an.behaviors.test-cases';
 import { registerShouldRequireEverySelectedRoleWhenRolematchIsAllPart4Cases } from './users.service.findmany.should-combine-selected-sso-providers-with-no-sso-users-for-an-an.behaviors.test-cases';
-import { registerShouldRequireUsersWithAnSsoProviderPart9Cases } from './users.service.findmany.should-require-users-with-an-sso-provider.behaviors.test-cases';
-import { registerShouldRetainTheRoleAssignmentFilterWhenSearchingPart3Cases } from './users.service.findmany.should-require-users-with-an-sso-provider.behaviors.test-cases';
 import { registerShouldReturnPaginatedUsersCases } from './users.service.findmany.should-return-paginated-users.test-cases';
-import { registerShouldThrowErrorForInvalidPaginationOptionsPart11Cases } from './users.service.findmany.should-require-users-with-an-sso-provider.behaviors.test-cases';
 import { registerUsersServiceFixture } from './users.service.users-service.test-fixture';
 
 export function registerShouldRequireUsersWithAnSsoProviderPart9Cases(
