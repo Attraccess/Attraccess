@@ -57,6 +57,7 @@ export function registerDeleteOneCases(fixture: ReturnType<typeof registerProjec
       expect(fixture.mockMetricsService.projectsTotal.dec).not.toHaveBeenCalled();
     });
 
+    // Schema synchronization under CI coverage can exceed Jest's five-second default.
     it('rolls back SQLite usage detachment on a delete abort and records only the successful delete', async () => {
       const source = await new DataSource({
         type: 'sqlite',
@@ -108,6 +109,6 @@ export function registerDeleteOneCases(fixture: ReturnType<typeof registerProjec
       } finally {
         await source.destroy();
       }
-    });
+    }, 30_000);
   });
 }

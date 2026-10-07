@@ -13,6 +13,7 @@ import { GenericMetersTestScope } from './resource-metering.persistence.spec';
 export function registerGenericMetersCarriesPaidFreeZeroAndUnavailableMeterEvidenceFromSettlementIntoTheSReceipt(
   scope: GenericMetersTestScope,
 ): void {
+  // Multiple SQLite settlements and receipt rendering run slower under CI coverage.
   it.each(['en', 'de'])(
     'carries paid, free, zero and unavailable meter evidence from settlement into the %s receipt',
     async (locale) => {
@@ -127,5 +128,6 @@ export function registerGenericMetersCarriesPaidFreeZeroAndUnavailableMeterEvide
       expect(await scope.items(started.id)).toEqual(before);
       expect((await scope.correctionsOf(started.id)).corrections).toEqual([expect.objectContaining({ amount: -34 })]);
     },
+    30_000,
   );
 }
