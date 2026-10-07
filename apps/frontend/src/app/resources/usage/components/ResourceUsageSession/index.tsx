@@ -19,7 +19,7 @@ import {
   SupervisionMode,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSSE } from '../../../../../utils/sse';
+import { useLiveUpdates } from '../../../../../utils/live-updates';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
@@ -56,8 +56,9 @@ export function ResourceUsageSession({
     queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
   }, [queryClient]);
 
-  useSSE({
-    path: `/api/resources/${resourceId}/events`,
+  useLiveUpdates({
+    topic: 'resource',
+    resourceId,
     onUpdate: (data: { eventType?: string; inUse?: boolean }) => {
       if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
         invalidateSessionQueries();

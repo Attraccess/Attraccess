@@ -1,5 +1,5 @@
 import { BillingTransaction } from '@attraccess/react-query-client';
-import { useSSE } from '../../../../utils/sse';
+import { useLiveUpdates } from '../../../../utils/live-updates';
 
 interface Props {
   onUpdate: (transaction: BillingTransaction) => void;
@@ -9,8 +9,8 @@ interface Props {
 export function useLiveTransactionUpdates(props: Props) {
   const { onUpdate, enabled = true } = props;
 
-  const { abort } = useSSE<BillingTransaction>({
-    path: '/api/billing/transactions/live',
+  const { abort } = useLiveUpdates({
+    topic: 'billing',
     onUpdate,
     enabled,
   });

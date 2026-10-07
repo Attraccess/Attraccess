@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 import type { PluginAuditContext } from './plugin-audit';
+import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 import { MqttServerConnectionConfig, PluginMqttClient } from './plugin-mqtt-context';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 
@@ -48,6 +49,8 @@ export interface PluginSecretsContext {
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
+  /** Shared authenticated UI transport. Optional for hosts predating this capability. */
+  readonly liveUpdates?: PluginLiveUpdatesContext;
   /** Optional for compatibility with hosts predating generic plugin audit support. */
   readonly audit?: PluginAuditContext;
   /** This plugin's own manifest (name, version, directory, id). */

@@ -6,6 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource as HostDataSource } from 'typeorm';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginMqttService } from './plugin-mqtt.service';
+import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 
 function getImplementationClass(): typeof PluginModule {
@@ -48,6 +49,12 @@ export abstract class PluginModuleRouteContext {
     return getImplementationClass()
       .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
       .get(PluginEventsService, { strict: false });
+  }
+
+  protected static pluginLiveUpdates(): PluginLiveUpdatesService {
+    return getImplementationClass()
+      .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
+      .get(PluginLiveUpdatesService, { strict: false });
   }
 
   protected static pluginMqtt(): PluginMqttService {

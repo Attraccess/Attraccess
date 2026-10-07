@@ -4,6 +4,8 @@ import { join } from 'path';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { SettingsModule } from '../settings/settings.module';
+import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { NpmPluginService } from './npm-plugin.service';
 import { registerPluginAuditDomains } from './plugin-audit-registry';
 import { PluginClassificationService } from './plugin-classification.service';
@@ -30,7 +32,7 @@ export abstract class PluginModuleLoadingImplementation extends PluginHostContex
 
       return {
         module: PluginModule,
-        imports: [SettingsModule, MqttModule],
+        imports: [SettingsModule, MqttModule, LiveTopicsModule],
         providers: [
           PluginService,
           PluginSandboxService,
@@ -38,6 +40,7 @@ export abstract class PluginModuleLoadingImplementation extends PluginHostContex
           PluginMqttService,
           NpmPluginService,
           PluginClassificationService,
+          PluginLiveUpdatesService,
         ],
         exports: [PluginEventsService],
         controllers: [PluginController],
@@ -99,7 +102,7 @@ export abstract class PluginModuleLoadingImplementation extends PluginHostContex
 
     return {
       module: PluginModule,
-      imports: [SettingsModule, MqttModule, ...pluginModules],
+      imports: [SettingsModule, MqttModule, LiveTopicsModule, ...pluginModules],
       providers: [
         PluginService,
         PluginSandboxService,
@@ -107,6 +110,7 @@ export abstract class PluginModuleLoadingImplementation extends PluginHostContex
         PluginMqttService,
         NpmPluginService,
         PluginClassificationService,
+        PluginLiveUpdatesService,
       ],
       exports: [PluginEventsService],
       controllers: [PluginController],
@@ -178,7 +182,10 @@ export abstract class PluginModuleLoadingImplementation extends PluginHostContex
         {
           provide: `plugin-mqtt-cleanup:${manifest.id}`,
           useFactory: () => ({
-            onModuleDestroy: () => getImplementationClass().pluginMqtt().clearPlugin(manifest.id),
+            onModuleDestroy: () => {
+              getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
+              getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
+            },
           }),
         },
       ],

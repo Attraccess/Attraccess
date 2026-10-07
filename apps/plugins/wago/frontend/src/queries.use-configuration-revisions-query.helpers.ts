@@ -1,3 +1,4 @@
+import { useWagoLiveQuery } from './live-updates';
 import { useQuery } from '@tanstack/react-query';
 import { listConfigurationRevisions } from './api';
 import { queryKeys } from './queries.query-keys';
@@ -24,10 +25,14 @@ import { saveDraft } from './api';
 import type { ConfigurationEditorMetadata } from './api';
 
 export function useConfigurationRevisionsQuery(controllerId: number, offset: number) {
+  useWagoLiveQuery(
+    [...queryKeys.revisions(controllerId), offset],
+    'configuration-revisions',
+    `${controllerId}:${offset}`,
+  );
   return useQuery({
     queryKey: [...queryKeys.revisions(controllerId), offset],
     queryFn: () => listConfigurationRevisions(controllerId, offset),
-    refetchInterval: 2_000,
   });
 }
 
@@ -48,10 +53,10 @@ export function useConfirmCommissioningHostKeyMutation() {
 }
 
 export function useControllersQuery() {
+  useWagoLiveQuery(queryKeys.controllers, 'controllers');
   return useQuery({
     queryKey: queryKeys.controllers,
     queryFn: listControllers,
-    refetchInterval: 10_000,
   });
 }
 

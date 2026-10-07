@@ -21,6 +21,7 @@ import { ShellyController } from './shelly.controller';
 import { ShellyDeviceApiService } from './shelly-device-api.service';
 import { ShellyFirmwareService } from './shelly-firmware.service';
 import { ShellyHttpClient } from './shelly-http.client';
+import { ShellyLiveUpdatesService } from './shelly-live-updates.service';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -46,6 +47,7 @@ const plugin: PluginBackendModule = {
         ShellyHttpClient,
         ShellyDeviceApiService,
         ShellyFirmwareService,
+        ShellyLiveUpdatesService,
       ],
     };
   },

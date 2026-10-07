@@ -38,6 +38,7 @@ export function createGuardedContext(
   return {
     manifest: base.manifest,
     audit: base.audit,
+    liveUpdates: base.liveUpdates,
     logger: base.logger,
     mqtt: {
       subscribe(serverId, topicFilter, handler) {

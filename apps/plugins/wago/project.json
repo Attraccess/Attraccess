@@ -63,6 +63,7 @@
       "cache": true,
       "inputs": [
         "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
         "{projectRoot}/backend/**/*",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/channel-behavior.ts",
@@ -101,6 +102,7 @@
         "{projectRoot}/frontend/**/*",
         "{projectRoot}/shared/**/*",
         "{projectRoot}/modbus/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
         "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
         "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
       ],

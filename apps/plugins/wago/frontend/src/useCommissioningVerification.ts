@@ -1,16 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { getCommissioningVerification, type CommissioningSession } from './api';
+import { useWagoLiveQuery } from './live-updates';
 
 /** Enrollment evidence is independent of configuration and physical qualification. */
 export function useCommissioningVerification(session: Pick<CommissioningSession, 'id' | 'state'>) {
   const enabled = ['awaiting_verification', 'completed'].includes(session.state);
+  useWagoLiveQuery(
+    ['wago', 'commissioning-verification', session.id],
+    'commissioning-verification',
+    String(session.id),
+    enabled,
+  );
   const query = useQuery({
     queryKey: ['wago', 'commissioning-verification', session.id],
     queryFn: () => getCommissioningVerification(session.id),
     enabled,
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
   });
   const [now, setNow] = useState(Date.now);
   useEffect(() => {

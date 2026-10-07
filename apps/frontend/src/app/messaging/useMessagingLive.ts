@@ -1,7 +1,7 @@
 // Subscribes to per-user SSE stream and reports newly arrived messages
 // FEATURE: Messaging inbox live updates
 import { Message } from '@attraccess/react-query-client';
-import { useSSE } from '../../utils/sse';
+import { useLiveUpdates } from '../../utils/live-updates';
 
 interface Props {
   onMessage: (message: Message) => void;
@@ -11,8 +11,8 @@ interface Props {
 export function useMessagingLive(props: Props) {
   const { onMessage, enabled = true } = props;
 
-  return useSSE<Message>({
-    path: '/api/messaging/live',
+  return useLiveUpdates({
+    topic: 'messaging',
     onUpdate: onMessage,
     enabled,
   });

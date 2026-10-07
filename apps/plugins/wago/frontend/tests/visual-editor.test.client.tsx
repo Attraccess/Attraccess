@@ -1,3 +1,4 @@
+import { PluginLiveUpdatesProvider, type PluginLiveUpdatesClient } from '@attraccess/plugins-frontend-sdk';
 import { expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,7 +10,7 @@ import { validateEditorSnapshot } from '../../backend/configuration-editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import { registerSwitchesDiagnosticStatusValuesWithTheHostLanguageWhilePreservingSourceIdentifiers } from './visual-editor.retains-local-edits-across-route-unmounts-and-requires-confirmation-to-discard-them.test-cases';
 import { registerLocalizesAcknowledgementAndProtocolEventDatesWhenTheHostLanguageChanges } from './visual-editor.freezes-editing-and-close-during-publication-and-keeps-readiness-unknown.test-cases';
-import { registerEmbedsRealDiagnosticsPollingWithoutSavingLocalEditsOrDuplicatingConfigurationControls } from './visual-editor.blocks-editing-if-the-applied-configuration-cannot-be-read.test-cases';
+import { registerReceivesLiveDiagnosticSnapshotsWithoutHttpPolling } from './visual-editor.blocks-editing-if-the-applied-configuration-cannot-be-read.test-cases';
 import { registerHidesCachedOnlineStatusOnPollingFailureAndRecoversWithoutLosingLocalEdits } from './visual-editor.freezes-editing-and-close-during-publication-and-keeps-readiness-unknown.test-cases';
 import { registerScopesDiagnosticsToTheSelectedControllerAndRemovesItWhenTheEditorCloses } from './visual-editor.retains-local-edits-across-route-unmounts-and-requires-confirmation-to-discard-them.test-cases';
 import { registerRendersLiteralEditorNamesInMetadataChanges } from './visual-editor.reloads-a-refreshed-saved-draft-while-clean-and-blocks-dirty-local-edits-from-overwriting-it.test-cases';
@@ -40,11 +41,13 @@ import { external } from './visual-editor.test.external.helpers';
 
 export let client: QueryClient;
 
-export function mount() {
+export function mount(liveClient: PluginLiveUpdatesClient | null = null) {
   const close = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <ConfigurationEditor controllerId={1} onOpenChange={close} />
+      <PluginLiveUpdatesProvider client={liveClient}>
+        <ConfigurationEditor controllerId={1} onOpenChange={close} />
+      </PluginLiveUpdatesProvider>
     </QueryClientProvider>,
   );
   return close;
@@ -70,7 +73,7 @@ export function defineVisualConfigurationWorkflowTests() {
 
   registerLocalizesAcknowledgementAndProtocolEventDatesWhenTheHostLanguageChanges(scope);
 
-  registerEmbedsRealDiagnosticsPollingWithoutSavingLocalEditsOrDuplicatingConfigurationControls(scope);
+  registerReceivesLiveDiagnosticSnapshotsWithoutHttpPolling(scope);
 
   registerHidesCachedOnlineStatusOnPollingFailureAndRecoversWithoutLosingLocalEdits(scope);
 

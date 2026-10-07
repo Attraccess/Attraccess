@@ -1,3 +1,4 @@
+import { useWagoLiveQuery } from './live-updates';
 import { useMutation } from '@tanstack/react-query';
 import { applyPreset } from './api';
 import type { WagoPresetApplication } from './api';
@@ -81,11 +82,10 @@ export function useCommissioningAttemptMutation(
 }
 
 export function useCommissioningSessionsQuery() {
+  useWagoLiveQuery(queryKeys.commissioningSessions, 'commissioning-sessions');
   return useQuery({
     queryKey: queryKeys.commissioningSessions,
     queryFn: ({ signal }) => listCommissioningSessions(100, 0, signal),
-    refetchInterval: 2_000,
-    refetchIntervalInBackground: true,
   });
 }
 
@@ -142,6 +142,12 @@ export function useConfigurationActions(controllerId: number) {
 }
 
 export function useConfigurationBaselineQuery(controllerId: number, enabled: boolean) {
+  useWagoLiveQuery(
+    ['wago', 'configuration-baseline', controllerId],
+    'configuration-baseline',
+    String(controllerId),
+    enabled,
+  );
   return useQuery({
     queryKey: ['wago', 'configuration-baseline', controllerId],
     queryFn: () => getConfigurationBaseline(controllerId),

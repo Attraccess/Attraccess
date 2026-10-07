@@ -182,11 +182,19 @@ export function registerConvertsARangedMeasurementIntoAPlainOutputWithoutAHidden
   });
 }
 
-export function registerEmbedsRealDiagnosticsPollingWithoutSavingLocalEditsOrDuplicatingConfigurationControls(
+export function registerReceivesLiveDiagnosticSnapshotsWithoutHttpPolling(
   scope: VisualConfigurationWorkflowTestScope,
 ): void {
-  it('embeds real diagnostics polling without saving local edits or duplicating configuration controls', async () => {
-    scope.mount();
+  it('receives live diagnostic snapshots without HTTP polling, saving local edits or duplicating controls', async () => {
+    const callbacks = new Set<(payload: unknown) => void>();
+    scope.mount({
+      subscribe: (subscription, callback) => {
+        if (subscription.topic === 'plugin:wago:diagnostics') callbacks.add(callback);
+        return () => {
+          callbacks.delete(callback);
+        };
+      },
+    });
     const user = userEvent.setup();
     expect(await screen.findByText('Fixture controller 1: online')).toBeInTheDocument();
     expect(screen.getAllByText(/Hardware readiness: unknown/)).toHaveLength(1);
@@ -197,21 +205,15 @@ export function registerEmbedsRealDiagnosticsPollingWithoutSavingLocalEditsOrDup
     );
     const name = await screen.findByRole('textbox', { name: 'Channel name' });
     await user.clear(name);
-    await user.type(name, 'Unsaved diagnostic session');
-    // Pause the 5 s refetchInterval for the exact-count window: an interval
-    // tick only refetches while focusManager.isFocused(), which reads
-    // document.visibilityState at tick time. Without this, a slow runner can
-    // let a background poll land between the clear and the manual refresh.
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
-    try {
-      scope.state.diagnostics.mockClear();
-      await scope.section(user, 'Diagnostics');
-      await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
-      await waitFor(() => expect(scope.state.diagnostics).toHaveBeenCalledTimes(1));
-    } finally {
-      Reflect.deleteProperty(document, 'visibilityState');
-    }
-    expect(name).toHaveValue('Unsaved diagnostic session');
+    await user.type(name, 'Live draft');
+    act(() =>
+      callbacks.forEach((callback) =>
+        callback({ eventType: 'snapshot', value: { ...scope.diagnosticsFixture(), name: 'Streamed controller' } }),
+      ),
+    );
+    expect(await screen.findByText('Streamed controller: online')).toBeInTheDocument();
+    expect(scope.state.diagnostics).toHaveBeenCalledTimes(1);
+    expect(name).toHaveValue('Live draft');
     expect(screen.getByText(/Unsaved local edits/)).toBeInTheDocument();
     expect(scope.state.save).not.toHaveBeenCalled();
     expect(scope.state.publish).not.toHaveBeenCalled();

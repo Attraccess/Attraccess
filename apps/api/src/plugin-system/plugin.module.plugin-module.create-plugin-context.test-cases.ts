@@ -1,11 +1,13 @@
 import 'reflect-metadata';
 
+import { EMPTY } from 'rxjs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { User } from '@attraccess/database-entities';
 import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from './plugin.module';
+import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 import { registerPluginModuleFixture } from './plugin.module.plugin-module.test-fixture';
@@ -51,6 +53,22 @@ export function registerCreatePluginContextCases(fixture: ReturnType<typeof regi
       ).resolves.toEqual({ status: 'recorded' });
       expect(record).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'plugin-id' }));
       expect(moduleRef.get).toHaveBeenCalledWith(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false });
+    });
+
+    it('binds live topic registration to the plugin identity through the guarded context', () => {
+      const register = jest.fn(() => jest.fn());
+      (moduleRef.get as jest.Mock).mockImplementation((token: unknown) =>
+        token === PluginLiveUpdatesService ? { register } : undefined,
+      );
+      const definition = {
+        topic: 'status',
+        identifier: 'none' as const,
+        authorize: jest.fn(),
+        source: jest.fn(() => EMPTY),
+      };
+      build([]).liveUpdates.register(definition);
+      expect(register).toHaveBeenCalledWith('plugin-id', 'ctx-plugin', definition);
+      expect(moduleRef.get).toHaveBeenCalledWith(PluginLiveUpdatesService, { strict: false });
     });
 
     it('hands back the live host DataSource when DATABASE_ACCESS is granted', () => {

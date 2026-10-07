@@ -9,6 +9,8 @@ import { MessageRateLimitService } from './rate-limiting/message-rate-limit.serv
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
 import { SettingsModule } from '../settings/settings.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { MessagingLiveTopicsProvider } from './messaging-live-topics.provider';
 
 @Module({
   imports: [
@@ -16,9 +18,16 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ResourceUsageModule,
     SettingsModule,
     NotificationsModule,
+    LiveTopicsModule,
   ],
   controllers: [MessagingController],
-  providers: [MessagingService, MessagingLiveService, MessageNotificationListener, MessageRateLimitService],
-  exports: [MessagingService],
+  providers: [
+    MessagingService,
+    MessagingLiveService,
+    MessageNotificationListener,
+    MessageRateLimitService,
+    MessagingLiveTopicsProvider,
+  ],
+  exports: [MessagingService, MessagingLiveService],
 })
 export class MessagingModule {}

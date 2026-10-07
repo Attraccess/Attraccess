@@ -81,6 +81,10 @@ export abstract class PluginHostContextImplementation extends PluginModuleRouteC
 
   protected static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      liveUpdates: {
+        register: (definition) =>
+          getImplementationClass().pluginLiveUpdates().register(manifest.id, manifest.name, definition),
+      },
       audit: createPluginAuditContext(manifest.id, () =>
         getImplementationClass()
           .requireRef(getImplementationClass().moduleRef, 'ModuleRef')

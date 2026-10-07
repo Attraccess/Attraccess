@@ -40,6 +40,6 @@ export class LiveNotificationsService {
       throw new BadRequestException('Transaction not found');
     }
 
-    this.getTransactionSubject(transaction.userId).next({ data: transaction });
+    this.transactionSubjects.get(transaction.userId)?.next({ data: transaction });
   }
 }

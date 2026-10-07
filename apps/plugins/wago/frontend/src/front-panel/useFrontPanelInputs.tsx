@@ -10,6 +10,7 @@ import {
 import { emptyConfiguration, emptyMetadata } from '../configuration-model';
 import { useWagoDiagnostics } from '../diagnostics';
 import { useDraftQuery } from '../queries';
+import { useWagoLiveQuery } from '../live-updates';
 import { type PanelConfiguration } from './model';
 import { WorkingCopy } from './useFrontPanel.working-copy';
 import { readConfiguration } from './useFrontPanel.helpers';
@@ -20,12 +21,12 @@ export function useFrontPanelInputs(controllerId: number) {
   const key = ['wago', 'front-panel-working-copy', controllerId];
   const [restored] = useState(() => client.getQueryData<WorkingCopy>(key));
   const draft = useDraftQuery(controllerId);
+  useWagoLiveQuery(['wago', 'configuration-baseline', controllerId], 'configuration-baseline', String(controllerId));
   const baseline = useQuery({
     queryKey: ['wago', 'configuration-baseline', controllerId],
     queryFn: () => getConfigurationBaseline(controllerId),
-    refetchInterval: 2000,
   });
-  const diagnostics = useWagoDiagnostics(controllerId, 2000);
+  const diagnostics = useWagoDiagnostics(controllerId);
   const [configuration, setConfiguration] = useState<PanelConfiguration | null>(restored?.configuration ?? null);
   const loadedDraft = useRef<WagoConfigurationDraft | null>(restored?.loadedDraft ?? null);
   const [editing, setEditing] = useState(Boolean(restored));

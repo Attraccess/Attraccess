@@ -1,3 +1,4 @@
+import { resumeLiveUpdates } from '../../utils/live-updates';
 import { useCallback, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
 import { KeyRound } from 'lucide-react';
@@ -5,11 +6,7 @@ import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/br
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  ApiError,
-  PasskeysService,
-  UseUsersServiceGetCurrentKeyFn,
-} from '@attraccess/react-query-client';
+import { ApiError, PasskeysService, UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
 import { Button } from '../../components/button';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -43,6 +40,7 @@ export function PasskeyLogin() {
         requestBody: { response: response as unknown as Record<string, unknown>, tokenLocation: 'cookie' },
       });
 
+      resumeLiveUpdates();
       await queryClient.invalidateQueries({ queryKey: UseUsersServiceGetCurrentKeyFn() });
     } catch (caught) {
       // The browser throws when the user dismisses the system prompt - that is not worth an alert

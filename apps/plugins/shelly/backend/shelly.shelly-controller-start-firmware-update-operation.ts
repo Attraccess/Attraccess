@@ -26,6 +26,7 @@ export abstract class ShellyControllerStartFirmwareUpdateOperation extends Shell
         currentPassword: body?.currentPassword,
       },
       stage,
+      id,
     );
     return { started: true, stage };
   }

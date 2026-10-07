@@ -8,26 +8,14 @@ import {
   useResourcesServiceSupervisionRejectRequest,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
-import { useSSE } from '../../utils/sse';
+import { useLiveUpdates } from '../../utils/live-updates';
 import { useToastMessage } from '../toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SupervisorApprovalModal } from './SupervisorApprovalModal';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
-/** Mirrors the backend SupervisionLiveEventType enum (delivered over SSE). */
-enum SupervisionLiveEventType {
-  REQUESTED = 'requested',
-  EXPIRED = 'expired',
-  RESOLVED = 'resolved',
-  REJECTED = 'rejected',
-}
-
-interface SupervisionLiveEvent {
-  type: SupervisionLiveEventType;
-  requestId: string;
-  request: SupervisionRequestDto | null;
-}
+import { SupervisionLiveEvent, SupervisionLiveEventType } from '../../utils/live-update-types';
 
 /**
  * Global listener (mounted once for authenticated users) that surfaces incoming
@@ -90,8 +78,8 @@ export function SupervisorApprovalListener() {
     [removeRequest],
   );
 
-  useSSE<SupervisionLiveEvent>({
-    path: '/api/resources/supervision/requests/live',
+  useLiveUpdates({
+    topic: 'supervision',
     onUpdate: handleEvent,
     enabled: !!user,
   });

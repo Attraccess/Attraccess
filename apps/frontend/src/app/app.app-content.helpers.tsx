@@ -1,3 +1,4 @@
+import { LiveUpdatesProvider } from '../utils/live-updates';
 import { TwoFactorGate } from './two-factor-gate';
 import { KioskGuard } from './kiosk/KioskGuard';
 import { useNavigate } from 'react-router-dom';
@@ -153,10 +154,14 @@ export function AppLayout(props: PropsWithChildren) {
 }
 
 export function App() {
-  const { isInitialized } = useAuth();
+  const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
   useLocaleSync();
 
   configureApiClient();
 
-  return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
+  return (
+    <LiveUpdatesProvider userId={!isTwoFactorStatusLoading && !needsTwoFactorSetup ? user?.id : undefined}>
+      <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>
+    </LiveUpdatesProvider>
+  );
 }
