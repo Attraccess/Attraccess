@@ -165,7 +165,8 @@ it('hydrates reloads, resets drafts across account identities, rejects stale sav
   act(() => state.options.onSuccess({ id: 2, dateTimeLocale: null }));
   expect(useDateTimePreferences.getState().dateTimeLocale).toBeNull();
 });
-it('disables editing and saving while loading or pending', () => {
+it('blocks editing and duplicate saves while pending, then retains the draft for a successful retry', () => {
+  state.user.dateTimeLocale = 'en-GB';
   state.loading = true;
   const view = show();
   expect(screen.getByRole('combobox')).toBeDisabled();
@@ -176,7 +177,9 @@ it('disables editing and saving while loading or pending', () => {
       <Form />
     </QueryClientProvider>,
   );
-  custom('en-GB');
+  custom('en-US');
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(state.save).toHaveBeenCalledTimes(1);
   state.pending = true;
   notify();
   view.rerender(
@@ -185,5 +188,27 @@ it('disables editing and saving while loading or pending', () => {
     </QueryClientProvider>,
   );
   expect(screen.getByRole('textbox')).toBeDisabled();
+  expect(screen.getByRole('combobox')).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(state.save).toHaveBeenCalledTimes(1);
+
+  act(() => state.options.onError());
+  state.pending = false;
+  notify();
+  expect(state.error).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('textbox')).toBeEnabled();
+  expect(screen.getByRole('combobox')).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  expect(screen.getByRole('textbox')).toHaveValue('en-US');
+  expect(useDateTimePreferences.getState().dateTimeLocale).toBe('en-GB');
+  expect(state.user.dateTimeLocale).toBe('en-GB');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(state.save).toHaveBeenCalledTimes(2);
+  expect(state.save).toHaveBeenLastCalledWith({ requestBody: { dateTimeLocale: 'en-US' } });
+  act(() => state.options.onSuccess({ id: 1, dateTimeLocale: 'en-US' }));
+  expect(client.getQueryData(['current-user'])).toEqual({ id: 1, dateTimeLocale: 'en-US' });
+  expect(useDateTimePreferences.getState().dateTimeLocale).toBe('en-US');
+  expect(state.success).toHaveBeenCalledTimes(1);
 });
