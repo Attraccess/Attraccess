@@ -22,7 +22,7 @@ interface Props {
   isDisabled?: boolean;
 }
 
-function DateFieldValidity({
+export function DateFieldValidity({
   incomplete,
   invalid,
   onIncompleteChange,
@@ -88,7 +88,7 @@ export function LocaleDateField({
             <Label>{label}</Label>
             <DateField.Group>
               <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
-              <DateField.Suffix>
+              <DateField.Suffix className="pointer-events-auto">
                 <Button
                   variant="ghost"
                   isIconOnly

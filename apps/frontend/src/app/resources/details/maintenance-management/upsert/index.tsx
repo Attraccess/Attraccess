@@ -1,4 +1,5 @@
 import { DateTimeLocaleProvider } from '../../../../../components/dateTimeLocaleProvider';
+import { DateFieldValidity } from '../../../../../components/localeDateField';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
@@ -58,6 +59,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
   const [endTime, setEndTime] = useState<ZonedDateTime | null>(null);
   const [reason, setReason] = useState<string>('');
   const [hasEndDate, setHasEndDate] = useState(false);
+  const [startIncomplete, setStartIncomplete] = useState(false);
+  const [endIncomplete, setEndIncomplete] = useState(false);
 
   const onHasEndDateChange = useCallback(
     (val: boolean) => {
@@ -101,7 +104,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
 
   const onSubmit = useCallback(() => {
     const isValid = formRef.current?.reportValidity();
-    if (!isValid || !startTime) return;
+    if (!isValid || !startTime || startIncomplete || (hasEndDate && (!endTime || endIncomplete))) return;
 
     const startTimeStr = dateValueToAbsoluteString(startTime);
     const endTimeStr = hasEndDate ? dateValueToAbsoluteString(endTime) : null;
@@ -115,7 +118,17 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         reason,
       },
     });
-  }, [createMaintenanceMutation, startTime, endTime, reason, resourceId, hasEndDate, dateValueToAbsoluteString]);
+  }, [
+    createMaintenanceMutation,
+    startTime,
+    endTime,
+    reason,
+    resourceId,
+    hasEndDate,
+    dateValueToAbsoluteString,
+    startIncomplete,
+    endIncomplete,
+  ]);
 
   return (
     <>
@@ -129,19 +142,50 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         </DrawerHeader>
 
         <DrawerBody>
-          <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
+          <Form
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSubmit();
+            }}
+            ref={formRef}
+            className="flex flex-col gap-4"
+          >
             <DateTimeLocaleProvider>
-              <DatePicker value={startTime} isRequired hideTimeZone onChange={setStartTime}>
+              <DatePicker
+                value={startTime}
+                isRequired
+                hideTimeZone
+                onChange={setStartTime}
+                isInvalid={startIncomplete}
+                validationBehavior="aria"
+              >
                 <Label>{t('inputs.startTime.label')}</Label>
                 <DateField.Group>
-                  <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
-                  <DateField.Suffix>
-                    <DatePicker.Trigger>
-                      <DatePicker.TriggerIndicator />
-                    </DatePicker.Trigger>
-                  </DateField.Suffix>
+                  <DateField
+                    className="contents"
+                    aria-label={t('inputs.startTime.label')}
+                    isInvalid={startIncomplete}
+                    validationBehavior="aria"
+                  >
+                    {({ state }) => (
+                      <>
+                        <DateFieldValidity
+                          incomplete={state.segments.some((segment) => segment.isEditable && segment.isPlaceholder)}
+                          invalid={!startTime}
+                          onIncompleteChange={setStartIncomplete}
+                        />
+
+                        <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+                        <DateField.Suffix>
+                          <DatePicker.Trigger>
+                            <DatePicker.TriggerIndicator />
+                          </DatePicker.Trigger>
+                        </DateField.Suffix>
+                      </>
+                    )}
+                  </DateField>
                 </DateField.Group>
-                <FieldError />
+                <FieldError>{t('inputs.incompleteDate')}</FieldError>
                 <DatePicker.Popover>
                   <Calendar aria-label={t('inputs.startTime.label')}>
                     <Calendar.Header>
@@ -168,17 +212,41 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
             </LabeledSwitch>
             {hasEndDate && (
               <DateTimeLocaleProvider>
-                <DatePicker value={endTime} isRequired hideTimeZone onChange={setEndTime}>
+                <DatePicker
+                  value={endTime}
+                  isRequired
+                  hideTimeZone
+                  onChange={setEndTime}
+                  isInvalid={endIncomplete}
+                  validationBehavior="aria"
+                >
                   <Label>{t('inputs.endTime.label')}</Label>
                   <DateField.Group>
-                    <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
-                    <DateField.Suffix>
-                      <DatePicker.Trigger>
-                        <DatePicker.TriggerIndicator />
-                      </DatePicker.Trigger>
-                    </DateField.Suffix>
+                    <DateField
+                      className="contents"
+                      aria-label={t('inputs.endTime.label')}
+                      isInvalid={endIncomplete}
+                      validationBehavior="aria"
+                    >
+                      {({ state }) => (
+                        <>
+                          <DateFieldValidity
+                            incomplete={state.segments.some((segment) => segment.isEditable && segment.isPlaceholder)}
+                            invalid={!endTime}
+                            onIncompleteChange={setEndIncomplete}
+                          />
+
+                          <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+                          <DateField.Suffix>
+                            <DatePicker.Trigger>
+                              <DatePicker.TriggerIndicator />
+                            </DatePicker.Trigger>
+                          </DateField.Suffix>
+                        </>
+                      )}
+                    </DateField>
                   </DateField.Group>
-                  <FieldError />
+                  <FieldError>{t('inputs.incompleteDate')}</FieldError>
                   <DatePicker.Popover>
                     <Calendar aria-label={t('inputs.endTime.label')}>
                       <Calendar.Header>
@@ -230,7 +298,13 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         </DrawerBody>
 
         <DrawerFooter>
-          <Button variant="primary" onPress={onSubmit} type="submit" isPending={isCreating}>
+          <Button
+            variant="primary"
+            onPress={onSubmit}
+            type="submit"
+            isPending={isCreating}
+            isDisabled={startIncomplete || (hasEndDate && endIncomplete)}
+          >
             {t('actions.save')}
           </Button>
         </DrawerFooter>
