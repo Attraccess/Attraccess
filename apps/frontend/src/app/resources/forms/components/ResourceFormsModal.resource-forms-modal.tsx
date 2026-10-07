@@ -13,7 +13,14 @@ import { extractSelectOptions } from './ResourceFormsModal.extract-select-option
 import { normalizeValue } from './ResourceFormsModal.normalize-value';
 import { renderFieldInput } from './ResourceFormsModal.render-field-input';
 
-export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }: ResourceFormsModalProps) {
+export function ResourceFormsModal({
+  isOpen,
+  action,
+  forms,
+  initialSubmissions,
+  onSubmit,
+  onCancel,
+}: ResourceFormsModalProps) {
   const { t } = useTranslations({ en, de });
   const [values, setValues] = useState<Record<number, FieldValue>>({});
   const [errors, setErrors] = useState<Record<number, string | null>>({});
@@ -27,6 +34,14 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
 
     setValues((prev) => {
       const next = { ...prev };
+      initialSubmissions?.forEach((submission) => {
+        const form = forms.find(({ id }) => id === submission.formId);
+        submission.answers.forEach(({ fieldId, value }) => {
+          if (form?.fields.some(({ id }) => id === fieldId)) {
+            next[fieldId] = typeof value === 'boolean' ? value : String(value);
+          }
+        });
+      });
       forms.forEach((form) => {
         form.fields.forEach((field) => {
           if (field.type === FormFieldType.BOOLEAN) {
@@ -41,7 +56,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
       return next;
     });
     setErrors({});
-  }, [forms, isOpen]);
+  }, [forms, isOpen, initialSubmissions]);
 
   const modalTitle = useMemo(() => {
     switch (action) {

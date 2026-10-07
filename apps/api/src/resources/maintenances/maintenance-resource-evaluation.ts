@@ -9,6 +9,7 @@ export abstract class MaintenanceResourceEvaluationImplementation extends Mainte
    * Evaluate all enabled schedules for a resource. If any triggers and there is no active maintenance, create one (first trigger wins).
    */
   async evaluateResource(resourceId: number): Promise<void> {
+    let createdMaintenanceId: number | undefined;
     await this.scheduleRepository.manager.transaction(async (transactionalEntityManager) => {
       const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);
       const schedules = await scheduleRepo.find({
@@ -32,18 +33,23 @@ export abstract class MaintenanceResourceEvaluationImplementation extends Mainte
         }
 
         const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-        await this.maintenanceService.createMaintenanceFromSchedule(
+        const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
           resourceId,
           schedule.id,
           reason,
           transactionalEntityManager,
+          false,
         );
+        createdMaintenanceId = maintenance.id;
         this.logger.log(
           `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
         );
         break; // Only one maintenance at a time
       }
     });
+    if (createdMaintenanceId !== undefined) {
+      this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, createdMaintenanceId);
+    }
   }
 
   /**

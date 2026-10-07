@@ -89,10 +89,12 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
       if (!user) return;
       let latestHistoryAt: string | null = null;
       let latestHistoryTime = -Infinity;
+      let latestHistoryId = -Infinity;
       let latestAction: string | undefined;
       for (const event of introduction.history ?? []) {
         const time = new Date(event.createdAt).getTime();
-        if (time > latestHistoryTime) {
+        if (time > latestHistoryTime || (time === latestHistoryTime && event.id > latestHistoryId)) {
+          latestHistoryId = event.id;
           latestHistoryTime = time;
           latestHistoryAt = event.createdAt;
           latestAction = event.action;

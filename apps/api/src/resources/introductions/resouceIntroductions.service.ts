@@ -69,6 +69,7 @@ export class ResourceIntroductionsService extends ResourceIntroductionWritingImp
       },
       order: {
         createdAt: 'DESC',
+        id: 'DESC',
       },
     });
 

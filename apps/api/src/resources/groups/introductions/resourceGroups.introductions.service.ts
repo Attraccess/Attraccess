@@ -46,6 +46,7 @@ export class ResourceGroupsIntroductionsService extends GroupIntroductionWriting
       },
       order: {
         createdAt: 'DESC',
+        id: 'DESC',
       },
     });
   }

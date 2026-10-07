@@ -54,7 +54,7 @@ export function useBillingDashboardTopupCardState(props: Props) {
           error,
           t,
           tExists,
-          baseTranslationKey: 'error.toast',
+          baseTranslationKey: 'api',
         });
       },
     });

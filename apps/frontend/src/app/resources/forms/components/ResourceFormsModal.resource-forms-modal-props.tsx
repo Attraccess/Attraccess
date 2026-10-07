@@ -5,6 +5,7 @@ export interface ResourceFormsModalProps {
   isOpen: boolean;
   action: ResourceFormAction;
   forms: FormResponseDto[];
+  initialSubmissions?: FormSubmissionRequestDto[];
   onSubmit: (payload: FormSubmissionRequestDto[]) => void;
   onCancel: () => void;
 }

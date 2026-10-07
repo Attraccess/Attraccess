@@ -27,7 +27,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
   const navigate = useNavigate();
   const [isTakeoverNotesModalOpen, setIsTakeoverNotesModalOpen] = useState(false);
   const [isStopOtherUserSessionNotesModalOpen, setIsStopOtherUserSessionNotesModalOpen] = useState(false);
-  const { requestForms, modal: formsModal } = useResourceFormsSubmission(resourceId);
+  const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
 
   const { data: activeSessionResponse } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
@@ -51,6 +51,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
   const startSession = useResourcesServiceResourceUsageStartSession({
     onSuccess: () => {
+      clearFormsDraft();
       setIsTakeoverNotesModalOpen(false);
 
       invalidateSessionHistory();
@@ -70,6 +71,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
   const stopSession = useResourcesServiceResourceUsageEndSession({
     onSuccess: () => {
+      clearFormsDraft();
       setIsTakeoverNotesModalOpen(false);
 
       invalidateSessionHistory();

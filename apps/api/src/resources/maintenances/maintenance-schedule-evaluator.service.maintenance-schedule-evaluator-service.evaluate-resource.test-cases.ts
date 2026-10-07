@@ -67,6 +67,7 @@ export function registerEvaluateResourceCases(
         fixture.scheduleId,
         expect.any(String),
         expect.anything(),
+        false,
       );
       const reason = (fixture.maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls[0][2];
       const parsed = JSON.parse(reason);
@@ -124,6 +125,7 @@ export function registerEvaluateResourceCases(
         fixture.scheduleId,
         expect.any(String),
         expect.anything(),
+        false,
       );
       const reason = (fixture.maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls[0][2];
       const parsed = JSON.parse(reason);

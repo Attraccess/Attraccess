@@ -15,38 +15,41 @@ import type { useStartSessionControlsStateInputs } from './useStartSessionContro
 export function useStartSessionControlsStateStartUsageSessionMutate(
   model: ReturnType<typeof useStartSessionControlsStateInputs>,
 ) {
+  const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(model.resourceId);
+  const onStartSuccess = useCallback(() => {
+    clearFormsDraft();
+    model.onStartSuccess();
+  }, [clearFormsDraft, model.onStartSuccess]);
   const { mutate: startUsageSessionMutate, isPending: startUsageSessionIsPending } =
     useResourcesServiceResourceUsageStartSession({
-      onSuccess: model.onStartSuccess,
+      onSuccess: onStartSuccess,
       onError: (error) => {
         model.onStartError(error as ApiError);
       },
     });
 
   const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
-    onSuccess: model.onStartSuccess,
+    onSuccess: onStartSuccess,
     onError: (error) => {
       model.onStartError(error as ApiError);
     },
   });
 
   const { mutate: lockDoorMutate, isPending: lockDoorIsPending } = useResourcesServiceLockDoor({
-    onSuccess: model.onStartSuccess,
+    onSuccess: onStartSuccess,
     onError: (error) => {
       model.onStartError(error as ApiError);
     },
   });
 
   const { mutate: unlatchDoorMutate, isPending: unlatchDoorIsPending } = useResourcesServiceUnlatchDoor({
-    onSuccess: model.onStartSuccess,
+    onSuccess: onStartSuccess,
     onError: (error) => {
       model.onStartError(error as ApiError);
     },
   });
 
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined);
-
-  const { requestForms, modal: formsModal } = useResourceFormsSubmission(model.resourceId);
 
   const isFormsMissingError = useCallback((error: unknown) => {
     if (!(error instanceof ApiError)) {
@@ -109,6 +112,7 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
   );
   return {
     ...model,
+    onStartSuccess,
     startUsageSessionMutate,
     startUsageSessionIsPending,
     unlockDoorMutate,

@@ -109,7 +109,7 @@ export abstract class ResourceRetrainingPolicyImplementation extends ResourceRet
   protected async getTrainedAt(introduction: ResourceIntroduction): Promise<Date | null> {
     const latestGrant = await this.historyRepository.findOne({
       where: { introduction: { id: introduction.id }, action: IntroductionHistoryAction.GRANT },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'DESC', id: 'DESC' },
     });
     return latestGrant?.createdAt ?? introduction.completedAt ?? introduction.createdAt ?? null;
   }
@@ -117,7 +117,7 @@ export abstract class ResourceRetrainingPolicyImplementation extends ResourceRet
   protected async isValid(introductionId: number): Promise<boolean> {
     const lastHistoryItem = await this.historyRepository.findOne({
       where: { introduction: { id: introductionId } },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'DESC', id: 'DESC' },
     });
     return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
   }
