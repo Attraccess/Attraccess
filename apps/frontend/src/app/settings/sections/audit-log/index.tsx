@@ -1,3 +1,4 @@
+import { LocaleDateField } from '../../../../components/localeDateField';
 import { useState } from 'react';
 import {
   Alert,
@@ -21,7 +22,7 @@ import {
   TextField,
 } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   AuditEntryDto,
   AuditService,
@@ -145,6 +146,7 @@ function target(entry: AuditEntryDto, t: Translate) {
 }
 
 function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const diff = changes(entry);
   const metadata = Object.entries(entry.details).filter(([key]) => !['before', 'after'].includes(key));
   return (
@@ -159,7 +161,7 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
         <dt className="text-muted">{t('eventType')}</dt>
         <dd className="break-all">{entry.action}</dd>
         <dt className="text-muted">{t('time')}</dt>
-        <dd>{new Date(entry.at).toLocaleString()}</dd>
+        <dd>{formatDateTime(entry.at)}</dd>
         <dt className="text-muted">{t('actor')}</dt>
         <dd className="break-words">
           {actor(entry, t)}
@@ -253,6 +255,9 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
 }
 
 export function AuditLogSection() {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const formatDate = useDateTimeFormatter({ showTime: false });
+  const formatTime = useDateTimeFormatter({ showDate: false, showSeconds: true });
   const { t, language } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const client = useQueryClient();
@@ -265,6 +270,9 @@ export function AuditLogSection() {
   const [advanced, setAdvanced] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterError, setFilterError] = useState<string>();
+  const [fromDateValid, setFromDateValid] = useState(true);
+  const [toDateValid, setToDateValid] = useState(true);
+  const [dateFieldResetCount, setDateFieldResetCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
   const [draft, setDraft] = useState<AuditSettingsDto>();
@@ -290,12 +298,14 @@ export function AuditLogSection() {
   const updateFilter = (key: keyof AuditFilters, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
   const clearFilters = () => {
+    setDateFieldResetCount((count) => count + 1);
     setFilters(emptyFilters);
     setApplied(emptyFilters);
     setCursors([undefined]);
     setFilterError(undefined);
   };
   const applyFilters = () => {
+    if (!fromDateValid || !toDateValid) return;
     const result = filterRequest(filters, meta.data?.subjectTypes);
     if (result.error) {
       setFilterError(t(result.error));
@@ -402,14 +412,26 @@ export function AuditLogSection() {
                 <Label>{t('event')}</Label>
                 <Input placeholder={t('eventPlaceholder')} />
               </TextField>
-              <TextField value={filters.from} onChange={(value) => updateFilter('from', value)} type="datetime-local">
-                <Label>{t('from')}</Label>
-                <Input />
-              </TextField>
-              <TextField value={filters.to} onChange={(value) => updateFilter('to', value)} type="datetime-local">
-                <Label>{t('to')}</Label>
-                <Input />
-              </TextField>
+              <LocaleDateField
+                key={`from-${dateFieldResetCount}`}
+                label={t('from')}
+                clearLabel={`${t('clearDate')}: ${t('from')}`}
+                value={filters.from}
+                onChange={(value) => updateFilter('from', value)}
+                onValidityChange={setFromDateValid}
+                errorMessage={t('invalidDate')}
+                withTime
+              />
+              <LocaleDateField
+                key={`to-${dateFieldResetCount}`}
+                label={t('to')}
+                clearLabel={`${t('clearDate')}: ${t('to')}`}
+                value={filters.to}
+                onChange={(value) => updateFilter('to', value)}
+                onValidityChange={setToDateValid}
+                errorMessage={t('invalidDate')}
+                withTime
+              />
             </div>
             {advanced && (
               <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
@@ -438,7 +460,7 @@ export function AuditLogSection() {
             )}
             {filterError && <Notice title={filterError} />}
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" isDisabled={!fromDateValid || !toDateValid}>
                 <SearchIcon size={16} />
                 {t('search')}
               </Button>
@@ -522,9 +544,9 @@ export function AuditLogSection() {
                             </Table.Cell>
                             <Table.Cell>
                               <time className="whitespace-nowrap text-xs text-muted" dateTime={entry.at}>
-                                {new Date(entry.at).toLocaleDateString()}
+                                {formatDate(entry.at)}
                                 <br />
-                                {new Date(entry.at).toLocaleTimeString()}
+                                {formatTime(entry.at)}
                               </time>
                             </Table.Cell>
                             <Table.Cell>
@@ -551,7 +573,7 @@ export function AuditLogSection() {
                       <div className="flex justify-between gap-3">
                         <Chip size="sm">{domainLabel(entry.domain)}</Chip>
                         <time className="text-xs text-muted" dateTime={entry.at}>
-                          {new Date(entry.at).toLocaleString()}
+                          {formatDateTime(entry.at)}
                         </time>
                       </div>
                       <Card.Title>{auditLabel('events', entry.action, t)}</Card.Title>

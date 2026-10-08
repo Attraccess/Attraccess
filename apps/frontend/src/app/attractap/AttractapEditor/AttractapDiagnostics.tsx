@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Chip, Spinner } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { OpenAPI, useAttractapServiceGetReaderCrashReports } from '@attraccess/react-query-client';
@@ -50,6 +50,7 @@ function mismatchChipColor(matches: boolean | null | undefined): 'danger' | 'def
 }
 
 export function AttractapDiagnostics(props: Readonly<Props>) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { t } = useTranslations({ de, en });
   const toast = useToastMessage();
   const [expandedReports, setExpandedReports] = useState<Record<number, boolean>>({});
@@ -149,9 +150,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                   key={report.id}
                   className="flex-1 rounded-t-sm min-w-[6px]"
                   style={{ height: `${heightPct}%`, backgroundColor: 'var(--accent)' }}
-                  title={`${formatBytes(report.heapFreeBytes, fallback)} — ${new Date(
-                    report.createdAt,
-                  ).toLocaleString()}`}
+                  title={`${formatBytes(report.heapFreeBytes, fallback)} — ${formatDateTime(report.createdAt)}`}
                 />
               );
             })}
@@ -194,7 +193,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                     </Chip>
                   )}
                 </div>
-                <span className="text-xs text-default-400">{new Date(report.createdAt).toLocaleString()}</span>
+                <span className="text-xs text-default-400">{formatDateTime(report.createdAt)}</span>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
                 <span className="text-default-500">

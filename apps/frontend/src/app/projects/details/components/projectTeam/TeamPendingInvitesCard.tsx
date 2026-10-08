@@ -11,7 +11,7 @@ import {
   useProjectsServiceListProjectInvitations,
   useProjectsServiceResendProjectInvitation,
 } from '@attraccess/react-query-client';
-import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RefreshCcwIcon, XIcon } from 'lucide-react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -120,9 +120,7 @@ export function TeamPendingInvitesCard(props: Readonly<TeamPendingInvitesCardPro
     <Card>
       <Card.Header className="flex items-center justify-between gap-4">
         <p className="text-large font-semibold">{t('sections.pending.title')}</p>
-        <Chip variant="soft">
-          {pendingInvitations.length}
-        </Chip>
+        <Chip variant="soft">{pendingInvitations.length}</Chip>
       </Card.Header>
       <Card.Content>
         <div className="space-y-3">{content}</div>
@@ -147,6 +145,7 @@ const statusColor: Record<ProjectInvitation['status'], 'default' | 'success' | '
 };
 
 function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { invitation, isLoadingResend, isLoadingCancel, onCancel, onResend } = props;
   const { t } = useTranslations({ en, de });
 
@@ -160,23 +159,27 @@ function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-small text-default-500">
         <span>
-          {t(`roles.${invitation.requestedRole}` as const)} · {new Date(invitation.createdAt).toLocaleString()}
+          {t(`roles.${invitation.requestedRole}` as const)} · {formatDateTime(invitation.createdAt)}
         </span>
         {invitation.inviter && <span>{invitation.inviter.username}</span>}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
 
           isPending={isLoadingResend}
           onPress={onResend}
-        ><RefreshCcwIcon className="size-4" />
+        >
+          <RefreshCcwIcon className="size-4" />
           {t('actions.resend')}
         </Button>
-        <Button variant="danger-soft"
+        <Button
+          variant="danger-soft"
 
           isPending={isLoadingCancel}
           onPress={onCancel}
-        ><XIcon className="size-4" />
+        >
+          <XIcon className="size-4" />
           {t('actions.cancel')}
         </Button>
       </div>

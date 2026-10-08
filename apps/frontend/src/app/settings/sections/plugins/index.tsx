@@ -57,7 +57,7 @@ import {
   usePluginsServiceRetryPlugin,
   type PluginSystemStatusDto,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
 import { StandardModal } from '../../../../components/standardModal';
@@ -211,6 +211,7 @@ type Registry = { id: string; name: string; url: string; tokenConfigured: boolea
  * save bar; the table keeps its own confirmation modal.
  */
 export function PluginsSection() {
+  const formatDateTime = useDateTimeFormatter({ showTime: false });
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
 
@@ -1402,7 +1403,7 @@ export function PluginsSection() {
                   {selectedVersion.publishedAt ? (
                     <p>
                       {t('versionManagement.published', {
-                        date: new Date(selectedVersion.publishedAt).toLocaleDateString(),
+                        date: formatDateTime(selectedVersion.publishedAt),
                       })}
                     </p>
                   ) : null}

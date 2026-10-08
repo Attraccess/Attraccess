@@ -24,7 +24,6 @@ import { FormSubmission } from './form';
 import { UserRole } from './user-role.entity';
 import { ApiToken } from './api-token.entity';
 
-
 @Index('IDX_user_deleteAccountToken', ['deleteAccountToken'])
 @Entity()
 export class User {
@@ -55,6 +54,10 @@ export class User {
     example: 'en',
   })
   locale!: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  @ApiProperty({ type: String, nullable: true, description: 'Formatting locale; null follows app language' })
+  dateTimeLocale!: string | null;
 
   @Column({ default: false, type: 'boolean' })
   @ApiProperty({

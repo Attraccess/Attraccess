@@ -1,7 +1,7 @@
 import { PageHeader } from '../../components/pageHeader';
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { Button } from '../../components/button';
-import { BellIcon, KeyRoundIcon, LockKeyholeIcon, ShieldIcon, Trash2Icon, UserIcon } from 'lucide-react';
+import { BellIcon, CalendarClockIcon, KeyRoundIcon, LockKeyholeIcon, ShieldIcon, Trash2Icon, UserIcon } from 'lucide-react';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -13,6 +13,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
 import { PasskeysCard } from './passkeys';
 import { ApiTokensCard } from './api-tokens';
+import { DateTimePreferencesForm } from './date-time';
 import { NotificationPreferencesForm } from './notifications';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
@@ -93,6 +94,12 @@ export default function AccountPage() {
       key: 'preferences',
       label: t('groups.preferences'),
       items: [{
+        key: 'dateTime',
+        title: t('topics.dateTime.title'),
+        description: t('topics.dateTime.description'),
+        icon: <CalendarClockIcon size={19} />,
+        content: <DateTimePreferencesForm />,
+      }, {
         key: 'notifications',
         title: t('topics.notifications.title'),
         description: t('topics.notifications.description'),
