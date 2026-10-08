@@ -9,12 +9,14 @@ local function remove(token)
   for i=1,#data,2 do values[data[i]]=data[i+1] end
   local expiry = tonumber(values.expiresAtMs or (now + redis.call('PTTL', key)))
   redis.call('DEL', key)
+  redis.call('DEL', 'session_lineage:' .. (values.lineageId or token))
   redis.call('SREM', 'user_sessions:' .. values.userId, token)
   local indexes = cjson.decode(values.ssoIndexes or '[]')
   for _,index in ipairs(indexes) do redis.call('ZREM', index, token) end
   return expiry > now and 1 or 0
 end
 local function index(token, values, expiry)
+  redis.call('SET', 'session_lineage:' .. (values.lineageId or token), token, 'PXAT', expiry)
   redis.call('SADD', 'user_sessions:' .. values.userId, token)
   redis.call('EXPIRE', 'user_sessions:' .. values.userId, 604800)
   for _,key in ipairs(cjson.decode(values.ssoIndexes or '[]')) do
@@ -43,6 +45,7 @@ if #data == 0 then return 0 end
 local values = {}
 for i=1,#data,2 do values[data[i]]=data[i+1] end
 if tonumber(values.expiresAtMs or (now + redis.call('PTTL', KEYS[1]))) <= now then remove(ARGV[2]); return 0 end
+values.lineageId = values.lineageId or ARGV[2]
 remove(ARGV[2])
 values.expiresAt = ARGV[5]
 values.expiresAtMs = ARGV[4]
@@ -53,6 +56,9 @@ return 1
 `;
 
 export const REVOKE_SESSION_SCRIPT = SESSION_SCRIPT_COMMON + 'return remove(ARGV[2])';
+// Existing sessions without a lineage index use their original token hash.
+export const REVOKE_LOGOUT_SESSION_SCRIPT =
+  SESSION_SCRIPT_COMMON + "return remove(redis.call('GET', KEYS[1]) or ARGV[2])";
 export const REVOKE_USER_SCRIPT =
   SESSION_SCRIPT_COMMON +
   `
@@ -74,8 +80,7 @@ redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
 local function equal(a,b) return (a or '') == (b or '') end
 for _,token in ipairs(redis.call('ZRANGE', KEYS[1], 0, -1)) do
   local raw = redis.call('HGET', 'session:' .. token, 'ssoContext')
-  local createdAt = tonumber(redis.call('HGET', 'session:' .. token, 'createdAtMs') or '0')
-  if raw and (not selector.issuedBefore or createdAt <= selector.issuedBefore) then
+  if raw then
     local context = cjson.decode(raw)
     local match = context.protocol == selector.protocol and context.providerId == selector.providerId
     if selector.protocol == 'OIDC' then
@@ -92,6 +97,7 @@ for _,token in ipairs(redis.call('ZRANGE', KEYS[1], 0, -1)) do
         match = match and found
       end
     end
+    match = match and (not selector.issuedBefore or not context.providerIssuedAt or context.providerIssuedAt <= selector.issuedBefore)
     if match then count = count + remove(token) end
   end
 end

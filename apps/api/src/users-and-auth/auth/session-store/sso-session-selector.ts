@@ -19,6 +19,14 @@ export function matchesSsoSession(
   selector: SsoSessionSelector,
 ): boolean {
   if (!context || context.providerId !== selector.providerId || context.protocol !== selector.protocol) return false;
+  // Login and logout timestamps must come from the same provider clock.
+  // Older sessions have no provider timestamp and remain eligible for logout.
+  if (
+    selector.issuedBefore !== undefined &&
+    context.providerIssuedAt !== undefined &&
+    context.providerIssuedAt > selector.issuedBefore
+  )
+    return false;
   if (context.protocol === 'OIDC' && selector.protocol === 'OIDC') {
     return (
       context.issuer === selector.issuer &&

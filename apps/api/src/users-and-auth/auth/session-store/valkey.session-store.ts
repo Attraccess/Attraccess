@@ -2,7 +2,7 @@ import { Repository } from 'typeorm';
 import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
 import type { Redis } from 'ioredis';
 import { TokenHashService } from '../../../encryption/token-hash.service';
-import { SessionStore, SessionMetadata } from './session-store';
+import { SessionStore, SessionMetadata, LogoutSession } from './session-store';
 
 import { createHash } from 'node:crypto';
 import { SsoSessionSelector } from './sso-session-selector';
@@ -10,6 +10,7 @@ import {
   CREATE_SESSION_SCRIPT,
   ROTATE_SESSION_SCRIPT,
   REVOKE_SESSION_SCRIPT,
+  REVOKE_LOGOUT_SESSION_SCRIPT,
   REVOKE_USER_SCRIPT,
   REVOKE_SSO_SCRIPT,
 } from './valkey-session-scripts';
@@ -46,6 +47,7 @@ export class ValkeySessionStore implements SessionStore {
     const now = Date.now();
     const values = {
       userId: String(userId),
+      lineageId: hashedToken,
       userAgent: metadata?.userAgent || '',
       ipAddress: metadata?.ipAddress || '',
       expiresAt: expiresAt.toISOString(),
@@ -113,10 +115,24 @@ export class ValkeySessionStore implements SessionStore {
     return Number(await this.client.eval(REVOKE_USER_SCRIPT, 1, `${USER_SESSIONS_PREFIX}${userId}`, Date.now()));
   }
 
+  async getLogoutSession(token: string): Promise<LogoutSession | null> {
+    const hashed = this.tokenHashService.hashToken(token);
+    const data = await this.client.hgetall(`${SESSION_PREFIX}${hashed}`);
+    if (!data.userId || new Date(data.expiresAt) <= new Date()) return null;
+    return {
+      id: data.lineageId || hashed,
+      ssoContext: data.ssoContext ? (JSON.parse(data.ssoContext) as SsoSessionContext) : null,
+    };
+  }
+
+  async revokeLogoutSession(id: string): Promise<boolean> {
+    return (
+      Number(await this.client.eval(REVOKE_LOGOUT_SESSION_SCRIPT, 1, `session_lineage:${id}`, Date.now(), id)) === 1
+    );
+  }
+
   async getSsoContext(token: string): Promise<SsoSessionContext | null> {
-    const data = await this.client.hgetall(`${SESSION_PREFIX}${this.tokenHashService.hashToken(token)}`);
-    if (!data.ssoContext || new Date(data.expiresAt) <= new Date()) return null;
-    return JSON.parse(data.ssoContext) as SsoSessionContext;
+    return (await this.getLogoutSession(token))?.ssoContext ?? null;
   }
 
   async revokeSsoSessions(selector: SsoSessionSelector): Promise<number> {

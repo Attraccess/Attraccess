@@ -123,12 +123,22 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
   });
 
   it.each([
+    { exp: Math.floor(Date.now() / 1000) + 3600 },
+    { events: { 'http://schemas.openid.net/event/backchannel-logout': { reason: 'user_logout' } } },
+  ])('accepts a fresh signed logout token with permitted lifetime or event extensions: %j', async (claims) => {
+    await service.backchannel(1, await token(claims));
+    expect(sessions.revokeSsoSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
     { iss: 'https://wrong.example' },
     { aud: 'wrong-client' },
     { iat: undefined },
     { exp: undefined },
     { jti: undefined },
     { events: {} },
+    { events: { 'http://schemas.openid.net/event/backchannel-logout': null } },
+    { events: { 'http://schemas.openid.net/event/backchannel-logout': 'logout' } },
     { events: { 'http://schemas.openid.net/event/backchannel-logout': [] } },
     { nonce: 'forbidden' },
     { sub: undefined, sid: undefined },

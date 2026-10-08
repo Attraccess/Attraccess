@@ -151,7 +151,6 @@ export class SsoLogoutService {
         !event ||
         typeof event !== 'object' ||
         Array.isArray(event) ||
-        Object.keys(event).length ||
         'nonce' in claims ||
         typeof claims.jti !== 'string' ||
         !claims.jti ||
@@ -161,8 +160,7 @@ export class SsoLogoutService {
         (!claims.sub && !claims.sid) ||
         typeof claims.iat !== 'number' ||
         typeof claims.exp !== 'number' ||
-        claims.exp <= claims.iat ||
-        claims.exp - claims.iat > 300
+        claims.exp <= claims.iat
       )
         throw new Error('Invalid logout claims');
       await this.sessions.revokeSsoSessionsOnce(

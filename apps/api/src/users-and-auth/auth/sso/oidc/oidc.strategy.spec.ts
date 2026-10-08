@@ -681,7 +681,7 @@ describe('OIDC Passport callback authentication context', () => {
   it('selects the request-aware six-argument callback and attaches verified context only to that request', async () => {
     const { OidcTokenVerifier, OidcVerificationUnavailableError } = await import('./oidc-token-verifier.service');
     const { EncryptionService } = await import('../../../../encryption/encryption.service');
-    const claims = { sub: 'subject', sid: 'browser' };
+    const claims = { sub: 'subject', sid: 'browser', iat: 1700000000 };
     const verifier = { verify: jest.fn().mockResolvedValue(claims) };
     const moduleRef = {
       get: (token: unknown) =>
@@ -721,6 +721,7 @@ describe('OIDC Passport callback authentication context', () => {
         providerId: 4,
         issuer: config.issuer,
         subject: 'subject',
+        providerIssuedAt: 1700000000000,
         sid: 'browser',
         idTokenEncrypted: 'encrypted-hint',
       },

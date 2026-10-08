@@ -38,6 +38,11 @@ describe('AuthController', () => {
             createSession: jest.fn().mockResolvedValue('test-session-token'),
             refreshSession: jest.fn().mockResolvedValue('new-session-token'),
             revokeSession: jest.fn(),
+            revokeLogoutSession: jest.fn(),
+            getLogoutSession: jest.fn().mockResolvedValue({
+              id: 'stable-session',
+              ssoContext: { protocol: 'OIDC', providerId: 1, issuer: 'https://idp.example', subject: 'person' },
+            }),
             validateSession: jest.fn().mockResolvedValue({ id: 7 }),
             getSsoContext: jest
               .fn()
@@ -336,8 +341,8 @@ describe('AuthController', () => {
       kind: 'redirect',
       redirectUrl: 'https://idp.example/logout',
     });
-    expect(sessionService.getSsoContext).toHaveBeenCalledWith('header-session');
-    expect(sessionService.revokeSession).toHaveBeenCalledWith('header-session');
+    expect(sessionService.getLogoutSession).toHaveBeenCalledWith('header-session');
+    expect(sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(response);
     expect(request.logout).toHaveBeenCalled();
   });
@@ -365,7 +370,7 @@ describe('AuthController', () => {
       kind: 'local_only',
       reason: 'provider_failed',
     });
-    expect(sessionService.revokeSession).toHaveBeenCalledWith('session');
+    expect(sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
   });
 
   it('rejects API tokens and cross-origin central logout before revoking anything', async () => {
@@ -378,6 +383,7 @@ describe('AuthController', () => {
       await expect(authController.logoutEverywhere(request, response)).rejects.toThrow();
     }
     expect(sessionService.revokeSession).not.toHaveBeenCalled();
+    expect(sessionService.revokeLogoutSession).not.toHaveBeenCalled();
   });
 
   it('does not create a new session when refresh loses a race with logout', async () => {

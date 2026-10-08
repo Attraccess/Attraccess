@@ -151,8 +151,9 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<CentralLogoutResult> {
     const token = this.sessionToken(request);
-    if (!token || request.user.apiTokenId || !(await this.sessionService.validateSession(token)))
-      throw new UnauthorizedException('An active session is required');
+    if (!token || request.user.apiTokenId) throw new UnauthorizedException('An active session is required');
+    const session = await this.sessionService.getLogoutSession(token);
+    if (!session) throw new UnauthorizedException('An active session is required');
     const origin = request.headers.origin;
     const configuredUrl = await this.settings.getUrl();
     const returnUrl = await this.ssoLogout.returnURL().catch(() => configuredUrl);
@@ -164,11 +165,12 @@ export class AuthController {
       throw new ForbiddenException('Cross-origin logout is not allowed');
     let result: CentralLogoutResult;
     try {
-      result = await this.ssoLogout.prepare(await this.sessionService.getSsoContext(token));
+      result = await this.ssoLogout.prepare(session.ssoContext);
     } catch {
       result = { kind: 'local_only', reason: 'provider_failed' };
     } finally {
-      await this.endSession(request, response);
+      await this.sessionService.revokeLogoutSession(session.id);
+      await this.finishLogout(request, response);
     }
     response.setHeader('Cache-Control', 'no-store');
     return result;
@@ -196,6 +198,10 @@ export class AuthController {
 
     // End server access before cookie clearing or Passport/auditing can fail.
     if (sessionToken) await this.sessionService.revokeSession(sessionToken);
+    await this.finishLogout(request, response);
+  }
+
+  private async finishLogout(request: AuthenticatedRequest, response: Response): Promise<void> {
     await this.cookieConfigService.clearAuthCookie(response);
 
     // Passport clears request.user as part of logout, so retain the principal for the audit record.

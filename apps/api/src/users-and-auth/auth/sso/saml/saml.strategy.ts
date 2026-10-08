@@ -204,17 +204,16 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
     const assertionXml =
       typeof profile.getAssertionXml === 'function' ? (profile.getAssertionXml() as string) : undefined;
-    const indexes = assertionXml
-      ? Array.from(
-          new DOMParser()
-            .parseFromString(assertionXml, 'text/xml')
-            .getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'AuthnStatement'),
-        )
+    const assertion = assertionXml ? new DOMParser().parseFromString(assertionXml, 'text/xml') : undefined;
+    const providerIssuedAt = Date.parse(assertion?.documentElement.getAttribute('IssueInstant') ?? '');
+    const indexes = assertion
+      ? Array.from(assertion.getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'AuthnStatement'))
           .map((node) => node.getAttribute('SessionIndex'))
           .filter((index): index is string => !!index)
       : [];
     (req as SsoSessionRequest).ssoSessionContext = {
       protocol: 'SAML',
+      ...(Number.isFinite(providerIssuedAt) ? { providerIssuedAt } : {}),
       providerId,
       issuer: typeof profile.issuer === 'string' ? profile.issuer : undefined,
       nameID: samlUserId,

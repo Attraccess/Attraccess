@@ -81,6 +81,14 @@ export class SessionService implements OnModuleInit {
     });
   }
 
+  async getLogoutSession(token: string) {
+    return token ? this.store.getLogoutSession(token) : null;
+  }
+
+  async revokeLogoutSession(id: string): Promise<void> {
+    if (await this.store.revokeLogoutSession(id)) this.metricsService.authActiveSessions.dec();
+  }
+
   async getSsoContext(token: string) {
     return token ? this.store.getSsoContext(token) : null;
   }

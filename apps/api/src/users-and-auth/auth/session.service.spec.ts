@@ -25,6 +25,8 @@ describe('SessionService', () => {
 
   function makeStore(): jest.Mocked<SessionStore> {
     return {
+      getLogoutSession: jest.fn().mockResolvedValue(null),
+      revokeLogoutSession: jest.fn().mockResolvedValue(false),
       createSession: jest.fn().mockResolvedValue(undefined),
       validateSession: jest.fn().mockResolvedValue(null),
       rotateSession: jest.fn().mockResolvedValue(false),

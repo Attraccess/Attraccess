@@ -8,6 +8,15 @@ import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import Redis from 'ioredis';
 import { instanceToPlain } from 'class-transformer';
 import { SessionStore } from './session-store';
+import { AuthController } from '../auth.controller';
+import { SessionService } from '../session.service';
+import { SsoLogoutService } from '../sso/sso-logout.service';
+import { SettingsService } from '../../../settings/settings.service';
+import { CookieConfigService } from '../../../common/services/cookie-config.service';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Response } from 'express';
+import { MetricsService } from '../../../metrics/metrics.service';
+import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
 import { SqliteSessionStore } from './sqlite.session-store';
 import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
@@ -148,6 +157,107 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       }
     });
 
+    it.each([false, true])(
+      'central logout ends a session refreshed during provider preparation (failure: %s)',
+      async (failure) => {
+        await create('original', oidc);
+        await create('independent', oidc);
+        const dec = jest.fn();
+        const sessions = new SessionService(
+          store,
+          hash,
+          { authActiveSessions: { dec } } as unknown as MetricsService,
+          {} as CronTimer,
+        );
+        let started: () => void;
+        const preparing = new Promise<void>((resolve) => {
+          started = resolve;
+        });
+        let proceed: () => void;
+        const paused = new Promise<void>((resolve) => {
+          proceed = resolve;
+        });
+        const controller = new AuthController(
+          sessions,
+          {
+            getCookieName: () => 'auth-session',
+            clearAuthCookie: async () => undefined,
+          } as unknown as CookieConfigService,
+          undefined,
+          {
+            returnURL: async () => 'https://app.example/',
+            prepare: async () => {
+              started();
+              await paused;
+              if (failure) throw new Error('Provider unavailable');
+              return { kind: 'redirect', redirectUrl: 'https://idp.example/logout' };
+            },
+          } as unknown as SsoLogoutService,
+          { getUrl: async () => 'https://app.example' } as SettingsService,
+        );
+        const request = {
+          user: { id: 7 },
+          headers: { authorization: 'Bearer original', origin: 'https://app.example' },
+          cookies: {},
+          logout: (done: () => void) => done(),
+        } as unknown as AuthenticatedRequest;
+        const logout = controller.logoutEverywhere(request, { setHeader: jest.fn() } as unknown as Response);
+        await preparing;
+        expect(await store.rotateSession('original', hash.hashToken('rotated'), new Date(Date.now() + 60000))).toBe(
+          true,
+        );
+        expect(
+          await store.rotateSession('rotated', hash.hashToken('rotated-again'), new Date(Date.now() + 60000)),
+        ).toBe(true);
+        proceed();
+        expect((await logout).kind).toBe(failure ? 'local_only' : 'redirect');
+        expect(await store.validateSession('rotated-again')).toBeNull();
+        expect(await store.validateSession('independent')).not.toBeNull();
+        expect(dec).toHaveBeenCalledTimes(1);
+        expect(
+          await store.rotateSession('rotated-again', hash.hashToken('revived'), new Date(Date.now() + 60000)),
+        ).toBe(false);
+      },
+    );
+
+    it('atomically revokes a captured session lineage when refresh races with logout', async () => {
+      for (let i = 0; i < 20; i++) {
+        await create(`original-${i}`, oidc);
+        const session = await store.getLogoutSession(`original-${i}`);
+        const [, removed] = await Promise.all([
+          store.rotateSession(`original-${i}`, hash.hashToken(`rotated-${i}`), new Date(Date.now() + 60000)),
+          store.revokeLogoutSession(session.id),
+        ]);
+        expect(removed).toBe(true);
+        expect(await store.validateSession(`original-${i}`)).toBeNull();
+        expect(await store.validateSession(`rotated-${i}`)).toBeNull();
+        expect(await store.revokeLogoutSession(session.id)).toBe(false);
+      }
+    });
+
+    it.each([oidc, saml])(
+      'compares provider timestamps for $protocol logout and protects later logins',
+      async (context) => {
+        const providerNow = Date.now() - 15000;
+        await create('before-logout', { ...context, providerIssuedAt: providerNow - 1000 });
+        await create('after-logout', { ...context, providerIssuedAt: providerNow + 1000 });
+        await create('legacy-timestamp', context);
+        expect(
+          await store.rotateSession('before-logout', hash.hashToken('refreshed'), new Date(Date.now() + 60000)),
+        ).toBe(true);
+        const selector = { ...context, issuedBefore: providerNow };
+        expect(
+          await store.revokeSsoSessionsOnce(selector, { key: 'provider-clock', expiresAt: Date.now() + 60000 }),
+        ).toEqual({ fresh: true, count: 2 });
+        expect(await store.validateSession('refreshed')).toBeNull();
+        expect(await store.validateSession('legacy-timestamp')).toBeNull();
+        expect(await store.validateSession('after-logout')).not.toBeNull();
+        expect(
+          await store.revokeSsoSessionsOnce(selector, { key: 'provider-clock', expiresAt: Date.now() + 60000 }),
+        ).toEqual({ fresh: false, count: 0 });
+      },
+    );
+
     it('returns actual counts for concurrent duplicate revocations and omits private context from session responses', async () => {
       await create('live', oidc);
       const publicSessions = await store.getUserSessions(7);
@@ -187,6 +297,20 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       await create('new-login', oidc);
       expect(await store.revokeSsoSessionsOnce(selector, receipt)).toEqual({ fresh: false, count: 0 });
       expect(await store.validateSession('new-login')).not.toBeNull();
+    });
+
+    it('keeps captured logout handles usable for existing Valkey sessions without lineage metadata', async () => {
+      if (!client) return;
+      await create('legacy');
+      await client.hdel(`session:${hash.hashToken('legacy')}`, 'lineageId');
+      await client.del(`session_lineage:${hash.hashToken('legacy')}`);
+      const session = await store.getLogoutSession('legacy');
+      expect(await store.rotateSession('legacy', hash.hashToken('rotated-legacy'), new Date(Date.now() + 60000))).toBe(
+        true,
+      );
+      expect(await store.revokeLogoutSession(session.id)).toBe(true);
+      expect(await store.validateSession('rotated-legacy')).toBeNull();
+      expect(await client.keys('session_lineage:*')).toEqual([]);
     });
 
     it('cleans expired lookup members and leaves legacy sessions usable', async () => {

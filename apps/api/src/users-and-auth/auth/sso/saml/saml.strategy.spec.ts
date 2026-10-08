@@ -151,7 +151,7 @@ describe('SSOSamlStrategy', () => {
       spNameQualifier: 'sp-a',
       sessionIndex: 'first',
       getAssertionXml: () =>
-        '<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"><saml:AuthnStatement SessionIndex="first"/><saml:AuthnStatement SessionIndex="second"/></saml:Assertion>',
+        '<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" IssueInstant="2026-10-08T12:00:00Z"><saml:AuthnStatement SessionIndex="first"/><saml:AuthnStatement SessionIndex="second"/></saml:Assertion>',
       emailA: 'a@example.com',
     } as SamlProfile;
     const profileB = {
@@ -182,6 +182,7 @@ describe('SSOSamlStrategy', () => {
     expect(errorB.email).toBe('b@example.com');
     expect(requestA).toHaveProperty('ssoSessionContext', {
       protocol: 'SAML',
+      providerIssuedAt: Date.parse('2026-10-08T12:00:00Z'),
       providerId: 10,
       issuer: profileA.issuer,
       nameID: 'user-a',

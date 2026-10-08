@@ -134,6 +134,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
         providerId: this.config.ssoProviderId,
         issuer: this.config.issuer,
         subject: profile.id,
+        providerIssuedAt: Number(claims.iat) * 1000,
         ...(typeof claims.sid === 'string' && claims.sid ? { sid: claims.sid } : {}),
         idTokenEncrypted: encryption.encrypt(idToken),
       };

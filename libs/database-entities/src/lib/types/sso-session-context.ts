@@ -1,7 +1,18 @@
 /** Internal authentication provenance. Never expose this through session response DTOs. */
 export type SsoSessionContext =
-  | { protocol: 'OIDC'; providerId: number; issuer: string; subject: string; sid?: string; idTokenEncrypted?: string }
   | {
+      /** Verified ID token iat in milliseconds, on the provider clock. */
+      providerIssuedAt?: number;
+      protocol: 'OIDC';
+      providerId: number;
+      issuer: string;
+      subject: string;
+      sid?: string;
+      idTokenEncrypted?: string;
+    }
+  | {
+      /** Signed login assertion IssueInstant in milliseconds, on the provider clock. */
+      providerIssuedAt?: number;
       protocol: 'SAML';
       providerId: number;
       issuer?: string;

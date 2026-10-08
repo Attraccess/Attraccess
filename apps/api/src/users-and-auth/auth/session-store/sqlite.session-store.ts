@@ -2,7 +2,7 @@ import { runSerializedTransaction } from '../../../database/run-serialized-trans
 import { Repository, LessThan, MoreThan } from 'typeorm';
 import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
 import { TokenHashService } from '../../../encryption/token-hash.service';
-import { SessionStore, SessionMetadata } from './session-store';
+import { SessionStore, SessionMetadata, LogoutSession } from './session-store';
 
 import { matchesSsoSession, SsoSessionSelector } from './sso-session-selector';
 
@@ -78,7 +78,7 @@ export class SqliteSessionStore implements SessionStore {
     return rows.some((row) => new Date(row.expiresAt + 'Z') > new Date());
   }
 
-  async getSsoContext(token: string): Promise<SsoSessionContext | null> {
+  async getLogoutSession(token: string): Promise<LogoutSession | null> {
     const session = await this.sessionRepository
       .createQueryBuilder('session')
       .addSelect('session.ssoContext')
@@ -88,7 +88,18 @@ export class SqliteSessionStore implements SessionStore {
         now: new Date(),
       })
       .getOne();
-    return session?.ssoContext ?? null;
+    return session ? { id: String(session.id), ssoContext: session.ssoContext ?? null } : null;
+  }
+
+  async revokeLogoutSession(id: string): Promise<boolean> {
+    const rows = (await this.sessionRepository.query('delete FROM "session" WHERE "id" = ? RETURNING "expiresAt"', [
+      id,
+    ])) as { expiresAt: string }[];
+    return rows.some((row) => new Date(row.expiresAt + 'Z') > new Date());
+  }
+
+  async getSsoContext(token: string): Promise<SsoSessionContext | null> {
+    return (await this.getLogoutSession(token))?.ssoContext ?? null;
   }
 
   async revokeSsoSessions(selector: SsoSessionSelector): Promise<number> {
@@ -100,8 +111,6 @@ export class SqliteSessionStore implements SessionStore {
       query.andWhere('session.ssoSessionId = :sid', { sid: selector.sid });
     const subject = selector.protocol === 'OIDC' ? selector.subject : selector.nameID;
     if (subject) query.andWhere('session.ssoSubject = :subject', { subject });
-    if (selector.issuedBefore !== undefined)
-      query.andWhere('session.createdAt <= :before', { before: new Date(selector.issuedBefore) });
     const sessions = (await query.getMany()).filter((session) => matchesSsoSession(session.ssoContext, selector));
     if (!sessions.length) return 0;
     const placeholders = sessions.map(() => '?').join(',');

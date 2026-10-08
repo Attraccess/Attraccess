@@ -11,7 +11,15 @@ export interface SessionMetadata {
   expiresIn?: number; // seconds
 }
 
+/** Internal handle stays stable across token refreshes. */
+export interface LogoutSession {
+  id: string;
+  ssoContext: SsoSessionContext | null;
+}
+
 export interface SessionStore {
+  getLogoutSession(token: string): Promise<LogoutSession | null>;
+  revokeLogoutSession(id: string): Promise<boolean>;
   createSession(
     hashedToken: string,
     userId: number,
