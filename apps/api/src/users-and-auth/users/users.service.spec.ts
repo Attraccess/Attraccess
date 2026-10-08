@@ -123,6 +123,22 @@ describe('UsersService', () => {
     };
   });
 
+  describe('local login identifier lookup', () => {
+    it.each([
+      [' Alice ', { username: 'alice' }],
+      [' Alice@Example.com ', { email: 'Alice@Example.com' }],
+    ])('resolves %s using existing normalization', async (identifier, where) => {
+      const user = { id: 7 } as User;
+      userRepository.findOne.mockResolvedValue(user);
+      await expect(service.findByLoginIdentifier(identifier)).resolves.toBe(user);
+      expect(userRepository.findOne).toHaveBeenCalledWith({ where, relations: undefined });
+    });
+    it.each(['', '  ', 'a@', '@example.com', 'a@@example.com'])('rejects malformed identifier %s without a query', async (identifier) => {
+      await expect(service.findByLoginIdentifier(identifier)).resolves.toBeNull();
+      expect(userRepository.findOne).not.toHaveBeenCalled();
+    });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });

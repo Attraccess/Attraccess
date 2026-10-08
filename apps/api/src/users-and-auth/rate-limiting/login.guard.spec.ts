@@ -14,7 +14,7 @@ describe('login guard authentication and audit boundaries', () => {
     recordFailure: jest.fn(),
     recordSuccess: jest.fn(),
   };
-  const users = { findOne: jest.fn() };
+  const users = { findByLoginIdentifier: jest.fn() };
   const audit = { log: jest.fn() };
   let guard: LoginRateLimitGuard;
   let authenticate: jest.SpyInstance;
@@ -24,7 +24,8 @@ describe('login guard authentication and audit boundaries', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
-    users.findOne.mockResolvedValue({ id: 7, username: 'alice' });
+    request.body.username = ' alice ';
+    users.findByLoginIdentifier.mockResolvedValue({ id: 7, username: 'alice' });
     authenticate = jest
       .spyOn(Object.getPrototypeOf(LoginRateLimitGuard.prototype), 'canActivate')
       .mockResolvedValue(true);
@@ -63,7 +64,6 @@ describe('login guard authentication and audit boundaries', () => {
   });
   it.each([
     [new UnauthorizedException(), 'invalid_credentials'],
-    [new Error('TwoFactorRequired'), 'two_factor_required'],
     [new Error('TwoFactorInvalidCode'), 'two_factor_invalid'],
     [new Error('UserEmailNotVerifiedException'), 'email_not_verified'],
     [new AccountLockedException(5), 'account_locked'],
@@ -76,8 +76,30 @@ describe('login guard authentication and audit boundaries', () => {
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ outcome, userId: 7 }));
     expect(protection.recordSuccess).not.toHaveBeenCalled();
   });
+  it('audits the code challenge without incrementing or clearing counters', async () => {
+    const challenge = new UnauthorizedException('TwoFactorRequired');
+    authenticate.mockRejectedValue(challenge);
+    await expect(guard.canActivate(context)).rejects.toBe(challenge);
+    expect(protection.recordFailure).not.toHaveBeenCalled();
+    expect(protection.recordSuccess).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'two_factor_required', userId: 7 }));
+  });
+  it('blocks email login using the same account lockout', async () => {
+    request.body.username = ' alice@example.com ';
+    protection.assertAccountAllowed.mockRejectedValue(new AccountLockedException(45));
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(AccountLockedException);
+    expect(users.findByLoginIdentifier).toHaveBeenCalledWith('alice@example.com');
+    expect(protection.assertAccountAllowed).toHaveBeenCalledWith({ id: 7, username: 'alice' });
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+  it('counts invalid codes submitted with email against the resolved account', async () => {
+    request.body.username = 'alice@example.com';
+    authenticate.mockRejectedValue(new UnauthorizedException('TwoFactorInvalidCode'));
+    await expect(guard.canActivate(context)).rejects.toThrow('TwoFactorInvalidCode');
+    expect(protection.recordFailure).toHaveBeenCalledWith('login', '192.0.2.10', 7, 'alice@example.com');
+  });
   it('keeps unknown users in the IP bucket and still performs authentication', async () => {
-    users.findOne.mockRejectedValue(new Error('not found'));
+    users.findByLoginIdentifier.mockRejectedValue(new Error('not found'));
     authenticate.mockRejectedValue(new UnauthorizedException());
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
     expect(protection.assertAccountAllowed).not.toHaveBeenCalled();

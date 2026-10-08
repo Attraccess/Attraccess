@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isValidEmail } from '../../utils/email';
 import { ArrowRight, LogInIcon } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Input, Label, Skeleton, TextField } from '@heroui/react';
@@ -22,6 +22,11 @@ import { getTranslationKeyForApiError } from '../../utils/apiError';
 interface LoginFormProps {
   onNeedsAccount: (() => void) | null;
   onForgotPassword: () => void;
+}
+
+function getLoginErrorMessage(error: unknown): string | undefined {
+  const body = (error as ApiError | null)?.body as Record<string, unknown> | undefined;
+  return typeof body?.message === 'string' ? body.message : undefined;
 }
 
 export function LoginForm(props: LoginFormProps) {
@@ -89,7 +94,19 @@ function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean
 function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
   const { onForgotPassword, t, tExists } = props;
 
-  const { mutate: login, isPending, error } = useLogin();
+  const { mutate: login, isPending, error, reset } = useLogin();
+  const [identifier, setIdentifier] = useState('');
+  const [passwordValue, setPasswordValue] = useState('');
+  const [challengeCredentials, setChallengeCredentials] = useState<{ username: string; password: string } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitting = useRef(false);
+  const errorMessage = getLoginErrorMessage(error);
+
+  useEffect(() => {
+    if (challengeCredentials && !isPending) {
+      formRef.current?.querySelector<HTMLInputElement>('input[name="twoFactorCode"]')?.focus();
+    }
+  }, [challengeCredentials, isPending]);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [resendEmail, setResendEmail] = useState('');
   const [resendSuccess, setResendSuccess] = useState(false);
@@ -130,7 +147,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
   });
 
   const { errorTitle, errorDescription } = useMemo(() => {
-    if (!error) {
+    if (!error || errorMessage === 'TwoFactorRequired') {
       return {
         errorTitle: null,
         errorDescription: null,
@@ -151,37 +168,66 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         error,
       }),
     };
-  }, [error, t, tExists]);
+  }, [error, errorMessage, t, tExists]);
 
-  const handleSubmit: React.FormEventHandler = useCallback(
-    async (event) => {
+  const changeCredentials = useCallback(() => {
+    if (isPending || submitting.current) return;
+    setChallengeCredentials(null);
+    setTwoFactorCode('');
+    reset();
+    formRef.current?.querySelector<HTMLInputElement>('input[name="username"]')?.focus();
+  }, [isPending, reset]);
+
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = useCallback(
+    (event) => {
       event.preventDefault();
-      const formData = new FormData(event.currentTarget as HTMLFormElement);
+      if (isPending || submitting.current) return;
+      if (challengeCredentials && !/^\d{6}$/.test(twoFactorCode)) return;
+
+      // Read actual inputs before disabling them, including password-manager autofill.
+      const formData = new FormData(event.currentTarget);
       const username = formData.get('username');
       const password = formData.get('password');
-
-      if (typeof username !== 'string' || typeof password !== 'string') {
-        return;
-      }
+      if (typeof username !== 'string' || typeof password !== 'string') return;
+      const credentials = challengeCredentials ?? { username, password };
+      // Keep native autofill visible when the pending/challenge state rerenders the fields.
+      setIdentifier(credentials.username);
+      setPasswordValue(credentials.password);
 
       setResendSuccess(false);
       setResendError(null);
-
+      submitting.current = true;
       login({
-        username,
-        password,
-        twoFactorCode: twoFactorCode.trim() || undefined,
+        ...credentials,
+        ...(challengeCredentials ? { twoFactorCode } : {}),
         tokenLocation: 'cookie',
+      }, {
+        onError: (mutationError) => {
+          const message = getLoginErrorMessage(mutationError);
+          if (message === 'TwoFactorRequired') {
+            setChallengeCredentials(credentials);
+          } else if (['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LocalLoginForSSOForbiddenException'].includes(message ?? '')) {
+            setChallengeCredentials(null);
+            setTwoFactorCode('');
+          }
+        },
+        onSuccess: () => {
+          setChallengeCredentials(null);
+          setIdentifier('');
+          setPasswordValue('');
+          setTwoFactorCode('');
+        },
+        onSettled: () => { submitting.current = false; },
       });
     },
-    [login, twoFactorCode],
+    [login, isPending, challengeCredentials, twoFactorCode],
   );
 
   const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
-      <TextField isDisabled={isPending}>
+    <form ref={formRef} className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
+      <TextField value={identifier} onChange={setIdentifier} isDisabled={isPending} isReadOnly={!!challengeCredentials}>
         <Label>{t('username')}</Label>
         <Input id="username" name="username" type="text" required autoComplete="username" data-cy="login-form-username-input" />
       </TextField>
@@ -189,20 +235,31 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         id="password"
         name="password"
         label={t('password')}
+        value={passwordValue}
+        onChange={setPasswordValue}
         required
         isDisabled={isPending}
+        isReadOnly={!!challengeCredentials}
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
-      {/* Value sourced purely from React state (twoFactorCode), not FormData. */}
-      <OneTimeCodeInput
-        label={t('twoFactorCode')}
-        description={t('twoFactorHelper')}
-        value={twoFactorCode}
-        onChange={setTwoFactorCode}
-        isDisabled={isPending}
-        data-cy="login-form-two-factor-input"
-      />
+      {challengeCredentials && (
+        <fieldset aria-label={t('twoFactorCode')} className="space-y-2">
+          <p>{t('twoFactorInstruction')}</p>
+          <OneTimeCodeInput
+            label={t('twoFactorCode')}
+            name="twoFactorCode"
+            value={twoFactorCode}
+            onChange={setTwoFactorCode}
+            isDisabled={isPending}
+            autoFocus
+            data-cy="login-form-two-factor-input"
+          />
+          <Button variant="secondary" onPress={changeCredentials} isDisabled={isPending}>
+            {t('changeCredentials')}
+          </Button>
+        </fieldset>
+      )}
       <div className="flex items-center justify-between">
         <Button variant="secondary"
           onPress={onForgotPassword}
@@ -216,10 +273,10 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         type="submit"
         className="w-full"
         isPending={isPending}
-        isDisabled={isPending}
+        isDisabled={isPending || (!!challengeCredentials && !/^\d{6}$/.test(twoFactorCode))}
         data-cy="login-form-sign-in-button"
       >
-        {isPending ? t('signingIn') : t('signInButton')}
+        {isPending ? t('signingIn') : challengeCredentials ? t('verifyCode') : t('signInButton')}
         {arrowRight}</Button>
 
       {errorTitle && (

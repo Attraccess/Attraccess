@@ -33,7 +33,7 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
 
     let preCheckedUserId: number | null = null;
     if (username) {
-      const user = await this.usersService.findOne({ username }).catch(() => null);
+      const user = await this.usersService.findByLoginIdentifier(username).catch(() => null);
       if (user) {
         preCheckedUserId = user.id;
         try {
@@ -59,7 +59,9 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
       activated = result instanceof Observable ? await observableToPromise(result) : Boolean(result);
     } catch (error) {
       const outcome = classifyLoginFailure(error);
-      await this.bruteForce.recordFailure('login', ip, preCheckedUserId, username);
+      if (outcome !== 'two_factor_required') {
+        await this.bruteForce.recordFailure('login', ip, preCheckedUserId, username);
+      }
       await this.audit.log({
         type: 'login',
         outcome,

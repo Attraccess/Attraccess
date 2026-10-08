@@ -202,6 +202,18 @@ export class UsersService {
     );
   }
 
+  /** Resolve the identifier accepted by local login without ambiguous username/email queries. */
+  async findByLoginIdentifier(identifier: string): Promise<User | null> {
+    const value = identifier.trim();
+    if (!value) return null;
+
+    const options = value.includes('@') ? { email: value } : { username: value };
+    const parsed = FindOneOptionsSchema.safeParse(options);
+    if (!parsed.success) return null;
+
+    return this.findOne(parsed.data);
+  }
+
   async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(options);
 
