@@ -385,16 +385,21 @@ describe('LoginForm credential and authenticator steps', () => {
     expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toHaveValue('');
   });
 
-  it.each(['TooManyAuthAttemptsException', 'network failure', 'UnkownUserOrPasswordException'])('handles %s during the code step', async (message) => {
+  it.each(['TooManyAuthAttemptsException', 'network failure', 'UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'])('handles %s during the code step', async (message) => {
     loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockRejectedValueOnce(apiFailure(message));
     const user = userEvent.setup();
     renderLogin();
     await submitCredentials(user);
     await user.paste('012345');
     await user.click(screen.getByRole('button', { name: 'Verify code' }));
-    if (message === 'UnkownUserOrPasswordException') {
-      expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
+    if (['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'].includes(message)) {
+      expect(screen.queryByRole('textbox', { name: 'Authenticator code' })).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Email or username')).not.toHaveAttribute('readonly');
       expect(screen.getByLabelText('Password')).not.toHaveAttribute('readonly');
+      loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired'));
+      await user.click(screen.getByRole('button', { name: 'Start making' }));
+      expect(loginMock).toHaveBeenLastCalledWith({ username: 'alice@example.com', password: ' password ', tokenLocation: 'cookie' });
+      expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toHaveValue('');
     } else expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toBeInTheDocument();
   });
 

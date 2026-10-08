@@ -206,7 +206,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
           const message = getLoginErrorMessage(mutationError);
           if (message === 'TwoFactorRequired') {
             setChallengeCredentials(credentials);
-          } else if (['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LocalLoginForSSOForbiddenException'].includes(message ?? '')) {
+          } else if (['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'].includes(message ?? '')) {
             setChallengeCredentials(null);
             setTwoFactorCode('');
           }
