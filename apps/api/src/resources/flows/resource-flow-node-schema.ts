@@ -1,4 +1,4 @@
-import { getNodeDataSchema, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { getNodeDataSchema, ResourceFlowNodeType, ResourceMeter } from '@attraccess/database-entities';
 import { NotFoundException } from '@nestjs/common';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { getPluginFlowNode, getRegisteredPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
@@ -73,7 +73,21 @@ export abstract class ResourceFlowNodeSchemaImplementation extends ResourceFlows
 
     try {
       const schema = getNodeDataSchema(nodeData.type as ResourceFlowNodeType);
-      schema.parse(nodeData.data);
+      const data = schema.parse(nodeData.data);
+      if (nodeData.type.includes('.resource.metering.') && data && typeof data === 'object' && 'meterId' in data) {
+        const resourceId = validationContext.get('meterResourceId');
+        if (
+          typeof resourceId === 'number' &&
+          !(await this.resourceRepository.manager.existsBy(ResourceMeter, { id: Number(data.meterId), resourceId }))
+        ) {
+          errors.push({
+            nodeId: nodeData.id,
+            nodeType: nodeData.type,
+            field: 'meterId',
+            message: 'Choose a meter belonging to this resource',
+          });
+        }
+      }
     } catch (error) {
       // Handle Zod validation errors
       if (error.errors) {

@@ -17,7 +17,7 @@ export abstract class ResourceFlowWritingImplementation extends ResourceFlowNode
 
     // Collect validation errors from all nodes
     const allValidationErrors: ValidationError[] = [];
-    const validationContext = new Map<string, unknown>();
+    const validationContext = new Map<string, unknown>([['meterResourceId', resourceId]]);
     for (const nodeData of flowData.nodes) {
       const nodeErrors = await this.validateNodeData(nodeData, validationContext);
       allValidationErrors.push(...nodeErrors);
