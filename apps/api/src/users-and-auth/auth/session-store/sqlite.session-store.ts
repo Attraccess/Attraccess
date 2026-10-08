@@ -123,14 +123,20 @@ export class SqliteSessionStore implements SessionStore {
 
   async revokeSsoSessionsOnce(
     selector: SsoSessionSelector,
-    receipt: { key: string; expiresAt: number },
+    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
   ): Promise<{ fresh: boolean; count: number }> {
     return runSerializedTransaction(this.sessionRepository.manager, async (manager) => {
       const store = new SqliteSessionStore(manager.getRepository(Session), this.tokenHashService);
       // The receipt write acquires SQLite's writer lock before selecting sessions.
       // A failed delete rolls back the receipt so delivery can be retried safely.
       if (!(await store.putLogoutState(receipt.key, 'seen', receipt.expiresAt))) return { fresh: false, count: 0 };
-      return { fresh: true, count: await store.revokeSsoSessions(selector) };
+      const count = await store.revokeSsoSessions(selector);
+      if (receipt.requireMatch && count === 0) {
+        // Keep the writer lock and discard the untrusted allocation in this same transaction.
+        await store.takeLogoutState(receipt.key);
+        return { fresh: false, count: 0 };
+      }
+      return { fresh: true, count };
     });
   }
 

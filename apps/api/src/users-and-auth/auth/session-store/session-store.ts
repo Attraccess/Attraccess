@@ -27,9 +27,10 @@ export interface SessionStore {
     expiresAt: Date,
   ): Promise<void>;
   getSsoContext(token: string): Promise<SsoSessionContext | null>;
+  /** Unsigned notifications require a match to bound retained receipts by revoked active sessions. */
   revokeSsoSessionsOnce(
     selector: SsoSessionSelector,
-    receipt: { key: string; expiresAt: number },
+    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
   ): Promise<{ fresh: boolean; count: number }>;
   revokeSsoSessions(selector: SsoSessionSelector): Promise<number>;
   putLogoutState(key: string, value: string, expiresAt: number): Promise<boolean>;

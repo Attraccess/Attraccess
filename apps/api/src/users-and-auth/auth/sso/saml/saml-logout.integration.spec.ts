@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { SignedXml } from 'xml-crypto';
 import { inflateRawSync } from 'node:zlib';
 import { Profile } from '@node-saml/node-saml';
@@ -194,7 +195,13 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
     ]) {
       const outbound = decodeRedirect((await service.prepare(context)).redirectUrl);
       const message = await provider.validateMessage(outbound.values, outbound.query, idpDestination);
-      const xml = provider._generateLogoutResponse({ ID: message.id } as Profile, true).replace(success, status);
+      const original = provider._generateLogoutResponse({ ID: message.id } as Profile, true);
+      const xml = status.endsWith('PartialLogout')
+        ? original.replace(
+            `<samlp:StatusCode Value="${success}"/>`,
+            `<samlp:StatusCode Value="${success}"><samlp:StatusCode Value="${status}"/></samlp:StatusCode>`,
+          )
+        : original.replace(success, status);
       const expected = status === success ? 'returned' : status.endsWith('PartialLogout') ? 'partial' : 'failed';
       expect(
         await service.samlMessage(2, { SAMLResponse: signedPost(xml), RelayState: outbound.values.RelayState }, null),
@@ -204,6 +211,29 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
     await expect(
       service.samlMessage(2, { SAMLResponse: signedPost(xml), RelayState: 'not-outstanding' }, null),
     ).rejects.toThrow();
+  });
+
+  it('rejects contradictory or malformed signed status hierarchies without consuming correlation', async () => {
+    const outbound = decodeRedirect((await service.prepare(context)).redirectUrl);
+    const request = await provider.validateMessage(outbound.values, outbound.query, idpDestination);
+    const xml = provider._generateLogoutResponse({ ID: request.id } as Profile, true);
+    const status = (value: string, nested = '') => `<samlp:StatusCode Value="${value}">${nested}</samlp:StatusCode>`;
+    const prefix = 'urn:oasis:names:tc:SAML:2.0:status:';
+    for (const changed of [
+      status(prefix + 'Responder', status(success)),
+      status(success, status(prefix + 'Responder')),
+      status(success, '<samlp:StatusCode/>'),
+      status(success, status(prefix + 'PartialLogout') + status(prefix + 'PartialLogout')),
+      status(prefix + 'PartialLogout'),
+    ]) {
+      const modified = xml.replace(`<samlp:StatusCode Value="${success}"/>`, changed);
+      await expect(
+        service.samlMessage(2, { SAMLResponse: signedPost(modified), RelayState: outbound.values.RelayState }, null),
+      ).rejects.toThrow();
+    }
+    expect(
+      await service.samlMessage(2, { SAMLResponse: signedPost(xml), RelayState: outbound.values.RelayState }, null),
+    ).toBe('https://app.example/?ssoLogout=returned');
   });
 
   it('provider initiation follows the message scope, returns a signed correlated response and rejects replays', async () => {
@@ -225,15 +255,12 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
     });
     await expect(service.samlMessage(2, request.values, request.query)).rejects.toThrow();
     expect(sessions.revokeSsoSessions).toHaveBeenCalledTimes(1);
-    await service.samlMessage(
-      2,
-      {
-        SAMLRequest: signedPost(
-          (await requestXml()).replace(/<[^>]*SessionIndex[^>]*>[^<]*<\/[^>]*SessionIndex>/g, ''),
-        ),
-      },
-      null,
-    );
+    const document = new DOMParser().parseFromString(await requestXml(), 'text/xml');
+    for (const element of Array.from(
+      document.getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:protocol', 'SessionIndex'),
+    ))
+      element.parentNode.removeChild(element);
+    await service.samlMessage(2, { SAMLRequest: signedPost(new XMLSerializer().serializeToString(document)) }, null);
     expect(sessions.revokeSsoSessions).toHaveBeenLastCalledWith(expect.objectContaining({ sessionIndexes: [] }));
   });
 

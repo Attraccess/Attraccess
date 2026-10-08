@@ -152,7 +152,7 @@ export class ValkeySessionStore implements SessionStore {
 
   async revokeSsoSessionsOnce(
     selector: SsoSessionSelector,
-    receipt: { key: string; expiresAt: number },
+    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
   ): Promise<{ fresh: boolean; count: number }> {
     const kind = selector.protocol === 'OIDC' && selector.sid ? 'sid' : 'subject';
     const identity = selector.protocol === 'OIDC' ? selector.sid || selector.subject : selector.nameID;
@@ -165,6 +165,7 @@ export class ValkeySessionStore implements SessionStore {
       JSON.stringify(selector),
       `sso_logout_state:${receipt.key}`,
       receipt.expiresAt,
+      receipt.requireMatch ? 1 : 0,
     )) as number[];
     return { fresh: result[0] === 1, count: result[1] };
   }

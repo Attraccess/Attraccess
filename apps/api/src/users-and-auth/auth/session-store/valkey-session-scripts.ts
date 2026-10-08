@@ -102,6 +102,7 @@ for _,token in ipairs(redis.call('ZRANGE', KEYS[1], 0, -1)) do
   end
 end
 if receipt then
+  if ARGV[5] == '1' and count == 0 then return {0,0} end
   redis.call('SET', receipt, 'seen', 'PX', math.max(1, tonumber(ARGV[4])-now))
   return {1,count}
 end

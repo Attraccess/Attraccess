@@ -194,7 +194,11 @@ export class SsoLogoutService {
         throw new BadRequestException('Invalid OIDC browser notification');
       const fresh = await this.sessions.revokeSsoSessionsOnce(
         { protocol: 'OIDC', providerId, issuer, sid },
-        { key: receiptKey('OIDC-front', providerId, `${issuer}:${sid}`), expiresAt: Date.now() + 604800000 },
+        {
+          key: receiptKey('OIDC-front', providerId, `${issuer}:${sid}`),
+          expiresAt: Date.now() + 604800000,
+          requireMatch: true,
+        },
       );
       return (
         fresh &&
@@ -266,10 +270,9 @@ export class SsoLogoutService {
         if (!raw) throw new Error('Expired or consumed request');
         const transaction = JSON.parse(raw) as { state: string; returnTarget: string };
         if (container.RelayState !== transaction.state) throw new Error('RelayState mismatch');
-        if (message.status !== 'urn:oasis:names:tc:SAML:2.0:status:Success')
-          return this.returnURL(
-            message.status === 'urn:oasis:names:tc:SAML:2.0:status:PartialLogout' ? 'partial' : 'failed',
-          );
+        if (message.status !== 'urn:oasis:names:tc:SAML:2.0:status:Success') return this.returnURL('failed');
+        if (message.subStatusCodes?.[0] === 'urn:oasis:names:tc:SAML:2.0:status:PartialLogout')
+          return this.returnURL('partial');
         return transaction.returnTarget;
       }
       const fresh = await this.sessions.revokeSsoSessionsOnce(

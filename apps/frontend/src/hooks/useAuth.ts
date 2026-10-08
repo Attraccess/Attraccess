@@ -2,7 +2,8 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../components/toastProvider';
 import logoutEn from './logout.en.json';
 import logoutDe from './logout.de.json';
-import { resumeLiveUpdates, stopLiveUpdates } from '../utils/live-updates';
+import { restoreAuthentication } from '../utils/auth-session';
+import { stopLiveUpdates } from '../utils/live-updates';
 import { useNavigate } from 'react-router-dom';
 import {
   OpenAPI,
@@ -32,13 +33,7 @@ interface LoginCredentials {
 export function useLogin() {
   const queryClient = useQueryClient();
   const login = useAuthenticationServiceCreateSession({
-    onSuccess: () => {
-      queryClient.setQueryData(['auth-logout-status'], 'idle');
-      resumeLiveUpdates();
-      queryClient.invalidateQueries({
-        queryKey: UseUsersServiceGetCurrentKeyFn(),
-      });
-    },
+    onSuccess: () => restoreAuthentication(queryClient),
   });
 
   return {
@@ -134,6 +129,7 @@ export function useAuth() {
       await queryClient.cancelQueries();
       queryClient.setQueryData(['auth-logout-status'], 'ended');
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-logout-status' });
+      queryClient.getMutationCache().clear();
       queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), null);
       if (result?.kind === 'redirect' && result.redirectUrl) {
         window.location.assign(result.redirectUrl);
@@ -152,6 +148,7 @@ export function useAuth() {
       await queryClient.cancelQueries();
       queryClient.setQueryData(['auth-logout-status'], 'ended');
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-logout-status' });
+      queryClient.getMutationCache().clear();
       queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), null);
       navigate('/', { replace: true });
       showError({
@@ -164,7 +161,11 @@ export function useAuth() {
 
   const startLogout = useCallback(
     (everywhere: boolean) => {
-      if (queryClient.isMutating({ mutationKey: ['auth-logout'] })) return;
+      if (
+        queryClient.getQueryData(['auth-logout-status']) !== 'idle' ||
+        queryClient.isMutating({ mutationKey: ['auth-logout'] })
+      )
+        return;
       queryClient.setQueryData(['auth-logout-status'], 'pending');
       logoutMutation.mutate(everywhere);
     },

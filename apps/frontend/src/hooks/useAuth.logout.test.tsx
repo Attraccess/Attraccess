@@ -14,12 +14,16 @@ let fail: (error: Error) => void;
 const originalBase = OpenAPI.BASE;
 const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   requestLog = [];
   OpenAPI.BASE = 'http://localhost';
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   client.setQueryData(UseUsersServiceGetCurrentKeyFn(), { id: 7, username: 'fixture' });
+  const mutation = client.getMutationCache().build(client, {
+    mutationFn: async (variables: { secret: string }) => ({ secret: variables.secret }),
+  });
+  await mutation.execute({ secret: 'private-mutation-data' });
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -69,6 +73,9 @@ it('keeps local logout separate, disables duplicate submissions across hook user
   await act(async () => finish(json({})));
   await waitFor(() => expect(hook.result.current.every((auth) => !auth.isAuthenticated)).toBe(true));
   expect(client.getQueryData(['private-data'])).toBeUndefined();
+  expect(client.getMutationCache().getAll()).toHaveLength(0);
+  act(() => hook.result.current[1].logoutEverywhere());
+  expect(requestLog.filter((request) => request.path.endsWith('logout-everywhere'))).toHaveLength(0);
 });
 
 it('starts provider logout through the central endpoint and explains a local-only result', async () => {
@@ -96,4 +103,5 @@ it('keeps every hook signed out after a lost response and reports that server lo
   await waitFor(() => expect(hook.result.current.every((auth) => !auth.isAuthenticated)).toBe(true));
   expect(messages.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Logout could not be confirmed' }));
   expect(client.getQueryData(['auth-logout-status'])).toBe('ended');
+  expect(client.getMutationCache().getAll()).toHaveLength(0);
 });

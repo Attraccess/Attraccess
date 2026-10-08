@@ -299,6 +299,30 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       expect(await store.validateSession('new-login')).not.toBeNull();
     });
 
+    it('allocates unsigned logout receipts only for active matching sessions and preserves replay protection', async () => {
+      const selector = { protocol: 'OIDC' as const, providerId: 1, issuer: oidc.issuer, sid: oidc.sid };
+      const receipt = { key: 'unsigned-receipt', expiresAt: Date.now() + 60000, requireMatch: true };
+      for (let i = 0; i < 25; i++) {
+        expect(
+          await store.revokeSsoSessionsOnce({ ...selector, sid: `unknown-${i}` }, { ...receipt, key: `unknown-${i}` }),
+        ).toEqual({ fresh: false, count: 0 });
+      }
+      if (client) expect(await client.keys('sso_logout_state:*')).toEqual([]);
+      if (source) expect(await source.query('SELECT * FROM sso_logout_state')).toEqual([]);
+      await create('matched', oidc);
+      await create('unrelated', { ...oidc, sid: 'different' });
+      const results = await Promise.all([
+        store.revokeSsoSessionsOnce(selector, receipt),
+        store.revokeSsoSessionsOnce(selector, receipt),
+      ]);
+      expect(results.filter((result) => result.fresh)).toHaveLength(1);
+      expect(results.reduce((sum, result) => sum + result.count, 0)).toBe(1);
+      await create('later-login', oidc);
+      expect(await store.revokeSsoSessionsOnce(selector, receipt)).toEqual({ fresh: false, count: 0 });
+      expect(await store.validateSession('later-login')).not.toBeNull();
+      expect(await store.validateSession('unrelated')).not.toBeNull();
+    });
+
     it('keeps captured logout handles usable for existing Valkey sessions without lineage metadata', async () => {
       if (!client) return;
       await create('legacy');

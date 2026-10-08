@@ -38,9 +38,16 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
     },
   };
   Object.assign(sessions, {
-    revokeSsoSessionsOnce: async (selector: unknown, receipt: { key: string; expiresAt: number }) => {
+    revokeSsoSessionsOnce: async (
+      selector: unknown,
+      receipt: { key: string; expiresAt: number; requireMatch?: boolean },
+    ) => {
       if (!(await store.putLogoutState(receipt.key, 'seen', receipt.expiresAt))) return false;
-      await sessions.revokeSsoSessions(selector);
+      const count = await sessions.revokeSsoSessions(selector);
+      if (receipt.requireMatch && count === 0) {
+        receipts.delete(receipt.key);
+        return false;
+      }
       return true;
     },
   });
@@ -70,6 +77,7 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
   beforeEach(() => {
     receipts.clear();
     jest.clearAllMocks();
+    sessions.revokeSsoSessions.mockResolvedValue(1);
     discoveryOverride = undefined;
     config = {
       ssoProviderId: 1,
@@ -201,6 +209,26 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
     expect(await service.oidcReturn(1, state)).toBe('https://app.example/?ssoLogout=returned');
     await expect(service.oidcReturn(1, state)).rejects.toThrow('Expired or consumed');
     await expect(service.oidcReturn(2, state)).rejects.toThrow();
+  });
+
+  it('does not retain state or clear cookies for unmatched unsigned browser notifications', async () => {
+    sessions.revokeSsoSessions.mockResolvedValue(0);
+    for (let i = 0; i < 25; i++) {
+      expect(await service.frontchannel(1, issuer, `unknown-${i}`)).toBe(false);
+    }
+    expect(receipts.size).toBe(0);
+    sessions.revokeSsoSessions.mockResolvedValue(1);
+    sessions.getSsoContext.mockResolvedValue({
+      protocol: 'OIDC',
+      providerId: 1,
+      issuer,
+      subject: 'person',
+      sid: 'matched',
+    });
+    expect(await service.frontchannel(1, issuer, 'matched', 'cookie')).toBe(true);
+    expect(receipts.size).toBe(1);
+    expect(await service.frontchannel(1, issuer, 'matched', 'later-cookie')).toBe(false);
+    expect(receipts.size).toBe(1);
   });
 
   it('handles browser session parameters, cookie-only notifications and cookieless notifications without widening scope', async () => {

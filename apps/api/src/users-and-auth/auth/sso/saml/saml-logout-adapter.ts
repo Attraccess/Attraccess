@@ -6,6 +6,10 @@ import { BadRequestException } from '@nestjs/common';
 
 const PROTOCOL = 'urn:oasis:names:tc:SAML:2.0:protocol';
 const ASSERTION = 'urn:oasis:names:tc:SAML:2.0:assertion';
+const STATUS = 'urn:oasis:names:tc:SAML:2.0:status:';
+const TOP_LEVEL_STATUSES = new Set(
+  ['Success', 'Requester', 'Responder', 'VersionMismatch'].map((code) => STATUS + code),
+);
 const RSA_SHA256 = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
 const SHA256 = 'http://www.w3.org/2001/04/xmlenc#sha256';
 
@@ -41,6 +45,7 @@ export interface SamlLogoutMessage {
   inResponseTo?: string;
   issueInstant: number;
   status?: string;
+  subStatusCodes?: string[];
   nameID?: string;
   nameIDFormat?: string;
   nameQualifier?: string;
@@ -187,8 +192,26 @@ export class SamlLogoutAdapter extends SAML {
       const codes = statuses.length === 1 ? children(statuses[0], PROTOCOL, 'StatusCode') : [];
       if (!message.inResponseTo || codes.length !== 1 || !codes[0].getAttribute('Value'))
         throw new BadRequestException('SAML LogoutResponse requires correlation and status');
-      const nested = children(codes[0], PROTOCOL, 'StatusCode');
-      message.status = nested[0]?.getAttribute('Value') || codes[0].getAttribute('Value') || undefined;
+      const status = codes[0].getAttribute('Value') || '';
+      if (!TOP_LEVEL_STATUSES.has(status)) throw new BadRequestException('Invalid SAML top-level status');
+      message.status = status;
+      message.subStatusCodes = [];
+      let nested = children(codes[0], PROTOCOL, 'StatusCode');
+      while (nested.length) {
+        const value = nested[0].getAttribute('Value');
+        if (nested.length !== 1 || !value || TOP_LEVEL_STATUSES.has(value))
+          throw new BadRequestException('Invalid SAML subordinate status');
+        message.subStatusCodes.push(value);
+        nested = children(nested[0], PROTOCOL, 'StatusCode');
+      }
+      // SAML Core 3.7.3.2: Success describes the authority's session; PartialLogout
+      // is a second-level status describing incomplete propagation to participants.
+      if (
+        message.status === STATUS + 'Success' &&
+        message.subStatusCodes.length &&
+        message.subStatusCodes[0] !== STATUS + 'PartialLogout'
+      )
+        throw new BadRequestException('Contradictory SAML logout status');
     }
     return message;
   }

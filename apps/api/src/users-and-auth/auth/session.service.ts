@@ -95,7 +95,7 @@ export class SessionService implements OnModuleInit {
 
   async revokeSsoSessionsOnce(
     selector: SsoSessionSelector,
-    receipt: { key: string; expiresAt: number },
+    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
   ): Promise<boolean> {
     const result = await this.store.revokeSsoSessionsOnce(selector, receipt);
     if (result.count) this.metricsService.authActiveSessions.dec(result.count);
