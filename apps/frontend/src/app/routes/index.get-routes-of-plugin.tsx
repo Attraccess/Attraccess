@@ -1,4 +1,4 @@
-import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { PluginLiveUpdatesIdentityProvider, RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
 import { PluginManifestWithPlugin } from '../plugins/plugin.state';
 
@@ -26,6 +26,12 @@ export function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): Rou
   // Wrap each plugin route element so a throwing render can't crash the app shell.
   return routes.map((route) => ({
     ...route,
-    element: <PluginRouteBoundary pluginName={pluginName}>{route.element}</PluginRouteBoundary>,
+    element: (
+      <PluginRouteBoundary pluginName={pluginName}>
+        <PluginLiveUpdatesIdentityProvider name={pluginManifest.name}>
+          {route.element}
+        </PluginLiveUpdatesIdentityProvider>
+      </PluginRouteBoundary>
+    ),
   }));
 }
