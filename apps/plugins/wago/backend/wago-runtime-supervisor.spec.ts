@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, symlinkSync } from 'node:fs';
+import { chmodSync, existsSync, linkSync, readdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
+import { fw31RootOwnedHostStat } from './fixtures/fw31-root-owned-host-stat';
 import { wagoRuntimeSupervisorAcknowledgeShell, wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 import { registerFailsAfterBoundedLaunchAttemptsWithoutAnAcknowledgementAndRemovesItsRequest } from './wago-runtime-supervisor.test-cases';
 import { registerWaitsForAComplete174SecondGateWithoutPrematureReadinessOrDuplicateWorkers } from './wago-runtime-supervisor.test-cases';
@@ -44,6 +45,9 @@ ${body}`;
   // Advance only the launcher's requested sleep budget, not wall time. The
   // synthetic owner publishes nothing until its complete gate has finished.
   const controlledHandoff = (gateSeconds: number, lockSeconds = gateSeconds, interrupt = false) => {
+    // The clock and root ownership are simulated; permissions and link counts
+    // remain real. Metadata-tool startup must not become part of the test clock.
+    fixture.file('bin/stat', fw31RootOwnedHostStat(), 0o700);
     fixture.file('supervisor-fixture-live', '');
     return `
 supervisor_fixture_seconds=0
@@ -146,6 +150,32 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
     const result = fixture.run(script(controlledHandoff(302, 302) + wagoRuntimeSupervisorLaunchShell()));
     expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
     expect(fixture.read('elapsed')).toBe('302\n');
+  });
+
+  it('separates a failed fixture metadata tool from acknowledgement timing', () => {
+    fixture.file('bin/stat', '#!/bin/sh\nexit 1\n', 0o700);
+    const failed = fixture.run(script(wagoRuntimeSupervisorLaunchShell()));
+    expect({ status: failed.status, stderr: failed.stderr }).toEqual({
+      status: 1,
+      stderr: 'Runtime supervisor launch unverified: prerequisites\n',
+    });
+    expect(existsSync(join(fixture.root, 'elapsed'))).toBe(false);
+    const recovered = fixture.run(script(controlledHandoff(302, 302) + wagoRuntimeSupervisorLaunchShell()));
+    expect({ status: recovered.status, stderr: recovered.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(fixture.read('elapsed')).toBe('302\n');
+  });
+
+  it.each(['mode', 'hardlink'])('retains actual unsafe hook %s rejection with the virtual clock', (fault) => {
+    const body = controlledHandoff(302, 302) + wagoRuntimeSupervisorLaunchShell();
+    const hook = join(fixture.root, 'etc/rc.d/S99_zz_attraccess_wago');
+    if (fault === 'mode') chmodSync(hook, 0o644);
+    else linkSync(hook, join(fixture.root, 'hook-link'));
+    const result = fixture.run(script(body));
+    expect({ status: result.status, stderr: result.stderr }).toEqual({
+      status: 1,
+      stderr: 'Runtime supervisor launch unverified: prerequisites\n',
+    });
+    expect(existsSync(join(fixture.root, 'elapsed'))).toBe(false);
   });
 
   registerFailsClosedWhenAcknowledgementExceedsThe330SecondReadyBudget(scope);
