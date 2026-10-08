@@ -1,5 +1,5 @@
 import { Button, Modal } from '@heroui/react';
-import { DIGITAL_TERMINALS } from '../../../backend/configuration-digital';
+import { DIGITAL_TERMINALS } from '../../../backend/configuration/digital';
 import { useFrontPanelState } from './useFrontPanelState';
 type Props = Pick<ReturnType<typeof useFrontPanelState>, 'panel' | 't'>;
 export function FrontPanelModalBackdrop({ panel, t }: Props) {

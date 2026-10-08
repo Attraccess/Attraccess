@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { projectAdministrationAuditEvent } from './../audit/audit-administration-policy';
-import { recordNpmBootMigrationOutcome } from './npm-plugin-audit-state';
+import { projectAdministrationAuditEvent } from '../audit/policies/administration';
+import { recordNpmBootMigrationOutcome } from './npm/audit-state';
 import { NpmPluginService } from './npm-plugin.service';
 import type { ServiceInternals, SettingsMock } from './npm-plugin.test-fixture';
 import { setupNpmPluginFixture } from './npm-plugin.test-fixture';

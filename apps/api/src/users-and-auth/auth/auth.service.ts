@@ -1,18 +1,62 @@
-import { AuthenticationDetail, AuthenticationType, SSOProviderType } from '@attraccess/database-entities';
-import { Injectable, Logger } from '@nestjs/common';
+import { AuthenticationDetail, AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+
+import { Injectable, Logger, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+
+import { Repository, EntityManager } from 'typeorm';
+
 import { EmailService } from '../../email/email.service';
+
 import { TokenHashService } from '../../encryption/token-hash.service';
+
 import { MetricsService } from '../../metrics/metrics.service';
+
 import { UsersService } from '../users/users.service';
-import { PasswordResetImplementation } from './password-reset';
+
+import { randomBytes } from 'crypto';
+
+import { addDays } from 'date-fns';
+import * as bcrypt from 'bcrypt';
+
+import { LocalLoginForSSOForbiddenException } from './errors/localLoginForSSOForbidden.exception';
+
+import { UserEmailNotVerifiedException } from './errors/userEmailNotVerified.exception';
+
+export interface LocalPasswordAuthenticationOptions {
+  password: string;
+}
+
+export interface SSOAuthenticationOptions {
+  providerType: SSOProviderType;
+  providerId: number;
+  subject: string;
+}
+
+export type AuthenticationOptions =
+  | {
+      type: AuthenticationType.LOCAL_PASSWORD;
+      details: LocalPasswordAuthenticationOptions;
+    }
+  | {
+      type: AuthenticationType.SSO;
+      details: SSOAuthenticationOptions;
+    };
+
+export class UserEmailInvalidVerificationTokenException extends UnauthorizedException {
+  constructor() {
+    super('UserEmailInvalidVerificationTokenException');
+  }
+}
+
+export class UserEmailVerificationTokenExpiredException extends UnauthorizedException {
+  constructor() {
+    super('UserEmailVerificationTokenExpiredException');
+  }
+}
 
 @Injectable()
-export class AuthService extends PasswordResetImplementation {
-  protected readonly SALT_ROUNDS = 10;
-  protected readonly logger = new Logger(AuthService.name);
-
+export class AuthService {
   constructor(
     protected emailService: EmailService,
     @InjectRepository(AuthenticationDetail)
@@ -21,9 +65,12 @@ export class AuthService extends PasswordResetImplementation {
     protected readonly tokenHashService: TokenHashService,
     protected readonly metricsService: MetricsService,
   ) {
-    super();
     this.logger.debug('AuthService initialized');
   }
+
+  protected readonly SALT_ROUNDS = 10;
+
+  protected readonly logger = new Logger(AuthService.name);
 
   async findUserIdBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<number | null> {
     const detail = await this.authenticationDetailRepository.findOne({
@@ -54,10 +101,233 @@ export class AuthService extends PasswordResetImplementation {
   async updateSSOSubject(detailId: number, ssoSubject: string): Promise<void> {
     await this.authenticationDetailRepository.update(detailId, { ssoSubject });
   }
-}
 
-export {
-  AuthenticationOptions,
-  LocalPasswordAuthenticationOptions,
-  SSOAuthenticationOptions,
-} from './auth.service.feature-definitions';
+  async generatePasswordResetToken(email: string): Promise<string> {
+    const user = await this.usersService.findOne({ email });
+    if (!user) {
+      this.logger.debug(`No user found with email: ${email}`);
+      return null;
+    }
+
+    const token = randomBytes(16).toString('base64url').slice(0, 21);
+    const storedToken = this.tokenHashService.hashToken(token);
+    await this.usersService.updateOne(user.id, {
+      passwordResetToken: storedToken,
+      passwordResetTokenExpiresAt: addDays(new Date(), 1),
+    });
+
+    return token;
+  }
+
+  async changePassword(user: User, password: string): Promise<void> {
+    const isSSOUser = await this.usersService.isSSOUser(user.id);
+    if (isSSOUser) {
+      throw new ForbiddenException('You cannot change the password of an SSO user');
+    }
+
+    const authenticationDetail = await this.getAuthenticationDetail(AuthenticationType.LOCAL_PASSWORD, user.id).catch(
+      (error) => {
+        if (error instanceof NotFoundException) {
+          return null;
+        }
+        throw error;
+      },
+    );
+
+    if (authenticationDetail) {
+      authenticationDetail.password = await this.hashPassword(password);
+      await this.authenticationDetailRepository.save(authenticationDetail);
+    } else {
+      await this.addAuthenticationDetails(user.id, {
+        type: AuthenticationType.LOCAL_PASSWORD,
+        details: {
+          password,
+        },
+      });
+    }
+
+    // Notify user about password change
+    await this.emailService.sendPasswordChangedEmail(user);
+  }
+
+  async generateEmailVerificationToken(user: User, manager?: EntityManager): Promise<string> {
+    const token = randomBytes(16).toString('base64url').slice(0, 21);
+    const storedToken = this.tokenHashService.hashToken(token);
+
+    this.logger.debug(`Setting email verification token for user ID: ${user.id}`);
+    await this.usersService.updateOne(
+      user.id,
+      {
+        emailVerificationToken: storedToken,
+        emailVerificationTokenExpiresAt: addDays(new Date(), 3),
+      },
+      manager,
+    );
+
+    this.logger.debug(`Email verification token set for user ID: ${user.id}`);
+    return token;
+  }
+
+  async verifyEmail(email: string, token: string): Promise<void> {
+    this.logger.debug(`Verifying email: ${email} with token: ${token.substring(0, 5)}...`);
+    const user = await this.usersService.findOne({ email });
+
+    if (!user) {
+      this.logger.debug(`No user found with email: ${email}`);
+      throw new UserEmailInvalidVerificationTokenException();
+    }
+
+    const expected = this.tokenHashService.hashToken(token);
+    if (user.emailVerificationToken !== expected && user.emailVerificationToken !== token) {
+      this.logger.debug(`Invalid verification token for user ID: ${user.id}`);
+      throw new UserEmailInvalidVerificationTokenException();
+    }
+
+    if (user.emailVerificationTokenExpiresAt < new Date()) {
+      this.logger.debug(`Expired verification token for user ID: ${user.id}`);
+      throw new UserEmailVerificationTokenExpiredException();
+    }
+
+    this.logger.debug(`Marking email as verified for user ID: ${user.id}`);
+    await this.usersService.updateOne(user.id, {
+      isEmailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationTokenExpiresAt: null,
+    });
+    this.logger.debug(`Email successfully verified for user ID: ${user.id}`);
+  }
+
+  protected async getAuthenticationDetail(
+    authenticationType: AuthenticationType,
+    userId: number,
+  ): Promise<AuthenticationDetail> {
+    const details = await this.authenticationDetailRepository.findOne({
+      where: { userId, type: authenticationType },
+    });
+
+    if (!details) {
+      this.logger.debug(`Authentication details not found for user ID: ${userId}`);
+      throw new NotFoundException(`Authentication details for user ${userId} not found`);
+    }
+
+    return details;
+  }
+
+  async validateAuthenticationDetails(userId: number, options: AuthenticationOptions): Promise<boolean> {
+    const authenticationDetails = await this.getAuthenticationDetail(options.type, userId).catch((error) => {
+      if (error instanceof NotFoundException) {
+        return null;
+      }
+      throw error;
+    });
+
+    if (!authenticationDetails) {
+      this.logger.debug(`No authentication details of type ${options.type} found for user ID: ${userId}`);
+      return false;
+    }
+
+    let isValid = false;
+    switch (options.type) {
+      case AuthenticationType.LOCAL_PASSWORD: {
+        const isSSOUser = await this.usersService.isSSOUser(userId);
+        if (isSSOUser) {
+          throw new LocalLoginForSSOForbiddenException();
+        }
+        isValid = await bcrypt.compare(options.details.password, authenticationDetails.password || '');
+        break;
+      }
+
+      case AuthenticationType.SSO: {
+        isValid =
+          authenticationDetails.providerType === options.details.providerType &&
+          authenticationDetails.providerId === options.details.providerId &&
+          authenticationDetails.ssoSubject === options.details.subject;
+        break;
+      }
+
+      default: {
+        const exhaustiveCheck: never = options;
+        throw new Error(`Invalid authentication type: ${exhaustiveCheck}`);
+      }
+    }
+
+    return isValid;
+  }
+
+  async hashPassword(password: string): Promise<string> {
+    return await bcrypt.hash(password, this.SALT_ROUNDS);
+  }
+
+  async addAuthenticationDetails(
+    userId: number,
+    options: AuthenticationOptions,
+    manager?: EntityManager,
+    hashedPassword?: string,
+  ): Promise<AuthenticationDetail> {
+    const authenticationDetail = new AuthenticationDetail();
+    authenticationDetail.userId = userId;
+    authenticationDetail.type = options.type;
+
+    if (options.type === AuthenticationType.LOCAL_PASSWORD) {
+      this.logger.debug(`Adding local password authentication for user ID: ${userId}`);
+      authenticationDetail.password = hashedPassword ?? (await this.hashPassword(options.details.password));
+    } else if (options.type === AuthenticationType.SSO) {
+      authenticationDetail.providerType = options.details.providerType;
+      authenticationDetail.providerId = options.details.providerId;
+      authenticationDetail.ssoSubject = options.details.subject;
+    }
+
+    const saved = manager
+      ? await manager.save(authenticationDetail)
+      : await this.authenticationDetailRepository.save(authenticationDetail);
+    return saved;
+  }
+
+  async removeLocalPasswordAuthentication(userId: number): Promise<void> {
+    const detail = await this.authenticationDetailRepository.findOne({
+      where: { userId, type: AuthenticationType.LOCAL_PASSWORD },
+    });
+
+    if (detail) {
+      await this.removeAuthenticationDetails(detail.id);
+    }
+  }
+
+  async removeAuthenticationDetails(authenticationDetailsId: number): Promise<void> {
+    await this.authenticationDetailRepository.delete({
+      id: authenticationDetailsId,
+    });
+  }
+
+  async getUserByUsernameAndAuthenticationDetails(
+    username: string,
+    options: AuthenticationOptions,
+  ): Promise<User | null> {
+    const method = options.type === AuthenticationType.LOCAL_PASSWORD ? 'local' : 'sso';
+
+    const user = await this.usersService.findOne({ username });
+
+    if (!user) {
+      this.logger.debug(`No user found with username: ${username}`);
+      // Unknown usernames are the dominant brute-force / credential-stuffing
+      // vector, so they must be counted as failed logins for the alert to fire.
+      this.metricsService.authLoginTotal.inc({ method, status: 'fail' });
+      return null;
+    }
+
+    if (!user.isEmailVerified) {
+      this.logger.debug(`User ${user.id} email not verified`);
+      throw new UserEmailNotVerifiedException();
+    }
+
+    const isValid = await this.validateAuthenticationDetails(user.id, options);
+    if (!isValid) {
+      this.logger.debug(`Invalid authentication for user ID: ${user.id}`);
+      this.metricsService.authLoginTotal.inc({ method, status: 'fail' });
+      return null;
+    }
+
+    this.metricsService.authLoginTotal.inc({ method, status: 'success' });
+    return user;
+  }
+}

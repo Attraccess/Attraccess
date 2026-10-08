@@ -22,8 +22,8 @@
 #include "psa/crypto.h"
 #include "pn532_i2c.hpp"
 
-#include "pn532_commands.hpp"
-#include "pn532_card_state.hpp"
+#include "pn532/commands.hpp"
+#include "pn532/card-state.hpp"
 
 
 /**

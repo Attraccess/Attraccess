@@ -50,8 +50,8 @@ function fails(result, expected) {
   assert.ok(result.output.includes(expected), result.output);
 }
 
-test('every maintained source language enforces the strict 200-line boundary', (t) => {
-  const { write, check } = repository(t);
+test('every maintained source language enforces the 600-line maximum', (t) => {
+  const { git, write, check } = repository(t);
   const extensions = [
     'ts',
     'tsx',
@@ -74,17 +74,22 @@ test('every maintained source language enforces the strict 200-line boundary', (
     'html',
     'mjml',
   ];
-  for (const extension of extensions) write(`src/file.${extension}`, lines(199));
-  write('src/types.d.ts', lines(199));
-  write('vite.config.mts', lines(199));
+  for (const extension of extensions) write(`src/file.${extension}`, lines(600));
+  write('src/types.d.ts', lines(600));
+  write('vite.config.mts', lines(600));
+  git('add', '.');
   succeeds(check());
-  for (const extension of extensions) write(`src/file.${extension}`, lines(200));
-  write('src/types.d.ts', lines(200));
-  write('vite.config.mts', lines(200));
-  const result = check();
-  for (const extension of extensions) fails(result, `"src/file.${extension}": 200 lines (maximum 199)`);
-  fails(result, '"src/types.d.ts": 200 lines');
-  fails(result, '"vite.config.mts": 200 lines');
+  succeeds(check('--staged'));
+  for (const extension of extensions) write(`src/file.${extension}`, lines(601));
+  write('src/types.d.ts', lines(601));
+  write('vite.config.mts', lines(601));
+  git('add', '.');
+  for (const mode of [[], ['--staged']]) {
+    const result = check(...mode);
+    for (const extension of extensions) fails(result, `"src/file.${extension}": 601 lines (maximum 600)`);
+    fails(result, '"src/types.d.ts": 601 lines');
+    fails(result, '"vite.config.mts": 601 lines');
+  }
 });
 
 test('test names and test directories enforce a 1,000-line maximum', (t) => {
@@ -123,30 +128,30 @@ test('LF, CRLF, CR, blank lines, comments, and missing final newlines count cons
   write('empty.ts', '');
   for (const newline of ['\n', '\r\n', '\r']) {
     for (const trailing of [true, false]) {
-      write('source.ts', lines(199, newline, trailing));
+      write('source.ts', lines(600, newline, trailing));
       succeeds(check());
-      write('source.ts', lines(200, newline, trailing));
-      fails(check(), '"source.ts": 200 lines');
+      write('source.ts', lines(601, newline, trailing));
+      fails(check(), '"source.ts": 601 lines');
     }
   }
-  write('source.ts', '\n'.repeat(200));
-  fails(check(), '"source.ts": 200 lines');
+  write('source.ts', '\n'.repeat(601));
+  fails(check(), '"source.ts": 601 lines');
 });
 
 test('all committed code and tests fail until reduced below their limits in both views', (t) => {
-  const { git, write, check } = repository(t, { 'code.ts': lines(250), 'code.test.ts': lines(1100) });
+  const { git, write, check } = repository(t, { 'code.ts': lines(700), 'code.test.ts': lines(1100) });
   for (const mode of [[], ['--staged']]) {
-    fails(check(...mode), '"code.ts": 250 lines (maximum 199)');
+    fails(check(...mode), '"code.ts": 700 lines (maximum 600)');
     fails(check(...mode), '"code.test.ts": 1100 lines (maximum 1000)');
   }
-  write('code.ts', lines(220));
+  write('code.ts', lines(650));
   write('code.test.ts', lines(1050));
   git('add', '.');
   for (const mode of [[], ['--staged']]) {
-    fails(check(...mode), '"code.ts": 220 lines (maximum 199)');
+    fails(check(...mode), '"code.ts": 650 lines (maximum 600)');
     fails(check(...mode), '"code.test.ts": 1050 lines (maximum 1000)');
   }
-  write('code.ts', lines(199));
+  write('code.ts', lines(600));
   write('code.test.ts', lines(1000));
   git('add', '.');
   succeeds(check());
@@ -155,27 +160,27 @@ test('all committed code and tests fail until reduced below their limits in both
 
 test('new tracked and untracked files fail even after being committed', (t) => {
   const { git, write, commit, check } = repository(t);
-  write('new.ts', lines(200));
-  fails(check(), '"new.ts": 200 lines');
+  write('new.ts', lines(601));
+  fails(check(), '"new.ts": 601 lines');
   git('add', 'new.ts');
-  fails(check('--staged'), '"new.ts": 200 lines');
+  fails(check('--staged'), '"new.ts": 601 lines');
   commit();
-  fails(check(), '"new.ts": 200 lines');
+  fails(check(), '"new.ts": 601 lines');
 });
 
 test('partially staged oversized content cannot hide behind a smaller working copy', (t) => {
-  const { git, write, check } = repository(t, { 'code.ts': lines(199) });
-  write('code.ts', lines(200));
+  const { git, write, check } = repository(t, { 'code.ts': lines(600) });
+  write('code.ts', lines(601));
   git('add', 'code.ts');
-  write('code.ts', lines(199));
+  write('code.ts', lines(600));
   succeeds(check());
-  fails(check('--staged'), '"code.ts": 200 lines');
+  fails(check('--staged'), '"code.ts": 601 lines');
 });
 
 test('deletions pass and unchanged renames must meet the universal limit', (t) => {
-  const { cwd, git, check } = repository(t, { 'code.ts': lines(250) });
+  const { cwd, git, check } = repository(t, { 'code.ts': lines(700) });
   renameSync(path.join(cwd, 'code.ts'), path.join(cwd, 'renamed.ts'));
-  fails(check(), '"renamed.ts": 250 lines');
+  fails(check(), '"renamed.ts": 700 lines');
   rmSync(path.join(cwd, 'renamed.ts'));
   git('add', '-u');
   succeeds(check());
@@ -206,29 +211,29 @@ test('non-code, ignored output, generated clients, and vendored runtime are excl
     'apps/frontend/public/openscad/adapter.js',
     'apps/attractap/firmware/src/display/images/logo_40h.hpp',
   ]) {
-    write(file, lines(200));
-    fails(check(), `${JSON.stringify(file)}: 200 lines`);
+    write(file, lines(601));
+    fails(check(), `${JSON.stringify(file)}: 601 lines`);
   }
 });
 
 test('spaces, tabs, Unicode, and newlines in filenames work in working-tree and staged modes', (t) => {
   const { git, write, check } = repository(t);
   const file = 'src/space \t ü\nname.ts';
-  write(file, lines(200));
+  write(file, lines(601));
   fails(check(), JSON.stringify(file));
   git('add', '.');
   fails(check('--staged'), JSON.stringify(file));
 });
 
 test('target branch advancement cannot exempt unchanged oversized files', (t) => {
-  const { git, write, commit, check } = repository(t, { 'code.ts': lines(250) });
+  const { git, write, commit, check } = repository(t, { 'code.ts': lines(700) });
   const original = git('rev-parse', 'HEAD');
-  write('code.ts', lines(199));
+  write('code.ts', lines(600));
   commit();
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
   git('checkout', '--quiet', '-b', 'topic', original);
-  fails(check(), '"code.ts": 250 lines (maximum 199)');
-  fails(check('--staged'), '"code.ts": 250 lines (maximum 199)');
+  fails(check(), '"code.ts": 700 lines (maximum 600)');
+  fails(check('--staged'), '"code.ts": 700 lines (maximum 600)');
 });
 
 test('missing target refs and Nx base variables have no effect; unsupported arguments fail', (t) => {
@@ -244,8 +249,8 @@ test('missing target refs and Nx base variables have no effect; unsupported argu
 });
 
 test('an oversized working copy fails even when the index is compliant', (t) => {
-  const { write, check } = repository(t, { 'code.ts': lines(199) });
-  write('code.ts', lines(200));
-  fails(check(), '"code.ts": 200 lines (maximum 199)');
+  const { write, check } = repository(t, { 'code.ts': lines(600) });
+  write('code.ts', lines(601));
+  fails(check(), '"code.ts": 601 lines (maximum 600)');
   succeeds(check('--staged'));
 });

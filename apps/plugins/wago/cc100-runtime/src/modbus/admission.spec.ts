@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { connect } from 'node:net';
-import { WriteAdmissionError } from '../runtime-types';
+import { WriteAdmissionError } from '../runtime/types';
 import { QueuedModbusTransport } from './transports';
 
 jest.mock('node:net', () => ({ connect: jest.fn() }));

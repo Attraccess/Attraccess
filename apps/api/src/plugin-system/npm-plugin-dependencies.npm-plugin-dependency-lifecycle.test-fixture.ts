@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import * as tar from 'tar';
 import { NpmPluginService } from './npm-plugin.service';
-import { PluginDependency } from './plugin-dependencies';
+import { PluginDependency } from './runtime/dependencies';
 import { PluginService } from './plugin.service';
 
 function pkg(name: string, dependencies: PluginDependency[] = [], version = '1.0.0') {

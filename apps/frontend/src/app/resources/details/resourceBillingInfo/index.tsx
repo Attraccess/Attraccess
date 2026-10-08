@@ -6,9 +6,9 @@ import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { FlatSection } from '../../../../components/flatSection';
 import { LiveSessionBilling } from './metering/LiveSessionBilling';
 import { EnergySettlementNotices, MeterSetupNotice } from './metering/MeterNotices';
-import { Props } from './index.props';
-import { useResourceBillingInfoState } from './useResourceBillingInfoState';
-import { ResourceBillingInfoDt } from './ResourceBillingInfoDt';
+import { Props } from './useBillingDetails';
+import { useBillingDetails } from './useBillingDetails';
+import { BillingDetails } from './BillingDetails';
 
 export function ResourceBillingInfo(props: Props) {
   const {
@@ -36,7 +36,7 @@ export function ResourceBillingInfo(props: Props) {
     setExampleOperatingMinutes,
     exampleCost,
     exampleResultingBalance,
-  } = useResourceBillingInfoState(props);
+  } = useBillingDetails(props);
 
   if (!license?.modules.includes('billing')) {
     return null;
@@ -140,7 +140,7 @@ export function ResourceBillingInfo(props: Props) {
       </div>
 
       <dl className={cn(dlClass, 'border-t border-divider pt-3')}>
-        <ResourceBillingInfoDt
+        <BillingDetails
           {...{
             t,
             exampleSessionMinutes,

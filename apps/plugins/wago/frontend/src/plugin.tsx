@@ -6,16 +6,16 @@ import type {
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { PluginStore } from 'react-pluggable';
-import { ControllersPage } from './ControllersPage';
-import { ConfigurationPage } from './ConfigurationPage';
+import { ControllersPage } from './controllers/Page';
+import { ConfigurationPage } from './configuration/ConfigurationPage';
 import { HistoryPage } from './front-panel/HistoryPage';
 import {
   RESOURCE_OVERVIEW_SLOT,
   type PluginSlotContribution,
   type ResourceSlotContext,
 } from '@attraccess/plugins-frontend-sdk';
-import { ResourceDiagnostics } from './ResourceDiagnostics';
-import { WagoLogoIcon } from './WagoLogoIcon';
+import { ResourceDiagnostics } from './diagnostics/ResourceDiagnostics';
+import { WagoLogoIcon } from './shared/WagoLogoIcon';
 
 export default class WagoPlugin implements AttraccessFrontendPlugin {
   pluginStore!: PluginStore;

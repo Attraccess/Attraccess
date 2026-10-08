@@ -1,12 +1,245 @@
 'use strict';
-const { getEnvBoolean } = require('./dnsmasq-config');
-const { loadRecords, loadSettings, saveSettings, log, writeDnsmasqConfig } = require('./dnsmasq-config.js');
-const { applyAndReload, restartDnsmasq, startDnsmasq, stopDnsmasq, getDnsmasqStatus } = require('./dnsmasq-process.js');
+
+const fs = require('fs');
+
+const path = require('path');
+
+const DATA_DIR = process.env.DNS_DATA_DIR || '/data';
+
+const RECORDS_FILE = path.join(DATA_DIR, 'dns-records.json');
+
+const SETTINGS_FILE = path.join(DATA_DIR, 'dns-settings.json');
+
+const DNSMASQ_CONF_DIR = '/etc/dnsmasq.d';
+
+const DNSMASQ_CONF_FILE = path.join(DNSMASQ_CONF_DIR, 'records.conf');
+
+const DNSMASQ_HOSTS_FILE = path.join(DNSMASQ_CONF_DIR, 'custom-hosts');
+
+const LISTEN_ADDRESS = process.env.DNS_LISTEN_ADDRESS || '';
+
+function log(message) {
+  console.log(`[dnsmasq] ${message}`);
+}
+
+function loadJson(filePath, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function saveJson(filePath, data) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+function loadRecords() {
+  return loadJson(RECORDS_FILE, []);
+}
+
+function saveRecords(records) {
+  saveJson(RECORDS_FILE, records);
+}
+
+function loadSettings() {
+  const envSettings = {
+    upstream1: process.env.DNS_UPSTREAM_1 || '1.1.1.1',
+    upstream2: process.env.DNS_UPSTREAM_2 || '8.8.8.8',
+    localDomain: process.env.DNS_LOCAL_DOMAIN || '',
+    logQueries: getEnvBoolean('DNS_LOG_QUERIES', false),
+  };
+  const stored = loadJson(SETTINGS_FILE, null);
+  return stored || envSettings;
+}
+
+function saveSettings(settings) {
+  saveJson(SETTINGS_FILE, settings);
+}
+
+function generateDnsmasqConfig(settings, records) {
+  const lines = ['no-resolv', 'user=root'];
+  if (LISTEN_ADDRESS) {
+    lines.push(`listen-address=${LISTEN_ADDRESS}`);
+    lines.push('bind-interfaces');
+  }
+  lines.push(`server=${settings.upstream1 || '1.1.1.1'}`);
+  lines.push(`server=${settings.upstream2 || '8.8.8.8'}`);
+  lines.push(`addn-hosts=${DNSMASQ_HOSTS_FILE}`);
+
+  if (settings.localDomain) {
+    lines.push(`local=/${settings.localDomain}/`);
+    lines.push(`domain=${settings.localDomain}`);
+  }
+
+  if (settings.logQueries) {
+    lines.push('log-queries');
+  }
+
+  (records || [])
+    .filter((r) => r.hostname && r.ip && r.hostname.startsWith('*.'))
+    .forEach((r) => {
+      const domain = r.hostname.slice(2);
+      lines.push(`address=/${domain}/${r.ip}`);
+    });
+
+  return lines.join('\n') + '\n';
+}
+
+function generateHostsFile(records) {
+  return (
+    records
+      .filter((r) => r.hostname && r.ip)
+      .map((r) => `${r.ip} ${r.hostname}`)
+      .join('\n') + '\n'
+  );
+}
+
+function writeDnsmasqConfig(records, settings) {
+  try {
+    fs.mkdirSync(DNSMASQ_CONF_DIR, { recursive: true });
+    fs.writeFileSync(DNSMASQ_CONF_FILE, generateDnsmasqConfig(settings, records), 'utf-8');
+    fs.writeFileSync(DNSMASQ_HOSTS_FILE, generateHostsFile(records), 'utf-8');
+    return true;
+  } catch (err) {
+    log(`failed to write config: ${err.message}`);
+    return false;
+  }
+}
+
+function getEnvBoolean(name, defaultValue = false) {
+  const raw = process.env[name];
+  if (raw == null) return defaultValue;
+  const normalized = String(raw).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+module.exports.getEnvBoolean = getEnvBoolean;
+
+const { spawn } = require('child_process');
+
+let dnsmasqProcess = null;
+
+let restartTimer = null;
+
+let stopped = false;
+
+const RESTART_DELAY_MS = Number(process.env.DNS_RESTART_DELAY_MS) || 5000;
+
+// ponytail: fixed 5s retry, no backoff. The boot failure is transient — at reboot
+// the LAN interface (listen-address + bind-interfaces) or port 53 isn't free yet,
+// which clears within seconds. Add backoff if a permanent misconfig spams the log.
+function scheduleRestart() {
+  if (stopped || restartTimer) return;
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    log('retrying start');
+    startDnsmasq();
+  }, RESTART_DELAY_MS);
+  if (restartTimer.unref) restartTimer.unref();
+}
+
+function startDnsmasq() {
+  if (dnsmasqProcess) return;
+  stopped = false;
+  try {
+    // ,*.conf restricts conf-dir to *.conf files so the addn-hosts file
+    // (/etc/dnsmasq.d/custom-hosts) is NOT parsed as a config file. Without it
+    // dnsmasq dies with "bad option at line 1 of .../custom-hosts".
+    const proc = spawn('dnsmasq', ['--no-daemon', '--conf-dir=/etc/dnsmasq.d/,*.conf'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    dnsmasqProcess = proc;
+    // spawn reports a failed exec (ENOENT, EAGAIN under memory pressure at boot)
+    // as an async error event, not a throw — and an unhandled one kills config-ui.
+    // Attach before touching proc.stdout: on EMFILE/ENFILE the stdio streams are
+    // never created, so wiring them throws and would leave 'error' unhandled.
+    // Events from a superseded proc are ignored so a process killed by a restart
+    // can't clear the live reference and respawn a second dnsmasq.
+    proc.on('error', (err) => {
+      log(`failed to start: ${err.message}`);
+      if (dnsmasqProcess !== proc) return;
+      dnsmasqProcess = null;
+      scheduleRestart();
+    });
+    proc.on('exit', (code) => {
+      log(`exited with code ${code}`);
+      if (dnsmasqProcess !== proc) return;
+      dnsmasqProcess = null;
+      scheduleRestart();
+    });
+    proc.stdout.on('data', (data) => log(`${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => log(`${data.toString().trim()}`));
+    log(`started (pid ${proc.pid})`);
+  } catch (err) {
+    // Malformed args/options, or EMFILE/ENFILE leaving proc.stdout undefined.
+    log(`failed to start: ${err.message}`);
+    dnsmasqProcess = null;
+    scheduleRestart();
+  }
+}
+
+function stopDnsmasq() {
+  stopped = true;
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+  if (dnsmasqProcess) {
+    dnsmasqProcess.kill('SIGTERM');
+    dnsmasqProcess = null;
+  }
+}
+
+function reloadDnsmasq() {
+  if (dnsmasqProcess && dnsmasqProcess.pid) {
+    try {
+      process.kill(dnsmasqProcess.pid, 'SIGHUP');
+      log('sent SIGHUP');
+    } catch (err) {
+      log(`failed to send SIGHUP: ${err.message}`);
+    }
+  }
+}
+
+function writeHostsAndReload(records) {
+  try {
+    fs.writeFileSync(DNSMASQ_HOSTS_FILE, generateHostsFile(records), 'utf-8');
+  } catch (err) {
+    log(`failed to write hosts file: ${err.message}`);
+  }
+  reloadDnsmasq();
+}
+
+function restartDnsmasq(records, settings) {
+  stopDnsmasq();
+  writeDnsmasqConfig(records, settings);
+  startDnsmasq();
+}
+
+function applyAndReload(records) {
+  saveRecords(records);
+  writeHostsAndReload(records);
+}
+
+function getDnsmasqStatus() {
+  if (!dnsmasqProcess) return { running: false, pid: null };
+  try {
+    process.kill(dnsmasqProcess.pid, 0);
+    return { running: true, pid: dnsmasqProcess.pid };
+  } catch {
+    return { running: false, pid: null };
+  }
+}
 
 const crypto = require('crypto');
+
 const HOSTNAME_PATTERN =
   /^(\*\.)?(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
 const IPV4_PATTERN = /^(25[0-5]|2[0-4]\d|[01]?\d?\d)(\.(25[0-5]|2[0-4]\d|[01]?\d?\d)){3}$/;
+
 const IPV6_PATTERN = /^[0-9a-fA-F:]+$/;
 
 function isValidHostname(value) {

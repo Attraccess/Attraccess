@@ -1,16 +1,39 @@
 // Manages resource health state tracking with mutable status and source lifecycle tracking
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
-import { Resource, ResourceHealthState, ResourceHealthStatus } from '@attraccess/database-entities';
+import {
+  Resource,
+  ResourceHealthState,
+  ResourceHealthStatus,
+  ResourceHealthSource,
+} from '@attraccess/database-entities';
+
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
+
 import { InjectRepository } from '@nestjs/typeorm';
+
 import { In, Repository } from 'typeorm';
+
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
+
 import { AuditService } from '../../audit/audit.service';
+
 import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
+
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
+
 import { clearEntry as clearEntryImplementation } from './resource-health-clear';
-import { ReportInput } from './resource-health.service.definitions';
+
+export interface ReportInput {
+  resourceId: number;
+  identifier?: string | null;
+  status: ResourceHealthStatus;
+  reason?: string | null;
+  source: ResourceHealthSource;
+  reportedAt?: Date;
+  auditOrigin?: ResourceAuditOrigin;
+}
 
 @Injectable()
 export class ResourceHealthService {
@@ -175,5 +198,3 @@ export class ResourceHealthService {
     };
   }
 }
-
-export { ReportInput } from './resource-health.service.definitions';

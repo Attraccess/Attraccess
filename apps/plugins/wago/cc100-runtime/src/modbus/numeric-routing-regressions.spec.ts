@@ -1,4 +1,4 @@
-import { validateSnapshot as validateBackend } from '../../../backend/configuration';
+import { validateSnapshot as validateBackend } from '../../../backend/configuration/model';
 import { type Snapshot, validateSnapshot as validateRuntime } from '../runtime';
 
 import { ModbusDeviceRouter } from './adapter';

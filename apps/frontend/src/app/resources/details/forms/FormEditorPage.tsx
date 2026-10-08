@@ -6,8 +6,8 @@ import { DeleteConfirmationModal } from '../../../../components/deleteConfirmati
 import { FormPreview } from './components/FormPreview';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableField } from './FormEditorPage.helpers';
-import { useFormEditorPageState } from './useFormEditorPageState';
+import { SortableField } from './editor/useFormEditor';
+import { useFormEditor } from './editor/useFormEditor';
 
 export function FormEditorPage() {
   const {
@@ -36,7 +36,7 @@ export function FormEditorPage() {
     hasUnsavedChanges,
     handleSave,
     handleDelete,
-  } = useFormEditorPageState();
+  } = useFormEditor();
 
   if (!isCreateMode && isLoadingForm) {
     return (

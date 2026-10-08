@@ -12,7 +12,7 @@ import { Repository } from 'typeorm';
 
 import { MqttClientService } from './../../mqtt/mqtt-client.service';
 
-import { registerPluginFlowNodes } from './../../plugin-system/plugin-flow-node-registry';
+import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
 
 import { ResourceHealthService } from './../health/resource-health.service';
 
@@ -20,7 +20,7 @@ import { ResourceUsageService } from './../usage/resourceUsage.service';
 
 import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
 
-import { settleFlowBranches } from './flow-execution-engine';
+import { settleFlowBranches } from './execution/flow-execution-engine';
 
 import { FlowLogRecorderService } from './flow-log-recorder.service';
 

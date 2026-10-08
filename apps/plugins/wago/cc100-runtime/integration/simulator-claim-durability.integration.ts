@@ -3,9 +3,9 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { WagoController } from '../../backend/wago-controller.entity';
+import { WagoController } from '../../backend/controllers/entity';
 
-import { discoveryTopic } from '../../backend/protocol';
+import { discoveryTopic } from '../../backend/protocol/index';
 
 import { temporary } from './simulator-fixtures.test-utils';
 

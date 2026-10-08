@@ -1,8 +1,13 @@
 import { promises as dns } from 'node:dns';
 import { createServer, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { assertDiscoveryAddress, discoveryLookup, discoveryUrl, requestDiscoveryJson } from './sso-discovery-request';
-import { SsoDiscoveryRoutesImplementation } from './sso-discovery.routes';
+import { SsoProviderRoutes } from './providers/provider-routes';
+import {
+  assertDiscoveryAddress,
+  discoveryLookup,
+  discoveryUrl,
+  requestDiscoveryJson,
+} from './providers/discovery-client';
 
 describe('SSO discovery destinations', () => {
   it.each([
@@ -50,7 +55,7 @@ describe('SSO discovery HTTP boundaries', () => {
   let server: Server;
   let origin: string;
   const paths: string[] = [];
-  const routes = Object.create(SsoDiscoveryRoutesImplementation.prototype) as SsoDiscoveryRoutesImplementation;
+  const routes = Object.create(SsoProviderRoutes.prototype) as SsoProviderRoutes;
 
   beforeEach(async () => {
     paths.length = 0;

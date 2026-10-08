@@ -11,7 +11,7 @@ import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000
 import { RetirePasswordPolicyAudit1783900000000 } from '../database/migrations/1783900000000-retire-password-policy-audit';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
-import { AuditQueryDto } from './audit-query.dto';
+import { AuditQueryDto } from './dto/audit-query.dto';
 import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';

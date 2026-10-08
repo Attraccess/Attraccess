@@ -1,8 +1,8 @@
 import { ENGINEERING_UNITS } from '../measurement-contract';
-import { BUILTIN_MODBUS_PROFILES } from './model.builtin-modbus-profiles';
+import { BUILTIN_MODBUS_PROFILES } from './model';
 import { ModbusConfiguration } from './model-contracts';
 import { ModbusMeasurement } from './model-contracts';
-import { registerCount } from './model.register-count';
+import { registerCount } from './model';
 import { RegisterFormat } from './model-contracts';
 import { ModbusValidation } from './validation-context';
 export function validateProfiles(config: ModbusConfiguration, validation: ModbusValidation): void {

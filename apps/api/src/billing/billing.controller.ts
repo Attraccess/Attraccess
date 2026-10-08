@@ -5,6 +5,7 @@ import {
   ResourceBillingConfiguration,
   ResourceFlowNodeType,
 } from '@attraccess/plugins-backend-sdk';
+
 import {
   Body,
   Controller,
@@ -17,40 +18,74 @@ import {
   Req,
   Request,
   Sse,
+  Query,
+  Delete,
 } from '@nestjs/common';
+
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
 import { Observable } from 'rxjs';
+
 import { finalize } from 'rxjs/operators';
+
 import { LicenseModuleType } from '../license/license.service';
+
 import { RequiresLicense } from '../license/require-license.decorator';
+
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
+
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
-import { BillingTransactionRoutes } from './billing-transaction.routes';
+
 import { BillingService } from './billing.service';
+
 import { BalanceDto } from './dto/balance.dto';
+
 import { BillingConfigurationDto } from './dto/configuration.dto';
+
 import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
+
 import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
+
 import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
+
 import { LiveNotificationsService } from './liveNotificationsService';
+
 import { SumUpService } from './sumup.service';
-import { installInheritedMethods } from '../common/inherited-implementation';
+import { PaginationOptionsDto } from '../types/request';
+
+import { ModifyBalanceDto } from './dto/modify-balance.dto';
+
+import { RefundTransactionDto } from './dto/refund-transaction.dto';
+
+import { TransactionsDto } from './dto/transactions.dto';
+
+import { UsageTransactionDto } from './dto/usage-transaction.dto';
+
+import { PairSumUpReaderDto } from './dto/sumup/pair-sumup-reader.dto';
+
+import { SetSumUpApiKeyDto } from './dto/sumup/set-sumup-apiKey.dto';
+
+import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
+
+import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
+
+import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
+
+import { SumupTopUpDto } from './dto/sumup/top-up.dto';
 
 @RequiresLicense(LicenseModuleType.BILLING)
 @ApiTags('Billing')
 @Controller()
-export class BillingController extends BillingTransactionRoutes {
-  protected readonly logger = new Logger(BillingController.name);
-
+export class BillingController {
   constructor(
     protected readonly billingService: BillingService,
     protected readonly sumUpService: SumUpService,
     protected readonly liveNotificationsService: LiveNotificationsService,
     protected readonly flowsService: ResourceFlowsService,
     protected readonly sse: SseInstrumentation,
-  ) {
-    super();
-  }
+  ) {}
+
+  protected readonly logger = new Logger(BillingController.name);
 
   @Get('/users/:userId/billing/balance')
   @Auth()
@@ -152,24 +187,165 @@ export class BillingController extends BillingTransactionRoutes {
       subject.asObservable().pipe(finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId))),
     );
   }
+
+  @Get('/users/:userId/billing/transactions')
+  @Auth()
+  @ApiOperation({ summary: 'Get the billing transactions for a user', operationId: 'getBillingTransactions' })
+  @ApiResponse({
+    status: 200,
+    description: 'The billing transactions for the user.',
+    type: TransactionsDto,
+  })
+  async getBillingTransactions(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query() query: PaginationOptionsDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<TransactionsDto> {
+    if (userId !== request.user.id && !request.user.effectivePermissions?.has('billing.manage')) {
+      throw new ForbiddenException('You are not allowed to get the billing transactions for this user.');
+    }
+
+    return await this.billingService.getHistory(userId, query);
+  }
+
+  @Get('/billing/transactions/for-usage/:usageId')
+  @Auth()
+  @ApiOperation({
+    summary: 'Find the current user’s billing transaction for a usage session',
+    operationId: 'getUsageBillingTransaction',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The related transaction ID, or null when no owned transaction exists.',
+    type: UsageTransactionDto,
+  })
+  async getUsageBillingTransaction(
+    @Param('usageId', ParseIntPipe) usageId: number,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<UsageTransactionDto> {
+    return { transactionId: await this.billingService.getTransactionIdForUsage(usageId, request.user.id) };
+  }
+
+  @Get('/users/:userId/billing/transactions/:transactionId')
+  @Auth()
+  @ApiOperation({ summary: 'Get a billing transaction for a user', operationId: 'getBillingTransaction' })
+  @ApiResponse({ status: 200, description: 'The billing transaction for the user.', type: BillingTransaction })
+  async getBillingTransaction(
+    @Param('transactionId', ParseIntPipe) transactionId: number,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BillingTransaction> {
+    return await this.billingService.getTransaction(transactionId, request.user.id);
+  }
+
+  @Post('/users/:userId/billing/transactions')
+  @ApiOperation({ summary: 'Top up or charge the billing balance for a user', operationId: 'createManualTransaction' })
+  @ApiResponse({ status: 200, description: 'The billing balance for the user has been topped up.', type: Number })
+  @Auth('billing.manage')
+  async createManualTransaction(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Req() request: AuthenticatedRequest,
+    @Body() body: ModifyBalanceDto,
+  ): Promise<BillingTransaction> {
+    return await this.billingService.createManualTransaction(userId, request.user.id, body.amount);
+  }
+
+  @Post('/billing/transactions/:transactionId/refund')
+  @Auth('billing.manage')
+  @ApiOperation({
+    summary: 'Refund a billing transaction',
+    operationId: 'refundTransaction',
+  })
+  @ApiResponse({ status: 200, description: 'The billing transaction has been refunded.', type: BillingTransaction })
+  async refundTransaction(
+    @Request() request: AuthenticatedRequest,
+    @Param('transactionId', ParseIntPipe) transactionId: number,
+    @Body() data: RefundTransactionDto,
+  ) {
+    return await this.billingService.refundTransaction(request.user.id, transactionId, data);
+  }
+
+  @Post('/billing/sumup/configuration/api-key')
+  @Auth('billing.manage')
+  @ApiOperation({
+    summary: 'Set the SumUp configuration',
+    operationId: 'setSumUpApiKey',
+  })
+  @ApiResponse({ status: 200, description: 'The SumUp apiKey has been set.', type: String, example: 'OK' })
+  async setSumUpApiKey(@Body() body: SetSumUpApiKeyDto): Promise<string> {
+    await this.sumUpService.setApiKey(body.apiKey);
+    return 'OK';
+  }
+
+  @Get('/billing/sumup/configuration')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get the SumUp configuration',
+    operationId: 'getSumUpConfiguration',
+  })
+  @ApiResponse({ status: 200, description: 'The current SumUp configuration.', type: SumUpConfigurationDto })
+  async getSumUpConfiguration(): Promise<SumUpConfigurationDto> {
+    return { enabled: await this.sumUpService.getIsEnabled() };
+  }
+
+  @Get('/billing/sumup/readers')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get the linked SumUp readers',
+    operationId: 'getSumUpReaders',
+  })
+  @ApiResponse({ status: 200, description: 'The linked SumUp readers.', type: SumUpReaderDto, isArray: true })
+  async getSumUpReaders(): Promise<SumUpReaderDto[]> {
+    return await this.sumUpService.getReaders();
+  }
+
+  @Post('/billing/sumup/readers/pair')
+  @Auth('billing.manage')
+  @ApiOperation({
+    summary: 'Pair a SumUp reader',
+    operationId: 'pairSumUpReader',
+  })
+  @ApiResponse({ status: 200, description: 'The created SumUp reader.', type: SumUpReaderDto })
+  async pairSumUpReader(@Body() body: PairSumUpReaderDto): Promise<SumUpReaderDto> {
+    return await this.sumUpService.pairReader(body.pairingCode, body.name);
+  }
+
+  @Delete('/billing/sumup/readers/:readerId')
+  @Auth('billing.manage')
+  @ApiOperation({
+    summary: 'Remove a SumUp reader',
+    operationId: 'removeSumUpReader',
+  })
+  async removeSumUpReader(@Param('readerId') readerId: string): Promise<void> {
+    return await this.sumUpService.removeReader(readerId);
+  }
+
+  @Post('/billing/top-up/sumup')
+  @Auth()
+  @ApiOperation({
+    summary: 'Top up using a SumUp reader',
+    operationId: 'topUpWithSumUpReader',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The billing transaction for the user has been topped up.',
+    type: BillingTransaction,
+  })
+  async topUpWithSumUpReader(
+    @Body() body: SumupTopUpDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BillingTransaction> {
+    return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount);
+  }
+
+  @Post('/billing/top-up/sumup/callback')
+  @ApiOperation({
+    summary: 'Callback from SumUp',
+    operationId: 'sumUpTopUpCallback',
+  })
+  async sumUpTopUpCallback(@Body() data: SumupTransactionCallbackDto): Promise<{ message: string }> {
+    this.logger.debug('Received SumUp callback', { data });
+    await this.sumUpService.handleTransactionCallback(data);
+
+    return { message: 'OK' };
+  }
 }
-installInheritedMethods(BillingController, [
-  'getBillingBalance',
-  'getBillingTransactions',
-  'getUsageBillingTransaction',
-  'getBillingTransaction',
-  'createManualTransaction',
-  'getResourceBillingConfiguration',
-  'updateResourceBillingConfiguration',
-  'setSumUpApiKey',
-  'setBillingConfiguration',
-  'getBillingConfiguration',
-  'getSumUpConfiguration',
-  'getSumUpReaders',
-  'pairSumUpReader',
-  'removeSumUpReader',
-  'topUpWithSumUpReader',
-  'sumUpTopUpCallback',
-  'streamEvents',
-  'refundTransaction',
-]);

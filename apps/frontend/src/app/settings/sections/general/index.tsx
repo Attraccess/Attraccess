@@ -11,14 +11,22 @@ import {
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { PasswordInput } from '../../../../components/PasswordInput';
-import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton';
+import { PasswordInput } from '../../../../components/PasswordInput/index';
+import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton/index';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
 import de from './de.json';
-import { isAbsoluteUrl } from './index.is-absolute-url';
+export /** Mirrors the API's `@IsUrl()`: a full absolute URL, scheme included. */
+const isAbsoluteUrl = (value: string) => {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 export function GeneralSection() {
   const { t, tExists } = useTranslations({

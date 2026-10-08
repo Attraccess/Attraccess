@@ -2,9 +2,9 @@ import { writeFile } from 'node:fs/promises';
 
 import { join } from 'node:path';
 
-import { WagoController } from '../../backend/wago-controller.entity';
+import { WagoController } from '../../backend/controllers/entity';
 
-import { WagoConfigurationRevision } from '../../backend/wago-configuration-revision.entity';
+import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
 
 import { hash } from '../src/runtime';
 import { temporary } from './simulator-fixtures.test-utils';

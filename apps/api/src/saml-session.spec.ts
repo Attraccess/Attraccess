@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { samlSession } from './saml-session';
+import { samlSession } from './main.bootstrap';
 
 describe('SAML state transport', () => {
   function app(trustProxy: boolean) {

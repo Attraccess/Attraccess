@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import 'reflect-metadata';
-import { validateSnapshot as validateBackend } from '../backend/configuration';
+import { validateSnapshot as validateBackend } from '../backend/configuration/model';
 import { validateSnapshot } from '../cc100-runtime/src/runtime';
 import { temporary } from './production-fleet-globals.test-utils';
 

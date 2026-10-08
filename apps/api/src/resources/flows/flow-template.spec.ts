@@ -1,6 +1,6 @@
 import Handlebars from 'handlebars';
 import { FlowExecutionError } from './errors/flow-execution.error';
-import { compileFlowTemplate } from './flow-template';
+import { compileFlowTemplate } from './execution/flow-template';
 
 describe('flow templates', () => {
   it.each([

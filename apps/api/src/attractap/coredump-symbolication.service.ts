@@ -1,34 +1,58 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { execFile } from 'child_process';
+
 import { mkdtemp, rm, writeFile } from 'fs/promises';
+
 import { tmpdir } from 'os';
-import { join } from 'path';
-import {
-  BUILD_ID_PATTERN,
-  BUILD_ID_SCAN_WINDOW_BYTES,
-  ESP_CORE_DUMP_INFO_MARKER,
-  MAX_OUTPUT_BYTES,
-  SYMBOLICATION_TIMEOUT_MS,
-  SymbolicationResult,
-} from './coredump-symbolication.service.feature-definitions';
-import { CoredumpToolchainImplementation } from './coredump-toolchain';
+
+import { join, delimiter } from 'path';
 import { AttractapFirmwareService } from './firmware.service';
 
-// ELF note name written by esp-idf's core dump component (esp_core_dump_elf.c).
+import { existsSync } from 'fs';
+export type SymbolicationStatus = 'success' | 'failed' | 'skipped' | 'unavailable';
+
+export interface SymbolicationResult {
+  status: SymbolicationStatus;
+  backtrace: string | null;
+  buildId: string | null;
+}
+
+export const SYMBOLICATION_TIMEOUT_MS = 30000;
+
+export const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+
+export // ELF note name written by esp-idf's core dump component (esp_core_dump_elf.c).
 // Its note payload contains the truncated app ELF SHA256 as a plain ASCII hex string.
-// Note payload: u32 version + zero-terminated ASCII sha. Scan a small window after the
+const ESP_CORE_DUMP_INFO_MARKER = Buffer.from('ESP_CORE_DUMP_INFO', 'ascii');
+
+export // Note payload: u32 version + zero-terminated ASCII sha. Scan a small window after the
 // marker so we never pick up unrelated hex sequences elsewhere in the dump.
-// esp-idf truncates the app ELF SHA256 to CONFIG_APP_RETRIEVE_LEN_ELF_SHA hex chars
+const BUILD_ID_SCAN_WINDOW_BYTES = 128;
+
+export // esp-idf truncates the app ELF SHA256 to CONFIG_APP_RETRIEVE_LEN_ELF_SHA hex chars
 // (Kconfig range 8..64; idf 5.x defaults to 9, older versions used 16).
+const BUILD_ID_PATTERN = /[0-9a-fA-F]{8,64}/;
+
+export const RISCV_CHIPS = new Set([
+  'esp32c2',
+  'esp32c3',
+  'esp32c5',
+  'esp32c6',
+  'esp32c61',
+  'esp32h2',
+  'esp32h21',
+  'esp32h4',
+  'esp32p4',
+]);
 
 @Injectable()
-export class CoredumpSymbolicationService extends CoredumpToolchainImplementation {
-  protected readonly logger = new Logger(CoredumpSymbolicationService.name);
-  protected readonly toolCommand = process.env.ESP_COREDUMP_CMD || 'esp-coredump';
+export class CoredumpSymbolicationService {
+  public constructor(protected readonly firmwareService: AttractapFirmwareService) {}
 
-  public constructor(protected readonly firmwareService: AttractapFirmwareService) {
-    super();
-  }
+  protected readonly logger = new Logger(CoredumpSymbolicationService.name);
+
+  protected readonly toolCommand = process.env.ESP_COREDUMP_CMD || 'esp-coredump';
 
   public async symbolicate(
     coredump: Buffer | null,
@@ -163,6 +187,48 @@ export class CoredumpSymbolicationService extends CoredumpToolchainImplementatio
   protected isToolchainMissing(message: string): boolean {
     return message.includes('GDB executable not found') || message.includes('Please install GDB');
   }
-}
 
-export { SymbolicationResult, SymbolicationStatus } from './coredump-symbolication.service.feature-definitions';
+  protected resolveGdbPath(chip: string | null): string | null {
+    if (process.env.ESP_COREDUMP_GDB) {
+      return process.env.ESP_COREDUMP_GDB;
+    }
+
+    const normalizedChip = chip?.toLowerCase() ?? null;
+    const isRiscv = normalizedChip ? RISCV_CHIPS.has(normalizedChip) : false;
+    const archOverride = isRiscv ? process.env.ESP_COREDUMP_RISCV_GDB : process.env.ESP_COREDUMP_XTENSA_GDB;
+    if (archOverride) {
+      return archOverride;
+    }
+
+    // 'xtensa-esp-elf-gdb' is the unified multi-target name modern esp-idf installs.
+    const candidates = isRiscv
+      ? ['riscv32-esp-elf-gdb']
+      : ['xtensa-esp-elf-gdb', 'xtensa-esp32-elf-gdb', 'xtensa-esp32s3-elf-gdb'];
+    for (const candidate of candidates) {
+      const resolved = this.findExecutableOnPath(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    }
+
+    return null;
+  }
+
+  protected findExecutableOnPath(command: string): string | null {
+    if (command.includes('/')) {
+      return existsSync(command) ? command : null;
+    }
+
+    for (const directory of (process.env.PATH || '').split(delimiter)) {
+      if (!directory) {
+        continue;
+      }
+      const candidate = join(directory, command);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+}

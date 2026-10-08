@@ -18,7 +18,7 @@ function limitFor(file) {
     return null;
   const testDirectory = /(^|\/)(__tests__|__mocks__|tests?|test-utils|fixtures|acceptance|e2e)(\/|$)/;
   const testName = /(?:^|[/. _-])(spec|test|tests|e2e|cy)(?:[. _-]|$)/;
-  return testDirectory.test(file) || testName.test(path.basename(file)) ? 1000 : 199;
+  return testDirectory.test(file) || testName.test(path.basename(file)) ? 1000 : 600;
 }
 
 function lineCount(content) {

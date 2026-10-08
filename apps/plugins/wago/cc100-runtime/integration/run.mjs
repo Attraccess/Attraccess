@@ -1,4 +1,5 @@
 import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -14,6 +15,10 @@ function run(command, args, env = process.env) {
 }
 function argument(name) {
   return process.argv.find((value) => value.startsWith(`--${name}=`))?.slice(name.length + 3);
+}
+function backendSource(sourceRoot, currentPath, legacyPath) {
+  const current = join(sourceRoot, 'apps/plugins/wago/backend', currentPath);
+  return existsSync(current) ? current : join(sourceRoot, 'apps/plugins/wago/backend', legacyPath);
 }
 async function snapshot(ref, label, directories) {
   const commit = execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {
@@ -56,22 +61,25 @@ try {
     // modules remain exact git blobs from the selected source revision.
     for (const file of [
       'simulator.ts',
-      'simulator-device.ts',
-      'simulator-identity.ts',
-      'simulator-inspection.ts',
-      'simulator-mqtt.ts',
-      'simulator-settings.ts',
-      'simulator-state.ts',
-      'simulator-transport.ts',
-    ])
-      await writeFile(join(stagedRoot, runtime, 'src', file), await readFile(join(root, runtime, 'src', file)));
+      'simulator/device.ts',
+      'simulator/identity.ts',
+      'simulator/inspection.ts',
+      'simulator/mqtt.ts',
+      'simulator/settings.ts',
+      'simulator/state.ts',
+      'simulator/transport.ts',
+    ]) {
+      const target = join(stagedRoot, runtime, 'src', file);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, await readFile(join(root, runtime, 'src', file)));
+    }
     const config = join(stagedRoot, 'tsconfig.simulator.json');
     await writeFile(
       config,
       JSON.stringify({
         extends: join(root, 'tsconfig.base.json'),
         compilerOptions: { rootDir: '/', types: ['node'], typeRoots: [join(root, 'node_modules/@types')] },
-        include: [`${runtime}/src/simulator.ts`, `${runtime}/src/simulator-device.ts`],
+        include: [`${runtime}/src/simulator.ts`, `${runtime}/src/simulator/device.ts`],
       }),
     );
     run('pnpm', ['exec', 'tsc', '--noEmit', '-p', config]);
@@ -106,8 +114,8 @@ try {
     {
       ...process.env,
       WAGO_INTEGRATION_TEMP: temporary,
-      WAGO_INTEGRATION_FLOW_SOURCE: join(flowRoot, backend, 'wago-flow.service.ts'),
-      WAGO_INTEGRATION_MAIN_SOURCE: join(mainRoot, backend, 'wago.service.ts'),
+      WAGO_INTEGRATION_FLOW_SOURCE: backendSource(flowRoot, 'flow/service.ts', 'wago-flow.service.ts'),
+      WAGO_INTEGRATION_MAIN_SOURCE: backendSource(mainRoot, 'controllers/service.ts', 'wago.service.ts'),
       WAGO_INTEGRATION_LIFECYCLE_ONLY: process.argv.includes('--lifecycle-only') ? '1' : '0',
     },
   );

@@ -1,16 +1,93 @@
 import { useEffect, useMemo, useRef } from 'react';
 import grapesjs from 'grapesjs';
 import type { Component } from 'grapesjs';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { getBaseUrl } from '../../../api/index';
+import {
+  decodeHtmlOnlyEntities,
+  unwrapFragment,
+  withLogoPlaceholder,
+  withPreviewEmailLogo,
+  isWellFormedXml,
+  splitHead,
+  wrapFragment,
+} from './mjmlLayout';
+import { isFullMjmlDocument } from '@attraccess/shared';
+import grapesJSMJMLModule from 'grapesjs-mjml';
 import 'grapesjs/dist/css/grapes.min.css';
 import './MjmlVisualEditor.css';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { getBaseUrl } from '../../../api';
-import { decodeHtmlOnlyEntities, unwrapFragment, withLogoPlaceholder, withPreviewEmailLogo } from './mjmlLayout';
-import { unwrapDefault } from './MjmlVisualEditor.state';
-import { grapesJSMJML } from './MjmlVisualEditor.state';
-import { warningTranslations } from './MjmlVisualEditor.state';
-import { MjmlVisualEditorProps } from './MjmlVisualEditor.mjml-visual-editor-props';
-import { analyzeInitialValue } from './MjmlVisualEditor.state';
+
+function removeScripts(root: Document | DocumentFragment): boolean {
+  let removed = false;
+  for (const element of Array.from(root.querySelectorAll('*'))) {
+    if (element.localName.toLowerCase() === 'script') {
+      element.remove();
+      removed = true;
+    } else if (element instanceof HTMLTemplateElement) {
+      removed = removeScripts(element.content) || removed;
+    }
+  }
+  return removed;
+}
+
+/** Remove executable elements before seeding the unsandboxed GrapesJS canvas. */
+export function stripScripts(mjml: string): string {
+  const xml = isWellFormedXml(mjml);
+  const document = new DOMParser().parseFromString(mjml, xml ? 'application/xml' : 'text/html');
+  if (!removeScripts(document)) return mjml;
+  return xml ? new XMLSerializer().serializeToString(document) : document.body.innerHTML;
+}
+
+export // Pure analysis of the initial value, shared between the mount effect (parser
+// selection) and render (warning banners).
+const analyzeInitialValue = (initialValue: string) => {
+  const raw = decodeHtmlOnlyEntities(initialValue);
+  const { head, body } = isFullMjmlDocument(raw) ? splitHead(raw) : { head: '', body: raw };
+  const wrapped = wrapFragment(body);
+  const initialMjml = stripScripts(wrapped);
+  const scriptsStripped = initialMjml !== wrapped;
+  return { initialMjml, droppedHead: head, useXmlParser: isWellFormedXml(initialMjml), scriptsStripped };
+};
+
+export // grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
+// interop the callable/plain export is either the module itself or `.default`.
+const unwrapDefault = <T,>(mod: T): T => (mod as { default?: T })?.default ?? mod;
+
+export const grapesJSMJML = unwrapDefault(grapesJSMJMLModule);
+
+export const warningTranslations = {
+  en: {
+    htmlParserFallback:
+      'This template is not well-formed XML, so a lossier parser is used: raw HTML table markup may be reformatted by visual edits. Fix the markup in the code editor to avoid this.',
+    headDropped:
+      'This template contains document-level styles (<mj-head>) that the visual editor cannot keep. Saving will remove them; the global layout styles apply instead.',
+    scriptsStripped:
+      'This template contains <script> tags that have been removed from the visual preview. Switch to the code editor to edit templates with scripts.',
+  },
+  de: {
+    htmlParserFallback:
+      'Diese Vorlage ist kein wohlgeformtes XML, daher wird ein verlustbehafteter Parser verwendet: rohes HTML-Tabellen-Markup kann durch visuelle Bearbeitungen umformatiert werden. Korrigiere das Markup im Code-Editor, um das zu vermeiden.',
+    headDropped:
+      'Diese Vorlage enthält Dokument-Styles (<mj-head>), die der visuelle Editor nicht übernehmen kann. Beim Speichern werden sie entfernt; stattdessen gelten die Styles des globalen Layouts.',
+    scriptsStripped:
+      'Diese Vorlage enthält <script>-Tags, die aus der visuellen Vorschau entfernt wurden. Wechsle zum Code-Editor, um Vorlagen mit Skripten zu bearbeiten.',
+  },
+};
+export interface MjmlVisualEditorProps {
+  /** MJML fragment (mj-section...) or full <mjml> document. Read once on mount — remount (key) to reload. */
+  initialValue: string;
+  onChange: (mjml: string) => void;
+  language: string;
+  /**
+   * mj-head fragment (e.g. "<mj-head><mj-attributes>...</mj-attributes></mj-head>") injected into the
+   * per-component MJML compile so global styles render in the canvas. Not editable, never exported.
+   */
+  headMjml?: string;
+  /** Components whose css-class contains this become inert: visible but not selectable/editable/removable. */
+  lockClass?: string;
+  /** Report the full <mjml> document (incl. mj-body attributes) from onChange instead of the body fragment. */
+  exportFullDocument?: boolean;
+}
 
 // grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
 // interop the callable/plain export is either the module itself or `.default`.

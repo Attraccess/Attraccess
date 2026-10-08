@@ -1,7 +1,7 @@
 import * as processes from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { WriteAdmissionError } from '../runtime-types';
+import { WriteAdmissionError } from '../runtime/types';
 import { QueuedModbusTransport, serialExchange } from './transports';
 import { rtuFrame } from './protocol';
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));

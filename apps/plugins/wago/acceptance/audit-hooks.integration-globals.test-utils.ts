@@ -1,6 +1,6 @@
 import type { PluginMqttClient } from '@attraccess/plugins-backend-sdk';
-import type { WagoConfigurationSnapshot } from '../backend/configuration';
-import { discoveryTopic } from '../backend/protocol';
+import type { WagoConfigurationSnapshot } from '../backend/configuration/model';
+import { discoveryTopic } from '../backend/protocol/index';
 export const pluginId = 'abcdefghijklmnopqrstu';
 export const principal = { userId: 42, authenticationMethod: 'api-token' as const, apiTokenId: 19 };
 export const verifier = 'v'.repeat(43);

@@ -1,9 +1,9 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from './../modbus/model';
-import { type WagoConfigurationSnapshot, canonicalSnapshot, configurationHash } from './configuration';
-import type { WagoConfigurationDraft } from './wago-configuration-draft.entity';
-import type { WagoConfigurationRevision } from './wago-configuration-revision.entity';
-import { WagoService } from './wago.service';
+import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../modbus/model';
+import { type WagoConfigurationSnapshot, canonicalSnapshot, configurationHash } from './configuration/model';
+import type { WagoConfigurationDraft } from './configuration/draft.entity';
+import type { WagoConfigurationRevision } from './configuration/revision.entity';
+import { WagoService } from './controllers/service';
 
 describe('configuration editor service boundaries', () => {
   const snapshot: WagoConfigurationSnapshot = {

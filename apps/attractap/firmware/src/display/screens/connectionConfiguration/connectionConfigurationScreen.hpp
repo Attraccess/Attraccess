@@ -3,7 +3,7 @@
 #include <functional>
 
 #include <string>
-#include "../../screens/IScreen.hpp"
+#include "../IScreen.hpp"
 #include "../../../settings/settings.hpp"
 #include "../../shared/pinInput/pinInputPage.hpp"
 #include "../../shared/powerOff/powerOffButton.hpp"

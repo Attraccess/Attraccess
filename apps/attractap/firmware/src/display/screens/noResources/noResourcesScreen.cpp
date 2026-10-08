@@ -1,7 +1,7 @@
 #include "noResourcesScreen.hpp"
-#include "display/fonts/attractap_fonts.hpp"
-#include "display/theme.hpp"
-#include "display/images/lockscreen_background_image.hpp"
+#include "../../fonts/attractap_fonts.hpp"
+#include "../../theme.hpp"
+#include "../../images/lockscreen_background_image.hpp"
 #include <string>
 
 void NoResourcesScreen::init()

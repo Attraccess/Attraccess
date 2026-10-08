@@ -2,7 +2,7 @@
 
 #include <functional>
 #include "resourceDetailsTypes.hpp"
-#include "resourceDetailsFormState.hpp"
+#include "forms/state.hpp"
 #include "resourceDetailsProjectState.hpp"
 #include "resourceDetailsUsageState.hpp"
 
@@ -10,9 +10,9 @@
 
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
-#include "display/theme.hpp"
-#include "display/shared/sessionHeader.hpp"
-#include "display/shared/actionOverlay.hpp"
+#include "../../theme.hpp"
+#include "../../shared/sessionHeader.hpp"
+#include "../../shared/actionOverlay.hpp"
 #include "../../../utils.hpp"
 #include "../../../api/api.hpp"
 

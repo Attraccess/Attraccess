@@ -1,5 +1,5 @@
 import { Alert } from '@heroui/react';
-import { ConfigurationErrors } from '../ConfigurationChanges';
+import { ConfigurationErrors } from '../configuration/ConfigurationChanges';
 import type { useFrontPanelState } from './useFrontPanelState';
 export function FrontPanelStatusAlerts({ model }: { model: ReturnType<typeof useFrontPanelState> }) {
   return (

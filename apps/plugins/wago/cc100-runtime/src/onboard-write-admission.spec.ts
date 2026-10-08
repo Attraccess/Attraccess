@@ -1,5 +1,5 @@
 import * as files from 'node:fs/promises';
-import { WriteAdmissionError } from './runtime-types';
+import { WriteAdmissionError } from './runtime/types';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

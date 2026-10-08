@@ -115,4 +115,4 @@ export {
   TimeSeriesSpendRaw,
   TimeSeriesUsageRaw,
   UsageSummaryRaw,
-} from './project-usage.service.definitions';
+} from './project-usage-statistics';

@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-durable-audit';
 import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
-import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/plugin-audit-registry';
+import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditService } from './audit.service';
 

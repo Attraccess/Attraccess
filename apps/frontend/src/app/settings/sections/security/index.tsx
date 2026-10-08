@@ -5,6 +5,18 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
   Spinner,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
 } from '@heroui/react';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
@@ -13,12 +25,72 @@ import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { PasswordPreview } from './PasswordPreview';
 import { RoleOverridesModal } from './RoleOverridesModal';
 import { POLICY_BOOL_FIELDS, POLICY_NUMBER_FIELDS } from './policy-fields';
-import { SubHeading } from './index.helpers';
-import { useSecuritySectionState } from './useSecuritySectionState';
-import { SecuritySectionSettingsRow } from './SecuritySectionSettingsRow';
-import { SecuritySectionStandardModal } from './SecuritySectionStandardModal';
-import { SecuritySectionTwoFactorLabel } from './SecuritySectionTwoFactorLabel';
-import { SecuritySectionRateLimitLoadFailed } from './SecuritySectionRateLimitLoadFailed';
+import { SubHeading, useSecuritySectionState, SecuritySettingsForm } from './components/SecuritySettingsForm';
+import { TwoFactorSettings } from './components/TwoFactorSettings';
+import { RateLimitSettings } from './components/RateLimitSettings';
+import { Button } from '../../../../components/button/index';
+import { StandardModal } from '../../../../components/standardModal';
+
+type Props = Pick<
+  ReturnType<typeof useSecuritySectionState>,
+  'isConfirmOpen' | 'setIsConfirmOpen' | 't' | 'policyDiff' | 'isSaving' | 'commit'
+>;
+
+export function SecuritySectionStandardModal({
+  isConfirmOpen,
+  setIsConfirmOpen,
+  t,
+  policyDiff,
+  isSaving,
+  commit,
+}: Props) {
+  return (
+    <StandardModal isOpen={isConfirmOpen} onOpenChange={(open) => !open && setIsConfirmOpen(false)} size="lg">
+      {({ close }) => (
+        <>
+          <ModalHeader className="flex flex-col gap-1">
+            <ModalHeading>{t('diff.title')}</ModalHeading>
+            <span className="text-sm font-normal text-muted">{t('diff.subtitle')}</span>
+          </ModalHeader>
+          <ModalBody>
+            <Table data-testid="policy-diff-table">
+              <TableScrollContainer>
+                <TableContent aria-label={t('diff.title')}>
+                  <TableHeader>
+                    <TableColumn isRowHeader>{t('diff.field')}</TableColumn>
+                    <TableColumn>{t('diff.before')}</TableColumn>
+                    <TableColumn>{t('diff.after')}</TableColumn>
+                  </TableHeader>
+                  <TableBody>
+                    {policyDiff.map((row) => (
+                      <TableRow key={row.field} id={row.field}>
+                        <TableCell className="font-medium">{row.label}</TableCell>
+                        <TableCell>
+                          <code className="text-muted">{row.before}</code>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-foreground">{row.after}</code>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </TableContent>
+              </TableScrollContainer>
+            </Table>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onPress={close} isDisabled={isSaving}>
+              {t('diff.cancel')}
+            </Button>
+            <Button variant="primary" onPress={commit} isPending={isSaving} data-testid="policy-diff-confirm">
+              {t('diff.confirm')}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
+  );
+}
 
 /**
  * Everything that decides who gets in and on what terms: sign-in throttling, the password policy,
@@ -59,11 +131,11 @@ export function SecuritySection() {
     <SettingsSection title={model.t('title')} description={model.t('description')} aside={aside}>
       <SubHeading title={model.t('access.heading')} description={model.t('access.description')} />
 
-      <SecuritySectionTwoFactorLabel {...model} />
+      <TwoFactorSettings {...model} />
 
       <SubHeading title={model.t('rateLimit.heading')} description={model.t('rateLimit.description')} />
 
-      <SecuritySectionRateLimitLoadFailed {...model} />
+      <RateLimitSettings {...model} />
 
       <SubHeading title={model.t('policy.heading')} description={model.t('policy.description')} />
 
@@ -110,7 +182,7 @@ export function SecuritySection() {
               </SettingsRow>
             ))}
 
-            <SecuritySectionSettingsRow {...model} />
+            <SecuritySettingsForm {...model} />
           </>
         )}
       </div>

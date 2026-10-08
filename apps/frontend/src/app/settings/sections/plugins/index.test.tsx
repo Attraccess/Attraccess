@@ -1,8 +1,9 @@
-import { hoisted, makePlugin, deferred } from './index.test.hoisted';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
+// Register the shared API mocks before loading the component's feature modules.
+import { deferred, hoisted, makePlugin } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 import { describe } from 'vitest';

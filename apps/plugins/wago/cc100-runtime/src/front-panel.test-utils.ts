@@ -1,4 +1,4 @@
-import type { StateStore } from './runtime-types';
+import type { StateStore } from './runtime/types';
 import { MemoryDeviceAdapter } from './adapters';
 import { WagoRuntime, hash, type RuntimeState, type Snapshot, type Transport } from './runtime';
 

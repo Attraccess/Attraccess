@@ -1,18 +1,126 @@
 // Layout shell for resource detail pages with persistent tab navigation bar
 // FEATURE: ATT-386 Resource details page full redesign tabbed hub layout
-import { useParams, Outlet, Navigate } from 'react-router-dom';
-import { Button, Spinner, Tabs, TabList, Tab } from '@heroui/react';
-import { ArrowLeft, Settings2Icon, QrCodeIcon, ShapesIcon, Trash } from 'lucide-react';
-import { memo, ReactNode } from 'react';
-import { PageHeader, PageAction } from '../../../../components/pageHeader';
-import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
-import { ResourceQrCode } from '../qrcode';
-import { filenameToUrl } from '../../../../api';
-import { ResourceHealthWarning } from '../health-state';
-import { Select } from '../../../../components/select';
-import { ResourceTabKey } from './useResourceTabs';
-import { TAB_ICONS } from './ResourceTabsLayout.tab-icons';
-import { useResourceTabsLayoutInnerState } from './useResourceTabsLayoutInnerState';
+
+import { useParams, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Button, Spinner, Tabs, TabList, Tab, useOverlayState } from '@heroui/react';
+import {
+  ArrowLeft,
+  Settings2Icon,
+  QrCodeIcon,
+  ShapesIcon,
+  Trash,
+  Gauge,
+  History as HistoryIcon,
+  Users,
+  WrenchIcon,
+} from 'lucide-react';
+import { memo, ReactNode, JSX, useMemo, useRef } from 'react';
+import { PageHeader, PageAction } from '../../../../components/pageHeader/index';
+import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal/index';
+import { ResourceQrCode } from '../qrcode/index';
+import { filenameToUrl } from '../../../../api/index';
+import { ResourceHealthWarning } from '../health-state/index';
+import { Select } from '../../../../components/select/index';
+import { ResourceTabKey, useResourceTabs } from './useResourceTabs';
+import { useAuth } from '../../../../hooks/useAuth';
+import { useToastMessage } from '../../../../components/toastProvider';
+import {
+  useResourcesServiceDeleteOneResource,
+  useResourcesServiceGetOneResourceById,
+  useResourcesServiceGetAllResourcesKey,
+} from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useQrCodeAction } from '../useQrCodeAction';
+import de from '../resourceDetails.de.json';
+import en from '../resourceDetails.en.json';
+
+export const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
+  overview: <Gauge className="w-4 h-4" />,
+  history: <HistoryIcon className="w-4 h-4" />,
+  people: <Users className="w-4 h-4" />,
+  maintenance: <WrenchIcon className="w-4 h-4" />,
+};
+
+export function useResourceTabsLayoutInnerState({
+  resourceId,
+  children,
+}: {
+  resourceId: number;
+  children?: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
+
+  const { hasPermission } = useAuth();
+  const { success, error: showError } = useToastMessage();
+  useQrCodeAction({ resourceId });
+
+  const { t } = useTranslations({ en, de });
+
+  const canUpdateResources = hasPermission('resources.update');
+  const canDeleteResources = hasPermission('resources.delete');
+
+  const {
+    data: resource,
+    isLoading: isLoadingResource,
+    error: resourceError,
+  } = useResourcesServiceGetOneResourceById({ id: resourceId });
+
+  const deleteResource = useResourcesServiceDeleteOneResource();
+
+  const qrOpenRef = useRef<() => void>(() => undefined);
+
+  const { tabs } = useResourceTabs(resourceId);
+
+  const activeTabKey = useMemo<ResourceTabKey>(() => {
+    const base = `/resources/${resourceId}`;
+    const remainder = location.pathname.startsWith(base)
+      ? location.pathname.slice(base.length).replace(/^\//, '').split('/')[0]
+      : '';
+    const match = tabs.find((tab) => tab.path === remainder);
+    return match?.key ?? 'overview';
+  }, [location.pathname, resourceId, tabs]);
+
+  const handleDelete = async () => {
+    if (!canDeleteResources) return;
+    try {
+      await deleteResource.mutateAsync({ id: resourceId });
+      success({
+        title: 'Resource deleted',
+        description: `${resource?.name} has been successfully deleted`,
+      });
+      queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      navigate('/resources');
+    } catch (err) {
+      showError({
+        title: 'Failed to delete resource',
+        description: 'An error occurred while deleting the resource. Please try again.',
+      });
+      throw err;
+    }
+  };
+  return {
+    navigate,
+    isOpen,
+    open,
+    closeDeleteModal,
+    t,
+    canUpdateResources,
+    canDeleteResources,
+    resource,
+    isLoadingResource,
+    resourceError,
+    qrOpenRef,
+    tabs,
+    activeTabKey,
+    handleDelete,
+    resourceId,
+    children,
+  };
+}
 
 function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
   const { id } = useParams<{ id: string }>();

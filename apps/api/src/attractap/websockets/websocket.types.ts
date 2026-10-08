@@ -1,5 +1,5 @@
 // Firmware update related types
-export { AttractapEvent, AttractapEventType, AttractapMessage } from './websocket-event';
+export { AttractapEvent, AttractapEventType, AttractapMessage } from './websocket-socket-state';
 export {
   FormFieldAnswerValue,
   ResourceUsageFormCancelPayload,
@@ -11,7 +11,7 @@ export {
   ResourceUsageFormPageResultPayload,
   ResourceUsageFormRequestPayload,
   ResourceUsageFormSubmitPagePayload,
-} from './websocket-form-payloads';
+} from './websocket-socket-state';
 export {
   FirmwareRequestChunkPayload,
   FirmwareUpdateResponse,

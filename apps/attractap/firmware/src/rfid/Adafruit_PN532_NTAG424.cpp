@@ -1,7 +1,7 @@
 // Adafruit PN532 driver, BSD license. See pn532_driver_history.hpp.
-#include "pn532_driver_internal.hpp"
+#include "pn532/internal.hpp"
 
-#include "pn532_driver_history.hpp"
+#include "pn532/history.hpp"
 
 Pn532DebugPort Pn532Driver::serial;
 byte pn532ack[] = {0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00};

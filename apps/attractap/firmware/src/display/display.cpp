@@ -5,7 +5,7 @@
 #include <functional>
 
 #include "../utils.hpp"
-#include "platform.hpp"
+#include "../platform.hpp"
 #ifndef ATTRACTAP_HOST
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
@@ -126,4 +126,315 @@ void Display::increase_reboot(void *arg)
 uint32_t Display::tick_cb()
 {
     return millis();
+}
+
+#ifndef ATTRACTAP_HOST
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
+#ifdef HAS_IO_EXPANDER
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
+#if defined(DISPLAY_DRIVER_GT911)
+#include "driver/gt911/rgb_gt911_driver.hpp"
+#endif
+#if defined(DISPLAY_DRIVER_QUALIA)
+#include "driver/qualia/qualia_ft_cst_driver.hpp"
+#endif
+
+void Display::renderTask(void *parameter)
+{
+#ifndef ATTRACTAP_HOST
+    (void)parameter;
+    while (true)
+    {
+        // lv_timer_handler self-locks via lv_lock() (LV_USE_OS LV_OS_FREERTOS)
+        // and returns the time until the next ready timer.
+        uint32_t delayMs = lv_timer_handler();
+        if (delayMs == LV_NO_TIMER_READY)
+        {
+            delayMs = LV_DEF_REFR_PERIOD;
+        }
+        if (delayMs < 1)
+        {
+            delayMs = 1;
+        }
+        else if (delayMs > LV_DEF_REFR_PERIOD)
+        {
+            delayMs = LV_DEF_REFR_PERIOD;
+        }
+        vTaskDelay(pdMS_TO_TICKS(delayMs));
+    }
+#else
+    (void)parameter;
+#endif
+}
+
+void Display::asyncCall(lv_async_cb_t cb, void *user_data)
+{
+#ifdef ATTRACTAP_HOST
+    lv_async_call(cb, user_data);
+#else
+    lv_lock();
+    lv_async_call(cb, user_data);
+    lv_unlock();
+#endif
+}
+
+bool Display::hasTouchInput()
+{
+    return Display::driver && Display::driver->touchAvailable();
+}
+
+void Display::loop()
+{
+#ifdef ATTRACTAP_HOST
+    Display::updateDrawerAvailability();
+    Display::updateNetworkQualityOverlay();
+    Display::advanceScreenRouter();
+    return;
+#endif
+    // Runs on the main application loop; rendering itself lives on LvglTask
+    // (renderTask). Everything below mutates LVGL objects, so hold lv_lock for
+    // the duration (recursive FreeRTOS mutex, also taken by lv_timer_handler).
+    lv_lock();
+
+    if (Display::touchWarningPending)
+    {
+        Display::touchWarningPending = false;
+        Display::showErrorPopup("Touch Unavailable",
+                                "Touch panel not detected.\nCheck hardware and reboot.");
+    }
+
+    Display::updateDrawerAvailability();
+    Display::updateNetworkQualityOverlay();
+    Display::advanceScreenRouter();
+
+    lv_unlock();
+}
+
+#ifndef ATTRACTAP_HOST
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
+#ifdef HAS_IO_EXPANDER
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
+#if defined(DISPLAY_DRIVER_GT911)
+#include "driver/gt911/rgb_gt911_driver.hpp"
+#endif
+#if defined(DISPLAY_DRIVER_QUALIA)
+#include "driver/qualia/qualia_ft_cst_driver.hpp"
+#endif
+
+#ifdef ATTRACTAP_HOST
+void Display::setup(IDisplayDriver &hostDriver)
+#elif defined(HAS_IO_EXPANDER)
+void Display::setup(IOExpander *ioExpander)
+#else
+void Display::setup()
+#endif
+{
+    Display::logger.info("Initializing");
+
+#ifdef ATTRACTAP_HOST
+    Display::driver = &hostDriver;
+    if (!Display::driver->begin())
+    {
+        Display::logger.error("Host display driver init failed");
+        return;
+    }
+    Display::screenWidth = Display::driver->width();
+    Display::screenHeight = Display::driver->height();
+    lv_init();
+    lv_tick_set_cb(Display::tick_cb);
+    static std::vector<uint16_t> buffer;
+    buffer.resize(Display::screenWidth * 80);
+    Display::disp = lv_display_create(static_cast<int32_t>(Display::screenWidth), static_cast<int32_t>(Display::screenHeight));
+    lv_display_set_color_format(Display::disp, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_flush_cb(Display::disp, Display::flush);
+    lv_display_set_buffers(Display::disp, buffer.data(), nullptr, buffer.size() * sizeof(buffer.front()), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    Display::indev = lv_indev_create();
+    lv_indev_set_type(Display::indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(Display::indev, Display::touchpad_read);
+    DisplayTheme::init(Display::disp);
+    Display::initDeviceOverlay();
+    Display::initDrawer();
+    Display::transitionToScreen(&Display::bootScreen);
+    Display::logger.info("Host display setup done");
+#else
+
+#if defined(DISPLAY_DRIVER_GT911)
+#ifdef HAS_IO_EXPANDER
+    Display::driver = new RgbGt911Driver(Display::logger, ioExpander);
+#else
+    Display::driver = new RgbGt911Driver(Display::logger);
+#endif
+#elif defined(DISPLAY_DRIVER_QUALIA)
+    Display::driver = new QualiaFtCstDriver(Display::logger);
+#else
+    Display::driver = nullptr;
+#endif
+
+    // Bounded retry: a transient I2C glitch at boot (the GT911/RGB panel shares the
+    // I2C bus with the PN532/IO-expander) can make begin() fail. Recover the bus and
+    // retry a few times; if it still fails, reboot rather than hang forever.
+    const uint8_t MAX_DISPLAY_INIT_ATTEMPTS = 5;
+    bool driverReady = false;
+    for (uint8_t attempt = 1; attempt <= MAX_DISPLAY_INIT_ATTEMPTS; attempt++)
+    {
+        if (Display::driver && Display::driver->begin())
+        {
+            driverReady = true;
+            break;
+        }
+
+        Display::logger.errorf("Display driver init failed (attempt %u/%u)", attempt, MAX_DISPLAY_INIT_ATTEMPTS);
+
+        if (attempt < MAX_DISPLAY_INIT_ATTEMPTS)
+        {
+#if defined(DISPLAY_DRIVER_GT911) && defined(PIN_TOUCH_I2C_SDA) && defined(PIN_TOUCH_I2C_SCL)
+            {
+                // Resetting the bus must not race other bus users (ATT-554).
+                I2CBusGuard busGuard;
+                // Clear any I2C slave stuck mid-transaction before the next
+                // attempt (the driver toggles SCL until SDA releases).
+                i2c_master_bus_reset(getSharedI2CBus());
+            }
+#endif
+            delay(200);
+        }
+    }
+
+    if (!driverReady)
+    {
+        Display::logger.error("Display driver init exhausted retries; restarting");
+        delay(100); // let the serial buffer flush before reset
+        esp_restart();
+    }
+
+    Display::screenWidth = Display::driver->width();
+    Display::screenHeight = Display::driver->height();
+
+    lv_init();
+
+#if LV_USE_LOG != 0
+    /* Route LVGL logs to our logger */
+    lv_log_register_print_cb(Display::logFromLvgl);
+#endif
+
+    /* Set LVGL tick source (v9) */
+    lv_tick_set_cb(Display::tick_cb);
+
+    Display::setupFramebuffer();
+#endif
+}
+
+#ifndef ATTRACTAP_HOST
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
+#ifdef HAS_IO_EXPANDER
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
+#if defined(DISPLAY_DRIVER_GT911)
+#include "driver/gt911/rgb_gt911_driver.hpp"
+#endif
+#if defined(DISPLAY_DRIVER_QUALIA)
+#include "driver/qualia/qualia_ft_cst_driver.hpp"
+#endif
+
+void Display::setupFramebuffer()
+{
+#ifndef ATTRACTAP_HOST
+    /* Allocate draw buffers in bytes for LVGL v9.
+     * Was 480x20 (1/24 of the frame) in internal DRAM, forcing 24 serialized
+     * partial render+flush passes per full screen (~150ms/frame, "Bildaufbau
+     * sehr langsam"). Enlarged to 480x120 (1/4) then 480x240 (1/2) double-
+     * buffered in PSRAM: a full-screen first paint drops from 24 to 2 passes,
+     * and the panel flushes concurrently (PERFORMANCE_ANALYSIS.md A-4). The
+     * RGB panel framebuffer is also in PSRAM, so flush is PSRAM->PSRAM. */
+    uint32_t buf_pixels = Display::screenWidth * 240; /* half of screen */
+    uint32_t buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
+    uint8_t *buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
+    uint8_t *buf2 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
+    if (buf1 == nullptr || buf2 == nullptr)
+    {
+        /* Fall back to the old small single buffer if PSRAM is tight; log a
+         * warning so a degraded rendering config is diagnosable on devices
+         * with constrained PSRAM (Sourcery PR #1694). */
+        if (buf1) heap_caps_free(buf1);
+        if (buf2) heap_caps_free(buf2);
+        buf_pixels = Display::screenWidth * 20;
+        buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
+        buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
+        buf2 = NULL;
+        if (buf1 == nullptr)
+        {
+            Display::logger.error("Draw-buffer allocation failed even for fallback; restarting");
+            delay(100); // let the serial buffer flush before reset
+            esp_restart();
+        }
+        Display::logger.warn("PSRAM draw-buffer alloc failed — falling back to 480x20 single buffer (degraded rendering)");
+    }
+
+    /* Create display and set buffers/callbacks (v9) */
+    Display::disp = lv_display_create((int32_t)Display::screenWidth, (int32_t)Display::screenHeight);
+    lv_display_set_flush_cb(Display::disp, Display::flush);
+    lv_display_set_buffers(Display::disp, buf1, buf2, buf_size_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
+
+#ifdef ATTRACTAP_LV_PERF_MONITOR
+    /* Log FPS / render / flush timing to serial (LV_USE_PERF_MONITOR_LOG_MODE)
+     * so Bildaufbau cost is measurable on hardware (PERFORMANCE_ANALYSIS.md A-4). */
+    lv_sysmon_show_performance(Display::disp);
+#endif
+
+    /* Initialize input device (v9) */
+    Display::indev = lv_indev_create();
+    lv_indev_set_type(Display::indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(Display::indev, Display::touchpad_read);
+    /* Touch sampling decoupled from refresh: LVGL defaults the indev read
+     * timer to LV_DEF_REFR_PERIOD (24 ms), so a tap waits up to that before
+     * the press is even seen — on top of the GT911 scan + render that feels
+     * sluggish. Sample touch at 10 ms (100 Hz); refresh stays at 24 ms
+     * (PERFORMANCE_ANALYSIS.md, measured: system ~90% idle, latency-bound). */
+    lv_timer_set_period(lv_indev_get_read_timer(Display::indev), 10);
+
+    const esp_timer_create_args_t reboot_timer_args = {
+        .callback = &Display::increase_reboot,
+        .arg = nullptr,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "reboot",
+        .skip_unhandled_events = false};
+
+    DisplayTheme::init(disp);
+
+    Display::initDeviceOverlay();
+    Display::initDrawer();
+
+    Display::transitionToScreen(&Display::bootScreen);
+
+    if (!Display::driver->touchAvailable())
+    {
+        Display::logger.warn("Touch panel not detected — warning will be shown after first render");
+        Display::touchWarningPending = true;
+    }
+
+    // Rendering + touch sampling on a dedicated task (ATT-554 item 7), pinned to
+    // core 1 (away from the WiFi/LwIP core) at priority 4: above the app loop,
+    // NFC task (1) and websocket client (3), so input/refresh never wait behind
+    // blocking application work.
+    xTaskCreatePinnedToCore(Display::renderTask, "LvglTask", 8192, nullptr, 4, nullptr, 1);
+
+    Display::logger.info("Setup done");
+#endif
 }

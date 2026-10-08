@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stripScripts } from './strip-preview-scripts';
+import { stripScripts } from './MjmlVisualEditor';
 
 describe('MJML preview scripts', () => {
   it.each(['<script>alert(1)</script>', '<SCRIPT>alert(1)</SCRIPT>', '<script>alert(1)</script >'])(

@@ -4,7 +4,7 @@ import {
   pluginActivationPlan,
   pluginRemovalClosure,
   resolvePluginDependencies,
-} from './plugin-dependencies';
+} from './runtime/dependencies';
 
 const dependency = (name: string, version = '^1.0.0', required = true) => ({ name, version, required });
 const plugin = (name: string, dependencies = [], version = '1.0.0') => ({ name, version, dependencies });

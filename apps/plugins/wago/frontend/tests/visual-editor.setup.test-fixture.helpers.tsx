@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
-import type { WagoDiagnostics } from '../src/diagnostics';
+import type { WagoDiagnostics } from '../src/diagnostics/diagnostics';
 import { state } from './visual-editor.test.state';
 type SetupScope = { state: typeof state; client: QueryClient; diagnosticsFixture: typeof diagnosticsFixture };
 

@@ -10,7 +10,7 @@ import { AttractapService } from '../../attractap.service';
 import { WebsocketService } from '../websocket.service';
 import { AuthenticatedWebSocket } from '../websocket.types';
 import { sendResourceListToSockets as sendResourceListToSocketsImplementation } from './resource-list-payload';
-import { DEBOUNCE_MS } from './resource-list.service.definitions';
+export const DEBOUNCE_MS = 200;
 
 @Injectable()
 export class ResourceListService {
@@ -179,5 +179,3 @@ export class ResourceListService {
       .join('\n');
   }
 }
-
-export { DEBOUNCE_MS } from './resource-list.service.definitions';

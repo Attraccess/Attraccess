@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import * as migrations from '../database/migrations';
-import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/plugin-audit-registry';
+import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';

@@ -25,9 +25,150 @@ import {
 } from 'recharts';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { EmptyState } from '../../../../../components/emptyState';
-import { ProjectUsageChartsProps } from './index.contracts';
-import { CHART_COLORS } from './index.state';
-import { useProjectUsageChartsState } from './useProjectUsageChartsState';
+import { useMemo, useCallback, useEffect, useState } from 'react';
+import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
+import en from './en.json';
+import de from './de.json';
+import type { Payload as TooltipPayload } from 'recharts/types/component/DefaultTooltipContent';
+import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
+
+export type ChartTooltipPayload = TooltipPayload;
+
+export type ChartTooltipProps = TooltipContentProps;
+
+export type ProjectUsageChartsProps = {
+  projectId: number;
+};
+
+export const CHART_COLORS = {
+  sessions: { base: 'var(--chart-sessions)', active: 'var(--chart-sessions-active)' },
+  minutes: { base: 'var(--chart-minutes)', active: 'var(--chart-minutes-active)' },
+  spend: 'var(--chart-spend)',
+};
+
+export const TOOLTIP_CONTAINER_CLASS =
+  'rounded-lg border border-border bg-surface/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
+
+export const TOOLTIP_DOT_CLASS = 'h-2 w-2 rounded-full';
+
+export const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-muted';
+
+export const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
+
+export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProps) {
+  const { t } = useTranslations({ en, de });
+  const formatNumber = useNumberFormatter();
+  const formatDate = useDateTimeFormatter({ showTime: false });
+  const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
+  const [canRenderCharts, setCanRenderCharts] = useState(false);
+
+  useEffect(() => {
+    setCanRenderCharts(true);
+  }, []);
+
+  const chartData = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    return data.timeSeries.map((point) => ({
+      date: (() => {
+        const parsed = new Date(point.date);
+        if (Number.isNaN(parsed.getTime())) {
+          return point.date;
+        }
+        return formatDate(parsed);
+      })(),
+      minutes: point.minutes,
+      sessions: point.sessions,
+      spend: dbCurrencyToUserCurrency(point.spend, data.summary.minorUnit),
+    }));
+  }, [data, formatDate]);
+
+  const topResources = data?.topResources ?? [];
+
+  const renderTimeSeriesTooltip = useCallback(
+    (tooltipProps: ChartTooltipProps) => {
+      const { active, payload, label } = tooltipProps;
+      const typedPayload = (payload ?? []) as ChartTooltipPayload[];
+
+      if (!active || typedPayload.length === 0 || label == null) {
+        return null;
+      }
+
+      return (
+        <div className={TOOLTIP_CONTAINER_CLASS}>
+          <p className={TOOLTIP_LABEL_CLASS}>{label}</p>
+          <div className="mt-2 space-y-1">
+            {typedPayload.map((entry, index) => {
+              const numericValue = typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0);
+              const isSpend = entry.dataKey === 'spend';
+              const formattedValue =
+                isSpend && data ? `${data.summary.currency} ${formatNumber(numericValue)}` : formatNumber(numericValue);
+
+              return (
+                <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
+                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? 'var(--muted)' }} />
+                  <span className="text-muted">{entry.name}</span>
+                  <span className={TOOLTIP_VALUE_CLASS}>{formattedValue}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    },
+    [data, formatNumber],
+  );
+
+  const renderTopResourcesTooltip = useCallback(
+    (tooltipProps: ChartTooltipProps) => {
+      const { active, payload, label } = tooltipProps;
+      const typedPayload = (payload ?? []) as ChartTooltipPayload[];
+
+      if (!active || typedPayload.length === 0 || label == null) {
+        return null;
+      }
+
+      return (
+        <div className={TOOLTIP_CONTAINER_CLASS}>
+          <p className={TOOLTIP_LABEL_CLASS}>{label}</p>
+          <div className="mt-2 space-y-1">
+            {typedPayload.map((entry, index) => {
+              const numericValue = typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0);
+              const value =
+                entry.dataKey === 'spend' && data
+                  ? `${data.summary.currency} ${formatNumber(
+                      dbCurrencyToUserCurrency(numericValue, data.summary.minorUnit),
+                    )}`
+                  : formatNumber(numericValue);
+
+              return (
+                <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
+                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? 'var(--muted)' }} />
+                  <span className="text-muted">{entry.name}</span>
+                  <span className={TOOLTIP_VALUE_CLASS}>{value}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    },
+    [data, formatNumber],
+  );
+  return {
+    t,
+    formatNumber,
+    data,
+    isLoading,
+    canRenderCharts,
+    chartData,
+    topResources,
+    renderTimeSeriesTooltip,
+    renderTopResourcesTooltip,
+  } as const;
+}
 
 export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   const {

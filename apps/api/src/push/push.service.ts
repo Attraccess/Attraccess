@@ -2,22 +2,50 @@
 // auto-generated on first use; admins can override them (which invalidates all subscriptions).
 // FEATURE: Push notification foundation
 import { PushSubscription } from '@attraccess/database-entities';
+
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
+
 import { Repository } from 'typeorm';
+
 import * as webpush from 'web-push';
+
 import { PUSH_KEYS, PUSH_PARENT } from '../settings/constants';
+
 import { SettingsStoreService } from '../settings/settings-store.service';
+
 import { SettingsService } from '../settings/settings.service';
+
 import { CreatePushSubscriptionDto } from './dtos/createPushSubscription.dto';
+
 import { sendToSubscription as sendToSubscriptionImplementation } from './push-delivery';
-import {
-  DEFAULT_VAPID_SUBJECT,
-  PushNotificationPayload,
-  VAPID_PRIVATE_KEY_BYTES,
-  VAPID_PUBLIC_KEY_BYTES,
-  VapidKeys,
-} from './push.service.definitions';
+
+// Generic Web Push (VAPID) sender. VAPID keys live in the settings table and are
+// auto-generated on first use; admins can override them (which invalidates all subscriptions).
+// FEATURE: Push notification foundation
+
+export interface PushNotificationPayload {
+  title: string;
+  body: string;
+  url?: string;
+  tag?: string;
+  icon?: string;
+}
+
+export interface VapidKeys {
+  publicKey: string;
+  privateKey: string;
+}
+
+export // Fallback VAPID subject when no app URL is configured. The subject is contact
+// information for push-service operators, not a functional endpoint.
+const DEFAULT_VAPID_SUBJECT = 'mailto:admin@localhost';
+
+export // Uncompressed P-256 public key (0x04 prefix + 2x32 bytes) and 32-byte private scalar.
+const VAPID_PUBLIC_KEY_BYTES = 65;
+
+export const VAPID_PRIVATE_KEY_BYTES = 32;
 
 // Fallback VAPID subject when no app URL is configured. The subject is contact
 // information for push-service operators, not a functional endpoint.
@@ -184,11 +212,3 @@ export class PushService {
     );
   }
 }
-
-export {
-  DEFAULT_VAPID_SUBJECT,
-  PushNotificationPayload,
-  VAPID_PRIVATE_KEY_BYTES,
-  VAPID_PUBLIC_KEY_BYTES,
-  VapidKeys,
-} from './push.service.definitions';

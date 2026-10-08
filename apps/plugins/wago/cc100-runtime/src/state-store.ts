@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { type RuntimeState, type StateStore } from './runtime-types';
+import { type RuntimeState, type StateStore } from './runtime/types';
 
 export class JsonStateStore implements StateStore {
   private saveQueue: Promise<void> = Promise.resolve();

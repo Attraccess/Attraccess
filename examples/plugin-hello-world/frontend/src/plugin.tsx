@@ -6,32 +6,216 @@
 //   - calls `getRoutes()` to merge the plugin's pages into the app router,
 //   - calls `getSidebarGroups()` to declare the plugin's navigation group, and
 //   - calls `getSidebarItems()` to add navigation entries to the app sidebar.
+
+export // The context shape the host documents for both MQTT slots.
+interface MqttServerSlotContext {
+  mqttServerId: number;
+  [key: string]: unknown;
+}
 // See ../vite.config.ts for the build.
 //
+
+export // Shared shell so both pages get the title, intro and cross-links. Tailwind
+// utility classes (`text-default-*`, `border-default-*`, …) resolve against the
+// host's compiled stylesheet because the plugin renders inside the host DOM, so
+// spacing and colours match the rest of the app in both light and dark mode.
+function PluginShell({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="hw:flex hw:flex-col hw:gap-6 hw:p-6 hw:max-w-4xl hw:mx-auto">
+      <div className="hw:flex hw:items-center hw:gap-3">
+        <HandIcon className="hw:w-6 hw:h-6 hw:text-primary" />
+        <h1 className="hw:text-2xl hw:font-semibold hw:text-default-800">{title}</h1>
+      </div>
+      <nav className="hw:flex hw:gap-2">
+        <Button as={Link} to="/hello-world" variant="ghost" size="sm" data-cy="hello-world-nav-greetings">
+          Greetings
+        </Button>
+        <Button
+          as={Link}
+          to="/hello-world/capabilities"
+          variant="ghost"
+          size="sm"
+          data-cy="hello-world-nav-capabilities"
+        >
+          Capabilities
+        </Button>
+      </nav>
+      {children}
+    </div>
+  );
+}
+
+export // The SDK's ready-made client: the host's API origin, the session cookie and
+// JSON/error handling are already wired up, so plugins never build their own.
+const api = createPluginApiClient('/api/hello-world');
+
+export // Host slot ids exposed by the MQTT UI. These are documented host strings (the
+// SDK is vendor-agnostic and does not export them, and the host owns them in
+// apps/frontend, which a plugin cannot import — so a plugin restates them, the
+// same way it restates a route `path` it links to). Both slots receive
+// `{ mqttServerId }`, declared here so each `render` is typed end-to-end with
+// no runtime casting.
+const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
+
+export const MQTT_SERVER_LIST_ROW_SLOT = 'mqtt.server.list.row';
+
+export // Page 2: a static showcase of the capabilities the example exercises.
+function CapabilitiesPage() {
+  const items: { title: string; body: string; icon: ComponentType<{ className?: string }> }[] = [
+    { title: 'Backend controller', body: 'Adds GET /hello-world/greetings to the host API.', icon: ServerIcon },
+    {
+      title: 'Injected repository',
+      body: "Reads users via context.getRepository('User') (needs READ_USERS).",
+      icon: DatabaseIcon,
+    },
+    {
+      title: 'Typed event handler',
+      body: 'Subscribes to RESOURCE_USAGE_STARTED via context.onEvent (needs LISTEN_EVENTS).',
+      icon: BellIcon,
+    },
+    { title: 'Frontend route', body: 'Registers the /hello-world pages through getRoutes().', icon: RouteIcon },
+    {
+      title: 'Sidebar entry',
+      body: 'Contributes this navigation item through getSidebarItems().',
+      icon: PanelLeftIcon,
+    },
+    {
+      title: 'Embedded slots',
+      body: 'Injects UI into the MQTT detail + list views via getSlotContributions().',
+      icon: PlugIcon,
+    },
+  ];
+
+  return (
+    <PluginShell title="Hello World — Capabilities">
+      <div data-cy="hello-world-capabilities-page" className="hw:grid hw:gap-4 hw:sm:grid-cols-2 hw:xl:grid-cols-3">
+        {items.map((item) => (
+          <Card key={item.title} className="hw:border hw:border-default-200 hw:dark:border-default-100">
+            <Card.Header className="hw:flex hw:flex-row hw:items-center hw:gap-2">
+              <item.icon className="hw:w-5 hw:h-5 hw:text-primary" />
+              <p className="hw:text-base hw:font-semibold hw:text-default-700">{item.title}</p>
+            </Card.Header>
+            <Card.Content>
+              <p className="hw:text-sm hw:text-default-500">{item.body}</p>
+            </Card.Content>
+          </Card>
+        ))}
+      </div>
+    </PluginShell>
+  );
+}
+
+export // Page 1: calls the example backend endpoint and renders the live result.
+function HelloWorldPage() {
+  const [greetings, setGreetings] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .request<{ greetings: string[] }>('/greetings')
+      .then((data) => setGreetings(data.greetings))
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <PluginShell title="Hello World">
+      <Card data-cy="hello-world-plugin-page" className="hw:border hw:border-default-200 hw:dark:border-default-100">
+        <Card.Header className="hw:flex hw:flex-col hw:items-start hw:gap-1">
+          <p className="hw:text-base hw:font-semibold hw:text-default-700">Greetings from the backend</p>
+          <p className="hw:text-sm hw:text-default-500">
+            Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads host users
+            through an injected repository (needs the <code>READ_USERS</code> permission).
+          </p>
+        </Card.Header>
+        <Card.Content>
+          {loading && (
+            <div className="hw:flex hw:items-center hw:gap-2 hw:text-default-500">
+              <Spinner size="sm" /> Loading…
+            </div>
+          )}
+          {error && (
+            <Alert status="danger">
+              <AlertContent>
+                <AlertDescription>Failed to load greetings: {error}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+          {!loading && !error && (
+            <ul data-cy="hello-world-greetings" className="hw:flex hw:flex-col hw:gap-2">
+              {greetings.map((greeting) => (
+                <li key={greeting}>
+                  <Chip color="accent" variant="soft">
+                    {greeting}
+                  </Chip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card.Content>
+      </Card>
+    </PluginShell>
+  );
+}
+
+export // Embedded into the MQTT server detail view through the generic slot mechanism.
+// Reads the host-supplied context to scope itself to the selected server.
+function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
+  return (
+    <Card
+      data-cy="hello-world-mqtt-detail-slot"
+      className="hw:w-full hw:border hw:border-default-200 hw:dark:border-default-100"
+    >
+      <Card.Header className="hw:flex hw:flex-row hw:items-center hw:gap-2">
+        <PlugIcon className="hw:w-5 hw:h-5 hw:text-primary" />
+        <p className="hw:text-base hw:font-semibold hw:text-default-700">Hello World plugin extension</p>
+      </Card.Header>
+      <Card.Content>
+        <p className="hw:text-sm hw:text-default-500">
+          This card is injected into the MQTT server detail slot via <code>getSlotContributions()</code> — no core code
+          knows about it. It is scoped to server{' '}
+          <Chip color="accent" variant="soft">
+            #{mqttServerId}
+          </Chip>
+          , passed in through the slot context.
+        </p>
+      </Card.Content>
+    </Card>
+  );
+}
+
+export // Embedded into each MQTT server list row through the per-row slot.
+function MqttServerListBadge({ mqttServerId }: { mqttServerId: number }) {
+  return (
+    <Chip data-cy={`hello-world-mqtt-list-slot-${mqttServerId}`} color="accent" variant="soft">
+      <PlugIcon className="hw:w-3.5 hw:h-3.5" />
+      plugin
+    </Chip>
+  );
+}
 // RECOMMENDED: build your UI with the host's own libraries so plugins look
 // native and inherit light/dark theming for free. The host shares `@heroui/react`
 // (its component kit) and we share `lucide-react` (its icon set) through module
 // federation — see ../vite.config.ts. Importing them here means the host serves
 // the single copy it already ships, so the plugin bundle stays tiny and every
 // HeroUI component picks up the host's active theme automatically.
-import './styles.css';
-import { HandIcon, PlugIcon } from 'lucide-react';
 import type {
-  AttraccessFrontendPlugin,
-  AttraccessFrontendPluginAuthData,
-  PluginSidebarGroup,
-  PluginSidebarItem,
-  PluginSlotContribution,
-  RouteConfig,
+    AttraccessFrontendPlugin,
+    AttraccessFrontendPluginAuthData,
+    PluginSidebarGroup,
+    PluginSidebarItem,
+    PluginSlotContribution,
+    RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
+import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
+import { Alert, AlertContent, AlertDescription, Button, Card, Chip, Spinner } from '@heroui/react';
+import { BellIcon, DatabaseIcon, HandIcon, PanelLeftIcon, PlugIcon, RouteIcon, ServerIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { useEffect, useState } from 'react';
 import type { IPluginStore } from 'react-pluggable';
-import { HelloWorldPage } from './plugin.helpers';
-import { CapabilitiesPage } from './plugin.helpers';
-import { MQTT_SERVER_DETAIL_SLOT } from './plugin.state';
-import { MQTT_SERVER_LIST_ROW_SLOT } from './plugin.state';
-import { MqttServerSlotContext } from './plugin.mqtt-server-slot-context';
-import { MqttServerDetailExtension } from './plugin.helpers';
-import { MqttServerListBadge } from './plugin.helpers';
+import { Link } from 'react-router-dom';
+import './styles.css';
 
 // The SDK's ready-made client: the host's API origin, the session cookie and
 // JSON/error handling are already wired up, so plugins never build their own.

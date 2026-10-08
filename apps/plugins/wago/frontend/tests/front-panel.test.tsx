@@ -10,8 +10,8 @@ import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
 import { FrontPanel } from '../src/front-panel/FrontPanel';
 import { addDevice } from '../src/front-panel/model';
 import { useFrontPanel } from '../src/front-panel/useFrontPanel';
-import { DIGITAL_TERMINALS } from './../../backend/configuration-digital';
-import { updateTerminal } from './../src/front-panel/model';
+import { DIGITAL_TERMINALS } from '../../backend/configuration/digital';
+import { updateTerminal } from '../src/front-panel/model';
 
 const api = vi.hoisted(() => ({
   getDraft: vi.fn(),
@@ -23,8 +23,8 @@ const api = vi.hoisted(() => ({
   manual: vi.fn(),
   diagnostics: vi.fn(),
 }));
-vi.mock('../src/api', async (original) => ({
-  ...(await original<typeof import('../src/api')>()),
+vi.mock('../src/api/client', async (original) => ({
+  ...(await original<typeof import('../src/api/client')>()),
   getDraft: api.getDraft,
   getConfigurationBaseline: api.baseline,
   saveDraft: api.save,
@@ -33,7 +33,7 @@ vi.mock('../src/api', async (original) => ({
   publishConfiguration: api.publish,
   manualCommand: api.manual,
 }));
-vi.mock('../src/diagnostics', () => ({ useWagoDiagnostics: () => api.diagnostics() }));
+vi.mock('../src/diagnostics/diagnostics', () => ({ useWagoDiagnostics: () => api.diagnostics() }));
 
 const snapshot = {
   version: 1,

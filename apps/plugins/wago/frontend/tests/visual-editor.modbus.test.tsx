@@ -7,10 +7,10 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { validateEditorSnapshot } from '../../backend/configuration-editor';
+import { validateEditorSnapshot } from '../../backend/configuration/editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
-import type { WagoConfigurationSnapshot } from '../src/api';
-import { ConfigurationEditor } from '../src/ConfigurationEditor';
+import type { WagoConfigurationSnapshot } from '../src/api/client';
+import { ConfigurationEditor } from '../src/configuration/ConfigurationEditor';
 import { diagnosticsFixture, resetTestFixture } from './visual-editor.setup.test-fixture.helpers';
 import { external, section } from './visual-editor.test.external.helpers';
 

@@ -1,7 +1,282 @@
-import { ResourceUsage } from '@attraccess/react-query-client';
+import {
+  ResourceUsage,
+  AnalyticsService,
+  useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
+} from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
-import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
-import { useResourceUsageExportState } from './useResourceUsageExportState';
+import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer/index';
+import { useMemo, useCallback, useEffect, useState } from 'react';
+import {
+  combinedOperatingDurationStatus,
+  attributedDurationByResourceAndUsage,
+  mergeOperatingDurationSummaries,
+  operatingDurationWindows,
+} from './operating-duration';
+import { useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import de from './de.json';
+import en from './en.json';
+import { useQuery } from '@tanstack/react-query';
+import type { OperatingDurationSummary } from './operating-duration';
+
+export function durationMsForSession(item: ResourceUsage, asOf: Date): number {
+  const now = new Date();
+  const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
+  return end - new Date(item.startTime).getTime();
+}
+
+export const RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST = 100;
+
+export function useResourceUsageExportStateInputs(props: ExportProps) {
+  const { t } = useTranslations({
+    de,
+    en,
+  });
+
+  const [fetchAll, setFetchAll] = useState(false);
+
+  const { data, status, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
+    useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
+      start: props.start.toISOString(),
+      end: props.end.toISOString(),
+    });
+
+  // ponytail: only fetch remaining pages after user clicks export
+  useEffect(() => {
+    if (fetchAll && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [fetchAll, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const resourceUsageExport = useMemo(() => data?.pages.flatMap((page) => page.data) ?? [], [data]);
+
+  const isFetchingAllPages = fetchAll && (hasNextPage || isFetchingNextPage);
+  const fetchStatus = status === 'success' && isFetchingAllPages ? 'pending' : status;
+
+  const resourceIds = useMemo(
+    () => [...new Set(resourceUsageExport.map((usage) => usage.resourceId))],
+    [resourceUsageExport],
+  );
+  const operatingDurationRanges = useMemo(
+    () => operatingDurationWindows(props.start, props.end),
+    [props.start, props.end],
+  );
+  const { data: operatingDurations, status: operatingDurationsStatus } = useQuery({
+    queryKey: ['resource-operating-durations', resourceIds, props.start, props.end],
+    queryFn: async ({ signal }) => {
+      const operatingDurations: Record<number, OperatingDurationSummary> = {};
+      for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
+        for (const range of operatingDurationRanges) {
+          signal.throwIfAborted();
+          const request = AnalyticsService.getResourceOperatingDurations({
+            requestBody: {
+              resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
+              start: range.start.toISOString(),
+              end: range.end.toISOString(),
+            },
+          });
+          const cancelRequest = () => request.cancel();
+          signal.addEventListener('abort', cancelRequest, { once: true });
+          try {
+            mergeOperatingDurationSummaries(
+              operatingDurations,
+              (await request) as Record<number, OperatingDurationSummary>,
+            );
+          } finally {
+            signal.removeEventListener('abort', cancelRequest);
+          }
+        }
+      }
+      return operatingDurations;
+    },
+    enabled: resourceIds.length > 0 && !isFetchingAllPages,
+  });
+  const attributedDurations = useMemo(
+    () => attributedDurationByResourceAndUsage(operatingDurations),
+    [operatingDurations],
+  );
+
+  const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
+  const formatUsageDuration = useNumberFormatter();
+
+  const [activeOptions, setActiveOptions] = useState<string[]>([]);
+
+  const options = useMemo(() => {
+    return [
+      {
+        label: t('options.groupByUserAndResource'),
+        key: 'groupByUserAndResource',
+        value: activeOptions.includes('groupByUserAndResource'),
+      },
+    ];
+  }, [activeOptions, t]);
+
+  const setOption = useCallback((key: string, value: boolean) => {
+    setActiveOptions((prev) => {
+      if (value) {
+        return [...prev, key];
+      }
+      return prev.filter((k) => k !== key);
+    });
+  }, []);
+  return {
+    t,
+    fetchAll,
+    setFetchAll,
+    data,
+    status,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    resourceUsageExport,
+    isFetchingAllPages,
+    fetchStatus,
+    resourceIds,
+    operatingDurationRanges,
+    operatingDurations,
+    operatingDurationsStatus,
+    attributedDurations,
+    formatDateTimeFull,
+    formatUsageDuration,
+    activeOptions,
+    setActiveOptions,
+    options,
+    setOption,
+    props,
+  } as const;
+}
+
+export function useResourceUsageExportStateColumns(model: ReturnType<typeof useResourceUsageExportStateInputs>) {
+  const { t, formatDateTimeFull, formatUsageDuration, props, operatingDurations, attributedDurations } = model;
+  const columns = useMemo(() => {
+    return [
+      {
+        label: t('columns.resourceId'),
+        key: 'resourceId',
+        getter: (item) => item.resource?.id,
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.resourceName'),
+        key: 'resourceName',
+        getter: (item) => item.resource?.name,
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.userId'),
+        key: 'userId',
+        getter: (item) => item.user?.id,
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.username'),
+        key: 'username',
+        getter: (item) => item.user?.username,
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.startTimeISO'),
+        key: 'startTimeISO',
+        getter: (item) => item.startTime,
+      },
+      {
+        label: t('columns.startTime'),
+        key: 'startTime',
+        getter: (item) => formatDateTimeFull(item.startTime),
+      },
+      {
+        label: t('columns.endTimeISO'),
+        key: 'endTimeISO',
+        getter: (item) => item.endTime,
+      },
+      {
+        label: t('columns.endTime'),
+        key: 'endTime',
+        getter: (item) => formatDateTimeFull(item.endTime),
+      },
+      {
+        label: t('columns.usageInMinutes'),
+        key: 'usageInMinutes',
+        getter: (item) => formatUsageDuration(item.usageInMinutes),
+      },
+      {
+        label: t('columns.usageInHours'),
+        key: 'usageInHours',
+        getter: (item) => formatUsageDuration(item.usageInMinutes / 60),
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.sessionDurationMs'),
+        key: 'sessionDurationMs',
+        getter: (item) => durationMsForSession(item, props.end),
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.operatingDurationMs'),
+        key: 'operatingDurationMs',
+        getter: (item) =>
+          operatingDurations?.[item.resourceId]?.operatingDataAvailable
+            ? (attributedDurations.get(item.resourceId)?.get(item.id) ?? 0)
+            : '',
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.durationStatus'),
+        key: 'durationStatus',
+        getter: (item) =>
+          combinedOperatingDurationStatus(operatingDurations?.[item.resourceId], {
+            provisional: t('status.provisional'),
+            unavailable: t('status.unavailable'),
+          }),
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.startNotes'),
+        key: 'startNotes',
+        getter: (item) => item.startNotes ?? '',
+      },
+      {
+        label: t('columns.endNotes'),
+        key: 'endNotes',
+        getter: (item) => item.endNotes ?? '',
+      },
+      {
+        label: t('columns.supervisorId'),
+        key: 'supervisorId',
+        getter: (item) => item.supervisorUserId ?? '',
+      },
+      {
+        label: t('columns.supervisorUsername'),
+        key: 'supervisorUsername',
+        getter: (item) => item.supervisorUser?.username ?? '',
+      },
+    ] as ColumnDefinition<ResourceUsage>[];
+  }, [attributedDurations, formatUsageDuration, formatDateTimeFull, operatingDurations, props.end, t]);
+  return { ...model, columns } as const;
+}
+
+export function useResourceUsageExportStateOutput(model: ReturnType<typeof useResourceUsageExportStateColumns>) {
+  return {
+    setFetchAll: model.setFetchAll,
+    refetch: model.refetch,
+    resourceUsageExport: model.resourceUsageExport,
+    isFetchingAllPages: model.isFetchingAllPages,
+    fetchStatus: model.fetchStatus,
+    resourceIds: model.resourceIds,
+    operatingDurationsStatus: model.operatingDurationsStatus,
+    options: model.options,
+    setOption: model.setOption,
+    columns: model.columns,
+  } as const;
+}
+
+export function useResourceUsageExportState(props: ExportProps) {
+  const useResourceUsageExportStateInputsModel = useResourceUsageExportStateInputs(props);
+  const useResourceUsageExportStateColumnsModel = useResourceUsageExportStateColumns(
+    useResourceUsageExportStateInputsModel,
+  );
+  return useResourceUsageExportStateOutput(useResourceUsageExportStateColumnsModel);
+}
 
 export function ResourceUsageExport(props: ExportProps) {
   const {

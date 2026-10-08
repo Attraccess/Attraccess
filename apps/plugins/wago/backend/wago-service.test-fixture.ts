@@ -1,10 +1,10 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { WagoController } from './wago-controller.entity';
-import { WagoEnrollment } from './wago-enrollment.entity';
-import { WagoService } from './wago.service';
-import { WagoSettings } from './wago-settings.entity';
-import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
-import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { WagoController } from './controllers/entity';
+import { WagoEnrollment } from './controllers/enrollment.entity';
+import { WagoService } from './controllers/service';
+import { WagoSettings } from './controllers/settings.entity';
+import { WagoConfigurationDraft } from './configuration/draft.entity';
+import { WagoConfigurationRevision } from './configuration/revision.entity';
 export const controller = (): WagoController => ({
   id: 1,
   hardwareId: 'cc100-01',

@@ -1,5 +1,5 @@
 import { registerSsoControllerFixture } from './sso.controller.sso-controller.test-fixture';
-import * as discovery from './sso-discovery-request';
+import * as discovery from './providers/discovery-client';
 import { SSOProviderType, AuthenticationDetail, AuthenticationType, SSOProvider } from '@attraccess/database-entities';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';

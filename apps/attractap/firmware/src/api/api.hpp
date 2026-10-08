@@ -1,14 +1,346 @@
 #pragma once
 
-#include "api_state.hpp"
-#include <functional>
-#include <atomic>
-
-#include <ArduinoJson.h>
 #include <string>
 #include <vector>
+#include <cstdint>
+#include <cstddef>
+
+struct ApiResources
+{
+    static constexpr size_t MAX_RESOURCES = 10;
+
+    static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
+
+    // 32 username characters plus the terminator.
+    static constexpr size_t MAX_USERNAME_LEN = 33;
+
+    static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
+
+    static constexpr size_t MAX_INTRODUCERS = 8;
+
+    static constexpr size_t MAX_FLOW_BUTTONS = 7;
+
+    static constexpr size_t MAX_FLOW_BUTTON_LABEL_LEN = 32;
+
+    static constexpr size_t MAX_FLOW_BUTTON_ID_LEN = 48;
+
+    static constexpr size_t MAX_PROJECTS_PER_PAGE = 4;
+
+    static constexpr size_t MAX_FORMS_PER_REQUEST = 4;
+
+    static constexpr size_t MAX_FORM_PAGE_FIELDS = 1;
+
+    static constexpr size_t MAX_FORM_PAGE_ERRORS = MAX_FORM_PAGE_FIELDS;
+
+    static constexpr size_t MAX_SELECT_OPTIONS = 12;
+
+struct FlowButton
+    {
+        char id[MAX_FLOW_BUTTON_ID_LEN];
+        char label[MAX_FLOW_BUTTON_LABEL_LEN];
+    };
+
+struct ResourceBrief
+    {
+        uint32_t id;
+        uint8_t type; // 0: machine, 1: door (encode from API strings)
+        bool separateUnlockAndUnlatch;
+        bool allowTakeOver;
+        bool accessKnown = false;
+        bool canManageMaintenance = false;
+        bool hasIntroduction = false;
+        bool isIntroducer = false;
+        bool canManageResource = false;
+        bool requiresSupervisor = false;
+        char name[MAX_RESOURCE_NAME_LEN];
+        std::string description;
+        bool hasActiveUsage;
+        uint32_t activeUsageId = 0;
+        bool isUnderMaintenance;
+        bool isHealthy;
+        char healthReason[MAX_HEALTH_REASON_LEN];
+        char activeUser[MAX_USERNAME_LEN];
+        uint32_t activeStartEpoch;          // seconds since epoch (UTC)
+        int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
+        std::vector<std::string> introducers;
+        uint8_t flowButtonCount;
+        FlowButton flowButtons[MAX_FLOW_BUTTONS];
+    };
+
+struct ResourceList
+    {
+        uint32_t requestId = 0;
+        uint16_t count;
+        char authenticatedUsername[MAX_USERNAME_LEN] = {};
+        ResourceBrief items[MAX_RESOURCES];
+    };
+
+struct Project
+    {
+        uint32_t id;
+        std::string name;
+    };
+
+struct ProjectsOfUserResponse
+    {
+        uint16_t count;
+        uint32_t page = 1;
+        uint32_t limit = MAX_PROJECTS_PER_PAGE;
+        uint32_t total = 0;
+        bool hasMore = false;
+        Project items[MAX_PROJECTS_PER_PAGE];
+    };
+
+struct UsageStats
+    {
+        uint32_t resourceId = 0;
+        uint32_t usageId = 0;
+        int64_t operatingDurationMs = -1; // -1 means no operating data
+        int8_t isOperating = -1; // -1 unknown, 0 idle, 1 running
+        struct MeterValue {
+            std::string name;
+            std::string value;
+            int64_t creditsPerUnit = -1; // -1 means no captured rate was provided
+            std::string formattedRate;
+        };
+        std::vector<MeterValue> meters;
+    };
+
+struct ActionResult {
+        std::string type;
+        bool success = false;
+        uint32_t requestId = 0;
+        std::string error;
+        bool sumUpEnabled = false;
+        std::string billingTotal{};
+    };
+};
+
+struct ApiForms : public ApiResources
+{
+enum class ResourceUsageFormActionType : uint8_t
+    {
+        UNKNOWN,
+        START,
+        END,
+        TAKEOVER,
+    };
+
+enum class ResourceUsageFormFieldType : uint8_t
+    {
+        UNKNOWN,
+        TEXT,
+        NUMBER,
+        BOOLEAN,
+        SELECT,
+    };
+
+struct ResourceUsageFormFieldOptions
+    {
+        struct
+        {
+            bool hasPlaceholder = false;
+            std::string placeholder;
+            bool multiline = false;
+        } text;
+        struct
+        {
+            bool hasMin = false;
+            double min = 0;
+            bool hasMax = false;
+            double max = 0;
+            bool hasStep = false;
+            double step = 0;
+        } number;
+        struct
+        {
+            uint8_t count = 0;
+            std::string values[MAX_SELECT_OPTIONS];
+        } select;
+    };
+
+struct ResourceUsageFormField
+    {
+        uint32_t id = 0;
+        ResourceUsageFormFieldType type = ResourceUsageFormFieldType::UNKNOWN;
+        bool isRequired = false;
+        std::string name;
+        std::string description;
+        ResourceUsageFormFieldOptions options;
+        bool hasValue = false;
+        std::string value;
+    };
+
+struct ResourceUsageFormMeta
+    {
+        uint32_t id = 0;
+        std::string name;
+        uint32_t fieldCount = 0;
+    };
+
+struct ResourceUsageFormRequest
+    {
+        uint32_t requestId = 0;
+        uint32_t resourceId = 0;
+        ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
+        std::string resourceName;
+        uint8_t formCount = 0;
+        ResourceUsageFormMeta forms[MAX_FORMS_PER_REQUEST];
+    };
+
+struct ResourceUsageFormFieldsPage
+    {
+        uint32_t resourceId = 0;
+        ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
+        uint32_t formId = 0;
+        uint32_t offset = 0;
+        uint32_t totalFieldCount = 0;
+        uint8_t fieldCount = 0;
+        ResourceUsageFormField fields[MAX_FORM_PAGE_FIELDS];
+    };
+
+struct FormSubmissionAnswer
+    {
+        uint32_t fieldId = 0;
+        enum class ValueType : uint8_t
+        {
+            STRING,
+            NUMBER,
+            BOOLEAN,
+        } type = ValueType::STRING;
+        std::string stringValue;
+        double numberValue = 0;
+        bool boolValue = false;
+    };
+
+struct FormPageSubmission
+    {
+        uint32_t formId = 0;
+        uint32_t offset = 0;
+        uint8_t answerCount = 0;
+        FormSubmissionAnswer answers[MAX_FORM_PAGE_FIELDS];
+    };
+
+struct ResourceUsageFormPageResult
+    {
+        uint32_t resourceId = 0;
+        ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
+        uint32_t formId = 0;
+        uint32_t offset = 0;
+        bool valid = false;
+        uint8_t errorCount = 0;
+        struct Error
+        {
+            uint32_t fieldId = 0;
+            std::string message;
+        } errors[MAX_FORM_PAGE_ERRORS];
+    };
+};
+
+struct ApiCards : public ApiForms
+{
+struct CardAuthenticationDetailsResponse
+    {
+        uint8_t keyNo;
+        uint8_t keyBytes[16];
+        uint8_t keyLen;
+        std::string error;
+        std::string username;
+        bool canManageResource;
+        bool hasIntroduction;
+        bool isIntroducer;
+        // Two-card supervision (ATT-493). supervisionMode is the resource policy; requiresSupervisor
+        // is the server's verdict for this user (true => starting a session requires supervisor
+        // approval; authentication itself still unlocks the resource details screen).
+        std::string supervisionMode;
+        bool requiresSupervisor;
+    };
+
+struct SupervisionRequestResult
+    {
+        bool success = false;
+        std::string error;
+        uint32_t timeoutMs = 0;
+        uint8_t supervisorCount = 0;
+        std::string supervisorNames[MAX_INTRODUCERS];
+    };
+
+struct SupervisorCardAuthenticationResponse
+    {
+        uint8_t keyNo = 0;
+        uint8_t keyBytes[16] = {0};
+        uint8_t keyLen = 0;
+        std::string error;
+        std::string username;
+    };
+
+struct SupervisionResolvedResult
+    {
+        bool success = false;
+        std::string error;
+        std::string supervisorUsername;
+    };
+
+struct SupervisionStartCommand
+    {
+        uint32_t resourceId = 0;
+        uint32_t timeoutMs = 0;
+        std::string requesterUsername;
+    };
+};
+
+#include <functional>
+#include <atomic>
+#include <ArduinoJson.h>
+
+struct ApiState : public ApiCards
+{
+protected:
+    bool loopIsEnabled = false;
+    unsigned long heartbeat_sent_at = 0;
+    std::function<void(const ResourceList &)> resourceListUpdateCallback;
+    std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
+    std::function<void(SupervisionStartCommand)> supervisionStartCallback;
+    std::function<void(SupervisionRequestResult)> supervisionRequestResultCallback;
+    std::function<void(SupervisorCardAuthenticationResponse)> supervisorCardAuthenticationResponseCallback;
+    std::function<void(SupervisionResolvedResult)> supervisionResolvedCallback;
+    std::function<void(std::string)> deviceNameCallback;
+    std::function<void(uint8_t)> ledBrightnessChangedCallback;
+    uint32_t lastRequestedProjectsOfUserPage = -1;
+    std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;
+    static constexpr size_t JSON_INBUF = 4608;
+    static constexpr size_t JSON_OUTBUF_SMALL = 256;
+    static constexpr size_t JSON_OUTBUF_AUTH = 1024;
+    uint32_t resourceListMessageCounter = 0;
+    uint32_t resourceListRevision = 0;
+    uint32_t nextRequestId = 0;
+    std::atomic<uint32_t> usageStatsRequestId{0};
+    std::function<void(const UsageStats &)> usageStatsCallback;
+    std::atomic<uint32_t> activeActionRequestId{0};
+    ResourceList resourceListScratch;
+    StaticJsonDocument<6144> inboundDoc;
+    ProjectsOfUserResponse projectsOfUserResponseScratch;
+    ResourceUsageFormRequest resourceFormsRequestScratch;
+    ResourceUsageFormFieldsPage resourceFormFieldsScratch;
+    ResourceUsageFormPageResult resourceFormPageResultScratch;
+    std::function<void(const ResourceUsageFormRequest &)> resourceFormsRequestCallback;
+    std::function<void(const ResourceUsageFormFieldsPage &)> resourceFormFieldsCallback;
+    std::function<void(const ResourceUsageFormPageResult &)> resourceFormPageResultCallback;
+    bool crashReportAwaitingAck = false;
+    bool crashReportSentCoredump = false;
+    std::function<void(std::string username)> enrollNewCardGetAvailableKeyNoCallback;
+    std::function<void(uint8_t keyNo, std::string key)> enrollNewCardCallback;
+    std::function<void(std::string error)> enrollNewCardErrorCallback;
+    std::function<void(std::string username, uint8_t keyNo, std::string key)> resetNfcCardCallback;
+    std::function<void(const char *title, const char *message)> errorCallback;
+    std::function<void(const ActionResult &)> actionResultCallback;
+    std::function<void(bool)> insufficientBalanceCallback;
+    std::function<void(int)> firmwareUpdateProgressCallback;
+    std::function<void(std::string availableVersion)> firmwareUpdateMetaCallback;
+};
+
 #include "../settings/settings.hpp"
-#include "state/state.hpp"
+#include "../state/state.hpp"
 #include "../logger/logger.hpp"
 #include "reader_transport.hpp"
 #include "../utils.hpp"

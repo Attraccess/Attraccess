@@ -1,20 +1,208 @@
-import { Controller, Optional } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Controller, Optional, Delete, Req, Res, Get, Query, Body, Post, UseGuards } from '@nestjs/common';
+
+import { ApiTags, ApiOkResponse, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+
 import { IdentityAuditService } from '../../audit/identity-audit.service';
+
 import { CookieConfigService } from '../../common/services/cookie-config.service';
-import { AuthSessionEndRoutesImplementation } from './auth-session-end.routes';
+
 import { SessionService } from './session.service';
-import { installInheritedMethods } from '../../common/inherited-implementation';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
+
+import { Response } from 'express';
+
+import { randomUUID } from 'node:crypto';
+
+import { CreateSessionResponse } from './auth.types';
+
+import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
 
 @ApiTags('Authentication')
 @Controller('/auth')
-export class AuthController extends AuthSessionEndRoutesImplementation {
+export class AuthController {
   constructor(
     protected readonly sessionService: SessionService,
     protected readonly cookieConfigService: CookieConfigService,
     @Optional() protected readonly identityAudit?: IdentityAuditService,
-  ) {
-    super();
+  ) {}
+
+  @Delete('/session')
+  @SessionAuth()
+  @ApiOperation({ summary: 'Logout and invalidate the current session', operationId: 'endSession' })
+  @ApiOkResponse({
+    description: 'The session has been deleted',
+    schema: {
+      type: 'object',
+      properties: {},
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  async endSession(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    // Get session token from cookie or header
+    const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
+    const headerToken = request.headers.authorization?.startsWith('Bearer ')
+      ? request.headers.authorization.substring(7)
+      : null;
+
+    const sessionToken = headerToken || cookieToken;
+
+    // Clear authentication cookie regardless of request type
+    await this.cookieConfigService.clearAuthCookie(response);
+
+    // Revoke session token if present
+    if (sessionToken) {
+      await this.sessionService.revokeSession(sessionToken);
+    }
+
+    // Passport clears request.user as part of logout, so retain the principal for the audit record.
+    const principal = {
+      userId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+    };
+    const logout = request.logout as unknown as (callback: (error?: Error) => void) => void;
+    await new Promise<void>((resolve, reject) => logout.call(request, (error) => (error ? reject(error) : resolve())));
+    await this.identityAudit?.record({
+      action: 'logout',
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: principal.userId,
+      authenticationMethod: principal.authenticationMethod,
+      apiTokenId: principal.apiTokenId,
+      subjectId: principal.userId,
+      details: {},
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    });
+  }
+
+  @Get('/session/refresh')
+  @SessionAuth()
+  @ApiOperation({ summary: 'Refresh the current session', operationId: 'refreshSession' })
+  @ApiOkResponse({
+    description: 'The session has been refreshed',
+    type: CreateSessionResponse,
+  })
+  async refreshSession(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Query('tokenLocation') tokenLocation: 'cookie' | 'body',
+  ): Promise<CreateSessionResponse> {
+    // Get current session token from cookie or header
+    const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
+    const headerToken = request.headers.authorization?.startsWith('Bearer ')
+      ? request.headers.authorization.substring(7)
+      : null;
+
+    const currentToken = headerToken || cookieToken;
+
+    if (!currentToken) {
+      // Create a new session if no current token exists
+      const sessionToken = await this.sessionService.createSession(request.user, {
+        userAgent: request.headers['user-agent'],
+        ipAddress: request.ip || request.connection.remoteAddress,
+      });
+
+      return {
+        user: request.user,
+        authToken: sessionToken,
+      };
+    }
+
+    // Refresh the session token
+    const newToken = await this.sessionService.refreshSession(currentToken);
+
+    if (!newToken) {
+      // If session refresh failed, create a new session
+      const sessionToken = await this.sessionService.createSession(request.user, {
+        userAgent: request.headers['user-agent'],
+        ipAddress: request.ip || request.connection.remoteAddress,
+      });
+
+      if (tokenLocation === 'cookie') {
+        await this.cookieConfigService.setAuthCookie(response, sessionToken);
+        return {
+          user: request.user,
+          authToken: '',
+        };
+      } else {
+        return {
+          user: request.user,
+          authToken: sessionToken,
+        };
+      }
+    }
+
+    if (tokenLocation === 'cookie') {
+      // Update cookie with new token
+      await this.cookieConfigService.setAuthCookie(response, newToken);
+      return {
+        user: request.user,
+        authToken: '',
+      };
+    } else {
+      // Return new token for programmatic clients
+      return {
+        user: request.user,
+        authToken: newToken,
+      };
+    }
+  }
+
+  @Post('/session/local')
+  @UseGuards(LoginRateLimitGuard)
+  @ApiOperation({ summary: 'Create a new session using local authentication', operationId: 'createSession' })
+  @ApiResponse({
+    status: 200,
+    description: 'The session has been created',
+    type: CreateSessionResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid credentials',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        username: { type: 'string' },
+        password: { type: 'string' },
+        twoFactorCode: { type: 'string' },
+        tokenLocation: { type: 'string', enum: ['cookie', 'body'] },
+      },
+    },
+  })
+  async createSession(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Body() body: { tokenLocation: 'cookie' | 'body'; twoFactorCode?: string },
+  ): Promise<CreateSessionResponse> {
+    // Create session token using SessionService
+    const sessionToken = await this.sessionService.createSession(request.user, {
+      userAgent: request.headers['user-agent'],
+      ipAddress: request.ip || request.connection.remoteAddress,
+    });
+
+    if (body.tokenLocation === 'cookie') {
+      // Set HTTP-only cookie for web browsers
+      await this.cookieConfigService.setAuthCookie(response, sessionToken);
+
+      // Return user data without token for web browsers
+      return {
+        user: request.user,
+        authToken: '', // Empty token for web browsers using cookies
+      };
+    } else {
+      // Return token in response body for programmatic clients
+      return {
+        user: request.user,
+        authToken: sessionToken,
+      };
+    }
   }
 }
-installInheritedMethods(AuthController, ['createSession', 'refreshSession', 'endSession']);

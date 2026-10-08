@@ -2,7 +2,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { randomUUID } from 'node:crypto';
 import { SettingsController } from '../settings/settings.controller';
 import { SettingsService } from '../settings/settings.service';
-import { AuditQueryDto } from './audit-query.dto';
+import { AuditQueryDto } from './dto/audit-query.dto';
 import { setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();

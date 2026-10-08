@@ -1,10 +1,10 @@
 #pragma once
 
-#include "display/fonts/attractap_fonts.hpp"
-#include "display/screens/IScreen.hpp"
-#include "display/theme.hpp"
-#include "display/shared/headerButton.hpp"
-#include "platform.hpp"
+#include "../fonts/attractap_fonts.hpp"
+#include "../screens/IScreen.hpp"
+#include "../theme.hpp"
+#include "headerButton.hpp"
+#include "../../platform.hpp"
 #include <algorithm>
 #include <functional>
 

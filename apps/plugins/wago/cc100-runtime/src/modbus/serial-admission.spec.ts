@@ -1,5 +1,5 @@
 import { type RuntimeState } from '../runtime';
-import { OutputController } from '../output-controller';
+import { OutputController } from '../outputs/controller';
 
 import { SerialAdmissionFixture, snapshot } from './serial-admission.test-utils';
 jest.mock('node:child_process', () => ({ ...jest.requireActual('node:child_process'), spawn: jest.fn() }));

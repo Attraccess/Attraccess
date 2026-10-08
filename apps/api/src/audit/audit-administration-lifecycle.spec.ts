@@ -7,7 +7,7 @@ import { InstalledNpmPlugin, NpmPluginAuditState } from '../plugin-system/npm-pl
 import { PluginController } from '../plugin-system/plugin.controller';
 import { PluginService } from '../plugin-system/plugin.service';
 import { SettingsController } from '../settings/settings.controller';
-import { projectAdministrationAuditEvent } from './audit-administration-policy';
+import { projectAdministrationAuditEvent } from './policies/administration';
 const req = { user: { id: 42, authenticationMethod: 'api-token', apiTokenId: 9 } } as AuthenticatedRequest;
 const secret = 'SECRET_MUST_NOT_BE_RECORDED';
 const plugin = {

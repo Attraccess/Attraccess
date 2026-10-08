@@ -28,8 +28,8 @@ const state = vi.hoisted(() => ({
   diagnostics: vi.fn(),
   validate: vi.fn(),
 }));
-vi.mock('../src/api', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../src/api')>()),
+vi.mock('../src/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/api/client')>()),
   getDraft: state.getDraft,
   getConfigurationBaseline: state.baseline,
   listPresets: vi.fn(async () => [

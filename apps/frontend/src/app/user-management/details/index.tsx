@@ -1,6 +1,426 @@
-import { useParams, useSearchParams } from 'react-router-dom';
-import { NotFound } from '../../not-found';
-import { UserDetails } from './UserDetails';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { NotFound } from '../../not-found/index';
+import { PageHeader } from '../../../components/pageHeader/index';
+import { UserPermissionForm } from './components/permissionsForm/index';
+import { SetPasswordForm } from './components/setPasswordForm/index';
+import { ChangeUsernameForm } from './components/changeUsername/index';
+import { ChangeEmailForm } from './components/changeEmail/index';
+import { Chip, ModalBody, ModalFooter, ModalHeader, ModalHeading, Separator, useOverlayState } from '@heroui/react';
+import {
+  AlertTriangleIcon,
+  KeyRoundIcon,
+  LinkIcon,
+  ListChecksIcon,
+  ShieldIcon,
+  UserIcon,
+  CreditCardIcon,
+} from 'lucide-react';
+import { FlatSection } from '../../../components/flatSection';
+import { Button } from '../../../components/button/index';
+import { StandardModal } from '../../../components/standardModal';
+import {
+  useRbacServiceListPermissions,
+  useRbacServiceListRoles,
+  useUsersServiceGetUserRoleAssignments,
+  ApiError,
+  SSOProvider,
+  SSOProviderType,
+  User,
+  useAuthenticationServiceGetAllSsoProviders,
+  useLicenseServiceGetLicenseInformation,
+  useUsersServiceDeleteUser,
+  useUsersServiceGetOneUserById,
+} from '@attraccess/react-query-client';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
+import { useMemo } from 'react';
+import en from './en.json';
+import de from './de.json';
+import { useToastMessage } from '../../../components/toastProvider';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import { useAuth } from '../../../hooks/useAuth';
+import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
+
+export function EffectivePermissionsSection({
+  userId,
+  t,
+}: {
+  userId: number;
+  t: ReturnType<typeof useTranslations>['t'];
+}) {
+  const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
+  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
+  const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
+  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
+
+  const effectivePermKeys = useMemo(() => {
+    if (!allRoles || !userRoles) return new Set<string>();
+    const assignedRoleIds = new Set(userRoles.map((ur) => ur.roleId));
+    const keys = new Set<string>();
+    for (const role of allRoles) {
+      if (!assignedRoleIds.has(role.id)) continue;
+      for (const rp of role.rolePermissions ?? []) {
+        keys.add(rp.permissionKey);
+      }
+    }
+    return keys;
+  }, [allRoles, userRoles]);
+
+  // Group effective permissions by category using the full permission list
+  const permsByCategory = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; description: string }[]>();
+    for (const perm of allPermissions ?? []) {
+      if (!effectivePermKeys.has(perm.key)) continue;
+      const cat = perm.category || t('effectivePermissions.uncategorized');
+      const bucket = map.get(cat) ?? [];
+      bucket.push(perm);
+      map.set(cat, bucket);
+    }
+    return map;
+  }, [allPermissions, effectivePermKeys, t]);
+
+  if (isLoadingRoles || isLoadingPerms || isLoadingUserRoles) {
+    return <p className="text-sm text-default-400">{t('effectivePermissions.loading')}</p>;
+  }
+
+  if (effectivePermKeys.size === 0) {
+    return <p className="text-sm text-default-400">{t('effectivePermissions.empty')}</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {[...permsByCategory.entries()].map(([category, perms], idx, arr) => (
+        <div key={category} className="flex flex-col gap-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">
+            {permissionCategory(category)}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {perms.map((p) => (
+              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={permissionDescription(p)}>
+                {permissionLabel(p)}
+              </Chip>
+            ))}
+          </div>
+          {idx < arr.length - 1 ? <Separator className="mt-1" /> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
+  const { t, tExists } = useTranslations({
+    en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
+  });
+
+  const navigate = useNavigate();
+  const toast = useToastMessage();
+  const { isOpen, open, setOpen } = useOverlayState();
+  const { user: me, hasPermission } = useAuth();
+
+  const { data: user } = useUsersServiceGetOneUserById({ id });
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: ssoProviders } = useAuthenticationServiceGetAllSsoProviders(undefined, {
+    enabled: license?.modules.includes('sso'),
+  });
+
+  const providersById = useMemo(
+    () => new Map((ssoProviders ?? []).map((provider: SSOProvider) => [provider.id, provider])),
+    [ssoProviders],
+  );
+  type AuthenticationDetailSummary = {
+    providerId?: number | null;
+    providerType?: string | null;
+    ssoSubject?: string | null;
+    type?: string | null;
+  };
+  type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
+    authenticationDetails?: AuthenticationDetailSummary[];
+  };
+  const ssoDetails = useMemo(
+    () =>
+      (user as UserWithAuthDetails | undefined)?.authenticationDetails?.filter(
+        (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
+      ) ?? [],
+    [user],
+  );
+
+  const ssoManagedProviders = useMemo(() => {
+    if (ssoDetails.length === 0) {
+      return [];
+    }
+
+    const labels = new Set<string>();
+
+    ssoDetails.forEach((detail) => {
+      if (!detail.providerId || !detail.providerType) {
+        return;
+      }
+
+      const provider = providersById.get(detail.providerId);
+      if (!provider) {
+        return;
+      }
+
+      const roleMappings =
+        detail.providerType === SSOProviderType.OIDC
+          ? provider.oidcConfiguration?.roleMappings
+          : detail.providerType === SSOProviderType.SAML
+            ? provider.samlConfiguration?.roleMappings
+            : undefined;
+
+      if (hasConfiguredPermissionMapping(roleMappings)) {
+        labels.add(provider.name ?? `${detail.providerType} #${detail.providerId}`);
+      }
+    });
+
+    return Array.from(labels);
+  }, [providersById, ssoDetails]);
+
+  const ssoManagedPermissionKeys = useMemo(() => {
+    const keys = new Set<string>();
+
+    ssoDetails.forEach((detail) => {
+      if (!detail.providerId || !detail.providerType) {
+        return;
+      }
+
+      const provider = providersById.get(detail.providerId);
+      if (!provider) {
+        return;
+      }
+
+      const roleMappings =
+        detail.providerType === SSOProviderType.OIDC
+          ? provider.oidcConfiguration?.roleMappings
+          : detail.providerType === SSOProviderType.SAML
+            ? provider.samlConfiguration?.roleMappings
+            : undefined;
+
+      getSsoManagedPermissionKeys(roleMappings).forEach((key) => keys.add(key));
+    });
+
+    return keys;
+  }, [providersById, ssoDetails]);
+
+  const isSelf = !!me && !!user && me.id === user.id;
+  const { mutate: deleteUser, isPending: isDeleting } = useUsersServiceDeleteUser({
+    onSuccess: () => {
+      toast.success({
+        title: t('delete.success.title'),
+        description: t('delete.success.description', { username: user?.username ?? '' }),
+      });
+      navigate('/users');
+    },
+    onError: (error) => {
+      toast.apiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'apiErrors',
+      });
+    },
+  });
+  return {
+    t,
+    navigate,
+    isOpen,
+    open,
+    setOpen,
+    hasPermission,
+    user,
+    license,
+    providersById,
+    ssoDetails,
+    ssoManagedProviders,
+    ssoManagedPermissionKeys,
+    isSelf,
+    deleteUser,
+    isDeleting,
+    id,
+    roleIdToAssign,
+  };
+}
+
+export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
+  const {
+    t,
+    navigate,
+    isOpen,
+    open,
+    setOpen,
+    hasPermission,
+    user,
+    license,
+    providersById,
+    ssoDetails,
+    ssoManagedProviders,
+    ssoManagedPermissionKeys,
+    isSelf,
+    deleteUser,
+    isDeleting,
+  } = useUserDetailsState({ id, roleIdToAssign });
+
+  return (
+    <div>
+      <PageHeader
+        title={`${user?.username ?? ''} (ID: ${user?.id ?? ''})`}
+        subtitle={t('details.externalIdentifier', { identifier: user?.externalIdentifier })}
+        backTo="/users"
+        actions={[
+          {
+            key: 'rfid-cards',
+            label: t('rfidCards.manage'),
+            icon: <CreditCardIcon />,
+            isHidden: !user || !license?.modules.includes('attractap') || !hasPermission('users.rfid-cards.manage'),
+            onPress: () => navigate(`/users/${id}/rfid-cards`),
+          },
+        ]}
+      />
+
+      {user && (
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start"
+          data-cy="user-details-sections"
+        >
+          <FlatSection icon={<UserIcon size={16} />} title={t('profile.title')} data-cy="user-details-profile-section">
+            <div className="flex flex-col gap-6">
+              <ChangeUsernameForm userId={user.id} />
+              <ChangeEmailForm userId={user.id} />
+            </div>
+          </FlatSection>
+
+          <FlatSection
+            icon={<ShieldIcon size={16} />}
+            title={t('security.title')}
+            data-cy="user-details-security-section"
+          >
+            <SetPasswordForm userId={user.id} username={user.username} />
+          </FlatSection>
+
+          <FlatSection
+            icon={<KeyRoundIcon size={16} />}
+            title={t('permissions.title')}
+            data-cy="user-details-permissions-section"
+          >
+            <UserPermissionForm
+              user={user}
+              ssoManagedProviders={ssoManagedProviders}
+              ssoManagedPermissionKeys={ssoManagedPermissionKeys}
+              providersById={providersById}
+              roleIdToAssign={roleIdToAssign}
+            />
+          </FlatSection>
+
+          <FlatSection
+            icon={<ListChecksIcon size={16} />}
+            title={t('effectivePermissions.title')}
+            data-cy="user-details-effective-permissions-section"
+          >
+            <EffectivePermissionsSection userId={id} t={t} />
+          </FlatSection>
+
+          <FlatSection
+            icon={<LinkIcon size={16} />}
+            title={t('sso.title')}
+            data-cy="user-details-sso-section"
+            actions={
+              <Chip
+                color={ssoDetails.length > 0 ? 'accent' : 'default'}
+                variant={ssoDetails.length > 0 ? 'secondary' : 'primary'}
+              >
+                {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
+              </Chip>
+            }
+          >
+            <div className="flex flex-col gap-4">
+              {ssoDetails.length === 0 ? (
+                <div className="flex items-center gap-2">
+                  <Chip color="default" variant="soft">
+                    {t('sso.notLinked')}
+                  </Chip>
+                  <span className="text-sm text-default-500">{t('sso.notLinkedHint')}</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {ssoDetails.map((detail, index) => {
+                    const providerName = detail.providerId ? providersById.get(detail.providerId)?.name : undefined;
+                    const providerLabel =
+                      providerName ??
+                      (detail.providerType && detail.providerId
+                        ? `${detail.providerType} #${detail.providerId}`
+                        : (detail.providerType ?? '-'));
+                    const itemKey = `${detail.providerId ?? 'unknown'}-${detail.ssoSubject ?? 'unknown'}-${
+                      detail.providerType ?? 'unknown'
+                    }`;
+                    return (
+                      <div key={itemKey} className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.provider')}</span>
+                          <div className="text-sm font-semibold text-default-900 break-words">{providerLabel}</div>
+                          <div className="text-xs text-default-500">{detail.providerType ?? '-'}</div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.userId')}</span>
+                          <div className="font-mono text-xs text-default-800 break-all">{detail.ssoSubject ?? '-'}</div>
+                        </div>
+                        {index < ssoDetails.length - 1 ? <Separator /> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </FlatSection>
+
+          <FlatSection
+            icon={<AlertTriangleIcon size={16} className="text-danger" />}
+            title={t('delete.title')}
+            data-cy="user-details-delete-section"
+          >
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-default-500">{t('delete.description')}</p>
+              <div className="flex w-full justify-end">
+                <Button variant="danger-soft" onPress={open} isDisabled={isSelf} data-cy="admin-delete-user-open-modal">
+                  {t('delete.actions.open')}
+                </Button>
+              </div>
+              {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
+            </div>
+          </FlatSection>
+        </div>
+      )}
+
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="sm">
+        {({ close: modalClose }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('delete.modal.title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
+                {t('delete.actions.cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                onPress={() => user && deleteUser({ id: user.id })}
+                isPending={isDeleting}
+                data-cy="admin-delete-user-confirm-button"
+              >
+                {t('delete.actions.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
+    </div>
+  );
+}
 
 // `/users/:id` also matches paths like `/users/security`, which used to render a detail page for a
 // user that cannot exist — heading `(ID: )`, empty body. A non-numeric segment is not a user (ATT-869).

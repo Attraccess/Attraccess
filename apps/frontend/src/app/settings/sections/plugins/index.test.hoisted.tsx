@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
-import type { DeleteOptions } from './index.contracts';
+import type { DeleteOptions } from './types';
 
-import { beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),

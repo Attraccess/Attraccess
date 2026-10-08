@@ -1,10 +1,45 @@
 import { Description, Input, InputGroup, Label, TextArea, TextField, Tooltip, TooltipContent } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Button } from '../../../../components/button';
+import { Button } from '../../../../components/button/index';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
-import { useSAMLConfigFormState } from './useSAMLConfigFormState';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from '../en.json';
+import de from '../de.json';
+
+export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
+  const { t } = useTranslations({ en, de });
+  const {
+    formValues,
+    setSaml,
+    emailAttributeKeysInput,
+    setEmailAttributeKeysInput,
+    showSamlProvisioningSecret,
+    setShowSamlProvisioningSecret,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
+    handleSamlToggleChange,
+    providerDetails,
+    roles,
+    isLoadingRoles,
+  } = form;
+  return {
+    t,
+    formValues,
+    setSaml,
+    emailAttributeKeysInput,
+    setEmailAttributeKeysInput,
+    showSamlProvisioningSecret,
+    setShowSamlProvisioningSecret,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
+    handleSamlToggleChange,
+    providerDetails,
+    roles,
+    isLoadingRoles,
+  } as const;
+}
 
 export interface SAMLConfigFormProps {
   form: SSOProviderFormApi;

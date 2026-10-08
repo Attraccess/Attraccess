@@ -1,5 +1,7 @@
 import { User } from '@attraccess/database-entities';
+
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
 import {
   BadRequestException,
   Controller,
@@ -13,32 +15,51 @@ import {
   Query,
   Req,
   UseInterceptors,
+  Body,
+  Patch,
+  Post,
 } from '@nestjs/common';
+
 import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
+
 import { IdentityAuditService } from '../../audit/identity-audit.service';
+
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+
 import { computeNextPage } from '../../types/response';
+
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
+
 import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
+
 import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+
 import { UserPasswordService } from './user-password.service';
-import { UsersAdminProfileRoutes } from './users-admin-profile.routes';
+
 import { UsersService } from './users.service';
-import { installInheritedMethods } from '../../common/inherited-implementation';
+import { randomUUID } from 'node:crypto';
+
+import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
+
+import { ChangeEmailDto } from './dtos/changeEmail.dto';
+
+import { ChangeUsernameDto } from './dtos/changeUsername.dto';
+
+import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
+
+import { mapEmailSendError } from './email-send-error.util';
 
 @ApiTags('Users')
 @Controller('users')
 @UseInterceptors(AuthRateLimitInterceptor)
-export class UsersAdminController extends UsersAdminProfileRoutes {
-  protected readonly logger = new Logger(UsersAdminController.name);
-
+export class UsersAdminController {
   constructor(
     protected readonly usersService: UsersService,
     protected readonly passwordService: UserPasswordService,
     @Optional() protected readonly identityAudit?: IdentityAuditService,
-  ) {
-    super();
-  }
+  ) {}
+
+  protected readonly logger = new Logger(UsersAdminController.name);
 
   @Auth()
   @Get(':id')
@@ -160,14 +181,102 @@ export class UsersAdminController extends UsersAdminProfileRoutes {
       nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }
+
+  @Post(':id/password')
+  @Auth()
+  @ApiOperation({ summary: "Set a user's password directly", operationId: 'setUserPassword' })
+  @ApiResponse({
+    status: 200,
+    description: 'The password has been successfully updated.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Password updated successfully' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found.',
+  })
+  async setUserPassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SetUserPasswordDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ message: string }> {
+    await this.passwordService.setUserPassword(id, body, request.user);
+    await this.record('user_updated', id, request, 'password');
+    return { message: 'Password updated successfully' };
+  }
+
+  @Patch(':id/username')
+  @Auth('users.update')
+  @ApiOperation({ summary: "Admin: Change a user's username (no limit)", operationId: 'changeUserUsername' })
+  @ApiResponse({ status: 200, description: 'Username changed.', type: User })
+  async changeUserUsername(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ChangeUsernameDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<User> {
+    const user = await this.usersService.changeUsername(id, body.username, request.user);
+    await this.record('user_updated', id, request, 'username');
+    return user;
+  }
+
+  @Patch(':id/email')
+  @Auth('users.update')
+  @ApiOperation({ summary: "Admin: Change a user's email address", operationId: 'changeUserEmail' })
+  @ApiResponse({ status: 200, description: 'Email changed.', type: User })
+  async changeUserEmail(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ChangeEmailDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<User> {
+    try {
+      const user = await this.usersService.changeEmail(id, body.email, request.user);
+      await this.record('user_updated', id, request, 'email');
+      return user;
+    } catch (error) {
+      throw mapEmailSendError(error);
+    }
+  }
+
+  @Patch(':id/billing-factor')
+  @Auth('billing.manage')
+  @ApiOperation({ summary: "Change a user's billing factor", operationId: 'changeUserBillingFactor' })
+  @ApiResponse({ status: 200, description: 'Billing factor changed.', type: User })
+  async changeUserBillingFactor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ChangeBillingFactorDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<User> {
+    const user = await this.usersService.changeBillingFactor(id, body.billingFactor);
+    await this.record('user_updated', id, request, 'billingFactor');
+    return user;
+  }
+
+  protected record(
+    action: 'user_deleted' | 'user_updated',
+    subjectId: number,
+    request: AuthenticatedRequest,
+    field?: 'username' | 'email' | 'password' | 'billingFactor',
+  ): Promise<void> {
+    return Promise.resolve(
+      this.identityAudit?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectId,
+        details: field ? { field } : {},
+        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+      }),
+    ).then(() => undefined);
+  }
 }
-installInheritedMethods(UsersAdminController, [
-  'getOneById',
-  'deleteOne',
-  'findMany',
-  'setUserPassword',
-  'changeUserUsername',
-  'changeUserEmail',
-  'changeUserBillingFactor',
-  'record',
-]);

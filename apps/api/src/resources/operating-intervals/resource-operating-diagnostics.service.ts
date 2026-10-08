@@ -1,14 +1,19 @@
 // Diagnostics over the authoritative machine operating timeline (ATT-1024).
 // All views are derived directly from `resource_operating_interval` rows; there are no persisted
 // aggregates yet, so verification recomputes derived durations from the timeline and compares.
-import { ResourceFlowNode, ResourceOperatingInterval } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceOperatingInterval, ResourceFlowNodeType } from '@attraccess/database-entities';
+
 import { Injectable } from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
+
 import { In, IsNull, MoreThan, Repository } from 'typeorm';
+
 import {
   OperatingDataQualityFailureKind,
   OperatingMetricsRecorder,
 } from '../../metrics/instrumentation/operating/operating.helper';
+
 import {
   OperatingDataQualityIssueDto,
   OperatingDataQualityReportDto,
@@ -17,14 +22,47 @@ import {
   OperatingTransitionDto,
   OperatingTransitionPageDto,
 } from './dtos/operating-diagnostics-response.dto';
+
 import { verifyTimeline as verifyTimelineImplementation } from './operating-timeline-verification';
+
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
-import {
-  DAY_MS,
-  SAMPLE_LIMIT,
-  STALE_SIGNAL_DAYS,
-  TRACKING_NODE_TYPES,
-} from './resource-operating-diagnostics.service.definitions';
+
+export /** A resource with tracking configured but no transition for this long is reported as stale. */
+const STALE_SIGNAL_DAYS = 7;
+
+export const DAY_MS = 24 * 60 * 60_000;
+
+export const SAMPLE_LIMIT = 10;
+
+export const TRACKING_NODE_TYPES = [
+  ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING,
+  ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE,
+];
+
+/** Total length of the union of [start, end) ranges, ignoring empty or inverted ranges. */
+export function unionDurationMs(ranges: { start: number; end: number }[]): number {
+  const sorted = ranges.filter((range) => range.end > range.start).sort((left, right) => left.start - right.start);
+  let total = 0;
+  let cursor: number | null = null;
+  let currentEnd: number | null = null;
+
+  for (const range of sorted) {
+    if (cursor === null || currentEnd === null || range.start >= currentEnd) {
+      if (cursor !== null && currentEnd !== null) {
+        total += currentEnd - cursor;
+      }
+      cursor = range.start;
+      currentEnd = range.end;
+    } else if (range.end > currentEnd) {
+      currentEnd = range.end;
+    }
+  }
+
+  if (cursor !== null && currentEnd !== null) {
+    total += currentEnd - cursor;
+  }
+  return total;
+}
 
 @Injectable()
 export class ResourceOperatingDiagnosticsService {
@@ -178,11 +216,3 @@ export class ResourceOperatingDiagnosticsService {
     );
   }
 }
-
-export {
-  DAY_MS,
-  SAMPLE_LIMIT,
-  STALE_SIGNAL_DAYS,
-  TRACKING_NODE_TYPES,
-  unionDurationMs,
-} from './resource-operating-diagnostics.service.definitions';

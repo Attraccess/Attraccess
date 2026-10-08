@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+
 import {
   Column,
   CreateDateColumn,
@@ -10,12 +11,17 @@ import {
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+
 import { BillingTransaction } from './billing-transaction.entity';
+
 import { FormSubmission } from './form';
+
 import { Project } from './project';
-import { ResourceUsageBillingSnapshot } from './resource-usage-billing-snapshot';
+
 import { Resource } from './resource.entity';
+
 import { ResourceUsageAction } from './resourceUsage.type';
+
 import { User } from './user.entity';
 
 @Index('IDX_resource_usage_resourceId', ['resourceId'])
@@ -23,7 +29,55 @@ import { User } from './user.entity';
 @Index('IDX_resource_usage_userId', ['userId'])
 @Index('IDX_resource_usage_resourceId_endTime', ['resourceId', 'endTime'])
 @Entity()
-export class ResourceUsage extends ResourceUsageBillingSnapshot {
+export class ResourceUsage {
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Snapshot of the session-duration rate when this usage session started',
+    required: false,
+    nullable: true,
+  })
+  sessionDurationCreditsPerMinute!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Snapshot of the attributable-operating-duration rate when this usage session started',
+    required: false,
+    nullable: true,
+  })
+  operatingDurationCreditsPerMinute!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Fixed usage fee snapshotted at session start; null for legacy sessions',
+    nullable: true,
+    required: false,
+  })
+  creditsPerUsage!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'User billing percentage snapshotted at session start; null for legacy sessions',
+    nullable: true,
+    required: false,
+  })
+  billingFactor!: number | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  @ApiProperty({
+    type: [Object],
+    nullable: true,
+    required: false,
+  })
+  meterRates!: { meterId: number; name: string; creditsPerUnit: number }[] | null;
+
+  @Column({ type: 'float', nullable: true })
+  @ApiProperty({
+    description: 'Operating duration attributed to this usage session in minutes',
+    required: false,
+    nullable: true,
+  })
+  attributedOperatingDurationInMinutes!: number | null;
+
   @PrimaryGeneratedColumn()
   @ApiProperty({
     description: 'The unique identifier of the resource usage',
@@ -119,6 +173,7 @@ export class ResourceUsage extends ResourceUsageBillingSnapshot {
     example: 120,
   })
   usageInMinutes!: number;
+
   @OneToOne(() => BillingTransaction, (billingTransaction) => billingTransaction.resourceUsage, {
     onDelete: 'CASCADE',
     nullable: true,

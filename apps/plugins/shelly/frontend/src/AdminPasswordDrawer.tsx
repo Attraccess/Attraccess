@@ -4,8 +4,8 @@ import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form } f
 import { KeyRoundIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { setAdminPassword, type ShellyDevice } from './api';
-import { PasswordFieldRow, StandardDrawer } from './drawer';
-import { StatusAlert } from './StatusAlert';
+import { PasswordFieldRow, StandardDrawer } from './shared/drawer';
+import { StatusAlert } from './shared/StatusAlert';
 import { useShellyTranslations } from './i18n';
 import { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 

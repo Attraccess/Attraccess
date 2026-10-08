@@ -1,20 +1,309 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { emailLayoutAccessChange } from './email-layout-access-change';
-import { emailLayoutDeleteAccountConfirmation } from './email-layout-delete-account-confirmation';
-import { emailLayoutMaintenanceRequestCreated } from './email-layout-maintenance-request-created';
-import { emailLayoutMessageReceived } from './email-layout-message-received';
-import { emailLayoutPasswordChanged } from './email-layout-password-changed';
-import { emailLayoutProjectInvitation } from './email-layout-project-invitation';
-import { emailLayoutResetPassword } from './email-layout-reset-password';
-import { emailLayoutResourceHealthChanged } from './email-layout-resource-health-changed';
-import { emailLayoutResourceSessionEnded } from './email-layout-resource-session-ended';
-import { emailLayoutResourceTakeover } from './email-layout-resource-takeover';
-import { emailLayoutResourceUsageBillingTransactionSummary } from './email-layout-resource-usage-billing-transaction-summary';
-import { emailLayoutResourceUsageNoteAdded } from './email-layout-resource-usage-note-added';
-import { emailLayoutUserInvitation } from './email-layout-user-invitation';
-import { emailLayoutUserRetrainingRequired } from './email-layout-user-retraining-required';
-import { emailLayoutUsernameChanged } from './email-layout-username-changed';
-import { emailLayoutVerifyEmail } from './email-layout-verify-email';
+export const emailLayoutAccessChange = {
+  'access-change': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">{{accessChange.body}}</mj-text>
+    {{#if accessChange.url}}
+    <mj-button href="{{accessChange.url}}" align="center">View Details</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{accessChange.url}}">{{accessChange.url}}</a>
+    </mj-text>
+    {{/if}}
+    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
+      You received this email because access-change notifications are enabled for your account.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutDeleteAccountConfirmation = {
+  'delete-account-confirmation': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 24px 0">
+      We received a request to delete your account. Click the button below to confirm. This action cannot be undone.
+    </mj-text>
+    <mj-button href="{{url}}" align="center" background-color="#DC2626">Confirm Deletion</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{url}}">{{url}}</a>
+    </mj-text>
+    <mj-text font-size="13px" color="#9CA3AF" padding="16px 0 0 0">
+      If you did not request account deletion, you can safely ignore this email.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutMaintenanceRequestCreated = {
+  'maintenance-request-created': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      <strong>{{request.requestedBy}}</strong> reported that <strong>{{resource.name}}</strong> may need maintenance.
+    </mj-text>
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">Reason: {{request.reason}}</mj-text>
+    <mj-button href="{{resource.url}}" align="center">Review Request</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{resource.url}}">{{resource.url}}</a>
+    </mj-text>
+    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
+      You received this email because you can manage maintenance for this resource.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutMessageReceived = {
+  'message-received': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      <strong>{{message.senderName}}</strong> sent you a message while you were offline:
+    </mj-text>
+    <mj-text font-size="14px" color="#374151" padding="12px" container-background-color="#F8FAFC">
+      {{message.preview}}
+    </mj-text>
+    <mj-button href="{{message.conversationUrl}}" align="center">Open Conversation</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{message.conversationUrl}}">{{message.conversationUrl}}</a>
+    </mj-text>
+    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
+      You received this email because you were offline when this message arrived.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutPasswordChanged = {
+  'password-changed': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      This is a confirmation that the password for your account ({{user.email}}) has been changed.
+    </mj-text>
+    <mj-text font-size="13px" color="#9CA3AF" padding="0">
+      If you did not make this change, please reset your password immediately and contact support.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutProjectInvitation = {
+  'project-invitation': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 24px 0">
+      {{inviter.username}} has invited you to join the project <strong>{{project.name}}</strong> as <strong>{{invitation.role}}</strong>.
+    </mj-text>
+    <mj-button href="{{invitationUrl}}" align="center">View Invitation</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Invitation ID: {{invitation.id}}
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutResetPassword = {
+  'reset-password': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 24px 0">
+      We received a request to reset your password. Click the button below to proceed.
+    </mj-text>
+    <mj-button href="{{url}}" align="center">Reset Password</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{url}}">{{url}}</a>
+    </mj-text>
+    <mj-text font-size="13px" color="#9CA3AF" padding="16px 0 0 0">
+      If you did not request a password reset, you can safely ignore this email.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutResourceHealthChanged = {
+  'resource-health-changed': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      Resource <strong>{{resource.name}}</strong> {{health.bodyAction}}.
+    </mj-text>
+    {{#if health.identifier}}
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 4px 0">Subsystem: <strong>{{health.identifier}}</strong></mj-text>
+    {{/if}}
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">
+      Previous status: <strong>{{health.previousStatus}}</strong><br/>
+      New status: <strong>{{health.status}}</strong>
+    </mj-text>
+    {{#if health.reason}}
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">Reason: {{health.reason}}</mj-text>
+    {{/if}}
+    <mj-button href="{{resource.url}}" align="center">Open Resource</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{resource.url}}">{{resource.url}}</a>
+    </mj-text>
+    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
+      You received this email because you can manage this resource.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutResourceSessionEnded = {
+  'resource-session-ended': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      <strong>{{session.endedBy}}</strong> ended your active session on <strong>{{resource.name}}</strong>.
+    </mj-text>
+    {{#if session.endedAt}}
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">Ended at: {{session.endedAt}}</mj-text>
+    {{/if}}
+    <mj-button href="{{resource.url}}" align="center">View Resource</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{resource.url}}">{{resource.url}}</a>
+    </mj-text>
+    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
+      You received this email because resource session ended notifications are enabled in your preferences.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutResourceTakeover = {
+  'resource-takeover': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      <strong>{{takeover.actorName}}</strong> took over your active session on <strong>{{resource.name}}</strong>.
+    </mj-text>
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">
+      If this was unexpected, please check the resource usage page or contact a maintainer.
+    </mj-text>
+    <mj-button href="{{resource.url}}" align="center">View Resource</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{resource.url}}">{{resource.url}}</a>
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutResourceUsageBillingTransactionSummary = {
+  'resource-usage-billing-transaction-summary': `<mj-section background-color="#FFFFFF" padding="32px 20px 8px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 8px 0">
+      Your session on <strong>{{resource.name}}</strong> has ended. Here is your receipt:
+    </mj-text>
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 4px 0">
+      Start: {{usage.startTime}}<br/>
+      End: {{usage.endTime}}<br/>
+      Duration: {{usage.roundedMinutes}} min
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#FFFFFF" padding="0 20px 24px 20px">
+  <mj-column>
+    <mj-table>
+      <tr><th align="left">Item</th><th align="right">Qty</th><th align="right">Unit</th><th align="right">Total</th></tr>
+      {{#each items}}
+      <tr>
+        <td>{{this.name}}</td>
+        <td align="right">{{this.quantity}}</td>
+        <td align="right">{{this.unitPrice}}</td>
+        <td align="right">{{this.total}}</td>
+      </tr>
+      {{/each}}
+      <tr>
+        <td colspan="3" align="right"><strong>Total Credits</strong></td>
+        <td align="right"><strong>{{totalCredits}}</strong></td>
+      </tr>
+      <tr>
+        <td colspan="3" align="right">New Balance</td>
+        <td align="right">{{newBalance}}</td>
+      </tr>
+    </mj-table>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutResourceUsageNoteAdded = {
+  'resource-usage-note-added': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      <strong>{{note.authorName}}</strong> left a note when {{note.phaseAction}} <strong>{{resource.name}}</strong>.
+    </mj-text>
+    <mj-text font-size="14px" color="#111827" padding="12px" container-background-color="#F8FAFC">
+      {{note.content}}
+    </mj-text>
+    <mj-button href="{{resource.url}}" align="center">View Resource</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{resource.url}}">{{resource.url}}</a>
+    </mj-text>
+    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
+      You received this email because you are an introducer, maintainer or administrator for this resource.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutUserInvitation = {
+  'user-invitation': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 24px 0">
+      You have been invited to join Attraccess. Accept your invitation to get started.
+    </mj-text>
+    <mj-button href="{{url}}" align="center">Accept Invitation</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{url}}">{{url}}</a>
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutUserRetrainingRequired = {
+  'user-retraining-required': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      Your training for <strong>{{resource.name}}</strong> is due for renewal.
+    </mj-text>
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">Reason: {{retraining.reason}}</mj-text>
+    {{#if retraining.blocksAccess}}
+    <mj-text font-size="14px" color="#DC2626" padding="0 0 12px 0">
+      Access to this resource is blocked until you have been retrained by an introducer.
+    </mj-text>
+    {{/if}}
+    <mj-button href="{{resource.url}}" align="center">Open Resource</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{resource.url}}">{{resource.url}}</a>
+    </mj-text>
+    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
+      You received this email because your training for this resource requires renewal.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutUsernameChanged = {
+  'username-changed': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">
+      Your username was changed from <strong>{{user.previousUsername}}</strong> to <strong>{{user.newUsername}}</strong>.
+    </mj-text>
+    <mj-text font-size="13px" color="#9CA3AF" padding="0">
+      If you did not make this change, please contact support immediately.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
+export const emailLayoutVerifyEmail = {
+  'verify-email': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
+    <mj-text padding="0 0 24px 0">
+      Please verify your email address to activate your Attraccess account.
+    </mj-text>
+    <mj-button href="{{url}}" align="center">Verify Email</mj-button>
+    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
+      Or copy this link into your browser:<br /><a href="{{url}}">{{url}}</a>
+    </mj-text>
+    <mj-text font-size="13px" color="#9CA3AF" padding="16px 0 0 0">
+      If you did not create an account, you can safely ignore this email.
+    </mj-text>
+  </mj-column>
+</mj-section>`,
+};
 
 const EMAIL_LAYOUT_SETTINGS_PARENT = 'email_layout';
 const EMAIL_LAYOUT_SETTINGS_KEY = 'body';

@@ -87,7 +87,7 @@ vi.mock('@xyflow/react', () => ({
   Controls: () => null,
   Background: () => null,
 }));
-vi.mock('./flowContext', () => ({
+vi.mock('./context/index', () => ({
   FlowProvider: ({ children }: { children: ReactNode }) => children,
   useFlowContext: () => {
     const [nodes, setNodes] = useState<Node[]>([]);

@@ -1,12 +1,186 @@
-import { BUILTIN_MODBUS_PROFILES } from './model.builtin-modbus-profiles';
-import { findProfile } from './model.find-profile';
-import { freeze } from './model.freeze';
-import { ModbusConfiguration } from './model-contracts';
+import ipaddr from 'ipaddr.js';
+import type {
+  ModbusAction,
+  ModbusConfiguration,
+  ModbusDevice,
+  ModbusMeasurement,
+  ModbusProfile,
+  RegisterFormat,
+} from './model-contracts';
 import { ModbusPoint } from './model-contracts';
-import { validateChannelBinding } from './model.validate-channel-binding';
 import { validateConnections } from './validate-connections';
 import { validateProfiles } from './validate-profiles';
 import { createModbusValidation } from './validation-context';
+import { wago8793020Measurements } from './wago-879-3020';
+
+export const base = {
+  addressBase: 0,
+  byteOrder: 'big',
+  wordOrder: 'big',
+  offset: 0,
+  pollIntervalMs: 5000,
+  functionCode: 3,
+} as const;
+
+export const legacyProfiles: ModbusProfile[] = ['879-3000', '879-1300'].map((model) => ({
+  id: `wago-${model}-unverified`,
+  name: `WAGO ${model} — UNQUALIFIED / map unverified`,
+  version: 1,
+  actions: [],
+  measurements: [
+    {
+      ...base,
+      id: 'active-power',
+      name: 'Active power',
+      address: 0x5012,
+      dataType: 'float32',
+      scale: 1000,
+      unit: 'watt',
+      kind: 'live',
+    },
+    ...[
+      { id: 'import-energy', name: 'Imported energy', address: 0x600c },
+      { id: 'export-energy', name: 'Exported energy', address: 0x6018 },
+    ].map((entry): ModbusMeasurement => ({
+      ...base,
+      ...entry,
+      dataType: model === '879-3000' ? 'float32' : 'uint32',
+      scale: model === '879-3000' ? 1000 : 1,
+      unit: 'watt-hour',
+      kind: 'cumulative',
+    })),
+  ],
+}));
+
+// Persisted legacy profiles retain their original IDs, versions and transforms.
+export const BUILTIN_MODBUS_PROFILES: readonly ModbusProfile[] = [
+  {
+    id: 'wago-879-3020',
+    name: 'WAGO 879-3020 (4PS) — Modbus RTU',
+    version: 1,
+    actions: [],
+    measurements: wago8793020Measurements(),
+  },
+  {
+    id: 'wago-879-3000',
+    name: 'WAGO 879-3000 — Modbus RTU',
+    version: 1,
+    actions: [],
+    measurements: [
+      ...legacyProfiles[0].measurements.map((measurement) => ({ ...measurement, decimalPlaces: 3 })),
+      {
+        ...base,
+        id: 'voltage-l1',
+        name: 'L1 voltage',
+        address: 0x5002,
+        dataType: 'float32',
+        scale: 1,
+        unit: 'volt',
+        kind: 'live',
+        decimalPlaces: 3,
+      },
+      {
+        ...base,
+        id: 'current-l1',
+        name: 'L1 current',
+        address: 0x500c,
+        dataType: 'float32',
+        scale: 1,
+        unit: 'ampere',
+        kind: 'live',
+        decimalPlaces: 3,
+      },
+    ],
+  },
+  ...legacyProfiles,
+];
+
+export function findProfile(config: ModbusConfiguration, device: ModbusDevice): ModbusProfile | undefined {
+  return [...BUILTIN_MODBUS_PROFILES, ...config.profiles].find(
+    (p) => p.id === device.profileId && p.version === device.profileVersion,
+  );
+}
+
+/** Pure numeric normalization, shared by validation and runtime bus ownership. No DNS lookup. */
+export function modbusHostIdentity(host: string): string {
+  if (ipaddr.isValid(host)) {
+    const address = ipaddr.parse(host);
+    if (address.kind() === 'ipv6') {
+      const ipv6 = address as ipaddr.IPv6;
+      if (ipv6.isIPv4MappedAddress() && !ipv6.zoneId) return ipv6.toIPv4Address().toString();
+    }
+    return address.toNormalizedString();
+  }
+  return host.toLowerCase();
+}
+
+export // Freeze nested maps: callers must duplicate before editing. Evidence URLs are documented in README.
+function freeze(value: object): void {
+  Object.values(value).forEach((child) => {
+    if (child && typeof child === 'object') freeze(child);
+  });
+  Object.freeze(value);
+}
+
+export function duplicateProfile(profile: ModbusProfile, id: string): ModbusProfile {
+  return { ...JSON.parse(JSON.stringify(profile)), id, name: `${profile.name} (custom)`, version: 1 };
+}
+
+export const registerCount = (format: RegisterFormat): number =>
+  ['uint16', 'int16'].includes(format.dataType) ? 1 : 2;
+
+export function wireAddress(format: RegisterFormat): number {
+  if (!Number.isSafeInteger(format.address) || ![0, 1].includes(format.addressBase))
+    throw new Error('invalid Modbus register address');
+  const address = format.address - format.addressBase;
+  if (address < 0 || address + registerCount(format) > 65536) throw new Error('invalid Modbus register address');
+  return address;
+}
+
+export /** Validate one logical owner against the selected profile and the shared physical address space. */
+function validateChannelBinding(
+  channel: {
+    capabilities?: unknown;
+    measurement?: { unit?: unknown; kind?: unknown; scale?: unknown; offset?: unknown };
+  },
+  measurement: ModbusMeasurement | undefined,
+  action: ModbusAction | undefined,
+  device: ModbusDevice | undefined,
+  outputOwners: Set<string>,
+  fail: (message: string) => void,
+): void {
+  const capabilities = Array.isArray(channel.capabilities) ? channel.capabilities : [];
+  if (capabilities.includes('output') && action && device) {
+    // Connection endpoints are unique in a valid config. Device/profile/action names
+    // are aliases, while FC06 and FC16 share the same holding-register address space.
+    for (let offset = 0; offset < registerCount(action); offset++) {
+      const key = JSON.stringify([
+        device.connectionId,
+        device.unitId,
+        action.functionCode === 5 ? 'coil' : 'register',
+        wireAddress(action) + offset,
+      ]);
+      if (outputOwners.has(key)) fail('each physical Modbus output must have a single logical owner');
+      outputOwners.add(key);
+    }
+  }
+  if (capabilities.includes('input') && !capabilities.includes('measurement'))
+    fail(
+      measurement
+        ? 'Modbus register inputs require measurement capability and its named measurement transform'
+        : 'input requires named measurement',
+    );
+  if (capabilities.includes('output') && !action) fail('output requires named action');
+  if (
+    capabilities.includes('measurement') &&
+    (!measurement ||
+      channel.measurement?.unit !== measurement.unit ||
+      (channel.measurement?.kind ?? 'live') !== measurement.kind ||
+      channel.measurement?.scale !== 1 ||
+      channel.measurement?.offset !== 0)
+  )
+    fail('measurement channel must match profile unit/kind with identity transform');
+}
 
 // Persisted legacy profiles retain their original IDs, versions and transforms.
 // Freeze nested maps: callers must duplicate before editing. Evidence URLs are documented in README.
@@ -111,12 +285,5 @@ export function validateModbusBindings(snapshot: {
   }
   return errors;
 }
-
-export { BUILTIN_MODBUS_PROFILES } from './model.builtin-modbus-profiles';
-export { duplicateProfile } from './model.duplicate-profile';
-export { findProfile } from './model.find-profile';
-export { modbusHostIdentity } from './model.modbus-host-identity';
-export { registerCount } from './model.register-count';
-export { wireAddress } from './model.wire-address';
 
 export * from './model-contracts';

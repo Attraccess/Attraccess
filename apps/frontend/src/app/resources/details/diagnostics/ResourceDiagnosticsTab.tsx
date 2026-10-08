@@ -1,19 +1,248 @@
 // Admin diagnostics surface over the machine operating timeline (ATT-1024):
 // current state, transition history, unattributed operation, data quality and verification.
 // FEATURE: ATT-1024 operating-timeline diagnostics tab
-import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Chip, Spinner } from '@heroui/react';
-import { AlertTriangleIcon, CheckCircle2Icon, ShieldCheckIcon } from 'lucide-react';
+
+import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Chip, Spinner, Table } from '@heroui/react';
+import {
+  AlertTriangleIcon,
+  CheckCircle2Icon,
+  ShieldCheckIcon,
+  ActivityIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from 'lucide-react';
 import { formatDurationMs } from '@attraccess/shared';
-import { Button } from '../../../../components/button';
+import { Button } from '../../../../components/button/index';
 import { FlatSection } from '../../../../components/flatSection';
-import { Select } from '../../../../components/select';
+import { Select } from '../../../../components/select/index';
 import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
-import { OperatingTrackingNotice } from '../operating-readiness';
-import { RANGE_OPTIONS } from './ResourceDiagnosticsTab.state';
-import { formatDuration } from './ResourceDiagnosticsTab.helpers';
-import { OperatingStateSection } from './ResourceDiagnosticsTab.helpers';
-import { useResourceDiagnosticsTabState } from './useResourceDiagnosticsTabState';
-import { ResourceDiagnosticsTabFlatSection } from './ResourceDiagnosticsTabFlatSection';
+import { OperatingTrackingNotice } from '../operating-readiness/index';
+import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import {
+  useResourcesServiceResourceOperatingDiagnosticsGetDataQuality,
+  useResourcesServiceResourceOperatingDiagnosticsGetState,
+  useResourcesServiceResourceOperatingDiagnosticsGetTransitions,
+  useResourcesServiceResourceOperatingDiagnosticsVerifyTimeline,
+} from '@attraccess/react-query-client';
+import { useOperatingDuration } from '../../operatingDuration';
+import en from './en.json';
+import de from './de.json';
+import type { OperatingStateDto } from '@attraccess/react-query-client';
+
+export const PAGE_LIMIT = 10;
+
+export const RANGE_OPTIONS = [
+  { key: '7', labelKey: 'unattributed.ranges.7' },
+  { key: '30', labelKey: 'unattributed.ranges.30' },
+  { key: '90', labelKey: 'unattributed.ranges.90' },
+] as const;
+
+export /** null means "operating data unavailable" (ATT-1027 semantics) — never render it as 0. */
+function formatDuration(durationMs: number | null | undefined, unavailable: string): string {
+  return durationMs === null || durationMs === undefined ? unavailable : formatDurationMs(durationMs);
+}
+
+export function OperatingStateSection({
+  state,
+  isLoadingState,
+}: {
+  state: OperatingStateDto | undefined;
+  isLoadingState: boolean;
+}) {
+  const { t } = useTranslations({ en, de });
+  return (
+    <FlatSection icon={<ActivityIcon className="w-4 h-4" />} title={t('state.title')}>
+      {isLoadingState ? (
+        <Spinner size="sm" />
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Chip
+            size="sm"
+            color={state?.state === 'operating' ? 'success' : 'default'}
+            data-testid="diagnostics-state-chip"
+          >
+            {state?.state === 'operating' ? t('state.operating') : t('state.idle')}
+          </Chip>
+          {state?.openInterval && (
+            <span className="text-sm text-muted">
+              {t('state.openSince')}: <DateTimeDisplay date={new Date(state.openInterval.startTime)} />
+            </span>
+          )}
+          <span className="text-sm text-muted">
+            {state?.lastTransitionAt ? (
+              <>
+                {t('state.lastTransition')}: <DateTimeDisplay date={new Date(state.lastTransitionAt)} />
+              </>
+            ) : (
+              t('state.never')
+            )}
+          </span>
+        </div>
+      )}
+    </FlatSection>
+  );
+}
+
+export function rangeToBounds(days: string): { from: string; to: string; start: Date; end: Date } {
+  const end = new Date();
+  const start = new Date(end.getTime() - Number(days) * 24 * 60 * 60_000);
+  return { from: start.toISOString(), to: end.toISOString(), start, end };
+}
+
+export function useResourceDiagnosticsTabState() {
+  const { id } = useParams<{ id: string }>();
+  const resourceId = Number.parseInt(id ?? '', 10);
+  const { t } = useTranslations({ en, de });
+
+  const [rangeDays, setRangeDays] = useState<string>('30');
+  const [page, setPage] = useState(1);
+  const [verificationRequested, setVerificationRequested] = useState(false);
+
+  const range = useMemo(() => rangeToBounds(rangeDays), [rangeDays]);
+
+  const { data: state, isLoading: isLoadingState } = useResourcesServiceResourceOperatingDiagnosticsGetState({
+    resourceId,
+  });
+  const { data: transitions, isLoading: isLoadingTransitions } =
+    useResourcesServiceResourceOperatingDiagnosticsGetTransitions({ resourceId, page, limit: PAGE_LIMIT });
+  // Unattributed summary rides the shared operating-attribution endpoint (ATT-1025/ATT-1027) —
+  // the single derivation path — instead of a diagnostics-only duplicate.
+  const { data: unattributed, isLoading: isLoadingUnattributed } = useOperatingDuration(resourceId, true, {
+    start: range.start,
+    end: range.end,
+  });
+  const { data: dataQuality, isLoading: isLoadingDataQuality } =
+    useResourcesServiceResourceOperatingDiagnosticsGetDataQuality({ resourceId, ...range });
+  const {
+    data: verification,
+    isFetching: isVerifying,
+    refetch: runVerification,
+  } = useResourcesServiceResourceOperatingDiagnosticsVerifyTimeline({ resourceId, ...range }, undefined, {
+    enabled: verificationRequested,
+  });
+
+  const totalPages = Math.max(1, Math.ceil((transitions?.totalIntervals ?? 0) / PAGE_LIMIT));
+
+  // The shared attribution summary reports operating and unattributed; attributed is the remainder.
+  const attributedMs =
+    unattributed &&
+    unattributed.operatingDataAvailable &&
+    unattributed.operatingDurationMs !== null &&
+    unattributed.unattributedOperatingDurationMs !== null
+      ? unattributed.operatingDurationMs - unattributed.unattributedOperatingDurationMs
+      : null;
+  return {
+    id,
+    resourceId,
+    t,
+    rangeDays,
+    setRangeDays,
+    page,
+    setPage,
+    setVerificationRequested,
+    state,
+    isLoadingState,
+    transitions,
+    isLoadingTransitions,
+    unattributed,
+    isLoadingUnattributed,
+    dataQuality,
+    isLoadingDataQuality,
+    verification,
+    isVerifying,
+    runVerification,
+    totalPages,
+    attributedMs,
+  } as const;
+}
+
+type Props = Pick<
+  ReturnType<typeof useResourceDiagnosticsTabState>,
+  't' | 'isLoadingTransitions' | 'transitions' | 'page' | 'totalPages' | 'setPage'
+>;
+
+export function ResourceDiagnosticsTabFlatSection({
+  t,
+  isLoadingTransitions,
+  transitions,
+  page,
+  totalPages,
+  setPage,
+}: Props) {
+  return (
+    <FlatSection icon={<ActivityIcon className="w-4 h-4" />} title={t('transitions.title')}>
+      {isLoadingTransitions ? (
+        <Spinner size="sm" />
+      ) : (transitions?.items ?? []).length === 0 ? (
+        <p className="text-sm text-muted">{t('transitions.empty')}</p>
+      ) : (
+        <div className="flex flex-col gap-3" data-testid="diagnostics-transitions">
+          <Table>
+            <Table.ScrollContainer>
+              <Table.Content aria-label={t('transitions.title')}>
+                <Table.Header>
+                  <Table.Column isRowHeader>{t('transitions.columns.timestamp')}</Table.Column>
+                  <Table.Column>{t('transitions.columns.state')}</Table.Column>
+                  <Table.Column>{t('transitions.columns.source')}</Table.Column>
+                  <Table.Column>{t('transitions.columns.interval')}</Table.Column>
+                </Table.Header>
+                <Table.Body>
+                  {(transitions?.items ?? []).map((transition) => (
+                    <Table.Row
+                      key={`${transition.intervalId}-${transition.state}-${transition.timestamp}`}
+                      id={`${transition.intervalId}-${transition.state}`}
+                      textValue={transition.state}
+                    >
+                      <Table.Cell>
+                        <DateTimeDisplay date={new Date(transition.timestamp)} />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Chip size="sm" color={transition.state === 'operating' ? 'success' : 'default'}>
+                          {transition.state === 'operating' ? t('state.operating') : t('state.idle')}
+                        </Chip>
+                      </Table.Cell>
+                      <Table.Cell className="text-sm">{t('transitions.sourceFlowSignal')}</Table.Cell>
+                      <Table.Cell className="text-sm text-muted">#{transition.intervalId}</Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Content>
+            </Table.ScrollContainer>
+          </Table>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted">
+              {t('transitions.page')
+                .replace('{page}', `${page}/${totalPages}`)
+                .replace('{total}', String(transitions?.totalIntervals ?? 0))}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                isDisabled={page <= 1}
+                onPress={() => setPage((current) => Math.max(1, current - 1))}
+                aria-label={t('transitions.previous')}
+              >
+                <ChevronLeftIcon size={16} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                isDisabled={page >= totalPages}
+                onPress={() => setPage((current) => current + 1)}
+                aria-label={t('transitions.next')}
+              >
+                <ChevronRightIcon size={16} />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </FlatSection>
+  );
+}
 
 export function ResourceDiagnosticsTab() {
   const {

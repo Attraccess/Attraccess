@@ -1,5 +1,5 @@
 import { type RuntimeState } from '../runtime';
-import { OutputController } from '../output-controller';
+import { OutputController } from '../outputs/controller';
 import { ModbusDeviceRouter } from './adapter';
 import { QueuedModbusTransport } from './transports';
 import { rtuFrame } from './protocol';

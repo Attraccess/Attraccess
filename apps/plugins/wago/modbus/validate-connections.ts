@@ -1,5 +1,5 @@
 import { ModbusConfiguration } from './model-contracts';
-import { modbusHostIdentity } from './model.modbus-host-identity';
+import { modbusHostIdentity } from './model';
 import { ModbusValidation } from './validation-context';
 export function validateConnections(config: ModbusConfiguration, validation: ModbusValidation): void {
   const { fail, integer, name, keys } = validation;

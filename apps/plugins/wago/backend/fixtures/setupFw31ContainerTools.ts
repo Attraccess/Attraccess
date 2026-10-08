@@ -1,6 +1,6 @@
 import { symlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { WAGO_DIN, WAGO_DOUT } from '../wago-hardware-deployment';
+import { WAGO_DIN, WAGO_DOUT } from '../host/hardware-deployment';
 
 export function setupFw31ContainerTools({
   root,

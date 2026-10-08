@@ -1,5 +1,5 @@
 #pragma once
-#include "application_forms_state.hpp"
+#include "state/forms.hpp"
 
 class Application : protected ApplicationFormsState
 {

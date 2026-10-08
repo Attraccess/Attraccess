@@ -13,7 +13,7 @@ import {
   getPluginAuditDomain,
   registerPluginAuditDomains,
   resetPluginAuditRegistry,
-} from '../plugin-system/plugin-audit-registry';
+} from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsController } from '../settings/settings.controller';
 import { SettingsService } from '../settings/settings.service';
@@ -30,7 +30,7 @@ import {
   scenarioEntries,
   scenarios,
 } from './audit-domain-scenarios.test-fixture';
-import { CORE_AUDIT_DOMAINS } from './audit-domains';
+import { CORE_AUDIT_DOMAINS } from './policies/domains';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
 

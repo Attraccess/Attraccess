@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { AttractapDiagnostics } from './AttractapDiagnostics';
+import { AttractapDiagnostics } from './diagnostics/index';
 const state = vi.hoisted(() => ({
   reports: [] as unknown[],
   loading: false,

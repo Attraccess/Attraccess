@@ -2,14 +2,37 @@ import { BillingTransactionStatus } from '@attraccess/database-entities';
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
 import type { ProjectUsageService } from './project-usage.service';
-import {
-  ResourceSpendAggregateRaw,
-  ResourceUsageAggregateRaw,
-  SpendRaw,
-  TimeSeriesSpendRaw,
-  TimeSeriesUsageRaw,
-  UsageSummaryRaw,
-} from './project-usage.service.definitions';
+export type UsageSummaryRaw = {
+  totalSessions: string | null;
+  totalMinutes: string | null;
+};
+
+export type SpendRaw = {
+  totalSpend: string | null;
+};
+
+export type TimeSeriesUsageRaw = {
+  usageDate: string;
+  sessions: string;
+  minutes: string;
+};
+
+export type TimeSeriesSpendRaw = {
+  usageDate: string;
+  spend: string;
+};
+
+export type ResourceUsageAggregateRaw = {
+  resourceId: string;
+  resourceName: string | null;
+  sessions: string;
+  minutes: string;
+};
+
+export type ResourceSpendAggregateRaw = {
+  resourceId: string;
+  spend: string;
+};
 
 interface ProjectUsageServiceProjectUsageStatisticsContext {
   projectAccessService: ProjectUsageService['projectAccessService'];

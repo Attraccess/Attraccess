@@ -1,9 +1,0 @@
-export { WagoRuntimeArtifactCatalogHasOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-has-operation';
-export { WagoRuntimeArtifactCatalogAcquireOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-acquire-operation';
-export { WagoRuntimeArtifactCatalogBackfillMetadataOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-backfill-metadata-operation';
-export { WagoRuntimeArtifactCatalogImportOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-import-operation';
-export { WagoRuntimeArtifactCatalogCacheOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-cache-operation';
-export { WagoRuntimeArtifactCatalogCreateTemporaryDirectoryOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-create-temporary-directory-operation';
-export { WagoRuntimeArtifactCatalogCreateUploadDirectoryOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-create-upload-directory-operation';
-export { WagoRuntimeArtifactCatalogCurrentOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-current-operation';
-export { WagoRuntimeArtifactCatalogGetOperation } from './wago-runtime-artifacts.wago-runtime-artifact-catalog-get-operation';

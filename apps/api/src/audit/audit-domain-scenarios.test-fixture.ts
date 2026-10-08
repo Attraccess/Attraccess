@@ -1,6 +1,6 @@
 import { AuditLog, SSOProviderType } from '@attraccess/database-entities';
 import { randomUUID } from 'node:crypto';
-import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/sso-audit-snapshot';
+import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { AuditService } from './audit.service';
 export interface DomainScenario {
   domain: string;

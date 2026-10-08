@@ -12,15 +12,15 @@ import { TwoFactorService } from '../../../api/src/users-and-auth/auth/two-facto
 import { AuthAuditLogger } from '../../../api/src/users-and-auth/rate-limiting/auth-audit.logger';
 import { RbacService } from '../../../api/src/users-and-auth/rbac/rbac.service';
 import { SessionStrategy } from '../../../api/src/users-and-auth/strategies/session.strategy';
-import { heartbeatTopic } from '../backend/protocol';
-import { WagoCommissioningSession } from '../backend/wago-commissioning-session.entity';
-import { WagoCommissioningService } from '../backend/wago-commissioning.service';
-import { WagoController } from '../backend/wago-controller.entity';
-import { WagoCredentialRotationService } from '../backend/wago-credential-rotation';
-import { WagoCredentialRotationEntity } from '../backend/wago-credential-rotation.entity';
-import { WagoRuntimeArtifactsService } from '../backend/wago-runtime-artifacts';
-import { WagoControllerApi } from '../backend/wago.controller';
-import { WagoService } from '../backend/wago.service';
+import { heartbeatTopic } from '../backend/protocol/index';
+import { WagoCommissioningSession } from '../backend/commissioning/session.entity';
+import { WagoCommissioningService } from '../backend/commissioning/service';
+import { WagoController } from '../backend/controllers/entity';
+import { WagoCredentialRotationService } from '../backend/credentials/service';
+import { WagoCredentialRotationEntity } from '../backend/credentials/service';
+import { WagoRuntimeArtifactsService } from '../backend/runtime/artifacts/catalog';
+import { WagoControllerApi } from '../backend/controllers/controller';
+import { WagoService } from '../backend/controllers/service';
 import { FixtureMqtt, pluginId, principal, privateValue, snapshot } from './audit-hooks.integration-globals.test-utils';
 
 export class AuditFixtureState {

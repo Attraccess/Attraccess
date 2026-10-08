@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import 'reflect-metadata';
-import { parseOperationalMessage } from './../backend/protocol';
+import { parseOperationalMessage } from '../backend/protocol/index';
 import { hash } from './../cc100-runtime/src/runtime';
 import { FleetAfterAll } from './production-fleet-afterall.test-utils';
 import { FleetBeforeAll } from './production-fleet-beforeall.test-utils';

@@ -15,16 +15,16 @@ import {
   UploadIcon,
 } from 'lucide-react';
 import { NodeCatalogPanel } from './nodeCatalog';
-import { FlowProvider } from './flowContext';
+import { FlowProvider } from './context/index';
 import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
-import { useFlowsPageInnerState } from './useFlowsPageInnerState';
+import { useFlowEditor } from './canvas/useFlowEditor';
 
 // Efficient comparison functions to replace expensive JSON.stringify operations
 
 function FlowsPageInner() {
-  const model = useFlowsPageInnerState();
+  const model = useFlowEditor();
 
   return (
     <div className="h-full w-full flex flex-col">

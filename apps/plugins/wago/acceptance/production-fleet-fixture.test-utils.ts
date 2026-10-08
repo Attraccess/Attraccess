@@ -4,8 +4,8 @@ import { type Server, type Socket } from 'node:net';
 import { join } from 'node:path';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { WagoFlowService } from '../backend/wago-flow.service';
-import { WagoService } from '../backend/wago.service';
+import { WagoFlowService } from '../backend/flow/service';
+import { WagoService } from '../backend/controllers/service';
 import { WagoRuntime, type Snapshot } from '../cc100-runtime/src/runtime';
 import { base, Log, temporary, Wire } from './production-fleet-globals.test-utils';
 

@@ -24,7 +24,7 @@ import { closeResourceTransactionConnection } from './../../database/run-seriali
 
 import { inheritTestScope } from './../../test-utils/inherit-test-scope';
 
-import { compileFlowTemplate } from './../flows/flow-template';
+import { compileFlowTemplate } from '../flows/execution/flow-template';
 
 import { resetTestFixture } from './resource-metering.persistence.setup.test-fixture';
 

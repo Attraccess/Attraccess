@@ -7,7 +7,7 @@ import {
   usePluginLiveUpdates,
 } from '@attraccess/plugins-frontend-sdk';
 import { afterEach, expect, it, vi } from 'vitest';
-import { getRoutesOfPlugin } from '../routes/index.get-routes-of-plugin';
+import { getRoutesOfPlugin } from '../routes/index';
 import { PluginSlot } from './PluginSlot';
 import usePluginState, { PluginManifestWithPlugin } from './plugin.state';
 

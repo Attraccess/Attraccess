@@ -1,4 +1,5 @@
 import { Attractap, Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
 import {
   Body,
   ClassSerializerInterceptor,
@@ -13,26 +14,42 @@ import {
   Patch,
   Req,
   UseInterceptors,
+  StreamableFile,
+  Post,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags, ApiProduces } from '@nestjs/swagger';
+
 import { LicenseModuleType } from '../license/license.service';
+
 import { RequiresLicense } from '../license/require-license.decorator';
-import { AttractapCrashReportRoutes } from './attractap-crash-report.routes';
+
 import { AttractapService } from './attractap.service';
+
 import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
+
 import { UpdateReaderDto } from './dtos/update-reader.dto';
+
 import { AttractapGateway } from './websockets/websocket.gateway';
+
 import { WebsocketService } from './websockets/websocket.service';
-import { installInheritedMethods } from '../common/inherited-implementation';
 import { CardAccessService } from './card-access.service';
+
+import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+
+import { EnrollNfcCardResponseDto } from './dtos/enroll-rfid-card-response.dto';
+
+import { EnrollNfcCardDto } from './dtos/enroll-rfid-card.dto';
+
+import { ResetNfcCardResponseDto } from './dtos/reset-rfid-card-response.dto';
+
+import { ResetNfcCardDto } from './dtos/reset-rfid-card.dto';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
 @UseInterceptors(ClassSerializerInterceptor)
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
-export class AttractapController extends AttractapCrashReportRoutes {
-  protected readonly logger = new Logger(AttractapController.name);
-
+export class AttractapController {
   public constructor(
     @Inject(AttractapGateway)
     protected readonly attractapGateway: AttractapGateway,
@@ -41,9 +58,9 @@ export class AttractapController extends AttractapCrashReportRoutes {
     @Inject(AttractapService)
     protected readonly attractapService: AttractapService,
     protected readonly cardAccess: CardAccessService,
-  ) {
-    super();
-  }
+  ) {}
+
+  protected readonly logger = new Logger(AttractapController.name);
 
   @Patch(':readerId')
   @Auth('resources.update')
@@ -123,14 +140,98 @@ export class AttractapController extends AttractapCrashReportRoutes {
       });
     }
   }
+
+  @Get(':readerId/crash-reports')
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'Get crash reports for a reader', operationId: 'getReaderCrashReports' })
+  @ApiParam({ name: 'readerId', description: 'The ID of the reader', example: 1 })
+  @ApiResponse({
+    status: 200,
+    description: 'The list of crash reports for the reader, newest first',
+    type: [AttractapCrashReportDto],
+  })
+  async getReaderCrashReports(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCrashReportDto[]> {
+    return await this.attractapService.getCrashReportsForReader(readerId);
+  }
+
+  @Get(':readerId/crash-reports/:reportId/coredump')
+  @Auth('resources.update')
+  @ApiOperation({
+    summary: 'Download the coredump blob of a crash report',
+    operationId: 'getReaderCrashReportCoredump',
+  })
+  @ApiParam({ name: 'readerId', description: 'The ID of the reader', example: 1 })
+  @ApiParam({ name: 'reportId', description: 'The ID of the crash report', example: 1 })
+  @ApiProduces('application/octet-stream')
+  @ApiResponse({ status: 200, description: 'The coredump binary blob' })
+  @ApiResponse({ status: 404, description: 'Crash report or coredump not found' })
+  async getReaderCrashReportCoredump(
+    @Param('readerId', ParseIntPipe) readerId: number,
+    @Param('reportId', ParseIntPipe) reportId: number,
+  ): Promise<StreamableFile> {
+    const result = await this.attractapService.getCrashReportCoredump(readerId, reportId);
+
+    if (!result) {
+      throw new NotFoundException(`No coredump found for crash report ${reportId} of reader ${readerId}`);
+    }
+
+    return new StreamableFile(result.coredump, {
+      type: 'application/octet-stream',
+      disposition: `attachment; filename="${result.filename}"`,
+    });
+  }
+
+  @Post('enroll-nfc-card')
+  @Auth()
+  @ApiOperation({ summary: 'Enroll a new NFC card', operationId: 'enrollNfcCard' })
+  @ApiBody({ type: EnrollNfcCardDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Enrollment initiated, continue on Reader',
+    type: EnrollNfcCardResponseDto,
+  })
+  public async enrollNfcCard(
+    @Body() enrollData: EnrollNfcCardDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<EnrollNfcCardResponseDto> {
+    const userId = await this.cardAccess.resolveUserId(req.user, enrollData.userId);
+    await this.attractapGateway.startEnrollOfNewNfcCard({
+      readerId: enrollData.readerId,
+      userId,
+      actorId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+    });
+
+    return {
+      message: 'Enrollment initiated, continue on Reader',
+    };
+  }
+
+  @Post('reset-nfc-card')
+  @Auth()
+  @ApiOperation({ summary: 'Reset an NFC card', operationId: 'resetNfcCard' })
+  @ApiBody({ type: ResetNfcCardDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Reset initiated, continue on Reader',
+    type: ResetNfcCardResponseDto,
+  })
+  public async resetNfcCard(
+    @Body() resetData: ResetNfcCardDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResetNfcCardResponseDto> {
+    await this.cardAccess.getCardForManagement(resetData.cardId, req.user);
+    await this.attractapGateway.startResetOfNfcCard({
+      readerId: resetData.readerId,
+      cardId: resetData.cardId,
+      userId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+    });
+
+    return {
+      message: 'Reset initiated, continue on Reader',
+    };
+  }
 }
-installInheritedMethods(AttractapController, [
-  'enrollNfcCard',
-  'resetNfcCard',
-  'updateReader',
-  'getReaders',
-  'getReaderById',
-  'getReaderCrashReports',
-  'getReaderCrashReportCoredump',
-  'deleteReader',
-]);

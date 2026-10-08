@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 // The standalone runtime bundles the plugin-owned measurement contract.
 // The API and standalone runtime enforce the same configured output behavior.
 import { validateDesired } from './configuration';
-import { RuntimeTelemetry } from './runtime-telemetry';
+import { RuntimeTelemetry } from './runtime/telemetry';
 
 export { hash, PROTOCOL_VERSION, validateDesired, validateSnapshot } from './configuration';
-export { MAX_PENDING_CHANNEL_WRITES } from './output-controller';
-export type { DeviceAdapter, RuntimeState, Snapshot, Transport, ValidationError } from './runtime-types';
+export { MAX_PENDING_CHANNEL_WRITES } from './outputs/controller';
+export type { DeviceAdapter, RuntimeState, Snapshot, Transport, ValidationError } from './runtime/types';
 export { JsonStateStore } from './state-store';
 
 export class WagoRuntime extends RuntimeTelemetry {

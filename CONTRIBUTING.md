@@ -2,7 +2,7 @@
 
 ## File size limits
 
-Keep code files **below 200 lines** (maximum 199) and test suites and test helpers
+Keep code files **at or below 600 lines** and test suites and test helpers
 **at or below 1,000 lines**. The check counts every physical line, including blank
 lines and comments; a final newline does not add an extra line. CRLF and LF count the same.
 
@@ -13,8 +13,14 @@ checks. The PR and merge-queue workflow runs the check in the required
 `lint-and-typecheck` job, independently of Nx's affected-project selection.
 
 The limits apply to every covered file, including unchanged files and renames.
-Split oversized code into cohesive modules while preserving behavior. Keep a
-normal test suite together, including its setup, related cases, and assertions;
+Split oversized code by feature or responsibility while preserving behavior.
+Keep related logic together; the limit is a ceiling, not a target for making
+every function or method its own file. Place multi-file implementations in a
+named feature folder, with concise filenames that describe their role (for
+example, `commissioning/transport.ts` and `commissioning/credentials.ts`). Keep
+shared helpers close to their consumers; avoid flat piles of repeated prefixes
+and generic `helpers` or `part-N` files. Keep a normal test suite together,
+including its setup, related cases, and assertions;
 when a test file exceeds 1,000 lines, split it by behavior or feature. Avoid
 single-case files and registration wrappers created only to meet a line count.
 Use shared fixtures when they reduce repeated setup without hiding the tests.

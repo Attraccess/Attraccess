@@ -10,18 +10,18 @@ import {
   TableHeader,
   TableScrollContainer,
 } from '@heroui/react';
-import { SettingsSection } from '../../components/SettingsSection';
-import { Button } from '../../../../components/button';
+import { Button } from '../../../../components/button/index';
 import { EmptyState } from '../../../../components/emptyState';
 import { UploadPluginModal } from '../../../plugins/UploadPluginModal';
-import { usePluginsSectionState } from './usePluginsSectionState';
-import { PluginsSectionStandardModal } from './PluginsSectionStandardModal';
-import { PluginsSectionPluginsListCheckUpdatesButton } from './PluginsSectionPluginsListCheckUpdatesButton';
-import { PluginsSectionStandardModalMarketplaceBack } from './PluginsSectionStandardModalMarketplaceBack';
-import { PluginsSectionStandardModalDeleteConfirmationTitle } from './PluginsSectionStandardModalDeleteConfirmationTitle';
-import { PluginsSectionStandardModalMarketplaceInstallTitle } from './PluginsSectionStandardModalMarketplaceInstallTitle';
-import { PluginsSectionStandardModalStatusErrorTitle } from './PluginsSectionStandardModalStatusErrorTitle';
-import { renderPluginsSectionPluginsRows } from './renderPluginsSectionPluginsRows';
+import { SettingsSection } from '../../components/SettingsSection';
+import { MarketplaceBrowser } from './marketplace/MarketplaceBrowser';
+import { PluginToolbar } from './installed/PluginToolbar';
+import { RemovePluginModal } from './installed/RemovePluginModal';
+import { InstallPluginModal } from './marketplace/InstallPluginModal';
+import { PluginErrorModal } from './installed/PluginErrorModal';
+import { renderPluginRow } from './installed/PluginRow';
+import { usePluginsSectionState } from './state/usePluginSettings';
+import { VersionManagementModal } from './versions/VersionManagementModal';
 
 /**
  * Installed plugins. This is the one section on `system.plugins.manage` rather than
@@ -62,7 +62,7 @@ export function PluginsSection() {
             </AlertContent>
           </Alert>
         ) : null}
-        <PluginsSectionPluginsListCheckUpdatesButton {...model} />
+        <PluginToolbar {...model} />
 
         <Table data-cy="plugins-list-table">
           <TableScrollContainer>
@@ -84,7 +84,7 @@ export function PluginsSection() {
                 renderEmptyState={() => <EmptyState />}
               >
                 {(plugin) =>
-                  renderPluginsSectionPluginsRows(plugin, {
+                  renderPluginRow(plugin, {
                     installedNpmPlugins: model.installedNpmPlugins,
                     t: model.t,
                     setFailedPlugin: model.setFailedPlugin,
@@ -101,16 +101,16 @@ export function PluginsSection() {
           </TableScrollContainer>
         </Table>
 
-        <PluginsSectionStandardModalStatusErrorTitle {...model} />
+        <PluginErrorModal {...model} />
 
-        <PluginsSectionStandardModalMarketplaceBack {...model} />
+        <MarketplaceBrowser {...model} />
       </div>
 
-      <PluginsSectionStandardModalMarketplaceInstallTitle {...model} />
+      <InstallPluginModal {...model} />
 
-      <PluginsSectionStandardModalDeleteConfirmationTitle {...model} />
+      <RemovePluginModal {...model} />
 
-      <PluginsSectionStandardModal {...model} />
+      <VersionManagementModal {...model} />
 
       <UploadPluginModal isOpen={model.isUploadOpen} onClose={() => model.setIsUploadOpen(false)} />
     </SettingsSection>

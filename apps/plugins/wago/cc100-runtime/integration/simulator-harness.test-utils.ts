@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { connect, type MqttClient } from 'mqtt';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 
-import { WagoSettings } from '../../backend/wago-settings.entity';
-import { WagoService } from '../../backend/wago.service';
+import { WagoSettings } from '../../backend/controllers/settings.entity';
+import { WagoService } from '../../backend/controllers/service';
 
 import { temporary } from './simulator-fixtures.test-utils';
 import { createBroker } from './simulator-fixtures.test-utils';

@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   resolveNodeSchema: vi.fn(),
 }));
 vi.mock('@xyflow/react', () => ({ useNodeId: () => 'node', useNodesData: () => mocks.current }));
-vi.mock('../../flowContext', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1 }) }));
+vi.mock('../../context/index', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1 }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
   useResourceFlowsServiceResolveNodeSchema: () => ({

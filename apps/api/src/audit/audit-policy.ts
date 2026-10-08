@@ -1,18 +1,18 @@
-export { ATTRACTAP_AUDIT_ACTIONS, projectAttractapAuditEvent } from './audit-attractap-policy';
+export { ATTRACTAP_AUDIT_ACTIONS, projectAttractapAuditEvent } from './policies/attractap';
 export {
   AttractapAuditEvent,
   ProjectAuditEvent,
   ResourceAuditEvent,
   ResourceAuditOrigin,
   SsoAuditEvent,
-} from './audit-domain-event.types';
+} from './policies/domain-events';
 export {
   IDENTITY_AUDIT_ACTIONS,
   IdentityAuditAction,
   IdentityAuditEvent,
   ProjectedIdentityAuditEvent,
   projectIdentityAuditEvent,
-} from './audit-identity-projection';
-export { projectProjectAuditEvent } from './audit-project-policy';
-export { RESOURCE_AUDIT_ACTIONS, projectResourceAuditEvent } from './audit-resource-policy';
-export { projectSsoAuditEvent } from './audit-sso-projection';
+} from './policies/identity';
+export { projectProjectAuditEvent } from './policies/projects';
+export { RESOURCE_AUDIT_ACTIONS, projectResourceAuditEvent } from './policies/resources';
+export { projectSsoAuditEvent } from './policies/sso';

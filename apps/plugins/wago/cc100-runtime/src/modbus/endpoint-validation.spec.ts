@@ -1,4 +1,4 @@
-import { validateSnapshot as validateBackend } from '../../../backend/configuration';
+import { validateSnapshot as validateBackend } from '../../../backend/configuration/model';
 import { validateSnapshot as validateRuntime } from '../runtime';
 
 import { QueuedModbusTransport } from './transports';

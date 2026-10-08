@@ -1,6 +1,6 @@
 import { mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { WAGO_DIN, WAGO_DOUT, wagoRuntimeBootScript } from '../wago-hardware-deployment';
+import { WAGO_DIN, WAGO_DOUT, wagoRuntimeBootScript } from '../host/hardware-deployment';
 import { fw31Model, fw31OsRelease, fw31Revisions } from './fw31-identity';
 import { fw31MinimalOd } from './fw31-minimal-od';
 export function setupFw31OperatingSystem({

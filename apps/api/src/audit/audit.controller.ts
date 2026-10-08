@@ -2,8 +2,8 @@ import { BadRequestException, Controller, Get, Query, ValidationPipe } from '@ne
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { ApiExtraModels, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
-import { AuditQueryDto } from './audit-query.dto';
-import { AuditMetaDto, AuditPageDto } from './audit-response.dto';
+import { AuditQueryDto } from './dto/audit-query.dto';
+import { AuditMetaDto, AuditPageDto } from './dto/audit-response.dto';
 
 @ApiTags('Audit')
 @ApiExtraModels(AuditQueryDto)

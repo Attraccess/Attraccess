@@ -1,26 +1,43 @@
-import { Permission, Role, RolePermission, User, UserRole } from '@attraccess/database-entities';
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
+
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Redis } from 'ioredis';
-import { EntityManager, Repository } from 'typeorm';
+
+import { type Redis } from 'ioredis';
+
+import { EntityManager, Repository, QueryFailedError, In } from 'typeorm';
+
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
+
 import {
   AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
   authorizationCacheInvalidationSource,
 } from './authorization-cache-invalidation';
+
 import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';
-import { RbacSsoRoleSyncImplementation } from './rbac-sso-role-sync';
+
+import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+
+import { RoleWithUsageDto } from './dtos/role-with-usage.dto';
+
+import { CreateRoleDto } from './dtos/create-role.dto';
+
+import { UpdateRoleDto } from './dtos/update-role.dto';
 
 @Injectable()
-export class RbacService extends RbacSsoRoleSyncImplementation {
-  protected readonly logger = new Logger(RbacService.name);
-  // ponytail: TTL cache — local invalidation keeps single-instance latency low; TTL bounds staleness
-  // in multi-instance Postgres deployments where a role change on another instance won't invalidate here.
-  protected readonly CACHE_TTL_MS = 30_000;
-  protected readonly MAX_CACHE_SIZE = 1_000;
-  protected readonly permissionsCache = new Map<number, { permissions: Set<string>; ts: number }>();
-
+export class RbacService {
   constructor(
     @InjectRepository(UserRole)
     protected readonly userRoleRepository: Repository<UserRole>,
@@ -34,9 +51,17 @@ export class RbacService extends RbacSsoRoleSyncImplementation {
     protected readonly rolePermissionRepository: Repository<RolePermission>,
     protected readonly eventEmitter: EventEmitter2,
     @Optional() @Inject(VALKEY_CLIENT) protected readonly valkeyClient: Redis | null,
-  ) {
-    super();
-  }
+  ) {}
+
+  protected readonly logger = new Logger(RbacService.name);
+
+  // ponytail: TTL cache — local invalidation keeps single-instance latency low; TTL bounds staleness
+  // in multi-instance Postgres deployments where a role change on another instance won't invalidate here.
+  protected readonly CACHE_TTL_MS = 30_000;
+
+  protected readonly MAX_CACHE_SIZE = 1_000;
+
+  protected readonly permissionsCache = new Map<number, { permissions: Set<string>; ts: number }>();
 
   protected async permissionsChanged(userId?: number): Promise<void> {
     this.eventEmitter.emit(UserPermissionsChangedEvent.EVENT_NAME, new UserPermissionsChangedEvent(userId));
@@ -114,5 +139,450 @@ export class RbacService extends RbacSsoRoleSyncImplementation {
       .where('rp.permissionKey = :permKey', { permKey: permissionKey })
       .getRawMany<{ userId: number }>();
     return rows.map((r) => r.userId);
+  }
+
+  async syncSsoRoles(
+    userId: number,
+    roles: Array<{ roleKey: string; externalValue?: string | null }>,
+    ssoProviderType: string,
+    ssoProviderId: number,
+  ): Promise<{ added: string[]; removed: string[]; updated: string[] }> {
+    const changes = await this.userRoleRepository.manager.transaction(async (manager) =>
+      this.syncSsoRolesInTransaction(
+        userId,
+        roles,
+        ssoProviderType,
+        ssoProviderId,
+        manager.getRepository(UserRole),
+        manager.getRepository(Role),
+      ),
+    );
+    this.permissionsCache.delete(userId);
+    await this.permissionsChanged(userId);
+    return changes;
+  }
+
+  protected async syncSsoRolesInTransaction(
+    userId: number,
+    roles: Array<{ roleKey: string; externalValue?: string | null }>,
+    ssoProviderType: string,
+    ssoProviderId: number,
+    userRoleRepository: Repository<UserRole>,
+    roleRepository: Repository<Role>,
+  ): Promise<{ added: string[]; removed: string[]; updated: string[] }> {
+    // roleKey -> external claim value that granted it (source metadata for the UI)
+    const targetByKey = new Map(roles.map((r) => [r.roleKey, r.externalValue ?? null]));
+
+    const currentSsoRoles = await userRoleRepository.find({
+      where: { userId, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
+      relations: ['role'],
+    });
+    const removed: string[] = [];
+    const added: string[] = [];
+    const updated: string[] = [];
+
+    for (const ur of currentSsoRoles) {
+      if (!targetByKey.has(ur.role.key)) {
+        // ponytail: last-administrator guardrail — transient IdP claim omission must not silently strip the last administrator
+        if (ur.role.key === 'administrator') {
+          const otherAdministratorCount = await userRoleRepository
+            .createQueryBuilder('ur2')
+            .innerJoin('ur2.user', 'u', 'u.deletedAt IS NULL')
+            .where('ur2.roleId = :roleId', { roleId: ur.roleId })
+            .andWhere('ur2.id != :id', { id: ur.id })
+            .getCount();
+          if (otherAdministratorCount === 0) {
+            continue;
+          }
+        }
+        await userRoleRepository.delete({ id: ur.id });
+        removed.push(ur.role.key);
+      }
+    }
+
+    const currentByKey = new Map(currentSsoRoles.map((ur) => [ur.role.key, ur]));
+    for (const [roleKey, externalValue] of targetByKey) {
+      const current = currentByKey.get(roleKey);
+      if (current) {
+        if ((current.externalValue ?? null) !== externalValue) {
+          await userRoleRepository.update({ id: current.id }, { externalValue });
+          updated.push(roleKey);
+        }
+        continue;
+      }
+      const role = await roleRepository.findOne({ where: { key: roleKey } });
+      if (!role) continue;
+      const existing = await userRoleRepository.findOne({
+        where: { userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
+      });
+      if (!existing) {
+        try {
+          await userRoleRepository.save(
+            userRoleRepository.create({
+              userId,
+              roleId: role.id,
+              source: UserRoleSource.SSO,
+              ssoProviderType,
+              ssoProviderId,
+              externalValue,
+            }),
+          );
+          added.push(roleKey);
+        } catch (err) {
+          // ponytail: '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
+          const code = (err as QueryFailedError & { code?: string }).code;
+          const isUniqueViolation =
+            err instanceof QueryFailedError &&
+            (code === '23505' || (code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE constraint failed')));
+          if (isUniqueViolation) {
+            // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
+            this.logger.debug(`syncSsoRoles: role ${roleKey} already held via another provider for user ${userId}`);
+          } else {
+            throw err;
+          }
+        }
+      }
+    }
+    return { added, removed, updated };
+  }
+
+  async assignRoleByKey(userId: number, roleKey: string, em?: EntityManager): Promise<UserRole | null> {
+    const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
+    const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
+
+    const role = await roleRepo.findOne({ where: { key: roleKey } });
+    if (!role) return null;
+    const existing = await urRepo.findOne({
+      where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
+    });
+    if (existing) return existing;
+    const result = await urRepo.save(urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }));
+    if (!em) {
+      this.permissionsCache.delete(userId);
+      await this.permissionsChanged(userId);
+    }
+    return result;
+  }
+
+  async assignDefaultRoles(userId: number, em?: EntityManager): Promise<void> {
+    const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
+    const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
+
+    const defaultRoles = await roleRepo.find({ where: { isDefault: true } });
+    for (const role of defaultRoles) {
+      const existing = await urRepo.findOne({
+        where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
+      });
+      if (!existing) {
+        await urRepo.save(urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }));
+      }
+    }
+    if (!em) {
+      this.permissionsCache.delete(userId);
+      await this.permissionsChanged(userId);
+    }
+  }
+
+  async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
+    const userExists = await this.userRepository.existsBy({ id: userId });
+    if (!userExists) throw new UserNotFoundException(userId);
+
+    const role = await this.roleRepository.findOne({
+      where: { id: roleId },
+      relations: ['rolePermissions'],
+    });
+
+    if (!role) {
+      throw new NotFoundException(`Role ${roleId} not found`);
+    }
+
+    // cannot-grant-what-you-don't-have: actor must hold every permission the role grants
+    const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
+    const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+    if (missing.length > 0) {
+      throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
+    }
+
+    const existing = await this.userRoleRepository.findOne({
+      where: { userId, roleId, source: UserRoleSource.MANUAL },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    const userRole = this.userRoleRepository.create({
+      userId,
+      roleId,
+      source: UserRoleSource.MANUAL,
+    });
+    const saved = await this.userRoleRepository.save(userRole);
+    this.permissionsCache.delete(userId);
+    await this.permissionsChanged(userId);
+    return saved;
+  }
+
+  async revokeRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<void> {
+    const userExists = await this.userRepository.existsBy({ id: userId });
+    if (!userExists) throw new UserNotFoundException(userId);
+
+    const role = await this.roleRepository.findOne({
+      where: { id: roleId },
+      relations: ['rolePermissions'],
+    });
+    if (!role) {
+      throw new NotFoundException(`Role ${roleId} not found`);
+    }
+
+    // cannot-revoke-what-you-don't-have: actor must hold every permission the role grants
+    const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
+    const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+    if (missing.length > 0) {
+      throw new ForbiddenException('You cannot revoke a role whose permissions exceed your own');
+    }
+
+    if (role.key === 'administrator') {
+      // ponytail: wrap count+delete in a transaction to close the TOCTOU race where two concurrent
+      // revocations could both see administratorCount=2, both pass the guard, and both proceed to delete
+      await this.userRoleRepository.manager.transaction(async (manager) => {
+        const administratorCount = await manager
+          .createQueryBuilder(UserRole, 'ur')
+          .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+          .where('ur.roleId = :roleId', { roleId })
+          .getCount();
+        if (administratorCount <= 1) {
+          throw new ForbiddenException('Cannot remove the last administrator from the system');
+        }
+        const result = await manager.delete(UserRole, { userId, roleId, source: UserRoleSource.MANUAL });
+        if (!result.affected) {
+          throw new ConflictException(
+            'Role is not manually assigned to this user and cannot be revoked via this endpoint',
+          );
+        }
+      });
+      this.permissionsCache.delete(userId);
+      await this.permissionsChanged(userId);
+      return;
+    }
+
+    const result = await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
+    if (!result.affected) {
+      throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
+    }
+    this.permissionsCache.delete(userId);
+    await this.permissionsChanged(userId);
+  }
+
+  async getRoles(): Promise<Role[]> {
+    return this.roleRepository.find({ relations: ['rolePermissions'] });
+  }
+
+  async getRoleKey(roleId: number): Promise<string | null> {
+    return (await this.roleRepository.findOne({ where: { id: roleId }, select: { key: true } }))?.key ?? null;
+  }
+
+  async getRolesWithUsage(): Promise<RoleWithUsageDto[]> {
+    const roles = await this.roleRepository.find({
+      relations: ['rolePermissions'],
+      order: { isSystemManaged: 'DESC', name: 'ASC' },
+    });
+    const counts = await this.userRoleRepository
+      .createQueryBuilder('ur')
+      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+      .select('ur.roleId', 'roleId')
+      .addSelect('COUNT(DISTINCT ur.userId)', 'userCount')
+      .groupBy('ur.roleId')
+      .getRawMany<{ roleId: number; userCount: string }>();
+    const countByRoleId = new Map(counts.map((c) => [Number(c.roleId), Number(c.userCount)]));
+    return roles.map((role) =>
+      Object.assign(new RoleWithUsageDto(), role, { userCount: countByRoleId.get(role.id) ?? 0 }),
+    );
+  }
+
+  protected async resolvePermissionKeys(keys: string[]): Promise<string[]> {
+    const unique = [...new Set(keys)];
+    if (unique.length === 0) return [];
+    const found = await this.permissionRepository.find({ where: { key: In(unique) } });
+    if (found.length !== unique.length) {
+      const known = new Set(found.map((p) => p.key));
+      const unknown = unique.filter((k) => !known.has(k));
+      throw new BadRequestException(`Unknown permission keys: ${unknown.join(', ')}`);
+    }
+    return unique;
+  }
+
+  // pass `manager` to count against uncommitted in-transaction state (permissions table itself is never
+  // modified by role CRUD, so the total always comes from the plain repository)
+  protected async countAdministratorEquivalentUsers(excludeRoleId?: number, manager?: EntityManager): Promise<number> {
+    const totalPermissions = await this.permissionRepository.count();
+    if (totalPermissions === 0) return 0;
+    const qb = (manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur'))
+      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+      .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+      .select('ur.userId', 'userId')
+      .groupBy('ur.userId')
+      .having('COUNT(DISTINCT rp.permissionKey) = :totalPermissions', { totalPermissions });
+    if (excludeRoleId !== undefined) {
+      qb.where('ur.roleId != :excludeRoleId', { excludeRoleId });
+    }
+    const rows = await qb.getRawMany();
+    return rows.length;
+  }
+
+  async getPermissions(): Promise<Permission[]> {
+    return this.permissionRepository.find({ order: { category: 'ASC', key: 'ASC' } });
+  }
+
+  protected async generateRoleKey(name: string): Promise<string> {
+    const base =
+      name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-/, '')
+        .replace(/-$/, '')
+        .slice(0, 80) || 'role';
+    let candidate = base;
+    for (let suffix = 2; await this.roleRepository.existsBy({ key: candidate }); suffix++) {
+      candidate = `${base}-${suffix}`;
+    }
+    return candidate;
+  }
+
+  async createRole(dto: CreateRoleDto, actorPermissions: Set<string>): Promise<Role> {
+    const permissionKeys = await this.resolvePermissionKeys(dto.permissionKeys ?? []);
+    this.assertActorHolds(actorPermissions, permissionKeys, 'grant');
+
+    const role = await this.roleRepository.save(
+      this.roleRepository.create({
+        key: await this.generateRoleKey(dto.name),
+        name: dto.name.trim(),
+        description: dto.description?.trim() ?? '',
+        isSystemManaged: false,
+        isDefault: false,
+      }),
+    );
+    if (permissionKeys.length > 0) {
+      await this.rolePermissionRepository.save(
+        permissionKeys.map((permissionKey) => this.rolePermissionRepository.create({ roleId: role.id, permissionKey })),
+      );
+    }
+    const created = await this.roleRepository.findOne({ where: { id: role.id }, relations: ['rolePermissions'] });
+    return created as Role;
+  }
+
+  async updateRole(roleId: number, dto: UpdateRoleDto, actorPermissions: Set<string>): Promise<Role> {
+    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
+    if (!role) throw new NotFoundException(`Role ${roleId} not found`);
+    if (role.isSystemManaged) {
+      throw new ForbiddenException('System-managed roles cannot be modified');
+    }
+
+    if (dto.name !== undefined) role.name = dto.name.trim();
+    if (dto.description !== undefined) role.description = dto.description.trim();
+
+    if (dto.permissionKeys !== undefined) {
+      const targetKeys = await this.resolvePermissionKeys(dto.permissionKeys);
+      const currentKeys = new Set(role.rolePermissions.map((rp) => rp.permissionKey));
+      const added = targetKeys.filter((k) => !currentKeys.has(k));
+      const removed = [...currentKeys].filter((k) => !targetKeys.includes(k));
+      this.assertActorHolds(actorPermissions, added, 'grant');
+      this.assertActorHolds(actorPermissions, removed, 'revoke');
+
+      await this.roleRepository.manager.transaction(async (manager) => {
+        const adminsBefore = removed.length > 0 ? await this.countAdministratorEquivalentUsers(undefined, manager) : 0;
+        await manager.save(Role, { id: role.id, name: role.name, description: role.description });
+        if (removed.length > 0) {
+          await manager.delete(RolePermission, { roleId: role.id, permissionKey: In(removed) });
+        }
+        for (const permissionKey of added) {
+          await manager.save(RolePermission, manager.create(RolePermission, { roleId: role.id, permissionKey }));
+        }
+        // same lockout guard as deleteRole: a permission removal must not drop the
+        // administrator-equivalent user count from >0 to 0 (rolls back via the thrown exception)
+        if (adminsBefore > 0 && (await this.countAdministratorEquivalentUsers(undefined, manager)) === 0) {
+          throw new ForbiddenException(
+            'Updating this role would leave no active user with full administrative permissions',
+          );
+        }
+      });
+      // a role's permission set changed — every user holding it is affected
+      this.permissionsCache.clear();
+      await this.permissionsChanged();
+    } else {
+      await this.roleRepository.save({ id: role.id, name: role.name, description: role.description });
+    }
+
+    const updated = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
+    return updated as Role;
+  }
+
+  async deleteRole(roleId: number, actorPermissions: Set<string>, reassignToRoleId?: number): Promise<void> {
+    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
+    if (!role) throw new NotFoundException(`Role ${roleId} not found`);
+    if (role.isSystemManaged) {
+      throw new ForbiddenException('System-managed roles cannot be deleted');
+    }
+
+    // deleting a role revokes its permissions from every assigned user — same rule as updateRole/revokeRole
+    this.assertActorHolds(
+      actorPermissions,
+      role.rolePermissions.map((rp) => rp.permissionKey),
+      'revoke',
+    );
+
+    let reassignTo: Role | null = null;
+    if (reassignToRoleId !== undefined) {
+      if (reassignToRoleId === roleId) {
+        throw new BadRequestException('Cannot reassign users to the role being deleted');
+      }
+      reassignTo = await this.roleRepository.findOne({
+        where: { id: reassignToRoleId },
+        relations: ['rolePermissions'],
+      });
+      if (!reassignTo) throw new NotFoundException(`Role ${reassignToRoleId} not found`);
+      this.assertActorHolds(
+        actorPermissions,
+        reassignTo.rolePermissions.map((rp) => rp.permissionKey),
+        'grant',
+      );
+    }
+
+    // ponytail: conservative — ignores that a reassignment target could restore administrator-equivalence.
+    // Delete blocks only if it would reduce the administrator-equivalent user count from >0 to 0.
+    const adminsWithoutRole = await this.countAdministratorEquivalentUsers(roleId);
+    if (adminsWithoutRole === 0 && (await this.countAdministratorEquivalentUsers()) > 0) {
+      throw new ForbiddenException(
+        'Deleting this role would leave no active user with full administrative permissions',
+      );
+    }
+
+    await this.roleRepository.manager.transaction(async (manager) => {
+      if (reassignTo) {
+        const assignments = await manager.find(UserRole, { where: { roleId } });
+        const affectedUserIds = [...new Set(assignments.map((a) => a.userId))];
+        for (const userId of affectedUserIds) {
+          const existing = await manager.findOne(UserRole, {
+            where: { userId, roleId: reassignTo.id, source: UserRoleSource.MANUAL },
+          });
+          if (!existing) {
+            await manager.save(
+              UserRole,
+              manager.create(UserRole, { userId, roleId: reassignTo.id, source: UserRoleSource.MANUAL }),
+            );
+          }
+        }
+      }
+      // FK cascades remove role_permission and user_role rows
+      await manager.delete(Role, { id: roleId });
+    });
+    this.permissionsCache.clear();
+    await this.permissionsChanged();
+  }
+
+  protected assertActorHolds(actorPermissions: Set<string>, keys: string[], action: 'grant' | 'revoke'): void {
+    const missing = keys.filter((k) => !actorPermissions.has(k));
+    if (missing.length > 0) {
+      throw new ForbiddenException(`You cannot ${action} permissions you do not have: ${missing.join(', ')}`);
+    }
   }
 }

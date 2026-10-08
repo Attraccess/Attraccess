@@ -17,16 +17,20 @@ import shellyEn from './../../../shelly/frontend/src/en.json';
 import { useShellyTranslations } from './../../../shelly/frontend/src/i18n';
 import { pulseBehaviorError } from './../../channel-behavior';
 import type { Freshness, WagoDiagnostics } from './../../diagnostics-types';
-import type { ModbusConnection, ModbusProfile, RegisterFormat } from './../../modbus/model';
-import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from './../../modbus/model';
-import type { CommissioningVerification, WagoConfigurationSnapshot } from './api';
-import { ChannelWorkspace } from './ChannelWorkspace';
-import type { Channel } from './configuration-model';
-import { changeLabel, emptyConfiguration, emptyMetadata, readableChangeValue } from './configuration-model';
-import { ConfigurationChanges, ConfigurationErrors, ConfigurationMetadataChanges } from './ConfigurationChanges';
+import type { ModbusConnection, ModbusProfile, RegisterFormat } from '../../modbus/model';
+import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
+import type { CommissioningVerification, WagoConfigurationSnapshot } from './api/client';
+import { ChannelWorkspace } from './configuration/channels/ChannelWorkspace';
+import type { Channel } from './configuration/model';
+import { changeLabel, emptyConfiguration, emptyMetadata, readableChangeValue } from './configuration/model';
+import {
+  ConfigurationChanges,
+  ConfigurationErrors,
+  ConfigurationMetadataChanges,
+} from './configuration/ConfigurationChanges';
 import { useWagoTranslations, wagoTranslations } from './i18n';
-import { modbusDisplayName } from './modbus-labels';
-import { ModbusChannels } from './ModbusChannels';
+import { modbusDisplayName } from './configuration/modbus/modbus-labels';
+import { ModbusChannels } from './configuration/channels/ModbusChannels';
 import germanPresets from './presets.de.json';
 import englishPresets from './presets.en.json';
 

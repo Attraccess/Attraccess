@@ -1,11 +1,5 @@
 import type { BruteForceProtectionService } from './brute-force.service';
-import {
-  COARSE_IP_MULTIPLIER,
-  computeLockoutMs,
-  ipCoarseKey,
-  ipKey,
-  RateLimitScope,
-} from './brute-force.service.definitions';
+import { COARSE_IP_MULTIPLIER, computeLockoutMs, ipCoarseKey, ipKey, RateLimitScope } from './brute-force.service';
 
 interface BruteForceProtectionServiceBruteForceFailureContext {
   settingsService: BruteForceProtectionService['settingsService'];

@@ -1,24 +1,242 @@
 import { EmailTemplateType } from '@attraccess/database-entities';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { accessChangeTranslations } from './email-access-change-translations';
-import { emailAccountDefaults } from './email-account-defaults';
-import { deleteAccountConfirmationTranslations } from './email-delete-account-confirmation-translations';
-import { maintenanceRequestCreatedTranslations } from './email-maintenance-request-created-translations';
-import { messageReceivedTranslations } from './email-message-received-translations';
-import { passwordChangedTranslations } from './email-password-changed-translations';
-import { projectInvitationTranslations } from './email-project-invitation-translations';
-import { resetPasswordTranslations } from './email-reset-password-translations';
-import { emailResourceDefaults } from './email-resource-defaults';
-import { resourceHealthChangedTranslations } from './email-resource-health-changed-translations';
-import { resourceSessionEndedTranslations } from './email-resource-session-ended-translations';
-import { resourceTakeoverTranslations } from './email-resource-takeover-translations';
-import { resourceUsageBillingTransactionSummaryTranslations } from './email-resource-usage-billing-transaction-summary-translations';
-import { resourceUsageNoteAddedTranslations } from './email-resource-usage-note-added-translations';
-import { userInvitationTranslations } from './email-user-invitation-translations';
-import { userRetrainingRequiredTranslations } from './email-user-retraining-required-translations';
-import { usernameChangedTranslations } from './email-username-changed-translations';
-import { verifyEmailTranslations } from './email-verify-email-translations';
+import { accessChangeTranslations } from './defaults/accounts-translations';
+import { deleteAccountConfirmationTranslations } from './defaults/accounts-translations';
+import { maintenanceRequestCreatedTranslations } from './defaults/resources-translations';
+import { messageReceivedTranslations } from './defaults/resources-translations';
+import { passwordChangedTranslations } from './defaults/accounts-translations';
+import { projectInvitationTranslations } from './defaults/accounts-translations';
+import { resetPasswordTranslations } from './defaults/accounts-translations';
+import { resourceHealthChangedTranslations } from './defaults/resources-translations';
+import { resourceSessionEndedTranslations } from './defaults/resources-translations';
+import { resourceTakeoverTranslations } from './defaults/resources-translations';
+import { resourceUsageBillingTransactionSummaryTranslations } from './defaults/resources-translations';
+import { resourceUsageNoteAddedTranslations } from './defaults/resources-translations';
+import { userInvitationTranslations } from './defaults/accounts-translations';
+import { userRetrainingRequiredTranslations } from './defaults/resources-translations';
+import { usernameChangedTranslations } from './defaults/accounts-translations';
+import { verifyEmailTranslations } from './defaults/accounts-translations';
+
+export const emailAccountDefaults = {
+  [EmailTemplateType.VERIFY_EMAIL]: {
+    subject: '{{t "subject" "Verify your email address"}}',
+    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+  },
+
+  [EmailTemplateType.RESET_PASSWORD]: {
+    subject: '{{t "subject" "Reset your password"}}',
+    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+  },
+
+  [EmailTemplateType.USER_INVITATION]: {
+    subject: '{{t "subject" "You have been invited to join Attraccess!"}}',
+    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+  },
+
+  [EmailTemplateType.USERNAME_CHANGED]: {
+    subject: '{{t "subject" "Your username has been changed"}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'user.previousUsername',
+      'user.newUsername',
+      'host.frontend',
+      'host.backend',
+      'url',
+    ],
+  },
+
+  [EmailTemplateType.PASSWORD_CHANGED]: {
+    subject: '{{t "subject" "Your password has been changed"}}',
+    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend'],
+  },
+
+  [EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION]: {
+    subject: '{{t "subject" "Confirm account deletion"}}',
+    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+  },
+
+  [EmailTemplateType.PROJECT_INVITATION]: {
+    subject: '{{t "subject" "You have been invited to {project}" project=project.name}}',
+    variables: [
+      'user.username',
+      'project.name',
+      'inviter.username',
+      'invitation.id',
+      'invitation.role',
+      'invitationUrl',
+      'host.frontend',
+    ],
+  },
+};
+
+export const emailResourceDefaults = {
+  [EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY]: {
+    subject: '{{t "subject" "Your usage receipt for {resource}" resource=resource.name}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'usage.startTime',
+      'usage.endTime',
+      'usage.roundedMinutes',
+      'usage.billingFactor',
+      'items[].name',
+      'items[].description',
+      'items[].quantity',
+      'items[].isUnavailable',
+      'items[].unitPrice',
+      'items[].total',
+      'items[].isFixedFee',
+      'items[].isSessionDuration',
+      'items[].isOperatingDuration',
+      'items[].isBillingFactor',
+      'items[].isDuration',
+      'items[].durationMs',
+      'items[].hasDuration',
+      'items[].durationSeconds',
+      'totalCredits',
+      'newBalance',
+    ],
+  },
+
+  [EmailTemplateType.RESOURCE_HEALTH_CHANGED]: {
+    subject:
+      '{{#if health.isDegraded}}{{t "subject_degraded" "Resource degraded: {resource}" resource=resource.name}}{{else}}{{t "subject_recovered" "Resource recovered: {resource}" resource=resource.name}}{{/if}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'resource.url',
+      'health.status',
+      'health.previousStatus',
+      'health.reason',
+      'health.identifier',
+      'health.isDegraded',
+      'health.headerColor',
+    ],
+  },
+
+  [EmailTemplateType.USER_RETRAINING_REQUIRED]: {
+    subject: '{{t "subject" "Retraining required: {resource}" resource=resource.name}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'resource.url',
+      'retraining.isAge',
+      'retraining.isInactivity',
+      'retraining.blocksAccess',
+    ],
+  },
+
+  [EmailTemplateType.MESSAGE_RECEIVED]: {
+    subject: '{{t "subject" "New message from {sender}" sender=message.senderName}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'message.senderName',
+      'message.preview',
+      'message.conversationUrl',
+    ],
+  },
+
+  [EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED]: {
+    subject: '{{t "subject" "New usage note: {resource}" resource=resource.name}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'resource.url',
+      'note.authorName',
+      'note.content',
+      'note.isStart',
+    ],
+  },
+
+  [EmailTemplateType.RESOURCE_TAKEOVER]: {
+    subject: '{{t "subject" "{resource} was taken over" resource=resource.name}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'resource.url',
+      'takeover.actorName',
+    ],
+  },
+
+  [EmailTemplateType.RESOURCE_SESSION_ENDED]: {
+    subject: '{{t "subject" "{resource} session ended" resource=resource.name}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'resource.url',
+      'session.id',
+      'session.endedAt',
+      'session.endedBy',
+    ],
+  },
+
+  [EmailTemplateType.ACCESS_CHANGE]: {
+    subject: '{{accessChange.title}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'accessChange.title',
+      'accessChange.body',
+      'accessChange.url',
+    ],
+  },
+
+  [EmailTemplateType.MAINTENANCE_REQUEST_CREATED]: {
+    subject: '{{t "subject" "Maintenance requested: {resource}" resource=resource.name}}',
+    variables: [
+      'user.username',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'resource.url',
+      'request.id',
+      'request.reason',
+      'request.requestedBy',
+    ],
+  },
+};
 
 export interface EmailTemplateDefault {
   subject: string;

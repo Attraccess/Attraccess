@@ -11,7 +11,7 @@ RUN mkdir -p /data /etc/dnsmasq.d /etc/prometheus \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-COPY server.js http-helpers.js /app/
+COPY server.js /app/
 COPY modules/ /app/modules/
 COPY public/ /app/public/
 

@@ -6,15 +6,15 @@ import {
   type ConfigurationReview,
   type ConfigurationValidationError,
   type WagoConfigurationDraft,
-} from '../api';
-import { emptyConfiguration, emptyMetadata } from '../configuration-model';
-import { useWagoDiagnostics } from '../diagnostics';
-import { useDraftQuery } from '../queries';
-import { useWagoLiveQuery } from '../live-updates';
+} from '../api/client';
+import { emptyConfiguration, emptyMetadata } from '../configuration/model';
+import { useWagoDiagnostics } from '../diagnostics/diagnostics';
+import { useDraftQuery } from '../api/queries';
+import { useWagoLiveQuery } from '../api/live-updates';
 import { type PanelConfiguration } from './model';
-import { WorkingCopy } from './useFrontPanel.working-copy';
-import { readConfiguration } from './useFrontPanel.helpers';
-import { draftIdentity } from './useFrontPanel.helpers';
+import { WorkingCopy } from './useFrontPanel';
+import { readConfiguration } from './useFrontPanel';
+import { draftIdentity } from './useFrontPanel';
 
 export function useFrontPanelInputs(controllerId: number) {
   const client = useQueryClient();

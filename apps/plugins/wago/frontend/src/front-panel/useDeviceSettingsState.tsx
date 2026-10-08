@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BUILTIN_MODBUS_PROFILES, type ModbusConnection, type ModbusDevice } from '../../../modbus/model';
-import { randomUUID } from '../configuration-id';
+import { randomUUID } from '../configuration/identity';
 import { useWagoTranslations } from '../i18n';
 import { busConnection, deviceProfile, type PanelConfiguration } from './model';
 

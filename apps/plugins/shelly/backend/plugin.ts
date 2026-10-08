@@ -13,15 +13,15 @@
 // into the shared DataSource so getRepository(ShellyDevice) resolves.
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule } from '@nestjs/common';
-import { DeviceRegistryService } from './device-registry.service';
-import { DiscoveryService } from './discovery.service';
-import { ShellyDevice } from './shelly-device.entity';
-import { ShellyProbeService } from './shelly-probe.service';
-import { ShellyController } from './shelly.controller';
-import { ShellyDeviceApiService } from './shelly-device-api.service';
-import { ShellyFirmwareService } from './shelly-firmware.service';
-import { ShellyHttpClient } from './shelly-http.client';
-import { ShellyLiveUpdatesService } from './shelly-live-updates.service';
+import { DeviceRegistryService } from './devices/device-registry.service';
+import { DiscoveryService } from './devices/discovery.service';
+import { ShellyDevice } from './devices/device.entity';
+import { ShellyProbeService } from './devices/probe.service';
+import { ShellyController } from './devices/controller';
+import { ShellyDeviceApiService } from './communication/device-api.service';
+import { ShellyFirmwareService } from './firmware/service.service';
+import { ShellyHttpClient } from './communication/http-client';
+import { ShellyLiveUpdatesService } from './devices/live-updates.service';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on

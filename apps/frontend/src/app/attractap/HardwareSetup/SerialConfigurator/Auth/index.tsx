@@ -1,7 +1,7 @@
-export { type NetworkStatusData } from './index.contracts';
-export { type WifiNetwork } from './index.contracts';
-export { type ApiStatusData } from './index.contracts';
-export { type AttractapConfiguration } from './index.contracts';
-export { AttractapSerialCommProvider } from './index.attractap-serial-comm-provider';
-export { useAttractapSerialComm } from './index.use-attractap-serial-comm';
-export { AttractapSerialCommGate } from './index.attractap-serial-comm-gate';
+export { type NetworkStatusData } from './provider';
+export { type WifiNetwork } from './provider';
+export { type ApiStatusData } from './provider';
+export { type AttractapConfiguration } from './provider';
+export { AttractapSerialCommProvider } from './provider';
+export { useAttractapSerialComm } from './provider';
+export { AttractapSerialCommGate } from './provider';

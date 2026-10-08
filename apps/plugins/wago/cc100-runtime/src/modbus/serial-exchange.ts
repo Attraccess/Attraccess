@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { type ModbusConnection } from '../../../modbus/model';
-import { WriteAdmissionError } from '../runtime-types';
+import { WriteAdmissionError } from '../runtime/types';
 import { TransactionAdmission } from './transport-contracts';
 import { ModbusTransportError, SerialAdmissionRejected } from './transport-errors';
-import { SERIAL_PROGRAM } from './transports.serial-program';
+import { SERIAL_PROGRAM } from './transports';
 
 export function serialExchange(
   c: Extract<ModbusConnection, { transport: 'rtu' }>,

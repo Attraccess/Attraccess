@@ -1,6 +1,6 @@
 #include "display.hpp"
-#include "display/fonts/attractap_fonts.hpp"
-#include "display/theme.hpp"
+#include "fonts/attractap_fonts.hpp"
+#include "theme.hpp"
 
 #include <cstdlib>
 #include <cstring>

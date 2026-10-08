@@ -8,7 +8,7 @@ import {
   OperatingTimelineVerificationDto,
 } from './dtos/operating-diagnostics-response.dto';
 import type { ResourceOperatingDiagnosticsService } from './resource-operating-diagnostics.service';
-import { unionDurationMs } from './resource-operating-diagnostics.service.definitions';
+import { unionDurationMs } from './resource-operating-diagnostics.service';
 
 interface ResourceOperatingDiagnosticsServiceOperatingTimelineVerificationContext {
   intervalRepository: ResourceOperatingDiagnosticsService['intervalRepository'];

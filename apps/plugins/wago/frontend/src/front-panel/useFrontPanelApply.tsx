@@ -1,8 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
-import { publishConfiguration, reviewConfiguration, saveDraft, validateConfiguration, manualCommand } from '../api';
+import {
+  publishConfiguration,
+  reviewConfiguration,
+  saveDraft,
+  validateConfiguration,
+  manualCommand,
+} from '../api/client';
 import { outputBehavior } from '../../../channel-behavior';
 import { type Channel } from './model';
-import { readConfiguration } from './useFrontPanel.helpers';
+import { readConfiguration } from './useFrontPanel';
 import type { useFrontPanelInputs } from './useFrontPanelInputs';
 
 export function useFrontPanelApply(model: ReturnType<typeof useFrontPanelInputs>) {

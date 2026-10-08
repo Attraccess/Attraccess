@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import * as coreMigrations from '../../../api/src/database/migrations';
-import { registerPluginAuditDomains } from '../../../api/src/plugin-system/plugin-audit-registry';
+import { registerPluginAuditDomains } from '../../../api/src/plugin-system/audit/audit-registry';
 import * as wagoMigrations from '../backend/migrations';
 import plugin from '../backend/plugin';
 import { pluginId } from './audit-hooks.integration-globals.test-utils';
