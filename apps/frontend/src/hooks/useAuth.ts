@@ -9,6 +9,9 @@ import {
   OpenAPI,
   useAuthenticationServiceCreateSession,
   AuthenticationService,
+  SsoService,
+  UsersService,
+  ApiError,
   useAuthenticationServiceGetLogoutCapability,
   useTwoFactorAuthenticationServiceGetTwoFactorStatus,
   useUsersServiceGetCurrent,
@@ -70,16 +73,6 @@ export function useAuth() {
   const { error: showError, warning, info } = useToastMessage();
   const logoutPending = useIsMutating({ mutationKey: ['auth-logout'] }) > 0;
 
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const result = url.searchParams.get('ssoLogout');
-    if (!['failed', 'partial', 'returned'].includes(result ?? '')) return;
-    url.searchParams.delete('ssoLogout');
-    window.history.replaceState(null, '', url.toString());
-    const key = result === 'partial' ? 'callbackPartial' : result === 'failed' ? 'callbackFailed' : 'callbackReturned';
-    info({ title: logoutText('localOnly'), description: logoutText(key), duration: 10000 });
-  }, [info, logoutText]);
-
   // Initialize API base URL and configure for cookie-based authentication
   useEffect(() => {
     const initializeAuth = () => {
@@ -105,6 +98,44 @@ export function useAuth() {
     retry: false,
     enabled: isInitialized && !hasStartedLogout, // Stop identity refetch while signing out
   }) as { data: UserWithEffectivePermissions | undefined };
+
+  const [returnToken] = useState(() => new URL(window.location.href).searchParams.get('ssoLogout'));
+  const { data: providerReturn, isFetched: isReturnFetched } = useQuery({
+    queryKey: ['auth-logout-return', returnToken],
+    enabled: isInitialized && /^[A-Za-z0-9_-]{43}$/.test(returnToken ?? ''),
+    retry: false,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      if (!returnToken) return null;
+      const outcome = await SsoService.consumeLogoutResult({ requestBody: { token: returnToken } });
+      // Check the server, rather than cached user data, before claiming local sign-out.
+      try {
+        await UsersService.getCurrent();
+        return null;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return outcome.result;
+        return null;
+      }
+    },
+  });
+  useEffect(() => {
+    if (!returnToken || (!isReturnFetched && /^[A-Za-z0-9_-]{43}$/.test(returnToken))) return;
+    const url = new URL(window.location.href);
+    // Several components use this hook; consuming the URL also prevents duplicate notices.
+    if (url.searchParams.get('ssoLogout') !== returnToken) return;
+    url.searchParams.delete('ssoLogout');
+    window.history.replaceState(null, '', url.toString());
+    queryClient.setQueryData(['auth-logout-return', returnToken], null);
+    if (!providerReturn || currentUser) return;
+    const key =
+      providerReturn === 'partial'
+        ? 'callbackPartial'
+        : providerReturn === 'failed'
+          ? 'callbackFailed'
+          : 'callbackReturned';
+    info({ title: logoutText('localOnly'), description: logoutText(key), duration: 10000 });
+  }, [returnToken, isReturnFetched, providerReturn, currentUser, queryClient, info, logoutText]);
 
   const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } =
     useTwoFactorAuthenticationServiceGetTwoFactorStatus(undefined, {

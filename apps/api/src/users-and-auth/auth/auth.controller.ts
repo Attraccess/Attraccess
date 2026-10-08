@@ -16,6 +16,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { SessionAuthenticatedRequest } from './session-request';
 import { SessionService } from './session.service';
 import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
 import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
@@ -136,10 +137,10 @@ export class AuthController {
   @SessionAuth()
   @ApiOperation({ summary: 'Central logout availability for the current session', operationId: 'getLogoutCapability' })
   @ApiOkResponse({ type: LogoutCapability })
-  async logoutCapability(@Req() request: AuthenticatedRequest): Promise<LogoutCapability> {
+  async logoutCapability(@Req() request: SessionAuthenticatedRequest): Promise<LogoutCapability> {
     const token = this.sessionToken(request);
     if (!token || request.user.apiTokenId) return { available: false, reason: 'local_session' };
-    return this.ssoLogout.capability(await this.sessionService.getSsoContext(token));
+    return this.ssoLogout.capability(request.authSession?.ssoContext ?? null);
   }
 
   @Post('/session/logout-everywhere')
@@ -147,12 +148,12 @@ export class AuthController {
   @ApiOperation({ summary: 'End the current session and initiate provider logout', operationId: 'logoutEverywhere' })
   @ApiOkResponse({ type: CentralLogoutResult })
   async logoutEverywhere(
-    @Req() request: AuthenticatedRequest,
+    @Req() request: SessionAuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CentralLogoutResult> {
     const token = this.sessionToken(request);
     if (!token || request.user.apiTokenId) throw new UnauthorizedException('An active session is required');
-    const session = await this.sessionService.getLogoutSession(token);
+    const session = request.authSession;
     if (!session) throw new UnauthorizedException('An active session is required');
     const origin = request.headers.origin;
     const configuredUrl = await this.settings.getUrl();
@@ -191,13 +192,16 @@ export class AuthController {
     description: 'Unauthorized - User is not authenticated',
   })
   async endSession(
-    @Req() request: AuthenticatedRequest,
+    @Req() request: SessionAuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     const sessionToken = this.sessionToken(request);
 
     // End server access before cookie clearing or Passport/auditing can fail.
-    if (sessionToken) await this.sessionService.revokeSession(sessionToken);
+    if (sessionToken && !request.user.apiTokenId) {
+      if (!request.authSession) throw new UnauthorizedException('An active session is required');
+      await this.sessionService.revokeLogoutSession(request.authSession.id);
+    }
     await this.finishLogout(request, response);
   }
 

@@ -180,6 +180,7 @@ describe('AuthController', () => {
     const mockRequest = {
       ...Object.create(Request.prototype),
       user: mockUser,
+      authSession: { id: 'stable-session', ssoContext: null },
       headers: {
         authorization: 'Bearer test-session-token',
       },
@@ -204,7 +205,7 @@ describe('AuthController', () => {
 
     expect(mockRequest.user).toBeNull();
     expect(sessionManager.logOut).toHaveBeenCalledWith(mockRequest, {}, expect.any(Function));
-    expect(sessionService.revokeSession).toHaveBeenCalledWith('test-session-token');
+    expect(sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
     expect(identityAudit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'logout', actorId: 1, subjectId: 1 }),
@@ -224,6 +225,7 @@ describe('AuthController', () => {
     const mockRequest = {
       ...Object.create(Request.prototype),
       user: mockUser,
+      authSession: { id: 'stable-session', ssoContext: null },
       headers: {},
       cookies: {
         'auth-session': 'cookie-session-token',
@@ -238,7 +240,7 @@ describe('AuthController', () => {
     await authController.endSession(mockRequest, mockResponse);
 
     expect(mockRequest.logout).toHaveBeenCalled();
-    expect(sessionService.revokeSession).toHaveBeenCalledWith('cookie-session-token');
+    expect(sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
   });
 
@@ -329,9 +331,10 @@ describe('AuthController', () => {
     expect(sessionService.refreshSession).toHaveBeenCalledWith('current-session-token');
     expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'new-session-token');
   });
-  it('central logout snapshots the actual bearer session before local termination, and uses its stored provider context', async () => {
+  it('central logout uses the session captured during authentication before local termination', async () => {
     const request = {
       user: { id: 7 },
+      authSession: { id: 'stable-session', ssoContext: null },
       headers: { authorization: 'Bearer header-session', origin: 'https://app.example' },
       cookies: { 'auth-session': 'cookie-session' },
       logout: jest.fn((done: () => void) => done()),
@@ -341,7 +344,7 @@ describe('AuthController', () => {
       kind: 'redirect',
       redirectUrl: 'https://idp.example/logout',
     });
-    expect(sessionService.getLogoutSession).toHaveBeenCalledWith('header-session');
+    expect(sessionService.getLogoutSession).not.toHaveBeenCalled();
     expect(sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(response);
     expect(request.logout).toHaveBeenCalled();
@@ -362,6 +365,7 @@ describe('AuthController', () => {
     );
     const request = {
       user: { id: 7 },
+      authSession: { id: 'stable-session', ssoContext: null },
       headers: {},
       cookies: { 'auth-session': 'session' },
       logout: (done: () => void) => done(),
@@ -379,7 +383,13 @@ describe('AuthController', () => {
       [{ id: 7, apiTokenId: 12 }, { authorization: 'Bearer api-token' }],
       [{ id: 7 }, { authorization: 'Bearer session', origin: 'https://attacker.example' }],
     ]) {
-      const request = { user, headers, cookies: {}, logout: jest.fn() } as unknown as AuthenticatedRequest;
+      const request = {
+        user,
+        authSession: { id: 'stable-session', ssoContext: null },
+        headers,
+        cookies: {},
+        logout: jest.fn(),
+      } as unknown as AuthenticatedRequest;
       await expect(authController.logoutEverywhere(request, response)).rejects.toThrow();
     }
     expect(sessionService.revokeSession).not.toHaveBeenCalled();
@@ -390,6 +400,7 @@ describe('AuthController', () => {
     jest.spyOn(sessionService, 'refreshSession').mockResolvedValue(null);
     const request = {
       user: { id: 7 },
+      authSession: { id: 'stable-session', ssoContext: null },
       headers: { authorization: 'Bearer ended-session' },
       cookies: {},
     } as unknown as AuthenticatedRequest;

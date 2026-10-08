@@ -4,7 +4,13 @@ import { SsoLogoutService } from './sso-logout.service';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 
 describe('Provider logout notification HTTP behavior', () => {
-  const service = { frontchannel: jest.fn(), backchannel: jest.fn(), samlMessage: jest.fn(), oidcReturn: jest.fn() };
+  const service = {
+    consumeResult: jest.fn(),
+    frontchannel: jest.fn(),
+    backchannel: jest.fn(),
+    samlMessage: jest.fn(),
+    oidcReturn: jest.fn(),
+  };
   const cookies = { getCookieName: () => 'auth-session', clearAuthCookie: jest.fn() };
   const controller = new SsoLogoutController(
     service as unknown as SsoLogoutService,
@@ -20,6 +26,13 @@ describe('Provider logout notification HTTP behavior', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     response.type.mockReturnValue(response);
+  });
+
+  it('consumes the supplied result once without caching its response', async () => {
+    service.consumeResult.mockResolvedValue({ result: 'partial' });
+    expect(await controller.consumeResult('receipt', response as unknown as Response)).toEqual({ result: 'partial' });
+    expect(service.consumeResult).toHaveBeenCalledWith('receipt');
+    expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
   });
 
   it('allows the minimal iframe response and clears cookies only when their session was affected', async () => {

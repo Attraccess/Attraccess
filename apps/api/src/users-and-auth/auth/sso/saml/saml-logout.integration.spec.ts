@@ -182,7 +182,8 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
     expect(message.nameQualifier).toBe(context.nameQualifier);
     expect(message.sessionIndexes).toEqual(context.sessionIndexes);
     const inbound = decodeRedirect(await provider.response(message.id, outbound.values.RelayState));
-    expect(await service.samlMessage(2, inbound.values, inbound.query)).toBe('https://app.example/?ssoLogout=returned');
+    const returned = new URL(await service.samlMessage(2, inbound.values, inbound.query));
+    expect(await service.consumeResult(returned.searchParams.get('ssoLogout'))).toEqual({ result: 'returned' });
     await expect(service.samlMessage(2, inbound.values, inbound.query)).rejects.toThrow('Invalid SAML');
     expect(sessions.revokeSsoSessions).not.toHaveBeenCalled();
   });
@@ -203,9 +204,12 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
           )
         : original.replace(success, status);
       const expected = status === success ? 'returned' : status.endsWith('PartialLogout') ? 'partial' : 'failed';
-      expect(
+      const returned = new URL(
         await service.samlMessage(2, { SAMLResponse: signedPost(xml), RelayState: outbound.values.RelayState }, null),
-      ).toBe(`https://app.example/?ssoLogout=${expected}`);
+      );
+      const token = returned.searchParams.get('ssoLogout');
+      expect(await service.consumeResult(token)).toEqual({ result: expected });
+      await expect(service.consumeResult(token)).rejects.toThrow('Expired or consumed');
     }
     const xml = provider._generateLogoutResponse({ ID: 'unknown' } as Profile, true);
     await expect(
@@ -231,9 +235,10 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
         service.samlMessage(2, { SAMLResponse: signedPost(modified), RelayState: outbound.values.RelayState }, null),
       ).rejects.toThrow();
     }
-    expect(
+    const returned = new URL(
       await service.samlMessage(2, { SAMLResponse: signedPost(xml), RelayState: outbound.values.RelayState }, null),
-    ).toBe('https://app.example/?ssoLogout=returned');
+    );
+    expect(await service.consumeResult(returned.searchParams.get('ssoLogout'))).toEqual({ result: 'returned' });
   });
 
   it('provider initiation follows the message scope, returns a signed correlated response and rejects replays', async () => {
@@ -306,9 +311,10 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
         service.samlMessage(2, { SAMLResponse: response, RelayState: outbound.values.RelayState }, null),
       ).rejects.toThrow();
     }
-    expect(
+    const returned = new URL(
       await service.samlMessage(2, { SAMLResponse: signedPost(xml), RelayState: outbound.values.RelayState }, null),
-    ).toContain('returned');
+    );
+    expect(await service.consumeResult(returned.searchParams.get('ssoLogout'))).toEqual({ result: 'returned' });
   });
 
   it('does not send incomplete logout requests without correlation or signing material', async () => {

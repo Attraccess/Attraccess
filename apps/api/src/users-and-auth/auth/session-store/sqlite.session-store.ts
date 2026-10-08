@@ -2,7 +2,7 @@ import { runSerializedTransaction } from '../../../database/run-serialized-trans
 import { Repository, LessThan, MoreThan } from 'typeorm';
 import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
 import { TokenHashService } from '../../../encryption/token-hash.service';
-import { SessionStore, SessionMetadata, LogoutSession } from './session-store';
+import { SessionStore, SessionMetadata, LogoutSession, AuthenticatedSession } from './session-store';
 
 import { matchesSsoSession, SsoSessionSelector } from './sso-session-selector';
 
@@ -40,6 +40,10 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   async validateSession(token: string): Promise<User | null> {
+    return (await this.authenticateSession(token))?.user ?? null;
+  }
+
+  async authenticateSession(token: string): Promise<AuthenticatedSession | null> {
     const session = await this.findByToken(token, true);
     if (!session) return null;
     if (session.expiresAt < new Date()) {
@@ -51,7 +55,7 @@ export class SqliteSessionStore implements SessionStore {
       session.lastAccessedAt = new Date();
       await this.sessionRepository.update({ id: session.id }, { lastAccessedAt: session.lastAccessedAt });
     }
-    return session.user;
+    return { user: session.user, session: { id: String(session.id), ssoContext: session.ssoContext ?? null } };
   }
 
   async rotateSession(token: string, newHashedToken: string, newExpiresAt: Date): Promise<boolean> {
@@ -195,11 +199,15 @@ export class SqliteSessionStore implements SessionStore {
 
   private async findByToken(token: string, withUser: boolean): Promise<Session | null> {
     const hashed = this.tokenHashService.hashToken(token);
-    const relations = withUser ? ['user'] : undefined;
-    let session = await this.sessionRepository.findOne({ where: { token: hashed }, relations });
+    const find = (value: string) => {
+      const query = this.sessionRepository.createQueryBuilder('session').addSelect('session.ssoContext');
+      if (withUser) query.leftJoinAndSelect('session.user', 'user');
+      return query.where('session.token = :token', { token: value }).getOne();
+    };
+    let session = await find(hashed);
     if (session) return session;
     // Legacy: migrate sessions stored with unhashed token
-    session = await this.sessionRepository.findOne({ where: { token }, relations });
+    session = await find(token);
     if (!session) return null;
     session.token = hashed;
     const result = await this.sessionRepository.update({ id: session.id, token }, { token: hashed });

@@ -16,6 +16,7 @@ const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  window.history.replaceState(null, '', '/');
   requestLog = [];
   OpenAPI.BASE = 'http://localhost';
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -104,4 +105,67 @@ it('keeps every hook signed out after a lost response and reports that server lo
   expect(messages.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Logout could not be confirmed' }));
   expect(client.getQueryData(['auth-logout-status'])).toBe('ended');
   expect(client.getMutationCache().getAll()).toHaveLength(0);
+});
+
+it.each(['failed', 'partial', 'returned'])(
+  'does not claim sign-out from a fabricated %s outcome URL',
+  async (outcome) => {
+    window.history.replaceState(null, '', `/?ssoLogout=${outcome}`);
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current[0].isAuthenticated).toBe(true));
+    expect(messages.info).not.toHaveBeenCalled();
+  },
+);
+
+const resultToken = 'r'.repeat(43);
+function mockReturn(outcome: string, authenticated: boolean, valid = true) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      requestLog.push({ path, method: init?.method ?? 'GET' });
+      if (path === '/api/auth/sso/logout-result')
+        return valid ? json({ result: outcome }) : new Response('{}', { status: 400 });
+      if (path === '/api/users/me')
+        return authenticated ? json({ id: 7, username: 'fixture' }) : new Response('{}', { status: 401 });
+      if (path === '/api/auth/two-factor') return json({ required: false, enabled: false });
+      if (path === '/api/auth/session/logout-capability') return json({ available: true });
+      throw new Error(`Unexpected request ${url}`);
+    }),
+  );
+  window.history.replaceState(null, '', `/?ssoLogout=${resultToken}`);
+}
+
+it.each(['failed', 'partial', 'returned'])(
+  'shows a verified %s return once after confirming local sign-out',
+  async (outcome) => {
+    client.clear();
+    mockReturn(outcome, false);
+    const hook = mount();
+    await waitFor(() => expect(messages.info).toHaveBeenCalledTimes(1));
+    expect(requestLog.filter(({ path }) => path === '/api/auth/sso/logout-result')).toHaveLength(1);
+    expect(hook.result.current[0].isAuthenticated).toBe(false);
+    expect(window.location.search).toBe('');
+    hook.unmount();
+    window.history.replaceState(null, '', `/?ssoLogout=${resultToken}`);
+    mount();
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(messages.info).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('does not claim sign-out for a valid old result when the browser has signed in again', async () => {
+  mockReturn('partial', true);
+  const hook = mount();
+  await waitFor(() => expect(window.location.search).toBe(''));
+  expect(hook.result.current[0].isAuthenticated).toBe(true);
+  expect(messages.info).not.toHaveBeenCalled();
+});
+
+it('ignores fabricated or consumed result tokens even when signed out', async () => {
+  client.clear();
+  mockReturn('partial', false, false);
+  mount();
+  await waitFor(() => expect(window.location.search).toBe(''));
+  expect(messages.info).not.toHaveBeenCalled();
 });

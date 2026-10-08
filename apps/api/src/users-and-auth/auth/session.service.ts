@@ -47,6 +47,10 @@ export class SessionService implements OnModuleInit {
     return this.store.validateSession(token);
   }
 
+  async authenticateSession(token: string) {
+    return token ? this.store.authenticateSession(token) : null;
+  }
+
   async refreshSession(token: string): Promise<string | null> {
     if (!token) return null;
     const newToken = this.generateSessionToken();

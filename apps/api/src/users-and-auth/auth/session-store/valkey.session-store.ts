@@ -2,7 +2,7 @@ import { Repository } from 'typeorm';
 import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
 import type { Redis } from 'ioredis';
 import { TokenHashService } from '../../../encryption/token-hash.service';
-import { SessionStore, SessionMetadata, LogoutSession } from './session-store';
+import { SessionStore, SessionMetadata, LogoutSession, AuthenticatedSession } from './session-store';
 
 import { createHash } from 'node:crypto';
 import { SsoSessionSelector } from './sso-session-selector';
@@ -69,6 +69,10 @@ export class ValkeySessionStore implements SessionStore {
   }
 
   async validateSession(token: string): Promise<User | null> {
+    return (await this.authenticateSession(token))?.user ?? null;
+  }
+
+  async authenticateSession(token: string): Promise<AuthenticatedSession | null> {
     const hashedToken = this.tokenHashService.hashToken(token);
     const key = `${SESSION_PREFIX}${hashedToken}`;
     const data = await this.client.hgetall(key);
@@ -82,7 +86,16 @@ export class ValkeySessionStore implements SessionStore {
 
     const remaining = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
     await this.client.expire(key, remaining);
-    return this.userRepository.findOne({ where: { id: parseInt(data['userId'], 10) } });
+    const user = await this.userRepository.findOne({ where: { id: parseInt(data['userId'], 10) } });
+    return user
+      ? {
+          user,
+          session: {
+            id: data.lineageId || hashedToken,
+            ssoContext: data.ssoContext ? (JSON.parse(data.ssoContext) as SsoSessionContext) : null,
+          },
+        }
+      : null;
   }
 
   async rotateSession(token: string, newHashedToken: string, newExpiresAt: Date): Promise<boolean> {

@@ -17,7 +17,13 @@ export interface LogoutSession {
   ssoContext: SsoSessionContext | null;
 }
 
+export interface AuthenticatedSession {
+  user: User;
+  session: LogoutSession;
+}
+
 export interface SessionStore {
+  authenticateSession(token: string): Promise<AuthenticatedSession | null>;
   getLogoutSession(token: string): Promise<LogoutSession | null>;
   revokeLogoutSession(id: string): Promise<boolean>;
   createSession(

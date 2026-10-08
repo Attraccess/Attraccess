@@ -8,6 +8,12 @@ import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import Redis from 'ioredis';
 import { instanceToPlain } from 'class-transformer';
 import { SessionStore } from './session-store';
+import { SessionStrategy } from '../../strategies/session.strategy';
+import { TwoFactorService } from '../two-factor.service';
+import { RbacService } from '../../rbac/rbac.service';
+import { ApiTokenService } from '../api-token/api-token.service';
+import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
+import { Request } from 'express';
 import { AuthController } from '../auth.controller';
 import { SessionService } from '../session.service';
 import { SsoLogoutService } from '../sso/sso-logout.service';
@@ -197,6 +203,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         );
         const request = {
           user: { id: 7 },
+          authSession: (await store.authenticateSession('original')).session,
           headers: { authorization: 'Bearer original', origin: 'https://app.example' },
           cookies: {},
           logout: (done: () => void) => done(),
@@ -217,6 +224,77 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         expect(
           await store.rotateSession('rotated-again', hash.hashToken('revived'), new Date(Date.now() + 60000)),
         ).toBe(false);
+      },
+    );
+
+    it.each(['local', 'central'])(
+      '%s logout revokes the authenticated session even when refresh completes before the handler starts',
+      async (kind) => {
+        await create('original', oidc);
+        await create('independent', oidc);
+        const dec = jest.fn();
+        const sessions = new SessionService(
+          store,
+          hash,
+          { authActiveSessions: { dec } } as unknown as MetricsService,
+          {} as CronTimer,
+        );
+        let authenticated: () => void;
+        const captured = new Promise<void>((resolve) => {
+          authenticated = resolve;
+        });
+        let proceed: () => void;
+        const paused = new Promise<void>((resolve) => {
+          proceed = resolve;
+        });
+        const strategy = new SessionStrategy(
+          sessions,
+          {} as TwoFactorService,
+          {
+            getEffectivePermissions: async () => {
+              authenticated();
+              await paused;
+              return new Set();
+            },
+          } as unknown as RbacService,
+          { authenticate: async () => null } as unknown as ApiTokenService,
+          {} as AuthAuditLogger,
+        );
+        const request = {
+          headers: { authorization: 'Bearer original', origin: 'https://app.example' },
+          cookies: {},
+          path: '/api/auth/session',
+          logout: (done: () => void) => done(),
+        } as unknown as AuthenticatedRequest;
+        const validating = strategy.validate(request as unknown as Request);
+        await captured;
+        expect(await store.rotateSession('original', hash.hashToken('rotated'), new Date(Date.now() + 60000))).toBe(
+          true,
+        );
+        proceed();
+        request.user = (await validating) as AuthenticatedRequest['user'];
+        const controller = new AuthController(
+          sessions,
+          {
+            getCookieName: () => 'auth-session',
+            clearAuthCookie: async () => undefined,
+          } as unknown as CookieConfigService,
+          undefined,
+          {
+            returnURL: async () => 'https://app.example/',
+            prepare: async () => ({ kind: 'local_only' }),
+          } as unknown as SsoLogoutService,
+          { getUrl: async () => 'https://app.example' } as SettingsService,
+        );
+        if (kind === 'local') await controller.endSession(request, {} as Response);
+        else await controller.logoutEverywhere(request, { setHeader: jest.fn() } as unknown as Response);
+        expect(await store.validateSession('original')).toBeNull();
+        expect(await store.validateSession('rotated')).toBeNull();
+        expect(await store.rotateSession('rotated', hash.hashToken('revived'), new Date(Date.now() + 60000))).toBe(
+          false,
+        );
+        expect(await store.validateSession('independent')).not.toBeNull();
+        expect(dec).toHaveBeenCalledTimes(1);
       },
     );
 

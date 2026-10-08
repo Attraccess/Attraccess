@@ -28,3 +28,7 @@ export class SsoLogoutSetupUrls {
   @ApiProperty() frontchannelLogoutUrl: string;
   @ApiProperty() samlSloUrl: string;
 }
+
+export class LogoutReturnResult {
+  @ApiProperty({ enum: ['failed', 'partial', 'returned'] }) result: 'failed' | 'partial' | 'returned';
+}

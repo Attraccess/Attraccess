@@ -22,6 +22,12 @@ describe('SqliteSessionStore', () => {
       delete: jest.fn(),
     } as unknown as jest.Mocked<Repository<Session>>;
 
+    const query = { addSelect: jest.fn(), leftJoinAndSelect: jest.fn(), where: jest.fn(), getOne: repo.findOne };
+    query.addSelect.mockReturnValue(query);
+    query.leftJoinAndSelect.mockReturnValue(query);
+    query.where.mockReturnValue(query);
+    repo.createQueryBuilder = jest.fn().mockReturnValue(query);
+
     tokenHashService = {
       hashToken: jest.fn().mockImplementation((t: string) => `hashed:${t}`),
     } as unknown as jest.Mocked<TokenHashService>;

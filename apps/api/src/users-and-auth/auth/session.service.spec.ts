@@ -28,6 +28,7 @@ describe('SessionService', () => {
       getLogoutSession: jest.fn().mockResolvedValue(null),
       revokeLogoutSession: jest.fn().mockResolvedValue(false),
       createSession: jest.fn().mockResolvedValue(undefined),
+      authenticateSession: jest.fn().mockResolvedValue(null),
       validateSession: jest.fn().mockResolvedValue(null),
       rotateSession: jest.fn().mockResolvedValue(false),
       revokeSession: jest.fn().mockResolvedValue(false),

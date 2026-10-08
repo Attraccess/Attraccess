@@ -206,9 +206,28 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
       'https://app.example/api/auth/sso/OIDC/1/post-logout',
     );
     const state = url.searchParams.get('state');
-    expect(await service.oidcReturn(1, state)).toBe('https://app.example/?ssoLogout=returned');
+    const returned = new URL(await service.oidcReturn(1, state));
+    const resultToken = returned.searchParams.get('ssoLogout');
+    expect(resultToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(await service.consumeResult(resultToken)).toEqual({ result: 'returned' });
+    await expect(service.consumeResult(resultToken)).rejects.toThrow('Expired or consumed');
+    await expect(service.consumeResult('fabricated')).rejects.toThrow('Invalid logout result');
+    await expect(service.consumeResult('x'.repeat(43))).rejects.toThrow('Expired or consumed');
     await expect(service.oidcReturn(1, state)).rejects.toThrow('Expired or consumed');
     await expect(service.oidcReturn(2, state)).rejects.toThrow();
+  });
+
+  it('expires callback results and never issues them for uncorrelated returns', async () => {
+    await expect(service.oidcReturn(1, 'x'.repeat(43))).rejects.toThrow('Expired or consumed');
+    expect(receipts.size).toBe(0);
+    const prepared = await service.prepare({ protocol: 'OIDC', providerId: 1, issuer, subject: 'person' });
+    expect([...receipts.keys()].some((key) => key.startsWith('logout-result:'))).toBe(false);
+    const state = new URL(prepared.redirectUrl).searchParams.get('state');
+    const returned = new URL(await service.oidcReturn(1, state));
+    const token = returned.searchParams.get('ssoLogout');
+    const receipt = receipts.get(`logout-result:${token}`);
+    receipt.expiry = Date.now() - 1;
+    await expect(service.consumeResult(token)).rejects.toThrow('Expired or consumed');
   });
 
   it('does not retain state or clear cookies for unmatched unsigned browser notifications', async () => {

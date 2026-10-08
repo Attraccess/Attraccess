@@ -14,7 +14,7 @@ import { OidcTokenVerifier } from './oidc/oidc-token-verifier.service';
 import { SamlLogoutAdapter } from './saml/saml-logout-adapter';
 import { SSOSamlStrategy } from './saml/saml.strategy';
 import { trustedEndpoint } from './logout-endpoints';
-import { CentralLogoutResult, LogoutCapability } from './logout.types';
+import { CentralLogoutResult, LogoutCapability, LogoutReturnResult } from './logout.types';
 
 const TTL_MS = 300000;
 const receiptKey = (protocol: string, providerId: number, id: string) =>
@@ -46,15 +46,32 @@ export class SsoLogoutService {
     return url.toString();
   }
 
-  async returnURL(result?: 'failed' | 'partial' | 'returned'): Promise<string> {
+  async returnURL(): Promise<string> {
     const base = this.appConfig?.get<AppConfigType>('app')?.ATTRACCESS_FRONTEND_URL || (await this.settings.getUrl());
     if (!base) throw new BadRequestException('Application URL not configured');
     const url = trustedEndpoint(base);
     url.pathname = '/';
     url.search = '';
     url.hash = '';
-    if (result) url.searchParams.set('ssoLogout', result);
     return url.toString();
+  }
+
+  private async resultURL(target: string, result: LogoutReturnResult['result']): Promise<string> {
+    const url = trustedEndpoint(target);
+    const token = randomBytes(32).toString('base64url');
+    if (!(await this.store.putLogoutState(`logout-result:${token}`, result, Date.now() + TTL_MS)))
+      throw new Error('Duplicate logout result');
+    url.searchParams.set('ssoLogout', token);
+    return url.toString();
+  }
+
+  async consumeResult(token: unknown): Promise<LogoutReturnResult> {
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token))
+      throw new BadRequestException('Invalid logout result');
+    const result = await this.store.takeLogoutState(`logout-result:${token}`);
+    if (result !== 'failed' && result !== 'partial' && result !== 'returned')
+      throw new BadRequestException('Expired or consumed logout result');
+    return { result };
   }
 
   async capability(context: SsoSessionContext | null): Promise<LogoutCapability> {
@@ -90,7 +107,7 @@ export class SsoLogoutService {
         context.providerId,
       );
       const state = randomBytes(32).toString('base64url');
-      const returnTarget = await this.returnURL('returned');
+      const returnTarget = await this.returnURL();
       if (context.protocol === 'OIDC') {
         const config = provider.oidcConfiguration;
         const { endSessionURL } = await this.oidc.metadata(config, true);
@@ -133,7 +150,7 @@ export class SsoLogoutService {
       throw new BadRequestException('Invalid logout state');
     const target = await this.store.takeLogoutState(`OIDC:${providerId}:state:${state}`);
     if (!target) throw new BadRequestException('Expired or consumed logout state');
-    return target;
+    return this.resultURL(target, 'returned');
   }
 
   async backchannel(providerId: number, token: unknown): Promise<void> {
@@ -270,10 +287,11 @@ export class SsoLogoutService {
         if (!raw) throw new Error('Expired or consumed request');
         const transaction = JSON.parse(raw) as { state: string; returnTarget: string };
         if (container.RelayState !== transaction.state) throw new Error('RelayState mismatch');
-        if (message.status !== 'urn:oasis:names:tc:SAML:2.0:status:Success') return this.returnURL('failed');
+        if (message.status !== 'urn:oasis:names:tc:SAML:2.0:status:Success')
+          return this.resultURL(transaction.returnTarget, 'failed');
         if (message.subStatusCodes?.[0] === 'urn:oasis:names:tc:SAML:2.0:status:PartialLogout')
-          return this.returnURL('partial');
-        return transaction.returnTarget;
+          return this.resultURL(transaction.returnTarget, 'partial');
+        return this.resultURL(transaction.returnTarget, 'returned');
       }
       const fresh = await this.sessions.revokeSsoSessionsOnce(
         {

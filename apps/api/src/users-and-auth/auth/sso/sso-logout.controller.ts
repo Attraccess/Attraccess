@@ -1,5 +1,5 @@
 import { SessionAuth } from '@attraccess/plugins-backend-sdk';
-import { SsoLogoutSetupUrls } from './logout.types';
+import { LogoutReturnResult, SsoLogoutSetupUrls } from './logout.types';
 import {
   BadRequestException,
   Body,
@@ -13,7 +13,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { ApiConsumes, ApiOperation, ApiTags, ApiOkResponse } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiTags, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { SsoLogoutService } from './sso-logout.service';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
@@ -25,6 +25,19 @@ export class SsoLogoutController {
     private readonly logout: SsoLogoutService,
     private readonly cookies: CookieConfigService,
   ) {}
+
+  @Post('/logout-result')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Consume a one-time provider logout result', operationId: 'consumeLogoutResult' })
+  @ApiBody({ schema: { type: 'object', required: ['token'], properties: { token: { type: 'string' } } } })
+  @ApiOkResponse({ type: LogoutReturnResult })
+  async consumeResult(
+    @Body('token') token: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LogoutReturnResult> {
+    response.setHeader('Cache-Control', 'no-store');
+    return this.logout.consumeResult(token);
+  }
 
   @Get('/:providerId/logout-urls')
   @SessionAuth()
