@@ -64,6 +64,24 @@ Each API token has an explicit permission allow-list. Requests receive only the 
 | **Billing** | `/api/billing` | Billing and transactions |
 | **Plugins** | `/api/plugins` | Plugin management |
 
+## Attractap WebSocket: stop session
+
+The authenticated reader sends an `EVENT` with `data.type: "STOP_RESOURCE_USAGE_SESSION"` and `data.payload: { resourceId: number, requestId?: number }`. The reply uses the same event type and echoes the optional request ID. Required end forms postpone the stop and success reply until submitted; failures return `error: string` rather than success.
+
+A successful reply contains `success: true` and `endedOwnSession: boolean`, comparing the ended usage's owner with the authenticated actor. `durationSeconds?: number` is elapsed session time from the committed start/end timestamps, rounded down to whole seconds and clamped to zero. Invalid or unavailable timestamps omit it. This is not operating time or billed minutes.
+
+`billingSummary?: { amount: number, total: string }` appears only for the owner's nonzero charge. `amount` is in database currency units; `total` is the existing formatted currency/credits string and must be displayed unchanged. Billing lookup failure does not fail the completed stop or remove duration/ownership. New firmware accepts whole duration values in the range 0–4294967295 and falls back to legacy feedback for missing or invalid summary metadata. Older firmware ignores the additive fields.
+
+```json
+{"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":42,"endedOwnSession":true,"durationSeconds":1440,"billingSummary":{"amount":290,"total":"2,90 EUR"}}}}
+```
+
+Unbilled reply (including zero charges):
+
+```json
+{"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":43,"endedOwnSession":true,"durationSeconds":1440}}}
+```
+
 ## Regenerating Clients
 
 After making changes to API endpoints, regenerate the client libraries to keep them in sync with the backend. Refer to the project's build scripts for the exact regeneration commands.

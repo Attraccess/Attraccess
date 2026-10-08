@@ -254,6 +254,10 @@ public:
         std::string error;
         bool sumUpEnabled = false;
         std::string billingTotal{};
+        bool hasDuration = false;
+        uint32_t durationSeconds = 0;
+        bool hasOwnership = false;
+        bool endedOwnSession = false;
     };
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
 

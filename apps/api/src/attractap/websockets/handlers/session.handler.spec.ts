@@ -303,6 +303,12 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
   describe('handleStopResourceUsageSession', () => {
     it('sends the final charge with configured precision and the action request ID', async () => {
+      mockResourceUsageService.endSession.mockResolvedValue({
+        id: 99,
+        userId: 1,
+        startTime: new Date(0),
+        endTime: new Date(1426999),
+      });
       mockBillingService.getResourceUsageCharge.mockResolvedValue({ amount: -1234 });
       mockBillingService.getConfiguration.mockResolvedValue({ currency: 'KWD', minorUnit: 3 });
       await handler.handleStopResourceUsageSession(
@@ -318,6 +324,8 @@ describe('AttractapSessionHandler – session + flow button', () => {
             payload: {
               success: true,
               requestId: 5,
+              endedOwnSession: true,
+              durationSeconds: 1426,
               billingSummary: { amount: 1234, total: '1,234 KWD' },
             },
           }),
@@ -335,10 +343,50 @@ describe('AttractapSessionHandler – session + flow button', () => {
       );
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ payload: { success: true } }),
+          data: expect.objectContaining({ payload: { success: true, endedOwnSession: true } }),
         }),
       );
       expect(mockBillingService.getConfiguration).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [0, 0],
+      [999, 0],
+      [1426999, 1426],
+      [100 * 3600000, 360000],
+      [-1000, 0],
+    ])('uses committed timestamps for elapsed duration (%i ms)', async (elapsed, seconds) => {
+      mockResourceUsageService.endSession.mockResolvedValue({
+        id: 99,
+        userId: 1,
+        startTime: new Date(0),
+        endTime: new Date(elapsed),
+      });
+      mockBillingService.getResourceUsageCharge.mockRejectedValue(new Error('billing unavailable'));
+      await handler.handleStopResourceUsageSession(
+        mockSocket as any,
+        {
+          payload: { resourceId: 10, requestId: 8 },
+        } as AttractapEvent['data'],
+      );
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload).toEqual({
+        success: true,
+        endedOwnSession: true,
+        durationSeconds: seconds,
+        requestId: 8,
+      });
+      expect(mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    });
+
+    it.each([null, undefined, new Date(NaN)])('omits unavailable duration (%p)', async (endTime) => {
+      mockResourceUsageService.endSession.mockResolvedValue({ id: 99, userId: 1, startTime: new Date(0), endTime });
+      await handler.handleStopResourceUsageSession(
+        mockSocket as any,
+        {
+          payload: { resourceId: 10 },
+        } as AttractapEvent['data'],
+      );
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload).toEqual({ success: true, endedOwnSession: true });
     });
 
     it('does not expose another user’s charge when an administrator ends their session', async () => {
@@ -350,6 +398,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         } as AttractapEvent['data'],
       );
       expect(mockBillingService.getResourceUsageCharge).not.toHaveBeenCalled();
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.payload).toEqual({ success: true, endedOwnSession: false });
     });
 
     it('keeps the action successful if the receipt lookup fails after ending the session', async () => {
@@ -362,7 +411,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
       );
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ payload: { success: true } }),
+          data: expect.objectContaining({ payload: { success: true, endedOwnSession: true } }),
         }),
       );
     });
@@ -434,7 +483,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
-            payload: { success: true },
+            payload: { success: true, endedOwnSession: true },
           }),
         }),
       );
