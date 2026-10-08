@@ -78,7 +78,7 @@ export abstract class ResourceFlowNodeSchemaImplementation extends ResourceFlows
         const resourceId = validationContext.get('meterResourceId');
         if (
           typeof resourceId === 'number' &&
-          !(await this.resourceRepository.manager.existsBy(ResourceMeter, { id: Number(data.meterId), resourceId }))
+          !(await this.resourceMeterIds(resourceId, validationContext)).has(Number(data.meterId))
         ) {
           errors.push({
             nodeId: nodeData.id,
@@ -114,6 +114,19 @@ export abstract class ResourceFlowNodeSchemaImplementation extends ResourceFlows
     }
 
     return errors;
+  }
+
+  private resourceMeterIds(resourceId: number, validationContext: Map<string, unknown>): Promise<Set<number>> {
+    const cacheKey = `resource-flow:meter-ids:${resourceId}`;
+    let meterIds = validationContext.get(cacheKey) as Promise<Set<number>> | undefined;
+    if (!meterIds) {
+      meterIds = this.resourceRepository.manager
+        .find(ResourceMeter, { where: { resourceId }, select: { id: true } })
+        .then((meters) => new Set(meters.map((meter) => meter.id)));
+      // Share the pending lookup with concurrent validators; each flow request has a fresh context.
+      validationContext.set(cacheKey, meterIds);
+    }
+    return meterIds;
   }
 
   public async getNodeSchemas(resourceId: number): Promise<ResourceFlowNodeSchemaDto[]> {
