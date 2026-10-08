@@ -1,6 +1,6 @@
-import { AttractapEvent } from '../websocket.types';
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
-import { AttractapSessionHandlerSessionFlowButtonTestScope } from './session.handler.spec.define-attractap-session-handler-session-flow-button-tests';
+import { AttractapEvent } from '../websocket.types';
+import type { AttractapSessionHandlerSessionFlowButtonTestScope } from './session.handler.spec';
 
 export function createHandleStopResourceUsageSessionFixture(
   parentScope: AttractapSessionHandlerSessionFlowButtonTestScope,

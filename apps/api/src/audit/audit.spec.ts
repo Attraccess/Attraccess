@@ -1,5 +1,6 @@
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import { ValidationPipe } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,92 +10,597 @@ import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-
 import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
 import { RetirePasswordPolicyAudit1783900000000 } from '../database/migrations/1783900000000-retire-password-policy-audit';
 import { SettingsStoreService } from '../settings/settings-store.service';
+import { SettingsService } from '../settings/settings.service';
 import { AuditQueryDto } from './audit-query.dto';
-import { registerAuditAuthorizationAndQueryValidationFixture } from './audit.audit-authorization-and-query-validation.test-fixture';
-import { registerUsesTheEffectivePermissionGuardForBothSessionAndTokenCeilingsCases } from './audit.audit-authorization-and-query-validation.uses-the-effective-permission-guard-for-both-session-and-token-ceilings.test-cases';
-import { registerValidatesAuditQueryBoundsAndAllowsTheRegisteredResourceAndBillingFiltersCases } from './audit.audit-authorization-and-query-validation.validates-audit-query-bounds-and-allows-the-registered-resource-and-billing-filters.test-cases';
+import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
-import { registerAppliesRetentionSettingChangesToReadsImmediatelyAndRejectsMalformedPersisteCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerBoundsAdmissionBeforeSettingsAwaitsAndRecoversAfterSettingsFailureCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerBoundsOutstandingWritesWithoutAnUnboundedQueueCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerDeclinesWritesUnderSqliteContentionWithinADeadlineAndRecoversCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerDiscardsABillingEventWhenItsOriginatingTransactionRollsBackCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerDoesNotPersistSsoEventsWhileTheSsoDomainIsDisabledCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerDoesNotRollBackARecordedEventWhenAPausedCleanupTransactionFailsCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerDrainsMultipleBoundedRetentionBatchesAndFiltersEventPrefixesAndTimeWindowsCases } from './audit.durable-audit-sqlite.applies-retention-setting-changes-to-reads-immediately-and-rejects-malformed-persiste.behaviors.test-cases';
-import { registerEnforcesHttpSessionPermissionsTokenCeilingsQueryValidationAndPersistedSettiCases } from './audit.durable-audit-sqlite.enforces-http-session-permissions-token-ceilings-query-validation-and-persisted-setti.test-cases';
-import { registerFailsClosedOnDisabledCaptureUnsupportedDomainsInvalidInputAndWriteFailureCases } from './audit.durable-audit-sqlite.fails-closed-on-disabled-capture-unsupported-domains-invalid-input-and-write-failure.behaviors.test-cases';
-import { registerFiltersAndPaginatesWithoutDuplicationHidesExpiredRowsAndCleansThemCases } from './audit.durable-audit-sqlite.fails-closed-on-disabled-capture-unsupported-domains-invalid-input-and-write-failure.behaviors.test-cases';
-import { registerNeverAcknowledgesOrPersistsAnEventInAnOriginatingTransactionThatRollsBackCases } from './audit.durable-audit-sqlite.fails-closed-on-disabled-capture-unsupported-domains-invalid-input-and-write-failure.behaviors.test-cases';
-import { registerPersistsEveryRegisteredPluginActionLifecycleAndPreservesDeclaredDetailFieldCases } from './audit.durable-audit-sqlite.fails-closed-on-disabled-capture-unsupported-domains-invalid-input-and-write-failure.behaviors.test-cases';
-import { registerPersistsProjectApiTokenAttributionOnlyWithAValidTokenContextCases } from './audit.durable-audit-sqlite.fails-closed-on-disabled-capture-unsupported-domains-invalid-input-and-write-failure.behaviors.test-cases';
-import { registerPersistsProviderOriginSsoRoleDeltasAndFiltersThemByDomainCases } from './audit.durable-audit-sqlite.fails-closed-on-disabled-capture-unsupported-domains-invalid-input-and-write-failure.behaviors.test-cases';
-import { registerPersistsResourceSystemAndDeviceOriginsHonorsSuppressionAndFiltersLifecycleCases } from './audit.durable-audit-sqlite.persists-resource-system-and-device-origins-honors-suppression-and-filters-lifecycle-.behaviors.test-cases';
-import { registerPersistsValidatedSettingsAcrossStoreAndServiceRestartsAndFailsClosedOnReaCases } from './audit.durable-audit-sqlite.persists-resource-system-and-device-origins-honors-suppression-and-filters-lifecycle-.behaviors.test-cases';
-import { registerPreservesSharedAuditRowsThroughIdentityDowngradeAndReUpgradeCases } from './audit.durable-audit-sqlite.preserves-shared-audit-rows-through-identity-downgrade-and-re-upgrade.test-cases';
-import { registerRecordsABillingEventOnlyAfterItsOriginatingTransactionCommitsCases } from './audit.durable-audit-sqlite.persists-resource-system-and-device-origins-honors-suppression-and-filters-lifecycle-.behaviors.test-cases';
-import { registerRecordsAllowlistedAdministrationMetadataAndRejectsCredentialBearingFieldsCases } from './audit.durable-audit-sqlite.persists-resource-system-and-device-origins-honors-suppression-and-filters-lifecycle-.behaviors.test-cases';
-import { registerRecordsAnAnonymousIdentityEventWhenTheIdentityDomainIsEnabledCases } from './audit.durable-audit-sqlite.persists-resource-system-and-device-origins-honors-suppression-and-filters-lifecycle-.behaviors.test-cases';
-import { registerRecordsAnEventAfterAPausedCleanupTransactionCommitsCases } from './audit.durable-audit-sqlite.persists-resource-system-and-device-origins-honors-suppression-and-filters-lifecycle-.behaviors.test-cases';
-import { registerRecordsAndFiltersAttractapEventsRespectingGlobalAndDomainSuppressionCases } from './audit.durable-audit-sqlite.records-and-filters-attractap-events-respecting-global-and-domain-suppression.behaviors.test-cases';
-import { registerRecordsBillingTransactionLifecycleEventsWithOnlyAllowlistedMetadataCases } from './audit.durable-audit-sqlite.records-and-filters-attractap-events-respecting-global-and-domain-suppression.behaviors.test-cases';
-import { registerRecordsIdentityApiTokenAttributionCases } from './audit.durable-audit-sqlite.records-and-filters-attractap-events-respecting-global-and-domain-suppression.behaviors.test-cases';
-import { registerRecordsProjectAdministrationEventsWithOnlySafeAllowlistedDetailsCases } from './audit.durable-audit-sqlite.records-and-filters-attractap-events-respecting-global-and-domain-suppression.behaviors.test-cases';
-import { registerRecordsSystemOriginatedResourceIntroductionsWithoutASynthesizedSessionCases } from './audit.durable-audit-sqlite.records-and-filters-attractap-events-respecting-global-and-domain-suppression.behaviors.test-cases';
-import { registerRecordsTheFinalDisablingSettingsChangeAndSuppressesSubsequentEventsJCases } from './audit.durable-audit-sqlite.records-and-filters-attractap-events-respecting-global-and-domain-suppression.behaviors.test-cases';
-import { registerRejectsOversizedDetailsAtTheDatabaseBoundaryTooCases } from './audit.durable-audit-sqlite.records-and-filters-attractap-events-respecting-global-and-domain-suppression.behaviors.test-cases';
-import { registerResolvesAuditFromAPluginContextRegisteredThroughFullPluginModuleForRootCases } from './audit.durable-audit-sqlite.resolves-audit-from-a-plugin-context-registered-through-full-plugin-module-for-root.test-cases';
-import { registerResolvesTheSdkProviderThroughTheModuleAndActualBridgeCases } from './audit.durable-audit-sqlite.resolves-the-sdk-provider-through-the-module-and-actual-bridge.behaviors.test-cases';
-import { registerRetainsBillingEventsFromACommittedSavepointWhenASiblingSavepointRollsBackCases } from './audit.durable-audit-sqlite.resolves-the-sdk-provider-through-the-module-and-actual-bridge.behaviors.test-cases';
-import { registerRetainsOuterBillingEventsWhenANestedTransactionRollsBackCases } from './audit.durable-audit-sqlite.resolves-the-sdk-provider-through-the-module-and-actual-bridge.behaviors.test-cases';
-import { registerDurableAuditSqliteFixture } from './audit.durable-audit-sqlite.test-fixture';
-import { registerUpgradesAdditivelySurvivesConnectionRestartAndPrincipalDeletionPreventsUpdatCases } from './audit.durable-audit-sqlite.resolves-the-sdk-provider-through-the-module-and-actual-bridge.behaviors.test-cases';
-import { registerUsesOneSafeEventSnapshotBeforeSettingsAwaitsAndWaitsSafelyForShutdownCases } from './audit.durable-audit-sqlite.resolves-the-sdk-provider-through-the-module-and-actual-bridge.behaviors.test-cases';
 import { AuditService } from './audit.service';
+import { setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
-  const fixture = registerDurableAuditSqliteFixture();
-  registerRecordsTheFinalDisablingSettingsChangeAndSuppressesSubsequentEventsJCases(fixture);
-  registerRecordsAllowlistedAdministrationMetadataAndRejectsCredentialBearingFieldsCases(fixture);
-  registerUpgradesAdditivelySurvivesConnectionRestartAndPrincipalDeletionPreventsUpdatCases(fixture);
-  registerPreservesSharedAuditRowsThroughIdentityDowngradeAndReUpgradeCases(fixture);
-  registerNeverAcknowledgesOrPersistsAnEventInAnOriginatingTransactionThatRollsBackCases(fixture);
-  registerRecordsBillingTransactionLifecycleEventsWithOnlyAllowlistedMetadataCases(fixture);
-  registerRecordsProjectAdministrationEventsWithOnlySafeAllowlistedDetailsCases(fixture);
-  registerPersistsProjectApiTokenAttributionOnlyWithAValidTokenContextCases(fixture);
-  registerRecordsAndFiltersAttractapEventsRespectingGlobalAndDomainSuppressionCases(fixture);
-  registerPersistsResourceSystemAndDeviceOriginsHonorsSuppressionAndFiltersLifecycleCases(fixture);
-  registerRecordsABillingEventOnlyAfterItsOriginatingTransactionCommitsCases(fixture);
-  registerDiscardsABillingEventWhenItsOriginatingTransactionRollsBackCases(fixture);
-  registerRetainsOuterBillingEventsWhenANestedTransactionRollsBackCases(fixture);
-  registerRetainsBillingEventsFromACommittedSavepointWhenASiblingSavepointRollsBackCases(fixture);
-  registerPersistsEveryRegisteredPluginActionLifecycleAndPreservesDeclaredDetailFieldCases(fixture);
-  registerFiltersAndPaginatesWithoutDuplicationHidesExpiredRowsAndCleansThemCases(fixture);
-  registerDoesNotRollBackARecordedEventWhenAPausedCleanupTransactionFailsCases(fixture);
-  registerRecordsAnEventAfterAPausedCleanupTransactionCommitsCases(fixture);
-  registerFailsClosedOnDisabledCaptureUnsupportedDomainsInvalidInputAndWriteFailureCases(fixture);
-  registerRecordsAnAnonymousIdentityEventWhenTheIdentityDomainIsEnabledCases(fixture);
-  registerRecordsSystemOriginatedResourceIntroductionsWithoutASynthesizedSessionCases(fixture);
-  registerRecordsIdentityApiTokenAttributionCases(fixture);
-  registerPersistsProviderOriginSsoRoleDeltasAndFiltersThemByDomainCases(fixture);
-  registerDoesNotPersistSsoEventsWhileTheSsoDomainIsDisabledCases(fixture);
-  registerRejectsOversizedDetailsAtTheDatabaseBoundaryTooCases(fixture);
-  registerBoundsOutstandingWritesWithoutAnUnboundedQueueCases(fixture);
-  registerPersistsValidatedSettingsAcrossStoreAndServiceRestartsAndFailsClosedOnReaCases(fixture);
-  registerAppliesRetentionSettingChangesToReadsImmediatelyAndRejectsMalformedPersisteCases(fixture);
-  registerBoundsAdmissionBeforeSettingsAwaitsAndRecoversAfterSettingsFailureCases(fixture);
-  registerDrainsMultipleBoundedRetentionBatchesAndFiltersEventPrefixesAndTimeWindowsCases(fixture);
-  registerDeclinesWritesUnderSqliteContentionWithinADeadlineAndRecoversCases(fixture);
-  registerEnforcesHttpSessionPermissionsTokenCeilingsQueryValidationAndPersistedSettiCases(fixture);
-  registerUsesOneSafeEventSnapshotBeforeSettingsAwaitsAndWaitsSafelyForShutdownCases(fixture);
-  registerResolvesAuditFromAPluginContextRegisteredThroughFullPluginModuleForRootCases(fixture);
-  registerResolvesTheSdkProviderThroughTheModuleAndActualBridgeCases(fixture);
-});
-describe('audit authorization and query validation', () => {
-  const fixture = registerAuditAuthorizationAndQueryValidationFixture();
-  registerUsesTheEffectivePermissionGuardForBothSessionAndTokenCeilingsCases(fixture);
-  registerValidatesAuditQueryBoundsAndAllowsTheRegisteredResourceAndBillingFiltersCases(fixture);
-});
+  const fixture = setupAuditDatabase();
+  it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
+    expect(await fixture.source.query('SELECT * FROM role_permission')).toEqual([
+      { roleId: 1, permissionKey: 'system.audit.read' },
+    ]);
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    await expect(fixture.source.query("UPDATE audit_log SET outcome = 'failed'")).rejects.toThrow('immutable');
+    expect(await fixture.source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
+    await fixture.source.query('DELETE FROM role WHERE id = 1');
+    await fixture.service.onModuleDestroy();
+    await fixture.source.destroy();
+    await fixture.source.initialize();
+    await fixture.source.query(
+      'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+    );
+    fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
+    fixture.service = new AuditService(fixture.source, fixture.store);
+    await fixture.service.onModuleInit();
+    expect((await fixture.service.list(new AuditQueryDto())).items).toEqual([
+      expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
+    ]);
+    await fixture.service.onModuleDestroy();
+    await fixture.identityMigration.down(fixture.source.createQueryRunner());
+    await fixture.migration.down(fixture.source.createQueryRunner());
+    expect(await fixture.source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toEqual([]);
+    expect(await fixture.source.query('SELECT * FROM permission')).toEqual([]);
+    expect(await fixture.source.query('SELECT * FROM role')).toEqual([{ id: 2, key: 'member' }]);
+    await fixture.migration.up(fixture.source.createQueryRunner());
+    await fixture.identityMigration.up(fixture.source.createQueryRunner());
+  });
 
+  it('preserves shared audit rows through identity downgrade and re-upgrade', async () => {
+    const rows = [
+      [
+        901,
+        'resource',
+        null,
+        'resource.usage_auto_closed',
+        '00000000-0000-4000-8000-000000000901',
+        null,
+        null,
+        null,
+        'resource.usage',
+        11,
+        null,
+        null,
+      ],
+      [
+        902,
+        'demo',
+        'abcdefghijklmnopqrstu',
+        'demo.device_connected',
+        '00000000-0000-4000-8000-000000000902',
+        42,
+        'api_token',
+        7,
+        'demo.device',
+        12,
+        '192.0.2.42',
+        'Demo/1.0',
+      ],
+      [
+        903,
+        'resource',
+        null,
+        'resource.maintenance_started',
+        '00000000-0000-4000-8000-000000000903',
+        null,
+        null,
+        null,
+        'resource.maintenance',
+        13,
+        '2001:db8::3',
+        'Resource worker/1.0',
+      ],
+    ];
+
+    for (const row of rows) {
+      await fixture.source.query(
+        `INSERT INTO "audit_log" ("id", "at", "domain", "pluginId", "action", "operationId", "actorId", "authenticationMethod", "apiTokenId", "outcome", "subjectType", "subjectId", "ipAddress", "userAgent", "details")
+         VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, 'succeeded', ?, ?, ?, ?, '{"source":"migration-test"}')`,
+        row,
+      );
+    }
+
+    await fixture.identityMigration.down(fixture.source.createQueryRunner());
+    await fixture.identityMigration.up(fixture.source.createQueryRunner());
+
+    expect(
+      await fixture.source
+        .query(`SELECT "id", "pluginId", "actorId", "authenticationMethod", "apiTokenId", "ipAddress", "userAgent"
+        FROM "audit_log" WHERE "id" IN (901, 902, 903) ORDER BY "id"`),
+    ).toEqual([
+      {
+        id: 901,
+        pluginId: null,
+        actorId: null,
+        authenticationMethod: null,
+        apiTokenId: null,
+        ipAddress: null,
+        userAgent: null,
+      },
+      {
+        id: 902,
+        pluginId: 'abcdefghijklmnopqrstu',
+        actorId: 42,
+        authenticationMethod: 'api_token',
+        apiTokenId: 7,
+        ipAddress: '192.0.2.42',
+        userAgent: 'Demo/1.0',
+      },
+      {
+        id: 903,
+        pluginId: null,
+        actorId: null,
+        authenticationMethod: null,
+        apiTokenId: null,
+        ipAddress: '2001:db8::3',
+        userAgent: 'Resource worker/1.0',
+      },
+    ]);
+    expect(
+      (await fixture.source.query('PRAGMA index_list(audit_log)')).map(({ name }: { name: string }) => name),
+    ).toEqual(
+      expect.arrayContaining([
+        'IDX_audit_log_at',
+        'IDX_audit_log_domain_id',
+        'IDX_audit_log_actor_id',
+        'IDX_audit_log_subject_id',
+        'IDX_audit_log_operation_id',
+        'IDX_audit_log_domain_at',
+      ]),
+    );
+    await expect(fixture.source.query("UPDATE audit_log SET outcome = 'failed' WHERE id = 901")).rejects.toThrow(
+      'immutable',
+    );
+  });
+
+  it('never acknowledges or persists an event in an originating transaction that rolls back', async () => {
+    const runner = fixture.source.createQueryRunner();
+    await runner.startTransaction();
+    const receipt = fixture.service.record(fixture.event());
+    await runner.rollbackTransaction();
+    expect(await receipt).toEqual({ status: 'unavailable' });
+    expect((await fixture.service.list(new AuditQueryDto())).items).toHaveLength(0);
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+  });
+
+  it('records a billing event only after its originating transaction commits', async () => {
+    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
+    let receipt: Promise<{ status: string }> | undefined;
+    await fixture.source.transaction(async (manager) => {
+      receipt = fixture.service.recordBillingTransactionAfterCommit(
+        {
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        },
+        manager,
+      );
+      expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
+    });
+    await expect(receipt).resolves.toEqual({ status: 'recorded' });
+    expect((await fixture.service.list({ limit: 1 })).items[0]).toMatchObject({ subjectId: 8, domain: 'billing' });
+  });
+
+  it('discards a billing event when its originating transaction rolls back', async () => {
+    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
+    let receipt: Promise<{ status: string }> | undefined;
+    await expect(
+      fixture.source.transaction(async (manager) => {
+        receipt = fixture.service.recordBillingTransactionAfterCommit(
+          {
+            transactionId: 8,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          },
+          manager,
+        );
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+    await expect(receipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
+  });
+
+  it('retains outer billing events when a nested transaction rolls back', async () => {
+    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
+    let outerReceipt: Promise<{ status: string }> | undefined;
+    let nestedReceipt: Promise<{ status: string }> | undefined;
+    await fixture.source.transaction(async (manager) => {
+      outerReceipt = fixture.service.recordBillingTransactionAfterCommit(
+        {
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        },
+        manager,
+      );
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          nestedReceipt = fixture.service.recordBillingTransactionAfterCommit(
+            {
+              transactionId: 9,
+              userId: 42,
+              amount: 0,
+              status: 'pending',
+              source: 'resource-usage',
+            },
+            nestedManager,
+          );
+          throw new Error('nested rollback');
+        }),
+      ).rejects.toThrow('nested rollback');
+    });
+    await expect(outerReceipt).resolves.toEqual({ status: 'recorded' });
+    await expect(nestedReceipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+  });
+
+  it('retains billing events from a committed savepoint when a sibling savepoint rolls back', async () => {
+    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
+    let committedReceipt: Promise<{ status: string }> | undefined;
+    let rolledBackReceipt: Promise<{ status: string }> | undefined;
+    await fixture.source.transaction(async (manager) => {
+      await manager.transaction(async (nestedManager) => {
+        committedReceipt = fixture.service.recordBillingTransactionAfterCommit(
+          {
+            transactionId: 8,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          },
+          nestedManager,
+        );
+      });
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          rolledBackReceipt = fixture.service.recordBillingTransactionAfterCommit(
+            {
+              transactionId: 9,
+              userId: 42,
+              amount: 0,
+              status: 'pending',
+              source: 'resource-usage',
+            },
+            nestedManager,
+          );
+          throw new Error('nested rollback');
+        }),
+      ).rejects.toThrow('nested rollback');
+    });
+    await expect(committedReceipt).resolves.toEqual({ status: 'recorded' });
+    await expect(rolledBackReceipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+  });
+
+  it('filters and paginates without duplication; hides expired rows and cleans them', async () => {
+    await fixture.service.record(fixture.event());
+    await fixture.service.record({ ...fixture.event(), outcome: 'failed' });
+    await fixture.service.record(fixture.event());
+    const page = await fixture.service.list({ limit: 1 });
+    expect(page.nextCursor).toBe(3);
+    expect((await fixture.service.list({ limit: 10, beforeId: page.nextCursor })).items.map((row) => row.id)).toEqual([
+      2, 1,
+    ]);
+    expect(
+      (
+        await fixture.service.list({
+          limit: 10,
+          outcome: 'failed',
+          actorId: 42,
+          subjectId: 7,
+          action: 'demo.publication',
+        })
+      ).items,
+    ).toHaveLength(1);
+    expect((await fixture.service.list({ limit: 10, subjectType: 'demo.commissioning' })).items).toHaveLength(0);
+    const old = fixture.source
+      .getRepository(AuditLog)
+      .create({ ...(await fixture.service.list({ limit: 1 })).items[0], id: undefined, at: new Date(0) });
+    await fixture.source.getRepository(AuditLog).insert(old);
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(4);
+    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(3);
+    await fixture.service.cleanup();
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(3);
+  });
+
+  it('does not roll back a recorded event when a paused cleanup transaction fails', async () => {
+    await fixture.source.getRepository(AuditLog).insert({
+      at: new Date(0),
+      domain: 'demo',
+      pluginId: 'abcdefghijklmnopqrstu',
+      action: 'demo.publication',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      apiTokenId: null,
+      outcome: 'succeeded',
+      subjectType: 'demo.device',
+      subjectId: 7,
+      ipAddress: null,
+      userAgent: null,
+      details: { revision: 1 },
+    });
+    await fixture.source.query(`CREATE TRIGGER fail_audit_cleanup BEFORE DELETE ON audit_log
+      BEGIN SELECT RAISE(ROLLBACK, 'cleanup delete failure'); END`);
+    const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+    const originalTransaction = storage.transaction.bind(storage);
+    let releaseCleanup!: () => void;
+    const cleanupPaused = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    let transactionStarted!: () => void;
+    const cleanupStarted = new Promise<void>((resolve) => {
+      transactionStarted = resolve;
+    });
+    const transaction = jest.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (manager) => {
+        transactionStarted();
+        await cleanupPaused;
+        return callback(manager);
+      }),
+    );
+
+    try {
+      const cleanup = fixture.service.cleanup();
+      await cleanupStarted;
+      let recorded = false;
+      const receipt = fixture.service.record(fixture.event()).then((value) => {
+        recorded = true;
+        return value;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(recorded).toBe(false);
+
+      releaseCleanup();
+      await cleanup;
+      await expect(receipt).resolves.toEqual({ status: 'recorded' });
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(2);
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
+  it('records an event after a paused cleanup transaction commits', async () => {
+    await fixture.source.getRepository(AuditLog).insert({
+      at: new Date(0),
+      domain: 'demo',
+      pluginId: 'abcdefghijklmnopqrstu',
+      action: 'demo.publication',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      apiTokenId: null,
+      outcome: 'succeeded',
+      subjectType: 'demo.device',
+      subjectId: 7,
+      ipAddress: null,
+      userAgent: null,
+      details: { revision: 1 },
+    });
+    const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+    const originalTransaction = storage.transaction.bind(storage);
+    let releaseCleanup!: () => void;
+    const cleanupPaused = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    let transactionStarted!: () => void;
+    const cleanupStarted = new Promise<void>((resolve) => {
+      transactionStarted = resolve;
+    });
+    const transaction = jest.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (manager) => {
+        transactionStarted();
+        await cleanupPaused;
+        return callback(manager);
+      }),
+    );
+
+    try {
+      const cleanup = fixture.service.cleanup();
+      await cleanupStarted;
+      let recorded = false;
+      const receipt = fixture.service.record(fixture.event()).then((value) => {
+        recorded = true;
+        return value;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(recorded).toBe(false);
+
+      releaseCleanup();
+      await cleanup;
+      await expect(receipt).resolves.toEqual({ status: 'recorded' });
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(1);
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
+  it('fails closed on disabled capture, unsupported domains, invalid input and write failure', async () => {
+    for (const disabled of [
+      { ...fixture.config, enabled: false },
+      { ...fixture.config, plugin_domains_disabled: ['demo'] },
+    ]) {
+      for (const [key, value] of Object.entries(disabled))
+        await fixture.store.setPlainSetting('audit', key, JSON.stringify(value));
+      const sink = new AuditService(fixture.source, fixture.store);
+      await sink.onModuleInit();
+      expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
+      await sink.onModuleDestroy();
+    }
+    await fixture.store.setPlainSetting('audit', 'enabled', 'true');
+    await fixture.store.setPlainSetting('audit', 'plugin_domains_disabled', '[]');
+    await fixture.store.setPlainSetting('audit', 'domains', '[]');
+    await fixture.service.recordResource({
+      action: 'resource.created',
+      actorId: 42,
+      subjectId: 7,
+      details: { 'after.name': 'Lathe', 'after.type': 'machine' },
+    });
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(0);
+    expect(await fixture.service.record({ ...fixture.event(), details: { password: 'not-stored' } })).toEqual({
+      status: 'unavailable',
+    });
+    await fixture.source.query('DROP TABLE audit_log');
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    await expect(fixture.service.cleanup()).resolves.toBeUndefined();
+  });
+
+  it('rejects oversized details at the database boundary too', async () => {
+    await fixture.service.record(fixture.event());
+    const row = (await fixture.service.list({ limit: 1 })).items[0];
+    await expect(
+      fixture.source.getRepository(AuditLog).insert({ ...row, id: undefined, details: { raw: 'x'.repeat(4096) } }),
+    ).rejects.toThrow('CHECK constraint');
+  });
+
+  it('bounds outstanding writes without an unbounded queue', async () => {
+    const receipts = await Promise.all(Array.from({ length: 40 }, () => fixture.service.record(fixture.event())));
+    expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(8);
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(8);
+  });
+
+  it('persists validated settings across store and service restarts, and fails closed on read failure', async () => {
+    expect(await readAuditSettings(fixture.store)).toEqual(fixture.config);
+    const settings = new SettingsService(null, fixture.store, null);
+    await expect(settings.updateAuditSettings({ retention_days: 0 })).rejects.toThrow();
+    await expect(settings.updateAuditSettings({ domains: ['unknown'] as never })).rejects.toThrow();
+    await expect(settings.updateAuditSettings({ enabled: null })).rejects.toThrow();
+    await expect(settings.updateAuditSettings({ secret: 'never' } as never)).rejects.toThrow();
+    await settings.updateAuditSettings({ enabled: false, domains: [], retention_days: 2 });
+    await fixture.service.onModuleDestroy();
+    fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
+    expect(await readAuditSettings(fixture.store)).toEqual({
+      enabled: false,
+      domains: [],
+      plugin_domains_disabled: [],
+      retention_days: 2,
+    });
+    fixture.service = new AuditService(fixture.source, fixture.store);
+    await fixture.service.onModuleInit();
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
+    jest.spyOn(fixture.store, 'getPlainSetting').mockRejectedValue(new Error('private failure'));
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit settings unavailable');
+  });
+
+  it('applies retention setting changes to reads immediately and rejects malformed persisted settings', async () => {
+    await fixture.service.record(fixture.event());
+    const row = (await fixture.service.list({ limit: 1 })).items[0];
+    await fixture.source
+      .getRepository(AuditLog)
+      .insert({ ...row, id: undefined, at: new Date(Date.now() - 3 * 86400000) });
+    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(2);
+    const settings = new SettingsService(null, fixture.store, null);
+    await settings.updateAuditSettings({ retention_days: 2 });
+    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(1);
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(2);
+    for (const invalid of ['null', '"private"', '0']) {
+      await fixture.store.setPlainSetting('audit', 'retention_days', invalid);
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit settings unavailable');
+      await fixture.service.cleanup();
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(2);
+    }
+  });
+
+  it('bounds admission before settings awaits and recovers after settings failure', async () => {
+    let release: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const read = jest.spyOn(fixture.store, 'getPlainSetting').mockImplementation(async () => {
+      await gate;
+      throw new Error('private');
+    });
+    const pending = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    expect(read).toHaveBeenCalledTimes(32);
+    release();
+    expect((await Promise.all(pending)).every((receipt) => receipt.status === 'unavailable')).toBe(true);
+    read.mockRestore();
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+  });
+
+  it('drains multiple bounded retention batches and filters event prefixes and time windows', async () => {
+    await fixture.service.record(fixture.event());
+    const row = (await fixture.service.list({ limit: 1 })).items[0];
+    for (let batch = 0; batch < 3; batch++) {
+      await fixture.source
+        .getRepository(AuditLog)
+        .insert(Array.from({ length: 800 }, () => ({ ...row, id: undefined, at: new Date(0) })));
+    }
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(2401);
+    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(1);
+    await fixture.service.cleanup();
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(1);
+    expect(
+      (
+        await fixture.service.list({
+          limit: 10,
+          eventPrefix: 'demo.pub',
+          from: row.at.toISOString(),
+          to: row.at.toISOString(),
+        })
+      ).items,
+    ).toHaveLength(1);
+    expect((await fixture.service.list({ limit: 10, eventPrefix: 'demo.commissioning.' })).items).toHaveLength(0);
+    expect((await fixture.service.list({ limit: 10, to: new Date(0).toISOString() })).items).toHaveLength(0);
+  });
+
+  it('declines writes under SQLite contention within a deadline and recovers', async () => {
+    await fixture.source.query('PRAGMA busy_timeout = 10');
+    const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
+    try {
+      await lock.query('BEGIN IMMEDIATE');
+      const start = Date.now();
+      const receipts = await Promise.all(Array.from({ length: 8 }, () => fixture.service.record(fixture.event())));
+      expect(receipts.every((receipt) => receipt.status === 'unavailable')).toBe(true);
+      expect(Date.now() - start).toBeLessThan(2500);
+      await lock.query('ROLLBACK');
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    } finally {
+      await lock.destroy();
+    }
+  }, 10_000);
+
+  it('uses one safe event snapshot before settings awaits and waits safely for shutdown', async () => {
+    let release: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const originalRead = fixture.store.getPlainSetting.bind(fixture.store);
+    const read = jest.spyOn(fixture.store, 'getPlainSetting').mockImplementation(async (parent, key) => {
+      await gate;
+      return originalRead(parent, key);
+    });
+    const input = fixture.event();
+    const pending = fixture.service.record(input);
+    input.principal.userId = 99;
+    input.details.revision = 999;
+    release();
+    expect(await pending).toEqual({ status: 'recorded' });
+    read.mockRestore();
+    expect((await fixture.service.list({ limit: 1 })).items[0]).toMatchObject({
+      actorId: 42,
+      details: { revision: 2 },
+    });
+    const writes = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
+    const shutdown = fixture.service.onModuleDestroy();
+    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    await Promise.all([...writes, shutdown]);
+    await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit storage unavailable');
+  });
+});
 it('upgrades the full registered schema, reverts the audit migration, and reapplies it', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'audit-upgrade-'));
   const prior = Object.values(migrations).filter(

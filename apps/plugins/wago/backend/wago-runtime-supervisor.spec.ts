@@ -1,32 +1,11 @@
-import { chmodSync, existsSync, linkSync, readdirSync, symlinkSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { chmodSync, existsSync, linkSync, readdirSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
 import { fw31RootOwnedHostStat } from './fixtures/fw31-root-owned-host-stat';
+import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
 import { wagoRuntimeSupervisorAcknowledgeShell, wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
-import { registerFailsAfterBoundedLaunchAttemptsWithoutAnAcknowledgementAndRemovesItsRequest } from './wago-runtime-supervisor.test-cases';
-import { registerWaitsForAComplete174SecondGateWithoutPrematureReadinessOrDuplicateWorkers } from './wago-runtime-supervisor.test-cases';
-import { registerLaunchesOnlyOneLiveCandidateThroughADelayedCompleteGate } from './wago-runtime-supervisor.test-cases';
-import { registerReplacesAnExitedCandidateWithNoAcknowledgementOnceOwnershipIsAvailable } from './wago-runtime-supervisor.test-cases';
-import { registerFailsClosedWhenAcknowledgementExceedsThe330SecondReadyBudget } from './wago-runtime-supervisor.test-cases';
-import { registerDoesNotRunUnlockedRollbackOnExhaustedReacquisitionInterruptedS } from './wago-runtime-supervisor.test-cases';
-import { registerDefersAnInterruptedRequestUntilTheGateOwnerReleasesTheTransactionLock } from './wago-runtime-supervisor.test-cases';
-import { registerAcceptsAnExistingSupervisorAcknowledgementWhenTheSecondLaunchCannotAcquireOwnership } from './wago-runtime-supervisor.test-cases';
-import { registerDefersInterruptionDuringHandoffUntilTheCallerCanRunItsLockedRollback } from './wago-runtime-supervisor.test-cases';
-import { registerPublishesAPrivateRegularAcknowledgementAndAcceptsARepeatedObservation } from './wago-runtime-supervisor.test-cases';
-import { registerDoesNotAcknowledgeARequestThatArrivedAfterTheGateBegan } from './wago-runtime-supervisor.test-cases';
-import { registerAllowsTheCallerToConsumeItsRequestImmediatelyAfterTheAcknowledgementIsPublished } from './wago-runtime-supervisor.test-cases';
-import { registerRejectsUnsafeAcknowledgementMetadataS } from './wago-runtime-supervisor.test-cases';
-import { registerRetainsSupervisionThroughContentionSAndContainsALaterHardwareConflict } from './wago-runtime-supervisor.retains-supervision-through-contention-s-and-contains-a-later-hardware-conflict.test-cases';
 
 describe('bounded runtime supervisor launch acknowledgement', () => {
-  defineBoundedRuntimeSupervisorLaunchAcknowledgementTests();
-});
-
-describe('runtime supervisor handoff with real advisory locks and processes', () => {
-  defineRuntimeSupervisorHandoffWithRealAdvisoryLocksAndProcessesTests();
-});
-
-export function defineBoundedRuntimeSupervisorLaunchAcknowledgementTests() {
   let fixture: ReturnType<typeof fw31ShellFixture>;
   const config = 'etc/attraccess-wago';
   const request = config + '/supervisor-start.fixture';
@@ -104,32 +83,6 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
       0o700,
     );
   });
-  const scope = {
-    get fixture() {
-      return fixture;
-    },
-    set fixture(value: typeof fixture) {
-      fixture = value;
-    },
-    get config() {
-      return config;
-    },
-    get script() {
-      return script;
-    },
-    get requests() {
-      return requests;
-    },
-    get controlledHandoff() {
-      return controlledHandoff;
-    },
-    get request() {
-      return request;
-    },
-    get owner() {
-      return owner;
-    },
-  };
   afterEach(() => fixture.dispose());
 
   it('confirms a live supervisor and removes only its acknowledged private request', () => {
@@ -138,13 +91,77 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
     expect(fixture.read('launches').trim().split('\n').length).toBeLessThanOrEqual(15);
   });
 
-  registerFailsAfterBoundedLaunchAttemptsWithoutAnAcknowledgementAndRemovesItsRequest(scope);
+  it('fails after bounded launch attempts without an acknowledgement and removes its request', () => {
+    // No existing owner in this case. Other tests exercise lock validation;
+    // avoid 165 external metadata probes just to count replacement launches.
+    rmSync(join(fixture.root, config, 'supervisor.lock'));
+    const result = fixture.run(
+      script(`
+nohup() { printf 'launch\\n' >> "$FIXTURE_ROOT/launches"; }
+sleep() { wait; }
+${wagoRuntimeSupervisorLaunchShell()}`),
+    );
+    expect(result.stderr).toContain('Runtime supervisor launch unverified');
+    expect(result.status).not.toBe(0);
+    expect(requests()).toEqual([]);
+    expect(fixture.read('launches').trim().split('\n')).toHaveLength(165);
+  });
 
-  registerWaitsForAComplete174SecondGateWithoutPrematureReadinessOrDuplicateWorkers(scope);
+  it('waits for a complete 174-second gate without premature readiness or duplicate workers', () => {
+    const result = fixture.run(script(controlledHandoff(174) + wagoRuntimeSupervisorLaunchShell()));
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(fixture.read('elapsed')).toBe('174\n');
+    expect(existsSync(join(fixture.root, 'launches'))).toBe(false);
+    expect(requests()).toEqual([]);
+  });
 
-  registerLaunchesOnlyOneLiveCandidateThroughADelayedCompleteGate(scope);
+  it('launches only one live candidate through a delayed complete gate', () => {
+    const result = fixture.run(
+      script(`
+supervisor_fixture_seconds=0
+nohup() {
+  printf 'launch\\n' >> "$FIXTURE_ROOT/launches"
+  : > "$FIXTURE_ROOT/candidate-started"
+  while test ! -f "$FIXTURE_ROOT/complete-gate"; do :; done
+  : > "$FIXTURE_ROOT/supervisor-fixture-live"
+  for request in "$config"/supervisor-start.*; do
+    printf '%s\\n' "$$" > "$request/ready"
+  done
+}
+sleep() {
+  while test ! -f "$FIXTURE_ROOT/candidate-started"; do :; done
+  supervisor_fixture_seconds=$((supervisor_fixture_seconds + $1))
+  printf '%s\\n' "$supervisor_fixture_seconds" > "$FIXTURE_ROOT/elapsed"
+  if test "$supervisor_fixture_seconds" -ge 174; then
+    : > "$FIXTURE_ROOT/complete-gate"
+    wait
+  else
+    for request in "$config"/supervisor-start.*; do test ! -e "$request/ready" || exit 99; done
+  fi
+}
+${wagoRuntimeSupervisorLaunchShell()}`),
+    );
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(fixture.read('elapsed')).toBe('174\n');
+    expect(fixture.read('launches')).toBe('launch\n');
+    expect(requests()).toEqual([]);
+  });
 
-  registerReplacesAnExitedCandidateWithNoAcknowledgementOnceOwnershipIsAvailable(scope);
+  it('replaces an exited candidate with no acknowledgement once ownership is available', () => {
+    fixture.file(
+      'bin/nohup',
+      fixture
+        .read('bin/nohup')
+        .replace(
+          "if(fault==='supervisor-launch-failed')process.exit(1);",
+          "if(fs.readFileSync(root+'/launches','utf8')==='launch\\n')process.exit(1);",
+        ),
+    );
+    const result = fixture.run(script(wagoRuntimeSupervisorLaunchShell()));
+    expect(result.status).toBe(0);
+    expect(fixture.read('launches')).toBe('launch\nlaunch\n');
+    expect(requests()).toEqual([]);
+  });
 
   it('allows acknowledgement scheduling after a gate finishes at its 300-second boundary', () => {
     const result = fixture.run(script(controlledHandoff(302, 302) + wagoRuntimeSupervisorLaunchShell()));
@@ -178,7 +195,14 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
     expect(existsSync(join(fixture.root, 'elapsed'))).toBe(false);
   });
 
-  registerFailsClosedWhenAcknowledgementExceedsThe330SecondReadyBudget(scope);
+  it('fails closed when acknowledgement exceeds the 330-second ready budget', () => {
+    const result = fixture.run(script(controlledHandoff(332, 330) + wagoRuntimeSupervisorLaunchShell()));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Runtime supervisor launch unverified');
+    expect(fixture.read('elapsed')).toBe('330\n');
+    expect(existsSync(join(fixture.root, 'launches'))).toBe(false);
+    expect(requests()).toEqual([]);
+  });
 
   it('allows a separately bounded 174-second lock reacquisition after readiness', () => {
     const result = fixture.run(script(controlledHandoff(2, 176) + wagoRuntimeSupervisorLaunchShell()));
@@ -187,11 +211,51 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
     expect(requests()).toEqual([]);
   });
 
-  registerDoesNotRunUnlockedRollbackOnExhaustedReacquisitionInterruptedS(scope);
+  it.each([false, true])('does not run unlocked rollback on exhausted reacquisition (interrupted: %s)', (interrupt) => {
+    const result = fixture.run(
+      script(
+        controlledHandoff(2, 304, interrupt) +
+          `
+trap 'echo unsafe-rollback' EXIT
+${wagoRuntimeSupervisorLaunchShell()}`,
+      ),
+    );
+    expect(result.status).toBe(75);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('Runtime supervisor handoff lock unverified; recovery required');
+    expect(fixture.read('elapsed')).toBe('302\n');
+    expect(requests()).toEqual([]);
+  });
 
-  registerDefersAnInterruptedRequestUntilTheGateOwnerReleasesTheTransactionLock(scope);
+  it('defers an interrupted request until the gate owner releases the transaction lock', () => {
+    const result = fixture.run(
+      script(
+        controlledHandoff(174, 174, true) +
+          `
+trap 'flock -n 9 && echo rollback-with-lock' EXIT
+${wagoRuntimeSupervisorLaunchShell()}`,
+      ),
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('rollback-with-lock\n');
+    expect(fixture.read('elapsed')).toBe('174\n');
+    expect(requests()).toEqual([]);
+  });
 
-  registerAcceptsAnExistingSupervisorAcknowledgementWhenTheSecondLaunchCannotAcquireOwnership(scope);
+  it('accepts an existing supervisor acknowledgement when the second launch cannot acquire ownership', () => {
+    fixture.file(
+      'bin/sleep',
+      `#!${process.execPath}
+const fs=require('node:fs'),config=process.env.FIXTURE_ROOT+'/${config}';
+fs.writeFileSync(process.env.FIXTURE_ROOT+'/supervisor-fixture-live','');
+for(const name of fs.readdirSync(config).filter(name=>name.startsWith('supervisor-start.')))
+ fs.writeFileSync(config+'/'+name+'/ready',String(process.ppid),{mode:0o600});
+`,
+      0o700,
+    );
+    expect(fixture.run(script(wagoRuntimeSupervisorLaunchShell()), 'supervisor-launch-failed').status).toBe(0);
+    expect(requests()).toEqual([]);
+  });
 
   it('rejects a symlinked launch acknowledgement without touching its target', () => {
     fixture.file('target', 'preserve target');
@@ -205,15 +269,70 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
     expect(requests()).toEqual([]);
   });
 
-  registerDefersInterruptionDuringHandoffUntilTheCallerCanRunItsLockedRollback(scope);
+  it('defers interruption during handoff until the caller can run its locked rollback', () => {
+    fixture.file('bin/sleep', `#!${process.execPath}\nprocess.kill(process.ppid,'SIGTERM');\n`, 0o700);
+    const result = fixture.run(
+      script(`trap ': >&9 && echo rollback-with-lock' EXIT\n${wagoRuntimeSupervisorLaunchShell()}`),
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('rollback-with-lock\n');
+    expect(requests()).toEqual([]);
+  });
 
-  registerPublishesAPrivateRegularAcknowledgementAndAcceptsARepeatedObservation(scope);
+  it('publishes a private regular acknowledgement and accepts a repeated observation', () => {
+    fixture.file(request + '/request', '');
+    const acknowledge = script(wagoRuntimeSupervisorAcknowledgeShell());
+    expect(fixture.run(acknowledge).status).toBe(0);
+    expect(statSync(join(fixture.root, request, 'ready')).mode & 0o777).toBe(0o600);
+    expect(fixture.run(acknowledge).status).toBe(0);
+    expect(readdirSync(join(fixture.root, request))).toEqual(['ready', 'request']);
+  });
 
-  registerDoesNotAcknowledgeARequestThatArrivedAfterTheGateBegan(scope);
+  it('does not acknowledge a request that arrived after the gate began', () => {
+    fixture.file(request + '/request', '');
+    expect(
+      fixture.run(script(`set -- "$config/supervisor-start.earlier"\n${wagoRuntimeSupervisorAcknowledgeShell()}`))
+        .status,
+    ).toBe(0);
+    expect(existsSync(join(fixture.root, request, 'ready'))).toBe(false);
+  });
 
-  registerAllowsTheCallerToConsumeItsRequestImmediatelyAfterTheAcknowledgementIsPublished(scope);
+  it('allows the caller to consume its request immediately after the acknowledgement is published', () => {
+    fixture.file(request + '/request', '');
+    rmSync(join(fixture.root, 'bin/mv'));
+    fixture.file(
+      'bin/mv',
+      `#!${process.execPath}
+const fs=require('node:fs'),root=process.env.FIXTURE_ROOT,args=process.argv.slice(2);
+if(args.at(-1)!==root+'/${request}/ready')process.exit(99);
+const moved=require('node:child_process').spawnSync('/bin/mv',args);
+if(moved.status!==0)process.exit(1);
+fs.rmSync(root+'/${request}',{recursive:true});
+`,
+      0o700,
+    );
+    expect(fixture.run(script(wagoRuntimeSupervisorAcknowledgeShell())).status).toBe(0);
+    expect(requests()).toEqual([]);
+  });
 
-  registerRejectsUnsafeAcknowledgementMetadataS(scope);
+  it.each(['directory-owner', 'directory-mode', 'ready-owner', 'ready-mode', 'ready-symlink', 'ready-hardlink'])(
+    'rejects unsafe acknowledgement metadata: %s',
+    (fault) => {
+      fixture.file(request + '/request', '');
+      if (fault === 'directory-owner') owner(request, '10001:10001');
+      if (fault === 'directory-mode') chmodSync(join(fixture.root, request), 0o777);
+      if (fault === 'ready-owner' || fault === 'ready-mode') fixture.file(request + '/ready', '');
+      if (fault === 'ready-owner') owner(request + '/ready', '10001:10001');
+      if (fault === 'ready-mode') chmodSync(join(fixture.root, request, 'ready'), 0o666);
+      if (fault === 'ready-symlink' || fault === 'ready-hardlink') {
+        fixture.file('target', 'preserve target');
+        const link = fault === 'ready-symlink' ? symlinkSync : linkSync;
+        link(join(fixture.root, 'target'), join(fixture.root, request, 'ready'));
+      }
+      expect(fixture.run(script(wagoRuntimeSupervisorAcknowledgeShell())).status).not.toBe(0);
+      if (existsSync(join(fixture.root, 'target'))) expect(fixture.read('target')).toBe('preserve target');
+    },
+  );
 
   it('rejects a request directory symlink without creating an acknowledgement at its target', () => {
     fixture.file('target/value', 'preserve target');
@@ -221,21 +340,148 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
     expect(fixture.run(script(wagoRuntimeSupervisorAcknowledgeShell())).status).not.toBe(0);
     expect(existsSync(join(fixture.root, 'target/ready'))).toBe(false);
   });
+});
 
-  return scope;
+describe('runtime supervisor handoff with real advisory locks and processes', () => {
+  {
+    it.each([14, 15])(
+      'retains supervision through contention %s and contains a later hardware conflict',
+      async (contention) => {
+        const fixture = fw31ShellFixture();
+        fixture.file(
+          'bin/timeout',
+          fixture.read('bin/timeout').replace("['10','30','45']", "['10','30','45','300']"),
+          0o700,
+        );
+        const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+        const waitFor = async (check: () => boolean) => {
+          // Loaded runners spawn each fixture shim through node; a tight deadline
+          // turns contention into spurious failures instead of catching real hangs.
+          const deadline = Date.now() + 240000;
+          while (!check()) {
+            if (Date.now() > deadline) throw new Error('Fixture process deadline exceeded');
+            await delay(20);
+          }
+        };
+        fixture.file(
+          'bin/flock',
+          `#!${process.env.PYTHON || '/usr/bin/python3'}
+import fcntl, sys, os
+try: fcntl.flock(int(sys.argv[2]), fcntl.LOCK_UN if sys.argv[1] == '-u' else fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError:
+ if sys.argv[2] == '9':
+  with open(os.environ['FIXTURE_ROOT'] + '/busy', 'a') as log: log.write('busy\\n')
+ sys.exit(1)
+`,
+          0o700,
+        );
+        fixture.file('bin/nohup', '#!/bin/sh\nexec /usr/bin/nohup "$@"\n', 0o700);
+        // Only the old owner's polling sleeps are controlled. Locks, process exit,
+        // inherited descriptors and the generated gate/handoff all remain real.
+        fixture.file(
+          'bin/sleep',
+          `#!${process.execPath}
+const fs=require('node:fs'),root=process.env.FIXTURE_ROOT;
+if(fs.existsSync(root+'/owner-pid') && Number(fs.readFileSync(root+'/owner-pid','utf8'))===process.ppid){
+ const count=fs.existsSync(root+'/sleeps')?Number(fs.readFileSync(root+'/sleeps','utf8'))+1:1;
+ fs.writeFileSync(root+'/sleeps',String(count));
+  if(count>=14 && !fs.existsSync(root+'/allow-polling')){
+  fs.writeFileSync(root+'/sleep-'+count,'');
+  while(!fs.existsSync(root+'/release-'+count))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ }
+}else {
+ if(fs.readdirSync(root+'/etc/attraccess-wago').some(name=>name.startsWith('supervisor-start.'))){
+  fs.writeFileSync(root+'/launcher-waiting','');
+  while(!fs.existsSync(root+'/release-launch'))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ }
+ Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
 }
-
-export type BoundedRuntimeSupervisorLaunchAcknowledgementTestScope = ReturnType<
-  typeof defineBoundedRuntimeSupervisorLaunchAcknowledgementTests
->;
-
-export function defineRuntimeSupervisorHandoffWithRealAdvisoryLocksAndProcessesTests() {
-  const scope = {};
-  registerRetainsSupervisionThroughContentionSAndContainsALaterHardwareConflict(scope);
-
-  return scope;
-}
-
-export type RuntimeSupervisorHandoffWithRealAdvisoryLocksAndProcessesTestScope = ReturnType<
-  typeof defineRuntimeSupervisorHandoffWithRealAdvisoryLocksAndProcessesTests
->;
+`,
+          0o700,
+        );
+        fixture.file(
+          'owner',
+          '#!/bin/sh\necho $$ > "$FIXTURE_ROOT/owner-pid"\nexec "$FIXTURE_ROOT/etc/rc.d/S99_zz_attraccess_wago" supervise\n',
+          0o700,
+        );
+        fixture.file('etc/attraccess-wago/runtime-enabled', '');
+        fixture.file('etc/attraccess-wago/install.lock', '');
+        fixture.setContainers([{ id: 'owned', name: 'attraccess-wago', running: true, restart: 'no' }]);
+        const child = spawn(
+          '/bin/sh',
+          [
+            '-c',
+            `set -eu
+umask 077
+config="$FIXTURE_ROOT/etc/attraccess-wago"
+hook="$FIXTURE_ROOT/etc/rc.d/S99_zz_attraccess_wago"
+fail() { echo "$*" >&2; exit 1; }
+exec 9<>"$config/install.lock"
+flock -n 9
+"$FIXTURE_ROOT/owner" </dev/null >/dev/null 2>&1 9>&- &
+while test ! -f "$FIXTURE_ROOT/trigger"; do sleep 2; done
+${wagoRuntimeSupervisorLaunchShell()}
+echo launched
+`,
+          ],
+          {
+            detached: true,
+            env: { PATH: join(fixture.root, 'bin'), FIXTURE_ROOT: fixture.root, TMPDIR: join(fixture.root, 'tmp') },
+            stdio: ['ignore', 'pipe', 'pipe'],
+          },
+        );
+        let output = '';
+        child.stdout.on('data', (data) => (output += data));
+        child.stderr.on('data', (data) => (output += data));
+        let status: number | null | undefined;
+        child.on('close', (code) => (status = code));
+        try {
+          await waitFor(() => existsSync(join(fixture.root, 'sleep-14')));
+          if (contention === 15) {
+            fixture.file('release-14', '');
+            await waitFor(() => existsSync(join(fixture.root, 'sleep-15')));
+            expect(
+              fixture.run('exec 8<>"$FIXTURE_ROOT/etc/attraccess-wago/supervisor.lock"\nflock -n 8').status,
+            ).not.toBe(0);
+          }
+          fixture.file('trigger', '');
+          // Pause at the launcher's actual poll, after its lock-release step, not
+          // merely after mkdir (the caller could still be preparing the handoff).
+          await waitFor(() => existsSync(join(fixture.root, 'launcher-waiting')));
+          fixture.file('release-14', '');
+          if (contention === 15) fixture.file('release-15', '');
+          if (contention === 14)
+            await waitFor(
+              () =>
+                existsSync(join(fixture.root, 'sleep-15')) ||
+                fixture.run('exec 8<>"$FIXTURE_ROOT/etc/attraccess-wago/supervisor.lock"\nflock -n 8').status === 0,
+            );
+          fixture.file('release-launch', '');
+          await waitFor(() => status !== undefined);
+          expect({ status, output }).toEqual({ status: 0, output: 'launched\n' });
+          expect(
+            fixture.run('exec 8<>"$FIXTURE_ROOT/etc/attraccess-wago/supervisor.lock"\nflock -n 8').status,
+          ).not.toBe(0);
+          expect(fixture.containers()[0].running).toBe(true);
+          fixture.file('plc', 'running');
+          fixture.file('allow-polling', '');
+          fixture.file('release-15', '');
+          fixture.file('release-16', '');
+          await waitFor(() => !fixture.containers()[0].running);
+          expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(true);
+        } finally {
+          for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
+            try {
+              if (child.pid) process.kill(-child.pid, signal);
+            } catch {
+              /* Only this fixture's process group. */
+            }
+            await delay(50);
+          }
+          fixture.dispose();
+        }
+      },
+      600000,
+    );
+  }
+});

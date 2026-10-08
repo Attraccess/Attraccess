@@ -1,19 +1,9 @@
+import { QueryClient } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
-import { QueryClient } from '@tanstack/react-query';
-import type { SetupScope } from './visual-editor.test';
-import { registerBindsANamedActionAndLiveMeasurementRetainingOutputControlsAndValidMeteredPayloads } from './visual-editor.binds-a-named-action-and-live-measurement-retaining-output-controls-and-valid-metered-payloads.test-cases';
-import { registerUsesTheActualTransportSelectorToReplaceTcpFieldsWithValidSerialConfiguration } from './visual-editor.retains-local-edits-across-route-unmounts-and-requires-confirmation-to-discard-them.test-cases';
-import { state } from './visual-editor.test.state';
-import { mount } from './visual-editor.test.client';
-import { external } from './visual-editor.test.external.helpers';
-import { section } from './visual-editor.test.external.helpers';
-import { registerRecoversFromAnInitialDraftReadFailureThroughTheRetryControl } from './visual-editor.freezes-editing-and-close-during-publication-and-keeps-readiness-unknown.test-cases';
-import { registerRecoversAnAppliedBaselineAfterAFailedInitialFetchWithoutClaimingASavedDraft } from './visual-editor.freezes-editing-and-close-during-publication-and-keeps-readiness-unknown.test-cases';
-import { registerShowsFieldValidationFailuresAndPreventsPersistenceUntilTheDraftIsValid } from './visual-editor.retains-local-edits-across-route-unmounts-and-requires-confirmation-to-discard-them.test-cases';
-import { registerRendersReportedConfigurationHardwareFaultsAndChannelSamplesWithoutTreatingThemAsReadines } from './visual-editor.reloads-a-refreshed-saved-draft-while-clean-and-blocks-dirty-local-edits-from-overwriting-it.test-cases';
-import { registerRequiresASelectedInputForAGuardedOutputAndPreservesItsWatchdogConfiguration } from './visual-editor.reloads-a-refreshed-saved-draft-while-clean-and-blocks-dirty-local-edits-from-overwriting-it.test-cases';
 import type { WagoDiagnostics } from '../src/diagnostics';
+import { state } from './visual-editor.test.state';
+type SetupScope = { state: typeof state; client: QueryClient; diagnosticsFixture: typeof diagnosticsFixture };
 
 export function resetTestFixture(scope: SetupScope) {
   vi.clearAllMocks();
@@ -73,22 +63,6 @@ export function deferred<T>() {
   return { promise, resolve };
 }
 
-export function defineModbusOutputAndSerialCompositionTests() {
-  const scope = {
-    get state() {
-      return state;
-    },
-    mount,
-    external,
-    section,
-  };
-  registerBindsANamedActionAndLiveMeasurementRetainingOutputControlsAndValidMeteredPayloads(scope);
-
-  registerUsesTheActualTransportSelectorToReplaceTcpFieldsWithValidSerialConfiguration(scope);
-
-  return scope;
-}
-
 export function diagnosticsFixture(controllerId = 1): WagoDiagnostics {
   return {
     controllerId,
@@ -131,26 +105,4 @@ export function diagnosticsFixture(controllerId = 1): WagoDiagnostics {
     events: [],
     limitations: [],
   };
-}
-
-export function defineRootTestRegistrationsTests() {
-  const scope = {
-    get state() {
-      return state;
-    },
-    mount,
-    diagnosticsFixture,
-  };
-
-  registerRecoversFromAnInitialDraftReadFailureThroughTheRetryControl(scope);
-
-  registerRecoversAnAppliedBaselineAfterAFailedInitialFetchWithoutClaimingASavedDraft(scope);
-
-  registerShowsFieldValidationFailuresAndPreventsPersistenceUntilTheDraftIsValid(scope);
-
-  registerRendersReportedConfigurationHardwareFaultsAndChannelSamplesWithoutTreatingThemAsReadines(scope);
-
-  registerRequiresASelectedInputForAGuardedOutputAndPreservesItsWatchdogConfiguration(scope);
-
-  return scope;
 }

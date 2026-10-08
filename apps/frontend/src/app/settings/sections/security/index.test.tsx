@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
@@ -12,22 +12,7 @@ import {
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SecuritySection } from './index';
-import { registerAbsorbsAllFourFormerDestinationsIntoOneSection } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerReportsAFailedPolicyQueryInsteadOfSpinningForeverAndKeepsTheRestEditable } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerStillCommitsAnEditToAHealthyGroupWhileThePolicyQueryIsDown } from './index.still-commits-an-edit-to-a-healthy-group-while-the-policy-query-is-down.test-cases';
-import { registerReportsAFailedThrottlingQueryWithoutTakingThePasswordPolicyWithIt } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerStillShowsTheSpinnerWhileTheQueriesAreGenuinelyInFlight } from './index.still-commits-an-edit-to-a-healthy-group-while-the-policy-query-is-down.test-cases';
-import { registerKeepsTheStrengthPreviewInTheAsideNotTheContentColumn } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerCommitsOnlyTheGroupThatIsDirty } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerPutsADiffInFrontOfAPasswordPolicyChangeAndSendsOnlyTheChangedKeys } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerSeedsTheOverridesEditorFromTheSavedPolicyNotAnUnsavedEdit } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerKeepsTheBarReachableWhenANumberIsClearedWithSaveBlocked } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerAddsAndRemovesSignupDomainsWithoutTouchingTheServerUntilSave } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerRefusesToEditTheDomainListBeforeItHasLoaded } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerSaysSoRatherThanShowingAnEmptyListWhenTheWhitelistCannotBeLoaded } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerBlocksSaveOnANonIntegerWhereTheApiValidatesIsInt } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerDoesNotClobberAnUnsavedEditWhenABackgroundRefetchLands } from './index.absorbs-all-four-former-destinations-into-one-section.test-cases';
-import { registerUpdatesCachedSettingsAfterSavesAndReportsFailuresForEachBackend } from './index.still-commits-an-edit-to-a-healthy-group-while-the-policy-query-is-down.test-cases';
+import userEvent from '@testing-library/user-event';
 
 const feedback = vi.hoisted(() => ({
   invalidate: vi.fn(() => Promise.resolve()),
@@ -101,10 +86,6 @@ const saveDomains = vi.fn();
 const idle = (mutate: unknown) => ({ mutate, isPending: false });
 
 describe('SecuritySection', () => {
-  defineSecuritySectionTests();
-});
-
-export function defineSecuritySectionTests() {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
@@ -139,47 +120,97 @@ export function defineSecuritySectionTests() {
 
   const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
   const saveButton = () => screen.getByRole('button', { name: 'saveBar.save' });
-  const scope = {
-    get saveBar() {
-      return saveBar;
-    },
-    get saveButton() {
-      return saveButton;
-    },
-    get saveTwoFactor() {
-      return saveTwoFactor;
-    },
-    get savePolicy() {
-      return savePolicy;
-    },
-    get saveRateLimit() {
-      return saveRateLimit;
-    },
-    get RATE_LIMIT() {
-      return RATE_LIMIT;
-    },
-    get saveDomains() {
-      return saveDomains;
-    },
-    get POLICY() {
-      return POLICY;
-    },
-    get feedback() {
-      return feedback;
-    },
-  };
+  it('absorbs all four former destinations into one section', () => {
+    // Login throttling was an inline form on /users/security, the password policy a page of its
+    // own, 2FA and signup domains header modals. If any of these stops rendering here, that
+    // content has been orphaned rather than moved.
+    render(<SecuritySection />);
 
-  registerAbsorbsAllFourFormerDestinationsIntoOneSection(scope);
+    expect(screen.getByLabelText('twoFactor.label')).toBeInTheDocument();
+    expect(screen.getByTestId('signup-domains-row')).toBeInTheDocument();
+    expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toBeInTheDocument();
+    expect(screen.getByTestId('policy-row-minLength')).toBeInTheDocument();
+    expect(screen.getByTestId('policy-row-checkHIBP')).toBeInTheDocument();
+    expect(screen.getByTestId('policy-overrides-table')).toBeInTheDocument();
+  });
 
-  registerReportsAFailedPolicyQueryInsteadOfSpinningForeverAndKeepsTheRestEditable(scope);
+  it('reports a failed policy query instead of spinning forever, and keeps the rest editable', () => {
+    // On error `isLoading` goes false while the data stays undefined. Folding `!policy` into the
+    // loading gate rendered the *loading* state permanently — and took 2FA, the domain whitelist and
+    // throttling down with it, none of which come from this query.
+    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
 
-  registerStillCommitsAnEditToAHealthyGroupWhileThePolicyQueryIsDown(scope);
+    render(<SecuritySection />);
 
-  registerReportsAFailedThrottlingQueryWithoutTakingThePasswordPolicyWithIt(scope);
+    expect(screen.queryByText('loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('policy-load-failed')).toHaveTextContent('policy.loadFailed');
+    expect(screen.queryByTestId('policy-row-minLength')).not.toBeInTheDocument();
 
-  registerStillShowsTheSpinnerWhileTheQueriesAreGenuinelyInFlight(scope);
+    // The three unrelated groups are still reachable.
+    expect(screen.getByLabelText('twoFactor.label')).toBeInTheDocument();
+    expect(screen.getByTestId('signup-domains-row')).toBeInTheDocument();
+    expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toBeInTheDocument();
+  });
 
-  registerKeepsTheStrengthPreviewInTheAsideNotTheContentColumn(scope);
+  it('still commits an edit to a healthy group while the policy query is down', async () => {
+    // Rendering the other groups is not enough — they have to be *savable*. A bare
+    // `!isPolicySavable` on the bar was unconditionally true with no policy (`Number.isInteger(
+    // undefined)` is false), so the bar came up on a 2FA edit with Save greyed out and nothing
+    // saying why, and Discard was the only way out.
+    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+
+    const { container } = render(<SecuritySection />);
+
+    await userEvent.click(screen.getByRole('button', { name: /twoFactor/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /twoFactor.options.all/ }));
+
+    expect(saveBar(container)).toBeInTheDocument();
+    expect(saveButton()).not.toBeDisabled();
+
+    await userEvent.click(saveButton());
+    expect(saveTwoFactor).toHaveBeenCalledWith({ requestBody: { policy: 'all' } });
+    expect(savePolicy).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed throttling query without taking the password policy with it', () => {
+    vi.mocked(useSettingsServiceGetAuthRateLimitSettings).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetAuthRateLimitSettings>);
+
+    render(<SecuritySection />);
+
+    expect(screen.queryByText('loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rate-limit-load-failed')).toHaveTextContent('rateLimit.loadFailed');
+    expect(screen.queryByLabelText('rateLimit.fields.maxAttempts.label')).not.toBeInTheDocument();
+    expect(screen.getByTestId('policy-row-minLength')).toBeInTheDocument();
+  });
+
+  it('still shows the spinner while the queries are genuinely in flight', () => {
+    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+
+    render(<SecuritySection />);
+
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('policy-load-failed')).not.toBeInTheDocument();
+  });
+
+  it('keeps the strength preview in the aside, not the content column', () => {
+    const { container } = render(<SecuritySection />);
+
+    expect(container.querySelector('[data-slot="settings-aside"]')).toContainElement(
+      screen.getByTestId('policy-preview-input'),
+    );
+  });
 
   it('shows no save bar until something is edited', () => {
     const { container } = render(<SecuritySection />);
@@ -187,26 +218,205 @@ export function defineSecuritySectionTests() {
     expect(saveBar(container)).toBeNull();
   });
 
-  registerCommitsOnlyTheGroupThatIsDirty(scope);
+  it('commits only the group that is dirty', async () => {
+    // Four backends sit behind one bar. Saving a throttling edit must not also PATCH the password
+    // policy with values this tab happens to be holding.
+    const { container } = render(<SecuritySection />);
 
-  registerPutsADiffInFrontOfAPasswordPolicyChangeAndSendsOnlyTheChangedKeys(scope);
+    const attempts = screen.getByLabelText('rateLimit.fields.maxAttempts.label');
+    await userEvent.clear(attempts);
+    await userEvent.type(attempts, '9');
+    await userEvent.tab();
 
-  registerSeedsTheOverridesEditorFromTheSavedPolicyNotAnUnsavedEdit(scope);
+    expect(saveBar(container)).toBeInTheDocument();
+    await userEvent.click(saveButton());
 
-  registerKeepsTheBarReachableWhenANumberIsClearedWithSaveBlocked(scope);
+    expect(saveRateLimit).toHaveBeenCalledWith({
+      requestBody: { ...RATE_LIMIT, maxAttempts: 9 },
+    });
+    expect(savePolicy).not.toHaveBeenCalled();
+    expect(saveTwoFactor).not.toHaveBeenCalled();
+    expect(saveDomains).not.toHaveBeenCalled();
+  });
 
-  registerAddsAndRemovesSignupDomainsWithoutTouchingTheServerUntilSave(scope);
+  it('puts a diff in front of a password-policy change, and sends only the changed keys', async () => {
+    // The one group here that can invalidate every existing password at once. The PATCH carries
+    // only what changed, so an untouched field cannot be clobbered by a stale value this tab loaded.
+    render(<SecuritySection />);
 
-  registerRefusesToEditTheDomainListBeforeItHasLoaded(scope);
+    const minLength = screen.getByLabelText('fields.minLength.label');
+    await userEvent.clear(minLength);
+    await userEvent.type(minLength, '16');
+    await userEvent.tab();
 
-  registerSaysSoRatherThanShowingAnEmptyListWhenTheWhitelistCannotBeLoaded(scope);
+    await userEvent.click(saveButton());
+    expect(savePolicy).not.toHaveBeenCalled();
 
-  registerBlocksSaveOnANonIntegerWhereTheApiValidatesIsInt(scope);
+    const diff = screen.getByTestId('policy-diff-table');
+    expect(diff).toHaveTextContent('12');
+    expect(diff).toHaveTextContent('16');
 
-  registerDoesNotClobberAnUnsavedEditWhenABackgroundRefetchLands(scope);
-  registerUpdatesCachedSettingsAfterSavesAndReportsFailuresForEachBackend(scope);
+    await userEvent.click(screen.getByTestId('policy-diff-confirm'));
+    expect(savePolicy).toHaveBeenCalledWith({ requestBody: { minLength: 16 } });
+  });
 
-  return scope;
-}
+  it('seeds the overrides editor from the saved policy, not an unsaved edit', async () => {
+    // The modal commits on its own, and inheritance resolves server-side against what is stored.
+    // Passing the merged draft made the "inherit" hint name a number no role would get, and turning
+    // an override on would pin it to a value the operator could still Discard.
+    render(<SecuritySection />);
 
-export type SecuritySectionTestScope = ReturnType<typeof defineSecuritySectionTests>;
+    const minLength = screen.getByLabelText('fields.minLength.label');
+    await userEvent.clear(minLength);
+    await userEvent.type(minLength, '16');
+    await userEvent.tab();
+
+    await userEvent.click(screen.getByTestId('policy-override-edit-admin'));
+    fireEvent.click(
+      screen
+        .getByTestId('override-admin-minLength-toggle')
+        .querySelector('[data-slot="switch-control"]') as HTMLElement,
+    );
+
+    expect(screen.getByTestId('override-admin-minLength-value')).toHaveValue('12');
+  });
+
+  it('keeps the bar reachable when a number is cleared, with Save blocked', async () => {
+    // Clearing a NumberField yields NaN. Treating that as "not dirty" would unmount the bar and
+    // strand the operator with an empty field and no way back to the saved value.
+    const { container } = render(<SecuritySection />);
+
+    await userEvent.clear(screen.getByLabelText('rateLimit.fields.windowSeconds.label'));
+    await userEvent.tab();
+
+    expect(saveBar(container)).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.discard' }));
+
+    expect(screen.getByLabelText('rateLimit.fields.windowSeconds.label')).toHaveValue('300');
+    expect(saveBar(container)).toBeNull();
+  });
+
+  it('adds and removes signup domains without touching the server until Save', async () => {
+    render(<SecuritySection />);
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'domains.addLabel' }), 'new.example{Enter}');
+
+    expect(screen.getByTestId('signup-domain-new.example')).toBeInTheDocument();
+    expect(saveDomains).not.toHaveBeenCalled();
+
+    await userEvent.click(saveButton());
+    expect(saveDomains).toHaveBeenCalledWith({ requestBody: ['example.org', 'new.example'] });
+  });
+
+  it('refuses to edit the domain list before it has loaded', async () => {
+    // PUT is a full replace. While the whitelist is undefined the fallback is `[]`, so an add would
+    // stage a one-element draft that pins — and Save would delete every domain the instance has.
+    vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+
+    const { container } = render(<SecuritySection />);
+
+    expect(screen.queryByRole('textbox', { name: 'domains.addLabel' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('signup-domains-row')).toHaveTextContent('domains.loading');
+    expect(saveBar(container)).toBeNull();
+  });
+
+  it('says so rather than showing an empty list when the whitelist cannot be loaded', () => {
+    // An errored query leaves `data` undefined too. Rendering that as "no domains configured" is a
+    // lie that one add and a Save turns into data loss — and blocking the whole section behind a
+    // spinner that will never resolve is no better.
+    vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+
+    render(<SecuritySection />);
+
+    expect(screen.getByTestId('signup-domains-row')).toHaveTextContent('domains.loadFailed');
+    expect(screen.queryByRole('textbox', { name: 'domains.addLabel' })).not.toBeInTheDocument();
+    // The rest of the section is still usable.
+    expect(screen.getByTestId('policy-row-minLength')).toBeInTheDocument();
+  });
+
+  it('blocks Save on a non-integer where the API validates @IsInt()', async () => {
+    // None of these steppers sets a `step`, so 2.5 is typeable. Number.isFinite let it through to a
+    // 400 rendered as a generic toast naming no field.
+    const { container } = render(<SecuritySection />);
+
+    const attempts = screen.getByLabelText('rateLimit.fields.maxAttempts.label');
+    await userEvent.clear(attempts);
+    await userEvent.type(attempts, '2.5');
+    await userEvent.tab();
+
+    expect(saveBar(container)).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+    expect(saveRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('does not clobber an unsaved edit when a background refetch lands', async () => {
+    const { rerender } = render(<SecuritySection />);
+
+    const attempts = screen.getByLabelText('rateLimit.fields.maxAttempts.label');
+    await userEvent.clear(attempts);
+    await userEvent.type(attempts, '7');
+    await userEvent.tab();
+
+    vi.mocked(useSettingsServiceGetAuthRateLimitSettings).mockReturnValue({
+      data: RATE_LIMIT,
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetAuthRateLimitSettings>);
+    rerender(<SecuritySection />);
+
+    expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toHaveValue('7');
+  });
+
+  it('updates cached settings after saves and reports failures for each backend', async () => {
+    render(<SecuritySection />);
+    const cases = [
+      [
+        usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy,
+        POLICY,
+        ['policy'],
+        'savedToast.title',
+        'errorToast.title',
+      ],
+      [
+        useSettingsServiceUpdateAuthRateLimitSettings,
+        RATE_LIMIT,
+        ['rate-limit'],
+        'rateLimit.saved.title',
+        'rateLimit.error.title',
+      ],
+      [
+        useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
+        { policy: 'all' },
+        ['two-factor'],
+        'twoFactor.saved.title',
+        'twoFactor.error.title',
+      ],
+      [
+        useUsersServiceSetLocalSignupDomainWhitelist,
+        undefined,
+        ['domains'],
+        'domains.saved.title',
+        'domains.error.title',
+      ],
+    ] as const;
+    for (const [hook, data, key, successTitle, errorTitle] of cases) {
+      const options = vi.mocked(hook).mock.calls.at(-1)?.[0] as {
+        onSuccess: (data: unknown) => void;
+        onError: () => void;
+      };
+      await act(async () => options.onSuccess(data));
+      expect(feedback.success).toHaveBeenLastCalledWith(expect.objectContaining({ title: successTitle }));
+      if (data) expect(feedback.cache).toHaveBeenLastCalledWith(key, data);
+      else expect(feedback.invalidate).toHaveBeenCalledWith({ queryKey: key });
+      act(() => options.onError());
+      expect(feedback.error).toHaveBeenLastCalledWith(expect.objectContaining({ title: errorTitle }));
+    }
+  });
+});

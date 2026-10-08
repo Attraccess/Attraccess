@@ -1,11 +1,8 @@
 import { WagoManagedAccess } from './wago-managed-access.entity';
 import { WagoController } from './wago-controller.entity';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
-import { ManagedEnrolmentAndDurableCredentialLifecycleTestScope } from './wago-managed-runtime.spec';
-export async function initializeCutover(
-  scope: ManagedEnrolmentAndDurableCredentialLifecycleTestScope,
-  remoteStatus: string,
-) {
+import { ManagedRuntimeFixture } from './wago-managed-runtime.setup.test-fixture';
+export async function initializeCutover(scope: ManagedRuntimeFixture, remoteStatus: string) {
   const current = await scope.db.getRepository(WagoController).save(
     Object.assign(new WagoController(), {
       id: 1,

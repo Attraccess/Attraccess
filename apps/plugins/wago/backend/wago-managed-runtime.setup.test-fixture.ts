@@ -10,8 +10,21 @@ import { WagoService } from './wago.service';
 import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import { managedSsh } from './wago-managed-ssh';
-import { ManagedEnrolmentAndDurableCredentialLifecycleTestScope } from './wago-managed-runtime.spec';
-export async function resetTestFixture(scope: ManagedEnrolmentAndDurableCredentialLifecycleTestScope) {
+import type { BuildRuntimeArtifact } from './wago-build-runtime';
+
+export type ManagedRuntimeFixture = {
+  db: DataSource;
+  service: WagoManagedRuntimeService;
+  encrypt: jest.Mock;
+  decrypt: jest.Mock;
+  audit: jest.Mock;
+  rootProbe: jest.Mock;
+  context: PluginContext;
+  artifact: BuildRuntimeArtifact;
+  principal: { userId: number; authenticationMethod: 'session' };
+  session: (id?: number) => WagoCommissioningSession;
+};
+export async function resetTestFixture(scope: ManagedRuntimeFixture) {
   scope.db = await new DataSource({
     type: 'sqlite',
     database: ':memory:',

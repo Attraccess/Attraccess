@@ -87,8 +87,8 @@ test('every maintained source language enforces the strict 200-line boundary', (
   fails(result, '"vite.config.mts": 200 lines');
 });
 
-test('test names and test directories enforce the strict 300-line boundary', (t) => {
-  const { write, check } = repository(t);
+test('test names and test directories enforce a 1,000-line maximum', (t) => {
+  const { git, write, check } = repository(t);
   const files = [
     'src/file.spec.mts',
     'src/file.test.tsx',
@@ -106,11 +106,16 @@ test('test names and test directories enforce the strict 300-line boundary', (t)
     'acceptance/plugin.ts',
     'e2e/browser.ts',
   ];
-  for (const file of files) write(file, lines(299));
+  for (const file of files) write(file, lines(1000));
+  git('add', '.');
   succeeds(check());
-  for (const file of files) write(file, lines(300));
-  const result = check();
-  for (const file of files) fails(result, `${JSON.stringify(file)}: 300 lines (maximum 299)`);
+  succeeds(check('--staged'));
+  for (const file of files) write(file, lines(1001));
+  git('add', '.');
+  for (const mode of [[], ['--staged']]) {
+    const result = check(...mode);
+    for (const file of files) fails(result, `${JSON.stringify(file)}: 1001 lines (maximum 1000)`);
+  }
 });
 
 test('LF, CRLF, CR, blank lines, comments, and missing final newlines count consistently', (t) => {
@@ -129,20 +134,20 @@ test('LF, CRLF, CR, blank lines, comments, and missing final newlines count cons
 });
 
 test('all committed code and tests fail until reduced below their limits in both views', (t) => {
-  const { git, write, check } = repository(t, { 'code.ts': lines(250), 'code.test.ts': lines(350) });
+  const { git, write, check } = repository(t, { 'code.ts': lines(250), 'code.test.ts': lines(1100) });
   for (const mode of [[], ['--staged']]) {
     fails(check(...mode), '"code.ts": 250 lines (maximum 199)');
-    fails(check(...mode), '"code.test.ts": 350 lines (maximum 299)');
+    fails(check(...mode), '"code.test.ts": 1100 lines (maximum 1000)');
   }
   write('code.ts', lines(220));
-  write('code.test.ts', lines(320));
+  write('code.test.ts', lines(1050));
   git('add', '.');
   for (const mode of [[], ['--staged']]) {
     fails(check(...mode), '"code.ts": 220 lines (maximum 199)');
-    fails(check(...mode), '"code.test.ts": 320 lines (maximum 299)');
+    fails(check(...mode), '"code.test.ts": 1050 lines (maximum 1000)');
   }
   write('code.ts', lines(199));
-  write('code.test.ts', lines(299));
+  write('code.test.ts', lines(1000));
   git('add', '.');
   succeeds(check());
   succeeds(check('--staged'));

@@ -1,14 +1,3 @@
-import { registerRootTestRegistrationsUsesConfiguredMqttTransportS } from './runtime-entrypoints.root-test-registrations-uses-configured-mqtt-transport-s.test-cases';
-import { registerRootTestRegistrationsEnrollsPersistsAClaimBeforeAcknowledgmentAndReconnectsOperationally } from './runtime-entrypoints.root-test-registrations-enrolls-persists-a-claim-before-acknowledgment-and-reconnects-operationally.test-cases';
-import { registerRootTestRegistrationsDoesNotAcknowledgeOrReconnectWhenAClaimIsInvalid } from './runtime-entrypoints.root-test-registrations-does-not-acknowledge-or-reconnect-when-a-claim-is-invalid.test-cases';
-import { registerRootTestRegistrationsRestoresPersistedIdentityAndRejectsAConflictingHardwareId } from './runtime-entrypoints.root-test-registrations-restores-persisted-identity-and-rejects-a-conflicting-hardware-id.test-cases';
-import { registerRootTestRegistrationsRejectsInvalidInitialValuesS } from './runtime-entrypoints.root-test-registrations-rejects-invalid-initial-values-s.test-cases';
-import { registerRootTestRegistrationsRejectsInvalidTimerIntervalS } from './runtime-entrypoints.root-test-registrations-rejects-invalid-timer-interval-s.test-cases';
-import { registerRootTestRegistrationsAnswersIpcDeviceReadsAndIgnoresMalformedMessages } from './runtime-entrypoints.root-test-registrations-answers-ipc-device-reads-and-ignores-malformed-messages.test-cases';
-import { registerRootTestRegistrationsProductionEntrypointDrainsConnectionStatesDuringStartupAndHandlesReconnects } from './runtime-entrypoints.root-test-registrations-production-entrypoint-drains-connection-states-during-startup-and-handles-reconnects.test-cases';
-import { registerRootTestRegistrationsProductionEntrypointRetriesInterruptedStartupAfterReconnectAndInstallsTelemetryTimersOnce } from './runtime-entrypoints.root-test-registrations-production-entrypoint-retries-interrupted-startup-after-reconnect-and-installs-telemetry-timers-once.test-cases';
-import { registerRootTestRegistrationsBootsAfterAnSshMqttRefreshUsingPermanentStateCredentialsAndTheRecreatedBrokerEnvironme } from './runtime-entrypoints.root-test-registrations-boots-after-an-ssh-mqtt-refresh-using-permanent-state-credentials-and-the-recreated-broker-environme.test-cases';
-import { registerRootTestRegistrationsProductionRtuProfileRoutesModbusDevicesAndSchedulesTheirConfiguredPollingIntervals } from './runtime-entrypoints.root-test-registrations-production-rtu-profile-routes-modbus-devices-and-schedules-their-configured-polling-intervals.test-cases';
 import { EventEmitter } from 'node:events';
 
 class FakeMqtt extends EventEmitter {
@@ -93,72 +82,236 @@ afterEach(() => {
   process.env = originalEnv;
   process.exitCode = originalExitCode;
 });
-defineRootTestRegistrationsTests();
-export type RootTestRegistrationsTestScope = ReturnType<typeof defineRootTestRegistrationsTests>;
+
+test.each([
+  ['mqtt://broker.test', undefined, undefined, {}],
+  ['mqtts://broker.test', 'true', 'broker.internal', { rejectUnauthorized: false, servername: 'broker.internal' }],
+])('uses configured MQTT transport %s', async (url, insecure, servername, options) => {
+  process.env.WAGO_MQTT_URL = url;
+  process.env.WAGO_MQTT_USERNAME = 'enrollment';
+  process.env.WAGO_MQTT_PASSWORD = 'fixture-only';
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
+  if (insecure) process.env.WAGO_MQTT_TLS_INSECURE = insecure;
+  if (servername) process.env.WAGO_MQTT_TLS_SERVERNAME = servername;
+  await import('./main');
+  await flush();
+  const { connect } = await import('mqtt');
+  expect(connect).toHaveBeenCalledWith(url, expect.objectContaining(options));
+  if (url.startsWith('mqtt://')) {
+    expect(jest.mocked(connect).mock.calls[0][1]).not.toHaveProperty('rejectUnauthorized');
+    expect(jest.mocked(connect).mock.calls[0][1]).not.toHaveProperty('servername');
+  }
+});
+
+test('enrolls, persists a claim before acknowledgment, and reconnects operationally', async () => {
+  await boot();
+  const enrollment = mockClients[0];
+  enrollment.emit('connect');
+  await flush();
+  expect(enrollment.publish).toHaveBeenCalledWith(
+    'attraccess/wago/discovery/test-device',
+    expect.stringContaining('123456'),
+    expect.anything(),
+    expect.any(Function),
+  );
+  enrollment.emit(
+    'message',
+    'attraccess/wago/discovery/test-device/claim',
+    Buffer.from(
+      JSON.stringify({
+        username: 'permanent',
+        password: 'new-password',
+        configuration: { namespace: '/local/wago/' },
+        acknowledgementToken: 'ack-token',
+      }),
+    ),
+  );
+  await flush();
+  expect(mockState).toEqual(
+    expect.objectContaining({
+      credentials: { username: 'permanent', password: 'new-password' },
+      operationalPrefix: 'local/wago',
+    }),
+  );
+  expect(enrollment.publish).toHaveBeenCalledWith(
+    'attraccess/wago/discovery/test-device/claim/ack',
+    JSON.stringify({ acknowledgementToken: 'ack-token' }),
+    expect.anything(),
+    expect.any(Function),
+  );
+  expect(mockStore.save.mock.invocationCallOrder.at(-1)).toBeLessThan(enrollment.end.mock.invocationCallOrder[0]);
+  const operational = mockClients[1];
+  operational.emit('connect');
+  await flush();
+  expect(mockRuntime.start).toHaveBeenCalledTimes(1);
+  operational.emit('close');
+  await flush();
+  expect(mockRuntime.setConnected).toHaveBeenLastCalledWith(false);
+  operational.emit('connect');
+  await flush();
+  expect(mockRuntime.start).toHaveBeenCalledTimes(1);
+  expect(mockRuntime.publishHeartbeat).toHaveBeenCalled();
+});
+
+test('does not acknowledge or reconnect when a claim is invalid', async () => {
+  await boot();
+  mockClients[0].emit('connect');
+  await flush();
+  mockClients[0].emit(
+    'message',
+    'attraccess/wago/discovery/test-device/claim',
+    Buffer.from('{"username":"missing-password"}'),
+  );
+  await flush();
+  expect(mockClients).toHaveLength(1);
+  expect(mockState.credentials).toBeUndefined();
+  expect(mockClients[0].end).not.toHaveBeenCalled();
+});
+
+test('restores persisted identity and rejects a conflicting hardware ID', async () => {
+  mockState = { simulatorHardwareId: 'other-device', credentials: { username: 'u', password: 'p' } };
+  await boot();
+  expect(process.exitCode).toBe(1);
+  expect(mockClients).toHaveLength(0);
+});
+
+test.each(['null', '[]', '{"point":"invalid"}'])('rejects invalid initial values %s', async (values) => {
+  process.env.WAGO_INITIAL_VALUES = values;
+  await expect(import('./simulator')).rejects.toThrow('WAGO_INITIAL_VALUES');
+});
+
+test.each(['0', '-1', '1.5', '2147483648'])('rejects invalid timer interval %s', async (value) => {
+  process.env.WAGO_HEARTBEAT_INTERVAL_MS = value;
+  await expect(import('./simulator')).rejects.toThrow('positive timer interval');
+});
+
+test('answers IPC device reads and ignores malformed messages', async () => {
+  const originalSend = process.send;
+  const send = jest.fn();
+  process.send = send;
+  try {
+    mockState = {
+      credentials: { username: 'u', password: 'p' },
+      accepted: {
+        snapshot: {
+          logicalChannels: [{ id: 'load', physicalPointId: 'point' }],
+          physicalPoints: [{ id: 'point' }],
+        },
+      },
+    };
+    await boot();
+    const receive = handlers.get('message');
+    receive?.(null);
+    receive?.({ type: 'unrelated', id: 'ignore', channelId: 'load' });
+    receive?.({ type: 'simulator-read', id: 'missing', channelId: 'absent' });
+    receive?.({ type: 'simulator-read', id: 'valid', channelId: 'load' });
+    await flush();
+    expect(send.mock.calls).toEqual([
+      [{ type: 'simulator-read-result', id: 'missing', error: 'unknown channel' }],
+      [{ type: 'simulator-read-result', id: 'valid', value: true }],
+    ]);
+  } finally {
+    process.send = originalSend;
+  }
+});
+
+test('production entrypoint drains connection states during startup and handles reconnects', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
+  delete process.env.WAGO_IO_PATHS;
+  delete process.env.WAGO_MQTT_USE_ENV_CREDENTIALS;
+  mockState = { credentials: { username: 'permanent', password: 'persisted' } };
+  await import('./main');
+  await flush();
+  const client = mockClients[0];
+  client.emit('connect');
+  client.emit('close');
+  await flush();
+  expect(mockRuntime.start).toHaveBeenCalledTimes(1);
+  expect(mockRuntime.setConnected.mock.calls).toEqual([[true], [false]]);
+  client.emit('connect');
+  await flush();
+  expect(mockRuntime.retryCredentialRotationSubscription).toHaveBeenCalled();
+  expect(mockRuntime.setConnected).toHaveBeenLastCalledWith(true);
+  expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
+});
+
+test('production entrypoint retries interrupted startup after reconnect and installs telemetry timers once', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-rtu-v1';
+  delete process.env.WAGO_IO_PATHS;
+  mockState = { credentials: { username: 'permanent', password: 'persisted' } };
+  let failStartup!: (error: Error) => void;
+  mockRuntime.start.mockImplementationOnce(() => new Promise<void>((_resolve, reject) => (failStartup = reject)));
+  await import('./main');
+  await flush();
+  const client = mockClients[0];
+  client.emit('connect');
+  await flush();
+  client.connected = false;
+  client.emit('close');
+  await flush();
+  client.connected = true;
+  client.emit('connect');
+  await flush();
+  // Reconnect can arrive before slow disconnect handling has unwound startup.
+  failStartup(new Error('MQTT subscribe acknowledgment timed out'));
+  await flush();
+  expect(mockRuntime.start).toHaveBeenCalledTimes(2);
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(1);
+  client.emit('connect');
+  await flush();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.start).toHaveBeenCalledTimes(2);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(2);
+});
+
+test('boots after an SSH MQTT refresh using permanent state credentials and the recreated broker environment', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
+  delete process.env.WAGO_IO_PATHS;
+  process.env.WAGO_MQTT_URL = 'mqtts://new-broker.test:8883';
+  process.env.WAGO_MQTT_USE_ENV_CREDENTIALS = 'false';
+  process.env.WAGO_MQTT_USERNAME = 'old-environment-username';
+  process.env.WAGO_MQTT_PASSWORD = 'old-environment-password';
+  mockState = {
+    credentials: {
+      username: 'wago-controller-test-device',
+      password: 'refreshed-device-password',
+      prefix: 'attraccess/wago',
+      credentialEpoch: '22222222-2222-4222-8222-222222222222',
+    },
+    credentialRotation: { revision: 1, token: 'fresh-ssh-operation-token' },
+  };
+  await import('./main');
+  await flush();
+  const { connect } = await import('mqtt');
+  expect(connect).toHaveBeenCalledWith(
+    'mqtts://new-broker.test:8883',
+    expect.objectContaining({
+      username: 'wago-controller-test-device',
+      password: 'refreshed-device-password',
+    }),
+  );
+  mockClients[0].emit('connect');
+  await flush();
+  expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
+});
+
+test('production RTU profile routes Modbus devices and schedules their configured polling intervals', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-rtu-v1';
+  delete process.env.WAGO_IO_PATHS;
+  mockState = { credentials: { username: 'permanent', password: 'persisted' } };
+  await import('./main');
+  await flush();
+  const { WagoRuntime } = await import('./runtime');
+  const { ModbusDeviceRouter } = await import('./modbus/adapter');
+  expect(jest.mocked(WagoRuntime).mock.calls[0][0].device).toBeInstanceOf(ModbusDeviceRouter);
+  mockClients[0].emit('connect');
+  await flush();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(1);
+});
 
 export async function boot() {
   await import('./simulator');
   await flush();
-}
-
-export function defineRootTestRegistrationsTests() {
-  const scope = {
-    get flush() {
-      return flush;
-    },
-    get boot() {
-      return boot;
-    },
-    get mockClients() {
-      return mockClients;
-    },
-    get mockState() {
-      return mockState;
-    },
-    set mockState(value: typeof mockState) {
-      mockState = value;
-    },
-    get mockStore() {
-      return mockStore;
-    },
-    get mockRuntime() {
-      return mockRuntime;
-    },
-    get handlers() {
-      return handlers;
-    },
-    set handlers(value: typeof handlers) {
-      handlers = value;
-    },
-  };
-
-  registerRootTestRegistrationsUsesConfiguredMqttTransportS(scope);
-
-  registerRootTestRegistrationsEnrollsPersistsAClaimBeforeAcknowledgmentAndReconnectsOperationally(scope);
-
-  registerRootTestRegistrationsDoesNotAcknowledgeOrReconnectWhenAClaimIsInvalid(scope);
-
-  registerRootTestRegistrationsRestoresPersistedIdentityAndRejectsAConflictingHardwareId(scope);
-
-  registerRootTestRegistrationsRejectsInvalidInitialValuesS(scope);
-
-  registerRootTestRegistrationsRejectsInvalidTimerIntervalS(scope);
-
-  registerRootTestRegistrationsAnswersIpcDeviceReadsAndIgnoresMalformedMessages(scope);
-
-  registerRootTestRegistrationsProductionEntrypointDrainsConnectionStatesDuringStartupAndHandlesReconnects(scope);
-
-  registerRootTestRegistrationsProductionEntrypointRetriesInterruptedStartupAfterReconnectAndInstallsTelemetryTimersOnce(
-    scope,
-  );
-
-  registerRootTestRegistrationsBootsAfterAnSshMqttRefreshUsingPermanentStateCredentialsAndTheRecreatedBrokerEnvironme(
-    scope,
-  );
-
-  registerRootTestRegistrationsProductionRtuProfileRoutesModbusDevicesAndSchedulesTheirConfiguredPollingIntervals(
-    scope,
-  );
-
-  return scope;
 }

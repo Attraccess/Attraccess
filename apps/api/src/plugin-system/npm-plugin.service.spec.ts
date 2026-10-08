@@ -1,114 +1,592 @@
-import { registerNpmPluginServiceFixture } from './npm-plugin.service.npm-plugin-service.test-fixture';
-import { registerCorrelatesAPersistedInstallWithItsSBootResultWithoutExposingAuditContextCases } from './npm-plugin.service.npm-plugin-service.correlates-a-persisted-install-with-its-s-boot-result-without-exposing-audit-context.test-cases';
-import { registerPinsTarballDnsOnEverySameOriginRedirectAndReturnsArchiveBytesCases } from './npm-plugin.service.npm-plugin-service.pins-tarball-dns-on-every-same-origin-redirect-and-returns-archive-bytes.test-cases';
-import { registerRejectsTarballRedirectsWithoutDestinationsAcrossOriginsOrBeyondTheLimitCases } from './npm-plugin.service.npm-plugin-service.rejects-tarball-redirects-without-destinations-across-origins-or-beyond-the-limit.test-cases';
-import { registerPinsMetadataRequestsToPublicRegistryAddressesAndLimitsTheirSizeCases } from './npm-plugin.service.npm-plugin-service.pins-metadata-requests-to-public-registry-addresses-and-limits-their-size.test-cases';
-import { registerReturnsInvalidSearchCandidatesWithAnActionableIncompatibilityReasonCases } from './npm-plugin.service.npm-plugin-service.returns-invalid-search-candidates-with-an-actionable-incompatibility-reason.test-cases';
-import { registerHydratesAbbreviatedSearchResultsBeforeValidatingMarketplacePackagesCases } from './npm-plugin.service.npm-plugin-service.hydrates-abbreviated-search-results-before-validating-marketplace-packages.test-cases';
-import { registerReturnsAnAttestationUrlWhenTheRegistryProvidesPackageProvenanceCases } from './npm-plugin.service.npm-plugin-service.returns-an-attestation-url-when-the-registry-provides-package-provenance.test-cases';
-import { registerDiscoversPluginsThroughRegistryKeywordSearchWithoutAHardcodedPackageListCases } from './npm-plugin.service.npm-plugin-service.discovers-plugins-through-registry-keyword-search-without-a-hardcoded-package-list.test-cases';
-import { registerRetainsHydratedMarketplacePackagesWhenAnotherResultNoLongerHasMetadataCases } from './npm-plugin.service.npm-plugin-service.retains-hydrated-marketplace-packages-when-another-result-no-longer-has-metadata.test-cases';
-import { registerDoesNotTrustAPackageDeclaredOfficialFlagOrAMismatchedRegistryPublisherCases } from './npm-plugin.service.npm-plugin-service.does-not-trust-a-package-declared-official-flag-or-a-mismatched-registry-publisher.test-cases';
-import { registerRejectsMarketplaceMetadataThatClaimsAnAllowlistedPackageIdentityForADifferCases } from './npm-plugin.service.npm-plugin-service.rejects-marketplace-metadata-that-claims-an-allowlisted-package-identity-for-a-differ.test-cases';
-import { registerUsesTheSelectedRegistryForDirectMarketplaceLookupCases } from './npm-plugin.service.npm-plugin-service.uses-the-selected-registry-for-direct-marketplace-lookup.test-cases';
-import { registerSearchesAConfiguredRegistryWhenItSupportsNpmSearchCases } from './npm-plugin.service.npm-plugin-service.searches-a-configured-registry-when-it-supports-npm-search.test-cases';
-import { registerRejectsMetadataRequestsToPrivateRegistryAddressesCases } from './npm-plugin.service.npm-plugin-service.rejects-metadata-requests-to-private-registry-addresses.test-cases';
-import { registerDoesNotPersistARegistryWhenTokenStorageFailsCases } from './npm-plugin.service.npm-plugin-service.does-not-persist-a-registry-when-token-storage-fails.test-cases';
-import { registerReturnsRegistryMetadataWithoutItsStoredTokenCases } from './npm-plugin.service.npm-plugin-service.returns-registry-metadata-without-its-stored-token.test-cases';
-import { registerRejectsRegistryAdditionsBeyondTheConfiguredRegistryLimitCases } from './npm-plugin.service.npm-plugin-service.rejects-registry-additions-beyond-the-configured-registry-limit.test-cases';
-import { registerPermitsRetryingRegistryTokenCleanupAfterItsRegistryRecordWasRemovedCases } from './npm-plugin.service.npm-plugin-service.permits-retrying-registry-token-cleanup-after-its-registry-record-was-removed.test-cases';
-import { registerPreservesARegistryTokenWhenRemovingItsRecordFailsCases } from './npm-plugin.service.npm-plugin-service.preserves-a-registry-token-when-removing-its-record-fails.test-cases';
-import { registerRemovesTheRegistryRecordBeforeDeletingItsTokenCases } from './npm-plugin.service.npm-plugin-service.removes-the-registry-record-before-deleting-its-token.test-cases';
-import { registerInstallsStandardPackagePrefixedTarballsWithoutLosingConcurrentStateUpdatesCases } from './npm-plugin.service.npm-plugin-service.installs-standard-package-prefixed-tarballs-without-losing-concurrent-state-updates.test-cases';
-import { registerPersistsAnExactPrivateRegistryInstallationAcrossServiceRestartCases } from './npm-plugin.service.npm-plugin-service.persists-an-exact-private-registry-installation-across-service-restart.test-cases';
-import { registerClassifiesAnInstallationUsingTheSelectedVersionPublisherCases } from './npm-plugin.service.npm-plugin-service.classifies-an-installation-using-the-selected-version-publisher.test-cases';
-import { registerDoesNotActivateConcurrentInstallsOfTheSamePackageCases } from './npm-plugin.service.npm-plugin-service.does-not-activate-concurrent-installs-of-the-same-package.test-cases';
-import { registerResolvesSemverRangesWhilePersistingTheRequestedSpecCases } from './npm-plugin.service.npm-plugin-service.resolves-semver-ranges-while-persisting-the-requested-spec.test-cases';
-import { registerRemovesNpmPackageCodeAndItsInstallationRecordWithoutRevertingMigrationsCases } from './npm-plugin.service.npm-plugin-service.removes-npm-package-code-and-its-installation-record-without-reverting-migrations.test-cases';
-import { registerRestartsAfterRemovingAPackageWhenQuarantineCleanupFailsCases } from './npm-plugin.service.npm-plugin-service.restarts-after-removing-a-package-when-quarantine-cleanup-fails.test-cases';
-import { registerKeepsARemovedNpmPluginQuarantinedWhenStatePersistenceFailsCases } from './npm-plugin.service.npm-plugin-service.keeps-a-removed-npm-plugin-quarantined-when-state-persistence-fails.test-cases';
-import { registerRestartsAfterBackupCleanupFailsFollowingASuccessfulInstallCases } from './npm-plugin.service.npm-plugin-service.restarts-after-backup-cleanup-fails-following-a-successful-install.test-cases';
-import { registerReturnsAQuarantinedInstallWhenQuarantineCleanupFailsCases } from './npm-plugin.service.npm-plugin-service.returns-a-quarantined-install-when-quarantine-cleanup-fails.test-cases';
-import { registerKeepsAPluginQuarantinedWhenItsFinalActiveStateCannotBePersistedCases } from './npm-plugin.service.npm-plugin-service.keeps-a-plugin-quarantined-when-its-final-active-state-cannot-be-persisted.test-cases';
-import { registerRollsBackAnActivationWhenItsQuarantineFallbackCannotBePersistedCases } from './npm-plugin.service.npm-plugin-service.rolls-back-an-activation-when-its-quarantine-fallback-cannot-be-persisted.test-cases';
-import { registerRetriesRollbackAfterIsolatingAFailedActivationCases } from './npm-plugin.service.npm-plugin-service.retries-rollback-after-isolating-a-failed-activation.test-cases';
-import { registerRestoresTheStateMatchingPackageAfterAnInterruptedReplacementCases } from './npm-plugin.service.npm-plugin-service.restores-the-state-matching-package-after-an-interrupted-replacement.test-cases';
-import { registerReplacesNewlyActivatedCodeWithTheStateMatchingBackupAfterACrashCases } from './npm-plugin.service.npm-plugin-service.replaces-newly-activated-code-with-the-state-matching-backup-after-a-crash.test-cases';
-import { registerSkipsBackupRecoveryWhenPluginsAreNotConfiguredCases } from './npm-plugin.service.npm-plugin-service.skips-backup-recovery-when-plugins-are-not-configured.test-cases';
-import { registerFailsRecoveryWhenItCannotReconcileAPackageBackupCases } from './npm-plugin.service.npm-plugin-service.fails-recovery-when-it-cannot-reconcile-a-package-backup.test-cases';
-import { registerClassifiesInstalledVersionsAndCalculatesTheirPermissionDeltaCases } from './npm-plugin.service.npm-plugin-service.classifies-installed-versions-and-calculates-their-permission-delta.test-cases';
-import { registerClassifiesEachVersionUsingItsOwnPublisherMetadataCases } from './npm-plugin.service.npm-plugin-service.classifies-each-version-using-its-own-publisher-metadata.test-cases';
-import { registerRequiresTheExactPermissionAdditionsBeforeReplacingAnInstalledPackageCases } from './npm-plugin.service.npm-plugin-service.requires-the-exact-permission-additions-before-replacing-an-installed-package.test-cases';
-import { registerRejectsReplacingAnInstalledPackageThroughTheInstallEndpointCases } from './npm-plugin.service.npm-plugin-service.rejects-replacing-an-installed-package-through-the-install-endpoint.test-cases';
-import { registerRequiresApprovalForPermissionsDeclaredByTheDownloadedReplacementTarballCases } from './npm-plugin.service.npm-plugin-service.requires-approval-for-permissions-declared-by-the-downloaded-replacement-tarball.test-cases';
-import { registerRecordsAnAvailablePatchUpdateWithoutChangingTheRequestedRangeCases } from './npm-plugin.service.npm-plugin-service.records-an-available-patch-update-without-changing-the-requested-range.test-cases';
-import { registerRequiresExplicitApprovalBeforeReplacingAnInstalledPackageWithAMajorVersionCases } from './npm-plugin.service.npm-plugin-service.requires-explicit-approval-before-replacing-an-installed-package-with-a-major-version.test-cases';
-import { registerClassifiesAMajorPrereleaseAsAMajorUpdateCases } from './npm-plugin.service.npm-plugin-service.classifies-a-major-prerelease-as-a-major-update.test-cases';
-import { registerAllowsPrereleaseCandidatesThatMatchAFollowRangeWhenEnabledByPolicyCases } from './npm-plugin.service.npm-plugin-service.allows-prerelease-candidates-that-match-a-follow-range-when-enabled-by-policy.test-cases';
-import { registerFollowsAConfiguredDistTagWhenSelectingAnUpdateCandidateCases } from './npm-plugin.service.npm-plugin-service.follows-a-configured-dist-tag-when-selecting-an-update-candidate.test-cases';
-import { registerSkipsRegistryUpdateChecksWhenChecksAreDisabledGloballyCases } from './npm-plugin.service.npm-plugin-service.skips-registry-update-checks-when-checks-are-disabled-globally.test-cases';
-import { registerRecordsAFailedUpdateCheckWhenReadingTheUpdatePolicyFailsCases } from './npm-plugin.service.npm-plugin-service.records-a-failed-update-check-when-reading-the-update-policy-fails.test-cases';
-import { registerPreservesConcurrentInstallPolicyChangesWhileRecordingAnUpdateCheckCases } from './npm-plugin.service.npm-plugin-service.preserves-concurrent-install-policy-changes-while-recording-an-update-check.test-cases';
-import { registerRetriesAnUpdateCheckAfterTheGlobalPolicyChangesCases } from './npm-plugin.service.npm-plugin-service.retries-an-update-check-after-the-global-policy-changes.test-cases';
-import { registerRetriesAFailedUpdateCheckAfterTheInstallationSpecChangesCases } from './npm-plugin.service.npm-plugin-service.retries-a-failed-update-check-after-the-installation-spec-changes.test-cases';
-import { registerRetriesADistTagUpdateCheckAfterItsRequestedSpecChangesCases } from './npm-plugin.service.npm-plugin-service.retries-a-dist-tag-update-check-after-its-requested-spec-changes.test-cases';
-import { registerUsesAnExplicitPerPluginUpdateModeInsteadOfTheGlobalModeCases } from './npm-plugin.service.npm-plugin-service.uses-an-explicit-per-plugin-update-mode-instead-of-the-global-mode.test-cases';
-import { registerLimitsSimultaneousUpdateChecksToFourInstallationsCases } from './npm-plugin.service.npm-plugin-service.limits-simultaneous-update-checks-to-four-installations.test-cases';
+import { createHash, randomUUID } from 'crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { projectAdministrationAuditEvent } from './../audit/audit-administration-policy';
+import { recordNpmBootMigrationOutcome } from './npm-plugin-audit-state';
+import { NpmPluginService } from './npm-plugin.service';
+import type { ServiceInternals, SettingsMock } from './npm-plugin.test-fixture';
+import { setupNpmPluginFixture } from './npm-plugin.test-fixture';
+import { PluginService } from './plugin.service';
+jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 describe('NpmPluginService', () => {
-  const fixture = registerNpmPluginServiceFixture();
-  registerCorrelatesAPersistedInstallWithItsSBootResultWithoutExposingAuditContextCases(fixture);
-  registerPinsTarballDnsOnEverySameOriginRedirectAndReturnsArchiveBytesCases(fixture);
-  registerRejectsTarballRedirectsWithoutDestinationsAcrossOriginsOrBeyondTheLimitCases(fixture);
-  registerPinsMetadataRequestsToPublicRegistryAddressesAndLimitsTheirSizeCases(fixture);
-  registerReturnsInvalidSearchCandidatesWithAnActionableIncompatibilityReasonCases(fixture);
-  registerHydratesAbbreviatedSearchResultsBeforeValidatingMarketplacePackagesCases(fixture);
-  registerReturnsAnAttestationUrlWhenTheRegistryProvidesPackageProvenanceCases(fixture);
-  registerDiscoversPluginsThroughRegistryKeywordSearchWithoutAHardcodedPackageListCases(fixture);
-  registerRetainsHydratedMarketplacePackagesWhenAnotherResultNoLongerHasMetadataCases(fixture);
-  registerDoesNotTrustAPackageDeclaredOfficialFlagOrAMismatchedRegistryPublisherCases(fixture);
-  registerRejectsMarketplaceMetadataThatClaimsAnAllowlistedPackageIdentityForADifferCases(fixture);
-  registerUsesTheSelectedRegistryForDirectMarketplaceLookupCases(fixture);
-  registerSearchesAConfiguredRegistryWhenItSupportsNpmSearchCases(fixture);
-  registerRejectsMetadataRequestsToPrivateRegistryAddressesCases(fixture);
-  registerDoesNotPersistARegistryWhenTokenStorageFailsCases(fixture);
-  registerReturnsRegistryMetadataWithoutItsStoredTokenCases(fixture);
-  registerRejectsRegistryAdditionsBeyondTheConfiguredRegistryLimitCases(fixture);
-  registerPermitsRetryingRegistryTokenCleanupAfterItsRegistryRecordWasRemovedCases(fixture);
-  registerPreservesARegistryTokenWhenRemovingItsRecordFailsCases(fixture);
-  registerRemovesTheRegistryRecordBeforeDeletingItsTokenCases(fixture);
-  registerInstallsStandardPackagePrefixedTarballsWithoutLosingConcurrentStateUpdatesCases(fixture);
-  registerPersistsAnExactPrivateRegistryInstallationAcrossServiceRestartCases(fixture);
-  registerClassifiesAnInstallationUsingTheSelectedVersionPublisherCases(fixture);
-  registerDoesNotActivateConcurrentInstallsOfTheSamePackageCases(fixture);
-  registerResolvesSemverRangesWhilePersistingTheRequestedSpecCases(fixture);
-  registerRemovesNpmPackageCodeAndItsInstallationRecordWithoutRevertingMigrationsCases(fixture);
-  registerRestartsAfterRemovingAPackageWhenQuarantineCleanupFailsCases(fixture);
-  registerKeepsARemovedNpmPluginQuarantinedWhenStatePersistenceFailsCases(fixture);
-  registerRestartsAfterBackupCleanupFailsFollowingASuccessfulInstallCases(fixture);
-  registerReturnsAQuarantinedInstallWhenQuarantineCleanupFailsCases(fixture);
-  registerKeepsAPluginQuarantinedWhenItsFinalActiveStateCannotBePersistedCases(fixture);
-  registerRollsBackAnActivationWhenItsQuarantineFallbackCannotBePersistedCases(fixture);
-  registerRetriesRollbackAfterIsolatingAFailedActivationCases(fixture);
-  registerRestoresTheStateMatchingPackageAfterAnInterruptedReplacementCases(fixture);
-  registerReplacesNewlyActivatedCodeWithTheStateMatchingBackupAfterACrashCases(fixture);
-  registerSkipsBackupRecoveryWhenPluginsAreNotConfiguredCases(fixture);
-  registerFailsRecoveryWhenItCannotReconcileAPackageBackupCases(fixture);
-  registerClassifiesInstalledVersionsAndCalculatesTheirPermissionDeltaCases(fixture);
-  registerClassifiesEachVersionUsingItsOwnPublisherMetadataCases(fixture);
-  registerRequiresTheExactPermissionAdditionsBeforeReplacingAnInstalledPackageCases(fixture);
-  registerRejectsReplacingAnInstalledPackageThroughTheInstallEndpointCases(fixture);
-  registerRequiresApprovalForPermissionsDeclaredByTheDownloadedReplacementTarballCases(fixture);
-  registerRecordsAnAvailablePatchUpdateWithoutChangingTheRequestedRangeCases(fixture);
-  registerRequiresExplicitApprovalBeforeReplacingAnInstalledPackageWithAMajorVersionCases(fixture);
-  registerClassifiesAMajorPrereleaseAsAMajorUpdateCases(fixture);
-  registerAllowsPrereleaseCandidatesThatMatchAFollowRangeWhenEnabledByPolicyCases(fixture);
-  registerFollowsAConfiguredDistTagWhenSelectingAnUpdateCandidateCases(fixture);
-  registerSkipsRegistryUpdateChecksWhenChecksAreDisabledGloballyCases(fixture);
-  registerRecordsAFailedUpdateCheckWhenReadingTheUpdatePolicyFailsCases(fixture);
-  registerPreservesConcurrentInstallPolicyChangesWhileRecordingAnUpdateCheckCases(fixture);
-  registerRetriesAnUpdateCheckAfterTheGlobalPolicyChangesCases(fixture);
-  registerRetriesAFailedUpdateCheckAfterTheInstallationSpecChangesCases(fixture);
-  registerRetriesADistTagUpdateCheckAfterItsRequestedSpecChangesCases(fixture);
-  registerUsesAnExplicitPerPluginUpdateModeInsteadOfTheGlobalModeCases(fixture);
-  registerLimitsSimultaneousUpdateChecksToFourInstallationsCases(fixture);
+  const fixture = setupNpmPluginFixture();
+  it.each(['succeeded', 'failed'] as const)(
+    'correlates a persisted install with its %s boot result without exposing audit context',
+    async (migrationOutcome) => {
+      const name = '@attraccess/plugin';
+      const tarball = await fixture.packageTarball(name, ['READ_USERS']);
+      const shasum = createHash('sha1').update(tarball).digest('hex');
+      const settings = {
+        getPlainSetting: jest.fn(
+          async (_parent, key) => ({ enabled: 'true', domains: '["administration"]', retention_days: '90' })[key],
+        ),
+      };
+      const audit = {
+        list: jest.fn().mockResolvedValue({ items: [] }),
+        recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }),
+      };
+      const service = new NpmPluginService(settings as never, undefined, audit as never);
+      const internals = service as unknown as ServiceInternals;
+      jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+      jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+        versions: {
+          '1.2.3': {
+            version: '1.2.3',
+            dist: {
+              tarball: 'plugin',
+              shasum,
+            },
+          },
+        },
+      });
+      jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+      const state = fixture.auditState();
+      state.context = { operationId: randomUUID(), actorId: 42, authenticationMethod: 'api-token', apiTokenId: 9 };
+      await service.install(name, '1.2.3', undefined, state);
+      expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+      expect(service.listInstalled()[0]).not.toHaveProperty('pendingAudit');
+      const persisted = JSON.parse(readFileSync(join(fixture.root, '.npm-plugin-state.json'), 'utf8'));
+      expect(persisted[0].pendingAudit.operationId).toBe(state.context.operationId);
+      expect(state.integrity).toBe(`sha1-${Buffer.from(shasum, 'hex').toString('base64')}`);
+      expect(persisted[0].integrity).toBe(`sha1-${Buffer.from(shasum, 'hex').toString('base64')}`);
+      await recordNpmBootMigrationOutcome(fixture.root, name, '1.2.3', migrationOutcome);
+      const manifest = PluginService.getPlugins()[0];
+      jest
+        .spyOn(PluginService, 'getPluginsWithLoadStatus')
+        .mockReturnValue([{ ...manifest, status: migrationOutcome === 'succeeded' ? 'loaded' : 'error' }]);
+      jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(migrationOutcome === 'failed');
+      const restarted = new NpmPluginService(settings as never, undefined, audit as never);
+      await restarted.onApplicationBootstrap();
+      const recorded = audit.recordAdministration.mock.calls[0][0];
+      expect(projectAdministrationAuditEvent(recorded)).not.toBeNull();
+      expect(recorded).toMatchObject({
+        operationId: state.context.operationId,
+        action: 'plugin.activation_completed',
+        actorId: 42,
+        authenticationMethod: 'api-token',
+        apiTokenId: 9,
+        outcome: migrationOutcome,
+        details: {
+          migrationOutcome,
+          activationOutcome: migrationOutcome === 'succeeded' ? 'succeeded' : 'quarantined',
+        },
+      });
+      await restarted.onApplicationBootstrap();
+      expect(audit.recordAdministration).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(readFileSync(join(fixture.root, '.npm-plugin-state.json'), 'utf8'))[0]).not.toHaveProperty(
+        'pendingAudit',
+      );
+    },
+  );
+
+  it('installs standard package-prefixed tarballs without losing concurrent state updates', async () => {
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    const internals = service as unknown as ServiceInternals;
+    const packages = await Promise.all(
+      ['@attraccess/one', '@attraccess/two'].map(async (name) => [name, await fixture.packageTarball(name)] as const),
+    );
+    const tarballs = new Map(packages);
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => {
+      const tarball = tarballs.get(name);
+      if (!tarball) throw new Error(`Unexpected package ${name}`);
+      return {
+        versions: {
+          '1.2.3': {
+            version: '1.2.3',
+            dist: { tarball: name, shasum: createHash('sha1').update(tarball).digest('hex') },
+          },
+        },
+      };
+    });
+    jest.spyOn(internals, 'download').mockImplementation(async (name) => {
+      const tarball = tarballs.get(name);
+      if (!tarball) throw new Error(`Unexpected tarball ${name}`);
+      return tarball;
+    });
+
+    await Promise.all(['@attraccess/one', '@attraccess/two'].map((name) => service.install(name, '1.2.3')));
+
+    expect(service.listInstalled()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: '@attraccess/one' }),
+        expect.objectContaining({ name: '@attraccess/two' }),
+      ]),
+    );
+    expect(existsSync(join(fixture.root, 'npm-QGF0dHJhY2Nlc3Mvb25l', 'dist', 'index.js'))).toBe(true);
+  });
+
+  it('persists an exact private-registry installation across service restart', async () => {
+    const name = '@private/plugin';
+    const tarball = await fixture.packageTarball(name);
+    const settings: SettingsMock = {
+      getPlainSetting: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify([{ id: 'private', name: 'Private', url: 'https://registry.example.com' }])),
+      getSecretSetting: jest.fn().mockResolvedValue({ value: null, configured: false }),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    await service.install(name, '1.2.3', 'private');
+
+    expect(new NpmPluginService(settings as unknown as never).listInstalled()).toEqual([
+      expect.objectContaining({ name, version: '1.2.3', registryId: 'private' }),
+    ]);
+  });
+
+  it('classifies an installation using the selected version publisher', async () => {
+    const name = '@attraccess/plugin-example';
+    const tarball = await fixture.packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      maintainers: [{ name: 'attraccess' }],
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          _npmUser: { name: 'someone-else' },
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    await expect(service.install(name, '1.2.3')).resolves.toMatchObject({
+      classification: 'community',
+      publisher: 'someone-else',
+    });
+  });
+
+  it('does not activate concurrent installs of the same package', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await fixture.packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    const results = await Promise.allSettled([service.install(name, '1.2.3'), service.install(name, '1.2.3')]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toEqual([
+      expect.objectContaining({
+        reason: expect.objectContaining({ message: 'Package is already installed; use the replacement endpoint' }),
+      }),
+    ]);
+    expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
+  });
+
+  it('resolves semver ranges while persisting the requested spec', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await fixture.packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.0.0': {
+          version: '1.0.0',
+          dist: { tarball: 'older', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    await expect(service.install(name, '^1.0.0')).resolves.toMatchObject({ version: '1.2.3', requestedSpec: '^1.0.0' });
+  });
+
+  it('removes npm package code and its installation record without reverting migrations', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    mkdirSync(join(fixture.root, installPath), { recursive: true });
+    writeFileSync(
+      join(fixture.root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.2.3',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({} as never);
+
+    await service.removeInstalled(name);
+
+    expect(existsSync(join(fixture.root, installPath))).toBe(false);
+    expect(service.listInstalled()).toEqual([]);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+  });
+
+  it('restarts after removing a package when quarantine cleanup fails', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    mkdirSync(join(fixture.root, installPath), { recursive: true });
+    writeFileSync(
+      join(fixture.root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.2.3',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => {
+      throw new Error('quarantine write failed');
+    });
+    const service = new NpmPluginService({} as never);
+
+    await expect(service.removeInstalled(name)).resolves.toBeUndefined();
+
+    expect(existsSync(join(fixture.root, installPath))).toBe(false);
+    expect(service.listInstalled()).toEqual([]);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+  });
+
+  it('keeps a removed npm plugin quarantined when state persistence fails', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    writeFileSync(
+      join(fixture.root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.2.3',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    mkdirSync(join(fixture.root, installPath), { recursive: true });
+    writeFileSync(
+      join(fixture.root, installPath, 'plugin.json'),
+      JSON.stringify({
+        name,
+        version: '1.2.3',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      }),
+    );
+    const [plugin] = PluginService.getPlugins();
+    PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+    const service = new NpmPluginService({} as never);
+    jest
+      .spyOn(service as unknown as { writeStateWithout(name: string): Promise<void> }, 'writeStateWithout')
+      .mockRejectedValue(new Error('state write failed'));
+
+    await expect(service.removeInstalled(name)).rejects.toThrow('state write failed');
+
+    expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+  });
+
+  it('restarts after backup cleanup fails following a successful install', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await fixture.packageTarball(name);
+    const target = join(fixture.root, `npm-${Buffer.from(name).toString('base64url')}`);
+    mkdirSync(target, { recursive: true });
+    writeFileSync(
+      join(target, 'plugin.json'),
+      JSON.stringify({
+        name,
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+        permissions: [],
+      }),
+    );
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(internals, 'removeBackup').mockRejectedValue(new Error('cleanup failed'));
+
+    await expect(service.install(name, '1.2.3')).resolves.toMatchObject({ name, version: '1.2.3' });
+
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+    expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
+    expect(readdirSync(join(fixture.root, '.npm-backups'))).toHaveLength(1);
+
+    await service.onModuleInit();
+
+    expect(existsSync(join(fixture.root, '.npm-backups'))).toBe(false);
+  });
+
+  it('returns a quarantined install when quarantine cleanup fails', async () => {
+    const name = '@attraccess/plugin';
+    const audit = fixture.auditState();
+    const tarball = await fixture.packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => {
+      throw new Error('quarantine write failed');
+    });
+
+    await expect(service.install(name, '1.2.3', undefined, audit)).resolves.toMatchObject({
+      name,
+      version: '1.2.3',
+      state: 'quarantined',
+      lastError: expect.stringContaining('quarantine cleanup failed'),
+    });
+
+    expect(audit).toMatchObject({
+      integrityResult: 'verified',
+      activationOutcome: 'quarantined',
+      migrationOutcome: 'not-run',
+      restartRequested: 1,
+    });
+    expect(service.listInstalled()).toEqual([
+      expect.objectContaining({
+        state: 'quarantined',
+        lastError: expect.stringContaining('quarantine cleanup failed'),
+      }),
+    ]);
+    expect(existsSync(join(fixture.root, `npm-${Buffer.from(name).toString('base64url')}`))).toBe(true);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+  });
+
+  it('keeps a plugin quarantined when its final active state cannot be persisted', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const tarball = await fixture.packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    const writeState = internals.writeState.bind(service);
+    jest
+      .spyOn(internals, 'writeState')
+      .mockImplementationOnce(writeState)
+      .mockRejectedValueOnce(new Error('final state write failed'));
+
+    await expect(service.install(name, '1.2.3')).rejects.toThrow('final state write failed');
+
+    expect(PluginService.isPluginQuarantined({ pluginDirectory: installPath })).toBe(true);
+    PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
+    expect(PluginService.isPluginQuarantined({ pluginDirectory: installPath })).toBe(true);
+  });
+
+  it('rolls back an activation when its quarantine fallback cannot be persisted', async () => {
+    const name = '@attraccess/plugin';
+    const audit = fixture.auditState();
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const tarball = await fixture.packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    const writeState = internals.writeState.bind(service);
+    jest
+      .spyOn(internals, 'writeState')
+      .mockImplementationOnce(writeState)
+      .mockRejectedValueOnce(new Error('final state write failed'));
+    jest.spyOn(PluginService, 'quarantinePluginDirectory').mockImplementation(() => {
+      throw new Error('quarantine write failed');
+    });
+
+    await expect(service.install(name, '1.2.3', undefined, audit)).rejects.toThrow('final state write failed');
+
+    expect(existsSync(join(fixture.root, installPath))).toBe(false);
+    expect(audit).toMatchObject({
+      integrityResult: 'verified',
+      activationOutcome: 'failed',
+      rollbackOutcome: 'succeeded',
+      restartRequested: 0,
+    });
+    expect(service.listInstalled()).toEqual([]);
+  });
+
+  it('retries rollback after isolating a failed activation', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const tarball = await fixture.packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals & {
+      rollbackActivation(activation: { target: string; backup: string }): Promise<void>;
+    };
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest
+      .spyOn(internals, 'writeState')
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new Error('final state write failed'));
+    jest.spyOn(PluginService, 'quarantinePluginDirectory').mockImplementation(() => {
+      throw new Error('quarantine write failed');
+    });
+    const rollbackActivation = internals.rollbackActivation.bind(service);
+    const rollback = jest
+      .spyOn(internals, 'rollbackActivation')
+      .mockRejectedValueOnce(new Error('rollback failed'))
+      .mockImplementation(rollbackActivation);
+
+    await expect(service.install(name, '1.2.3')).rejects.toThrow('final state write failed');
+
+    expect(rollback).toHaveBeenCalledTimes(2);
+    expect(existsSync(join(fixture.root, installPath))).toBe(false);
+    expect(readdirSync(join(fixture.root, '.npm-backups')).some((entry) => entry.startsWith('failed-'))).toBe(true);
+  });
+
+  it('restores the state-matching package after an interrupted replacement', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const backup = join(fixture.root, '.npm-backups', `${installPath}-00000000-0000-0000-0000-000000000000`);
+    mkdirSync(join(backup, 'dist'), { recursive: true });
+    writeFileSync(join(backup, 'plugin.json'), JSON.stringify({ name, version: '1.0.0' }));
+    writeFileSync(join(backup, 'dist', 'index.js'), 'module.exports = {};');
+    writeFileSync(
+      join(fixture.root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({} as never);
+
+    await service.onModuleInit();
+
+    expect(existsSync(join(fixture.root, installPath, 'dist', 'index.js'))).toBe(true);
+    expect(existsSync(backup)).toBe(false);
+  });
+
+  it('replaces newly activated code with the state-matching backup after a crash', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const backup = join(fixture.root, '.npm-backups', `${installPath}-00000000-0000-0000-0000-000000000000`);
+    mkdirSync(join(backup, 'dist'), { recursive: true });
+    writeFileSync(join(backup, 'plugin.json'), JSON.stringify({ name, version: '1.0.0' }));
+    writeFileSync(join(backup, 'dist', 'index.js'), 'module.exports = "1.0.0";');
+    mkdirSync(join(fixture.root, installPath, 'dist'), { recursive: true });
+    writeFileSync(join(fixture.root, installPath, 'plugin.json'), JSON.stringify({ name, version: '2.0.0' }));
+    writeFileSync(join(fixture.root, installPath, 'dist', 'index.js'), 'module.exports = "2.0.0";');
+    writeFileSync(
+      join(fixture.root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+
+    await NpmPluginService.recoverBackups();
+
+    expect(readFileSync(join(fixture.root, installPath, 'dist', 'index.js'), 'utf8')).toBe('module.exports = "1.0.0";');
+    expect(existsSync(backup)).toBe(false);
+  });
+
+  it('skips backup recovery when plugins are not configured', async () => {
+    PluginService.configure({ PLUGIN_DIR: '', RESTART_BY_EXIT: true });
+
+    await expect(NpmPluginService.recoverBackups()).resolves.toBeUndefined();
+  });
+
+  it('fails recovery when it cannot reconcile a package backup', async () => {
+    writeFileSync(join(fixture.root, '.npm-backups'), 'not a directory');
+
+    await expect(NpmPluginService.recoverBackups()).rejects.toThrow();
+  });
 });

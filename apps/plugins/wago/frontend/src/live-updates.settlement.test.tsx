@@ -1,5 +1,5 @@
 import { act, cleanup, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { setup } from './live-updates.test-fixture';
 
 afterEach(cleanup);

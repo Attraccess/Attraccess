@@ -1,5 +1,5 @@
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
-import { AttractapCardHandlerTestScope } from './card.handler.spec.define-attractap-card-handler-tests';
+import type { AttractapCardHandlerTestScope } from './card.handler.spec';
 
 export function createHandleCardAuthenticationRequestFixture(parentScope: AttractapCardHandlerTestScope) {
   const activeCard = {

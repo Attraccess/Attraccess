@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 import type { DeleteOptions } from './index.contracts';
 
+import { beforeEach, afterEach } from 'vitest';
+
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
   dependencyPlan: undefined as unknown,
@@ -24,6 +26,7 @@ const hoisted = vi.hoisted(() => ({
   pluginSystemStatus: { disabled: false, instanceId: 'original-instance' },
   deleteOptions: undefined as DeleteOptions | undefined,
 }));
+
 vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServicePluginControllerDependencyPlan: () => ({
     data: hoisted.dependencyPlan,
@@ -69,6 +72,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   usePluginsServiceUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({
     success: hoisted.successToast,
@@ -78,3 +82,89 @@ vi.mock('../../../../components/toastProvider', () => ({
 }));
 
 export { hoisted };
+export function resetTestFixture() {
+  hoisted.deleteMutateMock.mockReset();
+  hoisted.dependencyPlan = undefined;
+  hoisted.dependencyPlanError = null;
+  hoisted.removalPlan = [];
+  hoisted.removeGraphMock.mockReset();
+  hoisted.removeGraphMock.mockResolvedValue({ ok: true });
+  hoisted.checkAllInstalledPackagesMock.mockReset();
+  hoisted.addRegistryMock.mockReset();
+  hoisted.testRegistryMock.mockReset();
+  hoisted.removeRegistryMock.mockReset();
+  hoisted.installPackageMock.mockReset();
+  hoisted.replaceInstalledPackageMock.mockReset();
+  hoisted.updateInstalledPackagePolicyMock.mockReset();
+  hoisted.retryMutateAsyncMock.mockReset();
+  hoisted.statusRefetchMock.mockReset();
+  hoisted.successToast.mockReset();
+  hoisted.errorToast.mockReset();
+  hoisted.plugins = [];
+  hoisted.pluginSystemStatus = { disabled: false, instanceId: 'original-instance' };
+  hoisted.deleteOptions = undefined;
+  hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
+  hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
+  hoisted.checkAllInstalledPackagesMock.mockResolvedValue([]);
+  hoisted.addRegistryMock.mockResolvedValue({});
+  hoisted.testRegistryMock.mockResolvedValue({ ok: true });
+  hoisted.removeRegistryMock.mockResolvedValue(undefined);
+  hoisted.installPackageMock.mockResolvedValue({});
+  hoisted.replaceInstalledPackageMock.mockResolvedValue({});
+  hoisted.updateInstalledPackagePolicyMock.mockResolvedValue({});
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: { url?: string } | string) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      const plugin = {
+        name: '@attraccess/plugin-example',
+        version: '1.0.0',
+        displayName: 'Example',
+        description: 'Official integration',
+        permissions: [],
+        hostRange: '^1.0.0',
+        sdkCompatibility: { backend: '^1.0.0', frontend: null },
+        repository: null,
+        homepage: null,
+        license: 'MIT',
+        publisher: 'attraccess',
+        deprecated: false,
+        registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+        classification: 'official' as const,
+        classificationReason: 'Published by Attraccess on npm',
+        installable: true,
+        incompatibilityReason: null,
+        integrity: 'sha512-test',
+        provenance: null,
+      };
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({
+        ok: true,
+        json: async () => (url.includes('/marketplace/search') ? { results: [plugin], errors: [] } : plugin),
+      });
+    }),
+  );
+}
+export function deferred<T>() {
+  let resolve: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve: (value: T) => resolve(value) };
+}
+export function makePlugin(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'plugin-1',
+    name: 'Cool Plugin',
+    version: '1.2.3',
+    pluginDirectory: '/plugins/cool',
+    permissions: ['read:resources', 'write:resources'],
+    ...overrides,
+  };
+}
+beforeEach(resetTestFixture);
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});

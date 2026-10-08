@@ -2,12 +2,9 @@ import { WagoManagedAccess } from './wago-managed-access.entity';
 import { WagoController } from './wago-controller.entity';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { commissioningVerification } from './wago-commissioning-verification';
-import type { ManagedEnrolmentAndDurableCredentialLifecycleTestScope } from './wago-managed-runtime.spec';
+import type { ManagedRuntimeFixture } from './wago-managed-runtime.setup.test-fixture';
 
-export async function prepareRebootReconciliation(
-  scope: ManagedEnrolmentAndDurableCredentialLifecycleTestScope,
-  remoteStatus: string,
-) {
+export async function prepareRebootReconciliation(scope: ManagedRuntimeFixture, remoteStatus: string) {
   const current = await scope.db.getRepository(WagoController).save(
     Object.assign(new WagoController(), {
       id: 1,

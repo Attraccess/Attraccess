@@ -1,7 +1,20 @@
 import { WagoRuntimeUpdateCoordinator } from './wago-runtime-update';
 import { ManagedRuntimeUpdateHost } from './wago-runtime-update';
-import { DurableManagedRuntimeReconciliationTestScope } from './wago-runtime-update.spec';
-export function resetTestFixture(scope: DurableManagedRuntimeReconciliationTestScope) {
+import type { BuildRuntimeArtifact } from './wago-build-runtime';
+import type { RuntimeUpdateRecord, RuntimeUpdateStore } from './wago-runtime-update';
+
+type RuntimeUpdateFixture = {
+  now: number;
+  desired: BuildRuntimeArtifact;
+  rows: Map<number, RuntimeUpdateRecord>;
+  owners: Map<number, string>;
+  store: RuntimeUpdateStore;
+  host: jest.Mocked<ManagedRuntimeUpdateHost>;
+  audit: jest.Mock;
+  coordinator: WagoRuntimeUpdateCoordinator;
+  release: (id: string) => BuildRuntimeArtifact;
+};
+export function resetTestFixture(scope: RuntimeUpdateFixture) {
   scope.now = 1_000_000;
   scope.desired = scope.release('b');
   scope.rows = new Map();

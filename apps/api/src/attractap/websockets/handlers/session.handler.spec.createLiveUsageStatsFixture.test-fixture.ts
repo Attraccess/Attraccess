@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the original handler test policy for partial protocol mocks. */
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
-import { AttractapSessionHandlerSessionFlowButtonTestScope } from './session.handler.spec.define-attractap-session-handler-session-flow-button-tests';
+import type { AttractapSessionHandlerSessionFlowButtonTestScope } from './session.handler.spec';
 
 export function createLiveUsageStatsFixture(parentScope: AttractapSessionHandlerSessionFlowButtonTestScope) {
   const request = { payload: { resourceId: 10, requestId: 7 } } as any;

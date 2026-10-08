@@ -1,17 +1,14 @@
 import { AuditLog, entities, Resource, ResourceType, Setting, User } from '@attraccess/database-entities';
-import { DataSource } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { DataSource } from 'typeorm';
 import * as migrations from '../database/migrations';
+import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/plugin-audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { AuditService } from './audit.service';
 import { AuditController } from './audit.controller';
-import {
-  registerPluginAuditDomains,
-  resetPluginAuditRegistry,
-} from '../plugin-system/plugin-audit-registry';
+import { AuditService } from './audit.service';
 
 const fixturePluginId = 'abcdefghijklmnopqrstu';
 
@@ -45,22 +42,18 @@ describe('persisted audit names', () => {
     service = new AuditService(source, new SettingsStoreService(source.getRepository(Setting), null));
     await service.onModuleInit();
     controller = new AuditController(service);
-    await source
-      .getRepository(User)
-      .insert({
-        id: 7,
-        username: 'Current admin',
-        email: 'private@example.test',
-        passwordResetToken: 'private-reset-token',
-      });
-    await source
-      .getRepository(Resource)
-      .insert({
-        id: 7,
-        name: 'Current lathe',
-        type: ResourceType.Machine,
-        documentationMarkdown: 'private documentation',
-      });
+    await source.getRepository(User).insert({
+      id: 7,
+      username: 'Current admin',
+      email: 'private@example.test',
+      passwordResetToken: 'private-reset-token',
+    });
+    await source.getRepository(Resource).insert({
+      id: 7,
+      name: 'Current lathe',
+      type: ResourceType.Machine,
+      documentationMarkdown: 'private documentation',
+    });
   }, 60_000);
   afterEach(async () => {
     resetPluginAuditRegistry();
@@ -102,24 +95,22 @@ describe('persisted audit names', () => {
   });
 
   it('retains recorded names after deletion and never joins plugin target IDs to core resources', async () => {
-    await source
-      .getRepository(AuditLog)
-      .insert([
-        {
-          at: new Date(),
-          domain: 'resource',
-          pluginId: 'core',
-          action: 'resource.deleted',
-          operationId: randomUUID(),
-          actorId: 7,
-          authenticationMethod: 'session',
-          apiTokenId: null,
-          outcome: 'succeeded',
-          subjectType: 'resource',
-          subjectId: 7,
-          details: { actorUsername: 'Original admin', 'before.name': 'Original lathe' },
-        },
-      ]);
+    await source.getRepository(AuditLog).insert([
+      {
+        at: new Date(),
+        domain: 'resource',
+        pluginId: 'core',
+        action: 'resource.deleted',
+        operationId: randomUUID(),
+        actorId: 7,
+        authenticationMethod: 'session',
+        apiTokenId: null,
+        outcome: 'succeeded',
+        subjectType: 'resource',
+        subjectId: 7,
+        details: { actorUsername: 'Original admin', 'before.name': 'Original lathe' },
+      },
+    ]);
     expect(
       await service.record({
         pluginId: fixturePluginId,
