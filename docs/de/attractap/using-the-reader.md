@@ -47,6 +47,20 @@ _Mit dem Zurück-Pfeil gelangen Sie wieder zur Ressourcenliste. Beim Wechsel zwi
 > [!IMPORTANT]
 > **Abmelden** beendet Ihre Anmeldung am Leser. Eine laufende Maschinennutzung wird dadurch **nicht** beendet. Nutzen Sie **Stop** oder **Sitzung beenden**, wenn Sie mit der Maschine fertig sind.
 
+### Zusammenfassung zum Nutzungsende
+
+Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Benutzernamen. **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig.
+
+![Vollbild-Zusammenfassung mit Dauer und Endbetrag](../../_media/attractap/session-summary-billed.png)
+
+![Zusammenfassung ohne Gebühr mit mittiger Dauer](../../_media/attractap/session-summary-unbilled.png)
+
+Die Zusammenfassung bleibt etwa **3,5 Sekunden** sichtbar und meldet Sie danach ab. Tippen Sie auf eine beliebige Stelle oder legen Sie erneut eine Karte auf, um sie früher zu schließen. Ein bereits gehaltener Finger oder eine bereits aufliegende Karte schließt sie nicht. Die Karte zum Schließen wird nicht zur Anmeldung verwendet; nehmen Sie sie weg und legen Sie sie zur Anmeldung erneut auf. Andere laufende Maschinennutzungen bleiben aktiv.
+
+Das Beenden aus der Liste, aus den Details oder nach dem Absenden eines Pflichtformulars zeigt dieselbe Zusammenfassung. Bei einem fehlgeschlagenen Stop erscheint sie nicht. Wenn Sie als Administrator oder Einweiser die Sitzung einer anderen Person beenden, bleibt die bisherige Bestätigung erhalten und Sie bleiben angemeldet. Mit einem älteren Server ohne Zusammenfassungsdaten bleibt die bisherige Bestätigung erhalten.
+
+Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**. Vorgesehene englische Entsprechungen: **Thanks, {name}!**, **Duration**, **Charged**, **See you soon!**.
+
 ## Ein erforderliches Formular ausfüllen
 
 Ihre Werkstatt kann vor dem Start oder Ende einer Nutzung Angaben abfragen, zum Beispiel zum Zustand der Maschine oder zum verwendeten Material.

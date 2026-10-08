@@ -83,6 +83,14 @@ void Display::updateNetworkQualityOverlay()
         return;
     }
 
+    // The goodbye is a plain full-screen view. Connectivity still controls the
+    // application state; restore the badge when ordinary routing resumes.
+    if (Display::activeScreen == &Display::sessionSummaryScreen)
+    {
+        lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+        Display::networkQualityOverlayInitialized = false;
+        return;
+    }
     State::NetworkQualityState qualityState = State::getNetworkQualityState();
     if (Display::networkQualityOverlayInitialized && qualityState.quality == Display::networkQualityOverlayValue)
     {

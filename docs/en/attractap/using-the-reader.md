@@ -47,6 +47,20 @@ _The back arrow returns to the resource list. You remain signed in when you move
 > [!IMPORTANT]
 > **Abmelden** (Sign out) ends your sign-in on the reader. It does **not** stop machine usage. Use **Stop** or **Sitzung beenden** when you have finished using a machine.
 
+### Session finished summary
+
+After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your account username. **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears.
+
+![Full-screen goodbye with elapsed duration and final charge](../../_media/attractap/session-summary-billed.png)
+
+![Unbilled goodbye with centered duration](../../_media/attractap/session-summary-unbilled.png)
+
+The summary stays visible for about **3.5 seconds**, then signs you out. Tap anywhere or present a card again to dismiss it sooner. A finger or card already held when the summary opens does not dismiss it. The dismissing card is consumed; remove it and scan again to sign in. Other running machine sessions continue.
+
+Stopping from the list, details or after submitting a required end form produces the same summary. A failed stop does not show it. If you end another person's session as an administrator or introducer, you keep the existing confirmation and remain signed in. Readers using an older server without summary metadata keep the previous confirmation behavior.
+
+The device currently uses German labels, including **Bis bald!**. Future English equivalents are **Thanks, {name}!**, **Duration**, **Charged**, and **See you soon!**.
+
 ## Complete a required form
 
 Your workshop may ask for information before a machine starts or stops, such as a condition check or material used.
