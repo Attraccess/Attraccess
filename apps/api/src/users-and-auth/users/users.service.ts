@@ -208,16 +208,22 @@ export class UsersService {
     const value = identifier.trim();
     if (!value) return null;
 
-    const options = value.includes('@') ? { email: value.toLowerCase() } : { username: value };
+    const options = value.includes('@') ? { email: value } : { username: value };
     const parsed = FindOneOptionsSchema.safeParse(options);
     if (!parsed.success) return null;
 
     if (parsed.data.email !== undefined) {
-      // Compare both sides: existing addresses may have been stored with mixed case.
+      // Preserve distinct existing accounts whose addresses differ only by case.
+      const exactMatch = await this.userRepository.findOne({ where: { email: parsed.data.email } });
+      if (exactMatch) return exactMatch;
+
+      // Fall back only when case-insensitive matching identifies one account.
       // Equality keeps underscores literal, unlike a LIKE query.
-      return this.userRepository.findOne({
-        where: { email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email }) },
+      const matches = await this.userRepository.find({
+        where: { email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email.toLowerCase() }) },
+        take: 2,
       });
+      return matches.length === 1 ? matches[0] : null;
     }
     return this.findOne(parsed.data);
   }

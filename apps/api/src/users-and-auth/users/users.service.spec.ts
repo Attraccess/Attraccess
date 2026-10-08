@@ -130,33 +130,54 @@ describe('UsersService', () => {
       await expect(service.findByLoginIdentifier(' Alice ')).resolves.toBe(user);
       expect(userRepository.findOne).toHaveBeenCalledWith({ where: { username: 'alice' }, relations: undefined });
     });
-    it('matches stored mixed-case emails case-insensitively without wildcard matching', async () => {
+    describe('email lookup with stored case variants', () => {
       const schema = new EntitySchema<User>({
         name: 'LoginUser',
         columns: {
           id: { type: Number, primary: true },
-          email: { type: String },
+          email: { type: String, unique: true },
         },
       });
-      const db = await new DataSource({
-        type: 'sqlite',
-        database: ':memory:',
-        entities: [schema],
-        synchronize: true,
-      }).initialize();
-      try {
+      let db: DataSource;
+
+      beforeEach(async () => {
+        db = await new DataSource({
+          type: 'sqlite',
+          database: ':memory:',
+          entities: [schema],
+          synchronize: true,
+        }).initialize();
         const repo = db.getRepository(schema);
         await repo.save([
           { id: 7, email: 'Alice@Example.com' },
           { id: 8, email: 'a_btag@Example.com' },
         ]);
         userRepository.findOne.mockImplementation((options) => repo.findOne(options));
+        userRepository.find.mockImplementation((options) => repo.find(options));
+      });
+
+      afterEach(async () => {
+        await db.destroy();
+      });
+
+      it('matches unambiguous mixed-case emails without wildcard matching', async () => {
         await expect(service.findByLoginIdentifier(' ALICE@example.COM ')).resolves.toMatchObject({ id: 7 });
         await expect(service.findByLoginIdentifier('a_bTAG@example.COM')).resolves.toMatchObject({ id: 8 });
         await expect(service.findByLoginIdentifier('a__tag@example.com')).resolves.toBeNull();
-      } finally {
-        await db.destroy();
-      }
+      });
+
+      it.each([
+        ['Alice@Example.com', 7],
+        ['alice@example.com', 9],
+      ])('preserves the exact account for %s when email case variants coexist', async (email, id) => {
+        await db.getRepository(schema).save({ id: 9, email: 'alice@example.com' });
+        await expect(service.findByLoginIdentifier(` ${email} `)).resolves.toMatchObject({ id });
+      });
+
+      it('does not select an account when a case-insensitive fallback is ambiguous', async () => {
+        await db.getRepository(schema).save({ id: 9, email: 'alice@example.com' });
+        await expect(service.findByLoginIdentifier('ALICE@EXAMPLE.COM')).resolves.toBeNull();
+      });
     });
     it.each(['', '  ', 'a@', '@example.com', 'a@@example.com'])(
       'rejects malformed identifier %s without a query',
