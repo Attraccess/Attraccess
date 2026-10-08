@@ -191,7 +191,7 @@ describe('AuthService', () => {
       details: { password: 'correct-password' },
     });
 
-    expect(isAuthenticated).not.toBeNull();
+    expect(isAuthenticated).toBe(user);
     expect(bcrypt.compare).toHaveBeenCalledWith('correct-password', 'hashed-password');
   });
 

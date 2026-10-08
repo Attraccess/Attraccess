@@ -13,6 +13,7 @@ describe('login guard authentication and audit boundaries', () => {
     assertAccountAllowed: jest.fn(),
     recordFailure: jest.fn(),
     recordSuccess: jest.fn(),
+    runAccountAttempt: jest.fn(),
   };
   const users = { findByLoginIdentifier: jest.fn() };
   const audit = { log: jest.fn() };
@@ -24,6 +25,7 @@ describe('login guard authentication and audit boundaries', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    protection.runAccountAttempt.mockImplementation((_userId, attempt) => attempt());
     request.body.username = ' alice ';
     users.findByLoginIdentifier.mockResolvedValue({ id: 7, username: 'alice' });
     authenticate = jest

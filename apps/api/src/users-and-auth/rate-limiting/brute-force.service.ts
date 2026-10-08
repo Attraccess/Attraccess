@@ -27,6 +27,7 @@ export class BruteForceProtectionService {
   private readonly ipCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly ipCoarseCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly accountCounters = new FixedWindowCounterStore<number, CounterEntry>(MAX_COUNTER_ENTRIES);
+  private readonly accountAttempts = new Map<number, Promise<void>>();
   private readonly nowFn: () => number = () => Date.now();
 
   constructor(
@@ -53,6 +54,11 @@ export class BruteForceProtectionService {
   }
 
   async assertAccountAllowed(user: User): Promise<void> {
+    const entry = this.accountCounters.get(user.id);
+    if (entry) {
+      const remaining = this.remainingLockoutSeconds(entry);
+      if (remaining > 0) throw new AccountLockedException(remaining);
+    }
     if (!user?.lockedUntil) {
       return;
     }
@@ -61,6 +67,24 @@ export class BruteForceProtectionService {
     if (lockMs > now) {
       const retryAfter = Math.ceil((lockMs - now) / 1000);
       throw new AccountLockedException(retryAfter);
+    }
+  }
+
+  /** Serialize admission, authentication and failure recording for one account. */
+  async runAccountAttempt<T>(userId: number | null, attempt: () => Promise<T>): Promise<T> {
+    if (userId == null) return attempt();
+    const previous = this.accountAttempts.get(userId) ?? Promise.resolve();
+    let release: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.accountAttempts.set(userId, current);
+    await previous;
+    try {
+      return await attempt();
+    } finally {
+      release();
+      if (this.accountAttempts.get(userId) === current) this.accountAttempts.delete(userId);
     }
   }
 

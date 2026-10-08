@@ -8,6 +8,7 @@ import {
   EntityManager,
   Brackets,
   SelectQueryBuilder,
+  Raw,
 } from 'typeorm';
 import {
   AuthenticationDetail,
@@ -207,10 +208,17 @@ export class UsersService {
     const value = identifier.trim();
     if (!value) return null;
 
-    const options = value.includes('@') ? { email: value } : { username: value };
+    const options = value.includes('@') ? { email: value.toLowerCase() } : { username: value };
     const parsed = FindOneOptionsSchema.safeParse(options);
     if (!parsed.success) return null;
 
+    if (parsed.data.email !== undefined) {
+      // Compare both sides: existing addresses may have been stored with mixed case.
+      // Equality keeps underscores literal, unlike a LIKE query.
+      return this.userRepository.findOne({
+        where: { email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email }) },
+      });
+    }
     return this.findOne(parsed.data);
   }
 

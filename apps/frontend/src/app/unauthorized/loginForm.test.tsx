@@ -363,11 +363,15 @@ describe('LoginForm credential and authenticator steps', () => {
   });
 
   it('clears the previous code and error when credentials change', async () => {
-    loginMock.mockRejectedValue(apiFailure('TwoFactorRequired'));
+    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired'))
+      .mockRejectedValueOnce(apiFailure('TwoFactorInvalidCode'))
+      .mockRejectedValueOnce(apiFailure('TwoFactorRequired'));
     const user = userEvent.setup();
     renderLogin();
     await submitCredentials(user);
     await user.paste('012345');
+    await user.click(screen.getByRole('button', { name: 'Verify code' }));
+    expect(screen.getByText('Server Error')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Change credentials' }));
     expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
     const identifier = screen.getByLabelText('Email or username');

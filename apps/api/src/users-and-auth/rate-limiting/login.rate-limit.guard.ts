@@ -31,11 +31,10 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
       throw error;
     }
 
-    let preCheckedUserId: number | null = null;
-    if (username) {
-      const user = await this.usersService.findByLoginIdentifier(username).catch(() => null);
+    const user = username ? await this.usersService.findByLoginIdentifier(username).catch(() => null) : null;
+    const preCheckedUserId = user?.id ?? null;
+    return this.bruteForce.runAccountAttempt(preCheckedUserId, async () => {
       if (user) {
-        preCheckedUserId = user.id;
         try {
           await this.bruteForce.assertAccountAllowed(user);
         } catch (error) {
@@ -51,38 +50,38 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
           throw error;
         }
       }
-    }
 
-    let activated: boolean;
-    try {
-      const result = await super.canActivate(context);
-      activated = result instanceof Observable ? await observableToPromise(result) : Boolean(result);
-    } catch (error) {
-      const outcome = classifyLoginFailure(error);
-      if (outcome !== 'two_factor_required') {
-        await this.bruteForce.recordFailure('login', ip, preCheckedUserId, username);
+      let activated: boolean;
+      try {
+        const result = await super.canActivate(context);
+        activated = result instanceof Observable ? await observableToPromise(result) : Boolean(result);
+      } catch (error) {
+        const outcome = classifyLoginFailure(error);
+        if (outcome !== 'two_factor_required') {
+          await this.bruteForce.recordFailure('login', ip, preCheckedUserId, username);
+        }
+        await this.audit.log({
+          type: 'login',
+          outcome,
+          ip,
+          userId: preCheckedUserId,
+          username,
+          reason: errorName(error),
+        });
+        throw error;
       }
+
+      const authenticatedUser = (request as Request & { user?: { id: number; username?: string } }).user;
+      await this.bruteForce.recordSuccess('login', ip, authenticatedUser?.id ?? preCheckedUserId, username);
       await this.audit.log({
         type: 'login',
-        outcome,
+        outcome: 'success',
         ip,
-        userId: preCheckedUserId,
-        username,
-        reason: errorName(error),
+        userId: authenticatedUser?.id ?? null,
+        username: authenticatedUser?.username ?? username,
       });
-      throw error;
-    }
-
-    const user = (request as Request & { user?: { id: number; username?: string } }).user;
-    await this.bruteForce.recordSuccess('login', ip, user?.id ?? preCheckedUserId, username);
-    await this.audit.log({
-      type: 'login',
-      outcome: 'success',
-      ip,
-      userId: user?.id ?? null,
-      username: user?.username ?? username,
+      return activated;
     });
-    return activated;
   }
 }
 

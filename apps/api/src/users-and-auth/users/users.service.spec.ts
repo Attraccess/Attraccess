@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthenticationDetail, ResourceUsage, Role, Session, User } from '@attraccess/database-entities';
-import { DataSource, EntityManager, QueryFailedError, Repository, UpdateResult } from 'typeorm';
+import { DataSource, EntityManager, EntitySchema, QueryFailedError, Repository, UpdateResult } from 'typeorm';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
@@ -124,19 +124,47 @@ describe('UsersService', () => {
   });
 
   describe('local login identifier lookup', () => {
-    it.each([
-      [' Alice ', { username: 'alice' }],
-      [' Alice@Example.com ', { email: 'Alice@Example.com' }],
-    ])('resolves %s using existing normalization', async (identifier, where) => {
+    it('preserves existing username normalization', async () => {
       const user = { id: 7 } as User;
       userRepository.findOne.mockResolvedValue(user);
-      await expect(service.findByLoginIdentifier(identifier)).resolves.toBe(user);
-      expect(userRepository.findOne).toHaveBeenCalledWith({ where, relations: undefined });
+      await expect(service.findByLoginIdentifier(' Alice ')).resolves.toBe(user);
+      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { username: 'alice' }, relations: undefined });
     });
-    it.each(['', '  ', 'a@', '@example.com', 'a@@example.com'])('rejects malformed identifier %s without a query', async (identifier) => {
-      await expect(service.findByLoginIdentifier(identifier)).resolves.toBeNull();
-      expect(userRepository.findOne).not.toHaveBeenCalled();
+    it('matches stored mixed-case emails case-insensitively without wildcard matching', async () => {
+      const schema = new EntitySchema<User>({
+        name: 'LoginUser',
+        columns: {
+          id: { type: Number, primary: true },
+          email: { type: String },
+        },
+      });
+      const db = await new DataSource({
+        type: 'sqlite',
+        database: ':memory:',
+        entities: [schema],
+        synchronize: true,
+      }).initialize();
+      try {
+        const repo = db.getRepository(schema);
+        await repo.save([
+          { id: 7, email: 'Alice@Example.com' },
+          { id: 8, email: 'a_btag@Example.com' },
+        ]);
+        userRepository.findOne.mockImplementation((options) => repo.findOne(options));
+        await expect(service.findByLoginIdentifier(' ALICE@example.COM ')).resolves.toMatchObject({ id: 7 });
+        await expect(service.findByLoginIdentifier('a_bTAG@example.COM')).resolves.toMatchObject({ id: 8 });
+        await expect(service.findByLoginIdentifier('a__tag@example.com')).resolves.toBeNull();
+      } finally {
+        await db.destroy();
+      }
     });
+    it.each(['', '  ', 'a@', '@example.com', 'a@@example.com'])(
+      'rejects malformed identifier %s without a query',
+      async (identifier) => {
+        await expect(service.findByLoginIdentifier(identifier)).resolves.toBeNull();
+        expect(userRepository.findOne).not.toHaveBeenCalled();
+      },
+    );
   });
 
   it('should be defined', () => {
