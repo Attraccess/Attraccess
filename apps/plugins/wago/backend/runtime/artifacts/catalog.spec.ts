@@ -343,7 +343,7 @@ describe('runtime artifact catalog (isolated disk)', () => {
   });
 
   it('does not let the manifest-copy task cache and restore stale runtime/frontend bundles', async () => {
-    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
+    const project = JSON.parse(await readFile(join(__dirname, '../../../project.json'), 'utf8'));
     expect(project.targets.build.outputs).toEqual([
       '{projectRoot}/package/package.json',
       '{projectRoot}/package/plugin.json',
@@ -351,7 +351,7 @@ describe('runtime artifact catalog (isolated disk)', () => {
   });
 
   it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {
-    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
+    const project = JSON.parse(await readFile(join(__dirname, '../../../project.json'), 'utf8'));
     for (const target of ['pack', 'pack-test', 'zip']) expect(project.targets[target].cache).toBe(false);
   });
 
@@ -565,7 +565,7 @@ describe('runtime artifact catalog (isolated disk)', () => {
       const inner = Buffer.concat([tarMember('fixture', 'isolated image fixture'), Buffer.alloc(1024)]);
       await writeFile(join(root, 'image.tar'), inner);
       await exec(process.execPath, [
-        resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+        resolve(__dirname, '../../../scripts/package-runtime-artifact.mjs'),
         '--image-archive',
         join(root, 'image.tar'),
         '--image',
@@ -593,7 +593,7 @@ describe('runtime artifact catalog (isolated disk)', () => {
       expect(result.manifest.runtimeVersion).toBe('0.3.0');
       expect(result.manifest.hardware.profile).toBe(hardwareProfile);
       await exec(process.execPath, [
-        resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+        resolve(__dirname, '../../../scripts/package-runtime-artifact.mjs'),
         '--image-archive',
         join(root, 'image.tar'),
         '--image',
@@ -612,7 +612,7 @@ describe('runtime artifact catalog (isolated disk)', () => {
       await writeFile(join(root, 'compressed-image.tar'), gzipSync(inner));
       await expect(
         exec(process.execPath, [
-          resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+          resolve(__dirname, '../../../scripts/package-runtime-artifact.mjs'),
           '--image-archive',
           join(root, 'compressed-image.tar'),
           '--image',
@@ -634,7 +634,7 @@ describe('runtime artifact catalog (isolated disk)', () => {
       Buffer.concat([tarMember('fixture', 'image fixture'), Buffer.alloc(1024)]),
     );
     const args = [
-      resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+      resolve(__dirname, '../../../scripts/package-runtime-artifact.mjs'),
       '--image-archive',
       join(root, 'image.tar'),
       '--image',
@@ -681,7 +681,7 @@ describe('runtime artifact catalog (isolated disk)', () => {
       if (!dockerImage) throw new Error('Set WAGO_DOCKER_TEST_IMAGE to run this integration test');
       await exec('docker', ['save', '-o', archive, dockerImage]);
       await exec(process.execPath, [
-        resolve(__dirname, '../scripts/package-runtime-artifact.mjs'),
+        resolve(__dirname, '../../../scripts/package-runtime-artifact.mjs'),
         '--image-archive',
         archive,
         '--image',

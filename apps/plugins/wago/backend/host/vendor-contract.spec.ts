@@ -12,7 +12,7 @@ import { fw31ShellFixture } from '../fixtures/fw31-shell-fixture';
  * Absolute effect paths are relocated before execution; all external management commands are stubbed.
  */
 describe('actual WAGO daemon contract, byte-identical in the captured FW31 source', () => {
-  const source = readFileSync(join(__dirname, 'fixtures/fw30-dockerd.sh'), 'utf8');
+  const source = readFileSync(join(__dirname, '../fixtures/fw30-dockerd.sh'), 'utf8');
   let root: string;
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'wago-vendor-contract-'));
