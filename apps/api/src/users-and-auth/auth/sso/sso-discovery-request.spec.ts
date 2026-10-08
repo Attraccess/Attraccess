@@ -1,6 +1,11 @@
 import { promises as dns } from 'node:dns';
 import { createServer, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
+import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
+import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
+import { SSOController } from './sso.controller';
 import { SsoProviderRoutes } from './providers/provider-routes';
 import {
   assertDiscoveryAddress,
@@ -10,6 +15,21 @@ import {
 } from './providers/discovery-client';
 
 describe('SSO discovery destinations', () => {
+  it.each(['discoverAuthentik', 'discoverKeycloak'] as const)('requires SSO management permission for %s', (method) => {
+    const handler = SSOController.prototype[method];
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual(
+      expect.arrayContaining([DualAuthGuard, EffectivePermissionsGuard]),
+    );
+    const request = { user: undefined as { id: number; effectivePermissions: Set<string> } | undefined };
+    const context = new ExecutionContextHost([request], SSOController, handler);
+    const guard = new EffectivePermissionsGuard(new Reflector());
+    expect(() => guard.canActivate(context)).toThrow('Unauthorized');
+    request.user = { id: 1, effectivePermissions: new Set() };
+    expect(() => guard.canActivate(context)).toThrow('Insufficient permissions');
+    request.user.effectivePermissions.add('system.sso.manage');
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
   it.each([
     'http://169.254.169.254',
     'http://0xa9fea9fe',
@@ -103,6 +123,27 @@ describe('SSO discovery HTTP boundaries', () => {
     await expect(requestDiscoveryJson(url)).resolves.toEqual({ issuer: 'http://local-idp' });
     expect(lookup).toHaveBeenCalledTimes(1);
     expect(paths).toEqual(['/discovery']);
+  });
+
+  it.each([
+    '0.0.0.0',
+    '[::]',
+    '169.254.169.254',
+    '0xa9fea9fe',
+    '2852039166',
+    '[::ffff:169.254.169.254]',
+    '[fd00:ec2::254]',
+    '168.63.129.16',
+    '100.100.100.200',
+    '224.0.0.1',
+    '[64:ff9b::a9fe:a9fe]',
+    '[2002:a9fe:a9fe::1]',
+  ])('rejects a forbidden literal destination at the request boundary: %s', async (host) => {
+    const lookup = jest.spyOn(dns, 'lookup');
+    const url = new URL('/discovery', origin.replace('127.0.0.1', host));
+    await expect(requestDiscoveryJson(url, 500)).rejects.toThrow('Invalid discovery destination');
+    expect(lookup).not.toHaveBeenCalled();
+    expect(paths).toEqual([]);
   });
 
   it.each([

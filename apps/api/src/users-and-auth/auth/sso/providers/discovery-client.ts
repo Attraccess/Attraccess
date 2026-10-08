@@ -52,6 +52,10 @@ export const discoveryLookup: LookupFunction = (hostname, options, callback) => 
 
 export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024 * 1024): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    // Literal IPs bypass Node's lookup callback, so enforce the destination
+    // policy here as well as while constructing a discovery URL.
+    const hostname = url.hostname.replace(/^\[|\]$/g, '');
+    if (isIP(hostname)) assertDiscoveryAddress(hostname);
     const get = url.protocol === 'https:' ? httpsGet : httpGet;
     // HTTP forwards this socket option, but RequestOptions omits it. Enable
     // fallback across the validated list while retaining one request deadline.

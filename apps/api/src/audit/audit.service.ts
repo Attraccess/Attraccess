@@ -26,15 +26,15 @@ import {
   SsoAuditEvent,
 } from './audit-policy';
 
-import { BillingTransactionAuditEvent, SQLITE_BUSY_TIMEOUT_MS } from './storage/audit-storage';
+import { BillingTransactionAuditEvent, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
 
 import { Interval } from '@nestjs/schedule';
 
 import { readAuditSettings } from './audit.config';
 
-import { AuditStorage } from './storage/audit-storage';
+import { AuditStorage } from './persistence/audit-storage';
 
-export { BillingTransactionAuditEvent } from './storage/audit-storage';
+export { BillingTransactionAuditEvent } from './persistence/audit-storage';
 
 @Injectable()
 export class AuditService
