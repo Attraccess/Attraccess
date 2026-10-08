@@ -199,7 +199,8 @@ export class SsoLogoutService {
   async frontchannel(providerId: number, issuer: unknown, sid: unknown, cookieToken?: string): Promise<boolean> {
     const provider = await this.providers.getProviderByTypeAndIdWithConfiguration(SSOProviderType.OIDC, providerId);
     if (!provider?.oidcConfiguration) throw new BadRequestException('Invalid OIDC provider');
-    const context = cookieToken ? await this.sessions.getSsoContext(cookieToken) : null;
+    const session = cookieToken ? await this.sessions.getLogoutSession(cookieToken) : null;
+    const context = session?.ssoContext;
     if (issuer !== undefined || sid !== undefined) {
       if (
         typeof issuer !== 'string' ||
@@ -231,7 +232,7 @@ export class SsoLogoutService {
       context.issuer !== provider.oidcConfiguration.issuer
     )
       return false;
-    await this.sessions.revokeSession(cookieToken);
+    await this.sessions.revokeLogoutSession(session.id);
     return true;
   }
 

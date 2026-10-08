@@ -24,7 +24,7 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
   let jwks: { keys: unknown[] };
   let discoveryOverride: Record<string, unknown> | undefined;
   const receipts = new Map<string, { value: string; expiry: number }>();
-  const sessions = { revokeSsoSessions: jest.fn(), getSsoContext: jest.fn(), revokeSession: jest.fn() };
+  const sessions = { revokeSsoSessions: jest.fn(), getLogoutSession: jest.fn(), revokeLogoutSession: jest.fn() };
   const store = {
     putLogoutState: async (id: string, value: string, expiry: number) => {
       if ((receipts.get(id)?.expiry ?? 0) > Date.now()) return false;
@@ -237,12 +237,15 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
     }
     expect(receipts.size).toBe(0);
     sessions.revokeSsoSessions.mockResolvedValue(1);
-    sessions.getSsoContext.mockResolvedValue({
-      protocol: 'OIDC',
-      providerId: 1,
-      issuer,
-      subject: 'person',
-      sid: 'matched',
+    sessions.getLogoutSession.mockResolvedValue({
+      id: 'stable-session',
+      ssoContext: {
+        protocol: 'OIDC',
+        providerId: 1,
+        issuer,
+        subject: 'person',
+        sid: 'matched',
+      },
     });
     expect(await service.frontchannel(1, issuer, 'matched', 'cookie')).toBe(true);
     expect(receipts.size).toBe(1);
@@ -252,7 +255,7 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
 
   it('handles browser session parameters, cookie-only notifications and cookieless notifications without widening scope', async () => {
     const context: SsoSessionContext = { protocol: 'OIDC', providerId: 1, issuer, subject: 'person', sid: 'browser' };
-    sessions.getSsoContext.mockResolvedValue(context);
+    sessions.getLogoutSession.mockResolvedValue({ id: 'stable-session', ssoContext: context });
     expect(await service.frontchannel(1, issuer, 'browser')).toBe(false);
     expect(sessions.revokeSsoSessions).toHaveBeenCalledWith({
       protocol: 'OIDC',
@@ -267,8 +270,8 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
     expect(await service.frontchannel(1, issuer, 'browser', 'new-cookie')).toBe(false);
     expect(await service.frontchannel(1, undefined, undefined)).toBe(false);
     expect(await service.frontchannel(1, undefined, undefined, 'cookie')).toBe(true);
-    expect(sessions.revokeSession).toHaveBeenCalledWith('cookie');
-    sessions.getSsoContext.mockResolvedValue({ ...context, providerId: 2 });
+    expect(sessions.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
+    sessions.getLogoutSession.mockResolvedValue({ id: 'other-session', ssoContext: { ...context, providerId: 2 } });
     expect(await service.frontchannel(1, undefined, undefined, 'other-cookie')).toBe(false);
     await expect(service.frontchannel(1, issuer, undefined)).rejects.toThrow();
     await expect(service.frontchannel(1, 'https://wrong.example', 'browser')).rejects.toThrow();

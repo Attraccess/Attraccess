@@ -26,6 +26,7 @@ import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
 import { SqliteSessionStore } from './sqlite.session-store';
 import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
+import { SSOService } from '../sso/sso.service';
 
 jest.setTimeout(90000);
 const hash = { hashToken: (token: string) => `hashed:${token}` } as TokenHashService;
@@ -311,6 +312,54 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         expect(await store.validateSession(`rotated-${i}`)).toBeNull();
         expect(await store.revokeLogoutSession(session.id)).toBe(false);
       }
+    });
+
+    it('cookie-only OIDC logout revokes concurrent refreshes while preserving independent and later logins', async () => {
+      await create('original', oidc);
+      await create('independent', oidc);
+      await create('local');
+      const dec = jest.fn();
+      const sessions = new SessionService(
+        store,
+        hash,
+        { authActiveSessions: { dec } } as unknown as MetricsService,
+        {} as CronTimer,
+      );
+      const getSession = store.getLogoutSession.bind(store);
+      const capture = jest.spyOn(store, 'getLogoutSession').mockImplementationOnce(async (token) => {
+        const session = await getSession(token);
+        const refreshed = await sessions.refreshSession(token);
+        expect(refreshed).not.toBeNull();
+        // Rotate twice to cover the complete refresh lineage, then create a
+        // separate login with identical provider correlation before revocation.
+        expect(
+          await store.rotateSession(refreshed, hash.hashToken('rotated-again'), new Date(Date.now() + 60000)),
+        ).toBe(true);
+        await create('later-login', oidc);
+        return session;
+      });
+      const service = new SsoLogoutService(
+        {
+          getProviderByTypeAndIdWithConfiguration: async () => ({ oidcConfiguration: { issuer: oidc.issuer } }),
+        } as unknown as SSOService,
+        sessions,
+        store,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+      try {
+        expect(await service.frontchannel(1, undefined, undefined, 'original')).toBe(true);
+      } finally {
+        capture.mockRestore();
+      }
+      expect(await store.validateSession('original')).toBeNull();
+      expect(await store.validateSession('rotated-again')).toBeNull();
+      expect(await sessions.refreshSession('rotated-again')).toBeNull();
+      for (const token of ['independent', 'local', 'later-login'])
+        expect(await store.validateSession(token)).not.toBeNull();
+      expect(dec).toHaveBeenCalledTimes(1);
     });
 
     it.each([oidc, saml])(
