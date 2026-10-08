@@ -1,4 +1,20 @@
-import { Body, Controller, Delete, Get, Optional, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
+import { SsoLogoutService } from './sso/sso-logout.service';
+import { CentralLogoutResult, LogoutCapability } from './sso/logout.types';
+import { SettingsService } from '../../settings/settings.service';
+import {
+  UnauthorizedException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Optional,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { SessionService } from './session.service';
 import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
@@ -16,6 +32,8 @@ export class AuthController {
     private readonly sessionService: SessionService,
     private readonly cookieConfigService: CookieConfigService,
     @Optional() private readonly identityAudit?: IdentityAuditService,
+    @Optional() private readonly ssoLogout?: SsoLogoutService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
 
   @Post('/session/local')
@@ -82,50 +100,14 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
     @Query('tokenLocation') tokenLocation: 'cookie' | 'body',
   ): Promise<CreateSessionResponse> {
-    // Get current session token from cookie or header
-    const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
-    const headerToken = request.headers.authorization?.startsWith('Bearer ')
-      ? request.headers.authorization.substring(7)
-      : null;
+    const currentToken = this.sessionToken(request);
 
-    const currentToken = headerToken || cookieToken;
-
-    if (!currentToken) {
-      // Create a new session if no current token exists
-      const sessionToken = await this.sessionService.createSession(request.user, {
-        userAgent: request.headers['user-agent'],
-        ipAddress: request.ip || request.connection.remoteAddress,
-      });
-
-      return {
-        user: request.user,
-        authToken: sessionToken,
-      };
-    }
+    if (!currentToken) throw new UnauthorizedException('An active session is required');
 
     // Refresh the session token
     const newToken = await this.sessionService.refreshSession(currentToken);
 
-    if (!newToken) {
-      // If session refresh failed, create a new session
-      const sessionToken = await this.sessionService.createSession(request.user, {
-        userAgent: request.headers['user-agent'],
-        ipAddress: request.ip || request.connection.remoteAddress,
-      });
-
-      if (tokenLocation === 'cookie') {
-        await this.cookieConfigService.setAuthCookie(response, sessionToken);
-        return {
-          user: request.user,
-          authToken: '',
-        };
-      } else {
-        return {
-          user: request.user,
-          authToken: sessionToken,
-        };
-      }
-    }
+    if (!newToken) throw new UnauthorizedException('Session was ended or expired');
 
     if (tokenLocation === 'cookie') {
       // Update cookie with new token
@@ -141,6 +123,55 @@ export class AuthController {
         authToken: newToken,
       };
     }
+  }
+
+  private sessionToken(request: AuthenticatedRequest): string | null {
+    const bearer = request.headers.authorization?.startsWith('Bearer ')
+      ? request.headers.authorization.substring(7).trim()
+      : '';
+    return bearer || request.cookies?.[this.cookieConfigService.getCookieName()] || null;
+  }
+
+  @Get('/session/logout-capability')
+  @SessionAuth()
+  @ApiOperation({ summary: 'Central logout availability for the current session', operationId: 'getLogoutCapability' })
+  @ApiOkResponse({ type: LogoutCapability })
+  async logoutCapability(@Req() request: AuthenticatedRequest): Promise<LogoutCapability> {
+    const token = this.sessionToken(request);
+    if (!token || request.user.apiTokenId) return { available: false, reason: 'local_session' };
+    return this.ssoLogout.capability(await this.sessionService.getSsoContext(token));
+  }
+
+  @Post('/session/logout-everywhere')
+  @SessionAuth()
+  @ApiOperation({ summary: 'End the current session and initiate provider logout', operationId: 'logoutEverywhere' })
+  @ApiOkResponse({ type: CentralLogoutResult })
+  async logoutEverywhere(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<CentralLogoutResult> {
+    const token = this.sessionToken(request);
+    if (!token || request.user.apiTokenId || !(await this.sessionService.validateSession(token)))
+      throw new UnauthorizedException('An active session is required');
+    const origin = request.headers.origin;
+    const configuredUrl = await this.settings.getUrl();
+    const returnUrl = await this.ssoLogout.returnURL().catch(() => configuredUrl);
+    const allowedOrigins = new Set([
+      configuredUrl ? new URL(configuredUrl).origin : '',
+      returnUrl ? new URL(returnUrl).origin : '',
+    ]);
+    if ((origin && !allowedOrigins.has(origin)) || (!origin && request.headers['sec-fetch-site'] === 'cross-site'))
+      throw new ForbiddenException('Cross-origin logout is not allowed');
+    let result: CentralLogoutResult;
+    try {
+      result = await this.ssoLogout.prepare(await this.sessionService.getSsoContext(token));
+    } catch {
+      result = { kind: 'local_only', reason: 'provider_failed' };
+    } finally {
+      await this.endSession(request, response);
+    }
+    response.setHeader('Cache-Control', 'no-store');
+    return result;
   }
 
   @Delete('/session')
@@ -161,21 +192,11 @@ export class AuthController {
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    // Get session token from cookie or header
-    const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
-    const headerToken = request.headers.authorization?.startsWith('Bearer ')
-      ? request.headers.authorization.substring(7)
-      : null;
+    const sessionToken = this.sessionToken(request);
 
-    const sessionToken = headerToken || cookieToken;
-
-    // Clear authentication cookie regardless of request type
+    // End server access before cookie clearing or Passport/auditing can fail.
+    if (sessionToken) await this.sessionService.revokeSession(sessionToken);
     await this.cookieConfigService.clearAuthCookie(response);
-
-    // Revoke session token if present
-    if (sessionToken) {
-      await this.sessionService.revokeSession(sessionToken);
-    }
 
     // Passport clears request.user as part of logout, so retain the principal for the audit record.
     const principal = {

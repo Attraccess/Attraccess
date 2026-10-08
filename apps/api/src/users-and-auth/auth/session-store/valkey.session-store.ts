@@ -1,12 +1,21 @@
 import { Repository } from 'typeorm';
-import { Session, User } from '@attraccess/database-entities';
+import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
 import type { Redis } from 'ioredis';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SessionStore, SessionMetadata } from './session-store';
 
+import { createHash } from 'node:crypto';
+import { SsoSessionSelector } from './sso-session-selector';
+import {
+  CREATE_SESSION_SCRIPT,
+  ROTATE_SESSION_SCRIPT,
+  REVOKE_SESSION_SCRIPT,
+  REVOKE_USER_SCRIPT,
+  REVOKE_SSO_SCRIPT,
+} from './valkey-session-scripts';
+
 const SESSION_PREFIX = 'session:';
 const USER_SESSIONS_PREFIX = 'user_sessions:';
-const MAX_EXPIRATION_HOURS = 168;
 
 export class ValkeySessionStore implements SessionStore {
   constructor(
@@ -15,21 +24,46 @@ export class ValkeySessionStore implements SessionStore {
     private readonly tokenHashService: TokenHashService,
   ) {}
 
-  async createSession(hashedToken: string, userId: number, metadata: SessionMetadata | undefined, expiresAt: Date): Promise<void> {
-    const key = `${SESSION_PREFIX}${hashedToken}`;
-    const ttl = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-    const pipeline = this.client.pipeline();
-    pipeline.hset(key, {
+  async createSession(
+    hashedToken: string,
+    userId: number,
+    metadata: SessionMetadata | undefined,
+    expiresAt: Date,
+  ): Promise<void> {
+    const context = metadata?.ssoContext;
+    const indexes = context
+      ? [
+          this.ssoIndex(
+            context.providerId,
+            context.protocol,
+            'subject',
+            context.protocol === 'OIDC' ? context.subject : context.nameID,
+          ),
+        ]
+      : [];
+    if (context?.protocol === 'OIDC' && context.sid)
+      indexes.push(this.ssoIndex(context.providerId, context.protocol, 'sid', context.sid));
+    const now = Date.now();
+    const values = {
       userId: String(userId),
       userAgent: metadata?.userAgent || '',
       ipAddress: metadata?.ipAddress || '',
       expiresAt: expiresAt.toISOString(),
-      createdAt: new Date().toISOString(),
-    });
-    pipeline.expire(key, ttl);
-    pipeline.sadd(`${USER_SESSIONS_PREFIX}${userId}`, hashedToken);
-    pipeline.expire(`${USER_SESSIONS_PREFIX}${userId}`, MAX_EXPIRATION_HOURS * 3600);
-    await pipeline.exec();
+      expiresAtMs: String(expiresAt.getTime()),
+      createdAt: new Date(now).toISOString(),
+      createdAtMs: String(now),
+      ssoIndexes: JSON.stringify(indexes),
+      ...(context ? { ssoContext: JSON.stringify(context) } : {}),
+    };
+    await this.client.eval(
+      CREATE_SESSION_SCRIPT,
+      1,
+      `${SESSION_PREFIX}${hashedToken}`,
+      now,
+      hashedToken,
+      JSON.stringify(values),
+      expiresAt.getTime(),
+    );
   }
 
   async validateSession(token: string): Promise<User | null> {
@@ -50,65 +84,101 @@ export class ValkeySessionStore implements SessionStore {
   }
 
   async rotateSession(token: string, newHashedToken: string, newExpiresAt: Date): Promise<boolean> {
-    const hashedToken = this.tokenHashService.hashToken(token);
-    const key = `${SESSION_PREFIX}${hashedToken}`;
-    const data = await this.client.hgetall(key);
-    if (!data?.['userId']) return false;
-
-    const expiresAt = new Date(data['expiresAt'] ?? 0);
-    if (expiresAt < new Date()) {
-      await this.client.del(key);
-      return false;
-    }
-
-    const userId = parseInt(data['userId'], 10);
-    const newKey = `${SESSION_PREFIX}${newHashedToken}`;
-    const newTtl = Math.max(1, Math.floor((newExpiresAt.getTime() - Date.now()) / 1000));
-    const pipeline = this.client.pipeline();
-    pipeline.del(key);
-    pipeline.srem(`${USER_SESSIONS_PREFIX}${userId}`, hashedToken);
-    pipeline.hset(newKey, { ...data, expiresAt: newExpiresAt.toISOString() });
-    pipeline.expire(newKey, newTtl);
-    pipeline.sadd(`${USER_SESSIONS_PREFIX}${userId}`, newHashedToken);
-    await pipeline.exec();
-    return true;
+    const hashed = this.tokenHashService.hashToken(token);
+    return (
+      Number(
+        await this.client.eval(
+          ROTATE_SESSION_SCRIPT,
+          2,
+          `${SESSION_PREFIX}${hashed}`,
+          `${SESSION_PREFIX}${newHashedToken}`,
+          Date.now(),
+          hashed,
+          newHashedToken,
+          newExpiresAt.getTime(),
+          newExpiresAt.toISOString(),
+        ),
+      ) === 1
+    );
   }
 
   async revokeSession(token: string): Promise<boolean> {
-    const hashedToken = this.tokenHashService.hashToken(token);
-    const key = `${SESSION_PREFIX}${hashedToken}`;
-    const data = await this.client.hgetall(key);
-    if (!data?.['userId']) return false;
-
-    const wasActive = new Date(data['expiresAt'] ?? 0) > new Date();
-    const userId = parseInt(data['userId'], 10);
-    const pipeline = this.client.pipeline();
-    pipeline.del(key);
-    pipeline.srem(`${USER_SESSIONS_PREFIX}${userId}`, hashedToken);
-    await pipeline.exec();
-    return wasActive;
+    const hashed = this.tokenHashService.hashToken(token);
+    return (
+      Number(await this.client.eval(REVOKE_SESSION_SCRIPT, 1, `${SESSION_PREFIX}${hashed}`, Date.now(), hashed)) === 1
+    );
   }
 
   async revokeAllUserSessions(userId: number): Promise<number> {
-    const userKey = `${USER_SESSIONS_PREFIX}${userId}`;
-    const hashedTokens = await this.client.smembers(userKey);
-    if (!hashedTokens.length) return 0;
+    return Number(await this.client.eval(REVOKE_USER_SCRIPT, 1, `${USER_SESSIONS_PREFIX}${userId}`, Date.now()));
+  }
 
-    const now = new Date();
-    let activeCount = 0;
-    const pipeline = this.client.pipeline();
-    for (const ht of hashedTokens) {
-      const expiresAtStr = await this.client.hget(`${SESSION_PREFIX}${ht}`, 'expiresAt');
-      if (expiresAtStr && new Date(expiresAtStr) > now) activeCount++;
-      pipeline.del(`${SESSION_PREFIX}${ht}`);
-    }
-    pipeline.del(userKey);
-    await pipeline.exec();
-    return activeCount;
+  async getSsoContext(token: string): Promise<SsoSessionContext | null> {
+    const data = await this.client.hgetall(`${SESSION_PREFIX}${this.tokenHashService.hashToken(token)}`);
+    if (!data.ssoContext || new Date(data.expiresAt) <= new Date()) return null;
+    return JSON.parse(data.ssoContext) as SsoSessionContext;
+  }
+
+  async revokeSsoSessions(selector: SsoSessionSelector): Promise<number> {
+    const kind = selector.protocol === 'OIDC' && selector.sid ? 'sid' : 'subject';
+    const identity = selector.protocol === 'OIDC' ? selector.sid || selector.subject : selector.nameID;
+    if (!identity) return 0;
+    return Number(
+      await this.client.eval(
+        REVOKE_SSO_SCRIPT,
+        1,
+        this.ssoIndex(selector.providerId, selector.protocol, kind, identity),
+        Date.now(),
+        JSON.stringify(selector),
+      ),
+    );
+  }
+
+  async revokeSsoSessionsOnce(
+    selector: SsoSessionSelector,
+    receipt: { key: string; expiresAt: number },
+  ): Promise<{ fresh: boolean; count: number }> {
+    const kind = selector.protocol === 'OIDC' && selector.sid ? 'sid' : 'subject';
+    const identity = selector.protocol === 'OIDC' ? selector.sid || selector.subject : selector.nameID;
+    if (!identity) return { fresh: false, count: 0 };
+    const result = (await this.client.eval(
+      REVOKE_SSO_SCRIPT,
+      1,
+      this.ssoIndex(selector.providerId, selector.protocol, kind, identity),
+      Date.now(),
+      JSON.stringify(selector),
+      `sso_logout_state:${receipt.key}`,
+      receipt.expiresAt,
+    )) as number[];
+    return { fresh: result[0] === 1, count: result[1] };
+  }
+
+  async putLogoutState(key: string, value: string, expiresAt: number): Promise<boolean> {
+    if (expiresAt <= Date.now()) return false;
+    return (
+      (await this.client.set(`sso_logout_state:${key}`, value, 'PX', Math.max(1, expiresAt - Date.now()), 'NX')) ===
+      'OK'
+    );
+  }
+
+  async takeLogoutState(key: string): Promise<string | null> {
+    return (await this.client.call('GETDEL', `sso_logout_state:${key}`)) as string | null;
+  }
+
+  private ssoIndex(providerId: number, protocol: string, kind: string, identity: string): string {
+    return `sso_sessions:${providerId}:${protocol}:${kind}:${createHash('sha256').update(identity).digest('hex')}`;
   }
 
   async cleanupExpired(): Promise<null> {
-    return null; // TTL handles expiry natively
+    // Session hashes expire through TTL. Sorted lookup indexes remove expired members
+    // on reads/writes and during periodic cleanup, even if the hash is already gone.
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.client.scan(cursor, 'MATCH', 'sso_sessions:*', 'COUNT', 100);
+      for (const key of keys) await this.client.zremrangebyscore(key, '-inf', Date.now());
+      cursor = next;
+    } while (cursor !== '0');
+    return null;
   }
 
   async getUserSessions(userId: number): Promise<Session[]> {
@@ -117,7 +187,10 @@ export class ValkeySessionStore implements SessionStore {
     const sessions: Session[] = [];
     for (const ht of hashedTokens) {
       const data = await this.client.hgetall(`${SESSION_PREFIX}${ht}`);
-      if (!data?.['userId']) continue;
+      if (!data?.['userId']) {
+        await this.client.srem(`${USER_SESSIONS_PREFIX}${userId}`, ht);
+        continue;
+      }
       const expiresAt = new Date(data['expiresAt'] ?? 0);
       if (expiresAt < now) continue;
       sessions.push({

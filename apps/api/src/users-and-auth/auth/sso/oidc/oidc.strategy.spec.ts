@@ -66,11 +66,11 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     };
     const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
     const strategy = createStrategy({}, users, auth);
-    await expect(strategy.validate('issuer', {} as Profile)).rejects.toThrow('No user ID');
-    await expect(strategy.validate('issuer', { id: 'subject' } as Profile)).rejects.toThrow('No email');
+    await expect(strategy.validateProfile('issuer', {} as Profile)).rejects.toThrow('No user ID');
+    await expect(strategy.validateProfile('issuer', { id: 'subject' } as Profile)).rejects.toThrow('No email');
     expect(users.createOne).not.toHaveBeenCalled();
     await expect(
-      strategy.validate('issuer', { id: 'subject', emails: [{ value: 'user@example.com' }] } as Profile),
+      strategy.validateProfile('issuer', { id: 'subject', emails: [{ value: 'user@example.com' }] } as Profile),
     ).rejects.toThrow('Unauthorized');
     expect(auth.addAuthenticationDetails).not.toHaveBeenCalled();
   });
@@ -89,7 +89,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       auth,
       rbac,
     );
-    await strategy.validate('issuer', {
+    await strategy.validateProfile('issuer', {
       id: 'subject',
       emails: [{ value: 'user@example.com' }],
       _json: {
@@ -145,7 +145,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { customUser: 'preferred.user' },
     } as unknown as Profile;
 
-    const user = await strategy.validate('https://issuer', profile);
+    const user = await strategy.validateProfile('https://issuer', profile);
     expect(user.username).toBe('preferred.user');
     expect(user.email).toBe('user@example.com');
     expect(usersService.createOne).toHaveBeenCalled();
@@ -189,7 +189,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { mail: 'jsonmail@example.com' },
     } as unknown as Profile;
 
-    const user = await strategy.validate('https://issuer', profile);
+    const user = await strategy.validateProfile('https://issuer', profile);
     expect(user.email).toBe('jsonmail@example.com');
     expect(usersService.createOne).toHaveBeenCalled();
   });
@@ -230,7 +230,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       audit,
     );
 
-    await strategy.validate('https://issuer', {
+    await strategy.validateProfile('https://issuer', {
       id: 'subject',
       emails: [{ value: 'user@example.com' }],
       _json: { groups: ['admins'] },
@@ -283,7 +283,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
 
     await expect(
-      strategy.validate('https://issuer', {
+      strategy.validateProfile('https://issuer', {
         id: 'subject',
         emails: [{ value: 'user@example.com' }],
         _json: { groups: ['admins'] },
@@ -334,7 +334,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
 
     await expect(
-      strategy.validate('https://issuer', {
+      strategy.validateProfile('https://issuer', {
         id: 'subject',
         emails: [{ value: 'user@example.com' }],
       } as unknown as Profile),
@@ -381,7 +381,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { customUser: 'Name Surname' },
     } as unknown as Profile;
 
-    const user = await strategy.validate('https://issuer', profile);
+    const user = await strategy.validateProfile('https://issuer', profile);
     expect(usersService.buildUsernameFromSSOClaim).toHaveBeenCalledWith('Name Surname', 'user@example.com');
     expect(user.username).toBe('name.surname');
     expect(usersService.createOne).toHaveBeenCalledWith(
@@ -416,7 +416,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { roles: ['some-role'] },
     } as unknown as Profile;
 
-    await strategy.validate('https://issuer', profile);
+    await strategy.validateProfile('https://issuer', profile);
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
   });
@@ -452,7 +452,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { roles: ['attraccess_admin'] },
     } as unknown as Profile;
 
-    await strategy.validate('https://issuer', profile);
+    await strategy.validateProfile('https://issuer', profile);
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
   });
@@ -488,7 +488,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { roles: ['other-role'] }, // 'other-role' not in mapping → no roles granted
     } as unknown as Profile;
 
-    await strategy.validate('https://issuer', profile);
+    await strategy.validateProfile('https://issuer', profile);
 
     // syncSsoRoles called with empty set; existing SSO roles will be revoked
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
@@ -514,7 +514,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { groups: ['Attraccess Admin'] }, // matches 'attraccess_admin' after normalization
     } as unknown as Profile;
 
-    await strategy.validate('https://issuer', profile);
+    await strategy.validateProfile('https://issuer', profile);
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
       existingUser.id,
@@ -544,7 +544,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { groups: [] }, // claim key present but empty → authoritative, revoke
     } as unknown as Profile;
 
-    await strategy.validate('https://issuer', profile);
+    await strategy.validateProfile('https://issuer', profile);
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
   });
@@ -569,7 +569,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       _json: { email: 'existing@example.com' }, // no roles/groups keys → missing scope, do not revoke
     } as unknown as Profile;
 
-    await strategy.validate('https://issuer', profile);
+    await strategy.validateProfile('https://issuer', profile);
 
     expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
   });
@@ -674,5 +674,75 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       expect(baseAuthenticateSpy).toHaveBeenCalledWith(req, options);
       baseAuthenticateSpy.mockRestore();
     });
+  });
+});
+
+describe('OIDC Passport callback authentication context', () => {
+  it('selects the request-aware six-argument callback and attaches verified context only to that request', async () => {
+    const { OidcTokenVerifier, OidcVerificationUnavailableError } = await import('./oidc-token-verifier.service');
+    const { EncryptionService } = await import('../../../../encryption/encryption.service');
+    const claims = { sub: 'subject', sid: 'browser' };
+    const verifier = { verify: jest.fn().mockResolvedValue(claims) };
+    const moduleRef = {
+      get: (token: unknown) =>
+        token === OidcTokenVerifier
+          ? verifier
+          : token === EncryptionService
+            ? { encrypt: () => 'encrypted-hint' }
+            : undefined,
+    } as unknown as ModuleRef;
+    const config = {
+      ssoProviderId: 4,
+      issuer: 'https://issuer',
+      authorizationURL: 'https://issuer/auth',
+      tokenURL: 'https://issuer/token',
+      userInfoURL: 'https://issuer/me',
+      clientId: 'client',
+      clientSecret: 'secret',
+      jwksURL: 'https://issuer/jwks',
+    } as SSOProviderOIDCConfiguration;
+    const strategy = new SSOOIDCStrategy(moduleRef, config, 'https://app.example/callback', {} as OidcCookieStateStore);
+    const user = { id: 7 } as User;
+    jest.spyOn(strategy, 'validateProfile').mockResolvedValue(user);
+    const req = {};
+    const verify = (strategy as unknown as { _verify: (...args: unknown[]) => void })._verify;
+    expect(verify.length).toBe(6);
+    await new Promise<void>((resolve, reject) =>
+      verify(req, config.issuer, { id: 'subject' }, {}, 'signed-id-token', (error: Error | null, principal: User) => {
+        if (error) return reject(error);
+        expect(principal).toBe(user);
+        resolve();
+      }),
+    );
+    expect(verifier.verify).toHaveBeenCalledWith('signed-id-token', config);
+    expect(req).toEqual({
+      ssoSessionContext: {
+        protocol: 'OIDC',
+        providerId: 4,
+        issuer: config.issuer,
+        subject: 'subject',
+        sid: 'browser',
+        idTokenEncrypted: 'encrypted-hint',
+      },
+    });
+    expect(user).not.toHaveProperty('ssoSessionContext');
+    verifier.verify.mockRejectedValue(new Error('Bad signature'));
+    await expect(
+      strategy.validate({} as never, config.issuer, { id: 'subject' } as Profile, {}, 'bad-token'),
+    ).rejects.toThrow('verification failed');
+    config.jwksURL = null;
+    for (const code of ['ERR_JOSE_ALG_NOT_ALLOWED', 'ERR_JWKS_NO_MATCHING_KEY', 'ERR_JWT_EXPIRED']) {
+      verifier.verify.mockRejectedValue(Object.assign(new Error('Invalid token'), { code }));
+      await expect(
+        strategy.validate({} as never, config.issuer, { id: 'subject' } as Profile, {}, 'bad-token'),
+      ).rejects.toThrow('verification failed');
+    }
+    verifier.verify.mockRejectedValue(new OidcVerificationUnavailableError('No optional discovery'));
+    const legacyRequest = {};
+    await expect(
+      strategy.validate(legacyRequest as never, config.issuer, { id: 'subject' } as Profile, {}, 'legacy-token'),
+    ).resolves.toBe(user);
+    expect(legacyRequest).not.toHaveProperty('ssoSessionContext');
+    expect(strategy.validateProfile).toHaveBeenLastCalledWith(config.issuer, { id: 'subject' }, {}, undefined);
   });
 });

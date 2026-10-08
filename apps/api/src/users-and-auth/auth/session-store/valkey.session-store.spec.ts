@@ -12,16 +12,9 @@ const active = {
   ipAddress: '192.0.2.7',
 };
 describe('ValkeySessionStore', () => {
-  const pipeline = {
-    hset: jest.fn(),
-    expire: jest.fn(),
-    sadd: jest.fn(),
-    srem: jest.fn(),
-    del: jest.fn(),
-    exec: jest.fn(),
-  };
   const client = {
-    pipeline: jest.fn(() => pipeline),
+    eval: jest.fn(),
+    srem: jest.fn(),
     hgetall: jest.fn(),
     hget: jest.fn(),
     smembers: jest.fn(),
@@ -57,22 +50,11 @@ describe('ValkeySessionStore', () => {
       createdAt: new Date(active.createdAt),
     });
   });
-  it('revokes every indexed token but counts only active sessions and handles an empty index', async () => {
-    client.smembers.mockResolvedValueOnce(['live', 'expired', 'missing']).mockResolvedValueOnce([]);
-    client.hget
-      .mockResolvedValueOnce(active.expiresAt)
-      .mockResolvedValueOnce('2026-09-22T09:00:00Z')
-      .mockResolvedValueOnce(null);
+  it('uses one atomic store operation for account revocation and reports its count', async () => {
+    client.eval.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     expect(await store.revokeAllUserSessions(7)).toBe(1);
-    expect(pipeline.del.mock.calls).toEqual([
-      ['session:live'],
-      ['session:expired'],
-      ['session:missing'],
-      ['user_sessions:7'],
-    ]);
-    expect(pipeline.exec).toHaveBeenCalledTimes(1);
     expect(await store.revokeAllUserSessions(7)).toBe(0);
-    expect(pipeline.exec).toHaveBeenCalledTimes(1);
+    expect(client.eval).toHaveBeenCalledWith(expect.any(String), 1, 'user_sessions:7', now.getTime());
   });
   it('validates hashed tokens, removes expired entries, and loads the matching user', async () => {
     client.hgetall
@@ -87,15 +69,21 @@ describe('ValkeySessionStore', () => {
     expect(client.expire).toHaveBeenCalledWith('session:hashed-live', 3600);
     expect(users.findOne).toHaveBeenCalledWith({ where: { id: 7 } });
   });
-  it('rotates a live token atomically and preserves session metadata', async () => {
-    client.hgetall.mockResolvedValue(active);
+  it('delegates rotation to one atomic store operation', async () => {
+    client.eval.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     const expiry = new Date('2026-09-22T12:00:00Z');
     expect(await store.rotateSession('old', 'new-hash', expiry)).toBe(true);
-    expect(pipeline.del).toHaveBeenCalledWith('session:hashed-old');
-    expect(pipeline.hset).toHaveBeenCalledWith('session:new-hash', { ...active, expiresAt: expiry.toISOString() });
-    expect(pipeline.expire).toHaveBeenCalledWith('session:new-hash', 7200);
-    expect(pipeline.srem).toHaveBeenCalledWith('user_sessions:7', 'hashed-old');
-    expect(pipeline.sadd).toHaveBeenCalledWith('user_sessions:7', 'new-hash');
-    expect(pipeline.exec).toHaveBeenCalledTimes(1);
+    expect(await store.rotateSession('old', 'cannot-revive', expiry)).toBe(false);
+    expect(client.eval).toHaveBeenCalledWith(
+      expect.any(String),
+      2,
+      'session:hashed-old',
+      'session:new-hash',
+      now.getTime(),
+      'hashed-old',
+      'new-hash',
+      expiry.getTime(),
+      expiry.toISOString(),
+    );
   });
 });

@@ -25,6 +25,11 @@ vi.mock('../../hooks/useAuth', () => ({
     user: { id: 1, username: 'operator' },
     hasPermission: (permission: string) => permission === 'resources.update' && state.canManageWago,
     logout: vi.fn(),
+    logoutEverywhere: vi.fn(),
+    logoutEverywhereLabel: 'Logout everywhere',
+    logoutUnavailableReason: 'Requires an SSO session',
+    logoutPending: false,
+    canLogoutEverywhere: false,
   }),
 }));
 

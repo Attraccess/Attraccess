@@ -1,3 +1,6 @@
+import { SsoLogoutService } from './auth/sso/sso-logout.service';
+import { SsoLogoutController } from './auth/sso/sso-logout.controller';
+import { OidcTokenVerifier } from './auth/sso/oidc/oidc-token-verifier.service';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PassportModule } from '@nestjs/passport';
@@ -149,6 +152,8 @@ import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-
     LocalStrategy,
     SessionStrategy,
     SSOService,
+    SsoLogoutService,
+    OidcTokenVerifier,
     CookieConfigService,
     OidcCookieStateStore,
     SSOOIDCGuard,
@@ -196,6 +201,7 @@ import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-
     PasskeyController,
     ApiTokenController,
     SSOController,
+    SsoLogoutController,
     RbacController,
   ],
   exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger, RbacModule],

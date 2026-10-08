@@ -1,3 +1,5 @@
+import { SsoLogoutService } from './sso/sso-logout.service';
+import { SettingsService } from '../../settings/settings.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Response } from 'express';
 import { AuthController } from './auth.controller';
@@ -36,6 +38,10 @@ describe('AuthController', () => {
             createSession: jest.fn().mockResolvedValue('test-session-token'),
             refreshSession: jest.fn().mockResolvedValue('new-session-token'),
             revokeSession: jest.fn(),
+            validateSession: jest.fn().mockResolvedValue({ id: 7 }),
+            getSsoContext: jest
+              .fn()
+              .mockResolvedValue({ protocol: 'OIDC', providerId: 1, issuer: 'https://idp.example', subject: 'person' }),
           },
         },
         {
@@ -57,6 +63,14 @@ describe('AuthController', () => {
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
         { provide: UsersService, useValue: { findOne: jest.fn() } },
+        {
+          provide: SsoLogoutService,
+          useValue: {
+            prepare: jest.fn().mockResolvedValue({ kind: 'redirect', redirectUrl: 'https://idp.example/logout' }),
+            returnURL: async () => 'https://app.example/',
+          },
+        },
+        { provide: SettingsService, useValue: { getUrl: async () => 'https://app.example' } },
         { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },
       ],
@@ -309,5 +323,71 @@ describe('AuthController', () => {
     });
     expect(sessionService.refreshSession).toHaveBeenCalledWith('current-session-token');
     expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'new-session-token');
+  });
+  it('central logout snapshots the actual bearer session before local termination, and uses its stored provider context', async () => {
+    const request = {
+      user: { id: 7 },
+      headers: { authorization: 'Bearer header-session', origin: 'https://app.example' },
+      cookies: { 'auth-session': 'cookie-session' },
+      logout: jest.fn((done: () => void) => done()),
+    } as unknown as AuthenticatedRequest;
+    const response = { setHeader: jest.fn() } as unknown as Response;
+    expect(await authController.logoutEverywhere(request, response)).toEqual({
+      kind: 'redirect',
+      redirectUrl: 'https://idp.example/logout',
+    });
+    expect(sessionService.getSsoContext).toHaveBeenCalledWith('header-session');
+    expect(sessionService.revokeSession).toHaveBeenCalledWith('header-session');
+    expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(response);
+    expect(request.logout).toHaveBeenCalled();
+  });
+
+  it('always ends the local session when provider redirect preparation fails', async () => {
+    const controller = new AuthController(
+      sessionService,
+      cookieConfigService,
+      identityAudit as unknown as IdentityAuditService,
+      {
+        prepare: async () => {
+          throw new Error('Provider unavailable');
+        },
+        returnURL: async () => 'https://app.example/',
+      } as unknown as SsoLogoutService,
+      { getUrl: async () => 'https://app.example' } as SettingsService,
+    );
+    const request = {
+      user: { id: 7 },
+      headers: {},
+      cookies: { 'auth-session': 'session' },
+      logout: (done: () => void) => done(),
+    } as unknown as AuthenticatedRequest;
+    expect(await controller.logoutEverywhere(request, { setHeader: jest.fn() } as unknown as Response)).toEqual({
+      kind: 'local_only',
+      reason: 'provider_failed',
+    });
+    expect(sessionService.revokeSession).toHaveBeenCalledWith('session');
+  });
+
+  it('rejects API tokens and cross-origin central logout before revoking anything', async () => {
+    const response = { setHeader: jest.fn() } as unknown as Response;
+    for (const [user, headers] of [
+      [{ id: 7, apiTokenId: 12 }, { authorization: 'Bearer api-token' }],
+      [{ id: 7 }, { authorization: 'Bearer session', origin: 'https://attacker.example' }],
+    ]) {
+      const request = { user, headers, cookies: {}, logout: jest.fn() } as unknown as AuthenticatedRequest;
+      await expect(authController.logoutEverywhere(request, response)).rejects.toThrow();
+    }
+    expect(sessionService.revokeSession).not.toHaveBeenCalled();
+  });
+
+  it('does not create a new session when refresh loses a race with logout', async () => {
+    jest.spyOn(sessionService, 'refreshSession').mockResolvedValue(null);
+    const request = {
+      user: { id: 7 },
+      headers: { authorization: 'Bearer ended-session' },
+      cookies: {},
+    } as unknown as AuthenticatedRequest;
+    await expect(authController.refreshSession(request, {} as Response, 'body')).rejects.toThrow('ended or expired');
+    expect(sessionService.createSession).not.toHaveBeenCalled();
   });
 });

@@ -27,6 +27,16 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useAuthenticationServiceCreateOneSsoProvider: () => ({ mutateAsync: state.create, isPending: false }),
   useAuthenticationServiceUpdateOneSsoProvider: () => ({ mutateAsync: state.update, isPending: false }),
   useAuthenticationServiceGetOneSsoProviderById: () => ({ data: state.provider, isLoading: false }),
+  useSsoServiceGetSsoLogoutUrls: ({ providerId }: { providerId: number }) => ({
+    data: providerId
+      ? {
+          postLogoutUrl: `https://api.example/api/auth/sso/OIDC/${providerId}/post-logout`,
+          backchannelLogoutUrl: `https://api.example/api/auth/sso/OIDC/${providerId}/backchannel-logout`,
+          frontchannelLogoutUrl: `https://api.example/api/auth/sso/OIDC/${providerId}/frontchannel-logout`,
+          samlSloUrl: `https://api.example/api/auth/sso/SAML/${providerId}/slo`,
+        }
+      : undefined,
+  }),
   useRbacServiceListRoles: () => ({ data: [], isLoading: false }),
 }));
 afterEach(cleanup);
@@ -236,16 +246,19 @@ it('shows pending setup before save and copies the protocol-specific callback af
   const view = render(<Setup saml={false} />);
   expect(screen.getAllByText('setupUrlPending').length).toBeGreaterThan(0);
   view.rerender(<Setup saml={false} id={8} />);
+  expect(screen.getByText('https://api.example/api/auth/sso/OIDC/8/post-logout')).toBeInTheDocument();
+  expect(screen.getByText('https://api.example/api/auth/sso/OIDC/8/backchannel-logout')).toBeInTheDocument();
+  expect(screen.getByText('https://api.example/api/auth/sso/OIDC/8/frontchannel-logout')).toBeInTheDocument();
   const copy = () => {
     const button = view.container.querySelector('[data-cy="sso-provider-form-callback-url-copy-button"]');
     if (!button) throw new Error('Missing callback copy control');
     fireEvent.click(button);
   };
   copy();
-  expect(state.success).toHaveBeenLastCalledWith(expect.stringContaining('/api/auth/sso/OIDC/8/callback'));
+  expect(state.success).toHaveBeenLastCalledWith('https://api.example/api/auth/sso/OIDC/8/callback');
   view.rerender(<Setup saml id={8} />);
   copy();
-  expect(state.success).toHaveBeenLastCalledWith(expect.stringContaining('/api/auth/sso/SAML/8/callback*'));
+  expect(state.success).toHaveBeenLastCalledWith('https://api.example/api/auth/sso/SAML/8/callback*');
   expect(screen.queryByText('authentikRedirectRegex')).toBeNull();
 });
 

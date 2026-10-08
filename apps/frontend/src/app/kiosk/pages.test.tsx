@@ -13,12 +13,26 @@ const state = vi.hoisted(() => ({
   resources: [] as { id: number; name: string }[],
   query: vi.fn(),
   logout: vi.fn(),
+  logoutEverywhere: vi.fn(),
+  logoutPending: false,
+  canLogoutEverywhere: true,
   countdown: vi.fn(),
   remaining: 15 as number | null,
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
 vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => ({ isAuthenticated: state.authenticated, isInitialized: state.initialized, logout: state.logout }),
+  useAuth: () => ({
+    isAuthenticated: state.authenticated,
+    isInitialized: state.initialized,
+    logout: state.logout,
+    logoutEverywhere: state.logoutEverywhere,
+    logoutPending: state.logoutPending,
+    canLogoutEverywhere: state.canLogoutEverywhere,
+    logoutEverywhereLabel: 'Logout everywhere',
+    logoutPendingLabel: 'Signing out…',
+    logoutProviderNotice: 'Also requests sign-out from other applications at your SSO provider.',
+    logoutUnavailableReason: 'Central logout requires a new SSO session.',
+  }),
 }));
 vi.mock('./login/KioskLogin', () => ({ KioskLogin: () => <div>Kiosk login</div> }));
 vi.mock('../resources/details/overview/ResourceOverviewTab', () => ({
@@ -58,6 +72,8 @@ beforeEach(() => {
   state.resource = { id: 7, name: 'Laser', description: 'Workshop laser' };
   state.resources = [];
   state.remaining = 15;
+  state.logoutPending = false;
+  state.canLogoutEverywhere = true;
 });
 afterEach(cleanup);
 function Location() {
@@ -154,4 +170,36 @@ it('shows the auto-logoff countdown and explicit sign-out only for authenticated
   expect(screen.queryByRole('button', { name: 'signOut' })).toBeNull();
   expect(screen.getByText('Screensaver enabled')).toBeTruthy();
   expect(screen.queryByRole('progressbar')).toBeNull();
+});
+
+it('keeps local and provider logout separate, explains unavailable sessions and disables both while pending', () => {
+  const view = render(
+    <MemoryRouter>
+      <KioskLayout>Contents</KioskLayout>
+    </MemoryRouter>,
+  );
+  const central = screen.getByRole('button', { name: 'Logout everywhere' });
+  expect(central).toHaveAccessibleDescription('Also requests sign-out from other applications at your SSO provider.');
+  fireEvent.click(central);
+  expect(state.logoutEverywhere).toHaveBeenCalledOnce();
+  expect(state.logout).not.toHaveBeenCalled();
+  state.canLogoutEverywhere = false;
+  view.rerender(
+    <MemoryRouter>
+      <KioskLayout>Contents</KioskLayout>
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('button', { name: 'Logout everywhere' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Logout everywhere' })).toHaveAccessibleDescription(
+    'Central logout requires a new SSO session.',
+  );
+  expect(screen.getByRole('button', { name: 'signOut' })).toBeEnabled();
+  state.logoutPending = true;
+  view.rerender(
+    <MemoryRouter>
+      <KioskLayout>Contents</KioskLayout>
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('button', { name: 'Signing out…' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Logout everywhere' })).toBeDisabled();
 });

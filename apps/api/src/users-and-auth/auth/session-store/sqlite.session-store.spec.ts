@@ -14,6 +14,7 @@ describe('SqliteSessionStore', () => {
     repo = {
       create: jest.fn(),
       save: jest.fn(),
+      update: jest.fn(),
       remove: jest.fn(),
       findOne: jest.fn(),
       find: jest.fn(),
@@ -46,7 +47,10 @@ describe('SqliteSessionStore', () => {
 
       await store.validateSession('tok');
 
-      expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ lastAccessedAt: expect.any(Date) }));
+      expect(repo.update).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ lastAccessedAt: expect.any(Date) }),
+      );
     });
 
     it('writes lastAccessedAt when last access was >60s ago', async () => {
@@ -56,7 +60,10 @@ describe('SqliteSessionStore', () => {
 
       await store.validateSession('tok');
 
-      expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ lastAccessedAt: expect.any(Date) }));
+      expect(repo.update).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ lastAccessedAt: expect.any(Date) }),
+      );
     });
 
     it('skips DB write when last access was <60s ago', async () => {
@@ -65,7 +72,7 @@ describe('SqliteSessionStore', () => {
 
       await store.validateSession('tok');
 
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
     });
 
     it('returns null without writing when session is expired', async () => {
@@ -75,7 +82,7 @@ describe('SqliteSessionStore', () => {
       const result = await store.validateSession('tok');
 
       expect(result).toBeNull();
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
       expect(repo.remove).toHaveBeenCalledWith(session);
     });
   });

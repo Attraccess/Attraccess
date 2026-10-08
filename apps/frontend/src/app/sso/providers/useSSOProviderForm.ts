@@ -79,12 +79,16 @@ export const useSSOProviderForm = (providerId?: number) => {
   );
 
   const isSamlProvider = formValues.type === SSOProviderType.SAML;
-  const isSamlSigningEnabled = isSamlProvider && (formValues.samlConfiguration?.signRequest ?? false);
+  const isSamlSigningEnabled =
+    isSamlProvider &&
+    (!!formValues.samlConfiguration?.logoutURL || (formValues.samlConfiguration?.signRequest ?? false));
   const isMutationPending = createSSOProvider.isPending || updateSSOProvider.isPending;
   const samlSigningMaterialsReady = hasRequiredSamlSigningMaterial({
     isSigningEnabled: isSamlSigningEnabled,
     storedCertificate: providerDetails?.samlConfiguration?.spSigningCertificate,
-    storedKey: providerDetails?.samlConfiguration?.spSigningKeyEncrypted,
+    storedKey:
+      providerDetails?.samlConfiguration?.spSigningKeyEncryptionKeyId ??
+      providerDetails?.samlConfiguration?.spSigningKeyEncrypted,
     inputCertificate: formValues.samlConfiguration?.spSigningCertificate,
     inputPrivateKey: formValues.samlConfiguration?.spSigningPrivateKey,
   });
@@ -96,6 +100,9 @@ export const useSSOProviderForm = (providerId?: number) => {
       oidcConfiguration: {
         ...prev.oidcConfiguration,
         issuer: config.issuer,
+        endSessionURL: typeof config.end_session_endpoint === 'string' ? config.end_session_endpoint : '',
+        jwksURL: typeof config.jwks_uri === 'string' ? config.jwks_uri : '',
+        signingAlgorithms: prev.oidcConfiguration?.signingAlgorithms ?? ['RS256'],
         authorizationURL: config.authorization_endpoint,
         tokenURL: config.token_endpoint,
         userInfoURL: config.userinfo_endpoint,
@@ -124,6 +131,11 @@ export const useSSOProviderForm = (providerId?: number) => {
     if (extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration) {
       updatedFormValues.oidcConfiguration = {
         issuer: extendedProvider.oidcConfiguration.issuer ?? '',
+        endSessionURL: extendedProvider.oidcConfiguration.endSessionURL ?? '',
+        jwksURL: extendedProvider.oidcConfiguration.jwksURL ?? '',
+        signingAlgorithms: extendedProvider.oidcConfiguration.signingAlgorithms?.length
+          ? extendedProvider.oidcConfiguration.signingAlgorithms
+          : ['RS256'],
         authorizationURL: extendedProvider.oidcConfiguration.authorizationURL ?? '',
         tokenURL: extendedProvider.oidcConfiguration.tokenURL ?? '',
         userInfoURL: extendedProvider.oidcConfiguration.userInfoURL ?? '',
@@ -161,6 +173,8 @@ export const useSSOProviderForm = (providerId?: number) => {
     if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
       updatedFormValues.samlConfiguration = {
         entryPoint: extendedProvider.samlConfiguration.entryPoint ?? '',
+        idpIssuer: extendedProvider.samlConfiguration.idpIssuer ?? '',
+        logoutURL: extendedProvider.samlConfiguration.logoutURL ?? '',
         issuer: extendedProvider.samlConfiguration.issuer ?? '',
         certificate: extendedProvider.samlConfiguration.certificate ?? '',
         audience: extendedProvider.samlConfiguration.audience ?? '',
@@ -190,12 +204,15 @@ export const useSSOProviderForm = (providerId?: number) => {
     setFormValues(updatedFormValues);
   }, [providerDetails]);
 
-  const setOidc = useCallback((field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string) => {
-    setFormValues((prev) => ({
-      ...prev,
-      oidcConfiguration: { ...ensureOidcConfiguration(prev.oidcConfiguration), [field]: value },
-    }));
-  }, []);
+  const setOidc = useCallback(
+    (field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string | string[]) => {
+      setFormValues((prev) => ({
+        ...prev,
+        oidcConfiguration: { ...ensureOidcConfiguration(prev.oidcConfiguration), [field]: value },
+      }));
+    },
+    [],
+  );
 
   const setSaml = useCallback((field: keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>, value: string) => {
     setFormValues((prev) => ({
@@ -286,6 +303,9 @@ export const useSSOProviderForm = (providerId?: number) => {
         const base = ensureOidcConfiguration(formValues.oidcConfiguration);
         const payload: CreateOIDCConfigurationDto = {
           issuer: base.issuer,
+          endSessionURL: base.endSessionURL?.trim() || null,
+          jwksURL: base.jwksURL?.trim() || null,
+          signingAlgorithms: base.signingAlgorithms?.length ? base.signingAlgorithms : ['RS256'],
           authorizationURL: base.authorizationURL,
           tokenURL: base.tokenURL,
           userInfoURL: base.userInfoURL,
@@ -312,6 +332,8 @@ export const useSSOProviderForm = (providerId?: number) => {
         const base = ensureSamlConfiguration(formValues.samlConfiguration);
         const payload: NonNullable<CreateSSOProviderDto['samlConfiguration']> = {
           ...base,
+          idpIssuer: base.idpIssuer?.trim() || null,
+          logoutURL: base.logoutURL?.trim() || null,
           audience: sanitizeOptional(base.audience),
         };
         const parsedEmailKeys = parseList(emailAttributeKeysInput);

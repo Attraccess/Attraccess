@@ -1,11 +1,8 @@
+import { SsoSessionRequest } from '../sso-session-request';
+import { DOMParser } from '@xmldom/xmldom';
 import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import {
-  Strategy,
-  Profile as SamlProfile,
-  PassportSamlConfig,
-  MultiSamlStrategy,
-} from '@node-saml/passport-saml';
+import { Strategy, Profile as SamlProfile, PassportSamlConfig, MultiSamlStrategy } from '@node-saml/passport-saml';
 import { ModuleRef } from '@nestjs/core';
 import { UsersService } from '../../../users/users.service';
 import { SSOProviderSAMLConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
@@ -97,7 +94,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     }
   }
 
-  private static buildPassportConfig(
+  static buildPassportConfig(
     moduleRef: ModuleRef,
     requestOptions: SSOSamlRequestOptions,
     logger: Logger,
@@ -117,6 +114,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return {
       entryPoint: config.entryPoint,
       issuer: config.issuer,
+      idpIssuer: config.idpIssuer || undefined,
       callbackUrl: requestOptions.callbackUrl,
       idpCert: SSOSamlStrategy.toPem(config.certificate),
       audience: config.audience ?? undefined,
@@ -170,7 +168,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       }
     }
 
-    this.logger.debug('No email attribute could be resolved from the SAML assertion', profile);
+    this.logger.debug('No email attribute could be resolved from the SAML assertion');
     return undefined;
   }
 
@@ -203,6 +201,34 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       this.recordFailure(error);
       throw error;
     }
+
+    const assertionXml =
+      typeof profile.getAssertionXml === 'function' ? (profile.getAssertionXml() as string) : undefined;
+    const indexes = assertionXml
+      ? Array.from(
+          new DOMParser()
+            .parseFromString(assertionXml, 'text/xml')
+            .getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'AuthnStatement'),
+        )
+          .map((node) => node.getAttribute('SessionIndex'))
+          .filter((index): index is string => !!index)
+      : [];
+    (req as SsoSessionRequest).ssoSessionContext = {
+      protocol: 'SAML',
+      providerId,
+      issuer: typeof profile.issuer === 'string' ? profile.issuer : undefined,
+      nameID: samlUserId,
+      ...(typeof profile.nameIDFormat === 'string' && profile.nameIDFormat
+        ? { nameIDFormat: profile.nameIDFormat }
+        : {}),
+      ...(typeof profile.nameQualifier === 'string' && profile.nameQualifier
+        ? { nameQualifier: profile.nameQualifier }
+        : {}),
+      ...(typeof profile.spNameQualifier === 'string' && profile.spNameQualifier
+        ? { spNameQualifier: profile.spNameQualifier }
+        : {}),
+      sessionIndexes: indexes.length ? indexes : typeof profile.sessionIndex === 'string' ? [profile.sessionIndex] : [],
+    };
 
     const usersService = await this.moduleRef.get(UsersService);
     const email = this.resolveEmail(profile, config);
@@ -263,7 +289,11 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
     const candidateKeys = [
-      'roles', 'role', 'groups', 'group', 'memberof',
+      'roles',
+      'role',
+      'groups',
+      'group',
+      'memberof',
       // Azure AD / ADFS URI-style claim names
       'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
       'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
@@ -326,12 +356,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     // still sync (with zero assignments) so roles granted under the old mapping get revoked.
     let changes: { added: string[]; removed: string[]; updated: string[] } | undefined;
     if (rbacService && claimValues.length > 0) {
-      changes = await rbacService.syncSsoRoles(
-        user.id,
-        roleAssignments,
-        SSOProviderType.SAML,
-        config.ssoProviderId,
-      );
+      changes = await rbacService.syncSsoRoles(user.id, roleAssignments, SSOProviderType.SAML, config.ssoProviderId);
     }
     if (changes) await this.recordProvisioningAudit(user.id, config.ssoProviderId, 'permissions_synced', changes);
     return user;
@@ -358,7 +383,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
         details: { ...details, changes: JSON.stringify(action === 'user_created' ? { userCreated: true } : changes) },
       });
     } catch (error) {
-      this.logger.warn(`Failed to record committed SAML provisioning audit: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(
+        `Failed to record committed SAML provisioning audit: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

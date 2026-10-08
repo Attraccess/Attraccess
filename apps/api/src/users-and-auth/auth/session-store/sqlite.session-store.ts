@@ -1,7 +1,10 @@
+import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 import { Repository, LessThan, MoreThan } from 'typeorm';
-import { Session, User } from '@attraccess/database-entities';
+import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SessionStore, SessionMetadata } from './session-store';
+
+import { matchesSsoSession, SsoSessionSelector } from './sso-session-selector';
 
 const LAST_ACCESSED_THROTTLE_MS = 60_000;
 
@@ -11,13 +14,27 @@ export class SqliteSessionStore implements SessionStore {
     private readonly tokenHashService: TokenHashService,
   ) {}
 
-  async createSession(hashedToken: string, userId: number, metadata: SessionMetadata | undefined, expiresAt: Date): Promise<void> {
+  async createSession(
+    hashedToken: string,
+    userId: number,
+    metadata: SessionMetadata | undefined,
+    expiresAt: Date,
+  ): Promise<void> {
     const session = this.sessionRepository.create({
       token: hashedToken,
       userId,
       userAgent: metadata?.userAgent || null,
       ipAddress: metadata?.ipAddress || null,
       expiresAt,
+      createdAt: new Date(),
+      ssoContext: metadata?.ssoContext ?? null,
+      ssoProviderId: metadata?.ssoContext?.providerId ?? null,
+      ssoProtocol: metadata?.ssoContext?.protocol ?? null,
+      ssoSubject:
+        metadata?.ssoContext?.protocol === 'OIDC'
+          ? metadata.ssoContext.subject
+          : (metadata?.ssoContext?.nameID ?? null),
+      ssoSessionId: metadata?.ssoContext?.protocol === 'OIDC' ? (metadata.ssoContext.sid ?? null) : null,
     });
     await this.sessionRepository.save(session);
   }
@@ -32,43 +49,105 @@ export class SqliteSessionStore implements SessionStore {
     // ponytail: skip write if within throttle window to reduce per-request DB pressure
     if (!session.lastAccessedAt || Date.now() - session.lastAccessedAt.getTime() > LAST_ACCESSED_THROTTLE_MS) {
       session.lastAccessedAt = new Date();
-      await this.sessionRepository.save(session);
+      await this.sessionRepository.update({ id: session.id }, { lastAccessedAt: session.lastAccessedAt });
     }
     return session.user;
   }
 
   async rotateSession(token: string, newHashedToken: string, newExpiresAt: Date): Promise<boolean> {
-    const session = await this.findByToken(token, true);
-    if (!session) return false;
-    if (session.expiresAt < new Date()) {
-      await this.sessionRepository.remove(session);
-      return false;
-    }
-    session.token = newHashedToken;
-    session.expiresAt = newExpiresAt;
-    session.lastAccessedAt = new Date();
-    await this.sessionRepository.save(session);
-    return true;
+    const result = await this.sessionRepository
+      .createQueryBuilder()
+      .update(Session)
+      .set({ token: newHashedToken, expiresAt: newExpiresAt, lastAccessedAt: new Date() })
+      .where('(token = :hashed OR token = :raw) AND expiresAt > :now', {
+        hashed: this.tokenHashService.hashToken(token),
+        raw: token,
+        now: new Date(),
+      })
+      .execute();
+    return (result.affected ?? 0) > 0;
   }
 
+  // Lowercase RETURNING statements use sqlite3.all in TypeORM's SQLite runner;
+  // its uppercase mutation path uses sqlite3.run and discards returned rows.
   async revokeSession(token: string): Promise<boolean> {
-    const hashed = this.tokenHashService.hashToken(token);
-    const existing = await this.sessionRepository.findOne({
-      where: [{ token: hashed }, { token }],
-      select: ['id', 'expiresAt'],
+    const rows = (await this.sessionRepository.query(
+      'delete FROM "session" WHERE ("token" = ? OR "token" = ?) RETURNING "expiresAt"',
+      [this.tokenHashService.hashToken(token), token],
+    )) as { expiresAt: string }[];
+    return rows.some((row) => new Date(row.expiresAt + 'Z') > new Date());
+  }
+
+  async getSsoContext(token: string): Promise<SsoSessionContext | null> {
+    const session = await this.sessionRepository
+      .createQueryBuilder('session')
+      .addSelect('session.ssoContext')
+      .where('(session.token = :hashed OR session.token = :raw) AND session.expiresAt > :now', {
+        hashed: this.tokenHashService.hashToken(token),
+        raw: token,
+        now: new Date(),
+      })
+      .getOne();
+    return session?.ssoContext ?? null;
+  }
+
+  async revokeSsoSessions(selector: SsoSessionSelector): Promise<number> {
+    const query = this.sessionRepository
+      .createQueryBuilder('session')
+      .addSelect('session.ssoContext')
+      .where('session.ssoProviderId = :providerId AND session.ssoProtocol = :protocol', selector);
+    if (selector.protocol === 'OIDC' && selector.sid)
+      query.andWhere('session.ssoSessionId = :sid', { sid: selector.sid });
+    const subject = selector.protocol === 'OIDC' ? selector.subject : selector.nameID;
+    if (subject) query.andWhere('session.ssoSubject = :subject', { subject });
+    if (selector.issuedBefore !== undefined)
+      query.andWhere('session.createdAt <= :before', { before: new Date(selector.issuedBefore) });
+    const sessions = (await query.getMany()).filter((session) => matchesSsoSession(session.ssoContext, selector));
+    if (!sessions.length) return 0;
+    const placeholders = sessions.map(() => '?').join(',');
+    const rows = (await this.sessionRepository.query(
+      `delete FROM "session" WHERE "id" IN (${placeholders}) RETURNING "expiresAt"`,
+      sessions.map((session) => session.id),
+    )) as { expiresAt: string }[];
+    return rows.filter((row) => new Date(row.expiresAt + 'Z') > new Date()).length;
+  }
+
+  async revokeSsoSessionsOnce(
+    selector: SsoSessionSelector,
+    receipt: { key: string; expiresAt: number },
+  ): Promise<{ fresh: boolean; count: number }> {
+    return runSerializedTransaction(this.sessionRepository.manager, async (manager) => {
+      const store = new SqliteSessionStore(manager.getRepository(Session), this.tokenHashService);
+      // The receipt write acquires SQLite's writer lock before selecting sessions.
+      // A failed delete rolls back the receipt so delivery can be retried safely.
+      if (!(await store.putLogoutState(receipt.key, 'seen', receipt.expiresAt))) return { fresh: false, count: 0 };
+      return { fresh: true, count: await store.revokeSsoSessions(selector) };
     });
-    if (!existing) return false;
-    const wasActive = existing.expiresAt > new Date();
-    await this.sessionRepository.delete({ id: existing.id });
-    return wasActive;
+  }
+
+  async putLogoutState(key: string, value: string, expiresAt: number): Promise<boolean> {
+    if (expiresAt <= Date.now()) return false;
+    await this.sessionRepository.query('delete FROM "sso_logout_state" WHERE "expiresAt" <= ?', [Date.now()]);
+    const rows = (await this.sessionRepository.query(
+      'insert INTO "sso_logout_state" ("key", "value", "expiresAt") VALUES (?, ?, ?) ON CONFLICT("key") DO NOTHING RETURNING "key"',
+      [key, value, expiresAt],
+    )) as { key: string }[];
+    return rows.length === 1;
+  }
+
+  async takeLogoutState(key: string): Promise<string | null> {
+    const rows = (await this.sessionRepository.query(
+      'delete FROM "sso_logout_state" WHERE "key" = ? RETURNING "value", "expiresAt"',
+      [key],
+    )) as { value: string; expiresAt: number }[];
+    return rows[0]?.expiresAt > Date.now() ? rows[0].value : null;
   }
 
   async revokeAllUserSessions(userId: number): Promise<number> {
-    const activeCount = await this.sessionRepository.count({
-      where: { userId, expiresAt: MoreThan(new Date()) },
-    });
-    await this.sessionRepository.delete({ userId });
-    return activeCount;
+    const rows = (await this.sessionRepository.query('delete FROM "session" WHERE "userId" = ? RETURNING "expiresAt"', [
+      userId,
+    ])) as { expiresAt: string }[];
+    return rows.filter((row) => new Date(row.expiresAt + 'Z') > new Date()).length;
   }
 
   async cleanupExpired(): Promise<{ remainingActive: number }> {
@@ -108,7 +187,7 @@ export class SqliteSessionStore implements SessionStore {
     session = await this.sessionRepository.findOne({ where: { token }, relations });
     if (!session) return null;
     session.token = hashed;
-    await this.sessionRepository.save(session);
-    return session;
+    const result = await this.sessionRepository.update({ id: session.id, token }, { token: hashed });
+    return result.affected ? session : null;
   }
 }

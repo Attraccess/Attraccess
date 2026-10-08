@@ -98,3 +98,21 @@ Die Provider-ID wird nach dem Erstellen des Anbieters angezeigt.
 - [SSO Überblick](user-management/sso-overview.md)
 - [SAML einrichten](user-management/sso-saml.md)
 - [Berechtigungen](user-management/permissions.md)
+
+## Zentrale OIDC-Abmeldung
+
+Hinterlegen Sie optional eine **End-Session-URL** und **JWKS-URL**, oder lassen Sie sie leer, um die Discovery des konfigurierten Issuers zu verwenden. Die entdeckte Issuer-Identität muss exakt übereinstimmen. Erlaubte asymmetrische Signaturalgorithmen sind konfigurierbar; der Standard ist `RS256`. In Produktion ist HTTPS erforderlich. Bei lokaler Entwicklung sind HTTP-Loopback-URLs erlaubt. Metadatenabrufe begrenzen Zeit, Größe, Weiterleitungen und Cache-Dauer. Schlüssel-URLs aus eingehenden Tokens werden niemals vertraut.
+
+Registrieren Sie folgende URLs beim Anbieter. Ersetzen Sie `API_ORIGIN` und `PROVIDER_ID` durch die öffentliche API-Adresse und Anbieter-ID. Das Formular zeigt die exakten URLs aus den Anwendungseinstellungen:
+
+| Anbietereinstellung | URL |
+| --- | --- |
+| Weiterleitungs-URI nach Abmeldung | `API_ORIGIN/api/auth/sso/OIDC/PROVIDER_ID/post-logout` |
+| Back-Channel-Abmelde-URI | `API_ORIGIN/api/auth/sso/OIDC/PROVIDER_ID/backchannel-logout` |
+| Front-Channel-Abmelde-URI | `API_ORIGIN/api/auth/sso/OIDC/PROVIDER_ID/frontchannel-logout` |
+
+**Überall abmelden** verwendet, soweit vorhanden, einen verifizierten ID-Token-Hinweis und einen einmaligen serverseitigen Statuswert. Registrieren Sie die Rücksprung-URI exakt. Abmelde-Tokens werden per formularcodiertem POST gesendet. Sie müssen signiert sein und passenden Issuer und Empfänger, `iat`, `exp`, `jti`, das Back-Channel-Abmeldeereignis sowie `sub` oder `sid` enthalten. Eine Nonce ist unzulässig. Nachrichten dürfen höchstens fünf Minuten alt sein; die Token-Gültigkeit darf fünf Minuten nicht überschreiten. Enthält eine Nachricht sowohl Benutzer- als auch Sitzungs-ID, müssen beide passen. Gültige Wiederholungen sind erfolgreich, ohne neuere Sitzungen zu beenden.
+
+Front-Channel-Nachrichten akzeptieren `iss` und `sid` gemeinsam. Ohne diese Parameter kann nur die passende aktuelle Browsersitzung beendet werden; ohne Cookie geschieht nichts. Attraccess-Cookies verwenden SameSite=Strict. Browserbeschränkungen für Drittanbieter-Cookies können reine Cookie-Nachrichten verhindern. Nachrichten mit Sitzungsparametern erfordern keine Cookies. Aktivieren Sie **Back-Channel-Abmeldung** für zuverlässige Anbieternachrichten. Nur der minimale Benachrichtigungsendpunkt erlaubt die Einbettung als Iframe; Anwendungsseiten behalten ihren bestehenden Frame-Schutz.
+
+Ältere Sitzungen ohne verifizierte SSO-Zuordnung bleiben für lokale Anmeldung und Abmeldung gültig. Sind Verifizierung oder Discovery einer älteren Konfiguration nicht verfügbar, wird keine unverifizierte ID-Token-Zuordnung gespeichert. Hinterlegen Sie vertrauenswürdige JWKS-Metadaten und melden Sie sich erneut an, um die zentrale Abmeldung zu aktivieren.
