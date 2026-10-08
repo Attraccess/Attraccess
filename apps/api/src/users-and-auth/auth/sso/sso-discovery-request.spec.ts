@@ -117,6 +117,40 @@ describe('SSO discovery HTTP boundaries', () => {
     await expect(routes.discoverAuthentik(origin, '..')).rejects.toThrow('Invalid discovery path');
   });
 
+  it.each([
+    '.',
+    '..',
+    '../other',
+    '../../other',
+    'team/other',
+    'team\\other',
+    '%2e%2e',
+    '%2e%2e%2fother',
+    '%252e%252e%252fother',
+    '%25%32%65%25%32%65%25%32%66other',
+    '..%5cother',
+    '%invalid%2fother',
+    '..;parameters',
+    '%2e%2e%3bparameters',
+    '%' + '25'.repeat(9) + '2fother',
+  ])('rejects a provider identifier that can leave its path component: %s', async (name) => {
+    await expect(routes.discoverAuthentik(origin, name)).rejects.toThrow('Invalid discovery path');
+    await expect(routes.discoverKeycloak(origin, name)).rejects.toThrow('Invalid discovery path');
+    expect(paths).toEqual([]);
+  });
+
+  it.each(['team_name-v1.2', 'team name', 'Überblick', 'discount 20%', 'percent%literal'])(
+    'preserves a valid provider identifier: %s',
+    async (name) => {
+      await expect(routes.discoverAuthentik(origin, name)).resolves.toEqual({ issuer: 'http://local-idp' });
+      await expect(routes.discoverKeycloak(origin, name)).resolves.toEqual({ issuer: 'http://local-idp' });
+      expect(paths).toEqual([
+        `/application/o/${encodeURIComponent(name)}/.well-known/openid-configuration`,
+        `/realms/${encodeURIComponent(name)}/.well-known/openid-configuration`,
+      ]);
+    },
+  );
+
   it('uses the checked DNS answer for the connection without a second resolution', async () => {
     const lookup = jest.spyOn(dns, 'lookup').mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }]);
     const url = discoveryUrl(origin.replace('127.0.0.1', 'idp.example'), '/discovery');

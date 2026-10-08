@@ -55,7 +55,7 @@ import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from '../dto/ss
 import { SSOLinkTokenService } from '../link-token.service';
 
 import { SSOService } from '../sso.service';
-import { discoveryUrl, requestDiscoveryJson } from './discovery-client';
+import { discoveryPathSegment, discoveryUrl, requestDiscoveryJson } from './discovery-client';
 
 // Private and loopback IdPs are supported. Metadata services and non-unicast
 // destinations are not IdPs, including their IPv4-mapped IPv6 representations.
@@ -153,10 +153,9 @@ export abstract class SsoProviderRoutes {
       throw new BadRequestException('Missing required parameters');
     }
 
-    if (['.', '..'].includes(applicationName)) throw new BadRequestException('Invalid discovery path');
     const target = discoveryUrl(
       host,
-      `/application/o/${encodeURIComponent(applicationName)}/.well-known/openid-configuration`,
+      `/application/o/${discoveryPathSegment(applicationName)}/.well-known/openid-configuration`,
     );
     return requestDiscoveryJson(target);
   }
@@ -173,8 +172,7 @@ export abstract class SsoProviderRoutes {
       throw new BadRequestException('Missing required parameters');
     }
 
-    if (['.', '..'].includes(realm)) throw new BadRequestException('Invalid discovery path');
-    const target = discoveryUrl(host, `/realms/${encodeURIComponent(realm)}/.well-known/openid-configuration`);
+    const target = discoveryUrl(host, `/realms/${discoveryPathSegment(realm)}/.well-known/openid-configuration`);
     return requestDiscoveryJson(target);
   }
 

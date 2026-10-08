@@ -32,6 +32,21 @@ export function discoveryUrl(host: string, path: string): URL {
   }
 }
 
+export function discoveryPathSegment(value: string): string {
+  let decoded = value;
+  // Upstream servers may decode again before normalizing their paths. Inspect
+  // nested escapes too, while bounding the work and preserving literal '%'.
+  for (let depth = 0; depth < 8; depth++) {
+    if (!decoded || ['.', '..'].includes(decoded) || /[/\\;]/.test(decoded)) {
+      throw new BadRequestException('Invalid discovery path');
+    }
+    const next = decoded.replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    if (next === decoded) return encodeURIComponent(value);
+    decoded = next;
+  }
+  throw new BadRequestException('Invalid discovery path');
+}
+
 // Validate every answer before returning the exact list to the socket. Node can
 // try alternate addresses without a second, unchecked DNS resolution.
 export const discoveryLookup: LookupFunction = (hostname, options, callback) => {
