@@ -114,6 +114,11 @@ void Application::handleProjectSelection(uint32_t projectId,
 }
 
 void Application::handleTouch(int16_t x, int16_t y) {
+  if (this->sessionSummaryActive) {
+    if (this->sessionSummaryVisible && Display::touchPressSequence != this->sessionSummaryTouchSequence)
+      this->sessionSummaryDismissRequested = true;
+    return;
+  }
   if (this->unlocked && this->actionInProgressCount == 0 && this->pendingUiAction.empty() && !this->waitingForResourceRefresh) {
     this->restartSessionTimeout();
   }
@@ -287,6 +292,10 @@ void Application::resetSessionOnDisconnect() {
     return;
   }
 
+  this->sessionSummaryActive = false;
+  this->sessionSummaryVisible = false;
+  this->sessionSummaryDismissRequested = false;
+  Display::sessionSummaryScreen.clearSummary();
   this->logger.info("Connectivity lost; resetting session state");
   Display::hidePopup();
 
@@ -399,7 +408,53 @@ void Application::finishReaderAction(bool success) {
   this->resourceRefreshRequestId = this->api.requestResourceList();
 }
 
+void Application::beginSessionSummary(const API::ActionResult &result) {
+  Display::hidePopup();
+  this->onActionResult(result.type);
+  this->clearFormPageCache();
+  this->pendingFormFieldsReady = false;
+  this->pendingFormPageResultReady = false;
+  this->formCursorFormIdx = 0;
+  this->formCursorOffset = 0;
+  this->awaitingFieldRender = false;
+  this->pendingActionResourceId = 0;
+  this->pendingActionProjectId = 0;
+  this->pendingActionIsTakeover = false;
+  this->pendingFormRequestResourceId = 0;
+  this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
+  this->pendingUiAction.clear();
+  this->waitingForResourceRefresh = false;
+  this->returnToListAfterAction = false;
+  this->actionCompletionMessage.clear();
+  this->api.cancelResourceAction();
+  this->resetPauseAccounting();
+  Display::resourceListScreen.hideActionProgress();
+  Display::resourceDetailsScreen.hideActionProgress();
+  this->sessionSummaryActive = true;
+  this->sessionSummaryVisible = false;
+  this->sessionSummaryDismissRequested = false;
+  this->sessionSummaryTouchSequence = Display::touchPressSequence;
+  this->state = APPLICATION_STATE_SESSION_SUMMARY;
+  Display::sessionSummaryScreen.setSummary(this->cardAuthenticationData.username, result.durationSeconds, result.billingTotal);
+  Display::transitionToScreen(&Display::sessionSummaryScreen, [this] {
+    if (!this->sessionSummaryActive) return;
+    this->sessionSummaryShownAt = millis();
+    this->sessionSummaryVisible = true;
+  });
+  // Do not reset presence: a card already held must first leave the field.
+  this->nfc.enableCardDetection();
+}
+
+void Application::dismissSessionSummary() {
+  if (!this->sessionSummaryActive) return;
+  this->logoutReader();
+}
+
 void Application::logoutReader() {
+  this->sessionSummaryActive = false;
+  this->sessionSummaryVisible = false;
+  this->sessionSummaryDismissRequested = false;
+  Display::sessionSummaryScreen.clearSummary();
   Display::hidePopup();
   this->handleFormsCancel();
   this->finishCardAuthentication(false);

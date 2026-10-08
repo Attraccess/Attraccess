@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 #include "settings/kvstore.hpp"
 
 #ifdef DEMO_MODE
@@ -259,6 +260,13 @@ private:
     void showReaderActionProgress(const char *title);
     void finishReaderAction(bool success);
     void logoutReader();
+    void beginSessionSummary(const API::ActionResult &result);
+    void dismissSessionSummary();
+    std::atomic<bool> sessionSummaryActive{false};
+    bool sessionSummaryVisible = false;
+    std::atomic<bool> sessionSummaryDismissRequested{false};
+    uint32_t sessionSummaryShownAt = 0;
+    uint32_t sessionSummaryTouchSequence = 0;
     void finishCardAuthentication(bool success);
 
 #else
@@ -384,6 +392,7 @@ private:
         APPLICATION_STATE_RESOURCE_LIST,
         APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED,
         APPLICATION_STATE_UNLOCKED,
+        APPLICATION_STATE_SESSION_SUMMARY,
         APPLICATION_STATE_ENROLLMENT,
         APPLICATION_STATE_RESET,
         APPLICATION_STATE_SUPERVISION,
