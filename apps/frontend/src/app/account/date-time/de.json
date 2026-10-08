@@ -1,0 +1,14 @@
+{
+  "description": "Wähle das Datums- und Zeitformat unabhängig von der Sprache der App. Diese Einstellungen werden in deinem Konto gespeichert.",
+  "languageDefault": "Sprache der App verwenden",
+  "preview": "Vorschau",
+  "save": "Speichern",
+  "saved": "Datums- und Zeiteinstellungen gespeichert",
+  "error": "Datums- und Zeiteinstellungen konnten nicht gespeichert werden",
+  "mode": "Formatierung",
+  "custom": "Eigener Sprachcode",
+  "locale": "Sprachcode für die Formatierung",
+  "examples": "Beispiele: en-GB, en-US, de-DE",
+  "invalid": "Gib einen gültigen Sprachcode ein, zum Beispiel en-GB.",
+  "unsupported": "Dein Browser unterstützt diesen Sprachcode nicht."
+}

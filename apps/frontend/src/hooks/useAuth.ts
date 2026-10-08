@@ -16,15 +16,10 @@ import {
   useTwoFactorAuthenticationServiceGetTwoFactorStatus,
   useUsersServiceGetCurrent,
   UseUsersServiceGetCurrentKeyFn,
-  type User,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type SystemPermission } from '@attraccess/shared';
-
-// The GET /users/me response includes effectivePermissions at runtime even though the
-// generated User type does not declare it (the field is added by the profile controller).
-type UserWithEffectivePermissions = User & { effectivePermissions?: string[] };
 
 interface LoginCredentials {
   username: string;
@@ -93,11 +88,13 @@ export function useAuth() {
 
   // Check authentication status by trying to fetch current user
   // This will work with cookies automatically
-  const { data: currentUser } = useUsersServiceGetCurrent(undefined, {
+  const { data: fetchedUser } = useUsersServiceGetCurrent(undefined, {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     retry: false,
     enabled: isInitialized && !hasStartedLogout, // Stop identity refetch while signing out
-  }) as { data: UserWithEffectivePermissions | undefined };
+  });
+  // Ignore late identity responses as soon as either logout action starts.
+  const currentUser = hasStartedLogout ? null : fetchedUser;
 
   const [returnToken] = useState(() => new URL(window.location.href).searchParams.get('ssoLogout'));
   const { data: providerReturn, isFetched: isReturnFetched } = useQuery({

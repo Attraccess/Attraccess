@@ -751,6 +751,36 @@ describe('UsersService', () => {
     });
   });
 
+  describe('updateDateTimePreferences', () => {
+    it('updates only the selected user format preferences without changing locale', async () => {
+      jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValueOnce(Object.assign(new User(), { id: 42, locale: 'de', dateTimeLocale: 'en-GB' }));
+      const updated = await service.updateDateTimePreferences(42, { dateTimeLocale: ' en-gb ' });
+      expect(userRepository.update).toHaveBeenCalledWith(42, { dateTimeLocale: 'en-GB' });
+      expect(updated).toMatchObject({ locale: 'de', dateTimeLocale: 'en-GB' });
+    });
+  });
+
+  describe('date/time locale validation and reset', () => {
+    it('rejects unsupported locales before writing', async () => {
+      await expect(service.updateDateTimePreferences(42, { dateTimeLocale: 'zz-ZZ' })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(userRepository.update).not.toHaveBeenCalled();
+    });
+    it('persists an explicit null without changing translation language', async () => {
+      jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValueOnce(Object.assign(new User(), { id: 42, locale: 'de', dateTimeLocale: null }));
+      expect(await service.updateDateTimePreferences(42, { dateTimeLocale: null })).toMatchObject({
+        locale: 'de',
+        dateTimeLocale: null,
+      });
+      expect(userRepository.update).toHaveBeenCalledWith(42, { dateTimeLocale: null });
+    });
+  });
+
   describe('createOne – locale', () => {
     beforeEach(() => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);

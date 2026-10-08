@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SendIcon, BoxIcon, XIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { Button } from '../../components/button';
@@ -26,6 +26,7 @@ interface Props {
 const PAGE_SIZE = 20;
 
 export function MessageThread(props: Props) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { conversationId, currentUserId, pendingResourceId } = props;
 
   const { t } = useTranslations({ en, de });
@@ -158,9 +159,7 @@ export function MessageThread(props: Props) {
                     <span className="truncate">{message.referenceLabel}</span>
                   </Link>
                 )}
-                <span className="mt-0.5 text-tiny text-muted">
-                  {new Date(message.createdAt).toLocaleString()}
-                </span>
+                <span className="mt-0.5 text-tiny text-muted">{formatDateTime(message.createdAt)}</span>
               </div>
             );
           })}
@@ -191,10 +190,7 @@ export function MessageThread(props: Props) {
 
       <form
         onSubmit={handleSubmit}
-        className={cn(
-          'flex items-end gap-2 p-3',
-          attachedResourceId ? '' : 'border-t border-border',
-        )}
+        className={cn('flex items-end gap-2 p-3', attachedResourceId ? '' : 'border-t border-border')}
       >
         <TextArea
           value={draft}

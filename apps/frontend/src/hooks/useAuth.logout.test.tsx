@@ -4,6 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { OpenAPI, UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useAuth } from './useAuth';
+import { useDateTimePreferences } from '@attraccess/plugins-frontend-ui';
+import { useDateTimePreferencesSync } from './useDateTimePreferencesSync';
+import { restoreAuthentication } from '../utils/auth-session';
 
 const messages = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), info: vi.fn() }));
 vi.mock('../components/toastProvider', () => ({ useToastMessage: () => messages }));
@@ -45,6 +48,7 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   client.clear();
+  useDateTimePreferences.setState({ userId: null, dateTimeLocale: null });
   OpenAPI.BASE = originalBase;
   vi.unstubAllGlobals();
 });
@@ -169,3 +173,64 @@ it('ignores fabricated or consumed result tokens even when signed out', async ()
   await waitFor(() => expect(window.location.search).toBe(''));
   expect(messages.info).not.toHaveBeenCalled();
 });
+
+// Retain the date-formatting reset introduced on main for both logout actions.
+it.each([false, true])(
+  'keeps shared formatting reset during logout and after failure (central: %s)',
+  async (central) => {
+    const user = { id: 7, username: 'fixture', dateTimeLocale: 'en-GB' };
+    client.setQueryData(UseUsersServiceGetCurrentKeyFn(), user);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const path = new URL(url).pathname;
+        requestLog.push({ path, method: init?.method ?? 'GET' });
+        if (path === '/api/auth/session' || path === '/api/auth/session/logout-everywhere') {
+          return new Promise<Response>((resolve) => {
+            finish = resolve;
+          });
+        }
+        if (path === '/api/users/me') return json(user);
+        if (path === '/api/auth/session/logout-capability') return json({ available: true });
+        if (path === '/api/auth/two-factor') return json({ required: false, enabled: false });
+        throw new Error(`Unexpected request ${url}`);
+      }),
+    );
+    const hook = renderHook(
+      () => {
+        useDateTimePreferencesSync();
+        return [useAuth(), useAuth()];
+      },
+      {
+        wrapper: ({ children }) => (
+          <MemoryRouter>
+            <QueryClientProvider client={client}>{children}</QueryClientProvider>
+          </MemoryRouter>
+        ),
+      },
+    );
+    await waitFor(() => expect(useDateTimePreferences.getState().dateTimeLocale).toBe('en-GB'));
+    await waitFor(() => expect(hook.result.current[0].canLogoutEverywhere).toBe(true));
+    const identityRequests = requestLog.filter(({ path }) => path === '/api/users/me').length;
+    act(() => (central ? hook.result.current[0].logoutEverywhere() : hook.result.current[0].logout()));
+    await waitFor(() => expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null }));
+    act(() => client.setQueryData(UseUsersServiceGetCurrentKeyFn(), user));
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: UseUsersServiceGetCurrentKeyFn() });
+    });
+    expect(hook.result.current.every((auth) => auth.user === null && !auth.isAuthenticated)).toBe(true);
+    expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null });
+    expect(requestLog.filter(({ path }) => path === '/api/users/me')).toHaveLength(identityRequests);
+    // A failed response cannot prove the server retained the session. Keep the
+    // established sign-out safeguard until authentication is explicitly restored.
+    await act(async () => finish(new Response('{}', { status: 500 })));
+    await waitFor(() => expect(messages.error).toHaveBeenCalled());
+    expect(hook.result.current.every((auth) => !auth.isAuthenticated)).toBe(true);
+    expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null });
+    await act(async () => {
+      await restoreAuthentication(client);
+    });
+    await waitFor(() => expect(hook.result.current.every((auth) => auth.isAuthenticated)).toBe(true));
+    expect(useDateTimePreferences.getState()).toEqual({ userId: user.id, dateTimeLocale: 'en-GB' });
+  },
+);

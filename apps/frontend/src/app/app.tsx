@@ -27,6 +27,7 @@ import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
 import { KioskGuard } from './kiosk/KioskGuard';
+import { useDateTimePreferencesSync } from '../hooks/useDateTimePreferencesSync';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 import { NotFound } from './not-found';
 import { ThemeToggle } from '../components/themeToggle';
@@ -212,6 +213,7 @@ function AppContent() {
 export function App() {
   const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
   useLocaleSync();
+  useDateTimePreferencesSync();
 
   configureApiClient();
 

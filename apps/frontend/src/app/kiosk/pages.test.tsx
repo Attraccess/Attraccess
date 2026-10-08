@@ -195,6 +195,7 @@ it('keeps local and provider logout separate, explains unavailable sessions and 
   );
   expect(screen.getByRole('button', { name: 'signOut' })).toBeEnabled();
   state.logoutPending = true;
+  state.authenticated = false;
   view.rerender(
     <MemoryRouter>
       <KioskLayout>Contents</KioskLayout>
@@ -202,4 +203,6 @@ it('keeps local and provider logout separate, explains unavailable sessions and 
   );
   expect(screen.getByRole('button', { name: 'Signing out…' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Logout everywhere' })).toBeDisabled();
+  expect(screen.queryByText('Screensaver enabled')).toBeNull();
+  expect(screen.queryByText('Contents')).toBeNull();
 });

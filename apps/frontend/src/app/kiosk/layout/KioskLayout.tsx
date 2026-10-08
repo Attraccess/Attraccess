@@ -1,7 +1,7 @@
 import { PropsWithChildren } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LogOutIcon } from 'lucide-react';
-import { Button, ProgressBar } from '@heroui/react';
+import { Button, ProgressBar, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttraccessLogo } from '@attraccess/ui';
 import { useAutoLogoff } from '../hooks/useAutoLogoff';
@@ -63,10 +63,10 @@ export function KioskLayout({ children }: PropsWithChildren) {
     // cannot overlap longer resource pages. The content centers in the remaining space.
     <div className="h-screen overflow-y-auto bg-background">
       {/* Blanks the login screen after inactivity; auto-logoff covers the authenticated case. */}
-      <KioskScreensaver enabled={!isAuthenticated} />
+      <KioskScreensaver enabled={!isAuthenticated && !logoutPending} />
       <div className="min-h-screen flex flex-col">
         {autoLogoffSeconds && remaining !== null && <AutoLogoffBar fraction={remaining / autoLogoffSeconds} />}
-        {isAuthenticated && (
+        {(isAuthenticated || logoutPending) && (
           <div className="sticky top-0 z-40 flex items-start justify-between gap-4 bg-background p-3">
             <div className="flex min-w-0 flex-col gap-1 max-w-[65vw]">
               <div className="flex flex-wrap gap-2">
@@ -96,7 +96,7 @@ export function KioskLayout({ children }: PropsWithChildren) {
           <div className="flex items-center">
             <AttraccessLogo className="h-16 w-auto" />
           </div>
-          {children}
+          {logoutPending ? <Spinner aria-label={logoutPendingLabel} /> : children}
         </div>
       </div>
     </div>
