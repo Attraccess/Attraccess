@@ -80,6 +80,7 @@ describe('SSO provider form', () => {
       },
     });
     expect(result.current.scopesInput).toBe('openid, email');
+    expect(result.current.signingAlgorithmsInput).toBe('ES256');
     expect(result.current.usernameClaimPathsInput).toBe('preferred_username');
     expect(result.current.emailClaimPathsInput).toBe('email');
     expect(result.current.samlRoleMappingEntries).toEqual([]);
@@ -124,6 +125,7 @@ describe('SSO provider form', () => {
       result.current.setOidc('clientId', 'client');
       result.current.setOidc('clientSecret', 'secret');
       result.current.setScopesInput(' openid, email, , ');
+      result.current.setSigningAlgorithmsInput(' ES256, PS256, , ');
     });
     act(() =>
       result.current.onAutoDiscovery({
@@ -135,6 +137,7 @@ describe('SSO provider form', () => {
         userinfo_endpoint: 'https://idp.example/info',
       }),
     );
+    expect(result.current.signingAlgorithmsInput).toBe(' ES256, PS256, , ');
     await act(() => result.current.handleSubmit());
     expect(state.create).toHaveBeenCalledWith({
       requestBody: expect.objectContaining({
@@ -145,7 +148,7 @@ describe('SSO provider form', () => {
           scopes: ['openid', 'email'],
           endSessionURL: 'https://idp.example/logout',
           jwksURL: 'https://idp.example/jwks',
-          signingAlgorithms: ['RS256'],
+          signingAlgorithms: ['ES256', 'PS256'],
           issuer: 'https://idp.example',
         }),
       }),

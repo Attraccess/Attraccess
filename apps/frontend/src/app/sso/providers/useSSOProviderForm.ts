@@ -20,6 +20,8 @@ export function useSSOProviderFormOutput(model: ReturnType<typeof useSSOProvider
     setShowClientSecret: model.setShowClientSecret,
     showSamlProvisioningSecret: model.showSamlProvisioningSecret,
     setShowSamlProvisioningSecret: model.setShowSamlProvisioningSecret,
+    signingAlgorithmsInput: model.signingAlgorithmsInput,
+    setSigningAlgorithmsInput: model.setSigningAlgorithmsInput,
     scopesInput: model.scopesInput,
     setScopesInput: model.setScopesInput,
     usernameClaimPathsInput: model.usernameClaimPathsInput,

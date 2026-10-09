@@ -29,6 +29,8 @@ export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
     setOidc,
     scopesInput,
     setScopesInput,
+    signingAlgorithmsInput,
+    setSigningAlgorithmsInput,
     usernameClaimPathsInput,
     setUsernameClaimPathsInput,
     emailClaimPathsInput,
@@ -47,6 +49,8 @@ export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
     setOidc,
     scopesInput,
     setScopesInput,
+    signingAlgorithmsInput,
+    setSigningAlgorithmsInput,
     usernameClaimPathsInput,
     setUsernameClaimPathsInput,
     emailClaimPathsInput,
@@ -126,18 +130,7 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
           <Label>{model.t('jwksURL')}</Label>
           <Input placeholder="https://sso.example.com/jwks" />
         </TextField>
-        <TextField
-          value={(model.formValues.oidcConfiguration?.signingAlgorithms ?? ['RS256']).join(', ')}
-          onChange={(v) =>
-            model.setOidc(
-              'signingAlgorithms',
-              v
-                .split(',')
-                .map((algorithm) => algorithm.trim())
-                .filter(Boolean),
-            )
-          }
-        >
+        <TextField value={model.signingAlgorithmsInput} onChange={model.setSigningAlgorithmsInput}>
           <Label>{model.t('signingAlgorithms')}</Label>
           <Input placeholder="RS256" />
         </TextField>

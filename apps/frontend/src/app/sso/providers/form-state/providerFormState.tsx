@@ -18,7 +18,6 @@ import {
   getDefaultSamlConfiguration,
   defaultProviderValues,
   RoleMappingEntry,
-  buildRoleMappingsPayload,
 } from '../formDefaults';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,7 +27,7 @@ import { OpenIDConfiguration } from '../discovery/OpenIDC.data';
 import { hasRequiredSamlSigningMaterial } from '../signingMaterial';
 import en from '../en.json';
 import de from '../de.json';
-import type { CreateOIDCConfigurationDto, SSOProvider } from '@attraccess/react-query-client';
+import { buildOidcPayload, buildSamlPayload } from './providerFormPayload';
 
 /**
  * Where the provider list lives — the Single sign-on settings section, and the target for cancel,
@@ -44,6 +43,9 @@ export function useSSOProviderFormInputs(providerId?: number) {
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [showSamlProvisioningSecret, setShowSamlProvisioningSecret] = useState(false);
   const [scopesInput, setScopesInput] = useState('');
+  const [signingAlgorithmsInput, setSigningAlgorithmsInput] = useState(() =>
+    getDefaultOidcConfiguration().signingAlgorithms.join(', '),
+  );
   const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
   const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
   const [emailAttributeKeysInput, setEmailAttributeKeysInput] = useState('');
@@ -125,6 +127,8 @@ export function useSSOProviderFormInputs(providerId?: number) {
     setShowSamlProvisioningSecret,
     scopesInput,
     setScopesInput,
+    signingAlgorithmsInput,
+    setSigningAlgorithmsInput,
     usernameClaimPathsInput,
     setUsernameClaimPathsInput,
     emailClaimPathsInput,
@@ -158,6 +162,7 @@ export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProvide
   const {
     providerDetails,
     setScopesInput,
+    setSigningAlgorithmsInput,
     setUsernameClaimPathsInput,
     setEmailClaimPathsInput,
     setOidcRoleMappingEntries,
@@ -252,11 +257,13 @@ export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProvide
       setSamlRoleMappingEntries([]);
     }
 
+    setSigningAlgorithmsInput((updatedFormValues.oidcConfiguration?.signingAlgorithms ?? ['RS256']).join(', '));
     setFormValues(updatedFormValues);
   }, [
     providerDetails,
     setFormValues,
     setScopesInput,
+    setSigningAlgorithmsInput,
     setUsernameClaimPathsInput,
     setEmailClaimPathsInput,
     setOidcRoleMappingEntries,
@@ -266,12 +273,15 @@ export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProvide
 
   const setOidc = useCallback(
     (field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string | string[]) => {
+      if (field === 'signingAlgorithms') {
+        setSigningAlgorithmsInput(Array.isArray(value) ? value.join(', ') : value);
+      }
       setFormValues((prev) => ({
         ...prev,
         oidcConfiguration: { ...ensureOidcConfiguration(prev.oidcConfiguration), [field]: value },
       }));
     },
-    [setFormValues],
+    [setFormValues, setSigningAlgorithmsInput],
   );
 
   const setSaml = useCallback(
@@ -350,121 +360,6 @@ export function useSSOProviderFormCopyValue(model: ReturnType<typeof useSSOProvi
   return { ...model, copyValue, handleSamlToggleChange, handleSelectChange, handleCancel } as const;
 }
 
-const parseList = (value: string) =>
-  value
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-
-const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
-
-const hasStoredMappings = (config?: { roleMappings?: Record<string, unknown> | null }) =>
-  Object.keys(config?.roleMappings ?? {}).length > 0;
-
-export function buildOidcPayload({
-  formValues,
-  scopesInput,
-  usernameClaimPathsInput,
-  emailClaimPathsInput,
-  oidcRoleMappingEntries,
-  isEditing,
-  providerDetails,
-}: {
-  formValues: CreateSSOProviderDto;
-  scopesInput: string;
-  usernameClaimPathsInput: string;
-  emailClaimPathsInput: string;
-  oidcRoleMappingEntries: RoleMappingEntry[];
-  isEditing: boolean;
-  providerDetails: SSOProvider | undefined;
-}) {
-  const base = ensureOidcConfiguration(formValues.oidcConfiguration);
-  const payload: CreateOIDCConfigurationDto = {
-    issuer: base.issuer,
-    endSessionURL: base.endSessionURL?.trim() || null,
-    jwksURL: base.jwksURL?.trim() || null,
-    signingAlgorithms: base.signingAlgorithms?.length ? base.signingAlgorithms : ['RS256'],
-    authorizationURL: base.authorizationURL,
-    tokenURL: base.tokenURL,
-    userInfoURL: base.userInfoURL,
-    clientId: base.clientId,
-    clientSecret: base.clientSecret,
-  };
-
-  if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
-  if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
-  if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
-  const roleMappings = buildRoleMappingsPayload(oidcRoleMappingEntries);
-  if (roleMappings) {
-    payload.roleMappings = roleMappings;
-  } else if (isEditing && hasStoredMappings(providerDetails?.oidcConfiguration)) {
-    // emptied table must clear stored mappings; only sent when the provider had
-    // some, so plain edits by users without users.roles.manage keep working
-    payload.roleMappings = {};
-  }
-
-  return payload;
-}
-
-export function buildSamlPayload({
-  formValues,
-  emailAttributeKeysInput,
-  samlRoleMappingEntries,
-  isEditing,
-  providerDetails,
-}: {
-  formValues: CreateSSOProviderDto;
-  emailAttributeKeysInput: string;
-  samlRoleMappingEntries: RoleMappingEntry[];
-  isEditing: boolean;
-  providerDetails: SSOProvider | undefined;
-}) {
-  const base = ensureSamlConfiguration(formValues.samlConfiguration);
-  const payload: NonNullable<CreateSSOProviderDto['samlConfiguration']> = {
-    ...base,
-    idpIssuer: base.idpIssuer?.trim() || null,
-    logoutURL: base.logoutURL?.trim() || null,
-    audience: sanitizeOptional(base.audience),
-  };
-  const parsedEmailKeys = parseList(emailAttributeKeysInput);
-  if (parsedEmailKeys.length > 0) {
-    payload.emailAttributeKeys = parsedEmailKeys;
-  } else {
-    delete payload.emailAttributeKeys;
-  }
-
-  const sanitizedSigningCertificate = sanitizeOptional(base.spSigningCertificate);
-  if (sanitizedSigningCertificate) {
-    payload.spSigningCertificate = sanitizedSigningCertificate;
-  } else {
-    delete payload.spSigningCertificate;
-  }
-
-  if (base.spSigningPrivateKey && base.spSigningPrivateKey.trim().length > 0) {
-    payload.spSigningPrivateKey = base.spSigningPrivateKey.trim();
-  } else {
-    delete payload.spSigningPrivateKey;
-  }
-
-  if (base.provisioningSecret && base.provisioningSecret.trim().length > 0) {
-    payload.provisioningSecret = base.provisioningSecret.trim();
-  } else {
-    delete payload.provisioningSecret;
-  }
-
-  const roleMappings = buildRoleMappingsPayload(samlRoleMappingEntries);
-  if (roleMappings) {
-    payload.roleMappings = roleMappings;
-  } else if (isEditing && hasStoredMappings(providerDetails?.samlConfiguration)) {
-    // emptied table must clear stored mappings; only sent when the provider had
-    // some, so plain edits by users without users.roles.manage keep working
-    payload.roleMappings = {};
-  } else {
-    delete payload.roleMappings;
-  }
-  return payload;
-}
-
 export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOProviderFormCopyValue>) {
   const {
     samlSigningMaterialsReady,
@@ -474,6 +369,7 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
     providerId,
     formValues,
     scopesInput,
+    signingAlgorithmsInput,
     usernameClaimPathsInput,
     emailClaimPathsInput,
     oidcRoleMappingEntries,
@@ -503,6 +399,7 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
           requestBody.oidcConfiguration = buildOidcPayload({
             formValues: formValues,
             scopesInput: scopesInput,
+            signingAlgorithmsInput,
             usernameClaimPathsInput: usernameClaimPathsInput,
             emailClaimPathsInput: emailClaimPathsInput,
             oidcRoleMappingEntries: oidcRoleMappingEntries,
@@ -539,6 +436,7 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
           requestBody.oidcConfiguration = buildOidcPayload({
             formValues: formValues,
             scopesInput: scopesInput,
+            signingAlgorithmsInput,
             usernameClaimPathsInput: usernameClaimPathsInput,
             emailClaimPathsInput: emailClaimPathsInput,
             oidcRoleMappingEntries: oidcRoleMappingEntries,
@@ -584,6 +482,7 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
     samlRoleMappingEntries,
     samlSigningMaterialsReady,
     scopesInput,
+    signingAlgorithmsInput,
     showError,
     success,
     t,
