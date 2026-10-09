@@ -1,20 +1,22 @@
 import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { TFunction, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import {
-  ResourceFlowNodeSchemaDto,
   ResourceFlowNodeType,
   ResourceFlowsService,
   useResourceMeteringServiceListResourceMeters,
+  ResourceFlowNodeSchemaDto,
 } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-interface Props {
+export interface Props {
   tNodeTranslations: TFunction;
   schema: ResourceFlowNodeSchemaDto;
   resourceId?: number;
 }
+
+export type PreviewNode = { data: Record<string, unknown> } | null;
 
 export type NodePreviewEntryField = {
   label: string;
@@ -35,6 +37,8 @@ export type NodePreviewRow =
     };
 
 export type NodePreviewData = Array<NodePreviewRow>;
+
+export type PreviewBuilder = (t: TFunction, nodeData: PreviewNode) => NodePreviewData;
 
 export function useNodePreviewRows(props: Props): NodePreviewData {
   const { tNodeTranslations: t, schema, resourceId } = props;
@@ -96,9 +100,6 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
   }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError, locale, isMeterNode, meters]);
 }
 
-type PreviewNode = { data: Record<string, unknown> } | null;
-type PreviewBuilder = (t: TFunction, nodeData: PreviewNode) => NodePreviewData;
-
 const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
   [ResourceFlowNodeType.INPUT_BUTTON]: (t, nodeData) => {
     return [
@@ -108,6 +109,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY]: (t, nodeData) => {
     return [
       {
@@ -116,6 +118,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED]: (t, nodeData) => {
     return [
       {
@@ -124,6 +127,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.PROCESSING_WAIT]: (t, nodeData) => {
     return [
       {
@@ -132,6 +136,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE]: (t, nodeData) => {
     return [
       {
@@ -144,6 +149,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.PROCESSING_ERROR]: (t, nodeData) => {
     return [
       {
@@ -152,6 +158,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.PROCESSING_IF]: (t, nodeData) => {
     return [
       {
@@ -160,6 +167,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.PROCESSING_SET_PAYLOAD]: (t, nodeData) => {
     const entries = (nodeData?.data.entries as Array<{ key: string; value: string }>) ?? [];
     const preview = entries
@@ -173,6 +181,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS]: (t, nodeData) => {
     return [
       {
@@ -181,6 +190,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST]: (t, nodeData) => {
     return [
       {
@@ -193,6 +203,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: (t, nodeData) => {
     return [
       {
@@ -201,6 +212,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: (t, nodeData) => {
     return [
       {
@@ -209,6 +221,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT]: (t, nodeData) => {
     return [
       {
@@ -221,6 +234,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET]: (t, nodeData) => {
     return [
       {
@@ -233,6 +247,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED]: (t, nodeData) => {
     const watches = (nodeData?.data.watches as Array<{ key: string; scope: string }>) ?? [];
     const keyLabel = t('nodes.input.variable.changed.config.watches.items.key.label');
@@ -260,6 +275,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
     }
     return rows;
   },
+
   [ResourceFlowNodeType.PROCESSING_VARIABLES_SET]: (t, nodeData) => {
     const variables = (nodeData?.data.variables as Array<{ key: string; value: string; scope: string }>) ?? [];
     const keyLabel = t('nodes.processing.variables.set.config.variables.items.key.label');
@@ -281,6 +297,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_RESOURCE_METERING_READY]: (t, nodeData) => {
     const baseline = nodeData?.data.baselineValue as string | undefined;
     return [
@@ -298,6 +315,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.OUTPUT_RESOURCE_METERING_REPORT]: (t, nodeData) => {
     return [
       {
@@ -310,6 +328,7 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
       },
     ];
   },
+
   [ResourceFlowNodeType.PROCESSING_VARIABLES_GET]: (t, nodeData) => {
     const variables = (nodeData?.data.variables as Array<{ key: string; scope: string; payloadPath: string }>) ?? [];
     const keyLabel = t('nodes.processing.variables.get.config.variables.items.key.label');

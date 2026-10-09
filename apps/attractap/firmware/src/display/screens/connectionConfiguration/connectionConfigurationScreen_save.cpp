@@ -1,6 +1,6 @@
 #include "display/i18n.hpp"
 #include "connectionConfigurationScreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
 #include <string>
 #include <functional>
 #include <cstring>

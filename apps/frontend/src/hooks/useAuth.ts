@@ -37,14 +37,17 @@ export function useLogin() {
   return {
     ...login,
     mutate: (data: LoginCredentials, options?: Parameters<typeof login.mutate>[1]) => {
-      return login.mutate({
-        requestBody: {
-          username: data.username,
-          password: data.password,
-          twoFactorCode: data.twoFactorCode,
-          tokenLocation: data.tokenLocation,
+      return login.mutate(
+        {
+          requestBody: {
+            username: data.username,
+            password: data.password,
+            twoFactorCode: data.twoFactorCode,
+            tokenLocation: data.tokenLocation,
+          },
         },
-      }, options);
+        options,
+      );
     },
     mutateAsync: async (data: { username: string; password: string }) => {
       return login.mutateAsync({ requestBody: { username: data.username, password: data.password } });
@@ -194,6 +197,7 @@ export function useAuth() {
         queryClient.isMutating({ mutationKey: ['auth-logout'] })
       )
         return;
+      stopLiveUpdates();
       queryClient.setQueryData(['auth-logout-status'], 'pending');
       logoutMutation.mutate(everywhere);
     },

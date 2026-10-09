@@ -36,7 +36,7 @@ Existing event names, credentials and field values keep their meaning.
 
 The predecessor behavior was inspected at main commit
 `721ba7a6891042bf65d356f4dcf276d893ecaa0a`: `src/api/api.cpp` acknowledges events
-before dispatching them and only logs unknown types. `api_auth.cpp` reads the
+before dispatching them and only logs unknown types. `api/handlers/auth.cpp` reads the
 device name without consuming additional fields; `api_cards.cpp` likewise
 ignores the added language field. This is source evidence for that predecessor,
 not verification of every deployed firmware build.

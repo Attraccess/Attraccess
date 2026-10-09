@@ -8,8 +8,11 @@ describe('Attractap audit domain rollout', () => {
     source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
     await source.query('CREATE TABLE setting (parent text, key text, value text, UNIQUE(parent, key))');
   });
-  afterEach(async () => { await source.destroy(); });
-  const domains = async () => (await source.query("SELECT value FROM setting WHERE parent = 'audit' AND key = 'domains'"))[0].value;
+  afterEach(async () => {
+    await source.destroy();
+  });
+  const domains = async () =>
+    (await source.query("SELECT value FROM setting WHERE parent = 'audit' AND key = 'domains'"))[0].value;
 
   it('enables Attractap on a fresh database', async () => {
     await migration.up(source.createQueryRunner());
@@ -17,7 +20,9 @@ describe('Attractap audit domain rollout', () => {
   });
 
   it('preserves saved domain selections and global pause through upgrade and rollback', async () => {
-    await source.query("INSERT INTO setting VALUES ('audit', 'domains', ?), ('audit', 'enabled', 'false')", ['["billing","identity"]']);
+    await source.query("INSERT INTO setting VALUES ('audit', 'domains', ?), ('audit', 'enabled', 'false')", [
+      '["billing","identity"]',
+    ]);
     await migration.up(source.createQueryRunner());
     await migration.up(source.createQueryRunner());
     expect(JSON.parse(await domains())).toEqual(['billing', 'identity', 'attractap']);

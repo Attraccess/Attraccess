@@ -8,7 +8,7 @@ import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { FileUpload } from '../common/types/file-upload.types';
-import { auditSubjectKeyId } from '../audit/audit-administration-policy';
+import { auditSubjectKeyId } from '../audit/policies/administration';
 
 function frontendPlugin(name: string): LoadedPluginManifest {
   return {
@@ -50,11 +50,7 @@ describe('PluginController', () => {
       marketplacePackage: jest.fn(),
     };
     audit = { recordAdministration: jest.fn() };
-    controller = new PluginController(
-      service as unknown as PluginService,
-      npmService as never,
-      audit as never,
-    );
+    controller = new PluginController(service as unknown as PluginService, npmService as never, audit as never);
   });
 
   afterEach(() => {
@@ -97,7 +93,8 @@ describe('PluginController', () => {
 
       expect(audit.recordAdministration).toHaveBeenCalledWith(
         expect.objectContaining({
-          subjectId: auditSubjectKeyId(plugin.name), details: expect.objectContaining({ pluginId: plugin.id }),
+          subjectId: auditSubjectKeyId(plugin.name),
+          details: expect.objectContaining({ pluginId: plugin.id }),
         }),
         undefined,
       );

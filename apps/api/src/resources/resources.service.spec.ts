@@ -1,36 +1,66 @@
-import { activeUsageSql } from './usage/active-usage';
-import { Test, TestingModule } from '@nestjs/testing';
-import { ResourcesService } from './resources.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, DocumentationType, ResourceType, SupervisionMode } from '@attraccess/database-entities';
-import { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
-import { CreateResourceDto } from './dtos/createResource.dto';
-import { UpdateResourceDto } from './dtos/updateResource.dto';
-import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
-import { ResourceImageService } from './resourceImage.service';
-import { LicenseService } from '../license/license.service';
-import { createMockResource } from '../test-utils/resource.fixtures';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import { DocumentationType, Resource, ResourceType, SupervisionMode } from '@attraccess/database-entities';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { MetricsService } from '../metrics/metrics.service';
-import { AuditService } from '../audit/audit.service';
-import { projectResourceAuditEvent } from '../audit/audit-policy';
+
+import { Test, TestingModule } from '@nestjs/testing';
+
+import { getRepositoryToken } from '@nestjs/typeorm';
+
 import { randomUUID } from 'node:crypto';
 
-const mockMetricsService = {
-  resourcesTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
-  resourceUsageSessionsActive: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
-  resourceUsageSessionsTotal: { inc: jest.fn() },
-  resourceUsageDurationSeconds: { observe: jest.fn() },
-  resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
-  resourceIntroductionsTotal: { inc: jest.fn() },
-  resourceMaintenanceTotal: { inc: jest.fn() },
-  resourceMaintenanceOverdue: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
+
+import { projectResourceAuditEvent } from './../audit/audit-policy';
+
+import { AuditService } from './../audit/audit.service';
+
+import { ResourceNotFoundException } from './../exceptions/resource.notFound.exception';
+
+import { LicenseService } from './../license/license.service';
+
+import { MetricsService } from './../metrics/metrics.service';
+
+import { inheritTestScope } from './../test-utils/inherit-test-scope';
+
+import { createMockResource } from './../test-utils/resource.fixtures';
+
+import { CreateResourceDto } from './dtos/createResource.dto';
+
+import { ResourceImageService } from './resourceImage.service';
+
+import { ResourcesService } from './resources.service';
+
+import { mockMetricsService } from './resources.service.spec.mock-metrics-service';
+
+import { activeUsageSql } from './usage/sessions/active-usage';
+
+export type ResourcesServiceTestScope = {
+  resourceRepository: jest.Mocked<Repository<Resource>>;
+  mockResourceImageService: { saveImage: any; deleteImage: any; getPublicPath: any };
+  service: ResourcesService;
+  audit: { recordResource: any };
+  mockResourceRepository: () => {
+    find: any;
+    findOne: any;
+    findAndCount: any;
+    count: any;
+    create: any;
+    save: any;
+    delete: any;
+    softDelete: any;
+    createQueryBuilder: any;
+  };
 };
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
+
   let resourceRepository: jest.Mocked<Repository<Resource>>;
+
   const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+
   // ResourceImageService is injected but not directly used in these tests
 
   const mockResourceRepository = () => ({
@@ -60,6 +90,30 @@ describe('ResourcesService', () => {
     saveImage: jest.fn(),
     deleteImage: jest.fn(),
     getPublicPath: jest.fn(),
+  };
+
+  const scope = {
+    get resourceRepository() {
+      return resourceRepository;
+    },
+    set resourceRepository(value: typeof resourceRepository) {
+      resourceRepository = value;
+    },
+    get mockResourceImageService() {
+      return mockResourceImageService;
+    },
+    get service() {
+      return service;
+    },
+    set service(value: typeof service) {
+      service = value;
+    },
+    get audit() {
+      return audit;
+    },
+    get mockResourceRepository() {
+      return mockResourceRepository;
+    },
   };
 
   beforeEach(async () => {
@@ -100,48 +154,59 @@ describe('ResourcesService', () => {
 
   it('creates a resource with uploaded image and records actor attribution after persistence', async () => {
     const resource = createMockResource({ id: 8, name: 'Lathe', type: ResourceType.Machine });
-    resourceRepository.count.mockResolvedValue(2);
-    resourceRepository.create.mockReturnValue(resource);
-    resourceRepository.save.mockResolvedValue(resource);
-    mockResourceImageService.saveImage.mockResolvedValue('image.webp');
+    scope.resourceRepository.count.mockResolvedValue(2);
+    scope.resourceRepository.create.mockReturnValue(resource);
+    scope.resourceRepository.save.mockResolvedValue(resource);
+    scope.mockResourceImageService.saveImage.mockResolvedValue('image.webp');
     const file = { buffer: Buffer.from('image') };
-    const result = await service.createResource(
+    const result = await scope.service.createResource(
       { name: 'Lathe', type: ResourceType.Machine } as CreateResourceDto,
       file as never,
       { id: 7, authenticationMethod: 'api-token', apiTokenId: 9 },
     );
     expect(result.imageFilename).toBe('image.webp');
-    expect(mockResourceImageService.saveImage).toHaveBeenCalledWith(8, file);
-    expect(resourceRepository.save).toHaveBeenCalledTimes(2);
-    expect(audit.recordResource).toHaveBeenCalledWith(
+    expect(scope.mockResourceImageService.saveImage).toHaveBeenCalledWith(8, file);
+    expect(scope.resourceRepository.save).toHaveBeenCalledTimes(2);
+    expect(scope.audit.recordResource).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'resource.created', actorId: 7, apiTokenId: 9, subjectId: 8 }),
     );
   });
 
   it('removes the new resource if persisting its image filename fails', async () => {
     const resource = createMockResource({ id: 8 });
-    resourceRepository.count.mockResolvedValue(2);
-    resourceRepository.create.mockReturnValue(resource);
-    resourceRepository.save
+    scope.resourceRepository.count.mockResolvedValue(2);
+    scope.resourceRepository.create.mockReturnValue(resource);
+    scope.resourceRepository.save
       .mockResolvedValueOnce(resource)
       .mockRejectedValueOnce(new Error('image metadata write failed'));
-    mockResourceImageService.saveImage.mockResolvedValue('image.webp');
+    scope.mockResourceImageService.saveImage.mockResolvedValue('image.webp');
     await expect(
-      service.createResource(
+      scope.service.createResource(
         { name: 'Lathe', type: ResourceType.Machine } as CreateResourceDto,
         { buffer: Buffer.from('image') } as never,
       ),
     ).rejects.toThrow('image metadata write failed');
-    expect(resourceRepository.delete).toHaveBeenCalledWith(8);
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(scope.resourceRepository.delete).toHaveBeenCalledWith(8);
+    expect(scope.audit.recordResource).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {
-    expect(service).toBeDefined();
+    expect(scope.service).toBeDefined();
   });
 
   describe('listResources', () => {
     let mockQueryBuilder: jest.Mocked<SelectQueryBuilder<Resource>>;
+    const listResourcesScope = inheritTestScope(
+      {
+        get mockQueryBuilder() {
+          return mockQueryBuilder;
+        },
+        set mockQueryBuilder(value: typeof mockQueryBuilder) {
+          mockQueryBuilder = value;
+        },
+      },
+      scope,
+    );
 
     beforeEach(() => {
       mockQueryBuilder = {
@@ -157,10 +222,25 @@ describe('ResourcesService', () => {
         getOne: jest.fn(),
       } as unknown as jest.Mocked<SelectQueryBuilder<Resource>>;
 
-      resourceRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      scope.resourceRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
     });
 
     describe('Basic functionality', () => {
+      const basicFunctionalityScope = inheritTestScope(
+        {
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+          get parentScope() {
+            return listResourcesScope;
+          },
+        },
+        listResourcesScope,
+      );
+
       it('should return paginated resources with default options', async () => {
         const mockResources = [
           createMockResource({
@@ -177,19 +257,24 @@ describe('ResourcesService', () => {
           }),
         ];
 
-        mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 2]);
+        basicFunctionalityScope.mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 2]);
 
-        const result = await service.listResources();
+        const result = await basicFunctionalityScope.parentScope.service.listResources();
 
         expect(result.data).toEqual(mockResources);
         expect(result.total).toEqual(2);
         expect(result.page).toEqual(1);
         expect(result.limit).toEqual(10);
-        expect(resourceRepository.createQueryBuilder).toHaveBeenCalledWith('resource');
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.groups', 'groups');
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.name', 'ASC');
-        expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
-        expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+        expect(basicFunctionalityScope.parentScope.resourceRepository.createQueryBuilder).toHaveBeenCalledWith(
+          'resource',
+        );
+        expect(basicFunctionalityScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+          'resource.groups',
+          'groups',
+        );
+        expect(basicFunctionalityScope.mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.name', 'ASC');
+        expect(basicFunctionalityScope.mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+        expect(basicFunctionalityScope.mockQueryBuilder.take).toHaveBeenCalledWith(10);
       });
 
       it('should handle custom pagination', async () => {
@@ -201,20 +286,20 @@ describe('ResourcesService', () => {
             documentationMarkdown: '# Documentation 1',
           }),
         ];
-        mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
+        basicFunctionalityScope.mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
 
-        const result = await service.listResources({ page: 2, limit: 5 });
+        const result = await basicFunctionalityScope.parentScope.service.listResources({ page: 2, limit: 5 });
 
         expect(result.page).toEqual(2);
         expect(result.limit).toEqual(5);
-        expect(mockQueryBuilder.skip).toHaveBeenCalledWith(5); // (page - 1) * limit
-        expect(mockQueryBuilder.take).toHaveBeenCalledWith(5);
+        expect(basicFunctionalityScope.mockQueryBuilder.skip).toHaveBeenCalledWith(5); // (page - 1) * limit
+        expect(basicFunctionalityScope.mockQueryBuilder.take).toHaveBeenCalledWith(5);
       });
 
       it('should return empty results', async () => {
-        mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+        basicFunctionalityScope.mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
-        const result = await service.listResources();
+        const result = await basicFunctionalityScope.parentScope.service.listResources();
 
         expect(result.data).toEqual([]);
         expect(result.total).toEqual(0);
@@ -222,6 +307,21 @@ describe('ResourcesService', () => {
     });
 
     describe('Search filtering', () => {
+      const searchFilteringScope = inheritTestScope(
+        {
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+          get parentScope() {
+            return listResourcesScope;
+          },
+        },
+        listResourcesScope,
+      );
+
       it('should filter by search term in name and description', async () => {
         const mockResources = [
           createMockResource({
@@ -231,144 +331,270 @@ describe('ResourcesService', () => {
             documentationMarkdown: '# Documentation 1',
           }),
         ];
-        mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
+        searchFilteringScope.mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
 
-        await service.listResources({ search: 'test' });
+        await searchFilteringScope.parentScope.service.listResources({ search: 'test' });
 
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect(searchFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
           { search: '%test%' },
         );
       });
 
       it('should not add search filter when search is empty', async () => {
-        await service.listResources({ search: '' });
+        await searchFilteringScope.parentScope.service.listResources({ search: '' });
 
-        expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
+        expect(searchFilteringScope.mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
           expect.stringContaining('LOWER(resource.name) LIKE LOWER(:search)'),
         );
       });
     });
 
     describe('Group filtering', () => {
-      it('should filter by specific group ID', async () => {
-        await service.listResources({ groupId: 5 });
+      const groupFilteringScope = inheritTestScope(
+        {
+          get parentScope() {
+            return listResourcesScope;
+          },
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+        },
+        listResourcesScope,
+      );
 
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id = :groupId', { groupId: 5 });
+      it('should filter by specific group ID', async () => {
+        await groupFilteringScope.parentScope.service.listResources({ groupId: 5 });
+
+        expect(groupFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id = :groupId', {
+          groupId: 5,
+        });
       });
 
       it('should filter resources with no groups when groupId is -1', async () => {
-        await service.listResources({ groupId: -1 });
+        await groupFilteringScope.parentScope.service.listResources({ groupId: -1 });
 
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id IS NULL');
+        expect(groupFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id IS NULL');
       });
 
       it('should not add group filter when groupId is undefined', async () => {
-        await service.listResources();
+        await groupFilteringScope.parentScope.service.listResources();
 
-        expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(expect.stringContaining('groups.id'));
+        expect(groupFilteringScope.mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
+          expect.stringContaining('groups.id'),
+        );
       });
     });
 
     describe('IDs filtering', () => {
-      it('should filter by single resource ID', async () => {
-        await service.listResources({ ids: 5 });
+      const idsFilteringScope = inheritTestScope(
+        {
+          get parentScope() {
+            return listResourcesScope;
+          },
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+        },
+        listResourcesScope,
+      );
 
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [5] });
+      it('should filter by single resource ID', async () => {
+        await idsFilteringScope.parentScope.service.listResources({ ids: 5 });
+
+        expect(idsFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', {
+          ids: [5],
+        });
       });
 
       it('should filter by multiple resource IDs', async () => {
-        await service.listResources({ ids: [1, 2, 3] });
+        await idsFilteringScope.parentScope.service.listResources({ ids: [1, 2, 3] });
 
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [1, 2, 3] });
+        expect(idsFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', {
+          ids: [1, 2, 3],
+        });
       });
 
       it('should not add IDs filter when ids array is empty', async () => {
-        await service.listResources({ ids: [] });
+        await idsFilteringScope.parentScope.service.listResources({ ids: [] });
 
-        expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(expect.stringContaining('resource.id IN'));
+        expect(idsFilteringScope.mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
+          expect.stringContaining('resource.id IN'),
+        );
       });
 
       it('should not add IDs filter when ids is undefined', async () => {
-        await service.listResources();
+        await idsFilteringScope.parentScope.service.listResources();
 
-        expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(expect.stringContaining('resource.id IN'));
+        expect(idsFilteringScope.mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
+          expect.stringContaining('resource.id IN'),
+        );
       });
     });
 
     describe('In-use filtering', () => {
-      it('should filter resources currently in use by specific user', async () => {
-        await service.listResources({ onlyInUseByUserId: 10 });
+      const inUseFilteringScope = inheritTestScope(
+        {
+          get parentScope() {
+            return listResourcesScope;
+          },
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+        },
+        listResourcesScope,
+      );
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(expect.any(Brackets));
+      it('should filter resources currently in use by specific user', async () => {
+        await inUseFilteringScope.parentScope.service.listResources({ onlyInUseByUserId: 10 });
+
+        expect(inUseFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          activeUsageSql('usage'),
+        );
+        expect(inUseFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(expect.any(Brackets));
       });
 
       it('should not add in-use filter when onlyInUseByUserId is undefined', async () => {
-        await service.listResources();
+        await inUseFilteringScope.parentScope.service.listResources();
 
-        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
+        expect(inUseFilteringScope.mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          activeUsageSql('usage'),
+        );
       });
 
       it('should filter resources currently in use (onlyInUse)', async () => {
-        await service.listResources({ onlyInUse: true });
+        await inUseFilteringScope.parentScope.service.listResources({ onlyInUse: true });
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
+        expect(inUseFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          activeUsageSql('usage'),
+        );
+        expect(inUseFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
+        expect(inUseFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
       });
 
       it('should return using user information when returnUsingUser is true', async () => {
-        await service.listResources({ returnUsingUser: true });
+        await inUseFilteringScope.parentScope.service.listResources({ returnUsingUser: true });
 
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        expect(inUseFilteringScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
           'resource.usages',
           'usage',
           activeUsageSql('usage'),
         );
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
+        expect(inUseFilteringScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
       });
 
       it('should handle combination of onlyInUse and returnUsingUser', async () => {
-        await service.listResources({ onlyInUse: true, returnUsingUser: true });
+        await inUseFilteringScope.parentScope.service.listResources({ onlyInUse: true, returnUsingUser: true });
 
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        expect(inUseFilteringScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
           'resource.usages',
           'usage',
           activeUsageSql('usage'),
         );
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
+        expect(inUseFilteringScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
+        expect(inUseFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
+        expect(inUseFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
       });
     });
 
     describe('Permission filtering', () => {
+      const permissionFilteringScope = inheritTestScope(
+        {
+          get parentScope() {
+            return listResourcesScope;
+          },
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+        },
+        listResourcesScope,
+      );
+
       it('should filter resources with permissions for specific user', async () => {
-        await service.listResources({ onlyWithPermissionForUserId: 15 });
+        await permissionFilteringScope.parentScope.service.listResources({ onlyWithPermissionForUserId: 15 });
 
         // Check all the necessary joins for permission checking
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introducers', 'introducer');
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introductions', 'introduction');
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('introduction.history', 'resourceIntroductionHistory');
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.groups', 'resourceGroup');
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resourceGroup.introducers', 'groupIntroducer');
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resourceGroup.introductions', 'groupIntroduction');
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('groupIntroduction.history', 'groupIntroductionHistory');
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.introducers',
+          'introducer',
+        );
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.introductions',
+          'introduction',
+        );
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'introduction.history',
+          'resourceIntroductionHistory',
+        );
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.groups',
+          'resourceGroup',
+        );
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resourceGroup.introducers',
+          'groupIntroducer',
+        );
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resourceGroup.introductions',
+          'groupIntroduction',
+        );
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'groupIntroduction.history',
+          'groupIntroductionHistory',
+        );
 
         // Check that the complex where condition is added
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(expect.any(Brackets));
+        expect(permissionFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(expect.any(Brackets));
       });
 
       it('should not add permission filter when onlyWithPermissionForUserId is undefined', async () => {
-        await service.listResources();
+        await permissionFilteringScope.parentScope.service.listResources();
 
-        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith('resource.introducers', 'introducer');
-        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith('resource.introductions', 'introduction');
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith(
+          'resource.introducers',
+          'introducer',
+        );
+        expect(permissionFilteringScope.mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith(
+          'resource.introductions',
+          'introduction',
+        );
       });
     });
 
     describe('Combined filtering', () => {
+      const combinedFilteringScope = inheritTestScope(
+        {
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+          get parentScope() {
+            return listResourcesScope;
+          },
+        },
+        listResourcesScope,
+      );
+
       it('should handle multiple filters simultaneously', async () => {
         const mockResources = [
           createMockResource({
@@ -378,9 +604,9 @@ describe('ResourcesService', () => {
             documentationMarkdown: '# Documentation 1',
           }),
         ];
-        mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
+        combinedFilteringScope.mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
 
-        const result = await service.listResources({
+        const result = await combinedFilteringScope.parentScope.service.listResources({
           page: 2,
           limit: 5,
           search: 'test',
@@ -391,24 +617,35 @@ describe('ResourcesService', () => {
         });
 
         // Verify pagination
-        expect(mockQueryBuilder.skip).toHaveBeenCalledWith(5);
-        expect(mockQueryBuilder.take).toHaveBeenCalledWith(5);
+        expect(combinedFilteringScope.mockQueryBuilder.skip).toHaveBeenCalledWith(5);
+        expect(combinedFilteringScope.mockQueryBuilder.take).toHaveBeenCalledWith(5);
 
         // Verify search filter
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect(combinedFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
           { search: '%test%' },
         );
 
         // Verify group filter
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id = :groupId', { groupId: 3 });
+        expect(combinedFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id = :groupId', {
+          groupId: 3,
+        });
 
         // Verify IDs filter
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [1, 2, 3] });
+        expect(combinedFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', {
+          ids: [1, 2, 3],
+        });
 
         // Verify all joins for both in-use and permission filtering
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introducers', 'introducer');
+        expect(combinedFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.usages',
+          'usage',
+          activeUsageSql('usage'),
+        );
+        expect(combinedFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.introducers',
+          'introducer',
+        );
 
         // Verify result structure
         expect(result.data).toEqual(mockResources);
@@ -418,40 +655,48 @@ describe('ResourcesService', () => {
       });
 
       it('should handle edge case with groupId -1 and other filters', async () => {
-        await service.listResources({
+        await combinedFilteringScope.parentScope.service.listResources({
           groupId: -1,
           search: 'test',
           ids: [1, 2],
         });
 
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id IS NULL');
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect(combinedFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id IS NULL');
+        expect(combinedFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
           { search: '%test%' },
         );
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [1, 2] });
+        expect(combinedFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', {
+          ids: [1, 2],
+        });
       });
 
       it('should handle combination of returnUsingUser with other filters', async () => {
-        await service.listResources({
+        await combinedFilteringScope.parentScope.service.listResources({
           returnUsingUser: true,
           onlyWithPermissionForUserId: 15,
           search: 'test',
         });
 
         // Should use leftJoinAndSelect for usages when returnUsingUser is true
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        expect(combinedFilteringScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
           'resource.usages',
           'usage',
           activeUsageSql('usage'),
         );
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
+        expect(combinedFilteringScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+          'usage.user',
+          'usingUser',
+        );
 
         // Should still add permission filtering joins
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introducers', 'introducer');
+        expect(combinedFilteringScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.introducers',
+          'introducer',
+        );
 
         // Should add search filter
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect(combinedFilteringScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
           { search: '%test%' },
         );
@@ -459,62 +704,109 @@ describe('ResourcesService', () => {
     });
 
     describe('Edge cases', () => {
+      const edgeCasesScope = inheritTestScope(
+        {
+          get parentScope() {
+            return listResourcesScope;
+          },
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+        },
+        listResourcesScope,
+      );
+
       it('should handle null/undefined options gracefully', async () => {
-        const result = await service.listResources(undefined);
+        const result = await edgeCasesScope.parentScope.service.listResources(undefined);
 
         expect(result.page).toEqual(1);
         expect(result.limit).toEqual(10);
-        expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
-        expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+        expect(edgeCasesScope.mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+        expect(edgeCasesScope.mockQueryBuilder.take).toHaveBeenCalledWith(10);
       });
 
       it('should handle empty options object', async () => {
-        const result = await service.listResources({});
+        const result = await edgeCasesScope.parentScope.service.listResources({});
 
         expect(result.page).toEqual(1);
         expect(result.limit).toEqual(10);
       });
 
       it('should convert single ID to array for filtering', async () => {
-        await service.listResources({ ids: 42 });
+        await edgeCasesScope.parentScope.service.listResources({ ids: 42 });
 
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [42] });
+        expect(edgeCasesScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', {
+          ids: [42],
+        });
       });
 
       it('should handle zero and negative page numbers gracefully', async () => {
-        await service.listResources({ page: 0, limit: 5 });
+        await edgeCasesScope.parentScope.service.listResources({ page: 0, limit: 5 });
 
         // Page 0 should be treated as page 1, so skip should be 0
-        expect(mockQueryBuilder.skip).toHaveBeenCalledWith(-5); // (0-1) * 5
+        expect(edgeCasesScope.mockQueryBuilder.skip).toHaveBeenCalledWith(-5); // (0-1) * 5
       });
 
       it('should handle very large limit values', async () => {
-        await service.listResources({ limit: 1000 });
+        await edgeCasesScope.parentScope.service.listResources({ limit: 1000 });
 
-        expect(mockQueryBuilder.take).toHaveBeenCalledWith(1000);
+        expect(edgeCasesScope.mockQueryBuilder.take).toHaveBeenCalledWith(1000);
       });
     });
 
     describe('Query builder method calls order and structure', () => {
+      const queryBuilderMethodCallsOrderAndStructureScope = inheritTestScope(
+        {
+          get parentScope() {
+            return listResourcesScope;
+          },
+          get mockQueryBuilder() {
+            return listResourcesScope.mockQueryBuilder;
+          },
+          set mockQueryBuilder(value: typeof listResourcesScope.mockQueryBuilder) {
+            listResourcesScope.mockQueryBuilder = value;
+          },
+        },
+        listResourcesScope,
+      );
+
       it('should maintain proper query builder method call order', async () => {
-        await service.listResources({
+        await queryBuilderMethodCallsOrderAndStructureScope.parentScope.service.listResources({
           search: 'test',
           groupId: 1,
           onlyWithPermissionForUserId: 5,
         });
 
         // Verify that basic joins happen before filters
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.groups', 'groups');
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.name', 'ASC');
-        expect(mockQueryBuilder.getManyAndCount).toHaveBeenCalled();
+        expect(queryBuilderMethodCallsOrderAndStructureScope.mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+          'resource.groups',
+          'groups',
+        );
+        expect(queryBuilderMethodCallsOrderAndStructureScope.mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+          'resource.name',
+          'ASC',
+        );
+        expect(queryBuilderMethodCallsOrderAndStructureScope.mockQueryBuilder.getManyAndCount).toHaveBeenCalled();
 
         // Verify that permission-related joins are called
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introducers', 'introducer');
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introductions', 'introduction');
+        expect(queryBuilderMethodCallsOrderAndStructureScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.introducers',
+          'introducer',
+        );
+        expect(queryBuilderMethodCallsOrderAndStructureScope.mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+          'resource.introductions',
+          'introduction',
+        );
 
         // Verify that filters are applied
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id = :groupId', { groupId: 1 });
-        expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect(queryBuilderMethodCallsOrderAndStructureScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+          'groups.id = :groupId',
+          { groupId: 1 },
+        );
+        expect(queryBuilderMethodCallsOrderAndStructureScope.mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
           { search: '%test%' },
         );
@@ -523,6 +815,24 @@ describe('ResourcesService', () => {
   });
 
   describe('getResourceById', () => {
+    const getResourceByIdScope = inheritTestScope(
+      {
+        get resourceRepository() {
+          return scope.resourceRepository;
+        },
+        set resourceRepository(value: typeof scope.resourceRepository) {
+          scope.resourceRepository = value;
+        },
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+      },
+      scope,
+    );
+
     it('should return a resource by id', async () => {
       const mockResource = createMockResource({
         id: 1,
@@ -531,25 +841,46 @@ describe('ResourcesService', () => {
         documentationMarkdown: '# Documentation 1',
       });
 
-      resourceRepository.find.mockResolvedValue([mockResource]);
+      getResourceByIdScope.resourceRepository.find.mockResolvedValue([mockResource]);
 
-      const result = await service.getResourceById(1);
+      const result = await getResourceByIdScope.service.getResourceById(1);
 
       expect(result).toEqual(mockResource);
-      expect(resourceRepository.find).toHaveBeenCalledWith({
+      expect(getResourceByIdScope.resourceRepository.find).toHaveBeenCalledWith({
         where: { id: expect.anything() },
         relations: ['introductions', 'usages', 'groups'],
       });
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {
-      resourceRepository.find.mockResolvedValue([]);
+      getResourceByIdScope.resourceRepository.find.mockResolvedValue([]);
 
-      await expect(service.getResourceById(999)).rejects.toThrow(ResourceNotFoundException);
+      await expect(getResourceByIdScope.service.getResourceById(999)).rejects.toThrow(ResourceNotFoundException);
     });
   });
 
   describe('createResource', () => {
+    const createResourceScope = inheritTestScope(
+      {
+        get resourceRepository() {
+          return scope.resourceRepository;
+        },
+        set resourceRepository(value: typeof scope.resourceRepository) {
+          scope.resourceRepository = value;
+        },
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+        get audit() {
+          return scope.audit;
+        },
+      },
+      scope,
+    );
+
     it('should create a new resource', async () => {
       const createDto: CreateResourceDto = {
         name: 'New Resource',
@@ -573,13 +904,13 @@ describe('ResourcesService', () => {
         metadata: createDto.metadata ?? null,
       });
 
-      resourceRepository.create.mockReturnValue(newResource);
-      resourceRepository.save.mockResolvedValue(newResource);
+      createResourceScope.resourceRepository.create.mockReturnValue(newResource);
+      createResourceScope.resourceRepository.save.mockResolvedValue(newResource);
 
-      const result = await service.createResource(createDto);
+      const result = await createResourceScope.service.createResource(createDto);
 
       expect(result).toEqual(newResource);
-      expect(resourceRepository.create).toHaveBeenCalledWith({
+      expect(createResourceScope.resourceRepository.create).toHaveBeenCalledWith({
         name: createDto.name,
         type: createDto.type,
         description: createDto.description,
@@ -597,17 +928,19 @@ describe('ResourcesService', () => {
         autoIntroductionTarget: null,
         autoIntroductionGroupId: null,
       });
-      expect(resourceRepository.save).toHaveBeenCalled();
+      expect(createResourceScope.resourceRepository.save).toHaveBeenCalled();
     });
 
     it('audits only the safe resource projection when an actor is available', async () => {
       const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
-      resourceRepository.create.mockReturnValue(resource);
-      resourceRepository.save.mockResolvedValue(resource);
+      createResourceScope.resourceRepository.create.mockReturnValue(resource);
+      createResourceScope.resourceRepository.save.mockResolvedValue(resource);
 
-      await service.createResource({ name: 'Lathe', type: ResourceType.Machine }, undefined, { id: 9 });
+      await createResourceScope.service.createResource({ name: 'Lathe', type: ResourceType.Machine }, undefined, {
+        id: 9,
+      });
 
-      expect(audit.recordResource).toHaveBeenCalledWith(
+      expect(createResourceScope.audit.recordResource).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'resource.created',
           actorId: 9,
@@ -619,236 +952,22 @@ describe('ResourcesService', () => {
 
     it('bounds an oversized resource name in the audit projection', async () => {
       const resource = createMockResource({ id: 1, name: '"\\\0🙂'.repeat(5000), type: ResourceType.Machine });
-      resourceRepository.create.mockReturnValue(resource);
-      resourceRepository.save.mockResolvedValue(resource);
+      createResourceScope.resourceRepository.create.mockReturnValue(resource);
+      createResourceScope.resourceRepository.save.mockResolvedValue(resource);
 
-      await service.createResource({ name: resource.name, type: ResourceType.Machine }, undefined, { id: 9 });
+      await createResourceScope.service.createResource({ name: resource.name, type: ResourceType.Machine }, undefined, {
+        id: 9,
+      });
 
-      const details = audit.recordResource.mock.calls[0][0].details;
+      const details = createResourceScope.audit.recordResource.mock.calls[0][0].details;
       expect(details['after.name']).toMatch(/\.\.\.$/);
       expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
       expect(
         projectResourceAuditEvent({
-          ...audit.recordResource.mock.calls[0][0],
+          ...createResourceScope.audit.recordResource.mock.calls[0][0],
           operationId: randomUUID(),
         }),
       ).not.toBeNull();
-    });
-  });
-
-  describe('updateResource', () => {
-    it('should update an existing resource', async () => {
-      const resourceId = 1;
-      const updateDto: UpdateResourceDto = {
-        name: 'Updated Resource',
-        type: ResourceType.Machine,
-        description: 'Updated Description',
-        documentationType: DocumentationType.URL,
-        documentationUrl: 'https://example.com/updated',
-        metadata: { template: 'default', area: 'A2' },
-      };
-
-      const existingResource = createMockResource({
-        id: resourceId,
-        name: 'Old Resource',
-        description: 'Old Description',
-        documentationType: DocumentationType.MARKDOWN,
-        documentationMarkdown: '# Old Documentation',
-        documentationUrl: null,
-        imageFilename: null,
-      });
-
-      const updatedResource = createMockResource({
-        id: resourceId,
-        name: updateDto.name,
-        description: updateDto.description,
-        documentationType: updateDto.documentationType,
-        documentationMarkdown: null,
-        documentationUrl: updateDto.documentationUrl,
-        imageFilename: null,
-        maintenances: [],
-        metadata: updateDto.metadata ?? null,
-      });
-
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
-      resourceRepository.save.mockResolvedValue(updatedResource);
-
-      const result = await service.updateResource(resourceId, updateDto);
-
-      expect(result).toEqual(updatedResource);
-      expect(service.getResourceById).toHaveBeenCalledWith(resourceId);
-      expect(resourceRepository.save).toHaveBeenCalled();
-    });
-
-    it('audits changed safe fields without metadata or documentation', async () => {
-      const existingResource = createMockResource({ id: 1, name: 'Old', type: ResourceType.Lock });
-      const updatedResource = createMockResource({ id: 1, name: 'New', type: ResourceType.Machine });
-      updatedResource.metadata = { password: 'secret' };
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
-      resourceRepository.save.mockResolvedValue(updatedResource);
-
-      await service.updateResource(
-        1,
-        { name: 'New', type: ResourceType.Machine, metadata: { password: 'secret' } },
-        undefined,
-        { id: 9 },
-      );
-
-      expect(audit.recordResource).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'resource.updated',
-          details: {
-            'before.name': 'Old',
-            'after.name': 'New',
-            'before.type': ResourceType.Lock,
-            'after.type': ResourceType.Machine,
-            changedFields: '["name","type","metadata"]',
-          },
-        }),
-      );
-    });
-
-    it('does not audit metadata that only normalized from absent to empty', async () => {
-      const existingResource = createMockResource({ id: 1, name: 'Old', metadata: null });
-      const updatedResource = createMockResource({ id: 1, name: 'New', metadata: {} });
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
-      resourceRepository.save.mockResolvedValue(updatedResource);
-
-      await service.updateResource(1, { name: 'New', metadata: {} }, undefined, { id: 9 });
-
-      expect(audit.recordResource).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'resource.updated',
-          details: { 'before.name': 'Old', 'after.name': 'New', changedFields: '["name"]' },
-        }),
-      );
-    });
-
-    it('bounds both names in a rename audit projection', async () => {
-      const existingResource = createMockResource({ id: 1, name: '"'.repeat(5000) });
-      const updatedResource = createMockResource({ id: 1, name: '\\'.repeat(5000) + '🚪'.repeat(5000) });
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
-      resourceRepository.save.mockResolvedValue(updatedResource);
-
-      await service.updateResource(1, { name: updatedResource.name }, undefined, { id: 9 });
-
-      const details = audit.recordResource.mock.calls[0][0].details;
-      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
-      expect(
-        projectResourceAuditEvent({
-          ...audit.recordResource.mock.calls[0][0],
-          operationId: randomUUID(),
-        }),
-      ).not.toBeNull();
-    });
-
-    it('audits a non-name update without recording its value', async () => {
-      const existingResource = createMockResource({ id: 1, allowTakeOver: false });
-      const updatedResource = createMockResource({ id: 1, allowTakeOver: true });
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
-      resourceRepository.save.mockResolvedValue(updatedResource);
-
-      await service.updateResource(1, { allowTakeOver: true }, undefined, { id: 9 });
-
-      expect(audit.recordResource).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'resource.updated',
-          details: { changedFields: '["allowTakeOver"]' },
-        }),
-      );
-    });
-
-    it('does not audit an unchanged resubmission', async () => {
-      const resource = createMockResource({ id: 1, allowTakeOver: false });
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
-      resourceRepository.save.mockResolvedValue(resource);
-
-      await service.updateResource(1, { allowTakeOver: false }, undefined, { id: 9 });
-
-      expect(audit.recordResource).not.toHaveBeenCalled();
-    });
-
-    it('audits an image-only update without persisting the filename', async () => {
-      const resource = createMockResource({ id: 1, imageFilename: null });
-      const updatedResource = createMockResource({ id: 1, imageFilename: 'resource-1.png' });
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
-      mockResourceImageService.saveImage.mockResolvedValue('resource-1.png');
-      resourceRepository.save.mockResolvedValue(updatedResource);
-
-      await service.updateResource(1, {}, {} as never, { id: 9 });
-
-      expect(audit.recordResource).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'resource.updated',
-          details: { changedFields: '["image"]' },
-        }),
-      );
-    });
-
-    it('should throw ResourceNotFoundException if resource not found', async () => {
-      const resourceId = 999;
-      const updateDto: UpdateResourceDto = {
-        name: 'Updated Resource',
-        type: ResourceType.Machine,
-      };
-
-      jest.spyOn(service, 'getResourceById').mockRejectedValue(new ResourceNotFoundException(resourceId));
-
-      await expect(service.updateResource(resourceId, updateDto)).rejects.toThrow(ResourceNotFoundException);
-    });
-  });
-
-  describe('deleteResource', () => {
-    it('should delete a resource', async () => {
-      (resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 1, raw: {}, generatedMaps: [] });
-
-      await service.deleteResource(1);
-
-      expect(resourceRepository.softDelete).toHaveBeenCalledWith(1);
-    });
-
-    it('audits deletion with the pre-delete safe projection', async () => {
-      const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
-      resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
-
-      await service.deleteResource(1, { id: 9 });
-
-      expect(audit.recordResource).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'resource.deleted',
-          actorId: 9,
-          details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine },
-        }),
-      );
-    });
-
-    it('bounds an oversized resource name in a deletion audit projection', async () => {
-      const resource = createMockResource({
-        id: 1,
-        name: '\0'.repeat(5000) + '🙂'.repeat(5000),
-        type: ResourceType.Machine,
-      });
-      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
-      resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
-
-      await service.deleteResource(1, { id: 9 });
-
-      const details = audit.recordResource.mock.calls[0][0].details;
-      expect(details['before.name']).toMatch(/\.\.\.$/);
-      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
-      expect(
-        projectResourceAuditEvent({
-          ...audit.recordResource.mock.calls[0][0],
-          operationId: randomUUID(),
-        }),
-      ).not.toBeNull();
-    });
-
-    it('should throw ResourceNotFoundException if resource not found', async () => {
-      (resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 0, raw: {}, generatedMaps: [] });
-
-      await expect(service.deleteResource(999)).rejects.toThrow(ResourceNotFoundException);
     });
   });
 });

@@ -5,7 +5,7 @@ import { UserProfileController } from '../../../users-and-auth/users/user-profil
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { AttractapService } from '../../attractap.service';
 import { AuthenticatedWebSocket, AttractapEventType } from '../websocket.types';
-import { AttractapCardHandler } from './card.handler';
+import { AttractapCardHandler } from './card/card.handler';
 
 describe('persisted web UI locale at card authentication', () => {
   let source: DataSource;

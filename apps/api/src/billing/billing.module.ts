@@ -8,15 +8,15 @@ import {
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BillingController } from './billing.controller';
-import { BillingService } from './billing.service';
-import { SumUpService } from './sumup.service';
-import { LiveNotificationsService } from './liveNotificationsService';
+import { BillingService } from './charges/billing.service';
+import { SumUpService } from './sumup/sumup.service';
+import { LiveNotificationsService } from './live-notifications/live-notifications.service';
 import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
 import { EmailModule } from '../email/email.module';
 import { SettingsModule } from '../settings/settings.module';
 import { LicenseModule } from '../license/license.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
-import { BillingLiveTopicsProvider } from './billing-live-topics.provider';
+import { BillingLiveTopicsProvider } from './live-notifications/billing-live-topics.provider';
 
 @Module({
   imports: [

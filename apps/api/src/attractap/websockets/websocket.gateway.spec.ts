@@ -1,192 +1,17 @@
 import { WebSocket } from 'ws';
-import { Test, TestingModule } from '@nestjs/testing';
-import { AttractapGateway } from './websocket.gateway';
-import { WebsocketService } from './websocket.service';
-import { AttractapService } from '../attractap.service';
-import { UsersService } from '../../users-and-auth/users/users.service';
-import { AttractapFirmwareService } from '../firmware.service';
-import { SumUpService } from '../../billing/sumup.service';
-import { BillingService } from '../../billing/billing.service';
-import { LicenseService } from '../../license/license.service';
-import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
-import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
-import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
-import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
-import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
-import { ResourceHealthService } from '../../resources/health/resource-health.service';
-import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
-import { ProjectsService } from '../../projects/projects.service';
-import { ResourceFormsService } from '../../resources/forms/forms.service';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './websocket.types';
-import { MetricsService } from '../../metrics/metrics.service';
-import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
-import { WS_METRICS } from '../../metrics/definitions/tokens';
-import { ResourceMeteringService } from '../../resources/metering/resource-metering.service';
-import { ResourceOperatingAttributionService } from '../../resources/operating-intervals/resource-operating-attribution.service';
-import { ResourceListService } from './handlers/resource-list.service';
-import { ResourceActionGuard } from './handlers/resource-action.guard';
-import { AttractapAuthHandler } from './handlers/auth.handler';
-import { AttractapFirmwareHandler } from './handlers/firmware.handler';
-import { AttractapCrashReportHandler } from './handlers/crash-report.handler';
-import { AttractapCardHandler } from './handlers/card.handler';
-import { AttractapFormsHandler } from './handlers/forms.handler';
-import { AttractapSessionHandler } from './handlers/session.handler';
-import { AttractapBillingHandler } from './handlers/billing.handler';
-import { AttractapProjectsHandler } from './handlers/projects.handler';
-import { AttractapSupervisionHandler } from './handlers/supervision.handler';
-import { SupervisionService } from '../../resources/supervision/supervision.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource } from '@attraccess/database-entities';
-import { RbacService } from '../../users-and-auth/rbac/rbac.service';
-import { AuditService } from '../../audit/audit.service';
-import { SettingsService } from '../../settings/settings.service';
-
-const mockMetricsService = {
-  attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
-  attractapNfcTapsTotal: { inc: jest.fn() },
-  attractapFirmwareUpdatesTotal: { inc: jest.fn() },
-};
-
-const mockWsMetrics = {
-  messageDuration: { observe: jest.fn() },
-  messagesTotal: { inc: jest.fn() },
-  connectionDuration: { observe: jest.fn() },
-};
-
-const mockMetricsToggle = { isEnabledCached: jest.fn().mockReturnValue(true) };
-
-function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {
-  return {
-    id: 'test-id',
-    readerId: null,
-    messageCount: 0,
-    sendMessage: jest.fn().mockResolvedValue(undefined),
-    sendBinaryData: jest.fn(),
-    send: jest.fn(),
-    close: jest.fn(),
-    state: {
-      lastAuthenticatedUserId: null,
-      enrollment: null,
-      enrollNewCardData: null,
-      resetNfcCardData: null,
-      ota: null,
-    },
-    ...overrides,
-  } as unknown as AuthenticatedWebSocket;
-}
+import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
+import { AttractapEvent, AttractapEventType } from './websocket.types';
 
 describe('AttractapGateway', () => {
-  let gateway: AttractapGateway;
-  let websocketService: WebsocketService;
-  let licenseService: { verifyLicense: jest.Mock };
-  let attractapService: { updateLastReaderConnection: jest.Mock; findReaderById: jest.Mock };
-
-  it('sends language updates only to open authenticated readers', async () => {
-    const authenticated = createMockSocket({ id: 'authenticated', readerId: 42, readyState: WebSocket.OPEN });
-    const unauthenticated = createMockSocket({ id: 'unauthenticated', readyState: WebSocket.OPEN });
-    const missingIdentity = createMockSocket({ id: 'missing', readerId: undefined, readyState: WebSocket.OPEN });
-    const closed = createMockSocket({ id: 'closed', readerId: 43, readyState: WebSocket.CLOSED });
-    for (const socket of [authenticated, unauthenticated, missingIdentity, closed])
-      websocketService.sockets.set(socket.id, socket);
-    await gateway.updateReaderLanguage('en');
-    expect(websocketService.readerLanguage).toBe('en');
-    expect(authenticated.sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { type: AttractapEventType.READER_LANGUAGE, payload: { language: 'en' } } }),
-    );
-    for (const socket of [unauthenticated, missingIdentity, closed]) expect(socket.sendMessage).not.toHaveBeenCalled();
-    (authenticated.sendMessage as jest.Mock).mockClear();
-    authenticated.readerId = null;
-    await gateway.updateReaderLanguage('de');
-    expect(websocketService.readerLanguage).toBe('de');
-    expect(authenticated.sendMessage).not.toHaveBeenCalled();
-  });
-
-  it.each([AttractapEventType.READER_AUTHENTICATED, AttractapEventType.READER_LANGUAGE])(
-    'retries %s with the latest persisted default',
-    async (type) => {
-      const client = createMockSocket();
-      const wait = jest.spyOn(
-        gateway as unknown as { waitForClientResponse: () => Promise<void> },
-        'waitForClientResponse',
-      );
-      wait.mockResolvedValue(undefined);
-      await gateway.handleConnection(client);
-      const socket = Array.from(websocketService.sockets.values())[0];
-      (client.send as jest.Mock).mockClear();
-      wait.mockImplementationOnce(async () => {
-        await gateway.updateReaderLanguage('en');
-        throw new Error('Lost acknowledgement');
-      });
-      await socket.sendMessage(new AttractapEvent(type, { language: 'de', name: 'Reader' }));
-      const sent = (client.send as jest.Mock).mock.calls.map(([body]) => JSON.parse(body).data.payload.language);
-      expect(sent).toEqual(['de', 'en']);
-    },
-  );
-
-  beforeEach(async () => {
-    licenseService = {
-      verifyLicense: jest.fn().mockResolvedValue(undefined),
-    };
-
-    attractapService = {
-      updateLastReaderConnection: jest.fn().mockResolvedValue(undefined),
-      findReaderById: jest.fn().mockResolvedValue(null),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AttractapGateway,
-        WebsocketService,
-        { provide: AttractapService, useValue: attractapService },
-        { provide: UsersService, useValue: {} },
-        { provide: AttractapFirmwareService, useValue: {} },
-        { provide: SumUpService, useValue: {} },
-        { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
-        { provide: LicenseService, useValue: licenseService },
-        { provide: ResourceUsageService, useValue: {} },
-        { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
-        { provide: ResourceHealthService, useValue: { listForResource: jest.fn().mockResolvedValue([]) } },
-        { provide: ResourceIntroductionsService, useValue: {} },
-        { provide: ResourceIntroducersService, useValue: {} },
-        { provide: ResourceFlowsService, useValue: {} },
-        { provide: ResourceFlowsExecutorService, useValue: {} },
-        { provide: ProjectsService, useValue: {} },
-        { provide: ResourceFormsService, useValue: {} },
-        { provide: MetricsService, useValue: mockMetricsService },
-        { provide: WS_METRICS, useValue: mockWsMetrics },
-        { provide: MetricsToggleService, useValue: mockMetricsToggle },
-        { provide: SupervisionService, useValue: {} },
-        { provide: RbacService, useValue: {} },
-        { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
-        { provide: SettingsService, useValue: { getAttractapLanguage: jest.fn().mockResolvedValue('de') } },
-        { provide: getRepositoryToken(Resource), useValue: {} },
-        ResourceListService,
-        ResourceActionGuard,
-        AttractapAuthHandler,
-        AttractapFirmwareHandler,
-        AttractapCrashReportHandler,
-        AttractapCardHandler,
-        AttractapFormsHandler,
-        AttractapSessionHandler,
-        { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
-        { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
-        AttractapBillingHandler,
-        AttractapProjectsHandler,
-        AttractapSupervisionHandler,
-      ],
-    }).compile();
-
-    gateway = module.get(AttractapGateway);
-    websocketService = module.get(WebsocketService);
-  });
+  const fixture = registerAttractapGatewayFixture();
 
   it('should be defined', () => {
-    expect(gateway).toBeDefined();
+    expect(fixture.gateway).toBeDefined();
   });
 
   describe('LVGL output sanitization', () => {
     const sanitize = (value: string) =>
-      (gateway as unknown as { makeStringLVGLReady: (input: string) => string }).makeStringLVGLReady(value);
+      (fixture.gateway as unknown as { makeStringLVGLReady: (input: string) => string }).makeStringLVGLReady(value);
 
     it('preserves printable Latin-1 characters', () => {
       expect(sanitize('ÄÖÜ äöü ß \u00A0°®')).toBe('ÄÖÜ äöü ß \u00A0°®');
@@ -218,7 +43,9 @@ describe('AttractapGateway', () => {
           },
         ],
       });
-      const sanitized = (gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }).sanitizeForLVGL(message);
+      const sanitized = (fixture.gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }).sanitizeForLVGL(
+        message,
+      );
       const field = sanitized.data.payload.fields[0];
 
       expect(field.name).toBe('"Größe"');
@@ -230,10 +57,10 @@ describe('AttractapGateway', () => {
 
   describe('handleConnection', () => {
     it('closes the connection when license verification fails', async () => {
-      licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
+      fixture.licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
       const mockClient = { close: jest.fn(), send: jest.fn() } as unknown as WebSocket;
 
-      await gateway.handleConnection(mockClient);
+      await fixture.gateway.handleConnection(mockClient);
 
       expect(mockClient.close).toHaveBeenCalled();
     });
@@ -248,13 +75,13 @@ describe('AttractapGateway', () => {
       // handleConnection blocks on waitForClientResponse (3 retries × 4s).
       // Don't await — just let it start, then verify the socket was registered
       // and that send() was called with the READER_REQUEST_AUTHENTICATION event.
-      const connectionPromise = gateway.handleConnection(mockClient);
+      const connectionPromise = fixture.gateway.handleConnection(mockClient);
 
       // Give the event loop a tick so handleConnection reaches the send call
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(websocketService.sockets.size).toBe(1);
-      const registeredSocket = Array.from(websocketService.sockets.values())[0];
+      expect(fixture.websocketService.sockets.size).toBe(1);
+      const registeredSocket = Array.from(fixture.websocketService.sockets.values())[0];
       expect(registeredSocket.readerId).toBeNull();
       expect(registeredSocket.state.lastAuthenticatedUserId).toBeNull();
 
@@ -275,24 +102,24 @@ describe('AttractapGateway', () => {
 
   describe('handleDisconnect', () => {
     it('removes the socket from websocketService', async () => {
-      const socket = createMockSocket({ id: 'disc-1' });
-      websocketService.sockets.set('disc-1', socket);
-      (gateway as unknown as { connectedAt: WeakMap<object, bigint> }).connectedAt.set(
+      const socket = fixture.createMockSocket({ id: 'disc-1' });
+      fixture.websocketService.sockets.set('disc-1', socket);
+      (fixture.gateway as unknown as { connectedAt: WeakMap<object, bigint> }).connectedAt.set(
         socket as unknown as object,
         process.hrtime.bigint(),
       );
 
-      expect(websocketService.sockets.size).toBe(1);
-      await gateway.handleDisconnect(socket);
-      expect(websocketService.sockets.size).toBe(0);
-      expect(mockWsMetrics.connectionDuration.observe).toHaveBeenCalledWith(
+      expect(fixture.websocketService.sockets.size).toBe(1);
+      await fixture.gateway.handleDisconnect(socket);
+      expect(fixture.websocketService.sockets.size).toBe(0);
+      expect(fixture.mockWsMetrics.connectionDuration.observe).toHaveBeenCalledWith(
         { gateway: 'attractap' },
         expect.any(Number),
       );
     });
 
     it('closes OTA file descriptor on disconnect if present', async () => {
-      const socket = createMockSocket({
+      const socket = fixture.createMockSocket({
         id: 'disc-ota',
         state: {
           lastAuthenticatedUserId: null,
@@ -301,34 +128,34 @@ describe('AttractapGateway', () => {
           ota: { path: '/tmp/test', size: 1024, fd: 999 },
         },
       });
-      websocketService.sockets.set('disc-ota', socket);
+      fixture.websocketService.sockets.set('disc-ota', socket);
 
-      await gateway.handleDisconnect(socket);
-      expect(websocketService.sockets.has('disc-ota')).toBe(false);
+      await fixture.gateway.handleDisconnect(socket);
+      expect(fixture.websocketService.sockets.has('disc-ota')).toBe(false);
     });
   });
 
   describe('onHeartbeat', () => {
     it('updates last reader connection for authenticated sockets', async () => {
-      const socket = createMockSocket({ id: 'hb-1', readerId: 5 });
+      const socket = fixture.createMockSocket({ id: 'hb-1', readerId: 5 });
 
-      await gateway.onHeartbeat(socket);
+      await fixture.gateway.onHeartbeat(socket);
 
-      expect(attractapService.updateLastReaderConnection).toHaveBeenCalledWith(5);
+      expect(fixture.attractapService.updateLastReaderConnection).toHaveBeenCalledWith(5);
     });
 
     it('does not update for sockets without a readerId', async () => {
-      const socket = createMockSocket({ id: 'hb-2', readerId: null });
+      const socket = fixture.createMockSocket({ id: 'hb-2', readerId: null });
 
-      await gateway.onHeartbeat(socket);
+      await fixture.gateway.onHeartbeat(socket);
 
-      expect(attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
+      expect(fixture.attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
     });
 
     it('sends a heartbeat ack back so idle links stay live', async () => {
-      const socket = createMockSocket({ id: 'hb-3', readerId: 7 });
+      const socket = fixture.createMockSocket({ id: 'hb-3', readerId: 7 });
 
-      await gateway.onHeartbeat(socket);
+      await fixture.gateway.onHeartbeat(socket);
 
       expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(
         JSON.stringify({ event: 'HEARTBEAT' }),
@@ -338,11 +165,11 @@ describe('AttractapGateway', () => {
 
   describe('onClientEvent', () => {
     it('passes the resource refresh request identity to the list service', async () => {
-      const socket = createMockSocket({ readerId: 42 });
+      const socket = fixture.createMockSocket({ readerId: 42 });
       const refresh = jest
-        .spyOn(gateway['resourceListService'], 'sendResourceListToSocket')
+        .spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket')
         .mockResolvedValue(undefined);
-      await gateway.onClientEvent(
+      await fixture.gateway.onClientEvent(
         { type: AttractapEventType.REQUEST_RESOURCE_LIST, payload: { requestId: 880 } },
         socket,
       );
@@ -350,7 +177,7 @@ describe('AttractapGateway', () => {
     });
 
     it('rejects server-only event types from clients', async () => {
-      const socket = createMockSocket({ id: 'ev-1', readerId: 1 });
+      const socket = fixture.createMockSocket({ id: 'ev-1', readerId: 1 });
 
       const serverOnlyEvents = [
         AttractapEventType.RESOURCE_LIST,
@@ -364,15 +191,17 @@ describe('AttractapGateway', () => {
 
       for (const type of serverOnlyEvents) {
         const event = new AttractapEvent(type, {});
-        await expect(gateway.onClientEvent(event.data, socket)).rejects.toThrow('THIS IS A SERVER SIDE ONLY EVENT');
+        await expect(fixture.gateway.onClientEvent(event.data, socket)).rejects.toThrow(
+          'THIS IS A SERVER SIDE ONLY EVENT',
+        );
       }
     });
 
     it('ignores events from unauthenticated clients (no readerId) except REGISTER/AUTHENTICATE', async () => {
-      const socket = createMockSocket({ id: 'ev-2', readerId: null });
+      const socket = fixture.createMockSocket({ id: 'ev-2', readerId: null });
 
       const event = new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, {});
-      const result = await gateway.onClientEvent(event.data, socket);
+      const result = await fixture.gateway.onClientEvent(event.data, socket);
 
       expect(result).toBeUndefined();
     });
@@ -380,25 +209,70 @@ describe('AttractapGateway', () => {
 
   describe('sendResourceList', () => {
     it('does nothing when no sockets match the reader id', async () => {
-      await expect(gateway.sendResourceList(999)).resolves.toBeUndefined();
+      await expect(fixture.gateway.sendResourceList(999)).resolves.toBeUndefined();
     });
   });
 
   describe('disconnectReader', () => {
     it('does nothing when no sockets match the reader id', async () => {
-      await expect(gateway.disconnectReader(999)).resolves.toBeUndefined();
+      await expect(fixture.gateway.disconnectReader(999)).resolves.toBeUndefined();
     });
 
     it('closes all sockets for the given reader', async () => {
-      const socket1 = createMockSocket({ id: 'dr-1', readerId: 5 });
-      const socket2 = createMockSocket({ id: 'dr-2', readerId: 5 });
-      websocketService.sockets.set('dr-1', socket1);
-      websocketService.sockets.set('dr-2', socket2);
+      const socket1 = fixture.createMockSocket({ id: 'dr-1', readerId: 5 });
+      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5 });
+      fixture.websocketService.sockets.set('dr-1', socket1);
+      fixture.websocketService.sockets.set('dr-2', socket2);
 
-      await gateway.disconnectReader(5);
+      await fixture.gateway.disconnectReader(5);
 
       expect(socket1.close).toHaveBeenCalled();
       expect(socket2.close).toHaveBeenCalled();
     });
   });
+  it('sends language updates only to open authenticated readers', async () => {
+    const authenticated = fixture.createMockSocket({ id: 'authenticated', readerId: 42, readyState: WebSocket.OPEN });
+    const unauthenticated = fixture.createMockSocket({ id: 'unauthenticated', readyState: WebSocket.OPEN });
+    const missingIdentity = fixture.createMockSocket({
+      id: 'missing',
+      readerId: undefined,
+      readyState: WebSocket.OPEN,
+    });
+    const closed = fixture.createMockSocket({ id: 'closed', readerId: 43, readyState: WebSocket.CLOSED });
+    for (const socket of [authenticated, unauthenticated, missingIdentity, closed])
+      fixture.websocketService.sockets.set(socket.id, socket);
+    await fixture.gateway.updateReaderLanguage('en');
+    expect(fixture.websocketService.readerLanguage).toBe('en');
+    expect(authenticated.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { type: AttractapEventType.READER_LANGUAGE, payload: { language: 'en' } } }),
+    );
+    for (const socket of [unauthenticated, missingIdentity, closed]) expect(socket.sendMessage).not.toHaveBeenCalled();
+    (authenticated.sendMessage as jest.Mock).mockClear();
+    authenticated.readerId = null;
+    await fixture.gateway.updateReaderLanguage('de');
+    expect(fixture.websocketService.readerLanguage).toBe('de');
+    expect(authenticated.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([AttractapEventType.READER_AUTHENTICATED, AttractapEventType.READER_LANGUAGE])(
+    'retries %s with the latest persisted default',
+    async (type) => {
+      const client = fixture.createMockSocket();
+      const wait = jest.spyOn(
+        fixture.gateway as unknown as { waitForClientResponse: () => Promise<void> },
+        'waitForClientResponse',
+      );
+      wait.mockResolvedValue(undefined);
+      await fixture.gateway.handleConnection(client);
+      const socket = Array.from(fixture.websocketService.sockets.values())[0];
+      (client.send as jest.Mock).mockClear();
+      wait.mockImplementationOnce(async () => {
+        await fixture.gateway.updateReaderLanguage('en');
+        throw new Error('Lost acknowledgement');
+      });
+      await socket.sendMessage(new AttractapEvent(type, { language: 'de', name: 'Reader' }));
+      const sent = (client.send as jest.Mock).mock.calls.map(([body]) => JSON.parse(body).data.payload.language);
+      expect(sent).toEqual(['de', 'en']);
+    },
+  );
 });

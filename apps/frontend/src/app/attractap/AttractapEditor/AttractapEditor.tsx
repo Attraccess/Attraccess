@@ -176,11 +176,7 @@ export function AttractapEditor(props: Readonly<Props>) {
           >
             {t('cancel')}
           </Button>
-          <Button
-            isPending={updateReaderMutation.isPending}
-            onPress={save}
-            data-cy="attractap-editor-save-button"
-          >
+          <Button isPending={updateReaderMutation.isPending} onPress={save} data-cy="attractap-editor-save-button">
             {t('save')}
           </Button>
         </DrawerFooter>

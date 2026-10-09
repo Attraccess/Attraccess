@@ -6,7 +6,7 @@
 #include <functional>
 
 #include "../utils.hpp"
-#include "platform.hpp"
+#include "../platform.hpp"
 #ifndef ATTRACTAP_HOST
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
@@ -31,6 +31,22 @@
 //   display_input.cpp   - flush + touch input dispatch
 //   display_popups.cpp  - global overlay popups
 //   display_overlay.cpp - persistent device-info overlay
+
+static std::string s_renderedLanguage;
+
+void Display::refreshVisibleTextForLanguageChange()
+{
+    const std::string language = State::getActiveLanguage();
+    if (language == s_renderedLanguage) return;
+    s_renderedLanguage = language;
+    if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
+    FirmwareI18n::refreshTree(Display::activePopup, language);
+    FirmwareI18n::refreshTree(Display::drawerPanel, language);
+    FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
+    // Project and form dialogs live on LVGL's top layer, outside the active
+    // screen tree. Refreshing the layer reaches those open dialogs as well.
+    FirmwareI18n::refreshTree(lv_layer_top(), language);
+}
 
 // Static member definitions
 Logger Display::logger("Display");
@@ -80,22 +96,7 @@ int16_t Display::gestureStartY = 0;
 
 // Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
 // to ensure LVGL is fully running before creating overlay objects.
-static bool s_touchWarningPending = false;
-static std::string s_renderedLanguage;
-
-void Display::refreshVisibleTextForLanguageChange()
-{
-    const std::string language = State::getActiveLanguage();
-    if (language == s_renderedLanguage) return;
-    s_renderedLanguage = language;
-    if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
-    FirmwareI18n::refreshTree(Display::activePopup, language);
-    FirmwareI18n::refreshTree(Display::drawerPanel, language);
-    FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
-    // Project and form dialogs live on LVGL's top layer, outside the active
-    // screen tree. Refreshing the layer reaches those open dialogs as well.
-    FirmwareI18n::refreshTree(lv_layer_top(), language);
-}
+bool Display::touchWarningPending = false;
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -125,10 +126,6 @@ void Display::logFromLvgl(lv_log_level_t level, const char *buf)
         break;
     }
 }
-static void lvgl_log_cb(lv_log_level_t level, const char *buf)
-{
-    Display::logFromLvgl(level, buf);
-}
 #endif
 
 uint8_t Display::reboot_count = 0;
@@ -149,6 +146,114 @@ uint32_t Display::tick_cb()
 {
     return millis();
 }
+
+#ifndef ATTRACTAP_HOST
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
+#ifdef HAS_IO_EXPANDER
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
+#if defined(DISPLAY_DRIVER_GT911)
+#include "driver/gt911/rgb_gt911_driver.hpp"
+#endif
+#if defined(DISPLAY_DRIVER_QUALIA)
+#include "driver/qualia/qualia_ft_cst_driver.hpp"
+#endif
+
+void Display::renderTask(void *parameter)
+{
+#ifndef ATTRACTAP_HOST
+    (void)parameter;
+    while (true)
+    {
+        // lv_timer_handler self-locks via lv_lock() (LV_USE_OS LV_OS_FREERTOS)
+        // and returns the time until the next ready timer.
+        uint32_t delayMs = lv_timer_handler();
+        if (delayMs == LV_NO_TIMER_READY)
+        {
+            delayMs = LV_DEF_REFR_PERIOD;
+        }
+        if (delayMs < 1)
+        {
+            delayMs = 1;
+        }
+        else if (delayMs > LV_DEF_REFR_PERIOD)
+        {
+            delayMs = LV_DEF_REFR_PERIOD;
+        }
+        vTaskDelay(pdMS_TO_TICKS(delayMs));
+    }
+#else
+    (void)parameter;
+#endif
+}
+
+void Display::asyncCall(lv_async_cb_t cb, void *user_data)
+{
+#ifdef ATTRACTAP_HOST
+    lv_async_call(cb, user_data);
+#else
+    lv_lock();
+    lv_async_call(cb, user_data);
+    lv_unlock();
+#endif
+}
+
+bool Display::hasTouchInput()
+{
+    return Display::driver && Display::driver->touchAvailable();
+}
+
+void Display::loop()
+{
+#ifdef ATTRACTAP_HOST
+    Display::updateDrawerAvailability();
+    Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
+    Display::advanceScreenRouter();
+    return;
+#endif
+    // Runs on the main application loop; rendering itself lives on LvglTask
+    // (renderTask). Everything below mutates LVGL objects, so hold lv_lock for
+    // the duration (recursive FreeRTOS mutex, also taken by lv_timer_handler).
+    lv_lock();
+
+    if (Display::touchWarningPending)
+    {
+        Display::touchWarningPending = false;
+        Display::showErrorPopup(FirmwareI18n::Message::TouchUnavailable,
+                                FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot);
+    }
+
+    Display::updateDrawerAvailability();
+    Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
+    Display::advanceScreenRouter();
+
+
+    lv_unlock();
+}
+
+#ifndef ATTRACTAP_HOST
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
+#ifdef HAS_IO_EXPANDER
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
+#if defined(DISPLAY_DRIVER_GT911)
+#include "driver/gt911/rgb_gt911_driver.hpp"
+#endif
+#if defined(DISPLAY_DRIVER_QUALIA)
+#include "driver/qualia/qualia_ft_cst_driver.hpp"
+#endif
 
 #ifdef ATTRACTAP_HOST
 void Display::setup(IDisplayDriver &hostDriver)
@@ -243,12 +348,36 @@ void Display::setup()
 
 #if LV_USE_LOG != 0
     /* Route LVGL logs to our logger */
-    lv_log_register_print_cb(lvgl_log_cb);
+    lv_log_register_print_cb(Display::logFromLvgl);
 #endif
 
     /* Set LVGL tick source (v9) */
     lv_tick_set_cb(Display::tick_cb);
 
+    Display::setupFramebuffer();
+#endif
+}
+
+#ifndef ATTRACTAP_HOST
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
+#ifdef HAS_IO_EXPANDER
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
+#if defined(DISPLAY_DRIVER_GT911)
+#include "driver/gt911/rgb_gt911_driver.hpp"
+#endif
+#if defined(DISPLAY_DRIVER_QUALIA)
+#include "driver/qualia/qualia_ft_cst_driver.hpp"
+#endif
+
+void Display::setupFramebuffer()
+{
+#ifndef ATTRACTAP_HOST
     /* Allocate draw buffers in bytes for LVGL v9.
      * Was 480x20 (1/24 of the frame) in internal DRAM, forcing 24 serialized
      * partial render+flush passes per full screen (~150ms/frame, "Bildaufbau
@@ -319,7 +448,7 @@ void Display::setup()
     if (!Display::driver->touchAvailable())
     {
         Display::logger.warn("Touch panel not detected — warning will be shown after first render");
-        s_touchWarningPending = true;
+        Display::touchWarningPending = true;
     }
 
     // Rendering + touch sampling on a dedicated task (ATT-554 item 7), pinned to
@@ -330,77 +459,4 @@ void Display::setup()
 
     Display::logger.info("Setup done");
 #endif
-}
-
-void Display::renderTask(void *parameter)
-{
-#ifndef ATTRACTAP_HOST
-    (void)parameter;
-    while (true)
-    {
-        // lv_timer_handler self-locks via lv_lock() (LV_USE_OS LV_OS_FREERTOS)
-        // and returns the time until the next ready timer.
-        uint32_t delayMs = lv_timer_handler();
-        if (delayMs == LV_NO_TIMER_READY)
-        {
-            delayMs = LV_DEF_REFR_PERIOD;
-        }
-        if (delayMs < 1)
-        {
-            delayMs = 1;
-        }
-        else if (delayMs > LV_DEF_REFR_PERIOD)
-        {
-            delayMs = LV_DEF_REFR_PERIOD;
-        }
-        vTaskDelay(pdMS_TO_TICKS(delayMs));
-    }
-#else
-    (void)parameter;
-#endif
-}
-
-void Display::asyncCall(lv_async_cb_t cb, void *user_data)
-{
-#ifdef ATTRACTAP_HOST
-    lv_async_call(cb, user_data);
-#else
-    lv_lock();
-    lv_async_call(cb, user_data);
-    lv_unlock();
-#endif
-}
-
-bool Display::hasTouchInput()
-{
-    return Display::driver && Display::driver->touchAvailable();
-}
-
-void Display::loop()
-{
-#ifdef ATTRACTAP_HOST
-    Display::updateDrawerAvailability();
-    Display::updateNetworkQualityOverlay();
-    refreshVisibleTextForLanguageChange();
-    Display::advanceScreenRouter();
-    return;
-#endif
-    // Runs on the main application loop; rendering itself lives on LvglTask
-    // (renderTask). Everything below mutates LVGL objects, so hold lv_lock for
-    // the duration (recursive FreeRTOS mutex, also taken by lv_timer_handler).
-    lv_lock();
-
-    if (s_touchWarningPending)
-    {
-        s_touchWarningPending = false;
-        Display::showErrorPopup(FirmwareI18n::Message::TouchUnavailable,
-                                FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot);
-    }
-
-    Display::updateDrawerAvailability();
-    Display::updateNetworkQualityOverlay();
-    refreshVisibleTextForLanguageChange();
-    Display::advanceScreenRouter();
-
-    lv_unlock();
 }

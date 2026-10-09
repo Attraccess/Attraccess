@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { SSOProviderType } from '@attraccess/database-entities';
+import { randomUUID } from 'node:crypto';
+import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { projectSsoAuditEvent } from './audit-policy';
-import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/sso-audit-snapshot';
 
 describe('SSO audit policy', () => {
   const provider = JSON.stringify({
@@ -24,7 +24,6 @@ describe('SSO audit policy', () => {
   });
   const delta = JSON.stringify({ added: ['user-manager'], removed: [], updated: [] });
   const providerChanges = JSON.stringify({ changed: ['configuration.issuer'], rotated: [] });
-
   it.each([
     ['sso.provisioning.sessions_revoked', 'sessionsRevoked'],
     ['sso.provisioning.user_created', 'userCreated'],
@@ -36,11 +35,11 @@ describe('SSO audit policy', () => {
       actorId: null,
       authenticationMethod: null,
       subject: { type: 'user' as const, id: 9 },
-      details: { provider, changes: JSON.stringify({ [key]: true }) },
+      details: { provider: provider, changes: JSON.stringify({ [key]: true }) },
     };
     expect(projectSsoAuditEvent(event)).not.toBeNull();
     for (const changes of ['{', '{}', JSON.stringify({ [key]: false }), JSON.stringify({ [key]: true, extra: true })]) {
-      expect(projectSsoAuditEvent({ ...event, details: { provider, changes } })).toBeNull();
+      expect(projectSsoAuditEvent({ ...event, details: { provider: provider, changes } })).toBeNull();
     }
   });
 
@@ -334,7 +333,7 @@ describe('SSO audit policy', () => {
         actorId: null,
         authenticationMethod: null,
         subject: { type: 'user', id: 9 },
-        details: { provider, changes: delta },
+        details: { provider: provider, changes: delta },
       }),
     ).toMatchObject({ action: 'sso.provisioning.permissions_synced', actorId: null, subject: { type: 'user', id: 9 } });
   });
@@ -367,22 +366,22 @@ describe('SSO audit policy', () => {
       {
         action: 'sso.provisioning.permissions_synced',
         subject: { type: 'user', id: 9 },
-        details: { provider, changes: JSON.stringify({ added: ['administrator'], removed: [] }) },
+        details: { provider: provider, changes: JSON.stringify({ added: ['administrator'], removed: [] }) },
       },
       {
         action: 'sso.provisioning.permissions_synced',
         actorId: null,
         authenticationMethod: 'session',
         subject: { type: 'user', id: 9 },
-        details: { provider, changes: delta },
+        details: { provider: provider, changes: delta },
       },
-      { details: { before: provider, after: provider, provider } },
+      { details: { before: provider, after: provider, provider: provider } },
       {
         action: 'sso.provisioning.user_created',
         actorId: 7,
         authenticationMethod: 'session',
         subject: { type: 'user', id: 9 },
-        details: { provider, changes: JSON.stringify({ userCreated: true }) },
+        details: { provider: provider, changes: JSON.stringify({ userCreated: true }) },
       },
     ]) {
       expect(

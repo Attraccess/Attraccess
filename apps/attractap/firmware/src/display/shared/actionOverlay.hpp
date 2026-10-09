@@ -1,9 +1,8 @@
+#include "../i18n.hpp"
 #pragma once
 
-#include "display/i18n.hpp"
-
-#include "display/fonts/attractap_fonts.hpp"
-#include "display/theme.hpp"
+#include "../fonts/attractap_fonts.hpp"
+#include "../theme.hpp"
 
 // Owned by a screen; covers its complete input area while a request is pending.
 class ActionOverlay {

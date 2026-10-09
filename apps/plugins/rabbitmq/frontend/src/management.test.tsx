@@ -1,11 +1,11 @@
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
-import { RabbitmqUserPanel } from './RabbitmqUserPanel';
-import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
-import { RabbitmqPermissionsModal } from './RabbitmqPermissionsModal';
-import { useDetection, type RabbitmqDetectionResult } from './detection';
-import { DEFAULT_MQTT_PERMISSIONS } from './users-api';
+import { RabbitmqStatusPanel } from './detection/RabbitmqStatusPanel';
+import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
+import { RabbitmqUserFormModal } from './users/RabbitmqUserFormModal';
+import { RabbitmqPermissionsModal } from './users/permissions/RabbitmqPermissionsModal';
+import { useDetection, type RabbitmqDetectionResult } from './detection/detection';
+import { DEFAULT_MQTT_PERMISSIONS } from './users/users-api';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
 const request = vi.hoisted(() => vi.fn());

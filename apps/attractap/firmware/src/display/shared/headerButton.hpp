@@ -1,8 +1,7 @@
+#include "../i18n.hpp"
 #pragma once
 
-#include "display/i18n.hpp"
-
-#include "display/theme.hpp"
+#include "../theme.hpp"
 
 namespace ReaderHeader {
 // Header controls fill the row height, so the default pressed-state growth

@@ -1,52 +1,26 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, MinLength, IsEnum, IsUrl, ValidateIf, IsBoolean, IsObject, IsInt, Min } from 'class-validator';
-import { FileUpload } from '../../common/types/file-upload.types';
 import {
   AutoIntroductionTarget,
-  DocumentationType,
   ResourceType,
   SupervisionMode,
+  DocumentationType,
 } from '@attraccess/database-entities';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+  ValidateIf,
+  IsUrl,
+} from 'class-validator';
 import { ToBoolean, ToJson, ToNumber } from '../../common/request-transformers';
+import { FileUpload } from '../../common/types/file-upload.types';
 
-export class CreateResourceDto {
-  @ApiProperty({
-    description: 'The name of the resource',
-    example: '3D Printer',
-  })
-  @IsString()
-  @MinLength(1)
-  name: string;
-
-  @ApiProperty({
-    description: 'The type of the resource',
-    example: ResourceType.Machine,
-    enum: ResourceType,
-    enumName: 'ResourceType',
-  })
-  @IsEnum(ResourceType)
-  type: ResourceType;
-
-  @ApiProperty({
-    description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
-    example: false,
-    default: false,
-    required: false,
-  })
-  @IsBoolean()
-  @IsOptional()
-  @ToBoolean()
-  separateUnlockAndUnlatch?: boolean;
-
-  @ApiProperty({
-    description: 'A detailed description of the resource',
-    example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  description?: string;
-
+export class CreateResourceDtoDocumentation {
   @ApiProperty({
     description: 'Resource image file',
     required: false,
@@ -85,7 +59,45 @@ export class CreateResourceDto {
   @ValidateIf((o) => o.documentationType === DocumentationType.URL)
   @IsOptional()
   documentationUrl?: string;
+}
 
+export class CreateResourceDto extends CreateResourceDtoDocumentation {
+  @ApiProperty({
+    description: 'The name of the resource',
+    example: '3D Printer',
+  })
+  @IsString()
+  @MinLength(1)
+  name: string;
+
+  @ApiProperty({
+    description: 'The type of the resource',
+    example: ResourceType.Machine,
+    enum: ResourceType,
+    enumName: 'ResourceType',
+  })
+  @IsEnum(ResourceType)
+  type: ResourceType;
+
+  @ApiProperty({
+    description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
+    example: false,
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  @ToBoolean()
+  separateUnlockAndUnlatch?: boolean;
+
+  @ApiProperty({
+    description: 'A detailed description of the resource',
+    example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
   @ApiProperty({
     description: 'Custom metadata key-value pairs configured for this resource',
     required: false,

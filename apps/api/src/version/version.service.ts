@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository, MoreThan } from 'typeorm';
-import { activeUsageWhere } from '../resources/usage/active-usage';
+import { activeUsageWhere } from '../resources/usage/sessions/active-usage';
 import axios, { AxiosInstance } from 'axios';
 import * as semver from 'semver';
 import { User, Resource, Project, ResourceUsage, Session } from '@attraccess/database-entities';

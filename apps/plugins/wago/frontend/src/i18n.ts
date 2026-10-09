@@ -51,7 +51,8 @@ const serverMessagePatterns: {
   referenceParameter?: string;
 }[] = [
   {
-    pattern: /^Automatic SSH setup failed \((status|audit|ownership|proof|recovery_login|key_commit|acceptance|cutover|policy|root_login|boot|reboot|confirmation|rollback)\)\. (.+)$/,
+    pattern:
+      /^Automatic SSH setup failed \((status|audit|ownership|proof|recovery_login|key_commit|acceptance|cutover|policy|root_login|boot|reboot|confirmation|rollback)\)\. (.+)$/,
     key: 'Automatic SSH setup failed ({{stage}}). {{reason}}',
     parameters: ['stage', 'reason'],
   },

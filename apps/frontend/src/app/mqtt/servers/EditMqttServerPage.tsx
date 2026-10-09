@@ -1,12 +1,14 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Checkbox, Description, FieldError, Form, Input, Label, Spinner, TextField } from '@heroui/react';
-import { MqttManagementPort, parseManagementPort } from './managementPort';
+import { Checkbox, Description, Form, Input, Label, Spinner, TextField, FieldError } from '@heroui/react';
 import { TlsSection } from './TlsSection';
-import { Button } from '../../../components/button';
-import { Select } from '../../../components/select';
+import { Button } from '../../../components/button/index';
+import { Select } from '../../../components/select/index';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
-import { PageHeader } from '../../../components/pageHeader';
-import { PasswordInput } from '../../../components/PasswordInput';
+import { PageHeader } from '../../../components/pageHeader/index';
+import { PasswordInput } from '../../../components/PasswordInput/index';
+import { PluginSlot } from '../../plugins/PluginSlot';
+import { MQTT_SERVER_DETAIL_SLOT, MqttServerSlotContext } from '../mqtt.slots';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { MqttManagementPort, parseManagementPort } from './managementPort';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/edit/en.json';
@@ -19,10 +21,8 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { PluginSlot } from '../../plugins/PluginSlot';
-import { MQTT_SERVER_DETAIL_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 
-export function EditMqttServerPage() {
+export function useEditMqttServerPageState() {
   const { serverId } = useParams<{ serverId: string }>();
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
@@ -115,6 +115,123 @@ export function EditMqttServerPage() {
   const handleCancel = () => {
     navigate('/devices/mqtt/servers');
   };
+  return {
+    t,
+    managementPortInput,
+    setManagementPortInput,
+    clearPassword,
+    setClearPassword,
+    managementPort,
+    formValues,
+    setFormValues,
+    server,
+    isLoadingServer,
+    isError,
+    updateMqttServer,
+    qosOptions,
+    handleSubmit,
+    handleCancel,
+  } as const;
+}
+
+type Props = Pick<
+  ReturnType<typeof useEditMqttServerPageState>,
+  't' | 'formValues' | 'setFormValues' | 'managementPortInput' | 'setManagementPortInput' | 'managementPort'
+>;
+
+export function EditMqttServerPageEditMqttServerFormNameInput({
+  t,
+  formValues,
+  setFormValues,
+  managementPortInput,
+  setManagementPortInput,
+  managementPort,
+}: Props) {
+  return (
+    <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.connection')}</h3>
+      <TextField value={formValues.name} onChange={(v) => setFormValues((p) => ({ ...p, name: v }))} className="w-full">
+        <Label>{t('nameLabel')}</Label>
+        <Input
+          id="name"
+          name="name"
+          placeholder={t('namePlaceholder')}
+          required
+          data-cy="edit-mqtt-server-form-name-input"
+        />
+      </TextField>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+        <TextField
+          value={formValues.host}
+          onChange={(v) => setFormValues((p) => ({ ...p, host: v }))}
+          className="md:col-span-2"
+        >
+          <Label>{t('hostLabel')}</Label>
+          <Input
+            id="host"
+            name="host"
+            placeholder={t('hostPlaceholder')}
+            required
+            data-cy="edit-mqtt-server-form-host-input"
+          />
+        </TextField>
+
+        <TextField
+          value={String(formValues.port || 1883)}
+          onChange={(v) => setFormValues((p) => ({ ...p, port: parseInt(v, 10) }))}
+        >
+          <Label>{t('portLabel')}</Label>
+          <Input
+            id="port"
+            name="port"
+            type="number"
+            placeholder={t('portPlaceholder')}
+            required
+            data-cy="edit-mqtt-server-form-port-input"
+          />
+        </TextField>
+      </div>
+      <TextField
+        value={managementPortInput}
+        onChange={setManagementPortInput}
+        isInvalid={managementPort === undefined}
+        className="w-full"
+      >
+        <Label>{t('managementPortLabel')}</Label>
+        <Input
+          name="managementPort"
+          type="number"
+          min={1}
+          max={65535}
+          step={1}
+          data-cy="edit-mqtt-server-form-management-port-input"
+        />
+        <Description>{t('managementPortDescription')}</Description>
+        <FieldError>{t('managementPortInvalid')}</FieldError>
+      </TextField>
+    </section>
+  );
+}
+
+export function EditMqttServerPage() {
+  const {
+    t,
+    managementPortInput,
+    setManagementPortInput,
+    clearPassword,
+    setClearPassword,
+    managementPort,
+    formValues,
+    setFormValues,
+    server,
+    isLoadingServer,
+    isError,
+    updateMqttServer,
+    qosOptions,
+    handleSubmit,
+    handleCancel,
+  } = useEditMqttServerPageState();
 
   if (isLoadingServer) {
     return (
@@ -133,75 +250,9 @@ export function EditMqttServerPage() {
       <PageHeader title={t('editMqttServer')} onBack={handleCancel} />
 
       <Form onSubmit={handleSubmit} className="gap-8" data-cy="edit-mqtt-server-form">
-        <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
-          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-            {t('sections.connection')}
-          </h3>
-          <TextField
-            value={formValues.name}
-            onChange={(v) => setFormValues((p) => ({ ...p, name: v }))}
-            className="w-full"
-          >
-            <Label>{t('nameLabel')}</Label>
-            <Input
-              id="name"
-              name="name"
-              placeholder={t('namePlaceholder')}
-              required
-              data-cy="edit-mqtt-server-form-name-input"
-            />
-          </TextField>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-            <TextField
-              value={formValues.host}
-              onChange={(v) => setFormValues((p) => ({ ...p, host: v }))}
-              className="md:col-span-2"
-            >
-              <Label>{t('hostLabel')}</Label>
-              <Input
-                id="host"
-                name="host"
-                placeholder={t('hostPlaceholder')}
-                required
-                data-cy="edit-mqtt-server-form-host-input"
-              />
-            </TextField>
-
-            <TextField
-              value={String(formValues.port || 1883)}
-              onChange={(v) => setFormValues((p) => ({ ...p, port: parseInt(v, 10) }))}
-            >
-              <Label>{t('portLabel')}</Label>
-              <Input
-                id="port"
-                name="port"
-                type="number"
-                placeholder={t('portPlaceholder')}
-                required
-                data-cy="edit-mqtt-server-form-port-input"
-              />
-            </TextField>
-          </div>
-          <TextField
-            value={managementPortInput}
-            onChange={setManagementPortInput}
-            isInvalid={managementPort === undefined}
-            className="w-full"
-          >
-            <Label>{t('managementPortLabel')}</Label>
-            <Input
-              name="managementPort"
-              type="number"
-              min={1}
-              max={65535}
-              step={1}
-              data-cy="edit-mqtt-server-form-management-port-input"
-            />
-            <Description>{t('managementPortDescription')}</Description>
-            <FieldError>{t('managementPortInvalid')}</FieldError>
-          </TextField>
-        </section>
+        <EditMqttServerPageEditMqttServerFormNameInput
+          {...{ t, formValues, setFormValues, managementPortInput, setManagementPortInput, managementPort }}
+        />
 
         <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
           <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
@@ -222,10 +273,7 @@ export function EditMqttServerPage() {
           </TextField>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-            <TextField
-              value={formValues.username}
-              onChange={(v) => setFormValues((p) => ({ ...p, username: v }))}
-            >
+            <TextField value={formValues.username} onChange={(v) => setFormValues((p) => ({ ...p, username: v }))}>
               <Label>{t('usernameLabel')}</Label>
               <Input
                 id="username"
@@ -328,10 +376,7 @@ export function EditMqttServerPage() {
         </div>
       </Form>
 
-      <PluginSlot<MqttServerSlotContext>
-        slotId={MQTT_SERVER_DETAIL_SLOT}
-        context={{ mqttServerId: server.id }}
-      />
+      <PluginSlot<MqttServerSlotContext> slotId={MQTT_SERVER_DETAIL_SLOT} context={{ mqttServerId: server.id }} />
     </div>
   );
 }

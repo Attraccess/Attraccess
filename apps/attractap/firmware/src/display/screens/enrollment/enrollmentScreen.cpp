@@ -1,12 +1,12 @@
+#include "state/state.hpp"
 #include "display/i18n.hpp"
 #include "enrollmentScreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
-#include "platform.hpp"
-#include "state/state.hpp"
+#include "../../../platform.hpp"
 
 void EnrollmentScreen::init()
 {
@@ -39,6 +39,7 @@ void EnrollmentScreen::init()
    lv_obj_set_style_bg_color(this->timeoutBar, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->timeoutBar, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_radius(this->timeoutBar, 6, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
 
    // Title
    lv_obj_t *title = lv_label_create(this->screen);
@@ -84,8 +85,91 @@ void EnrollmentScreen::init()
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+
    this->updateTimeoutBar();
    this->applyStatus();
+}
+
+lv_obj_t *EnrollmentScreen::getScreen()
+{
+   return this->screen;
+}
+
+void EnrollmentScreen::setEnrollmentTimeoutTime(uint32_t enrollmentTimeoutTime)
+{
+   this->enrollmentTimeoutTime = enrollmentTimeoutTime;
+   this->updateTimeoutBar();
+}
+
+void EnrollmentScreen::setUserName(std::string userName)
+{
+   this->userNameCache = userName;
+   if (this->userNameLabel)
+   {
+      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str());
+   }
+}
+
+
+void EnrollmentScreen::setStatus(Status status)
+{
+   this->status = status;
+   if (status != STATUS_ERROR)
+   {
+      this->statusMessageOverride.clear();
+   }
+   this->applyStatus();
+}
+
+void EnrollmentScreen::setStatusMessage(const FirmwareI18n::Text &message)
+{
+   this->statusMessageOverride = message;
+   this->applyStatus();
+}
+
+void EnrollmentScreen::setOnCancelCallback(std::function<void()> callback)
+{
+   this->onCancelCallback = callback;
+}
+
+void EnrollmentScreen::onCancelButtonEvent(lv_event_t *e)
+{
+   EnrollmentScreen *self = static_cast<EnrollmentScreen *>(lv_event_get_user_data(e));
+   if (!self)
+   {
+      return;
+   }
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+   {
+      return;
+   }
+   if (self->onCancelCallback)
+   {
+      self->onCancelCallback();
+   }
+}
+
+std::string EnrollmentScreen::getName()
+{
+   return "EnrollmentScreen";
+}
+
+void EnrollmentScreen::onScreenLeave()
+{
+}
+
+void EnrollmentScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->timeoutBar = nullptr;
+   this->userNameLabel = nullptr;
+   this->statusLabel = nullptr;
+   this->cancelButton = nullptr;
 }
 
 void EnrollmentScreen::loop()
@@ -165,85 +249,4 @@ void EnrollmentScreen::applyStatus()
          lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
       }
    }
-}
-
-lv_obj_t *EnrollmentScreen::getScreen()
-{
-   return this->screen;
-}
-
-void EnrollmentScreen::setEnrollmentTimeoutTime(uint32_t enrollmentTimeoutTime)
-{
-   this->enrollmentTimeoutTime = enrollmentTimeoutTime;
-   this->updateTimeoutBar();
-}
-
-void EnrollmentScreen::setUserName(std::string userName)
-{
-   this->userNameCache = userName;
-   if (this->userNameLabel)
-   {
-      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str());
-   }
-}
-
-void EnrollmentScreen::setStatus(Status status)
-{
-   this->status = status;
-   if (status != STATUS_ERROR)
-   {
-      this->statusMessageOverride.clear();
-   }
-   this->applyStatus();
-}
-
-void EnrollmentScreen::setStatusMessage(const FirmwareI18n::Text &message)
-{
-   this->statusMessageOverride = message;
-   this->applyStatus();
-}
-
-void EnrollmentScreen::setOnCancelCallback(std::function<void()> callback)
-{
-   this->onCancelCallback = callback;
-}
-
-void EnrollmentScreen::onCancelButtonEvent(lv_event_t *e)
-{
-   EnrollmentScreen *self = static_cast<EnrollmentScreen *>(lv_event_get_user_data(e));
-   if (!self)
-   {
-      return;
-   }
-   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
-   {
-      return;
-   }
-   if (self->onCancelCallback)
-   {
-      self->onCancelCallback();
-   }
-}
-
-std::string EnrollmentScreen::getName()
-{
-   return "EnrollmentScreen";
-}
-
-void EnrollmentScreen::onScreenLeave()
-{
-}
-
-void EnrollmentScreen::destroy()
-{
-   if (!this->screen)
-   {
-      return;
-   }
-   lv_obj_del(this->screen);
-   this->screen = nullptr;
-   this->timeoutBar = nullptr;
-   this->userNameLabel = nullptr;
-   this->statusLabel = nullptr;
-   this->cancelButton = nullptr;
 }

@@ -1,17 +1,16 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, TextField, cn } from '@heroui/react';
-import { Button } from '../../../../../components/button';
+import { Button } from '../../../../../components/button/index';
 import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getBaseUrl } from '../../../../../api';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
-import { PageHeader } from '../../../../../components/pageHeader';
-import { useAttractapSerialComm } from '../Auth';
-
+import { PageHeader } from '../../../../../components/pageHeader/index';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getBaseUrl } from '../../../../../api/index';
+import { useAttractapSerialComm } from '../Auth/index';
 import de from './de.json';
 import en from './en.json';
 
-export function AttractapSerialConfiguratorApi({
+export function useAttractapSerialConfiguratorApiState({
   openDeviceSettings,
   className,
 }: {
@@ -140,6 +139,62 @@ export function AttractapSerialConfiguratorApi({
   const handleRefresh = async () => {
     await fetchConfiguration();
   };
+  return {
+    t,
+    isFetchingConfiguration,
+    isUpdatingApi,
+    showManual,
+    setShowManual,
+    status,
+    apiConnectionData,
+    manualHostname,
+    setManualHostname,
+    manualPort,
+    setManualPort,
+    manualUseSSL,
+    setManualUseSSL,
+    apiDataMatchesServer,
+    handleOpenDeviceSettings,
+    alertDescription,
+    alertTitle,
+    alertColor,
+    handleApplyCurrentServer,
+    handleManualSubmit,
+    handleRefresh,
+    className,
+  } as const;
+}
+
+export function AttractapSerialConfiguratorApi({
+  openDeviceSettings,
+  className,
+}: {
+  openDeviceSettings: (deviceId: string) => void;
+  className?: string;
+}) {
+  const {
+    t,
+    isFetchingConfiguration,
+    isUpdatingApi,
+    showManual,
+    setShowManual,
+    status,
+    apiConnectionData,
+    manualHostname,
+    setManualHostname,
+    manualPort,
+    setManualPort,
+    manualUseSSL,
+    setManualUseSSL,
+    apiDataMatchesServer,
+    handleOpenDeviceSettings,
+    alertDescription,
+    alertTitle,
+    alertColor,
+    handleApplyCurrentServer,
+    handleManualSubmit,
+    handleRefresh,
+  } = useAttractapSerialConfiguratorApiState({ openDeviceSettings, className });
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>

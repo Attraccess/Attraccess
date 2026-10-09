@@ -1,59 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { registerResourceIntroducersServiceFixture } from './resourceIntroducers.service.resource-introducers-service.test-fixture';
 import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
-import { ResourceIntroducersService } from './resourceIntroducers.service';
-import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
-import { NotificationCategory } from '../../notifications/notification-types';
+import { NotificationCategory } from './../../notifications/notification-types';
 
 describe('ResourceIntroducersService', () => {
-  let service: ResourceIntroducersService;
-  let repository: {
-    find: jest.Mock;
-    findOne: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
-    remove: jest.Mock;
-    createQueryBuilder: jest.Mock;
-  };
-  let userRepository: { findOne: jest.Mock };
-  let eventEmitter: { emit: jest.Mock };
-  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
-
-  const emptyGroupQuery = {
-    leftJoinAndSelect: jest.fn().mockReturnThis(),
-    innerJoin: jest.fn().mockReturnThis(),
-    leftJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  };
-
-  beforeEach(async () => {
-    repository = {
-      find: jest.fn().mockResolvedValue([]),
-      findOne: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
-      remove: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue(emptyGroupQuery),
-    };
-    userRepository = { findOne: jest.fn().mockResolvedValue({ id: 2, locale: 'en' } as User) };
-    eventEmitter = { emit: jest.fn() };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ResourceIntroducersService,
-        { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
-        { provide: getRepositoryToken(User), useValue: userRepository },
-        { provide: EventEmitter2, useValue: eventEmitter },
-        { provide: NotificationDispatchService, useValue: notifications },
-      ],
-    }).compile();
-
-    service = module.get(ResourceIntroducersService);
-  });
+  const fixture = registerResourceIntroducersServiceFixture();
 
   describe('getMany', () => {
     it('returns both direct and group-inherited introducers, deduped by user', async () => {
@@ -72,7 +22,7 @@ describe('ResourceIntroducersService', () => {
         user: { id: 20 },
       } as unknown as ResourceIntroducer;
 
-      repository.find.mockResolvedValue([directIntroducer]);
+      fixture.repository.find.mockResolvedValue([directIntroducer]);
 
       const groupQuery = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -81,9 +31,9 @@ describe('ResourceIntroducersService', () => {
         andWhere: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue([groupIntroducer]),
       };
-      repository.createQueryBuilder.mockReturnValue(groupQuery);
+      fixture.repository.createQueryBuilder.mockReturnValue(groupQuery);
 
-      const result = await service.getMany(1);
+      const result = await fixture.service.getMany(1);
 
       expect(result).toEqual([directIntroducer, groupIntroducer]);
     });
@@ -104,7 +54,7 @@ describe('ResourceIntroducersService', () => {
         user: { id: 10 },
       } as unknown as ResourceIntroducer;
 
-      repository.find.mockResolvedValue([directIntroducer]);
+      fixture.repository.find.mockResolvedValue([directIntroducer]);
 
       const groupQuery = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -113,9 +63,9 @@ describe('ResourceIntroducersService', () => {
         andWhere: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue([groupIntroducer]),
       };
-      repository.createQueryBuilder.mockReturnValue(groupQuery);
+      fixture.repository.createQueryBuilder.mockReturnValue(groupQuery);
 
-      const result = await service.getMany(1);
+      const result = await fixture.service.getMany(1);
 
       expect(result).toEqual([directIntroducer]);
     });
@@ -133,9 +83,9 @@ describe('ResourceIntroducersService', () => {
         type: ResourceIntroducerType.MAINTAINER,
         user: { id: 10 },
       } as ResourceIntroducer;
-      repository.find.mockResolvedValue([introducer, maintainer]);
+      fixture.repository.find.mockResolvedValue([introducer, maintainer]);
 
-      const result = await service.getMany(1);
+      const result = await fixture.service.getMany(1);
 
       expect(result).toEqual([introducer, maintainer]);
     });
@@ -157,7 +107,7 @@ describe('ResourceIntroducersService', () => {
         type: ResourceIntroducerType.INTRODUCER,
         user: { id: 20 },
       } as unknown as ResourceIntroducer;
-      repository.find.mockResolvedValue([directIntroducer]);
+      fixture.repository.find.mockResolvedValue([directIntroducer]);
 
       const groupQuery = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -173,11 +123,11 @@ describe('ResourceIntroducersService', () => {
           entities: [groupIntroducer],
         }),
       };
-      repository.createQueryBuilder.mockReturnValue(groupQuery);
+      fixture.repository.createQueryBuilder.mockReturnValue(groupQuery);
 
-      const result = await service.getManyForResources([1, 2], ResourceIntroducerType.INTRODUCER);
+      const result = await fixture.service.getManyForResources([1, 2], ResourceIntroducerType.INTRODUCER);
 
-      expect(repository.find).toHaveBeenCalledWith(
+      expect(fixture.repository.find).toHaveBeenCalledWith(
         expect.objectContaining({
           relations: ['user'],
           where: expect.objectContaining({ type: ResourceIntroducerType.INTRODUCER }),
@@ -195,62 +145,62 @@ describe('ResourceIntroducersService', () => {
 
   describe('isIntroducer', () => {
     it('returns true for a direct introducer row', async () => {
-      repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
-      await expect(service.isIntroducer(1, 2, false)).resolves.toBe(true);
+      fixture.repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
+      await expect(fixture.service.isIntroducer(1, 2, false)).resolves.toBe(true);
     });
 
     it('returns false for a maintainer row (maintainers cannot give introductions)', async () => {
-      repository.findOne.mockImplementation(({ where }) =>
+      fixture.repository.findOne.mockImplementation(({ where }) =>
         Promise.resolve(
           where.type === ResourceIntroducerType.MAINTAINER ? ({ type: where.type } as ResourceIntroducer) : null,
         ),
       );
-      await expect(service.isIntroducer(1, 2, false)).resolves.toBe(false);
-      expect(repository.findOne).toHaveBeenCalledWith({
+      await expect(fixture.service.isIntroducer(1, 2, false)).resolves.toBe(false);
+      expect(fixture.repository.findOne).toHaveBeenCalledWith({
         where: { resourceId: 1, userId: 2, type: ResourceIntroducerType.INTRODUCER },
       });
     });
 
     it('returns false when there is no row', async () => {
-      repository.findOne.mockResolvedValue(null);
-      await expect(service.isIntroducer(1, 2, false)).resolves.toBe(false);
+      fixture.repository.findOne.mockResolvedValue(null);
+      await expect(fixture.service.isIntroducer(1, 2, false)).resolves.toBe(false);
     });
   });
 
   describe('canMaintain', () => {
     it('returns true for a maintainer row', async () => {
-      repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer);
-      await expect(service.canMaintain(1, 2, false)).resolves.toBe(true);
+      fixture.repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer);
+      await expect(fixture.service.canMaintain(1, 2, false)).resolves.toBe(true);
     });
 
     it('returns true for an introducer row', async () => {
-      repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
-      await expect(service.canMaintain(1, 2, false)).resolves.toBe(true);
+      fixture.repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
+      await expect(fixture.service.canMaintain(1, 2, false)).resolves.toBe(true);
     });
 
     it('returns false when there is no row', async () => {
-      repository.findOne.mockResolvedValue(null);
-      await expect(service.canMaintain(1, 2, false)).resolves.toBe(false);
+      fixture.repository.findOne.mockResolvedValue(null);
+      await expect(fixture.service.canMaintain(1, 2, false)).resolves.toBe(false);
     });
   });
 
   describe('grant', () => {
     it('creates a maintainer row when none exists', async () => {
-      repository.findOne.mockResolvedValue(null);
-      repository.create.mockImplementation((data) => data);
-      repository.save.mockImplementation(async (data) => data);
+      fixture.repository.findOne.mockResolvedValue(null);
+      fixture.repository.create.mockImplementation((data) => data);
+      fixture.repository.save.mockImplementation(async (data) => data);
 
-      const result = await service.grant(1, 2, ResourceIntroducerType.MAINTAINER);
+      const result = await fixture.service.grant(1, 2, ResourceIntroducerType.MAINTAINER);
       await Promise.resolve(); // flush notification promise chain
 
-      expect(repository.create).toHaveBeenCalledWith({
+      expect(fixture.repository.create).toHaveBeenCalledWith({
         resourceId: 1,
         userId: 2,
         type: ResourceIntroducerType.MAINTAINER,
       });
       expect(result.type).toBe(ResourceIntroducerType.MAINTAINER);
-      expect(eventEmitter.emit).toHaveBeenCalled();
-      expect(notifications.dispatch).toHaveBeenCalledWith(
+      expect(fixture.eventEmitter.emit).toHaveBeenCalled();
+      expect(fixture.notifications.dispatch).toHaveBeenCalledWith(
         expect.objectContaining({
           category: NotificationCategory.ACCESS_CHANGES,
           recipients: [expect.objectContaining({ id: 2 })],
@@ -260,12 +210,12 @@ describe('ResourceIntroducersService', () => {
           sendEmail: expect.any(Function),
         }),
       );
-      const request = notifications.dispatch.mock.calls[0][0];
+      const request = fixture.notifications.dispatch.mock.calls[0][0];
       const enUser = { locale: 'en' } as User;
       expect(request.title(enUser)).toBe('Your resource access changed');
       expect(request.body(enUser)).toBe('You were made a maintainer for resource #1.');
       await request.sendEmail({ id: 2, email: 'user@example.com', locale: 'en' } as User);
-      expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+      expect(fixture.notifications.sendEmailTemplate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 2 }),
         NotificationCategory.ACCESS_CHANGES,
         {
@@ -279,74 +229,74 @@ describe('ResourceIntroducersService', () => {
     });
 
     it('defaults to introducer when no type is provided', async () => {
-      repository.findOne.mockResolvedValue(null);
-      repository.create.mockImplementation((data) => data);
-      repository.save.mockImplementation(async (data) => data);
+      fixture.repository.findOne.mockResolvedValue(null);
+      fixture.repository.create.mockImplementation((data) => data);
+      fixture.repository.save.mockImplementation(async (data) => data);
 
-      await service.grant(1, 2);
+      await fixture.service.grant(1, 2);
       await Promise.resolve(); // flush notification promise chain
 
-      expect(repository.create).toHaveBeenCalledWith({
+      expect(fixture.repository.create).toHaveBeenCalledWith({
         resourceId: 1,
         userId: 2,
         type: ResourceIntroducerType.INTRODUCER,
       });
-      const defaultsReq = notifications.dispatch.mock.calls[0][0];
+      const defaultsReq = fixture.notifications.dispatch.mock.calls[0][0];
       expect(defaultsReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
     });
 
     it('creates a second row when the user already holds the other role', async () => {
-      repository.findOne.mockImplementation(({ where }) =>
+      fixture.repository.findOne.mockImplementation(({ where }) =>
         Promise.resolve(
           where.type === ResourceIntroducerType.MAINTAINER ? ({ type: where.type } as ResourceIntroducer) : null,
         ),
       );
-      repository.create.mockImplementation((data) => data);
-      repository.save.mockImplementation(async (data) => data);
+      fixture.repository.create.mockImplementation((data) => data);
+      fixture.repository.save.mockImplementation(async (data) => data);
 
-      const result = await service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
+      const result = await fixture.service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
       await Promise.resolve(); // flush notification promise chain
 
       expect(result.type).toBe(ResourceIntroducerType.INTRODUCER);
-      expect(repository.findOne).toHaveBeenCalledWith({
+      expect(fixture.repository.findOne).toHaveBeenCalledWith({
         where: { resourceId: 1, userId: 2, type: ResourceIntroducerType.INTRODUCER },
       });
-      expect(repository.create).toHaveBeenCalledWith({
+      expect(fixture.repository.create).toHaveBeenCalledWith({
         resourceId: 1,
         userId: 2,
         type: ResourceIntroducerType.INTRODUCER,
       });
-      expect(eventEmitter.emit).toHaveBeenCalled();
+      expect(fixture.eventEmitter.emit).toHaveBeenCalled();
     });
 
     it('does not re-save when the existing row already matches', async () => {
       const existing = { type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer;
-      repository.findOne.mockResolvedValue(existing);
+      fixture.repository.findOne.mockResolvedValue(existing);
 
-      await service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
+      await fixture.service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
 
-      expect(repository.save).not.toHaveBeenCalled();
-      expect(eventEmitter.emit).not.toHaveBeenCalled();
-      expect(notifications.dispatch).not.toHaveBeenCalled();
+      expect(fixture.repository.save).not.toHaveBeenCalled();
+      expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
+      expect(fixture.notifications.dispatch).not.toHaveBeenCalled();
     });
   });
 
   describe('revoke', () => {
     it('notifies the user when resource introducer or maintainer access is revoked', async () => {
-      repository.findOne.mockResolvedValue({
+      fixture.repository.findOne.mockResolvedValue({
         userId: 2,
         type: ResourceIntroducerType.MAINTAINER,
       } as ResourceIntroducer);
-      repository.remove.mockImplementation(async (data) => data);
+      fixture.repository.remove.mockImplementation(async (data) => data);
 
-      await service.revoke(1, 2, ResourceIntroducerType.MAINTAINER);
+      await fixture.service.revoke(1, 2, ResourceIntroducerType.MAINTAINER);
       await Promise.resolve(); // flush notification promise chain
 
-      expect(repository.findOne).toHaveBeenCalledWith({
+      expect(fixture.repository.findOne).toHaveBeenCalledWith({
         where: { resourceId: 1, userId: 2, type: ResourceIntroducerType.MAINTAINER },
       });
 
-      const revokeReq = notifications.dispatch.mock.calls[0][0];
+      const revokeReq = fixture.notifications.dispatch.mock.calls[0][0];
       expect(revokeReq.category).toBe(NotificationCategory.ACCESS_CHANGES);
       expect(revokeReq.recipients).toEqual([expect.objectContaining({ id: 2 })]);
       expect(revokeReq.url).toBe('/resources/1');

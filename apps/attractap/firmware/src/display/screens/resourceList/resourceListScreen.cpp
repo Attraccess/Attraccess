@@ -1,7 +1,7 @@
 #include "display/i18n.hpp"
 #include "resourceListScreen.hpp"
-#include "display/images/logo_40h.hpp"
-#include "display/images/lockscreen_background_image.hpp"
+#include "../../images/logo_40h.hpp"
+#include "../../images/lockscreen_background_image.hpp"
 
 namespace {
 lv_obj_t *text(lv_obj_t *parent, const FirmwareI18n::Text &value, const lv_font_t *font, lv_color_t color) {

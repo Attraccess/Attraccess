@@ -1,32 +1,80 @@
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
+import { Body, Controller, ForbiddenException, Get, Patch, Post, Req, Delete } from '@nestjs/common';
+
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
 import {
-  recordAdministrationSafely,
   auditSubjectKeyId,
   PreviousAuditSettings,
-} from '../audit/audit-administration-policy';
-import { AuditSettingsDto, UpdateAuditSettingsDto } from './dto/audit-settings.dto';
-import { Body, Controller, Delete, ForbiddenException, Get, Patch, Post, Req } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+  recordAdministrationSafely,
+  SETTING_KEYS,
+  safeAuditHost,
+  safeAuditOrigin,
+  safeAuditSender,
+} from '../audit/policies/administration';
+
 import { AuditService } from '../audit/audit.service';
-import { safeAuditOrigin, safeAuditHost, safeAuditSender, SETTING_KEYS } from '../audit/audit-administration-policy';
-import { SettingsService } from './settings.service';
+import { AuditSettingsDto, UpdateAuditSettingsDto } from './dto/audit-settings.dto';
+
 import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
+
 import { SystemSettingsDto } from './dto/system-settings.dto';
+
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
-import { MetricsSettingsDto } from './dto/metrics-settings.dto';
-import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
+
+import { SettingsService } from './settings.service';
 import { GenerateMetricsApiKeyResponseDto } from './dto/generate-metrics-api-key-response.dto';
+
+import { MetricsSettingsDto } from './dto/metrics-settings.dto';
+
+import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
+
 import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
-import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
+
 import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settings.dto';
+
+import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
+
 import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
+
+export function systemSettingChanges(
+  before: SystemSettingsDto,
+  after: SystemSettingsDto,
+): Array<[string, string, string]> {
+  const values = [
+    ['app.url', safeAuditOrigin(before.app.url ?? ''), safeAuditOrigin(after.app.url ?? '')],
+    [
+      'app.publicInternetUrl',
+      safeAuditOrigin(before.app.publicInternetUrl ?? ''),
+      safeAuditOrigin(after.app.publicInternetUrl ?? ''),
+    ],
+    ['app.licenseKeyConfigured', before.app.licenseKeyConfigured, after.app.licenseKeyConfigured],
+    ['app.attractapLanguage', before.app.attractapLanguage, after.app.attractapLanguage],
+    ['smtp.service', before.smtp.service, after.smtp.service],
+    ['smtp.host', safeAuditHost(before.smtp.host ?? ''), safeAuditHost(after.smtp.host ?? '')],
+    ['smtp.port', before.smtp.port, after.smtp.port],
+    ['smtp.secure', before.smtp.secure, after.smtp.secure],
+    ['smtp.from', safeAuditSender(before.smtp.from ?? ''), safeAuditSender(after.smtp.from ?? '')],
+    ['smtp.userConfigured', !!before.smtp.user, !!after.smtp.user],
+    ['smtp.passConfigured', before.smtp.passConfigured, after.smtp.passConfigured],
+  ] as const;
+  return values
+    .filter(
+      ([key, oldValue, newValue]) =>
+        oldValue !== newValue ||
+        (key === 'app.url' && before.app.url !== after.app.url) ||
+        (key === 'app.publicInternetUrl' && before.app.publicInternetUrl !== after.app.publicInternetUrl),
+    )
+    .map(([key, oldValue, newValue]) => [key, String(oldValue ?? ''), String(newValue ?? '')]);
+}
 
 @ApiTags('Settings')
 @Controller('settings')
 export class SettingsController {
   constructor(
-    private readonly settingsService: SettingsService,
-    private readonly audit: AuditService,
+    protected readonly settingsService: SettingsService,
+    protected readonly audit: AuditService,
   ) {}
 
   @Get('audit')
@@ -92,6 +140,71 @@ export class SettingsController {
     return this.settingsService.getFirstTimeSetupStatus();
   }
 
+  protected async recordChanges(
+    req: AuthenticatedRequest,
+    prefix: string,
+    before: object,
+    after: object,
+    previousAuditSettings?: PreviousAuditSettings,
+  ) {
+    for (const key of SETTING_KEYS.filter((key) => key.startsWith(`${prefix}.`))) {
+      const field = key.slice(prefix.length + 1);
+      if (field.includes('.')) continue;
+      const oldValue = Object.getOwnPropertyDescriptor(before, field)?.value;
+      const newValue = Object.getOwnPropertyDescriptor(after, field)?.value;
+      if (oldValue === undefined || newValue === undefined) continue;
+      const oldText = Array.isArray(oldValue) ? oldValue.join(',') : String(oldValue);
+      const newText = Array.isArray(newValue) ? newValue.join(',') : String(newValue);
+      if (oldText !== newText) await this.recordSetting(req, key, oldText, newText, previousAuditSettings);
+    }
+  }
+
+  protected async recordSetting(
+    req: AuthenticatedRequest,
+    key: string,
+    before: string,
+    after: string,
+    previousAuditSettings?: PreviousAuditSettings,
+  ) {
+    await recordAdministrationSafely(
+      this.audit,
+      {
+        action: 'settings.updated',
+        actorId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        apiTokenId: req.user.apiTokenId,
+        subjectType: 'setting',
+        subjectId: auditSubjectKeyId(key),
+        details: { settingKey: key, before, after },
+      },
+      previousAuditSettings,
+    );
+  }
+
+  protected async recordKey(req: AuthenticatedRequest, action: string, configured: number) {
+    await recordAdministrationSafely(this.audit, {
+      action,
+      actorId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
+      subjectType: 'setting',
+      subjectId: auditSubjectKeyId('metrics.apiKeyConfigured'),
+      details: { settingKey: 'metrics.apiKeyConfigured', configured },
+    });
+  }
+
+  @Post('first-time-setup')
+  @ApiOperation({ summary: 'Apply first-time setup settings', operationId: 'applyFirstTimeSetupSettings' })
+  @ApiResponse({ status: 200, description: 'System settings updated.', type: SystemSettingsDto })
+  @ApiResponse({ status: 403, description: 'First-time setup is not available.' })
+  async applyFirstTimeSetupSettings(@Body() body: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
+    const available = await this.settingsService.isFirstTimeSetupAvailable();
+    if (!available) {
+      throw new ForbiddenException('First-time setup is no longer available');
+    }
+    return this.settingsService.updateSystemSettings(body);
+  }
+
   @Get('metrics')
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
@@ -141,7 +254,7 @@ export class SettingsController {
     return this.buildMetricsSettings();
   }
 
-  private async buildMetricsSettings(): Promise<MetricsSettingsDto> {
+  protected async buildMetricsSettings(): Promise<MetricsSettingsDto> {
     const [{ configured }, toggles, slowQueryThresholdSeconds] = await Promise.all([
       this.settingsService.getMetricsApiKey(),
       this.settingsService.getMetricsToggles(),
@@ -201,97 +314,4 @@ export class SettingsController {
     await this.recordChanges(req, 'messaging.rateLimit', before, after);
     return after;
   }
-
-  private async recordChanges(
-    req: AuthenticatedRequest,
-    prefix: string,
-    before: object,
-    after: object,
-    previousAuditSettings?: PreviousAuditSettings,
-  ) {
-    for (const key of SETTING_KEYS.filter((key) => key.startsWith(`${prefix}.`))) {
-      const field = key.slice(prefix.length + 1);
-      if (field.includes('.')) continue;
-      const oldValue = Object.getOwnPropertyDescriptor(before, field)?.value;
-      const newValue = Object.getOwnPropertyDescriptor(after, field)?.value;
-      if (oldValue === undefined || newValue === undefined) continue;
-      const oldText = Array.isArray(oldValue) ? oldValue.join(',') : String(oldValue);
-      const newText = Array.isArray(newValue) ? newValue.join(',') : String(newValue);
-      if (oldText !== newText) await this.recordSetting(req, key, oldText, newText, previousAuditSettings);
-    }
-  }
-
-  private async recordSetting(
-    req: AuthenticatedRequest,
-    key: string,
-    before: string,
-    after: string,
-    previousAuditSettings?: PreviousAuditSettings,
-  ) {
-    await recordAdministrationSafely(
-      this.audit,
-      {
-        action: 'settings.updated',
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        apiTokenId: req.user.apiTokenId,
-        subjectType: 'setting',
-        subjectId: auditSubjectKeyId(key),
-        details: { settingKey: key, before, after },
-      },
-      previousAuditSettings,
-    );
-  }
-
-  private async recordKey(req: AuthenticatedRequest, action: string, configured: number) {
-    await recordAdministrationSafely(this.audit, {
-      action,
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-      subjectType: 'setting',
-      subjectId: auditSubjectKeyId('metrics.apiKeyConfigured'),
-      details: { settingKey: 'metrics.apiKeyConfigured', configured },
-    });
-  }
-
-  @Post('first-time-setup')
-  @ApiOperation({ summary: 'Apply first-time setup settings', operationId: 'applyFirstTimeSetupSettings' })
-  @ApiResponse({ status: 200, description: 'System settings updated.', type: SystemSettingsDto })
-  @ApiResponse({ status: 403, description: 'First-time setup is not available.' })
-  async applyFirstTimeSetupSettings(@Body() body: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
-    const available = await this.settingsService.isFirstTimeSetupAvailable();
-    if (!available) {
-      throw new ForbiddenException('First-time setup is no longer available');
-    }
-    return this.settingsService.updateSystemSettings(body);
-  }
-}
-
-function systemSettingChanges(before: SystemSettingsDto, after: SystemSettingsDto): Array<[string, string, string]> {
-  const values = [
-    ['app.url', safeAuditOrigin(before.app.url ?? ''), safeAuditOrigin(after.app.url ?? '')],
-    [
-      'app.publicInternetUrl',
-      safeAuditOrigin(before.app.publicInternetUrl ?? ''),
-      safeAuditOrigin(after.app.publicInternetUrl ?? ''),
-    ],
-    ['app.licenseKeyConfigured', before.app.licenseKeyConfigured, after.app.licenseKeyConfigured],
-    ['app.attractapLanguage', before.app.attractapLanguage, after.app.attractapLanguage],
-    ['smtp.service', before.smtp.service, after.smtp.service],
-    ['smtp.host', safeAuditHost(before.smtp.host ?? ''), safeAuditHost(after.smtp.host ?? '')],
-    ['smtp.port', before.smtp.port, after.smtp.port],
-    ['smtp.secure', before.smtp.secure, after.smtp.secure],
-    ['smtp.from', safeAuditSender(before.smtp.from ?? ''), safeAuditSender(after.smtp.from ?? '')],
-    ['smtp.userConfigured', !!before.smtp.user, !!after.smtp.user],
-    ['smtp.passConfigured', before.smtp.passConfigured, after.smtp.passConfigured],
-  ] as const;
-  return values
-    .filter(
-      ([key, oldValue, newValue]) =>
-        oldValue !== newValue ||
-        (key === 'app.url' && before.app.url !== after.app.url) ||
-        (key === 'app.publicInternetUrl' && before.app.publicInternetUrl !== after.app.publicInternetUrl),
-    )
-    .map(([key, oldValue, newValue]) => [key, String(oldValue ?? ''), String(newValue ?? '')]);
 }

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ResourceUsage } from '@attraccess/react-query-client';
+import { ResourceUsage } from '@attraccess/react-query-client';
 import { UsageNotesModal } from './index';
 import { TransactionDetailsModal } from '../../../../billing/dashboard/summary/transactionDetailsModal';
 

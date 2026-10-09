@@ -1,11 +1,5 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
-import {
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerHeading,
-  useOverlayState,
-} from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { Button } from '../../../../../components/button';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { Select } from '../../../../../components/select';
@@ -116,9 +110,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
             label={t('inputs.user')}
             onSelectionChange={setSelectedUser}
             afterSelection={
-              selectedUser ? (
-                <span className="text-tiny text-default-500">{selectedUser.username}</span>
-              ) : null
+              selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
             }
           />
           <Select

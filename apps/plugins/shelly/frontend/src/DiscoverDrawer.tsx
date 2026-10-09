@@ -8,8 +8,8 @@ import { Button, Chip, DrawerBody, DrawerHeader, DrawerHeading, Form, Spinner } 
 import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { discoverDevices, type DiscoveryResult } from './api';
-import { StandardDrawer, TextFieldRow } from './drawer';
-import { StatusAlert } from './StatusAlert';
+import { StandardDrawer, TextFieldRow } from './shared/drawer';
+import { StatusAlert } from './shared/StatusAlert';
 import { useShellyTranslations } from './i18n';
 
 function ResultSummary({ result }: { result: DiscoveryResult }) {

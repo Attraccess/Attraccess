@@ -1,33 +1,3 @@
-/** Implemented by the generic audit foundation, not by individual plugins. */
-export const PLUGIN_AUDIT_HOST_PROVIDER = Symbol.for('attraccess.plugin.auditHostProvider');
-
-export interface PluginAuditPrincipal {
-  userId: number;
-  authenticationMethod: 'session' | 'api-token';
-  apiTokenId?: number;
-}
-
-export interface PluginAuditEvent {
-  action: string;
-  operationId: string;
-  principal: PluginAuditPrincipal;
-  outcome: 'attempted' | 'succeeded' | 'failed';
-  subject: { type: string; id: number };
-  /** Callers must project domain data through an explicit allowlist. */
-  details: Readonly<Record<string, string | number | boolean | null>>;
-}
-
-/** Only `recorded` means the host durably accepted the event. */
-export type PluginAuditReceipt = { status: 'recorded' } | { status: 'unavailable' };
-
-export interface PluginAuditContext {
-  record(event: PluginAuditEvent): Promise<PluginAuditReceipt>;
-}
-
-export interface PluginAuditHostProvider {
-  record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditReceipt>;
-}
-
 /**
  * Declarative audit policy a plugin contributes through `PluginBackendModule.auditDomains`.
  * The host registers the declaration, then enforces it on every event the plugin records:
@@ -39,8 +9,10 @@ export interface PluginAuditHostProvider {
 
 /** Domain identifiers are lowercase snake_case and prefix every action and subject type. */
 export const PLUGIN_AUDIT_DOMAIN_PATTERN = /^[a-z][a-z_]{0,31}$/;
+
 /** One dot-separated segment of an action or subject type name. */
 export const PLUGIN_AUDIT_SEGMENT_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+
 /** Detail field name: camelCase segments, optionally dot-prefixed (e.g. `before.count`). */
 export const PLUGIN_AUDIT_FIELD_PATTERN = /^[a-z][a-zA-Z0-9]*(?:\.[a-z][a-zA-Z0-9]*)*$/;
 
@@ -93,12 +65,6 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
-};
-
-const dottedName = (prefix: string, value: unknown, maxLength: number): boolean => {
-  if (typeof value !== 'string' || value.length > maxLength || !value.startsWith(`${prefix}.`)) return false;
-  const segments = value.slice(prefix.length + 1).split('.');
-  return segments.length > 0 && segments.every((segment) => PLUGIN_AUDIT_SEGMENT_PATTERN.test(segment));
 };
 
 function validateFieldChoices(path: string, policy: Record<string, unknown>, declared: string): void {
@@ -156,6 +122,41 @@ function validateFieldPolicy(path: string, policy: unknown): void {
       );
   }
 }
+/** Implemented by the generic audit foundation, not by individual plugins. */
+export const PLUGIN_AUDIT_HOST_PROVIDER = Symbol.for('attraccess.plugin.auditHostProvider');
+
+export interface PluginAuditPrincipal {
+  userId: number;
+  authenticationMethod: 'session' | 'api-token';
+  apiTokenId?: number;
+}
+
+export interface PluginAuditEvent {
+  action: string;
+  operationId: string;
+  principal: PluginAuditPrincipal;
+  outcome: 'attempted' | 'succeeded' | 'failed';
+  subject: { type: string; id: number };
+  /** Callers must project domain data through an explicit allowlist. */
+  details: Readonly<Record<string, string | number | boolean | null>>;
+}
+
+/** Only `recorded` means the host durably accepted the event. */
+export type PluginAuditReceipt = { status: 'recorded' } | { status: 'unavailable' };
+
+export interface PluginAuditContext {
+  record(event: PluginAuditEvent): Promise<PluginAuditReceipt>;
+}
+
+export interface PluginAuditHostProvider {
+  record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditReceipt>;
+}
+
+const dottedName = (prefix: string, value: unknown, maxLength: number): boolean => {
+  if (typeof value !== 'string' || value.length > maxLength || !value.startsWith(`${prefix}.`)) return false;
+  const segments = value.slice(prefix.length + 1).split('.');
+  return segments.length > 0 && segments.every((segment) => PLUGIN_AUDIT_SEGMENT_PATTERN.test(segment));
+};
 
 function validateDomainLabels(declaration: PluginAuditDomainDeclaration, prefix: string): void {
   if (declaration.labels !== undefined) {

@@ -1,5 +1,5 @@
 #include "ethernet.hpp"
-#include "platform.hpp"
+#include "../../platform.hpp"
 #include "esp_system.h"
 #include "esp_mac.h"
 #include "esp_eth_mac_w5500.h"
@@ -134,6 +134,170 @@ void Ethernet::loop()
     default:
         break;
     }
+}
+
+void Ethernet::deinit()
+{
+    logger.info("Deinitializing Ethernet");
+
+    // Clean up everything
+    cleanupPartialInit();
+
+    // Free SPI bus completely (only if we own it exclusively)
+    // Note: Comment out spi_bus_free if other devices use the same SPI bus
+    // spi_bus_free(SPI2_HOST);
+
+    // Reset retry state
+    retry_count = 0;
+    last_retry_time = 0;
+    dhcp_start_time = 0;
+    initialization_in_progress = false;
+
+    setState(ETHERNET_STATE_INIT);
+}
+
+esp_err_t Ethernet::w5500_read_version_register(spi_device_handle_t spi_device, uint8_t *version)
+{
+    // W5500 Version Register (VERSIONR) is at address 0x0039
+    // Command format: [addr_high|control][addr_low][data...]
+    // For common register read: control = 0x00
+
+    spi_transaction_t trans = {};
+    uint8_t tx_data[3] = {0x00, 0x39, 0x00}; // [addr_high|control][addr_low][dummy]
+    uint8_t rx_data[3] = {0};
+
+    trans.length = 24; // 3 bytes * 8 bits
+    trans.tx_buffer = tx_data;
+    trans.rx_buffer = rx_data;
+
+    esp_err_t ret = spi_device_transmit(spi_device, &trans);
+    if (ret != ESP_OK)
+    {
+        return ret;
+    }
+
+    *version = rx_data[2]; // Version data is in the third byte
+
+    // W5500 should return 0x04 for version register
+    if (*version != 0x04)
+    {
+        return ESP_FAIL; // Hardware not responding correctly
+    }
+
+    return ESP_OK;
+}
+
+void Ethernet::cleanupPartialInit()
+{
+    logger.info("Cleaning up partial initialization");
+
+    // Unregister event handlers (ignore errors if not registered)
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, got_ip_event_handler);
+    esp_event_handler_unregister(ETH_EVENT, ESP_EVENT_ANY_ID, eth_event_handler);
+
+    // Stop and clean up Ethernet driver
+    if (eth_handle != nullptr)
+    {
+        esp_eth_stop(eth_handle);
+        esp_eth_driver_uninstall(eth_handle);
+        eth_handle = nullptr;
+    }
+
+    // Clean up netif glue and netif
+    if (eth_netif_glue != nullptr)
+    {
+        esp_eth_del_netif_glue(eth_netif_glue);
+        eth_netif_glue = nullptr;
+    }
+
+    if (eth_netif != nullptr)
+    {
+        esp_netif_destroy(eth_netif);
+        eth_netif = nullptr;
+    }
+
+    // The W5500 driver owns its SPI device and removed it during uninstall;
+    // the SPI bus itself stays up for other users.
+    spi_ready = false;
+}
+
+void Ethernet::eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    uint8_t mac_addr[6] = {0};
+    /* we can get the ethernet driver handle from event data */
+    esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
+
+    switch (event_id)
+    {
+    case ETHERNET_EVENT_CONNECTED:
+        esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
+        logger.info("Ethernet Link Up");
+        logger.infof("Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
+                     mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+        initialization_in_progress = false; // Clear flag on successful connection
+        dhcp_start_time = millis();         // Record when we start waiting for DHCP
+        logger.info("Waiting for DHCP IP address...");
+        setState(ETHERNET_STATE_CONNECTED_WAITING_FOR_IP);
+        break;
+    case ETHERNET_EVENT_DISCONNECTED:
+        logger.info("Ethernet Link Down");
+        initialization_in_progress = false; // Clear flag on disconnection
+        setState(ETHERNET_STATE_DISCONNECTED);
+        break;
+    case ETHERNET_EVENT_START:
+        logger.info("Ethernet Started");
+        break;
+    case ETHERNET_EVENT_STOP:
+        logger.info("Ethernet Stopped");
+        initialization_in_progress = false; // Clear flag when stopped
+        setState(ETHERNET_STATE_DISCONNECTED);
+        break;
+    default:
+        break;
+    }
+}
+
+void Ethernet::got_ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+    const esp_netif_ip_info_t *ip_info = &event->ip_info;
+
+    logger.info("Ethernet Got IP Address");
+    logger.info("~~~~~~~~~~~");
+    logger.infof("ETHIP:" IPSTR, IP2STR(&ip_info->ip));
+    logger.infof("ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
+    logger.infof("ETHGW:" IPSTR, IP2STR(&ip_info->gw));
+    logger.info("~~~~~~~~~~~");
+
+    initialization_in_progress = false; // Clear flag when fully connected
+    setState(ETHERNET_STATE_CONNECTED);
+}
+
+void Ethernet::setState(EthernetState state)
+{
+    if (_state != state)
+    {
+        _state = state;
+        logger.infof("State changed to: %d", state);
+
+        State::setEthernetState(state == ETHERNET_STATE_CONNECTED, getIPAddress());
+    }
+}
+
+esp_ip4_addr_t Ethernet::getIPAddress()
+{
+    esp_ip4_addr_t ip = {0};
+
+    if (eth_netif != nullptr)
+    {
+        esp_netif_ip_info_t ip_info;
+        if (esp_netif_get_ip_info(eth_netif, &ip_info) == ESP_OK)
+        {
+            ip = ip_info.ip;
+        }
+    }
+
+    return ip;
 }
 
 esp_err_t Ethernet::initializeNetwork()
@@ -415,168 +579,4 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     *eth_port_cnt = 1;
     logger.info("W5500 Ethernet driver initialized successfully");
     return ESP_OK;
-}
-
-void Ethernet::eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    uint8_t mac_addr[6] = {0};
-    /* we can get the ethernet driver handle from event data */
-    esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
-
-    switch (event_id)
-    {
-    case ETHERNET_EVENT_CONNECTED:
-        esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
-        logger.info("Ethernet Link Up");
-        logger.infof("Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
-                     mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-        initialization_in_progress = false; // Clear flag on successful connection
-        dhcp_start_time = millis();         // Record when we start waiting for DHCP
-        logger.info("Waiting for DHCP IP address...");
-        setState(ETHERNET_STATE_CONNECTED_WAITING_FOR_IP);
-        break;
-    case ETHERNET_EVENT_DISCONNECTED:
-        logger.info("Ethernet Link Down");
-        initialization_in_progress = false; // Clear flag on disconnection
-        setState(ETHERNET_STATE_DISCONNECTED);
-        break;
-    case ETHERNET_EVENT_START:
-        logger.info("Ethernet Started");
-        break;
-    case ETHERNET_EVENT_STOP:
-        logger.info("Ethernet Stopped");
-        initialization_in_progress = false; // Clear flag when stopped
-        setState(ETHERNET_STATE_DISCONNECTED);
-        break;
-    default:
-        break;
-    }
-}
-
-void Ethernet::got_ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    const esp_netif_ip_info_t *ip_info = &event->ip_info;
-
-    logger.info("Ethernet Got IP Address");
-    logger.info("~~~~~~~~~~~");
-    logger.infof("ETHIP:" IPSTR, IP2STR(&ip_info->ip));
-    logger.infof("ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
-    logger.infof("ETHGW:" IPSTR, IP2STR(&ip_info->gw));
-    logger.info("~~~~~~~~~~~");
-
-    initialization_in_progress = false; // Clear flag when fully connected
-    setState(ETHERNET_STATE_CONNECTED);
-}
-
-void Ethernet::setState(EthernetState state)
-{
-    if (_state != state)
-    {
-        _state = state;
-        logger.infof("State changed to: %d", state);
-
-        State::setEthernetState(state == ETHERNET_STATE_CONNECTED, getIPAddress());
-    }
-}
-
-esp_ip4_addr_t Ethernet::getIPAddress()
-{
-    esp_ip4_addr_t ip = {0};
-
-    if (eth_netif != nullptr)
-    {
-        esp_netif_ip_info_t ip_info;
-        if (esp_netif_get_ip_info(eth_netif, &ip_info) == ESP_OK)
-        {
-            ip = ip_info.ip;
-        }
-    }
-
-    return ip;
-}
-
-void Ethernet::deinit()
-{
-    logger.info("Deinitializing Ethernet");
-
-    // Clean up everything
-    cleanupPartialInit();
-
-    // Free SPI bus completely (only if we own it exclusively)
-    // Note: Comment out spi_bus_free if other devices use the same SPI bus
-    // spi_bus_free(SPI2_HOST);
-
-    // Reset retry state
-    retry_count = 0;
-    last_retry_time = 0;
-    dhcp_start_time = 0;
-    initialization_in_progress = false;
-
-    setState(ETHERNET_STATE_INIT);
-}
-
-esp_err_t Ethernet::w5500_read_version_register(spi_device_handle_t spi_device, uint8_t *version)
-{
-    // W5500 Version Register (VERSIONR) is at address 0x0039
-    // Command format: [addr_high|control][addr_low][data...]
-    // For common register read: control = 0x00
-
-    spi_transaction_t trans = {};
-    uint8_t tx_data[3] = {0x00, 0x39, 0x00}; // [addr_high|control][addr_low][dummy]
-    uint8_t rx_data[3] = {0};
-
-    trans.length = 24; // 3 bytes * 8 bits
-    trans.tx_buffer = tx_data;
-    trans.rx_buffer = rx_data;
-
-    esp_err_t ret = spi_device_transmit(spi_device, &trans);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    *version = rx_data[2]; // Version data is in the third byte
-
-    // W5500 should return 0x04 for version register
-    if (*version != 0x04)
-    {
-        return ESP_FAIL; // Hardware not responding correctly
-    }
-
-    return ESP_OK;
-}
-
-void Ethernet::cleanupPartialInit()
-{
-    logger.info("Cleaning up partial initialization");
-
-    // Unregister event handlers (ignore errors if not registered)
-    esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, got_ip_event_handler);
-    esp_event_handler_unregister(ETH_EVENT, ESP_EVENT_ANY_ID, eth_event_handler);
-
-    // Stop and clean up Ethernet driver
-    if (eth_handle != nullptr)
-    {
-        esp_eth_stop(eth_handle);
-        esp_eth_driver_uninstall(eth_handle);
-        eth_handle = nullptr;
-    }
-
-    // Clean up netif glue and netif
-    if (eth_netif_glue != nullptr)
-    {
-        esp_eth_del_netif_glue(eth_netif_glue);
-        eth_netif_glue = nullptr;
-    }
-
-    if (eth_netif != nullptr)
-    {
-        esp_netif_destroy(eth_netif);
-        eth_netif = nullptr;
-    }
-
-    // The W5500 driver owns its SPI device and removed it during uninstall;
-    // the SPI bus itself stays up for other users.
-    spi_ready = false;
 }

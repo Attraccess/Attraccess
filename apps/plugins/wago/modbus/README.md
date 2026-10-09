@@ -22,7 +22,7 @@ no Modbus environment JSON. Configuration uses three arrays (maximum 64 each):
   Built-in IDs cannot be overridden. Duplicate a built-in to edit its map.
 
 The ATT-1058 owner can import these exports from
-`frontend/src/ModbusConfigurationForm.tsx`:
+`frontend/src/configuration/modbus/ConfigurationForm.tsx`:
 
 ```tsx
 <ModbusConfigurationForm
@@ -227,7 +227,7 @@ Remaining acceptance includes loaded power/energy accuracy, physical disconnect
 and fault scenarios, other meter models, and TCP hardware. Development-device
 reads and integrated software checks do not establish those broader claims.
 
-Tests: `backend/modbus-configuration.spec.ts` validates persisted models/bindings;
+Tests: `backend/configuration/modbus-configuration.spec.ts` validates persisted models/bindings;
 `cc100-runtime/src/modbus/modbus.spec.ts` contains actual loopback TCP fixtures,
 injected RTU CRC/echo/exception fixtures, multi-unit bus serialization, bounded
 queues/acquisition, codec order/scaling, and cumulative/reset tests. Socket tests

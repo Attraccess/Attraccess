@@ -1,74 +1,22 @@
-import { ConsoleLogger, Logger, LogLevel, Module, OnModuleInit } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { Console as NodeConsole } from 'node:console';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import fs from 'node:fs';
-import { once } from 'node:events';
-import { tmpdir } from 'node:os';
+import { registerApiLogDestinationsOnInstalledNest11Fixture } from './routed-logger.api-log-destinations-on-installed-nest-11.test-fixture';
+import fs, { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { stripVTControlCharacters } from 'node:util';
-import { format } from 'winston';
-import Transport from 'winston-transport';
-import { defaultLogDrivers, fileDriver, LogDestinationDriver, RoutedLogEntry } from './log-destinations';
-import { RoutedLogger } from './routed-logger';
+import { fileDriver } from './log-destinations';
 import { logDestinationsSchema, logLevelsSchema } from './logging.config';
-
-class RecordingTransport extends Transport {
-  readonly entries: RoutedLogEntry[] = [];
-  readonly closeSpy = jest.fn();
-  override log(info: RoutedLogEntry, callback: () => void): void {
-    this.entries.push(info);
-    callback();
-  }
-  override close(): void {
-    this.closeSpy();
-  }
-}
+import { once } from 'node:events';
+import { format } from 'winston';
+import { ConsoleLogger, Logger, Module, OnModuleInit, LogLevel } from '@nestjs/common';
+import { stripVTControlCharacters } from 'node:util';
+import { NestFactory } from '@nestjs/core';
 
 describe('API log destinations on installed Nest 11', () => {
-  let directory: string;
-  const loggers: RoutedLogger[] = [];
-  const env = { LOG_LEVELS: 'verbose,debug,log,warn,error' };
-  beforeEach(() => {
-    directory = mkdtempSync(join(tmpdir(), 'attraccess-logging-'));
-  });
-  afterEach(async () => {
-    Logger.detachBuffer();
-    Logger.overrideLogger(new ConsoleLogger());
-    Logger.flush();
-    await Promise.all(loggers.splice(0).map((logger) => logger.close()));
-    jest.restoreAllMocks();
-    rmSync(directory, { recursive: true, force: true });
-  });
-  function create(environment: NodeJS.ProcessEnv, drivers = defaultLogDrivers, emergency = jest.fn()) {
-    const logger = new RoutedLogger(environment, drivers, directory, emergency);
-    loggers.push(logger);
-    return logger;
-  }
-  function driver(transport: Transport): LogDestinationDriver {
-    return { configure: () => () => transport };
-  }
-  function captureOutput() {
-    const stdout: string[] = [];
-    const stderr: string[] = [];
-    const capture = (output: string[]) => (chunk: unknown, encodingOrCallback?: unknown, callback?: unknown) => {
-      output.push(String(chunk));
-      const done = typeof encodingOrCallback === 'function' ? encodingOrCallback : callback;
-      if (typeof done === 'function') done();
-      return true;
-    };
-    jest.spyOn(process.stdout, 'write').mockImplementation(capture(stdout));
-    jest.spyOn(process.stderr, 'write').mockImplementation(capture(stderr));
-    // Use Node's real console contract; Jest's buffered console merges streams.
-    jest.replaceProperty(global, 'console', new NodeConsole(process.stdout, process.stderr));
-    return { stdout, stderr };
-  }
+  const fixture = registerApiLogDestinationsOnInstalledNest11Fixture();
 
   it('defaults to console, normalizes/deduplicates destinations and ignores unselected file options', async () => {
     expect(logDestinationsSchema.parse(undefined)).toEqual(['console']);
-    const console = new RecordingTransport();
+    const console = new fixture.RecordingTransport();
     const configure = jest.fn(() => () => console);
-    const logger = create(
+    const logger = fixture.create(
       { LOG_DESTINATIONS: ' Console,console, CONSOLE ', LOG_FILE_PATH: '\0' },
       {
         console: { configure },
@@ -85,7 +33,7 @@ describe('API log destinations on installed Nest 11', () => {
   it('rejects unknown names and invalid selected options before opening any transport', () => {
     const configure = jest.fn(() => jest.fn());
     expect(() =>
-      create(
+      fixture.create(
         { LOG_DESTINATIONS: 'console,remote' },
         {
           console: { configure },
@@ -96,18 +44,21 @@ describe('API log destinations on installed Nest 11', () => {
     const factory = configure.mock.results[0].value;
     expect(factory).not.toHaveBeenCalled();
     for (const path of ['', '   ', 'bad\0path']) {
-      expect(() => create({ LOG_DESTINATIONS: 'file', LOG_FILE_PATH: path })).toThrow('LOG_FILE_PATH');
+      expect(() => fixture.create({ LOG_DESTINATIONS: 'file', LOG_FILE_PATH: path })).toThrow('LOG_FILE_PATH');
     }
-    expect(() => create({ LOG_DESTINATIONS: ' , ' })).toThrow('at least one driver');
-    expect(() => create({ LOG_LEVELS: 'info' })).toThrow('Invalid log level');
-    expect(() => create({ LOG_LEVELS: 'fatal' })).toThrow('Invalid log level');
+    expect(() => fixture.create({ LOG_DESTINATIONS: ' , ' })).toThrow('at least one driver');
+    expect(() => fixture.create({ LOG_LEVELS: 'info' })).toThrow('Invalid log level');
+    expect(() => fixture.create({ LOG_LEVELS: 'fatal' })).toThrow('Invalid log level');
   });
 
   it.each(['', 'log', 'error', 'warn', 'debug', 'verbose', 'log,error', 'debug,error', ' WARN, Log '])(
     'retains Nest filtering for LOG_LEVELS=%j, including gaps and fatal calls',
     async (levels) => {
-      const recording = new RecordingTransport();
-      const logger = create({ LOG_LEVELS: levels, LOG_DESTINATIONS: 'test' }, { test: driver(recording) });
+      const recording = new fixture.RecordingTransport();
+      const logger = fixture.create(
+        { LOG_LEVELS: levels, LOG_DESTINATIONS: 'test' },
+        { test: fixture.driver(recording) },
+      );
       const nest = new ConsoleLogger({ logLevels: logLevelsSchema.parse(levels) });
       const all: LogLevel[] = ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'];
       for (const level of all) logger[level](`entry-${level}`);
@@ -117,11 +68,11 @@ describe('API log destinations on installed Nest 11', () => {
   );
 
   it('registers a third transport and preserves object/variadic messages, context and supplied errors', async () => {
-    const console = new RecordingTransport();
-    const third = new RecordingTransport();
-    const logger = create(
-      { ...env, LOG_DESTINATIONS: 'console,third' },
-      { console: driver(console), third: driver(third) },
+    const console = new fixture.RecordingTransport();
+    const third = new fixture.RecordingTransport();
+    const logger = fixture.create(
+      { ...fixture.env, LOG_DESTINATIONS: 'console,third' },
+      { console: fixture.driver(console), third: fixture.driver(third) },
     );
     Logger.overrideLogger(logger);
     const producer = new Logger('Plugin');
@@ -152,7 +103,7 @@ describe('API log destinations on installed Nest 11', () => {
 
   it('keeps console formatting and stdout/stderr routing compatible with Nest and fail2ban', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(1780000000000);
-    const { stdout, stderr } = captureOutput();
+    const { stdout, stderr } = fixture.captureOutput();
     const audit =
       'auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 username=alice ts=2026-05-28T20:00:00Z reason=bad_password';
     const emit = (logger: ConsoleLogger) => {
@@ -164,7 +115,7 @@ describe('API log destinations on installed Nest 11', () => {
     emit(new ConsoleLogger());
     const expected = { stdout: stdout.join(''), stderr: stderr.join('') };
     stdout.length = stderr.length = 0;
-    const logger = create(env);
+    const logger = fixture.create(fixture.env);
     emit(logger);
     await logger.close();
     expect({ stdout: stdout.join(''), stderr: stderr.join('') }).toEqual(expected);
@@ -174,11 +125,15 @@ describe('API log destinations on installed Nest 11', () => {
 
   it.each(['default', 'relative', 'absolute'])('defaults file output to the storage root (%s)', async (kind) => {
     const storageRoot =
-      kind === 'default' ? undefined : kind === 'relative' ? 'custom-storage' : join(directory, 'custom-storage');
-    const logger = create({ LOG_DESTINATIONS: 'file', STORAGE_ROOT: storageRoot });
+      kind === 'default'
+        ? undefined
+        : kind === 'relative'
+          ? 'custom-storage'
+          : join(fixture.directory, 'custom-storage');
+    const logger = fixture.create({ LOG_DESTINATIONS: 'file', STORAGE_ROOT: storageRoot });
     logger.log('storage-default-entry');
     await logger.close();
-    expect(readFileSync(resolve(directory, storageRoot ?? 'storage', 'api.log'), 'utf8')).toContain(
+    expect(readFileSync(resolve(fixture.directory, storageRoot ?? 'storage', 'api.log'), 'utf8')).toContain(
       'storage-default-entry',
     );
   });
@@ -187,10 +142,10 @@ describe('API log destinations on installed Nest 11', () => {
     'resolves paths, creates directories, flushes UTF-8 and appends on restart (absolute=%s)',
     async (absolute) => {
       const relative = 'nested/log/api.log';
-      const filename = join(directory, relative);
-      const options = { ...env, LOG_DESTINATIONS: 'file', LOG_FILE_PATH: absolute ? filename : relative };
+      const filename = join(fixture.directory, relative);
+      const options = { ...fixture.env, LOG_DESTINATIONS: 'file', LOG_FILE_PATH: absolute ? filename : relative };
       const stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
-      const logger = create(options);
+      const logger = fixture.create(options);
       for (let index = 0; index < 500; index++) logger.log(`\u001b[31mGrüße ${index}\u001b[0m`, 'File');
       logger.error('failed', 'Error: supplied\n    at caller (/test.ts:1:2)', 'File');
       await logger.close();
@@ -199,7 +154,7 @@ describe('API log destinations on installed Nest 11', () => {
       expect(stripVTControlCharacters(first)).toBe(first);
       expect(first).toContain('[File] Grüße 499');
       expect(first.match(/Error: supplied/g)).toHaveLength(1);
-      const restarted = create(options);
+      const restarted = fixture.create(options);
       restarted.log('after restart');
       await restarted.close();
       expect(readFileSync(filename, 'utf8').startsWith(first)).toBe(true);
@@ -209,23 +164,23 @@ describe('API log destinations on installed Nest 11', () => {
   );
 
   it('fans out once to console and file', async () => {
-    const { stdout } = captureOutput();
-    const logger = create({ LOG_DESTINATIONS: 'console,file,file', LOG_FILE_PATH: 'api.log' });
+    const { stdout } = fixture.captureOutput();
+    const logger = fixture.create({ LOG_DESTINATIONS: 'console,file,file', LOG_FILE_PATH: 'api.log' });
     logger.log('unique-message', 'Fanout');
     await logger.close();
     expect(stdout.join('').match(/unique-message/g)).toHaveLength(1);
-    expect(readFileSync(join(directory, 'api.log'), 'utf8').match(/unique-message/g)).toHaveLength(1);
+    expect(readFileSync(join(fixture.directory, 'api.log'), 'utf8').match(/unique-message/g)).toHaveLength(1);
   });
 
   it('isolates file initialization failures and reports once without disabling healthy drivers', async () => {
-    writeFileSync(join(directory, 'blocked'), 'not a directory');
-    const healthy = new RecordingTransport();
+    writeFileSync(join(fixture.directory, 'blocked'), 'not a directory');
+    const healthy = new fixture.RecordingTransport();
     const emergency = jest.fn();
-    const logger = create(
+    const logger = fixture.create(
       { LOG_DESTINATIONS: 'file,healthy', LOG_FILE_PATH: 'blocked/api.log' },
       {
         file: fileDriver,
-        healthy: driver(healthy),
+        healthy: fixture.driver(healthy),
       },
       emergency,
     );
@@ -238,13 +193,13 @@ describe('API log destinations on installed Nest 11', () => {
   });
 
   it('isolates asynchronous file-open errors even when shutdown begins before opening completes', async () => {
-    const healthy = new RecordingTransport();
+    const healthy = new fixture.RecordingTransport();
     const emergency = jest.fn();
-    const logger = create(
-      { LOG_DESTINATIONS: 'file,healthy', LOG_FILE_PATH: directory },
+    const logger = fixture.create(
+      { LOG_DESTINATIONS: 'file,healthy', LOG_FILE_PATH: fixture.directory },
       {
         file: fileDriver,
-        healthy: driver(healthy),
+        healthy: fixture.driver(healthy),
       },
       emergency,
     );
@@ -258,7 +213,7 @@ describe('API log destinations on installed Nest 11', () => {
   it.each(['event', 'throw', 'format'])(
     'isolates runtime destination failures (%s), suppresses spam and closes healthy drivers',
     async (mode) => {
-      const broken = new RecordingTransport();
+      const broken = new fixture.RecordingTransport();
       if (mode === 'throw')
         broken.log = () => {
           throw new Error('disk full');
@@ -267,11 +222,11 @@ describe('API log destinations on installed Nest 11', () => {
         broken.format = format(() => {
           throw new Error('format failed');
         })();
-      const healthy = new RecordingTransport();
+      const healthy = new fixture.RecordingTransport();
       const emergency = jest.fn();
-      const logger = create(
+      const logger = fixture.create(
         { LOG_DESTINATIONS: 'broken,healthy' },
-        { broken: driver(broken), healthy: driver(healthy) },
+        { broken: fixture.driver(broken), healthy: fixture.driver(healthy) },
         emergency,
       );
       if (mode === 'event') broken.emit('error', new Error('disk full'));
@@ -286,8 +241,8 @@ describe('API log destinations on installed Nest 11', () => {
   );
 
   it('does not buffer indefinitely or throw when all destinations fail', async () => {
-    const broken = new RecordingTransport();
-    const logger = create({ LOG_DESTINATIONS: 'broken' }, { broken: driver(broken) });
+    const broken = new fixture.RecordingTransport();
+    const logger = fixture.create({ LOG_DESTINATIONS: 'broken' }, { broken: fixture.driver(broken) });
     broken.emit('error', new Error('unavailable'));
     for (let i = 0; i < 100; i++) logger.error('no destination');
     await logger.close();
@@ -295,16 +250,16 @@ describe('API log destinations on installed Nest 11', () => {
   });
 
   it.each(['throw', 'event'])('completes shutdown when a driver finalizer fails synchronously (%s)', async (mode) => {
-    const broken = new RecordingTransport();
+    const broken = new fixture.RecordingTransport();
     broken._final = () => {
       if (mode === 'throw') throw new Error('flush failed');
       broken.emit('error', new Error('flush failed'));
     };
-    const healthy = new RecordingTransport();
+    const healthy = new fixture.RecordingTransport();
     const emergency = jest.fn();
-    const logger = create(
+    const logger = fixture.create(
       { LOG_DESTINATIONS: 'broken,healthy' },
-      { broken: driver(broken), healthy: driver(healthy) },
+      { broken: fixture.driver(broken), healthy: fixture.driver(healthy) },
       emergency,
     );
     logger.log('pending');
@@ -315,17 +270,17 @@ describe('API log destinations on installed Nest 11', () => {
   });
 
   it('forwards a file write-stream runtime error and continues healthy delivery without repeated diagnostics', async () => {
-    const filename = join(directory, 'runtime.log');
+    const filename = join(fixture.directory, 'runtime.log');
     const stream = fs.createWriteStream(filename, { flags: 'a', encoding: 'utf8' });
     await once(stream, 'open');
     const factory = jest.spyOn(fs, 'createWriteStream').mockReturnValue(stream);
-    const healthy = new RecordingTransport();
+    const healthy = new fixture.RecordingTransport();
     const emergency = jest.fn();
-    const logger = create(
+    const logger = fixture.create(
       { LOG_DESTINATIONS: 'file,healthy', LOG_FILE_PATH: filename },
       {
         file: fileDriver,
-        healthy: driver(healthy),
+        healthy: fixture.driver(healthy),
       },
       emergency,
     );
@@ -351,8 +306,8 @@ describe('API log destinations on installed Nest 11', () => {
     }
     @Module({ providers: [Startup] })
     class TestModule {}
-    const recording = new RecordingTransport();
-    const logger = create({ LOG_DESTINATIONS: 'third' }, { third: driver(recording) });
+    const recording = new fixture.RecordingTransport();
+    const logger = fixture.create({ LOG_DESTINATIONS: 'third' }, { third: fixture.driver(recording) });
     Logger.attachBuffer();
     new Logger('Bootstrap').log('before-env');
     const context = await NestFactory.createApplicationContext(TestModule, {

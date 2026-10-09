@@ -1,10 +1,10 @@
 import type { AuthenticatedUser, PluginContext, PluginLiveTopic } from '@attraccess/plugins-backend-sdk';
 import { WagoLiveUpdatesService } from './wago-live-updates.service';
-import { WagoService } from './wago.service';
-import { WagoCommissioningService } from './wago-commissioning.service';
-import { WagoDiagnosticsService } from './diagnostics.service';
-import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
-import { WagoNetworkChangeService } from './wago-network-change.service';
+import { WagoService } from './controllers/service';
+import { WagoCommissioningService } from './commissioning/service';
+import { WagoDiagnosticsService } from './diagnostics/service';
+import { WagoManagedRuntimeService } from './runtime/managed/service';
+import { WagoNetworkChangeService } from './network/service';
 
 describe('WAGO bundled status sources', () => {
   function setup() {

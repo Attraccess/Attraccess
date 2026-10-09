@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useState, HTMLAttributes, useMemo } from 'react';
 import { ImageIcon, X } from 'lucide-react';
+import React, { useCallback, useEffect, useState, useMemo, HTMLAttributes } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useToastMessage } from '../toastProvider';
-import { AutoScaleOptions, processImageWithAutoScale } from './imageProcessing';
+import { processImageWithAutoScale, AutoScaleOptions } from './imageProcessing';
 
-interface ImageUploadProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
+export interface ImageUploadProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
   id: string;
   label: string;
   onChange: (file: File | null) => void;
@@ -16,10 +16,11 @@ interface ImageUploadProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChang
   autoScale?: AutoScaleOptions;
 }
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
-export function ImageUpload({
+export const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+export function useImageUploadState({
   id,
   label,
   onChange,
@@ -168,6 +169,47 @@ export function ImageUpload({
     onChange(null);
     setImageWasChanged(true);
   }, [onChange]);
+  return {
+    t,
+    isDragActive,
+    selectedFile,
+    imageUrlToDisplay,
+    handleFileChange,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleRemoveFile,
+    id,
+    label,
+    onChange,
+    disabled,
+    className,
+    autoScale,
+    rest,
+  } as const;
+}
+
+export function ImageUpload({
+  id,
+  label,
+  onChange,
+  disabled = false,
+  className = '',
+  currentImageUrl,
+  autoScale,
+  ...rest
+}: Readonly<ImageUploadProps>) {
+  const {
+    t,
+    isDragActive,
+    selectedFile,
+    imageUrlToDisplay,
+    handleFileChange,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleRemoveFile,
+  } = useImageUploadState({ id, label, onChange, disabled, className, currentImageUrl, autoScale, ...rest });
 
   return (
     <div {...rest}>

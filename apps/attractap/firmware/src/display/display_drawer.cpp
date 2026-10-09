@@ -1,7 +1,7 @@
-#include "display/i18n.hpp"
+#include "i18n.hpp"
+#include "fonts/attractap_fonts.hpp"
 #include "display.hpp"
-#include "display/theme.hpp"
-#include "display/fonts/attractap_fonts.hpp"
+#include "theme.hpp"
 #include <functional>
 #include "shared/powerOff/powerOffButton.hpp"
 
@@ -113,6 +113,7 @@ void Display::initDrawer()
     FirmwareI18n::setLabel(titleLbl, FirmwareI18n::Message::Maintenance);
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
     lv_obj_t *row = lv_obj_create(Display::drawerPanel);
     lv_obj_remove_style_all(row);

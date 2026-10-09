@@ -1,229 +1,42 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { SSOController } from './sso.controller';
-import { SSOService } from './sso.service';
-import { AuthService } from '../auth.service';
-import { SessionService } from '../session.service';
-import { AuthenticationDetail, AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
-import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
+import { registerSsoControllerFixture } from './sso.controller.sso-controller.test-fixture';
+import * as discovery from './providers/discovery-client';
+import { SSOProviderType, AuthenticationDetail, AuthenticationType, SSOProvider } from '@attraccess/database-entities';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
-import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
-import { UsersService } from '../../users/users.service';
-import { RbacService } from '../../rbac/rbac.service';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { NotFoundException, BadRequestException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { AuthService } from './../auth.service';
+import { UsersService } from './../../users/users.service';
+import { SessionService } from './../session.service';
 import type { Response, Request } from 'express';
-import { CookieConfigService } from '../../../common/services/cookie-config.service';
-import { SSOOIDCGuard } from './oidc/oidc.guard';
-import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
-import { LicenseService } from '../../../license/license.service';
-import { SSOLinkTokenService } from './link-token.service';
-import { SettingsService } from '../../../settings/settings.service';
 import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-cookie-state-store';
-import { MetricsService } from '../../../metrics/metrics.service';
-import { IdentityAuditService } from '../../../audit/identity-audit.service';
-import { SsoAuditService } from '../../../audit/sso-audit.service';
-
-const mockMetricsService = {
-  authSsoLoginTotal: { inc: jest.fn() },
-  authSsoLoginFailuresTotal: { inc: jest.fn() },
-};
+import { RbacService } from './../../rbac/rbac.service';
+import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
 
 describe('SsoController', () => {
-  let controller: SSOController;
-  let ssoService: SSOService;
-  let module: TestingModule;
-  let cookieConfigService: CookieConfigService;
-  let linkTokenService: SSOLinkTokenService;
-  const identityAudit = { record: jest.fn() };
-  const ssoAudit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
-
-  const mockSSOProvider: SSOProvider = {
-    id: 1,
-    name: 'Test Provider',
-    type: SSOProviderType.OIDC,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    oidcConfiguration: {
-      id: 1,
-      ssoProviderId: 1,
-      issuer: 'https://test-issuer.com',
-      authorizationURL: 'https://test-issuer.com/auth',
-      tokenURL: 'https://test-issuer.com/token',
-      userInfoURL: 'https://test-issuer.com/userinfo',
-      clientId: 'test-client-id',
-      clientSecret: 'test-client-secret',
-      roleMappings: {
-        'user-manager': ['attraccess_admin'],
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ssoProvider: null,
-    },
-  } as unknown as SSOProvider;
-
-  const mockSamlProvider: SSOProvider = {
-    id: 2,
-    name: 'Test SAML Provider',
-    type: SSOProviderType.SAML,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    samlConfiguration: {
-      id: 2,
-      ssoProviderId: 2,
-      entryPoint: 'https://idp.example.com/sso',
-      issuer: 'https://sp.example.com',
-      certificate: 'CERT',
-      signRequest: false,
-      wantAssertionsSigned: false,
-      wantAuthnResponseSigned: true,
-      forceAuthn: false,
-      provisioningSecret: 'saml-secret',
-      roleMappings: {
-        'billing-manager': ['billing-role'],
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ssoProvider: null,
-    },
-  } as unknown as SSOProvider;
-
-  beforeEach(async () => {
-    module = await Test.createTestingModule({
-      providers: [
-        {
-          provide: AuthService,
-          useValue: {
-            userHasSSOAuthentication: jest.fn(),
-            findSSOAuthenticationDetail: jest.fn(),
-            updateSSOSubject: jest.fn(),
-            validateAuthenticationDetails: jest.fn(),
-            findUserIdBySSO: jest.fn(),
-            addAuthenticationDetails: jest.fn(),
-            removeAuthenticationDetails: jest.fn(),
-          },
-        },
-        {
-          provide: SessionService,
-          useValue: {
-            createSession: jest.fn().mockResolvedValue('mock-session-token'),
-            revokeAllUserSessions: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: SSOService,
-          useValue: {
-            getAllProviders: jest.fn().mockResolvedValue([mockSSOProvider]),
-            getProviderById: jest.fn().mockResolvedValue(mockSSOProvider),
-            getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(mockSSOProvider),
-            createProvider: jest.fn().mockResolvedValue(mockSSOProvider),
-            updateProvider: jest.fn().mockResolvedValue(mockSSOProvider),
-            deleteProvider: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: UsersService,
-          useValue: {
-            findOne: jest.fn(),
-            findOneBySSO: jest.fn(),
-            updateOne: jest.fn(),
-            deleteOne: jest.fn(),
-          },
-        },
-        {
-          provide: RbacService,
-          useValue: {
-            syncSsoRoles: jest.fn().mockResolvedValue({ added: ['user-manager'], removed: [], updated: [] }),
-            getRoles: jest.fn().mockResolvedValue([]),
-          },
-        },
-        {
-          provide: CookieConfigService,
-          useValue: {
-            getConfig: jest.fn().mockReturnValue({
-              name: 'auth-session',
-              httpOnly: true,
-              secure: false,
-              sameSite: 'lax',
-              maxAge: 7 * 24 * 60 * 60 * 1000,
-              path: '/',
-            }),
-            setAuthCookie: jest.fn(),
-            clearAuthCookie: jest.fn(),
-          },
-        },
-        {
-          provide: SettingsService,
-          useValue: {
-            getUrl: jest.fn().mockResolvedValue('http://localhost:3000'),
-          },
-        },
-        {
-          provide: ModuleRef,
-          useValue: {
-            get: jest.fn(),
-          },
-        },
-        {
-          provide: LicenseService,
-          useValue: {
-            verifyLicense: jest.fn().mockResolvedValue({
-              valid: true,
-              payload: { cfg: { modules: ['sso'], usageLimits: {} } },
-            }),
-          },
-        },
-        {
-          provide: SSOLinkTokenService,
-          useValue: {
-            verify: jest.fn(),
-            issue: jest.fn(),
-          },
-        },
-        {
-          provide: OidcCookieStateStore,
-          useValue: {},
-        },
-        {
-          provide: MetricsService,
-          useValue: mockMetricsService,
-        },
-        { provide: IdentityAuditService, useValue: identityAudit },
-        { provide: SsoAuditService, useValue: ssoAudit },
-        SSOOIDCGuard,
-      ],
-      controllers: [SSOController],
-    }).compile();
-
-    controller = module.get<SSOController>(SSOController);
-    ssoService = module.get<SSOService>(SSOService);
-    cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
-    linkTokenService = module.get<SSOLinkTokenService>(SSOLinkTokenService);
-    identityAudit.record.mockReset();
-    ssoAudit.record.mockReset().mockResolvedValue({ status: 'recorded' });
-  });
+  const fixture = registerSsoControllerFixture();
 
   it('should be defined', () => {
-    expect(controller).toBeDefined();
+    expect(fixture.controller).toBeDefined();
   });
 
   describe('getProviders', () => {
     it('should return an array of providers', async () => {
-      const result = await controller.getAll();
-      expect(result).toEqual([mockSSOProvider]);
-      expect(ssoService.getAllProviders).toHaveBeenCalled();
+      const result = await fixture.controller.getAll();
+      expect(result).toEqual([fixture.mockSSOProvider]);
+      expect(fixture.ssoService.getAllProviders).toHaveBeenCalled();
     });
   });
 
   describe('getProviderById', () => {
     it('should return a single provider', async () => {
-      const result = await controller.getOneById('1');
-      expect(result).toEqual(mockSSOProvider);
-      expect(ssoService.getProviderById).toHaveBeenCalledWith(1);
+      const result = await fixture.controller.getOneById('1');
+      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(fixture.ssoService.getProviderById).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException if provider not found', async () => {
-      jest.spyOn(ssoService, 'getProviderById').mockRejectedValueOnce(new NotFoundException());
-      await expect(controller.getOneById('999')).rejects.toThrow(NotFoundException);
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockRejectedValueOnce(new NotFoundException());
+      await expect(fixture.controller.getOneById('999')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -242,11 +55,11 @@ describe('SsoController', () => {
         },
       };
 
-      const result = await controller.createOne(createDto, { user: { id: 1 } } as AuthenticatedRequest);
+      const result = await fixture.controller.createOne(createDto, { user: { id: 1 } } as AuthenticatedRequest);
 
-      expect(result).toEqual(mockSSOProvider);
-      expect(ssoService.createProvider).toHaveBeenCalledWith(createDto);
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(fixture.ssoService.createProvider).toHaveBeenCalledWith(createDto);
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provider.created',
           actorId: 1,
@@ -256,16 +69,16 @@ describe('SsoController', () => {
     });
 
     it('keeps provider creation successful when the awaited audit receipt fails', async () => {
-      ssoAudit.record.mockRejectedValueOnce(new Error('audit unavailable'));
+      fixture.ssoAudit.record.mockRejectedValueOnce(new Error('audit unavailable'));
 
       await expect(
-        controller.createOne(
+        fixture.controller.createOne(
           { name: 'New Provider', type: SSOProviderType.OIDC } as CreateSSOProviderDto,
           {
             user: { id: 1 },
           } as AuthenticatedRequest,
         ),
-      ).resolves.toEqual(mockSSOProvider);
+      ).resolves.toEqual(fixture.mockSSOProvider);
     });
   });
 
@@ -276,19 +89,19 @@ describe('SsoController', () => {
       };
 
       // Provider without permission mappings — no ceiling check triggered.
-      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce({
-        ...mockSSOProvider,
-        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, roleMappings: {} },
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce({
+        ...fixture.mockSSOProvider,
+        oidcConfiguration: { ...fixture.mockSSOProvider.oidcConfiguration, roleMappings: {} },
       } as SSOProvider);
 
       const mockReq = {
         user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
       } as unknown as AuthenticatedRequest;
-      const result = await controller.updateOne('1', updateDto, mockReq);
+      const result = await fixture.controller.updateOne('1', updateDto, mockReq);
 
-      expect(result).toEqual(mockSSOProvider);
-      expect(ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(fixture.ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provider.updated',
           details: expect.objectContaining({ before: expect.any(String), after: expect.any(String) }),
@@ -303,21 +116,21 @@ describe('SsoController', () => {
 
       const mockReq = { user: { id: 1, effectivePermissions: new Set<string>() } } as unknown as AuthenticatedRequest;
 
-      await expect(controller.updateOne('1', updateDto, mockReq)).rejects.toThrow(ForbiddenException);
-      expect(ssoService.updateProvider).not.toHaveBeenCalled();
+      await expect(fixture.controller.updateOne('1', updateDto, mockReq)).rejects.toThrow(ForbiddenException);
+      expect(fixture.ssoService.updateProvider).not.toHaveBeenCalled();
     });
 
     it('does not audit a provider update that fails before commit', async () => {
-      jest.spyOn(ssoService, 'updateProvider').mockRejectedValueOnce(new Error('configuration write failed'));
+      jest.spyOn(fixture.ssoService, 'updateProvider').mockRejectedValueOnce(new Error('configuration write failed'));
       const request = {
         user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
       } as unknown as AuthenticatedRequest;
 
-      await expect(controller.updateOne('1', { name: 'Updated Provider' }, request)).rejects.toThrow(
+      await expect(fixture.controller.updateOne('1', { name: 'Updated Provider' }, request)).rejects.toThrow(
         'configuration write failed',
       );
 
-      expect(ssoAudit.record).not.toHaveBeenCalled();
+      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
     });
 
     it('suppresses a true no-op but records a safe secret rotation flag', async () => {
@@ -325,28 +138,28 @@ describe('SsoController', () => {
         user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
       } as unknown as AuthenticatedRequest;
 
-      await controller.updateOne('1', {}, request);
-      expect(ssoAudit.record).not.toHaveBeenCalled();
+      await fixture.controller.updateOne('1', {}, request);
+      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
 
-      await controller.updateOne(
+      await fixture.controller.updateOne(
         '1',
         {
-          oidcConfiguration: { clientSecret: mockSSOProvider.oidcConfiguration?.clientSecret },
+          oidcConfiguration: { clientSecret: fixture.mockSSOProvider.oidcConfiguration?.clientSecret },
         } as UpdateSSOProviderDto,
         request,
       );
-      expect(ssoAudit.record).not.toHaveBeenCalled();
+      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
 
-      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce({
-        ...mockSSOProvider,
-        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, clientSecret: 'replacement' },
+      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce({
+        ...fixture.mockSSOProvider,
+        oidcConfiguration: { ...fixture.mockSSOProvider.oidcConfiguration, clientSecret: 'replacement' },
       } as SSOProvider);
-      await controller.updateOne(
+      await fixture.controller.updateOne(
         '1',
         { oidcConfiguration: { clientSecret: 'replacement' } } as UpdateSSOProviderDto,
         request,
       );
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provider.updated',
           details: expect.objectContaining({ changes: JSON.stringify({ changed: [], rotated: ['clientSecret'] }) }),
@@ -355,24 +168,26 @@ describe('SsoController', () => {
     });
 
     it('does not report rotation when a SAML form resubmits its unchanged certificate', async () => {
-      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce(mockSamlProvider);
-      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce(mockSamlProvider);
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(fixture.mockSamlProvider);
+      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce(fixture.mockSamlProvider);
       const request = {
         user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
       } as unknown as AuthenticatedRequest;
-      await controller.updateOne(
+      await fixture.controller.updateOne(
         '2',
-        { samlConfiguration: { certificate: mockSamlProvider.samlConfiguration?.certificate } } as UpdateSSOProviderDto,
+        {
+          samlConfiguration: { certificate: fixture.mockSamlProvider.samlConfiguration?.certificate },
+        } as UpdateSSOProviderDto,
         request,
       );
-      expect(ssoAudit.record).not.toHaveBeenCalled();
+      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
     });
 
     it('uses the authoritative configuration to detect same-count mapping and query-only URL changes', async () => {
       const before = {
-        ...mockSSOProvider,
+        ...fixture.mockSSOProvider,
         oidcConfiguration: {
-          ...mockSSOProvider.oidcConfiguration,
+          ...fixture.mockSSOProvider.oidcConfiguration,
           authorizationURL: 'https://test-issuer.com/auth?tenant=one',
           roleMappings: { 'user-manager': ['admins'] },
         },
@@ -385,16 +200,16 @@ describe('SsoController', () => {
           roleMappings: { 'billing-manager': ['billing'] },
         },
       } as SSOProvider;
-      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce(before);
-      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce(after);
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(before);
+      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce(after);
       jest
-        .spyOn(module.get(RbacService), 'getRoles')
+        .spyOn(fixture.module.get(RbacService), 'getRoles')
         .mockResolvedValue([{ key: 'billing-manager', rolePermissions: [] }] as never);
       const request = {
         user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
       } as unknown as AuthenticatedRequest;
 
-      await controller.updateOne(
+      await fixture.controller.updateOne(
         '1',
         {
           oidcConfiguration: {
@@ -405,7 +220,7 @@ describe('SsoController', () => {
         request,
       );
 
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           details: expect.objectContaining({
             changes: JSON.stringify({
@@ -418,24 +233,24 @@ describe('SsoController', () => {
     });
 
     it('records certificate replacement as a rotation without retaining certificate material', async () => {
-      const before = mockSamlProvider;
+      const before = fixture.mockSamlProvider;
       const after = {
         ...before,
         samlConfiguration: { ...before.samlConfiguration, certificate: 'REPLACEMENT' },
       } as SSOProvider;
-      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce(before);
-      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce(after);
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(before);
+      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce(after);
       const request = {
         user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
       } as unknown as AuthenticatedRequest;
 
-      await controller.updateOne(
+      await fixture.controller.updateOne(
         '2',
         { samlConfiguration: { certificate: 'REPLACEMENT' } } as UpdateSSOProviderDto,
         request,
       );
 
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           details: expect.objectContaining({
             changes: JSON.stringify({ changed: [], rotated: ['identityProviderCertificate'] }),
@@ -447,10 +262,10 @@ describe('SsoController', () => {
 
   describe('deleteProvider', () => {
     it('should delete a provider when user has permission', async () => {
-      await controller.deleteOne('1', { user: { id: 1 } } as AuthenticatedRequest);
+      await fixture.controller.deleteOne('1', { user: { id: 1 } } as AuthenticatedRequest);
 
-      expect(ssoService.deleteProvider).toHaveBeenCalledWith(1);
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoService.deleteProvider).toHaveBeenCalledWith(1);
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provider.deleted',
           actorId: 1,
@@ -488,10 +303,10 @@ describe('SsoController', () => {
       userExists = true,
       payload = linkPayload,
     } = {}) {
-      const authService = module.get<AuthService>(AuthService);
-      const usersService = module.get<UsersService>(UsersService);
+      const authService = fixture.module.get<AuthService>(AuthService);
+      const usersService = fixture.module.get<UsersService>(UsersService);
 
-      (linkTokenService.verify as jest.Mock).mockResolvedValue(payload);
+      (fixture.linkTokenService.verify as jest.Mock).mockResolvedValue(payload);
       (authService.findSSOAuthenticationDetail as jest.Mock).mockResolvedValue(existingSSODetail);
       (authService.updateSSOSubject as jest.Mock).mockResolvedValue(undefined);
       (authService.validateAuthenticationDetails as jest.Mock).mockResolvedValue(passwordOk);
@@ -515,7 +330,7 @@ describe('SsoController', () => {
       it('links when password is valid and removes local password', async () => {
         const { authService, usersService } = setupLinkMocks();
 
-        const result = await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        const result = await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
 
         expect(result).toEqual({ OK: true });
         expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(baseUser.id, {
@@ -530,15 +345,15 @@ describe('SsoController', () => {
       it('verifies link token', async () => {
         setupLinkMocks();
 
-        await controller.linkUserToExternalAccount({ linkToken: 'my-token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'my-token', password: 'secret' });
 
-        expect(linkTokenService.verify).toHaveBeenCalledWith('my-token');
+        expect(fixture.linkTokenService.verify).toHaveBeenCalledWith('my-token');
       });
 
       it('looks up user by email from link payload', async () => {
         const { usersService } = setupLinkMocks();
 
-        await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
 
         expect(usersService.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, ['authenticationDetails']);
       });
@@ -557,7 +372,7 @@ describe('SsoController', () => {
       it('updates ssoSubject when re-linking to the same provider', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
 
-        const result = await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        const result = await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
 
         expect(result).toEqual({ OK: true });
         expect(authService.updateSSOSubject).toHaveBeenCalledWith(20, 'sub-123');
@@ -570,9 +385,9 @@ describe('SsoController', () => {
           passwordOk: false,
         });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' })).rejects.toThrow(
-          UnauthorizedException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' }),
+        ).rejects.toThrow(UnauthorizedException);
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
       });
@@ -580,7 +395,7 @@ describe('SsoController', () => {
       it('removes local password after re-linking', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
 
-        await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
 
         expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(10);
       });
@@ -588,7 +403,7 @@ describe('SsoController', () => {
       it('clears externalIdentifier after re-linking', async () => {
         const { usersService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
 
-        await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
 
         expect(usersService.updateOne).toHaveBeenCalledWith(42, { externalIdentifier: null });
       });
@@ -599,9 +414,9 @@ describe('SsoController', () => {
           ssoSubjectExistsForOtherUser: true,
         });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
       });
@@ -620,9 +435,9 @@ describe('SsoController', () => {
       it('rejects linking when user is already linked to a different provider', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
 
         expect(authService.addAuthenticationDetails).not.toHaveBeenCalled();
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
@@ -631,17 +446,17 @@ describe('SsoController', () => {
       it('throws SSO_ALREADY_LINKED error message for cross-provider linking', async () => {
         setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          'SSO_ALREADY_LINKED',
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow('SSO_ALREADY_LINKED');
       });
 
       it('does not validate password when rejecting cross-provider link', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
 
         expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
       });
@@ -651,49 +466,49 @@ describe('SsoController', () => {
       it('throws UnauthorizedException when user not found by email', async () => {
         setupLinkMocks({ userExists: false });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          UnauthorizedException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(UnauthorizedException);
       });
 
       it('rejects when no local password is present', async () => {
         setupLinkMocks({ hasLocalPassword: false });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
       });
 
       it('throws PASSWORD_REQUIRED when no local password exists', async () => {
         setupLinkMocks({ hasLocalPassword: false });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          'PASSWORD_REQUIRED',
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow('PASSWORD_REQUIRED');
       });
 
       it('rejects when password verification fails', async () => {
         setupLinkMocks({ passwordOk: false });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          UnauthorizedException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(UnauthorizedException);
       });
 
       it('rejects when SSO subject is already linked to another user', async () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
       });
 
       it('throws SSO_SUBJECT_ALREADY_LINKED for subject collision', async () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
-        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-          'SSO_SUBJECT_ALREADY_LINKED',
-        );
+        await expect(
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow('SSO_SUBJECT_ALREADY_LINKED');
       });
     });
   });
@@ -709,7 +524,7 @@ describe('SsoController', () => {
     let sessionService: SessionService;
 
     beforeEach(() => {
-      sessionService = module.get<SessionService>(SessionService);
+      sessionService = fixture.module.get<SessionService>(SessionService);
 
       mockRequest = {
         user: { id: 1, username: 'testuser', email: 'test@example.com' },
@@ -728,7 +543,7 @@ describe('SsoController', () => {
     });
 
     it('should set cookie and return user data for web browser requests', async () => {
-      const result = await controller.oidcLoginCallback(
+      const result = await fixture.controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         undefined,
         mockResponse as unknown as Response,
@@ -739,7 +554,7 @@ describe('SsoController', () => {
         ipAddress: mockRequest.ip,
       });
 
-      expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
+      expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
 
       expect(result).toEqual({
         user: mockRequest.user,
@@ -752,7 +567,7 @@ describe('SsoController', () => {
       mockRequest.headers.accept = 'application/json';
       mockRequest.headers['user-agent'] = 'curl/7.68.0';
 
-      const result = await controller.oidcLoginCallback(
+      const result = await fixture.controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         undefined,
         mockResponse as unknown as Response,
@@ -772,14 +587,14 @@ describe('SsoController', () => {
     });
 
     it('records a safe successful SSO login event', async () => {
-      await controller.oidcLoginCallback(
+      await fixture.controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         undefined,
         mockResponse as unknown as Response,
         '1',
       );
 
-      expect(identityAudit.record).toHaveBeenCalledWith(
+      expect(fixture.identityAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso_login',
           outcome: 'succeeded',
@@ -794,20 +609,20 @@ describe('SsoController', () => {
     it('should redirect without leaking user data in URL', async () => {
       const redirectTo = 'http://localhost:3000/dashboard';
 
-      await controller.oidcLoginCallback(
+      await fixture.controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         redirectTo,
         mockResponse as unknown as Response,
       );
 
-      expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
+      expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
       expect(mockResponse.redirect).toHaveBeenCalledWith('http://localhost:3000/dashboard');
     });
 
     it('should strip account-linking params from redirect URL', async () => {
       const redirectTo = 'http://localhost:3000/dashboard?accountLinking=true&email=test@x.com&ssoLinkToken=abc';
 
-      await controller.oidcLoginCallback(
+      await fixture.controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         redirectTo,
         mockResponse as unknown as Response,
@@ -820,7 +635,7 @@ describe('SsoController', () => {
       const redirectFromState = 'https://app.example.com/from-state';
       (mockRequest as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] = redirectFromState;
 
-      await controller.oidcLoginCallback(
+      await fixture.controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         'https://app.example.com/from-query',
         mockResponse as unknown as Response,
@@ -834,24 +649,24 @@ describe('SsoController', () => {
     'builds and validates %s discovery requests',
     async (method) => {
       const fetchMock = jest
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue({ ok: true, json: async () => ({ issuer: 'https://idp.example' }) } as never);
+        .spyOn(discovery, 'requestDiscoveryJson')
+        .mockResolvedValue({ issuer: 'https://idp.example' });
       try {
-        expect(await controller[method]('idp.example/', 'team name')).toEqual({ issuer: 'https://idp.example' });
+        expect(await fixture.controller[method]('idp.example/', 'team name')).toEqual({
+          issuer: 'https://idp.example',
+        });
         const route = method === 'discoverAuthentik' ? 'application/o' : 'realms';
         expect(fetchMock).toHaveBeenCalledWith(
-          `http://idp.example/${route}/team%20name/.well-known/openid-configuration`,
-          { headers: { Accept: 'application/json' } },
+          new URL(`http://idp.example/${route}/team%20name/.well-known/openid-configuration`),
         );
-        await controller[method]('https://idp.example', 'team');
+        await fixture.controller[method]('https://idp.example', 'team');
         expect(fetchMock).toHaveBeenLastCalledWith(
-          `https://idp.example/${route}/team/.well-known/openid-configuration`,
-          expect.any(Object),
+          new URL(`https://idp.example/${route}/team/.well-known/openid-configuration`),
         );
-        fetchMock.mockResolvedValue({ ok: false, status: 503, statusText: 'Unavailable' } as never);
-        await expect(controller[method]('https://idp.example', 'team')).rejects.toThrow('503 Unavailable');
-        await expect(controller[method]('', 'team')).rejects.toThrow('Missing required');
-        await expect(controller[method]('idp.example', '')).rejects.toThrow('Missing required');
+        fetchMock.mockRejectedValue(new Error('503 Unavailable'));
+        await expect(fixture.controller[method]('https://idp.example', 'team')).rejects.toThrow('503 Unavailable');
+        await expect(fixture.controller[method]('', 'team')).rejects.toThrow('Missing required');
+        await expect(fixture.controller[method]('idp.example', '')).rejects.toThrow('Missing required');
       } finally {
         fetchMock.mockRestore();
       }
@@ -860,41 +675,43 @@ describe('SsoController', () => {
 
   describe('sso provisioning endpoints', () => {
     it('resolves OIDC users by email only when they belong to the requested provider', async () => {
-      const users = module.get<UsersService>(UsersService);
+      const users = fixture.module.get<UsersService>(UsersService);
       const request = { headers: { authorization: 'Bearer test-client-secret' } } as unknown as Request;
       (users.findOne as jest.Mock).mockResolvedValue({
         id: 55,
         authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 1 }],
       });
-      expect(await controller.oidcLogout('1', request, { email: ' user@example.com ' })).toEqual({ OK: true });
+      expect(await fixture.controller.oidcLogout('1', request, { email: ' user@example.com ' })).toEqual({ OK: true });
       expect(users.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, ['authenticationDetails']);
       (users.findOne as jest.Mock).mockResolvedValue({
         id: 55,
         authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 99 }],
       });
-      await expect(controller.oidcLogout('1', request, { email: 'user@example.com' })).rejects.toThrow(
+      await expect(fixture.controller.oidcLogout('1', request, { email: 'user@example.com' })).rejects.toThrow(
         'SSO_USER_NOT_FOUND',
       );
-      await expect(controller.oidcLogout('1', request, { subject: ' ', email: ' ' })).rejects.toThrow(
+      await expect(fixture.controller.oidcLogout('1', request, { subject: ' ', email: ' ' })).rejects.toThrow(
         'SSO_SUBJECT_OR_EMAIL_REQUIRED',
       );
     });
 
     it('requires an external identity for SAML email fallback', async () => {
-      const users = module.get<UsersService>(UsersService);
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue(mockSamlProvider);
+      const users = fixture.module.get<UsersService>(UsersService);
+      jest
+        .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
+        .mockResolvedValue(fixture.mockSamlProvider);
       const request = { headers: { authorization: 'Bearer saml-secret' } } as unknown as Request;
       (users.findOne as jest.Mock).mockResolvedValue({ id: 55, externalIdentifier: 'saml-subject' });
-      expect(await controller.samlLogout('2', request, { email: 'user@example.com' })).toEqual({ OK: true });
+      expect(await fixture.controller.samlLogout('2', request, { email: 'user@example.com' })).toEqual({ OK: true });
       (users.findOne as jest.Mock).mockResolvedValue({ id: 55, externalIdentifier: null });
-      await expect(controller.samlLogout('2', request, { email: 'user@example.com' })).rejects.toThrow(
+      await expect(fixture.controller.samlLogout('2', request, { email: 'user@example.com' })).rejects.toThrow(
         'SSO_USER_NOT_FOUND',
       );
     });
 
     it('revokes sessions for oidc logout requests', async () => {
-      const usersService = module.get<UsersService>(UsersService);
-      const sessionService = module.get<SessionService>(SessionService);
+      const usersService = fixture.module.get<UsersService>(UsersService);
+      const sessionService = fixture.module.get<SessionService>(SessionService);
 
       (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 55 });
 
@@ -902,11 +719,11 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer test-client-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.oidcLogout('1', mockRequest as unknown as Request, { subject: 'sub-1' });
+      const result = await fixture.controller.oidcLogout('1', mockRequest as unknown as Request, { subject: 'sub-1' });
 
       expect(result).toEqual({ OK: true });
       expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(55);
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provisioning.sessions_revoked',
           actorId: null,
@@ -916,7 +733,7 @@ describe('SsoController', () => {
     });
 
     it('deletes users for oidc delete requests', async () => {
-      const usersService = module.get<UsersService>(UsersService);
+      const usersService = fixture.module.get<UsersService>(UsersService);
 
       (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 77 });
 
@@ -924,11 +741,13 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer test-client-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.oidcDeleteUser('1', mockRequest as unknown as Request, { subject: 'sub-2' });
+      const result = await fixture.controller.oidcDeleteUser('1', mockRequest as unknown as Request, {
+        subject: 'sub-2',
+      });
 
       expect(result).toEqual({ OK: true });
       expect(usersService.deleteOne).toHaveBeenCalledWith(77);
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provisioning.user_deleted',
           actorId: null,
@@ -938,8 +757,8 @@ describe('SsoController', () => {
     });
 
     it('does not sync RBAC roles when roles field is absent (incremental provisioning)', async () => {
-      const usersService = module.get<UsersService>(UsersService);
-      const rbacService = module.get<RbacService>(RbacService);
+      const usersService = fixture.module.get<UsersService>(UsersService);
+      const rbacService = fixture.module.get<RbacService>(RbacService);
 
       (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 88 });
 
@@ -947,7 +766,7 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer test-client-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
+      const result = await fixture.controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
         subject: 'sub-3',
       });
 
@@ -956,8 +775,8 @@ describe('SsoController', () => {
     });
 
     it('maps role names using provider permission mappings', async () => {
-      const usersService = module.get<UsersService>(UsersService);
-      const rbacService = module.get<RbacService>(RbacService);
+      const usersService = fixture.module.get<UsersService>(UsersService);
+      const rbacService = fixture.module.get<RbacService>(RbacService);
 
       (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 99 });
 
@@ -965,7 +784,7 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer test-client-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
+      const result = await fixture.controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
         subject: 'sub-4',
         roles: ['attraccess_admin'],
       });
@@ -978,7 +797,7 @@ describe('SsoController', () => {
         SSOProviderType.OIDC,
         1,
       );
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provisioning.permissions_synced',
           actorId: null,
@@ -991,9 +810,11 @@ describe('SsoController', () => {
     });
 
     it('handles SAML provisioning logout', async () => {
-      const usersService = module.get<UsersService>(UsersService);
-      const sessionService = module.get<SessionService>(SessionService);
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValueOnce(mockSamlProvider);
+      const usersService = fixture.module.get<UsersService>(UsersService);
+      const sessionService = fixture.module.get<SessionService>(SessionService);
+      jest
+        .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
+        .mockResolvedValueOnce(fixture.mockSamlProvider);
 
       (usersService.findOne as jest.Mock).mockResolvedValue({
         id: 101,
@@ -1005,11 +826,13 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer saml-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.samlLogout('2', mockRequest as unknown as Request, { subject: 'saml-user' });
+      const result = await fixture.controller.samlLogout('2', mockRequest as unknown as Request, {
+        subject: 'saml-user',
+      });
 
       expect(result).toEqual({ OK: true });
       expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(101);
-      expect(ssoAudit.record).toHaveBeenCalledWith(
+      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'sso.provisioning.sessions_revoked',
           actorId: null,
@@ -1019,8 +842,10 @@ describe('SsoController', () => {
     });
 
     it('handles SAML provisioning delete', async () => {
-      const usersService = module.get<UsersService>(UsersService);
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValueOnce(mockSamlProvider);
+      const usersService = fixture.module.get<UsersService>(UsersService);
+      jest
+        .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
+        .mockResolvedValueOnce(fixture.mockSamlProvider);
 
       (usersService.findOne as jest.Mock).mockResolvedValue({
         id: 102,
@@ -1032,7 +857,7 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer saml-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.samlDeleteUser('2', mockRequest as unknown as Request, {
+      const result = await fixture.controller.samlDeleteUser('2', mockRequest as unknown as Request, {
         subject: 'saml-user-2',
       });
 
@@ -1041,9 +866,11 @@ describe('SsoController', () => {
     });
 
     it('handles SAML provisioning permission updates', async () => {
-      const usersService = module.get<UsersService>(UsersService);
-      const rbacService = module.get<RbacService>(RbacService);
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValueOnce(mockSamlProvider);
+      const usersService = fixture.module.get<UsersService>(UsersService);
+      const rbacService = fixture.module.get<RbacService>(RbacService);
+      jest
+        .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
+        .mockResolvedValueOnce(fixture.mockSamlProvider);
 
       (usersService.findOne as jest.Mock).mockResolvedValue({
         id: 103,
@@ -1055,7 +882,7 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer saml-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.samlUpdatePermissions('2', mockRequest as unknown as Request, {
+      const result = await fixture.controller.samlUpdatePermissions('2', mockRequest as unknown as Request, {
         subject: 'saml-user-3',
         roles: ['billing-role'],
       });

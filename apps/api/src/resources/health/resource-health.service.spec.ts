@@ -1,97 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { registerResourceHealthServiceFixture } from './resource-health.service.resource-health-service.test-fixture';
 import { NotFoundException } from '@nestjs/common';
-import {
-  Resource,
-  ResourceHealthSource,
-  ResourceHealthState,
-  ResourceHealthStatus,
-} from '@attraccess/database-entities';
-import { ResourceHealthService } from './resource-health.service';
+import { ResourceHealthSource, ResourceHealthStatus, ResourceHealthState } from '@attraccess/database-entities';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
-import { AuditService } from '../../audit/audit.service';
-
-type MockRepository<T = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
-
-const stubResource = (id: number): Resource => ({ id, name: `Resource ${id}` } as unknown as Resource);
 
 describe('ResourceHealthService', () => {
-  let service: ResourceHealthService;
-  let healthRepo: MockRepository<ResourceHealthState>;
-  let resourceRepo: MockRepository<Resource>;
-  let eventEmitter: EventEmitter2;
-  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
-
-  const records: ResourceHealthState[] = [];
-
-  beforeEach(async () => {
-    records.length = 0;
-    audit.recordResource.mockClear();
-
-    healthRepo = {
-      findOne: jest.fn(async ({ where }: { where: Partial<ResourceHealthState> }) =>
-        records.find((r) => {
-          if (where.id !== undefined && r.id !== where.id) return false;
-          if (where.resourceId !== undefined && r.resourceId !== where.resourceId) return false;
-          if (where.identifier !== undefined && r.identifier !== where.identifier) return false;
-          return true;
-        }) ?? null,
-      ),
-      find: jest.fn(async ({ where }: { where: Partial<ResourceHealthState> }) =>
-        records.filter((r) => r.resourceId === where.resourceId),
-      ),
-      count: jest.fn(async ({ where }: { where: Partial<ResourceHealthState> }) =>
-        records.filter((r) => {
-          if (where.resourceId !== undefined && r.resourceId !== where.resourceId) return false;
-          if (where.status !== undefined && r.status !== where.status) return false;
-          return true;
-        }).length,
-      ),
-      create: jest.fn((data: Partial<ResourceHealthState>) => ({ ...data })),
-      save: jest.fn(async (entity: ResourceHealthState) => {
-        const existingIdx = records.findIndex(
-          (r) => r.resourceId === entity.resourceId && r.identifier === entity.identifier,
-        );
-        if (existingIdx >= 0) {
-          records[existingIdx] = { ...records[existingIdx], ...entity };
-          return records[existingIdx];
-        }
-        const persisted = { id: records.length + 1, createdAt: new Date(), updatedAt: new Date(), ...entity };
-        records.push(persisted as ResourceHealthState);
-        return persisted as ResourceHealthState;
-      }),
-      remove: jest.fn(async (entity: ResourceHealthState) => {
-        const idx = records.findIndex((r) => r.id === entity.id);
-        if (idx >= 0) records.splice(idx, 1);
-        return entity;
-      }),
-    };
-
-    resourceRepo = {
-      findOne: jest.fn(async ({ where }: { where: { id: number } }) =>
-        where.id === 999 ? null : stubResource(where.id),
-      ),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ResourceHealthService,
-        { provide: getRepositoryToken(ResourceHealthState), useValue: healthRepo },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepo },
-        EventEmitter2,
-        { provide: AuditService, useValue: audit },
-      ],
-    }).compile();
-
-    service = module.get(ResourceHealthService);
-    eventEmitter = module.get(EventEmitter2);
-  });
+  const fixture = registerResourceHealthServiceFixture();
 
   describe('reportHealth', () => {
     it('creates a new healthy entry when none exists', async () => {
-      const result = await service.reportHealth({
+      const result = await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'ir-bridge',
         status: ResourceHealthStatus.HEALTHY,
@@ -101,31 +18,31 @@ describe('ResourceHealthService', () => {
       expect(result.identifier).toBe('ir-bridge');
       expect(result.status).toBe(ResourceHealthStatus.HEALTHY);
       expect(result.reason).toBeNull();
-      expect(records).toHaveLength(1);
+      expect(fixture.records).toHaveLength(1);
     });
 
     it('normalises empty/undefined identifiers to empty string', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: undefined,
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
-      expect(records[0].identifier).toBe('');
+      expect(fixture.records[0].identifier).toBe('');
     });
 
     it('trims identifier whitespace', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '  primary  ',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
-      expect(records[0].identifier).toBe('primary');
+      expect(fixture.records[0].identifier).toBe('primary');
     });
 
     it('clears reason when transitioning to healthy', async () => {
-      records.push({
+      fixture.records.push({
         id: 1,
         resourceId: 1,
         identifier: '',
@@ -137,7 +54,7 @@ describe('ResourceHealthService', () => {
         updatedAt: new Date(),
       } as ResourceHealthState);
 
-      const result = await service.reportHealth({
+      const result = await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '',
         status: ResourceHealthStatus.HEALTHY,
@@ -149,7 +66,7 @@ describe('ResourceHealthService', () => {
     });
 
     it('falls back to null reason when unhealthy with empty reason', async () => {
-      const result = await service.reportHealth({
+      const result = await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '',
         status: ResourceHealthStatus.UNHEALTHY,
@@ -160,9 +77,9 @@ describe('ResourceHealthService', () => {
     });
 
     it('emits ResourceHealthChangedEvent only when status changes', async () => {
-      const emitSpy = jest.spyOn(eventEmitter, 'emit');
+      const emitSpy = jest.spyOn(fixture.eventEmitter, 'emit');
 
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '',
         status: ResourceHealthStatus.HEALTHY,
@@ -178,16 +95,16 @@ describe('ResourceHealthService', () => {
       );
 
       emitSpy.mockClear();
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
       expect(emitSpy).not.toHaveBeenCalled();
-      expect(audit.recordResource).toHaveBeenCalledTimes(1);
+      expect(fixture.audit.recordResource).toHaveBeenCalledTimes(1);
 
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '',
         status: ResourceHealthStatus.UNHEALTHY,
@@ -203,95 +120,98 @@ describe('ResourceHealthService', () => {
           reason: 'ka-pow',
         }),
       );
-      expect(audit.recordResource).toHaveBeenLastCalledWith(
+      expect(fixture.audit.recordResource).toHaveBeenLastCalledWith(
         expect.objectContaining({
           action: 'health.transition',
           actorId: null,
           subjectId: 1,
-          details: expect.objectContaining({ previousStatus: ResourceHealthStatus.HEALTHY, status: ResourceHealthStatus.UNHEALTHY }),
+          details: expect.objectContaining({
+            previousStatus: ResourceHealthStatus.HEALTHY,
+            status: ResourceHealthStatus.UNHEALTHY,
+          }),
         }),
       );
     });
 
     it('updates an existing record without creating duplicates', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: '',
         status: ResourceHealthStatus.UNHEALTHY,
         reason: 'gone',
         source: ResourceHealthSource.HEARTBEAT,
       });
-      expect(records).toHaveLength(1);
-      expect(records[0].source).toBe(ResourceHealthSource.HEARTBEAT);
-      expect(records[0].reason).toBe('gone');
+      expect(fixture.records).toHaveLength(1);
+      expect(fixture.records[0].source).toBe(ResourceHealthSource.HEARTBEAT);
+      expect(fixture.records[0].reason).toBe('gone');
     });
 
     it('keeps separate records per identifier', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'ir-bridge',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'Internal',
         status: ResourceHealthStatus.UNHEALTHY,
         reason: 'fault',
         source: ResourceHealthSource.MANUAL,
       });
-      expect(records).toHaveLength(2);
+      expect(fixture.records).toHaveLength(2);
     });
   });
 
   describe('isResourceUnhealthy', () => {
     it('returns false when no entries exist', async () => {
-      expect(await service.isResourceUnhealthy(1)).toBe(false);
+      expect(await fixture.service.isResourceUnhealthy(1)).toBe(false);
     });
 
     it('returns true when at least one entry is unhealthy', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'a',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'b',
         status: ResourceHealthStatus.UNHEALTHY,
         reason: 'bad',
         source: ResourceHealthSource.MANUAL,
       });
-      expect(await service.isResourceUnhealthy(1)).toBe(true);
+      expect(await fixture.service.isResourceUnhealthy(1)).toBe(true);
     });
 
     it('does not consider unhealthy entries from other resources', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 2,
         identifier: '',
         status: ResourceHealthStatus.UNHEALTHY,
         reason: 'bad',
         source: ResourceHealthSource.MANUAL,
       });
-      expect(await service.isResourceUnhealthy(1)).toBe(false);
+      expect(await fixture.service.isResourceUnhealthy(1)).toBe(false);
     });
   });
 
   describe('clearEntry', () => {
     it('throws NotFoundException when entry does not exist', async () => {
-      await expect(service.clearEntry(1, 999)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(fixture.service.clearEntry(1, 999)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('removes the entry and emits a healthy transition event when previously unhealthy', async () => {
-      const emitSpy = jest.spyOn(eventEmitter, 'emit');
-      await service.reportHealth({
+      const emitSpy = jest.spyOn(fixture.eventEmitter, 'emit');
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'ir-bridge',
         status: ResourceHealthStatus.UNHEALTHY,
@@ -300,10 +220,10 @@ describe('ResourceHealthService', () => {
       });
       emitSpy.mockClear();
 
-      const entryId = records[0].id;
-      await service.clearEntry(1, entryId);
+      const entryId = fixture.records[0].id;
+      await fixture.service.clearEntry(1, entryId);
 
-      expect(records).toHaveLength(0);
+      expect(fixture.records).toHaveLength(0);
       expect(emitSpy).toHaveBeenCalledWith(
         ResourceHealthChangedEvent.EVENT_NAME,
         expect.objectContaining({
@@ -313,62 +233,62 @@ describe('ResourceHealthService', () => {
           previousStatus: ResourceHealthStatus.UNHEALTHY,
         }),
       );
-      expect(audit.recordResource).toHaveBeenLastCalledWith(
+      expect(fixture.audit.recordResource).toHaveBeenLastCalledWith(
         expect.objectContaining({ action: 'health.transition', subjectId: 1 }),
       );
     });
 
     it('does not emit a transition event when entry was already healthy', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'ir-bridge',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
-      const emitSpy = jest.spyOn(eventEmitter, 'emit');
+      const emitSpy = jest.spyOn(fixture.eventEmitter, 'emit');
       emitSpy.mockClear();
 
-      const entryId = records[0].id;
-      await service.clearEntry(1, entryId);
+      const entryId = fixture.records[0].id;
+      await fixture.service.clearEntry(1, entryId);
 
-      expect(records).toHaveLength(0);
+      expect(fixture.records).toHaveLength(0);
       expect(emitSpy).not.toHaveBeenCalled();
     });
 
     it('does not delete entries belonging to other resources', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'ir-bridge',
         status: ResourceHealthStatus.UNHEALTHY,
         reason: 'broken',
         source: ResourceHealthSource.MANUAL,
       });
-      const entryId = records[0].id;
-      await expect(service.clearEntry(2, entryId)).rejects.toBeInstanceOf(NotFoundException);
-      expect(records).toHaveLength(1);
+      const entryId = fixture.records[0].id;
+      await expect(fixture.service.clearEntry(2, entryId)).rejects.toBeInstanceOf(NotFoundException);
+      expect(fixture.records).toHaveLength(1);
     });
   });
 
   describe('getSummary', () => {
     it('throws NotFoundException when resource does not exist', async () => {
-      await expect(service.getSummary(999)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(fixture.service.getSummary(999)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('reports healthy when no entries exist', async () => {
-      const summary = await service.getSummary(1);
+      const summary = await fixture.service.getSummary(1);
       expect(summary.isHealthy).toBe(true);
       expect(summary.entries).toEqual([]);
       expect(summary.unhealthyEntries).toEqual([]);
     });
 
     it('separates healthy and unhealthy entries', async () => {
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'a',
         status: ResourceHealthStatus.HEALTHY,
         source: ResourceHealthSource.MANUAL,
       });
-      await service.reportHealth({
+      await fixture.service.reportHealth({
         resourceId: 1,
         identifier: 'b',
         status: ResourceHealthStatus.UNHEALTHY,
@@ -376,7 +296,7 @@ describe('ResourceHealthService', () => {
         source: ResourceHealthSource.PAYLOAD,
       });
 
-      const summary = await service.getSummary(1);
+      const summary = await fixture.service.getSummary(1);
       expect(summary.isHealthy).toBe(false);
       expect(summary.entries).toHaveLength(2);
       expect(summary.unhealthyEntries).toHaveLength(1);

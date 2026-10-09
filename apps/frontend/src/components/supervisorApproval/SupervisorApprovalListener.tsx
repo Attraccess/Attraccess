@@ -15,7 +15,7 @@ import { SupervisorApprovalModal } from './SupervisorApprovalModal';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
-import { SupervisionLiveEvent, SupervisionLiveEventType } from '../../utils/live-update-types';
+import { SupervisionLiveEvent, SupervisionLiveEventType } from '../../utils/live-updates/types';
 
 /**
  * Global listener (mounted once for authenticated users) that surfaces incoming

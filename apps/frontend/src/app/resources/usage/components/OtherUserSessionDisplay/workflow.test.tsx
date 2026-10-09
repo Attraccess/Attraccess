@@ -55,7 +55,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseResourcesServiceResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
 }));
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
-  useResourceFormsSubmission: () => ({ requestForms: state.forms, modal: null }),
+  useResourceFormsSubmission: () => ({ requestForms: state.forms, modal: null, clearFormsDraft: vi.fn() }),
 }));
 vi.mock('../SessionNotesModal', () => ({
   SessionModalMode: { START: 'start', END: 'end' },

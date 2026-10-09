@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { coverageConfigDefaults, defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
@@ -23,6 +23,10 @@ export default defineConfig({
     // another file's DOM, producing intermittent input corruption and timeouts.
     fileParallelism: false,
     testTimeout: 15_000,
+    coverage: {
+      // Test helpers contain hoisted mocks that Istanbul's instrumentation breaks.
+      exclude: [...coverageConfigDefaults.exclude, 'apps/plugins/wago/frontend/tests/**', '**/*.test-fixture.{ts,tsx}'],
+    },
   },
   esbuild: { jsx: 'automatic' },
 });

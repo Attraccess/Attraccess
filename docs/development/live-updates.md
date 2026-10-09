@@ -196,6 +196,11 @@ The hook shares the authenticated host client, reference counts identical topics
 supports idempotent `abort`/unmount, and uses the latest callbacks without
 resubscribing. A realm-wide React context bridges independently bundled SDK
 copies in federation remotes; it contains no transport or global credential.
+The host wraps plugin routes and embedded slots in
+`PluginLiveUpdatesIdentityProvider` using the loaded manifest name. This identity
+overrides the hook's `plugin` fallback so npm packages (including scoped names)
+and legacy ZIP manifests subscribe to the same namespace their backend registers.
+Standalone consumers without that provider use the explicit `plugin` name.
 Logout and session replacement use the same host lifecycle as core consumers.
 The host alone invalidates React Query state on reconnect, including plugin
 queries. Plugins do not need their own query invalidation callback.

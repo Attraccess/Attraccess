@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   DrawerBody,
   DrawerFooter,
@@ -12,27 +10,29 @@ import {
   Spinner,
 } from '@heroui/react';
 import { ArrowLeft, Palette, RotateCcw } from 'lucide-react';
-import Editor, { type OnMount } from '@monaco-editor/react';
-import { Button } from '../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useAppTheme } from '@attraccess/ui';
-import { useToastMessage } from '../../components/toastProvider';
+import Editor from '@monaco-editor/react';
+import { Button } from '../../components/button/index';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { StandardModal } from '../../components/standardModal';
 import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { OnMount } from '@monaco-editor/react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useAppTheme } from '@attraccess/ui';
+import { useToastMessage } from '../../components/toastProvider';
 import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
 import {
   useEmailLayoutServiceEmailLayoutControllerFindGlobal,
   useEmailLayoutServiceEmailLayoutControllerUpdate,
   useEmailLayoutServiceEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
 } from '@attraccess/react-query-client';
-
 import en from './en.json';
 import de from './de.json';
 
-const PLACEHOLDER_CLASS = 'layout-content-placeholder';
+export const PLACEHOLDER_CLASS = 'layout-content-placeholder';
 
-// The stored layout is a full <mjml> document with a raw {{content}} token in
+export // The stored layout is a full <mjml> document with a raw {{content}} token in
 // mj-body. GrapesJS would drop that bare text node, so for editing we swap it
 // for a locked, visibly-marked section and swap back on save. The mj-head is
 // split off too (GrapesJS has no mj-attributes component) and carried through
@@ -42,9 +42,10 @@ const placeholderSection = (label: string) =>
   `<mj-column><mj-text align="center" color="#64748B" font-size="14px">${label}</mj-text></mj-column>` +
   `</mj-section>`;
 
-const toEditable = (body: string, label: string) => body.replace(CONTENT_PLACEHOLDER, () => placeholderSection(label));
+export const toEditable = (body: string, label: string) =>
+  body.replace(CONTENT_PLACEHOLDER, () => placeholderSection(label));
 
-const toStorable = (editedDoc: string, head: string) =>
+export const toStorable = (editedDoc: string, head: string) =>
   editedDoc
     .replace(
       new RegExp(`<mj-section[^>]*css-class="[^"]*${PLACEHOLDER_CLASS}[^"]*"[\\s\\S]*?</mj-section>`),
@@ -54,7 +55,7 @@ const toStorable = (editedDoc: string, head: string) =>
     // a literal '<mjml>' match would silently drop the head for such layouts.
     .replace(/<mjml([^>]*)>/, (_match, attrs) => `<mjml${attrs}>${head}`);
 
-export function EmailLayoutPage() {
+export function useEmailLayoutPageState() {
   const navigate = useNavigate();
   const basePath = '/settings/email';
   const { t, language } = useTranslations({ en, de });
@@ -146,6 +147,65 @@ export function EmailLayoutPage() {
       monaco.editor.setModelLanguage(model, 'mjml');
     }
   }, []);
+  return {
+    navigate,
+    basePath,
+    t,
+    language,
+    resolvedTheme,
+    layout,
+    headRef,
+    docRef,
+    editorSeed,
+    handleDocChange,
+    updateLayout,
+    onSave,
+    resetConfirmOpen,
+    setResetConfirmOpen,
+    resetLayout,
+    onResetConfirm,
+    stylesOpen,
+    setStylesOpen,
+    headDraft,
+    setHeadDraft,
+    openStyles,
+    applyStyles,
+    handleMonacoMount,
+  } as const;
+}
+
+// The stored layout is a full <mjml> document with a raw {{content}} token in
+// mj-body. GrapesJS would drop that bare text node, so for editing we swap it
+// for a locked, visibly-marked section and swap back on save. The mj-head is
+// split off too (GrapesJS has no mj-attributes component) and carried through
+// verbatim; MjmlVisualEditor injects it into the canvas so styles still render.
+
+export function EmailLayoutPage() {
+  const {
+    navigate,
+    basePath,
+    t,
+    language,
+    resolvedTheme,
+    layout,
+    headRef,
+    docRef,
+    editorSeed,
+    handleDocChange,
+    updateLayout,
+    onSave,
+    resetConfirmOpen,
+    setResetConfirmOpen,
+    resetLayout,
+    onResetConfirm,
+    stylesOpen,
+    setStylesOpen,
+    headDraft,
+    setHeadDraft,
+    openStyles,
+    applyStyles,
+    handleMonacoMount,
+  } = useEmailLayoutPageState();
 
   return (
     <div className="h-full flex flex-col gap-3" data-cy="email-layout-page">

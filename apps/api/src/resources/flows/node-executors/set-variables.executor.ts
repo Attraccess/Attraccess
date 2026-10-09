@@ -1,9 +1,5 @@
-import {
-  ResourceFlowNode,
-  SetVariablesNodeDataSchema,
-  ResourceFlowVariableScope,
-} from '@attraccess/database-entities';
-import { ResourceFlowVariablesService } from '../resource-flow-variables.service';
+import { ResourceFlowNode, SetVariablesNodeDataSchema, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class SetVariablesExecutor implements NodeExecutor {

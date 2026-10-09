@@ -21,17 +21,23 @@ test('covers shared contracts, runtime dependencies, image construction and acti
     'apps/plugins/wago/channel-behavior.ts',
     'apps/plugins/wago/measurement-contract.ts',
     'apps/plugins/wago/cc100-runtime/Dockerfile',
-    'apps/plugins/wago/backend/wago-hardware-deployment.ts',
+    'apps/plugins/wago/backend/protocol/index.ts',
+    'apps/plugins/wago/backend/host/hardware-deployment.ts',
+    'apps/plugins/wago/backend/host/host-io-guard.ts',
+    'apps/plugins/wago/backend/runtime/supervisor.ts',
+    'apps/plugins/wago/backend/runtime/install.ts',
+    'apps/plugins/wago/backend/runtime/update/shell.ts',
     'pnpm-lock.yaml',
     '.github/actions/build-cc100-runtime/action.yml',
   ])
     assert.equal(isRuntimeSource(path), true, path);
   for (const path of [
-    'apps/plugins/wago/frontend/src/ControllersTable.tsx',
+    'apps/plugins/wago/frontend/src/controllers/Table.tsx',
     'apps/plugins/wago/cc100-runtime/src/runtime.spec.ts',
     'apps/plugins/wago/cc100-runtime/HARDWARE.md',
     'apps/plugins/wago/cc100-runtime/integration/run.mjs',
     'apps/plugins/wago/cc100-runtime/src/simulator.ts',
+    'apps/plugins/wago/cc100-runtime/src/simulator/device.ts',
     'apps/plugins/wago/cc100-runtime/Dockerfile.simulator',
   ])
     assert.equal(isRuntimeSource(path), false, path);

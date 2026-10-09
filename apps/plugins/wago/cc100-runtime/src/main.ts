@@ -1,10 +1,10 @@
 import { connect, type MqttClient } from 'mqtt';
-import { Cc100OnboardIoAdapter } from './adapters';
 import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } from '../../shared/hardware-profile';
-import { ModbusDeviceRouter } from './modbus/adapter';
+import { Cc100OnboardIoAdapter } from './io/adapters';
+import { ModbusDeviceRouter } from './modbus/routing/adapter';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim } from './runtime';
-import { RunLed } from './status-led';
-import { MqttTransport } from './mqtt-transport';
+import { RunLed } from './io/status-led';
+import { MqttTransport } from './transport/mqtt';
 
 const hardwareId = required('WAGO_HARDWARE_ID');
 const defaultPrefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';

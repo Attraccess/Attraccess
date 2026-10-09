@@ -1,34 +1,34 @@
+import { Button } from '../../../components/button/index';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import {
   ApiError,
   NotificationCategory,
-  NotificationCategoryPreferenceDto,
   UseNotificationsServiceNotificationsGetPreferencesKeyFn,
   useLicenseServiceGetLicenseInformation,
   useNotificationsServiceNotificationsGetPreferences,
   useNotificationsServiceNotificationsUpdatePreferences,
+  NotificationCategoryPreferenceDto,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button } from '../../../components/button';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
 
-type NotificationChannel = 'email' | 'push' | 'toast';
+export type NotificationChannel = 'email' | 'push' | 'toast';
 
-const channels: NotificationChannel[] = ['email', 'push', 'toast'];
+export const channels: NotificationChannel[] = ['email', 'push', 'toast'];
 
-function getCategoryPreference(
+export function getCategoryPreference(
   preferences: NotificationCategoryPreferenceDto[] | undefined,
   category: NotificationCategory,
 ): NotificationCategoryPreferenceDto | undefined {
   return preferences?.find((preference) => preference.category === category);
 }
 
-export function NotificationPreferencesForm() {
+export function useNotificationPreferencesFormState() {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const push = usePushNotifications();
@@ -183,6 +183,39 @@ export function NotificationPreferencesForm() {
       />
     );
   };
+  return {
+    t,
+    push,
+    showSuccess,
+    showError,
+    categoryGroups,
+    toggleCategory,
+    toggleGroupChannel,
+    toggleAll,
+    isCategoryAllEnabled,
+    isGroupChannelAllEnabled,
+    isAllEnabled,
+    disabled,
+    renderChannelSwitch,
+  } as const;
+}
+
+export function NotificationPreferencesForm() {
+  const {
+    t,
+    push,
+    showSuccess,
+    showError,
+    categoryGroups,
+    toggleCategory,
+    toggleGroupChannel,
+    toggleAll,
+    isCategoryAllEnabled,
+    isGroupChannelAllEnabled,
+    isAllEnabled,
+    disabled,
+    renderChannelSwitch,
+  } = useNotificationPreferencesFormState();
 
   return (
     <div className="flex flex-col gap-4">

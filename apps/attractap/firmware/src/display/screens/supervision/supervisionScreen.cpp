@@ -1,11 +1,11 @@
 #include "display/i18n.hpp"
 #include "supervisionScreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
-#include "platform.hpp"
+#include "../../../platform.hpp"
 
 void SupervisionScreen::init()
 {
@@ -87,84 +87,16 @@ void SupervisionScreen::init()
    lv_obj_add_event_cb(this->cancelButton, &SupervisionScreen::onCancelButtonEvent, LV_EVENT_PRESSED, this);
    lv_obj_add_event_cb(this->cancelButton, &SupervisionScreen::onCancelButtonEvent, LV_EVENT_CLICKED, this);
 
+
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
    FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+
    this->updateTimeoutBar();
    this->applyStatus();
-}
-
-void SupervisionScreen::loop()
-{
-   this->updateTimeoutBar();
-}
-
-void SupervisionScreen::updateTimeoutBar()
-{
-   if (!this->timeoutBar)
-   {
-      return;
-   }
-   uint32_t now = millis();
-   int32_t remainingSeconds = 0;
-   if (this->timeoutTime > now)
-   {
-      remainingSeconds = (int32_t)((this->timeoutTime - now) / 1000);
-   }
-   if (remainingSeconds > 30)
-   {
-      remainingSeconds = 30;
-   }
-   lv_bar_set_value(this->timeoutBar, remainingSeconds, LV_ANIM_ON);
-}
-
-void SupervisionScreen::applyStatus()
-{
-   if (!this->statusLabel)
-   {
-      return;
-   }
-
-   FirmwareI18n::Text text;
-   lv_color_t color = DisplayTheme::text();
-   switch (this->view.status)
-   {
-   case STATUS_WAITING:
-      text = FirmwareI18n::Message::TapSupervisorCard;
-      color = DisplayTheme::text();
-      break;
-   case STATUS_VERIFYING:
-      text = FirmwareI18n::Message::CardReadPleaseKeepItStill;
-      color = DisplayTheme::warning();
-      break;
-   case STATUS_SUCCESS:
-      text = FirmwareI18n::Message::Approved;
-      color = DisplayTheme::success();
-      break;
-   case STATUS_ERROR:
-      text = !this->view.statusMessage.empty() ? this->view.statusMessage : FirmwareI18n::Text(FirmwareI18n::Message::Error);
-      color = DisplayTheme::danger();
-      break;
-   }
-
-   FirmwareI18n::setLabel(this->statusLabel, text);
-   lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   // Hide the cancel button once approved — nothing left to cancel.
-   if (this->cancelButton)
-   {
-      if (this->view.status == STATUS_SUCCESS)
-      {
-         lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
-      }
-      else
-      {
-         lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
-      }
-   }
 }
 
 lv_obj_t *SupervisionScreen::getScreen()
@@ -252,4 +184,74 @@ void SupervisionScreen::destroy()
    this->statusLabel = nullptr;
    this->hintLabel = nullptr;
    this->cancelButton = nullptr;
+}
+
+void SupervisionScreen::loop()
+{
+   this->updateTimeoutBar();
+}
+
+void SupervisionScreen::updateTimeoutBar()
+{
+   if (!this->timeoutBar)
+   {
+      return;
+   }
+   uint32_t now = millis();
+   int32_t remainingSeconds = 0;
+   if (this->timeoutTime > now)
+   {
+      remainingSeconds = (int32_t)((this->timeoutTime - now) / 1000);
+   }
+   if (remainingSeconds > 30)
+   {
+      remainingSeconds = 30;
+   }
+   lv_bar_set_value(this->timeoutBar, remainingSeconds, LV_ANIM_ON);
+}
+
+void SupervisionScreen::applyStatus()
+{
+   if (!this->statusLabel)
+   {
+      return;
+   }
+
+   FirmwareI18n::Text text;
+   lv_color_t color = DisplayTheme::text();
+   switch (this->view.status)
+   {
+   case STATUS_WAITING:
+      text = FirmwareI18n::Message::TapSupervisorCard;
+      color = DisplayTheme::text();
+      break;
+   case STATUS_VERIFYING:
+      text = FirmwareI18n::Message::CardReadPleaseKeepItStill;
+      color = DisplayTheme::warning();
+      break;
+   case STATUS_SUCCESS:
+      text = FirmwareI18n::Message::Approved;
+      color = DisplayTheme::success();
+      break;
+   case STATUS_ERROR:
+      text = !this->view.statusMessage.empty() ? this->view.statusMessage : FirmwareI18n::Text(FirmwareI18n::Message::Error);
+      color = DisplayTheme::danger();
+      break;
+   }
+
+   FirmwareI18n::setLabel(this->statusLabel, text);
+   lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Hide the cancel button once approved — nothing left to cancel.
+   if (this->cancelButton)
+   {
+      if (this->view.status == STATUS_SUCCESS)
+      {
+         lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+      else
+      {
+         lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+   }
 }

@@ -47,7 +47,8 @@ export class AuthController {
   })
   @ApiResponse({
     status: 401,
-    description: 'Invalid credentials, or TwoFactorRequired after valid credentials when an authenticator code is needed',
+    description:
+      'Invalid credentials, or TwoFactorRequired after valid credentials when an authenticator code is needed',
   })
   @ApiBody({
     schema: {

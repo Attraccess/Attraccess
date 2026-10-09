@@ -1,64 +1,57 @@
-import { useCallback, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
   InputGroup,
   ModalBody,
   ModalFooter,
   ModalHeader,
   ModalHeading,
+  Spinner,
+  TextField,
+  Tooltip,
+  TooltipContent,
+  Alert,
+  AlertContent,
+  AlertDescription,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
   NumberFieldIncrementButton,
   NumberFieldInput,
-  Spinner,
-  TextField,
-  Tooltip,
-  TooltipContent,
 } from '@heroui/react';
 import { ClipboardCopyIcon, RefreshCwIcon } from 'lucide-react';
+import { SettingsSection } from '../../components/SettingsSection';
+import { SettingsSaveBar } from '../../components/SettingsSaveBar';
+import { Button } from '../../../../components/button/index';
+import { StandardModal } from '../../../../components/standardModal';
+import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
+import { SettingsRow } from '../../components/SettingsRow';
+import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  MessagingRateLimitSettingsDto,
   usePushServicePushGetVapidConfig,
   UsePushServicePushGetVapidConfigKeyFn,
   usePushServicePushReplaceVapidKeys,
   useSettingsServiceGetMessagingRateLimitSettings,
   UseSettingsServiceGetMessagingRateLimitSettingsKeyFn,
   useSettingsServiceUpdateMessagingRateLimitSettings,
+  MessagingRateLimitSettingsDto,
 } from '@attraccess/react-query-client';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
-import { SettingsSection } from '../../components/SettingsSection';
-import { SettingsRow } from '../../components/SettingsRow';
-import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { Button } from '../../../../components/button';
-import { StandardModal } from '../../../../components/standardModal';
 import { useToastMessage } from '../../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
 
-type LimitKey = keyof MessagingRateLimitSettingsDto;
+export type ConfirmStep = 'warning' | 'final' | null;
 
-const LIMIT_KEYS: LimitKey[] = [
+export type LimitKey = keyof MessagingRateLimitSettingsDto;
+
+export const LIMIT_KEYS: LimitKey[] = [
   'sendMaxPerWindow',
   'sendWindowSeconds',
   'contactMaxPerWindow',
   'contactWindowSeconds',
 ];
 
-type ConfirmStep = 'warning' | 'final' | null;
-
-/**
- * Messaging limits and the push transport.
- *
- * Only the four rate limits are form state, so they are what the save bar commits. Replacing the
- * VAPID key pair is destructive and irreversible — it invalidates every existing subscription — so
- * it keeps its own two-step confirmation instead of riding along on Save.
- */
-export function MessagingSection() {
+export function useMessagingSectionState() {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
@@ -133,6 +126,168 @@ export function MessagingSection() {
     const value = valueOf(key);
     return Number.isInteger(value) && value >= 1;
   });
+  return {
+    t,
+    isLoading,
+    setDraft,
+    confirmStep,
+    setConfirmStep,
+    customPublicKey,
+    setCustomPublicKey,
+    customPrivateKey,
+    setCustomPrivateKey,
+    pendingOverride,
+    setPendingOverride,
+    vapidConfig,
+    saveLimits,
+    isSaving,
+    replaceKeys,
+    isReplacing,
+    copyPublicKey,
+    areLimitsReady,
+    valueOf,
+    isDirty,
+    isSavable,
+  } as const;
+}
+
+type Props = Pick<
+  ReturnType<typeof useMessagingSectionState>,
+  | 'areLimitsReady'
+  | 't'
+  | 'valueOf'
+  | 'setDraft'
+  | 'setPendingOverride'
+  | 'setConfirmStep'
+  | 'customPublicKey'
+  | 'setCustomPublicKey'
+  | 'customPrivateKey'
+  | 'setCustomPrivateKey'
+>;
+
+export function MessagingSectionLimitsLoadFailed({
+  areLimitsReady,
+  t,
+  valueOf,
+  setDraft,
+  setPendingOverride,
+  setConfirmStep,
+  customPublicKey,
+  setCustomPublicKey,
+  customPrivateKey,
+  setCustomPrivateKey,
+}: Props) {
+  return (
+    <div className="flex flex-col">
+      {!areLimitsReady ? (
+        // The limits are unknown, not zero. The VAPID controls below are a separate query and
+        // stay usable, so this replaces only the four rows it actually covers.
+        <Alert status="danger" data-testid="messaging-limits-load-failed">
+          <AlertStatusIcon status="danger" />
+          <AlertContent>
+            <AlertDescription>{t('limits.loadFailed')}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      ) : (
+        LIMIT_KEYS.map((key) => (
+          <SettingsRow
+            key={key}
+            data-testid={`messaging-limit-row-${key}`}
+            label={t(`fields.${key}.label`)}
+            hint={t(`fields.${key}.description`)}
+          >
+            <NumberField
+              aria-label={t(`fields.${key}.label`)}
+              value={valueOf(key)}
+              minValue={1}
+              onChange={(next) => setDraft((current) => ({ ...current, [key]: next }))}
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+          </SettingsRow>
+        ))
+      )}
+
+      <SettingsRow label={t('push.regenerateLabel')} hint={t('push.regenerateHint')}>
+        <Button
+          variant="tertiary"
+          size="sm"
+          onPress={() => {
+            setPendingOverride(undefined);
+            setConfirmStep('warning');
+          }}
+        >
+          <RefreshCwIcon size={16} />
+          {t('regenerateButton')}
+        </Button>
+      </SettingsRow>
+
+      <SettingsRow stacked label={t('overrideTitle')} hint={t('overrideDescription')}>
+        <div className="flex w-full flex-col gap-2">
+          <TextField value={customPublicKey} onChange={setCustomPublicKey} aria-label={t('publicKeyInputLabel')}>
+            <InputGroup>
+              <InputGroup.Input className="font-mono text-sm" placeholder={t('publicKeyInputLabel')} />
+            </InputGroup>
+          </TextField>
+          <TextField value={customPrivateKey} onChange={setCustomPrivateKey} aria-label={t('privateKeyInputLabel')}>
+            <InputGroup>
+              <InputGroup.Input className="font-mono text-sm" type="password" placeholder={t('privateKeyInputLabel')} />
+            </InputGroup>
+          </TextField>
+          <div className="flex">
+            <Button
+              variant="secondary"
+              size="sm"
+              isDisabled={!customPublicKey.trim() || !customPrivateKey.trim()}
+              onPress={() => {
+                setPendingOverride({ publicKey: customPublicKey.trim(), privateKey: customPrivateKey.trim() });
+                setConfirmStep('warning');
+              }}
+            >
+              {t('applyCustomButton')}
+            </Button>
+          </div>
+        </div>
+      </SettingsRow>
+    </div>
+  );
+}
+
+/**
+ * Messaging limits and the push transport.
+ *
+ * Only the four rate limits are form state, so they are what the save bar commits. Replacing the
+ * VAPID key pair is destructive and irreversible — it invalidates every existing subscription — so
+ * it keeps its own two-step confirmation instead of riding along on Save.
+ */
+export function MessagingSection() {
+  const {
+    t,
+    isLoading,
+    setDraft,
+    confirmStep,
+    setConfirmStep,
+    customPublicKey,
+    setCustomPublicKey,
+    customPrivateKey,
+    setCustomPrivateKey,
+    pendingOverride,
+    setPendingOverride,
+    vapidConfig,
+    saveLimits,
+    isSaving,
+    replaceKeys,
+    isReplacing,
+    copyPublicKey,
+    areLimitsReady,
+    valueOf,
+    isDirty,
+    isSavable,
+  } = useMessagingSectionState();
 
   if (isLoading) {
     return (
@@ -165,86 +320,20 @@ export function MessagingSection() {
 
   return (
     <SettingsSection title={t('title')} description={t('description')} aside={aside}>
-      <div className="flex flex-col">
-        {!areLimitsReady ? (
-          // The limits are unknown, not zero. The VAPID controls below are a separate query and
-          // stay usable, so this replaces only the four rows it actually covers.
-          <Alert status="danger" data-testid="messaging-limits-load-failed">
-            <AlertStatusIcon status="danger" />
-            <AlertContent>
-              <AlertDescription>{t('limits.loadFailed')}</AlertDescription>
-            </AlertContent>
-          </Alert>
-        ) : (
-          LIMIT_KEYS.map((key) => (
-            <SettingsRow
-              key={key}
-              data-testid={`messaging-limit-row-${key}`}
-              label={t(`fields.${key}.label`)}
-              hint={t(`fields.${key}.description`)}
-            >
-              <NumberField
-                aria-label={t(`fields.${key}.label`)}
-                value={valueOf(key)}
-                minValue={1}
-                onChange={(next) => setDraft((current) => ({ ...current, [key]: next }))}
-              >
-                <NumberFieldGroup>
-                  <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                  <NumberFieldInput />
-                  <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                </NumberFieldGroup>
-              </NumberField>
-            </SettingsRow>
-          ))
-        )}
-
-        <SettingsRow label={t('push.regenerateLabel')} hint={t('push.regenerateHint')}>
-          <Button
-            variant="tertiary"
-            size="sm"
-            onPress={() => {
-              setPendingOverride(undefined);
-              setConfirmStep('warning');
-            }}
-          >
-            <RefreshCwIcon size={16} />
-            {t('regenerateButton')}
-          </Button>
-        </SettingsRow>
-
-        <SettingsRow stacked label={t('overrideTitle')} hint={t('overrideDescription')}>
-          <div className="flex w-full flex-col gap-2">
-            <TextField value={customPublicKey} onChange={setCustomPublicKey} aria-label={t('publicKeyInputLabel')}>
-              <InputGroup>
-                <InputGroup.Input className="font-mono text-sm" placeholder={t('publicKeyInputLabel')} />
-              </InputGroup>
-            </TextField>
-            <TextField value={customPrivateKey} onChange={setCustomPrivateKey} aria-label={t('privateKeyInputLabel')}>
-              <InputGroup>
-                <InputGroup.Input
-                  className="font-mono text-sm"
-                  type="password"
-                  placeholder={t('privateKeyInputLabel')}
-                />
-              </InputGroup>
-            </TextField>
-            <div className="flex">
-              <Button
-                variant="secondary"
-                size="sm"
-                isDisabled={!customPublicKey.trim() || !customPrivateKey.trim()}
-                onPress={() => {
-                  setPendingOverride({ publicKey: customPublicKey.trim(), privateKey: customPrivateKey.trim() });
-                  setConfirmStep('warning');
-                }}
-              >
-                {t('applyCustomButton')}
-              </Button>
-            </div>
-          </div>
-        </SettingsRow>
-      </div>
+      <MessagingSectionLimitsLoadFailed
+        {...{
+          areLimitsReady,
+          t,
+          valueOf,
+          setDraft,
+          setPendingOverride,
+          setConfirmStep,
+          customPublicKey,
+          setCustomPublicKey,
+          customPrivateKey,
+          setCustomPrivateKey,
+        }}
+      />
 
       <SettingsSaveBar
         isDirty={isDirty}

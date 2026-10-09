@@ -1,7 +1,7 @@
 #include "display/i18n.hpp"
 #include "connectionConfigurationScreen.hpp"
-#include "display/theme.hpp"
-#include "display/fonts/attractap_fonts.hpp"
+#include "../../theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
@@ -36,67 +36,78 @@ void ConnectionConfigurationScreen::init()
    lv_obj_remove_flag(this->tabs, LV_OBJ_FLAG_SCROLLABLE);
    DisplayTheme::applyScreen(this->tabs);
 
-   lv_obj_t *wifiTab = FirmwareI18n::addTab(this->tabs, FirmwareI18n::Message::WiFi);
-   lv_obj_set_flex_flow(wifiTab, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(wifiTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   this->createWifiTab(networkConfig);
 
-   lv_obj_t *labelForWifiSelectNetwork = lv_label_create(wifiTab);
-   lv_obj_set_width(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForWifiSelectNetwork, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForWifiSelectNetwork, FirmwareI18n::Message::WiFiNetwork);
-   lv_obj_set_style_text_color(labelForWifiSelectNetwork, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->createApiTab(apiConfig);
 
-   this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
-   DisplayTheme::field(this->wifiSelectNetwork);
-   FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, FirmwareI18n::Message::SearchingForWiFiNetworks);
-   lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
-   lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
-   lv_obj_add_flag(this->wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_add_event_cb(this->wifiSelectNetwork, &ConnectionConfigurationScreen::onWifiDropdownEvent, LV_EVENT_VALUE_CHANGED, this);
+   this->createDeviceTab(deviceConfig);
 
-   this->labelForWifiSSID = lv_label_create(wifiTab);
-   lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->labelForWifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->labelForWifiSSID, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->labelForWifiSSID, FirmwareI18n::Message::Ssid);
-   lv_obj_set_style_text_color(this->labelForWifiSSID, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   this->labelForWifiSSIDDefaultColor = lv_obj_get_style_text_color(this->labelForWifiSSID, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->pinLockOverlay = this->pinInputPage.init(FirmwareI18n::Message::UnlockWithPin, this->screen);
+   lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
+   lv_obj_set_style_arc_width(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_height(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_align(this->pinLockOverlay, LV_ALIGN_CENTER);
+   lv_obj_set_width(this->pinLockOverlay, lv_pct(100));
+   lv_obj_set_height(this->pinLockOverlay, lv_pct(100));
+   lv_obj_set_x(this->pinLockOverlay, 0);
+   lv_obj_set_y(this->pinLockOverlay, 0);
 
-   this->wifiSSID = lv_textarea_create(wifiTab);
-   DisplayTheme::field(this->wifiSSID);
-   lv_obj_set_width(this->wifiSSID, lv_pct(100));
-   lv_obj_set_height(this->wifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->wifiSSID, LV_ALIGN_CENTER);
-   FirmwareI18n::setPlaceholder(this->wifiSSID, FirmwareI18n::Message::SsidAlt);
-   lv_textarea_set_one_line(this->wifiSSID, true);
-   lv_obj_add_event_cb(this->wifiSSID, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
-   lv_textarea_set_text(this->wifiSSID, networkConfig.ssid.c_str());
+   if (!this->pinLockEnabled)
+   {
+      lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
+   }
+}
 
-   this->labelForWifiPassword = lv_label_create(wifiTab);
-   lv_obj_set_width(this->labelForWifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->labelForWifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->labelForWifiPassword, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->labelForWifiPassword, FirmwareI18n::Message::Password);
-   lv_obj_set_style_text_color(this->labelForWifiPassword, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   this->labelForWifiPasswordDefaultColor = lv_obj_get_style_text_color(this->labelForWifiPassword, LV_PART_MAIN | LV_STATE_DEFAULT);
+lv_obj_t *ConnectionConfigurationScreen::getScreen()
+{
+   return this->screen;
+}
 
-   this->wifiPassword = lv_textarea_create(wifiTab);
-   DisplayTheme::field(this->wifiPassword);
-   lv_obj_set_width(this->wifiPassword, lv_pct(100));
-   lv_obj_set_height(this->wifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->wifiPassword, LV_ALIGN_CENTER);
-   FirmwareI18n::setPlaceholder(this->wifiPassword, FirmwareI18n::Message::PasswordAlt);
-   lv_textarea_set_one_line(this->wifiPassword, true);
-   lv_textarea_set_password_mode(this->wifiPassword, true);
-   lv_obj_add_event_cb(this->wifiPassword, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
-   lv_textarea_set_text(this->wifiPassword, networkConfig.password.c_str());
+std::string ConnectionConfigurationScreen::getName()
+{
+   return "ConnectionConfigurationScreen";
+}
 
-   lv_obj_t *containerForSaveButtonWifi = this->createSaveContainer(wifiTab);
-   this->createSaveButton(containerForSaveButtonWifi);
+void ConnectionConfigurationScreen::onScreenLeave()
+{
+#ifdef HAS_POWER_BUTTON
+   PowerOffButton::hideConfirm();
+#endif
+}
 
-   this->startWifiScan();
+void ConnectionConfigurationScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->pinLockOverlay = nullptr;
+   this->tabs = nullptr;
+   this->keyboard = nullptr;
+   this->wifiSSID = nullptr;
+   this->wifiPassword = nullptr;
+   this->wifiSelectNetwork = nullptr;
+   this->serverHostname = nullptr;
+   this->labelForWifiSSID = nullptr;
+   this->labelForWifiPassword = nullptr;
+   this->labelForServerHostname = nullptr;
+   this->useSSLSwitch = nullptr;
+   this->labelForUseSSLSwitch = nullptr;
+   this->resetCertButton = nullptr;
+   this->resetCertLabel = nullptr;
+   this->devicePin = nullptr;
+   this->labelForDevicePin = nullptr;
+   this->beeperEnabled = nullptr;
+   this->wifiScanRequested = false;
+   this->wifiScanCompleted = false;
+   this->wifiDropdownHasNetworks = false;
+   this->wifiScanStartMs = 0;
+}
+
+void ConnectionConfigurationScreen::createApiTab(const AttraccessApiConfig &apiConfig)
+{
 
    lv_obj_t *apiTab = FirmwareI18n::addTab(this->tabs, FirmwareI18n::Message::Api);
    lv_obj_set_flex_flow(apiTab, LV_FLEX_FLOW_COLUMN);
@@ -110,6 +121,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_style_text_color(this->labelForServerHostname, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForServerHostnameDefaultColor = lv_obj_get_style_text_color(this->labelForServerHostname, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+
    this->serverHostname = lv_textarea_create(apiTab);
    DisplayTheme::field(this->serverHostname);
    lv_obj_set_width(this->serverHostname, lv_pct(100));
@@ -118,6 +130,7 @@ void ConnectionConfigurationScreen::init()
    FirmwareI18n::setPlaceholder(this->serverHostname, FirmwareI18n::Message::EGYourDomainComOr19216811003000);
    lv_textarea_set_one_line(this->serverHostname, true);
    lv_obj_add_event_cb(this->serverHostname, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
+
 
    std::string fullHostname = apiConfig.hostname;
    if (apiConfig.port != 0)
@@ -159,6 +172,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_style_text_font(sslInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(sslInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
+
    // Reset the locked certificate decision (ATT-714): once a cert worked it is
    // pinned forever, this is the only way to unpin it after a server cert change.
    this->resetCertButton = lv_button_create(apiTab);
@@ -174,8 +188,14 @@ void ConnectionConfigurationScreen::init()
    FirmwareI18n::setLabel(this->resetCertLabel, FirmwareI18n::Message::ResetCertificate);
    lv_obj_set_style_text_font(this->resetCertLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
+
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
+
+}
+
+void ConnectionConfigurationScreen::createDeviceTab(const DeviceConfig &deviceConfig)
+{
 
    // Device tab
    lv_obj_t *deviceTab = FirmwareI18n::addTab(this->tabs, FirmwareI18n::Message::Device);
@@ -243,66 +263,73 @@ void ConnectionConfigurationScreen::init()
 
    this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { return this->onPinLockConfirmCallback(pin); });
-   this->pinLockOverlay = this->pinInputPage.init(FirmwareI18n::Message::UnlockWithPin, this->screen);
-   lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
-   lv_obj_set_style_arc_width(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_height(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_align(this->pinLockOverlay, LV_ALIGN_CENTER);
-   lv_obj_set_width(this->pinLockOverlay, lv_pct(100));
-   lv_obj_set_height(this->pinLockOverlay, lv_pct(100));
-   lv_obj_set_x(this->pinLockOverlay, 0);
-   lv_obj_set_y(this->pinLockOverlay, 0);
-
-   if (!this->pinLockEnabled)
-   {
-      lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
-   }
 }
 
-lv_obj_t *ConnectionConfigurationScreen::getScreen()
+void ConnectionConfigurationScreen::createWifiTab(const NetworkConfig &networkConfig)
 {
-   return this->screen;
-}
 
-std::string ConnectionConfigurationScreen::getName()
-{
-   return "ConnectionConfigurationScreen";
-}
+   lv_obj_t *wifiTab = FirmwareI18n::addTab(this->tabs, FirmwareI18n::Message::WiFi);
+   lv_obj_set_flex_flow(wifiTab, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(wifiTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-void ConnectionConfigurationScreen::onScreenLeave()
-{
-#ifdef HAS_POWER_BUTTON
-   PowerOffButton::hideConfirm();
-#endif
-}
+   lv_obj_t *labelForWifiSelectNetwork = lv_label_create(wifiTab);
+   lv_obj_set_width(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
+   lv_obj_set_height(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
+   lv_obj_set_align(labelForWifiSelectNetwork, LV_ALIGN_CENTER);
+   FirmwareI18n::setLabel(labelForWifiSelectNetwork, FirmwareI18n::Message::WiFiNetwork);
+   lv_obj_set_style_text_color(labelForWifiSelectNetwork, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-void ConnectionConfigurationScreen::destroy()
-{
-   if (!this->screen)
-   {
-      return;
-   }
-   lv_obj_del(this->screen);
-   this->screen = nullptr;
-   this->pinLockOverlay = nullptr;
-   this->tabs = nullptr;
-   this->keyboard = nullptr;
-   this->wifiSSID = nullptr;
-   this->wifiPassword = nullptr;
-   this->wifiSelectNetwork = nullptr;
-   this->serverHostname = nullptr;
-   this->labelForWifiSSID = nullptr;
-   this->labelForWifiPassword = nullptr;
-   this->labelForServerHostname = nullptr;
-   this->useSSLSwitch = nullptr;
-   this->labelForUseSSLSwitch = nullptr;
-   this->resetCertButton = nullptr;
-   this->resetCertLabel = nullptr;
-   this->devicePin = nullptr;
-   this->labelForDevicePin = nullptr;
-   this->beeperEnabled = nullptr;
-   this->wifiScanRequested = false;
-   this->wifiScanCompleted = false;
-   this->wifiDropdownHasNetworks = false;
-   this->wifiScanStartMs = 0;
+   this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
+   DisplayTheme::field(this->wifiSelectNetwork);
+   FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, FirmwareI18n::Message::SearchingForWiFiNetworks);
+   lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
+   lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
+   lv_obj_add_flag(this->wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_add_event_cb(this->wifiSelectNetwork, &ConnectionConfigurationScreen::onWifiDropdownEvent, LV_EVENT_VALUE_CHANGED, this);
+
+   this->labelForWifiSSID = lv_label_create(wifiTab);
+   lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->labelForWifiSSID, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->labelForWifiSSID, LV_ALIGN_CENTER);
+   FirmwareI18n::setLabel(this->labelForWifiSSID, FirmwareI18n::Message::Ssid);
+   lv_obj_set_style_text_color(this->labelForWifiSSID, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->labelForWifiSSIDDefaultColor = lv_obj_get_style_text_color(this->labelForWifiSSID, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+
+   this->wifiSSID = lv_textarea_create(wifiTab);
+   DisplayTheme::field(this->wifiSSID);
+   lv_obj_set_width(this->wifiSSID, lv_pct(100));
+   lv_obj_set_height(this->wifiSSID, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiSSID, LV_ALIGN_CENTER);
+   FirmwareI18n::setPlaceholder(this->wifiSSID, FirmwareI18n::Message::SsidAlt);
+   lv_textarea_set_one_line(this->wifiSSID, true);
+   lv_obj_add_event_cb(this->wifiSSID, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
+   lv_textarea_set_text(this->wifiSSID, networkConfig.ssid.c_str());
+
+   this->labelForWifiPassword = lv_label_create(wifiTab);
+   lv_obj_set_width(this->labelForWifiPassword, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->labelForWifiPassword, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->labelForWifiPassword, LV_ALIGN_CENTER);
+   FirmwareI18n::setLabel(this->labelForWifiPassword, FirmwareI18n::Message::Password);
+   lv_obj_set_style_text_color(this->labelForWifiPassword, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->labelForWifiPasswordDefaultColor = lv_obj_get_style_text_color(this->labelForWifiPassword, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+
+   this->wifiPassword = lv_textarea_create(wifiTab);
+   DisplayTheme::field(this->wifiPassword);
+   lv_obj_set_width(this->wifiPassword, lv_pct(100));
+   lv_obj_set_height(this->wifiPassword, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiPassword, LV_ALIGN_CENTER);
+   FirmwareI18n::setPlaceholder(this->wifiPassword, FirmwareI18n::Message::PasswordAlt);
+   lv_textarea_set_one_line(this->wifiPassword, true);
+   lv_textarea_set_password_mode(this->wifiPassword, true);
+   lv_obj_add_event_cb(this->wifiPassword, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
+   lv_textarea_set_text(this->wifiPassword, networkConfig.password.c_str());
+
+   lv_obj_t *containerForSaveButtonWifi = this->createSaveContainer(wifiTab);
+   this->createSaveButton(containerForSaveButtonWifi);
+
+   this->startWifiScan();
+
 }

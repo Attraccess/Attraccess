@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { AddDeviceDrawer } from './AddDeviceDrawer';
+import { AddDeviceDrawer } from './devices/AddDeviceDrawer';
 import { AdminPasswordDrawer } from './AdminPasswordDrawer';
 import { DiscoverDrawer } from './DiscoverDrawer';
-import { DeviceInfoDrawer } from './DeviceInfoDrawer';
+import { DeviceInfoDrawer } from './devices/info/DeviceInfoDrawer';
 import { addDevice, discoverDevices, getDeviceInfo, setAdminPassword, type ShellyDevice } from './api';
 vi.mock('./api', async (original) => ({
   ...(await original<typeof import('./api')>()),

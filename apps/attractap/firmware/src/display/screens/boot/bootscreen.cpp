@@ -1,6 +1,6 @@
 #include "display/i18n.hpp"
 #include "bootscreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
 #include <string>
 
 void BootScreen::init()

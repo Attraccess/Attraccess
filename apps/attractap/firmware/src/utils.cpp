@@ -105,6 +105,12 @@ void recoverI2CBus(int sda, int scl)
     gpio_reset_pin(sclPin);
 }
 
+
+std::string translateReaderError(const std::string &errorKey)
+{
+    return FirmwareI18n::readerError(errorKey).render(State::getActiveLanguage());
+}
+
 static inline int8_t hexCharToNibble(char c)
 {
     if (c >= '0' && c <= '9')
@@ -337,9 +343,4 @@ time_t parseIso8601ToTimeT(const std::string &iso8601)
     }
 
     return t;
-}
-
-std::string translateReaderError(const std::string &errorKey)
-{
-    return FirmwareI18n::readerError(errorKey).render(State::getActiveLanguage());
 }

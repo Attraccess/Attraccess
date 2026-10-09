@@ -4,7 +4,7 @@
 #include "application.hpp"
 #include "../state/state.hpp"
 #include "../serial/serialCommandHandler.hpp"
-#include "platform.hpp"
+#include "../platform.hpp"
 #include <cstring>
 #include <string>
 #ifdef ESP_PLATFORM
@@ -90,578 +90,17 @@ void Application::setup() {
 
   this->api.setup();
 
-#ifdef HAS_LVGL_DISPLAY
-  this->supervision.setup();
-  this->api.onDeviceName(
-      [this](std::string deviceName) { Display::setDeviceName(deviceName); });
-#endif
-#ifdef HAS_LVGL_DISPLAY
-  this->api.setUsageStatsCallback([this](const API::UsageStats &stats) {
-    lv_lock();
-    if (this->unlocked && this->resourceIsSelected && stats.resourceId == this->selectedResourceId &&
-        this->cardAuthenticationData.username == this->resourceList.authenticatedUsername)
-      Display::resourceDetailsScreen.setUsageStats(stats);
-    lv_unlock();
-  });
-#endif
+  this->setupApiCallbacks();
 
-  this->api.setResourceListUpdateCallback(
-      [this](const API::ResourceList &resourceList) {
-#ifdef HAS_LVGL_DISPLAY
-        lv_lock();
-        this->handleResourceListUpdate(resourceList);
-        lv_unlock();
-#else
-        if (resourceList.count > 0) {
-          this->selectedResourceId = resourceList.items[0].id;
-          this->resourceIsDoor = resourceList.items[0].type == 1;
-        }
-#endif
-      });
+  this->setupErrorCallbacks();
 
-#ifdef HAS_WS2812_LED
-  this->api.setLedBrightnessChangedCallback(
-      [this](uint8_t brightness) { this->led.setBrightness(brightness); });
-#endif
+  this->setupActionCallbacks();
 
-  this->api.setCardAuthenticationDetailsResponseCallback(
-      [this](API::CardAuthenticationDetailsResponse response) {
-#ifdef HAS_LVGL_DISPLAY
-        if (!this->cardAuthenticationPending || this->unlocked) return;
-#endif
-        if (response.error.length() > 0) {
-          State::setUserLanguage(false);
-          this->logger.errorf("Authentication failed: %s",
-                              response.error.c_str());
-          this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
-#else
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-#endif
-          return;
-        }
+  this->setupDisplayCallbacks();
+  this->setupCardCallbacks();
+  this->setupFormCallbacks();
 
-        if (response.keyLen != 16) {
-          State::setUserLanguage(false);
-          this->logger.error("Invalid key bytes provided");
-          this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
-#else
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-#endif
-          return;
-        }
-
-        this->cardAuthenticationData = response;
-#ifdef HAS_LVGL_DISPLAY
-        if (this->currentProjectsUser != response.username) {
-          this->clearProjectSelection();
-        }
-        this->currentProjectsUser = response.username;
-        this->requestProjectsPage(1);
-#endif
-
-        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-      });
-
-#ifdef HAS_LVGL_DISPLAY
-  // Insufficient balance special-case (with SumUp capability flag)
-  this->api.setInsufficientBalanceCallback([this](bool sumUpEnabled) {
-    this->beeper.errorBeep();
-
-    struct Payload {
-      Application *self;
-      bool enabled;
-    };
-    Payload *pl = new Payload{this, sumUpEnabled};
-    if (!pl)
-      return;
-    Display::asyncCall(
-        [](void *u) {
-          auto *p = (Payload *)u;
-          if (!p || !p->self) {
-            if (p)
-              delete p;
-            return;
-          }
-          p->self->finishReaderAction(false);
-          p->self->handleFormsCancel();
-          Display::resourceDetailsScreen.hideActionProgress();
-          if (p->enabled) {
-            Display::showInsufficientBalancePopup(
-                [self = p->self](uint32_t amountCents) {
-                  self->api.requestBillingTopup(amountCents);
-                },
-                []() {});
-          } else {
-            Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("INSUFFICIENT_BALANCE"));
-          }
-          delete p;
-        },
-        pl);
-  });
-#endif
-
-  // Generic error fallback for all other errors
-  this->api.setErrorCallback([this](const char *title, const char *message) {
-    this->beeper.errorBeep();
-
-#ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED)
-#else
-    if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
-#endif
-    {
-      this->nfc.enableCardDetection();
-    }
-
-#ifdef HAS_LVGL_DISPLAY
-    // Ensure UI operations on LVGL thread
-    struct ErrPayload {
-      Application *self;
-      FirmwareI18n::Text t;
-      FirmwareI18n::Text m;
-    };
-    ErrPayload *p = new ErrPayload();
-    if (!p)
-      return;
-    p->self = this;
-    p->t = FirmwareI18n::Message::Error;
-    this->logger.errorf("Reader error %s: %s", title, message);
-    p->m = FirmwareI18n::readerError(message);
-    Display::asyncCall(
-        [](void *u) {
-          auto *pl = (ErrPayload *)u;
-          if (!pl || !pl->self) {
-            if (pl)
-              delete pl;
-            return;
-          }
-          if (pl->self->cardAuthenticationPending) pl->self->finishCardAuthentication(false);
-          pl->self->finishReaderAction(false);
-          pl->self->handleFormsCancel();
-          Display::showErrorPopup(pl->t, pl->m);
-          if (pl && pl->self) {
-            pl->self->pendingActionType = PENDING_ACTION_NONE;
-            pl->self->hasPendingFormRequest = false;
-            pl->self->formFlowSubmitted = false;
-            Display::resourceDetailsScreen.hideFormsModal();
-          }
-          delete pl;
-        },
-        p);
-#endif
-  });
-
-#ifdef HAS_LVGL_DISPLAY
-  // Generic action result handling: stop overlay and show success toast
-  this->api.setActionResultCallback([this](const API::ActionResult &result) {
-    struct Payload { Application *self; API::ActionResult result; };
-    auto *payload = new Payload{this, result};
-    Display::asyncCall([](void *data) {
-      auto *payload = static_cast<Payload *>(data);
-      auto *self = payload->self;
-      const auto &result = payload->result;
-      if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
-        if (result.success && result.type == "STOP_RESOURCE_USAGE_SESSION" &&
-            self->pendingActionType == PENDING_ACTION_STOP_SESSION && result.hasDuration &&
-            result.hasOwnership && result.endedOwnSession) {
-          self->beginSessionSummary(result);
-          delete payload;
-          return;
-        }
-        self->finishReaderAction(result.success);
-        if (result.success) {
-          self->onActionResult(result.type);
-          if (!result.billingTotal.empty()) {
-            self->restartSessionTimeout();
-            Display::showBillingSummary(result.billingTotal);
-          }
-        }
-        else {
-          self->handleFormsCancel();
-          if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
-            Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
-          } else {
-            Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
-          }
-        }
-      }
-      delete payload;
-    }, payload);
-  });
-#endif
-
-  this->api.setFirmwareUpdateMetaCallback([this](std::string availableVersion) {
-    this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-    this->availableFirmwareVersion = availableVersion;
-  });
-
-  this->api.setFirmwareUpdateProgressCallback([this](int percent) {
-    this->logger.debugf("Got firmware update pct %d", percent);
-    this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-    this->firmwareUpdateProgressPct = percent;
-  });
-
-#ifdef HAS_LVGL_DISPLAY
-  Display::resourceDetailsScreen.setButtonClickCallback(
-      [this](ResourceDetailsScreen::ButtonClickEventData evt) {
-        this->handleResourceDetailsButtonClick(evt);
-      });
-
-  Display::resourceDetailsScreen.setProjectsPageRequestCallback(
-      [this](uint32_t page) { this->requestProjectsPage(page); });
-  Display::resourceDetailsScreen.setProjectSelectionCallback(
-      [this](uint32_t projectId, const std::string &projectName) {
-        this->handleProjectSelection(projectId, projectName);
-      });
-  Display::resourceDetailsScreen.setFormPageNextCallback(
-      [this](const API::FormPageSubmission &page) {
-        this->handleFormPageNext(page);
-      });
-  Display::resourceDetailsScreen.setFormPageBackCallback(
-      [this]() { this->handleFormPageBack(); });
-  Display::resourceDetailsScreen.setFormsCancelCallback(
-      [this]() { this->handleFormsCancel(); });
-
-  Display::setPinScreen.setOnPinConfirmedCallback(
-      [this](std::string pin) { Settings::setDevicePin(pin); });
-
-  Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]() {
-    Display::transitionToScreen(&Display::initScreen);
-    this->state = APPLICATION_STATE_BOOT;
-    this->api.enableConnectionAttempts();
-  });
-
-  Display::connectionConfigurationScreen.setOnSaveCallback(
-      [this](const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
-        this->handleConnectionConfigurationSave(cfg);
-      });
-
-  Display::connectionConfigurationScreen.setOnResetCertificateCallback(
-      [this]() { this->api.resetCertificateTrust(); });
-
-#ifdef HAS_POWER_BUTTON
-  Display::connectionConfigurationScreen.setOnPowerOffCallback(
-      [this]() { this->ioExpander.powerOff(); });
-#endif
-
-  Display::initScreen.setOnOpenSettingsCallback([this]() {
-#ifdef DEMO_MODE
-    Display::transitionToScreen(&Display::demoSettingsScreen);
-#else
-    this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
-    this->api.disableConnectionAttempts();
-    Display::connectionConfigurationScreen.enablePinLock();
-    Display::transitionToScreen(&Display::connectionConfigurationScreen);
-#endif
-  });
-
-  // Hidden maintenance drawer (pull down from the top edge)
-  Display::setDrawerAvailableCallback([this]() {
-    return !this->sessionSummaryActive && !this->cardAuthenticationPending && this->pendingUiAction.empty() &&
-           !this->waitingForResourceRefresh && !this->hasPendingFormRequest &&
-           this->state != APPLICATION_STATE_SUPERVISION;
-  });
-  Display::setOnOpenSettingsCallback([this]() {
-#ifdef DEMO_MODE
-    Display::transitionToScreen(&Display::demoSettingsScreen);
-#else
-    this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
-    this->api.disableConnectionAttempts();
-    Display::connectionConfigurationScreen.enablePinLock();
-    Display::transitionToScreen(&Display::connectionConfigurationScreen);
-#endif
-  });
-
-#ifdef DEMO_MODE
-  Display::demoSettingsScreen.setStartScanCallback([this]() {
-    this->demoPendingScanActive = true;
-    this->demoPendingScanReady = false;
-    this->nfc.resetCardPresence();
-    this->nfc.enableCardDetection();
-  });
-  Display::demoSettingsScreen.setCancelScanCallback([this]() {
-    this->demoPendingScanActive = false;
-    this->demoPendingScanReady = false;
-    this->nfc.disableCardDetection();
-  });
-#ifdef HAS_POWER_BUTTON
-  Display::demoSettingsScreen.setPowerOffCallback(
-      [this]() { this->ioExpander.powerOff(); });
-#endif
-#endif
-
-  Display::resourceListScreen.setResourceSelectionCallback(
-      [this](const API::ResourceBrief &resource) {
-        if (!this->pendingUiAction.empty() || this->waitingForResourceRefresh || this->cardAuthenticationPending) return;
-        this->returnToListAfterAction = false;
-        this->selectResource(resource);
-      });
-  Display::resourceListScreen.setActionCallback([this](const API::ResourceBrief &resource, ResourceListAction action) {
-    this->handleResourceListAction(resource, action);
-  });
-  Display::resourceListScreen.setLogoutCallback([this] { this->logoutReader(); });
-  Display::lockscreen.setBackCallback([this] {
-    if (this->cardAuthenticationPending) return;
-    this->resourceIsSelected = false;
-    this->selectedResourceId = 0;
-  });
-
-  Display::setTouchCallback(
-      [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
-
-  this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](std::string username) {
-    this->apiEnrollNewCardGetAvailableKeyNoData = {
-        username = username,
-    };
-    this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
-  });
-
-  this->api.setEnrollNewCardCallback([this](uint8_t keyNo, std::string key) {
-    uint8_t keyBytes[16] = {0};
-    stringToHexArray(key, keyBytes, 16);
-
-    this->apiEnrollNewCardData.keyNo = keyNo;
-    memset(this->apiEnrollNewCardData.keyBytes, 0, 16);
-    memcpy(this->apiEnrollNewCardData.keyBytes, keyBytes, 16);
-
-    // Just flag readiness; processEnrollment() performs the write on the main
-    // loop while the card is still held (no card-detection edge required).
-    this->enrollKeyMaterialReady = true;
-  });
-
-  this->api.setEnrollNewCardErrorCallback([this](std::string error) {
-    // Runs on the websocket task. Copy into the fixed buffer, then publish via
-    // the volatile flag (set last) so the main loop reads a complete message.
-    strlcpy(this->enrollErrorMessage, error.c_str(),
-            sizeof(this->enrollErrorMessage));
-    this->enrollErrorPending = true;
-  });
-
-  Display::enrollmentScreen.setOnCancelCallback(
-      [this]() { this->enrollCancelRequested = true; });
-
-  this->api.setResetNfcCardCallback(
-      [this](std::string username, uint8_t keyNo, std::string key) {
-        uint8_t keyBytes[16] = {0};
-        stringToHexArray(key, keyBytes, 16);
-
-        this->apiResetNfcCardData.username = username;
-        this->apiResetNfcCardData.keyNo = keyNo;
-        memset(this->apiResetNfcCardData.keyBytes, 0, 16);
-        memcpy(this->apiResetNfcCardData.keyBytes, keyBytes, 16);
-
-        // The reset state machine takes over on the main loop (beginReset()).
-        this->externalState = EXTERNAL_STATE_RESET_NFC_CARD;
-      });
-
-  Display::resetScreen.setOnCancelCallback(
-      [this]() { this->resetCancelRequested = true; });
-
-  // --- Two-card supervision (ATT-493) ---------------------------------------
-  Display::supervisionScreen.setOnCancelCallback(
-      [this]() { this->supervision.requestCancel(); });
-
-  this->api.setSupervisionRequestResultCallback(
-      [this](API::SupervisionRequestResult result) {
-        this->supervision.onRequestResult(result);
-      });
-
-  this->api.setSupervisorCardAuthenticationResponseCallback(
-      [this](API::SupervisorCardAuthenticationResponse response) {
-        this->supervision.onCardAuthentication(response);
-      });
-
-  // Server-armed supervision (ATT-816). The flow queues the websocket payload;
-  // the main loop decides whether this reader can enter the screen.
-  this->api.setSupervisionStartCallback(
-      [this](API::SupervisionStartCommand command) {
-        this->supervision.armWebInitiated(command);
-      });
-
-  this->api.setSupervisionResolvedCallback(
-      [this](API::SupervisionResolvedResult result) {
-        this->supervision.onResolved(result);
-      });
-
-  this->api.setProjectsOfUserResponseCallback(
-      [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
-        this->projectsOfUserResponse = projectsOfUserResponse;
-        this->projectsCurrentPage = projectsOfUserResponse.page;
-        this->projectsTotalCount = projectsOfUserResponse.total;
-        this->projectsHasMore = projectsOfUserResponse.hasMore;
-        this->projectsOfUserResponseUpdated = true;
-      });
-
-  this->api.setResourceFormsRequestCallback(
-      [this](const API::ResourceUsageFormRequest &request) {
-        // DO NOT copy the large struct here - websocket task has limited
-        // stack/heap. Queue only its identity; LVGL validates it against the
-        // pending action before copying the complete request metadata.
-        struct Payload {
-          Application *self;
-          uint32_t resourceId;
-          uint32_t requestId;
-          API::ResourceUsageFormActionType action;
-        };
-        Payload *payload = new Payload{this, request.resourceId, request.requestId, request.action};
-        if (!payload) {
-          return;
-        }
-        Display::asyncCall(
-            [](void *u) {
-              auto *payload = static_cast<Payload *>(u);
-              if (payload && payload->self) {
-                // The scratch buffer can hold a newer request by the time this
-                // runs, so only process the request represented by this payload.
-                const auto &request = payload->self->api.getFormRequestScratch();
-                if (request.resourceId == payload->resourceId && request.requestId == payload->requestId &&
-                    request.action == payload->action && payload->self->api.isCurrentResourceAction(request.requestId)) {
-                  payload->self->handleFormsRequest(request);
-                }
-              }
-              delete payload;
-            },
-            payload);
-      });
-
-  this->api.setResourceFormFieldsCallback(
-      [this](const API::ResourceUsageFormFieldsPage &page) {
-        (void)page; // The data is in api.getFormFieldsScratch()
-        this->pendingFormFieldsReady = true;
-        Display::asyncCall(
-            [](void *u) {
-              auto *self = static_cast<Application *>(u);
-              if (self && self->pendingFormFieldsReady) {
-                self->pendingFormFieldsReady = false;
-                self->pendingFormFields = self->api.getFormFieldsScratch();
-                self->handleFormFields(self->pendingFormFields);
-              }
-            },
-            this);
-      });
-
-  this->api.setResourceFormPageResultCallback(
-      [this](const API::ResourceUsageFormPageResult &result) {
-        (void)result; // The data is in api.getFormPageResultScratch()
-        this->pendingFormPageResultReady = true;
-        Display::asyncCall(
-            [](void *u) {
-              auto *self = static_cast<Application *>(u);
-              if (self && self->pendingFormPageResultReady) {
-                self->pendingFormPageResultReady = false;
-                self->pendingFormPageResult = self->api.getFormPageResultScratch();
-                self->handleFormPageResult(self->pendingFormPageResult);
-              }
-            },
-            this);
-      });
-#endif
-
-  auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength) {
-#ifdef HAS_LVGL_DISPLAY
-    if (this->sessionSummaryActive) {
-      this->sessionSummaryDismissRequested = true;
-      return; // consume this presentation; do not authenticate the next member
-    }
-#endif
-    this->logger.infof("Card detected: %s",
-                       hexToString(uid, uidLength).c_str());
-
-#ifdef DEMO_MODE
-    if (this->demoPendingScanActive) {
-        this->demoScanUid = hexToString(uid, uidLength);
-        this->demoPendingScanActive = false;
-        this->demoPendingScanReady = true;
-        return;
-    }
-#endif
-
-#ifndef HAS_LVGL_DISPLAY
-    this->cardDetected = true;
-    this->cardRemoved = false;
-    this->cardPresentationWasLong = false;
-    this->cardDetectionTimeMs = millis();
-#endif
-
-#ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED || this->state == APPLICATION_STATE_RESOURCE_LIST)
-#else
-    if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
-#endif
-    {
-#ifdef HAS_LVGL_DISPLAY
-      if (this->cardAuthenticationPending || this->resourceCount == 0) return;
-      this->cardAuthenticationPending = true;
-      this->cardAuthenticationStartedAt = millis();
-      this->authenticationResourceId = this->resourceIsSelected ? this->selectedResourceId : this->resourceList.items[0].id;
-      lv_lock();
-      // A repeated scan by the same user must not reuse access from an earlier
-      // login while the new personalized list is still loading.
-      this->resourceList.authenticatedUsername[0] = '\0';
-      for (uint16_t i = 0; i < this->resourceList.count; ++i) this->resourceList.items[i].accessKnown = false;
-      this->resourceListUpdated = true;
-      this->selectedResourceChanged = true;
-      if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
-      else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
-      lv_unlock();
-      this->api.requestCardAuthenticationData(uid, uidLength, this->authenticationResourceId);
-#else
-      this->api.requestCardAuthenticationData(uid, uidLength,
-                                              this->selectedResourceId);
-#endif
-      return;
-    }
-
-#ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_ENROLLMENT) {
-      // A card entered the field while waiting to enroll. Flag it; the
-      // enrollment state machine picks the writable key on the main loop. We
-      // ride the normal detection loop here precisely because it re-arms the
-      // reader reliably across removals/re-presentations (ATT-503).
-      this->enrollCardDetected = true;
-      return;
-    }
-
-    if (this->state == APPLICATION_STATE_RESET) {
-      // A card entered the field while waiting to reset. Same rationale as
-      // enrollment: flag it and let the reset state machine authenticate + write
-      // the factory key back on the main loop.
-      this->resetCardDetected = true;
-      return;
-    }
-
-    if (this->state == APPLICATION_STATE_SUPERVISION) {
-      this->supervision.onCardDetected(uid, uidLength);
-      return;
-    }
-#endif
-
-    if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
-      this->processCardAuthenticationData();
-      return;
-    }
-  };
-  this->nfc.setCardDetectionCallback(cardDetectionCallback);
-
-#ifndef HAS_LVGL_DISPLAY
-  this->nfc.setCardRemovalCallback([this](uint32_t presentationTimeMs) {
-    this->logger.debugf("Card removed after %d ms", presentationTimeMs);
-    this->cardRemoved = true;
-
-    // log inmportant vars (cardDetected, cardRemoved, cardPresentationTimeMs,
-    // state)
-    this->logger.debugf("cardDetected: %d", this->cardDetected);
-    this->logger.debugf("cardRemoved: %d", this->cardRemoved);
-    this->logger.debugf("unlocked: %d", this->unlocked);
-    this->logger.debugf("state: %d", this->state);
-  });
-#endif
+  this->setupNfcCallbacks();
 
 #if !defined(DEMO_MODE) && defined(ESP_PLATFORM)
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
@@ -715,3 +154,433 @@ void Application::loop() {
   vTaskDelay(pdMS_TO_TICKS(1));
 #endif
 }
+
+// Session coordination: resource/project selection, action buttons, pause timing
+// FEATURE: application-session
+
+#include <cstdlib>
+
+#ifdef HAS_LVGL_DISPLAY
+void Application::finishReaderAction(bool success) {
+  if (this->pendingUiAction.empty()) return;
+  const auto type = this->pendingUiAction;
+  this->pendingUiAction.clear();
+  this->waitingForResourceRefresh = true;
+  this->pendingUiStartedAt = millis();
+  Display::resourceDetailsScreen.hideFormsModal();
+  if (this->returnToListAfterAction) this->resourceIsSelected = false;
+  this->actionCompletionMessage = success
+      ? FirmwareI18n::Text(type == "START_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageStarted
+      : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded : FirmwareI18n::Message::ActionConfirmed)
+      : FirmwareI18n::Text();
+  // Keep input blocked until fresh ownership/availability arrives, so a fast
+  // second tap cannot act on the row's pre-action state.
+  this->showReaderActionProgress(FirmwareI18n::Message::LoadingStatus);
+  this->api.cancelResourceAction();
+  this->resourceRefreshRequestId = this->api.requestResourceList();
+}
+
+void Application::beginSessionSummary(const API::ActionResult &result) {
+  Display::hidePopup();
+  this->onActionResult(result.type);
+  this->clearFormPageCache();
+  this->pendingFormFieldsReady = false;
+  this->pendingFormPageResultReady = false;
+  this->formCursorFormIdx = 0;
+  this->formCursorOffset = 0;
+  this->awaitingFieldRender = false;
+  this->pendingActionResourceId = 0;
+  this->pendingActionProjectId = 0;
+  this->pendingActionIsTakeover = false;
+  this->pendingFormRequestResourceId = 0;
+  this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
+  this->pendingUiAction.clear();
+  this->waitingForResourceRefresh = false;
+  this->returnToListAfterAction = false;
+  this->actionCompletionMessage.clear();
+  this->api.cancelResourceAction();
+  this->resetPauseAccounting();
+  Display::resourceListScreen.hideActionProgress();
+  Display::resourceDetailsScreen.hideActionProgress();
+  this->sessionSummaryActive = true;
+  this->sessionSummaryVisible = false;
+  this->sessionSummaryDismissRequested = false;
+  this->sessionSummaryTouchSequence = Display::touchPressSequence;
+  this->state = APPLICATION_STATE_SESSION_SUMMARY;
+  Display::sessionSummaryScreen.setSummary(this->cardAuthenticationData.username, result.durationSeconds, result.billingTotal);
+  Display::transitionToScreen(&Display::sessionSummaryScreen, [this] {
+    if (!this->sessionSummaryActive) return;
+    this->sessionSummaryShownAt = millis();
+    this->sessionSummaryVisible = true;
+  });
+  // Do not reset presence: a card already held must first leave the field.
+  this->nfc.enableCardDetection();
+}
+
+void Application::dismissSessionSummary() {
+  if (!this->sessionSummaryActive) return;
+  this->logoutReader();
+}
+
+void Application::logoutReader() {
+  State::setUserLanguage(false);
+  this->sessionSummaryActive = false;
+  this->sessionSummaryVisible = false;
+  this->sessionSummaryDismissRequested = false;
+  Display::sessionSummaryScreen.clearSummary();
+  Display::hidePopup();
+  this->handleFormsCancel();
+  this->finishCardAuthentication(false);
+  this->unlocked = false;
+  this->resourceIsSelected = false;
+  this->selectedResourceId = 0;
+  this->returnToListAfterAction = false;
+  this->pendingUiAction.clear();
+  this->api.cancelResourceAction();
+  this->waitingForResourceRefresh = false;
+  this->actionCompletionMessage.clear();
+  Display::resourceDetailsScreen.hideActionProgress();
+  this->currentProjectsUser.clear();
+  this->cardAuthenticationData = {};
+  this->clearProjectSelection();
+  this->resetPauseAccounting();
+  Display::resourceListScreen.setAuthenticatedUser("");
+  Display::resourceListScreen.hideActionProgress();
+  this->nfc.enableCardDetection();
+}
+
+void Application::finishCardAuthentication(bool success) {
+  this->cardAuthenticationPending = false;
+  Display::resourceListScreen.hideActionProgress();
+  Display::lockscreen.hideActionProgress();
+  if (success) {
+    this->restartSessionTimeout();
+    this->selectedResourceChanged = true;
+  } else {
+    State::setUserLanguage(false);
+    this->externalState = EXTERNAL_STATE_NONE;
+    this->state = APPLICATION_STATE_INIT;
+    this->nfc.enableCardDetection();
+  }
+}
+void Application::pollUsageStats() {
+  const API::ResourceBrief *resource = nullptr;
+  if (this->unlocked && this->resourceIsSelected && this->state == APPLICATION_STATE_UNLOCKED &&
+      this->cardAuthenticationData.username == this->resourceList.authenticatedUsername) {
+    for (uint16_t i = 0; i < this->resourceList.count; ++i)
+      if (this->resourceList.items[i].id == this->selectedResourceId) resource = &this->resourceList.items[i];
+  }
+  if (!resource || !resource->hasActiveUsage || !resource->activeUsageId ||
+      this->cardAuthenticationData.username != resource->activeUser) {
+    this->usageStatsResourceId = 0;
+    this->usageStatsUsageId = 0;
+    return;
+  }
+  const uint32_t now = millis();
+  if (this->usageStatsResourceId != resource->id || this->usageStatsUsageId != resource->activeUsageId ||
+      now - this->usageStatsRequestedAt >= 10000) {
+    this->usageStatsResourceId = resource->id;
+    this->usageStatsUsageId = resource->activeUsageId;
+    this->usageStatsRequestedAt = now;
+    this->api.requestUsageStats(resource->id);
+  }
+}
+
+#endif
+
+
+#ifdef HAS_LVGL_DISPLAY
+void Application::beginEnrollment() {
+  this->unlocked = false;
+  State::setUserLanguage(false);
+  // WAIT_FOR_CARD rides the normal card-detection loop, which re-arms the
+  // reader reliably across removals/re-presentations. (The earlier poll-only
+  // approach wedged the PN532 after the auth performed for an already-enrolled
+  // card, so a freshly presented card was never seen until timeout — ATT-503.)
+  // Detection is disabled again only for the auth/write once a card is picked.
+  this->enrollCardDetected = false;
+  this->nfc.resetCardPresence();
+  this->nfc.enableCardDetection();
+  this->enrollPhase = ENROLL_PHASE_WAIT_FOR_CARD;
+  this->enrollKeyMaterialReady = false;
+  this->enrollCancelRequested = false;
+  this->enrollErrorPending = false;
+  this->enrollErrorMessage[0] = '\0';
+  this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
+  this->enrollPhaseChangedMs = this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs;
+
+  Display::enrollmentScreen.setUserName(
+      this->apiEnrollNewCardGetAvailableKeyNoData.username);
+  Display::enrollmentScreen.setEnrollmentTimeoutTime(
+      this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + ENROLLMENT_TIMEOUT_MS);
+  Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WAITING);
+  Display::transitionToScreen(&Display::enrollmentScreen);
+
+  this->state = APPLICATION_STATE_ENROLLMENT;
+  this->externalState = EXTERNAL_STATE_NONE;
+}
+
+void Application::exitEnrollment() {
+  this->enrollPhase = ENROLL_PHASE_NONE;
+  this->externalState = EXTERNAL_STATE_NONE;
+  this->unlocked = false;
+  State::setUserLanguage(false);
+  // Hand back to the generic screen routing; next processState() iteration
+  // re-evaluates and transitions to the correct idle screen (lock / list /
+  // no-resources), re-enabling card detection on the way.
+  this->state = APPLICATION_STATE_INIT;
+}
+
+void Application::processEnrollment() {
+  uint32_t now = millis();
+
+  // Explicit cancel (device touch button) wins over everything else.
+  if (this->enrollCancelRequested) {
+    this->enrollCancelRequested = false;
+    this->logger.debug("Enrollment cancelled by user");
+    this->api.sendEnrollNewCardCancel();
+    this->exitEnrollment();
+    return;
+  }
+
+  // Overall timeout — but never interrupt the brief success confirmation.
+  if (this->enrollPhase != ENROLL_PHASE_SUCCESS &&
+      now - this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs >
+          ENROLLMENT_TIMEOUT_MS) {
+    this->logger.error("Enrollment timeout reached");
+    this->api.sendEnrollNewCardCancel();
+    this->exitEnrollment();
+    return;
+  }
+
+  // Server-reported error (e.g. card already enrolled). Surface it, then the
+  // ERROR dwell loop retries within the remaining time.
+  if (this->enrollErrorPending) {
+    this->enrollErrorPending = false;
+    this->beeper.errorBeep();
+    Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
+    Display::enrollmentScreen.setStatusMessage(FirmwareI18n::readerError(this->enrollErrorMessage));
+    this->enrollPhase = ENROLL_PHASE_ERROR;
+    this->enrollPhaseChangedMs = now;
+    return;
+  }
+
+  switch (this->enrollPhase) {
+  case ENROLL_PHASE_WAIT_FOR_CARD: {
+    // The detection loop flags a card via the card-detection callback; until
+    // then there is nothing to do but keep the screen up.
+    if (!this->enrollCardDetected) {
+      break;
+    }
+    this->enrollCardDetected = false;
+
+    // Take exclusive control of the PN532 for the authenticate + write that
+    // follow, so the detection loop doesn't probe the card underneath us.
+    this->nfc.disableCardDetection();
+
+    uint8_t uid[7] = {0};
+    uint8_t uidLength = 0;
+    uint8_t keyNo = 0;
+    if (this->nfc.getAvailableKeyNo(uid, &uidLength, &keyNo)) {
+      this->api.sendEnrollNewCardAvailableKeyNo(uid, uidLength, keyNo);
+      this->enrollPhase = ENROLL_PHASE_REQUESTED_KEY;
+      this->enrollPhaseChangedMs = now;
+    } else {
+      // Card slipped away or has no writable key. Surface the failure instead
+      // of silently re-arming, otherwise DESFire setup/auth failures look like
+      // the reader ignored the card.
+      this->beeper.errorBeep();
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
+      Display::enrollmentScreen.setStatusMessage(
+          FirmwareI18n::Message::CouldNotPrepareCard);
+      this->enrollPhase = ENROLL_PHASE_ERROR;
+      this->enrollPhaseChangedMs = now;
+      this->nfc.resetCardPresence();
+    }
+    break;
+  }
+
+  case ENROLL_PHASE_REQUESTED_KEY: {
+    // Key material arrives asynchronously via the API callback, which only
+    // sets a flag — the actual write happens here on the main loop.
+    if (this->enrollKeyMaterialReady) {
+      this->enrollKeyMaterialReady = false;
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WRITING);
+      this->enrollPhase = ENROLL_PHASE_WRITING;
+      this->enrollPhaseChangedMs = now;
+    }
+    break;
+  }
+
+  case ENROLL_PHASE_WRITING: {
+    bool ok = this->nfc.changeKey(
+        this->apiEnrollNewCardData.keyNo, this->nfc.getFactoryKey(),
+        this->nfc.getFactoryKey(), this->apiEnrollNewCardData.keyBytes,
+        INfc::CARD_KEY_VERSION_ENROLLED);
+    this->api.sendEnrollNewCard(ok);
+    if (ok) {
+      this->beeper.successBeep();
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_SUCCESS);
+      this->enrollPhase = ENROLL_PHASE_SUCCESS;
+    } else {
+      this->beeper.errorBeep();
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
+      Display::enrollmentScreen.setStatusMessage(
+          FirmwareI18n::Message::CouldNotWriteCard);
+      this->enrollPhase = ENROLL_PHASE_ERROR;
+    }
+    this->enrollPhaseChangedMs = now;
+    break;
+  }
+
+  case ENROLL_PHASE_SUCCESS: {
+    if (now - this->enrollPhaseChangedMs > ENROLL_SUCCESS_DWELL_MS) {
+      this->exitEnrollment();
+    }
+    break;
+  }
+
+  case ENROLL_PHASE_ERROR: {
+    // Per ATT-503 the screen must not disappear on error. Show it briefly,
+    // then drop back to waiting so the user can re-present the card. Re-arm the
+    // detection loop so the next (possibly different) card is picked up cleanly.
+    if (now - this->enrollPhaseChangedMs > ENROLL_ERROR_DWELL_MS) {
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WAITING);
+      this->enrollPhase = ENROLL_PHASE_WAIT_FOR_CARD;
+      this->enrollCardDetected = false;
+      this->nfc.resetCardPresence();
+      this->nfc.enableCardDetection();
+    }
+    break;
+  }
+
+  default:
+    break;
+  }
+}
+
+#endif
+
+#ifdef HAS_LVGL_DISPLAY
+
+void Application::beginReset() {
+  this->unlocked = false;
+  State::setUserLanguage(false);
+  // Mirrors beginEnrollment(): WAIT_FOR_CARD rides the normal card-detection
+  // loop (reliable re-arm across removals); detection is disabled only for the
+  // authenticate + write once a card is actually picked.
+  this->resetCardDetected = false;
+  this->nfc.resetCardPresence();
+  this->nfc.enableCardDetection();
+  this->resetPhase = RESET_PHASE_WAIT_FOR_CARD;
+  this->resetCancelRequested = false;
+  this->resetStartTimeMs = millis();
+  this->resetPhaseChangedMs = this->resetStartTimeMs;
+
+  Display::resetScreen.setUserName(this->apiResetNfcCardData.username);
+  Display::resetScreen.setTimeoutTime(this->resetStartTimeMs + RESET_TIMEOUT_MS);
+  Display::resetScreen.setStatus(ResetScreen::STATUS_WAITING);
+  Display::transitionToScreen(&Display::resetScreen);
+
+  this->state = APPLICATION_STATE_RESET;
+  this->externalState = EXTERNAL_STATE_NONE;
+}
+
+void Application::exitReset() {
+  this->resetPhase = RESET_PHASE_NONE;
+  this->externalState = EXTERNAL_STATE_NONE;
+  this->unlocked = false;
+  State::setUserLanguage(false);
+  // Hand back to the generic screen routing; next processState() iteration
+  // re-evaluates and transitions to the correct idle screen.
+  this->state = APPLICATION_STATE_INIT;
+}
+
+void Application::processReset() {
+  uint32_t now = millis();
+
+  // Explicit cancel (device touch button) wins over everything else.
+  if (this->resetCancelRequested) {
+    this->resetCancelRequested = false;
+    this->logger.debug("Reset cancelled by user");
+    this->api.sendResetNfcCardCancel();
+    this->exitReset();
+    return;
+  }
+
+  // Overall timeout — but never interrupt the brief success confirmation.
+  if (this->resetPhase != RESET_PHASE_SUCCESS &&
+      now - this->resetStartTimeMs > RESET_TIMEOUT_MS) {
+    this->logger.error("Reset timeout reached");
+    this->api.sendResetNfcCardCancel();
+    this->exitReset();
+    return;
+  }
+
+  switch (this->resetPhase) {
+  case RESET_PHASE_WAIT_FOR_CARD: {
+    // The detection loop flags a card via the card-detection callback; until
+    // then there is nothing to do but keep the screen up.
+    if (!this->resetCardDetected) {
+      break;
+    }
+    this->resetCardDetected = false;
+
+    // Take exclusive control of the PN532 for the authenticate + write that
+    // follow, so the detection loop doesn't probe the card underneath us.
+    this->nfc.disableCardDetection();
+    Display::resetScreen.setStatus(ResetScreen::STATUS_WRITING);
+    this->resetPhase = RESET_PHASE_WRITING;
+    this->resetPhaseChangedMs = now;
+    break;
+  }
+
+  case RESET_PHASE_WRITING: {
+    // Authenticate as the (still factory) application master key, then change
+    // the stored slot from the card's current key back to the factory key.
+    bool ok = this->nfc.changeKey(this->apiResetNfcCardData.keyNo,
+                                  this->nfc.getFactoryKey(),
+                                  this->apiResetNfcCardData.keyBytes,
+                                  this->nfc.getFactoryKey(),
+                                  INfc::CARD_KEY_VERSION_FREE);
+    this->api.sendResetNfcCard(ok);
+    if (ok) {
+      this->beeper.successBeep();
+      Display::resetScreen.setStatus(ResetScreen::STATUS_SUCCESS);
+      this->resetPhase = RESET_PHASE_SUCCESS;
+    } else {
+      this->beeper.errorBeep();
+      Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
+      Display::resetScreen.setStatusMessage(
+          FirmwareI18n::Message::CouldNotResetCard);
+      this->resetPhase = RESET_PHASE_ERROR;
+    }
+    this->resetPhaseChangedMs = now;
+    break;
+  }
+
+  case RESET_PHASE_SUCCESS: {
+    if (now - this->resetPhaseChangedMs > RESET_SUCCESS_DWELL_MS) {
+      this->exitReset();
+    }
+    break;
+  }
+
+  case RESET_PHASE_ERROR: {
+    // Keep the screen up briefly, then drop back to waiting so the user can
+    // re-present the card. Re-arm detection so the next card is picked cleanly.
+    if (now - this->resetPhaseChangedMs > RESET_ERROR_DWELL_MS) {
+      Display::resetScreen.setStatus(ResetScreen::STATUS_WAITING);
+      this->resetPhase = RESET_PHASE_WAIT_FOR_CARD;
+      this->resetCardDetected = false;
+      this->nfc.resetCardPresence();
+      this->nfc.enableCardDetection();
+    }
+    break;
+  }
+
+  default:
+    break;
+  }
+}
+#endif

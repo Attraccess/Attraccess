@@ -2,7 +2,7 @@
 #include "display/i18n.hpp"
 #include <string>
 #include "../../../network/wifi/wifi.hpp"
-#include "platform.hpp"
+#include "../../../platform.hpp"
 
 // WiFi network scanning + dropdown population.
 

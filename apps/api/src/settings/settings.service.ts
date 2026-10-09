@@ -1,29 +1,27 @@
+import { User } from '@attraccess/database-entities';
+
+import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
+
+import { Repository } from 'typeorm';
+
 import { normalizeDeviceLanguage } from '../attractap/language/device-language';
 import { auditSettingsUpdateSchema, readAuditSettings } from '../audit/audit.config';
-import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { User } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
-import { randomBytes } from 'crypto';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
-import { AppSettingsDto } from './dto/app-settings.dto';
-import { SmtpServiceType, SmtpSettingsDto } from './dto/smtp-settings.dto';
-import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
-import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
-import { SystemSettingsDto } from './dto/system-settings.dto';
-import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
-import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
+
 import {
   APP_KEYS,
   APP_PARENT,
-  AUTH_KEYS,
-  AUTH_PARENT,
   METRICS_KEYS,
   METRICS_PARENT,
   METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
   METRICS_TOGGLE_DEFAULTS,
   METRICS_TOGGLE_KEYS,
   MetricsSubsystem,
+  AUTH_KEYS,
+  AUTH_PARENT,
   MESSAGING_KEYS,
   MESSAGING_PARENT,
   MESSAGING_RATE_LIMIT_DEFAULTS,
@@ -31,19 +29,79 @@ import {
   RATE_LIMIT_DEFAULTS,
   RateLimitPolicy,
 } from './constants';
-import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
-import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
-import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settings.dto';
-import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
-import { SettingsStoreService } from './settings-store.service';
-import { FirstTimeSetupStatusDto, FirstTimeSetupStepsDto } from './dto/first-time-setup-status.dto';
-import { MetricsTogglesDto } from './dto/metrics-toggles.dto';
-import { UpdateMetricsTogglesDto } from './dto/update-metrics-toggles.dto';
+
+import { SmtpSettingsDto, SmtpServiceType } from './dto/smtp-settings.dto';
+
+import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
+
 import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-toggle-invalidator.token';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+import { SettingsStoreService } from './settings-store.service';
+
+import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
+
+import { AppSettingsDto } from './dto/app-settings.dto';
+
+import { FirstTimeSetupStatusDto, FirstTimeSetupStepsDto } from './dto/first-time-setup-status.dto';
+
+import { SystemSettingsDto } from './dto/system-settings.dto';
+
+import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
+
+import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
+
+import { randomBytes } from 'crypto';
+
+import { MetricsTogglesDto } from './dto/metrics-toggles.dto';
+
+import { UpdateMetricsTogglesDto } from './dto/update-metrics-toggles.dto';
+
+import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
+
+import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settings.dto';
+
+import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
+
+import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
+
+export function parsePositiveInt(raw: string | null, fallback: number): number {
+  if (raw === null || raw === undefined || raw === '') {
+    return fallback;
+  }
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
+}
+
+export function parsePositiveFloat(raw: string | null, fallback: number): number {
+  if (raw === null || raw === undefined || raw === '') {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
+}
+
 @Injectable()
 export class SettingsService {
+  constructor(
+    @InjectRepository(User)
+    protected readonly userRepository: Repository<User>,
+    protected readonly settingsStore: SettingsStoreService,
+    protected readonly smtpSettingsService: SmtpSettingsService,
+    @Optional()
+    @Inject(METRICS_TOGGLE_INVALIDATOR)
+    protected readonly metricsToggleInvalidator: MetricsToggleInvalidator | null = null,
+    @Optional()
+    @Inject(EventEmitter2)
+    private readonly eventEmitter?: EventEmitter2,
+  ) {}
+
   getAuditSettings() {
     return readAuditSettings(this.settingsStore);
   }
@@ -57,18 +115,34 @@ export class SettingsService {
     return this.getAuditSettings();
   }
 
-  constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly settingsStore: SettingsStoreService,
-    private readonly smtpSettingsService: SmtpSettingsService,
-    @Optional()
-    @Inject(METRICS_TOGGLE_INVALIDATOR)
-    private readonly metricsToggleInvalidator: MetricsToggleInvalidator | null = null,
-    @Optional()
-    @Inject(EventEmitter2)
-    private readonly eventEmitter?: EventEmitter2,
-  ) {}
+  async getSmtpSettings(): Promise<SmtpSettingsDto> {
+    return this.smtpSettingsService.getSettings();
+  }
+
+  async updateSmtpSettings(update: UpdateSmtpSettingsDto): Promise<void> {
+    return this.smtpSettingsService.updateSettings(update);
+  }
+
+  async getUrl(): Promise<string | null> {
+    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url);
+  }
+
+  async getPublicInternetUrl(): Promise<string | null> {
+    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl);
+  }
+
+  async getLicenseKey(): Promise<string | null> {
+    const licenseKey = await this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey);
+    return licenseKey.value;
+  }
+
+  async getSmtpConfiguration(): Promise<SmtpSettingsInternal | null> {
+    return this.smtpSettingsService.getConfiguration();
+  }
+
+  buildSmtpTransportOptions(config: SmtpSettingsInternal): SMTPTransport.Options {
+    return this.smtpSettingsService.buildTransportOptions(config);
+  }
 
   async isFirstTimeSetupAvailable(): Promise<boolean> {
     const count = await this.userRepository.count();
@@ -159,35 +233,6 @@ export class SettingsService {
     return language === null ? 'de' : normalizeDeviceLanguage(language);
   }
 
-  async getSmtpSettings(): Promise<SmtpSettingsDto> {
-    return this.smtpSettingsService.getSettings();
-  }
-
-  async updateSmtpSettings(update: UpdateSmtpSettingsDto): Promise<void> {
-    return this.smtpSettingsService.updateSettings(update);
-  }
-
-  async getUrl(): Promise<string | null> {
-    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url);
-  }
-
-  async getPublicInternetUrl(): Promise<string | null> {
-    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl);
-  }
-
-  async getLicenseKey(): Promise<string | null> {
-    const licenseKey = await this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey);
-    return licenseKey.value;
-  }
-
-  async getSmtpConfiguration(): Promise<SmtpSettingsInternal | null> {
-    return this.smtpSettingsService.getConfiguration();
-  }
-
-  buildSmtpTransportOptions(config: SmtpSettingsInternal): SMTPTransport.Options {
-    return this.smtpSettingsService.buildTransportOptions(config);
-  }
-
   async getMetricsApiKey(): Promise<{ value: string | null; configured: boolean }> {
     return this.settingsStore.getSecretSetting(METRICS_PARENT, METRICS_KEYS.apiKey);
   }
@@ -234,6 +279,24 @@ export class SettingsService {
     if (this.metricsToggleInvalidator) {
       await this.metricsToggleInvalidator.refresh();
     }
+  }
+
+  async updateMetricsToggles(update: UpdateMetricsTogglesDto): Promise<MetricsTogglesDto> {
+    const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
+    const writes = subsystems
+      .filter((subsystem) => update[subsystem] !== undefined)
+      .map((subsystem) =>
+        this.settingsStore.setPlainSetting(
+          METRICS_PARENT,
+          METRICS_TOGGLE_KEYS[subsystem],
+          update[subsystem] === true ? 'true' : 'false',
+        ),
+      );
+    await Promise.all(writes);
+    if (this.metricsToggleInvalidator) {
+      await this.metricsToggleInvalidator.refresh();
+    }
+    return this.getMetricsToggles();
   }
 
   async getAuthRateLimitSettings(): Promise<AuthRateLimitSettingsDto> {
@@ -287,7 +350,7 @@ export class SettingsService {
     return this.resolveRateLimitPolicy();
   }
 
-  private async resolveRateLimitPolicy(): Promise<RateLimitPolicy> {
+  protected async resolveRateLimitPolicy(): Promise<RateLimitPolicy> {
     const [maxAttempts, windowSeconds, lockoutDurationSeconds, exponentialBackoff, backoffMultiplier] =
       await Promise.all([
         this.settingsStore.getPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitMaxAttempts),
@@ -358,7 +421,7 @@ export class SettingsService {
     return this.resolveMessagingRateLimitPolicy();
   }
 
-  private async resolveMessagingRateLimitPolicy(): Promise<MessagingRateLimitPolicy> {
+  protected async resolveMessagingRateLimitPolicy(): Promise<MessagingRateLimitPolicy> {
     const [sendMax, sendWindow, contactMax, contactWindow] = await Promise.all([
       this.settingsStore.getPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.sendRateLimitMax),
       this.settingsStore.getPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.sendRateLimitWindowSeconds),
@@ -373,44 +436,4 @@ export class SettingsService {
       contactWindowSeconds: parsePositiveInt(contactWindow, MESSAGING_RATE_LIMIT_DEFAULTS.contactWindowSeconds),
     };
   }
-
-  async updateMetricsToggles(update: UpdateMetricsTogglesDto): Promise<MetricsTogglesDto> {
-    const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
-    const writes = subsystems
-      .filter((subsystem) => update[subsystem] !== undefined)
-      .map((subsystem) =>
-        this.settingsStore.setPlainSetting(
-          METRICS_PARENT,
-          METRICS_TOGGLE_KEYS[subsystem],
-          update[subsystem] === true ? 'true' : 'false',
-        ),
-      );
-    await Promise.all(writes);
-    if (this.metricsToggleInvalidator) {
-      await this.metricsToggleInvalidator.refresh();
-    }
-    return this.getMetricsToggles();
-  }
-}
-
-function parsePositiveInt(raw: string | null, fallback: number): number {
-  if (raw === null || raw === undefined || raw === '') {
-    return fallback;
-  }
-  const parsed = parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return fallback;
-  }
-  return parsed;
-}
-
-function parsePositiveFloat(raw: string | null, fallback: number): number {
-  if (raw === null || raw === undefined || raw === '') {
-    return fallback;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return fallback;
-  }
-  return parsed;
 }

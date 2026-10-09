@@ -1,16 +1,17 @@
 // Tests live controls and apply behavior with isolated controller endpoints.
 // FEATURE: WAGO front panel edits never replace applied control routing.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
-import { FrontPanel } from '../src/front-panel/FrontPanel';
-import { useFrontPanel } from '../src/front-panel/useFrontPanel';
-import { DIGITAL_TERMINALS } from '../../backend/configuration-digital';
-import { addDevice, updateTerminal } from '../src/front-panel/model';
-import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeMeasurement } from '../../measurement-contract';
+import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
+import { FrontPanel } from '../src/front-panel/FrontPanel';
+import { addDevice } from '../src/front-panel/model';
+import { useFrontPanel } from '../src/front-panel/working-copy/useFrontPanel';
+import { DIGITAL_TERMINALS } from '../../backend/configuration/digital';
+import { updateTerminal } from '../src/front-panel/model';
 
 const api = vi.hoisted(() => ({
   getDraft: vi.fn(),
@@ -22,8 +23,8 @@ const api = vi.hoisted(() => ({
   manual: vi.fn(),
   diagnostics: vi.fn(),
 }));
-vi.mock('../src/api', async (original) => ({
-  ...(await original<typeof import('../src/api')>()),
+vi.mock('../src/api/client', async (original) => ({
+  ...(await original<typeof import('../src/api/client')>()),
   getDraft: api.getDraft,
   getConfigurationBaseline: api.baseline,
   saveDraft: api.save,
@@ -32,7 +33,7 @@ vi.mock('../src/api', async (original) => ({
   publishConfiguration: api.publish,
   manualCommand: api.manual,
 }));
-vi.mock('../src/diagnostics', () => ({ useWagoDiagnostics: () => api.diagnostics() }));
+vi.mock('../src/diagnostics/diagnostics', () => ({ useWagoDiagnostics: () => api.diagnostics() }));
 
 const snapshot = {
   version: 1,
@@ -171,7 +172,7 @@ function required<T>(value: T | null | undefined): T {
 
 describe('front panel', () => {
   it('exposes an interactive output switch and sends a manual command when clicked', async () => {
-    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
     const control = await screen.findByRole('switch', { name: 'Switch DO1 Laser power' });
     await waitFor(() => expect(control.getAttribute('aria-disabled')).not.toBe('true'));
     fireEvent.click(control);
@@ -185,7 +186,7 @@ describe('front panel', () => {
   });
 
   it('exposes an interactive input inversion switch in the terminal settings', async () => {
-    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
     fireEvent.click(await screen.findByRole('button', { name: 'Configure DI1' }));
     const control = await screen.findByRole('switch', { name: 'Invert input' });
     fireEvent.click(control);
@@ -206,7 +207,7 @@ describe('front panel', () => {
   });
 
   it('shows every terminal and switches languages through the host store', async () => {
-    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
     await screen.findByText('CC100 onboard I/O');
     for (const terminal of DIGITAL_TERMINALS) expect(screen.getByText(terminal.label)).toBeTruthy();
     expect(screen.queryByText('Unapplied changes')).toBeNull();
@@ -217,7 +218,7 @@ describe('front panel', () => {
   });
 
   it('translates the shared bus baud rate while its drawer is open', async () => {
-    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
     fireEvent.click(await screen.findByRole('button', { name: 'RS-485 port · 9600 E1' }));
     expect(await screen.findByText('Baud rate')).toBeTruthy();
     act(() => useTranslationState.getState().setLanguage('de'));
@@ -226,7 +227,7 @@ describe('front panel', () => {
   });
 
   it('cancels a new device without changing the working configuration', async () => {
-    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
     fireEvent.click(await screen.findByRole('button', { name: 'Add Modbus device' }, { timeout: 10000 }));
     await screen.findByRole('dialog');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -252,14 +253,14 @@ describe('front panel', () => {
       },
       refetch: vi.fn(),
     });
-    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(result.current.pending).toBe(true);
     expect(result.current.live.enabled).toBe(false);
   });
 
   it('keeps live commands on the applied channel and revision while edits are unapplied', async () => {
-    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     const configuration = required(result.current.configuration);
     act(() =>
@@ -287,7 +288,7 @@ describe('front panel', () => {
       presetProvenance: JSON.stringify({ editor: { names: { output: 'Saved draft name' }, presets: [] } }),
     };
     api.getDraft.mockResolvedValue(savedDraft);
-    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(result.current.configuration?.metadata.names.output).toBe('Saved draft name');
     act(() =>
@@ -304,7 +305,7 @@ describe('front panel', () => {
   });
 
   it('requires confirmation even without flow impacts and retains the revision acknowledgement wait', async () => {
-    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     act(() =>
       result.current.edit(
@@ -328,7 +329,7 @@ describe('front panel', () => {
   ])('shows $label and allows confirmation regardless of output state', async ({ value, current, label }) => {
     const diagnostics = api.diagnostics();
     diagnostics.data.channels[0].samples[0] = { kind: 'output', value, current };
-    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
     fireEvent.click(await screen.findByRole('button', { name: /^Configure DO1/ }));
     fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'Changed label' } });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -344,7 +345,7 @@ describe('front panel', () => {
   });
 
   it('cancels apply confirmation without publishing', async () => {
-    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     act(() => result.current.apply());
     await waitFor(() => expect(result.current.review).not.toBeNull());
@@ -358,7 +359,7 @@ describe('front panel', () => {
       draft: { ...draft, reviewedHash: 'reviewed' },
       impacts: [{ channelId: 'output', references: [{ resourceId: 1, nodeId: 'flow' }] }],
     });
-    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     act(() => result.current.apply());
     await waitFor(() => expect(result.current.review?.impacts).toHaveLength(1));
@@ -368,8 +369,11 @@ describe('front panel', () => {
   });
 
   it('discards persisted draft changes back to the applied configuration', async () => {
-    api.getDraft.mockResolvedValue({ ...draft, snapshot: JSON.stringify({ ...snapshot, logicalChannels: [] }) });
-    const { result } = renderHook(() => useFrontPanel(1), { wrapper });
+    api.getDraft.mockResolvedValue({
+      ...draft,
+      snapshot: JSON.stringify({ ...snapshot, logicalChannels: [] }),
+    });
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
     await waitFor(() => expect(result.current.dirty).toBe(true));
     act(() => result.current.discard());
     await waitFor(() => expect(result.current.dirty).toBe(false));

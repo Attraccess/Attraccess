@@ -1,10 +1,10 @@
+#include "state/state.hpp"
 #include "display/i18n.hpp"
 #include "lockscreen.hpp"
-#include "display/fonts/attractap_fonts.hpp"
-#include "display/theme.hpp"
-#include "display/shared/headerButton.hpp"
-#include "display/images/lockscreen_background_image.hpp"
-#include "state/state.hpp"
+#include "../../fonts/attractap_fonts.hpp"
+#include "../../theme.hpp"
+#include "../../shared/headerButton.hpp"
+#include "../../images/lockscreen_background_image.hpp"
 #include <string>
 
 #include <cstring>
@@ -79,6 +79,7 @@ void Lockscreen::init()
     lv_obj_set_style_text_color(this->resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->resourceNameLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+
     this->usageInfoLabel = lv_label_create(resourceInfo);
     lv_obj_set_width(this->usageInfoLabel, lv_pct(100));
     lv_label_set_long_mode(this->usageInfoLabel, LV_LABEL_LONG_DOT);
@@ -95,6 +96,7 @@ lv_obj_t *Lockscreen::getScreen()
 {
     return this->screen;
 }
+
 
 void Lockscreen::loop()
 {

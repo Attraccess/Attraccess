@@ -5,7 +5,7 @@
 #include "../../images/logo_40h.hpp"
 #include "../IScreen.hpp"
 #include "../../../api/api.hpp"
-#include "display/shared/actionOverlay.hpp"
+#include "../../shared/actionOverlay.hpp"
 #include <functional>
 
 class Lockscreen : public IScreen

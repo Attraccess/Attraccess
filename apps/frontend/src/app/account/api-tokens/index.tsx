@@ -1,5 +1,4 @@
 import { LocaleDateField } from '../../../components/localeDateField';
-import { useEffect, useMemo, useState } from 'react';
 import {
   Input,
   Label,
@@ -16,10 +15,12 @@ import {
 } from '@heroui/react';
 import { Copy, KeyRound, Trash2, X } from 'lucide-react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button } from '../../../components/button';
+import { Button } from '../../../components/button/index';
 import { EmptyState } from '../../../components/emptyState';
+import { PermissionPicker } from '../../../components/permissionPicker/index';
+import { SimplePagination } from '../../../components/simplePagination/index';
+import { useEffect, useMemo, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
-import { PermissionPicker } from '../../../components/permissionPicker';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import {
   useApiTokensServiceCreateApiToken,
@@ -27,11 +28,10 @@ import {
   useApiTokensServiceRevokeApiToken,
   useRbacServiceListPermissions,
 } from '@attraccess/react-query-client';
-import { SimplePagination } from '../../../components/simplePagination';
 import en from './en.json';
 import de from './de.json';
 
-interface ApiToken {
+export interface ApiToken {
   id: number;
   name: string;
   permissionKeys: string[];
@@ -40,20 +40,20 @@ interface ApiToken {
   expiresAt: string | null;
 }
 
-interface CreatedApiToken extends ApiToken {
-  token: string;
-}
-
-interface ApiTokenPage {
+export interface ApiTokenPage {
   data: ApiToken[];
   total: number;
   page: number;
   limit: number;
 }
 
-const PAGE_SIZE = 10;
+export interface CreatedApiToken extends ApiToken {
+  token: string;
+}
 
-export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
+export const PAGE_SIZE = 10;
+
+export function useApiTokensCardState({ availablePermissions }: { availablePermissions: string[] }) {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
@@ -119,6 +119,61 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     await navigator.clipboard.writeText(secret);
     showToast({ title: t('success.copied'), type: 'success' });
   };
+  return {
+    t,
+    permissionLabel,
+    permissionDescription,
+    permissionCategory,
+    page,
+    setPage,
+    name,
+    setName,
+    permissionKeys,
+    setPermissionKeys,
+    expiresAt,
+    setExpiresAt,
+    expiryValid,
+    setExpiryValid,
+    secret,
+    setSecret,
+    tokenPage,
+    isLoadingTokens,
+    isCreating,
+    isRevoking,
+    availablePermissionDetails,
+    createToken,
+    revokeToken,
+    copySecret,
+  } as const;
+}
+
+export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
+  const {
+    t,
+    permissionLabel,
+    permissionDescription,
+    permissionCategory,
+    page,
+    setPage,
+    name,
+    setName,
+    permissionKeys,
+    setPermissionKeys,
+    expiresAt,
+    setExpiresAt,
+    expiryValid,
+    setExpiryValid,
+    secret,
+    setSecret,
+    tokenPage,
+    isLoadingTokens,
+    isCreating,
+    isRevoking,
+    availablePermissionDetails,
+    createToken,
+    revokeToken,
+    copySecret,
+  } = useApiTokensCardState({ availablePermissions });
 
   if (isLoadingTokens) return <Skeleton className="w-full h-10" />;
   const apiTokens = tokenPage?.data ?? [];

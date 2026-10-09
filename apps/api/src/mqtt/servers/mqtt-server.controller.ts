@@ -1,4 +1,4 @@
-import { recordAdministrationSafely, safeAuditHost } from '../../audit/audit-administration-policy';
+import { recordAdministrationSafely, safeAuditHost } from '../../audit/policies/administration';
 import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { MqttServer } from '@attraccess/database-entities';

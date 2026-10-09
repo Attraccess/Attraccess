@@ -2,8 +2,8 @@
 #ifdef HAS_POWER_BUTTON
 
 #include "powerOffButton.hpp"
-#include "display/theme.hpp"
-#include "display/fonts/attractap_fonts.hpp"
+#include "../../theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 
 namespace
 {

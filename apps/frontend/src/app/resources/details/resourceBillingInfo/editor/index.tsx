@@ -1,13 +1,4 @@
 import {
-  useResourceMeteringServiceListResourceMeters,
-  useResourceMeteringServiceSetResourceMeterRate,
-  UseResourceMeteringServiceListResourceMetersKeyFn,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetResourceBillingConfiguration,
-  UseBillingServiceGetResourceBillingConfigurationKeyFn,
-  useBillingServiceUpdateResourceBillingConfiguration,
-} from '@attraccess/react-query-client';
-import {
   Description,
   FieldError,
   Input,
@@ -25,27 +16,36 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button';
+import { Button } from '../../../../../components/button/index';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
+import { MeterNameEditor } from '../../meters/MeterNameEditor';
+import { MeterSetupNotice } from '../metering/MeterNotices';
+import { formatCredits, parseCredits, dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
+import {
+  UseResourceMeteringServiceListResourceMetersKeyFn,
+  useResourceMeteringServiceListResourceMeters,
+  useResourceMeteringServiceSetResourceMeterRate,
+  useBillingServiceGetBillingConfiguration,
+  useBillingServiceGetResourceBillingConfiguration,
+  UseBillingServiceGetResourceBillingConfigurationKeyFn,
+  useBillingServiceUpdateResourceBillingConfiguration,
+} from '@attraccess/react-query-client';
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../../../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../../../../../hooks/useAuth';
-import { MeterNameEditor } from '../../meters/MeterNameEditor';
-import { MeterSetupNotice } from '../metering/MeterNotices';
-import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency, formatCredits, parseCredits } from '@attraccess/shared';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
-interface Props {
+export interface Props {
   resourceId: number;
   children: (onOpen: () => void) => React.ReactNode;
 }
 
-export function ResourceBillingInfoEditor(props: Props) {
+export function useResourceBillingInfoEditorStateInputs(props: Props) {
   const { resourceId } = props;
 
   const { isOpen, open, setOpen, close } = useOverlayState();
@@ -128,45 +128,77 @@ export function ResourceBillingInfoEditor(props: Props) {
       };
     });
   }, [isOpen, meters, configuration]);
+  return {
+    resourceId,
+    isOpen,
+    open,
+    setOpen,
+    close,
+    t,
+    tExists,
+    toast,
+    queryClient,
+    configuration,
+    resourceBillingConfiguration,
+    updateConfiguration,
+    isSaving,
+    creditsPerUsage,
+    setCreditsPerUsage,
+    creditsPerMinute,
+    setCreditsPerMinute,
+    creditsPerOperatingMinute,
+    setCreditsPerOperatingMinute,
+    meters,
+    setMeterRate,
+    ratesPending,
+    rates,
+    setRates,
+    props,
+  } as const;
+}
 
+export function useResourceBillingInfoEditorStateOutput(
+  model: ReturnType<typeof useResourceBillingInfoEditorStateInputs>,
+) {
   useEffect(() => {
-    if (!configuration) {
+    if (!model.configuration) {
       return;
     }
 
-    setCreditsPerUsage(
+    model.setCreditsPerUsage(
       dbCurrencyToUserCurrency(
-        resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
-        configuration.minorUnit,
+        model.resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
+        model.configuration.minorUnit,
       ),
     );
-    setCreditsPerMinute(
+    model.setCreditsPerMinute(
       dbCurrencyToUserCurrency(
-        resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
-        configuration.minorUnit,
+        model.resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
+        model.configuration.minorUnit,
       ),
     );
-    setCreditsPerOperatingMinute(
+    model.setCreditsPerOperatingMinute(
       dbCurrencyToUserCurrency(
-        (resourceBillingConfiguration?.configuration as { creditsPerOperatingMinute?: number } | undefined)
+        (model.resourceBillingConfiguration?.configuration as { creditsPerOperatingMinute?: number } | undefined)
           ?.creditsPerOperatingMinute ?? 0,
-        configuration.minorUnit,
+        model.configuration.minorUnit,
       ),
     );
-  }, [resourceBillingConfiguration, configuration]);
+  }, [model.resourceBillingConfiguration, model.configuration]);
 
   const onSubmit = useCallback(async () => {
-    if (!configuration) {
+    if (!model.configuration) {
       return;
     }
 
     let parsedRates: { meterId: number; creditsPerUnit: number }[];
     try {
-      parsedRates = meters.map((meter) => ({
+      parsedRates = model.meters.map((meter) => ({
         meterId: meter.id,
         creditsPerUnit: parseCredits(
-          rates[meter.id] ?? formatCredits(meter.creditsPerUnit, configuration.minorUnit, { useGrouping: false }),
-          configuration.minorUnit,
+          model.rates[meter.id] ??
+            formatCredits(meter.creditsPerUnit, model.configuration.minorUnit, { useGrouping: false }),
+          model.configuration.minorUnit,
         ),
       }));
     } catch {
@@ -175,39 +207,98 @@ export function ResourceBillingInfoEditor(props: Props) {
     }
     try {
       for (const rate of parsedRates)
-        await setMeterRate({ resourceId, meterId: rate.meterId, requestBody: { creditsPerUnit: rate.creditsPerUnit } });
-      await queryClient.invalidateQueries({
-        queryKey: UseResourceMeteringServiceListResourceMetersKeyFn({ resourceId }),
+        await model.setMeterRate({
+          resourceId: model.resourceId,
+          meterId: rate.meterId,
+          requestBody: { creditsPerUnit: rate.creditsPerUnit },
+        });
+      await model.queryClient.invalidateQueries({
+        queryKey: UseResourceMeteringServiceListResourceMetersKeyFn({ resourceId: model.resourceId }),
       });
     } catch (error) {
-      toast.apiError({ error: error as Error, t, tExists, baseTranslationKey: 'api' });
+      model.toast.apiError({ error: error as Error, t: model.t, tExists: model.tExists, baseTranslationKey: 'api' });
       return;
     }
-    updateConfiguration({
-      resourceId,
+    model.updateConfiguration({
+      resourceId: model.resourceId,
       requestBody: {
-        creditsPerUsage: userCurrencyToDbCurrency(creditsPerUsage, configuration.minorUnit),
-        creditsPerMinute: userCurrencyToDbCurrency(creditsPerMinute, configuration.minorUnit),
-        creditsPerOperatingMinute: userCurrencyToDbCurrency(creditsPerOperatingMinute, configuration.minorUnit),
+        creditsPerUsage: userCurrencyToDbCurrency(model.creditsPerUsage, model.configuration.minorUnit),
+        creditsPerMinute: userCurrencyToDbCurrency(model.creditsPerMinute, model.configuration.minorUnit),
+        creditsPerOperatingMinute: userCurrencyToDbCurrency(
+          model.creditsPerOperatingMinute,
+          model.configuration.minorUnit,
+        ),
       },
     });
   }, [
-    updateConfiguration,
-    resourceId,
-    creditsPerUsage,
-    creditsPerMinute,
-    creditsPerOperatingMinute,
-    meters,
-    rates,
-    setMeterRate,
-    queryClient,
-    toast,
-    t,
-    tExists,
-    configuration,
+    model.updateConfiguration,
+    model.resourceId,
+    model.creditsPerUsage,
+    model.creditsPerMinute,
+    model.creditsPerOperatingMinute,
+    model.meters,
+    model.rates,
+    model.setMeterRate,
+    model.queryClient,
+    model.toast,
+    model.t,
+    model.tExists,
+    model.configuration,
   ]);
 
   const { hasPermission } = useAuth();
+  return {
+    resourceId: model.resourceId,
+    isOpen: model.isOpen,
+    open: model.open,
+    setOpen: model.setOpen,
+    t: model.t,
+    configuration: model.configuration,
+    isSaving: model.isSaving,
+    creditsPerUsage: model.creditsPerUsage,
+    setCreditsPerUsage: model.setCreditsPerUsage,
+    creditsPerMinute: model.creditsPerMinute,
+    setCreditsPerMinute: model.setCreditsPerMinute,
+    creditsPerOperatingMinute: model.creditsPerOperatingMinute,
+    setCreditsPerOperatingMinute: model.setCreditsPerOperatingMinute,
+    meters: model.meters,
+    ratesPending: model.ratesPending,
+    rates: model.rates,
+    setRates: model.setRates,
+    onSubmit,
+    hasPermission,
+    props: model.props,
+  };
+}
+
+export function useResourceBillingInfoEditorState(props: Props) {
+  const useResourceBillingInfoEditorStateInputsModel = useResourceBillingInfoEditorStateInputs(props);
+  return useResourceBillingInfoEditorStateOutput(useResourceBillingInfoEditorStateInputsModel);
+}
+
+export function ResourceBillingInfoEditor(props: Props) {
+  const {
+    resourceId,
+    isOpen,
+    open,
+    setOpen,
+    t,
+    configuration,
+    isSaving,
+    creditsPerUsage,
+    setCreditsPerUsage,
+    creditsPerMinute,
+    setCreditsPerMinute,
+    creditsPerOperatingMinute,
+    setCreditsPerOperatingMinute,
+    meters,
+    ratesPending,
+    rates,
+    setRates,
+    onSubmit,
+    hasPermission,
+  } = useResourceBillingInfoEditorState(props);
+
   if (!hasPermission('billing.manage')) {
     return null;
   }

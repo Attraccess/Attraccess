@@ -3,7 +3,7 @@ import {
   projectAdministrationAuditEvent,
   safeAuditOrigin,
   safeRequestedSpec,
-} from './audit-administration-policy';
+} from './policies/administration';
 
 const event: AdministrationAuditEvent = {
   action: 'mqtt_server.created',

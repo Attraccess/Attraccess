@@ -1,34 +1,42 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
 import { Form, FormField, FormSubmission, Resource, ResourceFormAction } from '@attraccess/database-entities';
-import { FormResponseDto } from './dto/form-response.dto';
+
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { Repository, EntityManager } from 'typeorm';
+
 import {
-  CreateFormDto,
-  CreateFormFieldDto,
   FormFieldResponseDto,
-  FormSubmissionRequestDto,
-  UpdateFormDto,
+  CreateFormFieldDto,
   UpdateFormFieldDto,
-} from './dto';
-import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
+  FormSubmissionRequestDto,
+  CreateFormDto,
+  UpdateFormDto,
+} from './dto/index';
+
+import { FormResponseDto } from './dto/form-response.dto';
+
 import { parseFieldOptions, parseFieldValue } from './forms.validation';
+
 import { MissingFormSubmissionException } from './errors/missingFormSubmission.exception';
+
+import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
 @Injectable()
 export class ResourceFormsService {
-  private readonly logger = new Logger(ResourceFormsService.name);
-
   constructor(
     @InjectRepository(Form)
-    private readonly formRepository: Repository<Form>,
+    protected readonly formRepository: Repository<Form>,
     @InjectRepository(FormField)
-    private readonly formFieldRepository: Repository<FormField>,
+    protected readonly formFieldRepository: Repository<FormField>,
     @InjectRepository(FormSubmission)
-    private readonly formSubmissionRepository: Repository<FormSubmission>,
+    protected readonly formSubmissionRepository: Repository<FormSubmission>,
     @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    protected readonly resourceRepository: Repository<Resource>,
   ) {}
+
+  protected readonly logger = new Logger(ResourceFormsService.name);
 
   async findAll(resourceId: number): Promise<FormResponseDto[]> {
     await this.ensureResourceExists(resourceId);
@@ -44,6 +52,248 @@ export class ResourceFormsService {
     await this.ensureResourceExists(resourceId);
     const form = await this.getFormOrThrow(resourceId, formId);
     return this.mapFormResponse(form);
+  }
+
+  async getFormsForAction(resourceId: number, action: ResourceFormAction): Promise<FormResponseDto[]> {
+    await this.ensureResourceExists(resourceId);
+    const forms = await this.getFormsByAction(resourceId, action);
+    return forms.map((form) => this.mapFormResponse(form));
+  }
+
+  async getFormMetaForAction(
+    resourceId: number,
+    action: ResourceFormAction,
+  ): Promise<{ id: number; name: string; fieldCount: number }[]> {
+    await this.ensureResourceExists(resourceId);
+    const forms = await this.getFormsByAction(resourceId, action);
+    return forms.map((form) => ({ id: form.id, name: form.name, fieldCount: (form.fields ?? []).length }));
+  }
+
+  async getFieldsWindow(
+    resourceId: number,
+    formId: number,
+    offset: number,
+    limit: number,
+  ): Promise<{ totalFieldCount: number; fields: FormFieldResponseDto[] }> {
+    await this.ensureResourceExists(resourceId);
+    const form = await this.getFormOrThrow(resourceId, formId);
+    const fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
+    const safeOffset = Math.max(0, offset);
+    const safeLimit = Math.max(1, limit);
+    const window = fields.slice(safeOffset, safeOffset + safeLimit).map((field) => this.mapFieldResponse(field));
+    return { totalFieldCount: fields.length, fields: window };
+  }
+
+  protected async getFormsByAction(
+    resourceId: number,
+    action: ResourceFormAction,
+    manager?: EntityManager,
+  ): Promise<Form[]> {
+    const column = this.getActionColumn(action);
+    const repo = manager ? manager.getRepository(Form) : this.formRepository;
+    const forms = await repo.find({
+      where: { resourceId, [column]: true },
+      relations: ['fields'],
+      order: { createdAt: 'ASC' },
+    });
+    return forms.map((form) => {
+      form.fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
+      return form;
+    });
+  }
+
+  protected getActionColumn(action: ResourceFormAction): keyof Form {
+    switch (action) {
+      case ResourceFormAction.START:
+        return 'isRequiredOnResourceUsageStart';
+      case ResourceFormAction.TAKEOVER:
+        return 'isRequiredOnResourceUsageTakeOver';
+      case ResourceFormAction.END:
+        return 'isRequiredOnResourceUsageEnd';
+      default:
+        throw new BadRequestException(`Unsupported form action: ${action}`);
+    }
+  }
+
+  protected buildFieldPayload(field: CreateFormFieldDto | UpdateFormFieldDto) {
+    return {
+      name: field.name,
+      type: field.type,
+      isRequired: field.isRequired,
+      description: field.description ?? null,
+      options: parseFieldOptions(field.type, field.options),
+      position: field.position,
+    };
+  }
+
+  protected mapFieldResponse(field: FormField): FormFieldResponseDto {
+    const fieldDto = new FormFieldResponseDto();
+    fieldDto.id = field.id;
+    fieldDto.name = field.name;
+    fieldDto.type = field.type;
+    fieldDto.isRequired = field.isRequired;
+    fieldDto.description = field.description;
+    fieldDto.options = field.options;
+    fieldDto.position = field.position;
+    return fieldDto;
+  }
+
+  protected mapFormResponse(form: Form): FormResponseDto {
+    const response = new FormResponseDto();
+    response.id = form.id;
+    response.createdAt = form.createdAt;
+    response.updatedAt = form.updatedAt;
+    response.name = form.name;
+    response.isRequiredOnResourceUsageStart = form.isRequiredOnResourceUsageStart;
+    response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
+    response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
+    response.resourceId = form.resourceId;
+    response.fields = (form.fields ?? [])
+      .sort((a, b) => a.position - b.position)
+      .map((field) => this.mapFieldResponse(field));
+
+    return response;
+  }
+
+  async validatePageAnswers(
+    resourceId: number,
+    formId: number,
+    answers: { fieldId: number; value: unknown }[],
+  ): Promise<{ valid: boolean; errors: { fieldId: number; message: string; code: string }[] }> {
+    await this.ensureResourceExists(resourceId);
+    const form = await this.getFormOrThrow(resourceId, formId);
+    const errors: { fieldId: number; message: string; code: string }[] = [];
+
+    for (const answer of answers) {
+      const field = form.fields?.find((item) => item.id === answer.fieldId);
+      if (!field) {
+        errors.push({ fieldId: answer.fieldId, message: `Unknown field #${answer.fieldId}.`, code: 'UNKNOWN_FIELD' });
+        continue;
+      }
+      try {
+        this.validateFieldAnswer(form, field, answer.value);
+      } catch (error) {
+        // Add stable identifiers for firmware; keep the diagnostic message for
+        // existing clients. Field names and values remain separate display data.
+        const missingRequired =
+          field.isRequired &&
+          (answer.value === undefined || answer.value === null || answer.value === '' || field.type === 'boolean');
+        const code = missingRequired
+          ? 'REQUIRED_FIELD'
+          : field.type === 'number'
+            ? 'INVALID_NUMBER'
+            : field.type === 'select'
+              ? 'INVALID_SELECTION'
+              : 'INVALID_INPUT';
+        errors.push({ fieldId: field.id, message: (error as Error).message, code });
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  async saveRequiredSubmissions(options: {
+    resourceId: number;
+    action: ResourceFormAction;
+    submissions: FormSubmissionRequestDto[] | undefined;
+    userId: number;
+    resourceUsageId: number;
+    manager: EntityManager;
+  }): Promise<FormSubmission[]> {
+    const submissions = await this.prepareRequiredSubmissions(options);
+    const repository = options.manager.getRepository(FormSubmission);
+    const saved: FormSubmission[] = [];
+    for (const submission of submissions) saved.push(await repository.save(submission));
+    return saved;
+  }
+
+  /** Validate and snapshot answers before external lifecycle effects, without publishing submissions. */
+  async prepareRequiredSubmissions(
+    options: Parameters<ResourceFormsService['saveRequiredSubmissions']>[0],
+  ): Promise<FormSubmission[]> {
+    const forms = await this.getFormsByAction(options.resourceId, options.action, options.manager);
+
+    if (!forms.length) {
+      if (options.submissions?.length) {
+        this.logger.debug(
+          `Received ${options.submissions.length} form submissions for action ${options.action} on resource #${options.resourceId} without required forms. Ignoring.`,
+        );
+      }
+      return [];
+    }
+
+    const submissionEntities: FormSubmission[] = [];
+
+    for (const form of forms) {
+      const submissionsForForm = options.submissions?.filter((item) => item.formId === form.id) ?? [];
+
+      if (submissionsForForm.length > 1) {
+        throw new BadRequestException(`Multiple submissions for form "${form.name}" are not allowed.`);
+      }
+
+      const submission = submissionsForForm[0];
+
+      if (!submission) {
+        throw new MissingFormSubmissionException(form.name);
+      }
+
+      const data = this.buildSubmissionData(form, submission);
+
+      const submissionEntity = Object.assign(new FormSubmission(), {
+        formId: form.id,
+        form,
+        resourceUsageId: options.resourceUsageId,
+        userId: options.userId,
+        data,
+        action: options.action,
+      });
+
+      submissionEntities.push(submissionEntity);
+    }
+
+    return submissionEntities;
+  }
+
+  protected buildSubmissionData(form: Form, submission: FormSubmissionRequestDto) {
+    const data: Record<string, { value: string; fieldDefinition: FormField }> = {};
+
+    const unknownField = submission.answers.find(
+      (answer) => !form.fields?.some((field) => field.id === answer.fieldId),
+    );
+    if (unknownField) {
+      throw new BadRequestException(
+        `Answer provided for unknown field #${unknownField.fieldId} on form "${form.name}".`,
+      );
+    }
+
+    for (const field of form.fields ?? []) {
+      const answer = submission.answers.find((item) => item.fieldId === field.id);
+      const value = this.validateFieldAnswer(form, field, answer?.value);
+      if (value === undefined) {
+        continue;
+      }
+      data[field.id.toString()] = { value, fieldDefinition: field };
+    }
+
+    return data;
+  }
+
+  protected validateFieldAnswer(form: Form, field: FormField, rawValue: unknown): string | undefined {
+    if (field.type === 'boolean' && field.isRequired) {
+      const boolValue = rawValue === true || rawValue === 'true';
+      if (!boolValue) {
+        throw new BadRequestException(`Field "${field.name}" must be checked on form "${form.name}".`);
+      }
+    }
+
+    if (rawValue === undefined || rawValue === null || rawValue === '') {
+      if (field.isRequired) {
+        throw new BadRequestException(`Field "${field.name}" is required on form "${form.name}".`);
+      }
+      return undefined;
+    }
+
+    return parseFieldValue(field.type, rawValue, field.options);
   }
 
   async create(resourceId: number, dto: CreateFormDto): Promise<FormResponseDto> {
@@ -147,136 +397,7 @@ export class ResourceFormsService {
     });
   }
 
-  async getFormsForAction(resourceId: number, action: ResourceFormAction): Promise<FormResponseDto[]> {
-    await this.ensureResourceExists(resourceId);
-    const forms = await this.getFormsByAction(resourceId, action);
-    return forms.map((form) => this.mapFormResponse(form));
-  }
-
-  async getFormMetaForAction(
-    resourceId: number,
-    action: ResourceFormAction,
-  ): Promise<{ id: number; name: string; fieldCount: number }[]> {
-    await this.ensureResourceExists(resourceId);
-    const forms = await this.getFormsByAction(resourceId, action);
-    return forms.map((form) => ({ id: form.id, name: form.name, fieldCount: (form.fields ?? []).length }));
-  }
-
-  async getFieldsWindow(
-    resourceId: number,
-    formId: number,
-    offset: number,
-    limit: number,
-  ): Promise<{ totalFieldCount: number; fields: FormFieldResponseDto[] }> {
-    await this.ensureResourceExists(resourceId);
-    const form = await this.getFormOrThrow(resourceId, formId);
-    const fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
-    const safeOffset = Math.max(0, offset);
-    const safeLimit = Math.max(1, limit);
-    const window = fields.slice(safeOffset, safeOffset + safeLimit).map((field) => this.mapFieldResponse(field));
-    return { totalFieldCount: fields.length, fields: window };
-  }
-
-  async validatePageAnswers(
-    resourceId: number,
-    formId: number,
-    answers: { fieldId: number; value: unknown }[],
-  ): Promise<{ valid: boolean; errors: { fieldId: number; message: string; code: string }[] }> {
-    await this.ensureResourceExists(resourceId);
-    const form = await this.getFormOrThrow(resourceId, formId);
-    const errors: { fieldId: number; message: string; code: string }[] = [];
-
-    for (const answer of answers) {
-      const field = form.fields?.find((item) => item.id === answer.fieldId);
-      if (!field) {
-        errors.push({ fieldId: answer.fieldId, message: `Unknown field #${answer.fieldId}.`, code: 'UNKNOWN_FIELD' });
-        continue;
-      }
-      try {
-        this.validateFieldAnswer(form, field, answer.value);
-      } catch (error) {
-        // Add stable identifiers for firmware; keep the diagnostic message for
-        // existing clients. Field names and values remain separate display data.
-        const missingRequired =
-          field.isRequired &&
-          (answer.value === undefined || answer.value === null || answer.value === '' || field.type === 'boolean');
-        const code = missingRequired
-          ? 'REQUIRED_FIELD'
-          : field.type === 'number'
-            ? 'INVALID_NUMBER'
-            : field.type === 'select'
-              ? 'INVALID_SELECTION'
-              : 'INVALID_INPUT';
-        errors.push({ fieldId: field.id, message: (error as Error).message, code });
-      }
-    }
-
-    return { valid: errors.length === 0, errors };
-  }
-
-  async saveRequiredSubmissions(options: {
-    resourceId: number;
-    action: ResourceFormAction;
-    submissions: FormSubmissionRequestDto[] | undefined;
-    userId: number;
-    resourceUsageId: number;
-    manager: EntityManager;
-  }): Promise<FormSubmission[]> {
-    const submissions = await this.prepareRequiredSubmissions(options);
-    const repository = options.manager.getRepository(FormSubmission);
-    const saved: FormSubmission[] = [];
-    for (const submission of submissions) saved.push(await repository.save(submission));
-    return saved;
-  }
-
-  /** Validate and snapshot answers before external lifecycle effects, without publishing submissions. */
-  async prepareRequiredSubmissions(
-    options: Parameters<ResourceFormsService['saveRequiredSubmissions']>[0],
-  ): Promise<FormSubmission[]> {
-    const forms = await this.getFormsByAction(options.resourceId, options.action, options.manager);
-
-    if (!forms.length) {
-      if (options.submissions?.length) {
-        this.logger.debug(
-          `Received ${options.submissions.length} form submissions for action ${options.action} on resource #${options.resourceId} without required forms. Ignoring.`,
-        );
-      }
-      return [];
-    }
-
-    const submissionEntities: FormSubmission[] = [];
-
-    for (const form of forms) {
-      const submissionsForForm = options.submissions?.filter((item) => item.formId === form.id) ?? [];
-
-      if (submissionsForForm.length > 1) {
-        throw new BadRequestException(`Multiple submissions for form "${form.name}" are not allowed.`);
-      }
-
-      const submission = submissionsForForm[0];
-
-      if (!submission) {
-        throw new MissingFormSubmissionException(form.name);
-      }
-
-      const data = this.buildSubmissionData(form, submission);
-
-      const submissionEntity = Object.assign(new FormSubmission(), {
-        formId: form.id,
-        form,
-        resourceUsageId: options.resourceUsageId,
-        userId: options.userId,
-        data,
-        action: options.action,
-      });
-
-      submissionEntities.push(submissionEntity);
-    }
-
-    return submissionEntities;
-  }
-
-  private async ensureResourceExists(resourceId: number): Promise<Resource> {
+  protected async ensureResourceExists(resourceId: number): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
@@ -284,7 +405,7 @@ export class ResourceFormsService {
     return resource;
   }
 
-  private async getFormOrThrow(resourceId: number, formId: number, manager?: EntityManager): Promise<Form> {
+  protected async getFormOrThrow(resourceId: number, formId: number, manager?: EntityManager): Promise<Form> {
     const repo = manager ? manager.getRepository(Form) : this.formRepository;
     const form = await repo.findOne({
       where: { id: formId, resourceId },
@@ -296,118 +417,5 @@ export class ResourceFormsService {
     }
 
     return form;
-  }
-
-  private async getFormsByAction(
-    resourceId: number,
-    action: ResourceFormAction,
-    manager?: EntityManager,
-  ): Promise<Form[]> {
-    const column = this.getActionColumn(action);
-    const repo = manager ? manager.getRepository(Form) : this.formRepository;
-    const forms = await repo.find({
-      where: { resourceId, [column]: true },
-      relations: ['fields'],
-      order: { createdAt: 'ASC' },
-    });
-    return forms.map((form) => {
-      form.fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
-      return form;
-    });
-  }
-
-  private getActionColumn(action: ResourceFormAction): keyof Form {
-    switch (action) {
-      case ResourceFormAction.START:
-        return 'isRequiredOnResourceUsageStart';
-      case ResourceFormAction.TAKEOVER:
-        return 'isRequiredOnResourceUsageTakeOver';
-      case ResourceFormAction.END:
-        return 'isRequiredOnResourceUsageEnd';
-      default:
-        throw new BadRequestException(`Unsupported form action: ${action}`);
-    }
-  }
-
-  private buildFieldPayload(field: CreateFormFieldDto | UpdateFormFieldDto) {
-    return {
-      name: field.name,
-      type: field.type,
-      isRequired: field.isRequired,
-      description: field.description ?? null,
-      options: parseFieldOptions(field.type, field.options),
-      position: field.position,
-    };
-  }
-
-  private buildSubmissionData(form: Form, submission: FormSubmissionRequestDto) {
-    const data: Record<string, { value: string; fieldDefinition: FormField }> = {};
-
-    const unknownField = submission.answers.find(
-      (answer) => !form.fields?.some((field) => field.id === answer.fieldId),
-    );
-    if (unknownField) {
-      throw new BadRequestException(
-        `Answer provided for unknown field #${unknownField.fieldId} on form "${form.name}".`,
-      );
-    }
-
-    for (const field of form.fields ?? []) {
-      const answer = submission.answers.find((item) => item.fieldId === field.id);
-      const value = this.validateFieldAnswer(form, field, answer?.value);
-      if (value === undefined) {
-        continue;
-      }
-      data[field.id.toString()] = { value, fieldDefinition: field };
-    }
-
-    return data;
-  }
-
-  private validateFieldAnswer(form: Form, field: FormField, rawValue: unknown): string | undefined {
-    if (field.type === 'boolean' && field.isRequired) {
-      const boolValue = rawValue === true || rawValue === 'true';
-      if (!boolValue) {
-        throw new BadRequestException(`Field "${field.name}" must be checked on form "${form.name}".`);
-      }
-    }
-
-    if (rawValue === undefined || rawValue === null || rawValue === '') {
-      if (field.isRequired) {
-        throw new BadRequestException(`Field "${field.name}" is required on form "${form.name}".`);
-      }
-      return undefined;
-    }
-
-    return parseFieldValue(field.type, rawValue, field.options);
-  }
-
-  private mapFieldResponse(field: FormField): FormFieldResponseDto {
-    const fieldDto = new FormFieldResponseDto();
-    fieldDto.id = field.id;
-    fieldDto.name = field.name;
-    fieldDto.type = field.type;
-    fieldDto.isRequired = field.isRequired;
-    fieldDto.description = field.description;
-    fieldDto.options = field.options;
-    fieldDto.position = field.position;
-    return fieldDto;
-  }
-
-  private mapFormResponse(form: Form): FormResponseDto {
-    const response = new FormResponseDto();
-    response.id = form.id;
-    response.createdAt = form.createdAt;
-    response.updatedAt = form.updatedAt;
-    response.name = form.name;
-    response.isRequiredOnResourceUsageStart = form.isRequiredOnResourceUsageStart;
-    response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
-    response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
-    response.resourceId = form.resourceId;
-    response.fields = (form.fields ?? [])
-      .sort((a, b) => a.position - b.position)
-      .map((field) => this.mapFieldResponse(field));
-
-    return response;
   }
 }

@@ -1,11 +1,11 @@
 #include "display/i18n.hpp"
 #include "resetScreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
-#include "platform.hpp"
+#include "../../../platform.hpp"
 
 void ResetScreen::init()
 {
@@ -75,14 +75,98 @@ void ResetScreen::init()
    DisplayTheme::secondaryButton(this->cancelButton);
    lv_obj_add_event_cb(this->cancelButton, &ResetScreen::onCancelButtonEvent, LV_EVENT_CLICKED, this);
 
+
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
    FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+
    this->updateTimeoutBar();
    this->applyStatus();
+}
+
+lv_obj_t *ResetScreen::getScreen()
+{
+   return this->screen;
+}
+
+void ResetScreen::setTimeoutTime(uint32_t timeoutTime)
+{
+   this->timeoutTime = timeoutTime;
+   this->updateTimeoutBar();
+}
+
+void ResetScreen::setUserName(std::string userName)
+{
+   this->userNameCache = userName;
+   if (this->userNameLabel)
+   {
+      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str());
+   }
+}
+
+
+void ResetScreen::setStatus(Status status)
+{
+   this->status = status;
+   if (status != STATUS_ERROR)
+   {
+      this->statusMessageOverride.clear();
+   }
+   this->applyStatus();
+}
+
+void ResetScreen::setStatusMessage(const FirmwareI18n::Text &message)
+{
+   this->statusMessageOverride = message;
+   this->applyStatus();
+}
+
+void ResetScreen::setOnCancelCallback(std::function<void()> callback)
+{
+   this->onCancelCallback = callback;
+}
+
+void ResetScreen::onCancelButtonEvent(lv_event_t *e)
+{
+   ResetScreen *self = static_cast<ResetScreen *>(lv_event_get_user_data(e));
+   if (!self)
+   {
+      return;
+   }
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+   {
+      return;
+   }
+   if (self->onCancelCallback)
+   {
+      self->onCancelCallback();
+   }
+}
+
+std::string ResetScreen::getName()
+{
+   return "ResetScreen";
+}
+
+void ResetScreen::onScreenLeave()
+{
+}
+
+void ResetScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->timeoutBar = nullptr;
+   this->userNameLabel = nullptr;
+   this->statusLabel = nullptr;
+   this->cancelButton = nullptr;
 }
 
 void ResetScreen::loop()
@@ -154,85 +238,4 @@ void ResetScreen::applyStatus()
          lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
       }
    }
-}
-
-lv_obj_t *ResetScreen::getScreen()
-{
-   return this->screen;
-}
-
-void ResetScreen::setTimeoutTime(uint32_t timeoutTime)
-{
-   this->timeoutTime = timeoutTime;
-   this->updateTimeoutBar();
-}
-
-void ResetScreen::setUserName(std::string userName)
-{
-   this->userNameCache = userName;
-   if (this->userNameLabel)
-   {
-      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str());
-   }
-}
-
-void ResetScreen::setStatus(Status status)
-{
-   this->status = status;
-   if (status != STATUS_ERROR)
-   {
-      this->statusMessageOverride.clear();
-   }
-   this->applyStatus();
-}
-
-void ResetScreen::setStatusMessage(const FirmwareI18n::Text &message)
-{
-   this->statusMessageOverride = message;
-   this->applyStatus();
-}
-
-void ResetScreen::setOnCancelCallback(std::function<void()> callback)
-{
-   this->onCancelCallback = callback;
-}
-
-void ResetScreen::onCancelButtonEvent(lv_event_t *e)
-{
-   ResetScreen *self = static_cast<ResetScreen *>(lv_event_get_user_data(e));
-   if (!self)
-   {
-      return;
-   }
-   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
-   {
-      return;
-   }
-   if (self->onCancelCallback)
-   {
-      self->onCancelCallback();
-   }
-}
-
-std::string ResetScreen::getName()
-{
-   return "ResetScreen";
-}
-
-void ResetScreen::onScreenLeave()
-{
-}
-
-void ResetScreen::destroy()
-{
-   if (!this->screen)
-   {
-      return;
-   }
-   lv_obj_del(this->screen);
-   this->screen = nullptr;
-   this->timeoutBar = nullptr;
-   this->userNameLabel = nullptr;
-   this->statusLabel = nullptr;
-   this->cancelButton = nullptr;
 }
