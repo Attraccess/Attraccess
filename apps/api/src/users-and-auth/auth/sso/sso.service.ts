@@ -29,6 +29,8 @@ import {
 
 import { SSOProviderNotFoundException } from './errors';
 
+import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from './logout-endpoints';
+
 @Injectable()
 export class SSOService {
   public constructor(
@@ -176,7 +178,10 @@ export class SSOService {
     config: CreateSAMLConfigurationDto,
     repository = this.samlConfigRepository,
   ): Promise<SSOProviderSAMLConfiguration> {
-    const shouldSignRequests = Boolean(config.signRequest);
+    if (config.logoutURL) trustedEndpoint(config.logoutURL);
+    if (config.logoutURL && !config.idpIssuer?.trim())
+      throw new BadRequestException('SAML logout requires an IdP issuer');
+    const shouldSignRequests = Boolean(config.signRequest || config.logoutURL);
     const normalizedCertificate = this.normalizeCertificate(config.certificate);
     const normalizedSpSigningCertificate = config.spSigningCertificate
       ? this.normalizeCertificate(config.spSigningCertificate)
@@ -211,6 +216,7 @@ export class SSOService {
     config: UpdateSAMLConfigurationDto,
     repository = this.samlConfigRepository,
   ): Promise<SSOProviderSAMLConfiguration> {
+    if (config.logoutURL) trustedEndpoint(config.logoutURL);
     const existing = await repository.findOne({ where: { ssoProviderId: providerId } });
     if (!existing) {
       throw new BadRequestException('SAML configuration not found for provider');
@@ -218,6 +224,9 @@ export class SSOService {
 
     type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
     const payload: Partial<SAMLConfigEntity> = {};
+    for (const key of ['idpIssuer', 'logoutURL'] as const) {
+      if (config[key] !== undefined) Object.assign(payload, { [key]: config[key] });
+    }
 
     if (typeof config.entryPoint !== 'undefined') {
       payload.entryPoint = config.entryPoint;
@@ -286,7 +295,10 @@ export class SSOService {
         ? payload.spSigningKeyEncrypted
         : (existing.spSigningKeyEncrypted ?? null);
 
-    this.ensureSigningMaterialAvailability(Boolean(nextSignRequest), nextSigningCert, nextSigningKey);
+    const nextLogoutURL = config.logoutURL === undefined ? existing.logoutURL : config.logoutURL;
+    const nextIdpIssuer = config.idpIssuer === undefined ? existing.idpIssuer : config.idpIssuer;
+    if (nextLogoutURL && !nextIdpIssuer?.trim()) throw new BadRequestException('SAML logout requires an IdP issuer');
+    this.ensureSigningMaterialAvailability(Boolean(nextSignRequest || nextLogoutURL), nextSigningCert, nextSigningKey);
 
     await repository.update({ ssoProviderId: providerId }, payload);
     return repository.findOne({ where: { ssoProviderId: providerId } });
@@ -333,11 +345,23 @@ export class SSOService {
     }
   }
 
+  private validateOidcLogoutConfig(config: {
+    endSessionURL?: string | null;
+    jwksURL?: string | null;
+    signingAlgorithms?: string[] | null;
+  }): void {
+    for (const endpoint of [config.endSessionURL, config.jwksURL]) if (endpoint) trustedEndpoint(endpoint);
+    if (config.signingAlgorithms?.some((algorithm) => !OIDC_SIGNING_ALGORITHMS.includes(algorithm))) {
+      throw new BadRequestException('Unsupported OIDC signing algorithm');
+    }
+  }
+
   protected async createOIDCConfiguration(
     providerId: number,
     config: CreateOIDCConfigurationDto,
     repository = this.oidcConfigRepository,
   ): Promise<SSOProviderOIDCConfiguration> {
+    this.validateOidcLogoutConfig(config);
     const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
     const newConfig = repository.create({
       ...config,
@@ -353,7 +377,11 @@ export class SSOService {
     updateConfig: UpdateOIDCConfigurationDto,
     repository = this.oidcConfigRepository,
   ): Promise<SSOProviderOIDCConfiguration> {
+    this.validateOidcLogoutConfig(updateConfig);
     const payload: Partial<SSOProviderOIDCConfiguration> = {};
+    for (const key of ['endSessionURL', 'jwksURL', 'signingAlgorithms'] as const) {
+      if (updateConfig[key] !== undefined) Object.assign(payload, { [key]: updateConfig[key] });
+    }
 
     if (typeof updateConfig.issuer !== 'undefined') {
       payload.issuer = updateConfig.issuer;

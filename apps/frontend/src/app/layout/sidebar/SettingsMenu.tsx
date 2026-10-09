@@ -1,5 +1,13 @@
 import { Settings, LogOut, User, Languages, Check, Moon, Sun, Monitor } from 'lucide-react';
-import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  DropdownPopover,
+  Label,
+  Description,
+} from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useSidebarState } from './HelpfulLinks';
 type Props = Pick<
@@ -15,6 +23,13 @@ type Props = Pick<
   | 'cycleTheme'
   | 'theme'
   | 'logout'
+  | 'logoutEverywhere'
+  | 'logoutPending'
+  | 'canLogoutEverywhere'
+  | 'logoutUnavailableReason'
+  | 'logoutEverywhereLabel'
+  | 'logoutPendingLabel'
+  | 'logoutProviderNotice'
 >;
 export function SettingsMenu({
   isCollapsed,
@@ -28,6 +43,13 @@ export function SettingsMenu({
   cycleTheme,
   theme,
   logout,
+  logoutEverywhere,
+  logoutPending,
+  canLogoutEverywhere,
+  logoutUnavailableReason,
+  logoutEverywhereLabel,
+  logoutPendingLabel,
+  logoutProviderNotice,
 }: Props) {
   return (
     <div className={isCollapsed ? 'p-2' : 'p-4'}>
@@ -53,7 +75,7 @@ export function SettingsMenu({
             >
               <Settings className="h-5 w-5" />
             </DropdownTrigger>
-            <DropdownPopover>
+            <DropdownPopover className="max-w-xs">
               <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
                 <DropdownItem key="language-label" id="language-label" isDisabled>
                   <Languages className="h-4 w-4" />
@@ -96,9 +118,29 @@ export function SettingsMenu({
                   )}
                   {t('design', { variant: t(`designVariants.${theme}`) })}
                 </DropdownItem>
-                <DropdownItem key="logout" id="logout" onPress={() => logout()} data-cy="sidebar-logout-button">
+                <DropdownItem
+                  key="logout"
+                  id="logout"
+                  isDisabled={logoutPending}
+                  onPress={() => logout()}
+                  data-cy="sidebar-logout-button"
+                >
                   <LogOut />
-                  {t('logout')}
+                  {logoutPending ? logoutPendingLabel : t('logout')}
+                </DropdownItem>
+                <DropdownItem
+                  key="logout-everywhere"
+                  id="logout-everywhere"
+                  textValue={logoutEverywhereLabel}
+                  isDisabled={logoutPending || !canLogoutEverywhere}
+                  onPress={logoutEverywhere}
+                  data-cy="sidebar-logout-everywhere-button"
+                >
+                  <LogOut />
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <Label>{logoutEverywhereLabel}</Label>
+                    <Description>{canLogoutEverywhere ? logoutProviderNotice : logoutUnavailableReason}</Description>
+                  </div>
                 </DropdownItem>
               </DropdownMenu>
             </DropdownPopover>

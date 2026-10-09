@@ -76,7 +76,8 @@ function formatLine(fields: AuthAuditFields): string {
   parts.push(`outcome=${fields.outcome}`);
   parts.push(`ip=${sanitize(fields.ip)}`);
   parts.push(`user_id=${fields.userId == null ? '-' : String(fields.userId)}`);
-  parts.push(`username=${sanitize(fields.username ?? '-')}`);
+  const username = fields.username?.includes('@') ? '[redacted]' : (fields.username ?? '-');
+  parts.push(`username=${sanitize(username)}`);
   parts.push(`auth_method=${fields.authenticationMethod ?? 'anonymous'}`);
   parts.push(`api_token_id=${fields.apiTokenId == null ? '-' : String(fields.apiTokenId)}`);
   parts.push(`ts=${new Date().toISOString()}`);

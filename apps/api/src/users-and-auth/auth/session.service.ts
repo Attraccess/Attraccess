@@ -7,6 +7,8 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { SESSION_STORE, SessionStore, SessionMetadata } from './session-store/session-store';
 
+import { SsoSessionSelector } from './session-store/sso-session-selector';
+
 export type { SessionMetadata } from './session-store/session-store';
 
 const DEFAULT_EXPIRATION_HOURS = 24;
@@ -31,10 +33,7 @@ export class SessionService implements OnModuleInit {
   async createSession(user: User, metadata?: SessionMetadata): Promise<string> {
     const token = this.generateSessionToken();
     const hashedToken = this.tokenHashService.hashToken(token);
-    const expiresIn = Math.min(
-      metadata?.expiresIn || DEFAULT_EXPIRATION_HOURS * 3600,
-      MAX_EXPIRATION_HOURS * 3600,
-    );
+    const expiresIn = Math.min(metadata?.expiresIn || DEFAULT_EXPIRATION_HOURS * 3600, MAX_EXPIRATION_HOURS * 3600);
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
     await this.store.createSession(hashedToken, user.id, metadata, expiresAt);
@@ -46,6 +45,10 @@ export class SessionService implements OnModuleInit {
   async validateSession(token: string): Promise<User | null> {
     if (!token) return null;
     return this.store.validateSession(token);
+  }
+
+  async authenticateSession(token: string) {
+    return token ? this.store.authenticateSession(token) : null;
   }
 
   async refreshSession(token: string): Promise<string | null> {
@@ -63,7 +66,7 @@ export class SessionService implements OnModuleInit {
     if (!token) return;
     const wasActive = await this.store.revokeSession(token);
     if (wasActive) this.metricsService.authActiveSessions.dec();
-    this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
+    this.logger.log('Revoked session');
   }
 
   async revokeAllUserSessions(userId: number): Promise<void> {
@@ -80,6 +83,33 @@ export class SessionService implements OnModuleInit {
         this.metricsService.authActiveSessions.set(result.remainingActive);
       }
     });
+  }
+
+  async getLogoutSession(token: string) {
+    return token ? this.store.getLogoutSession(token) : null;
+  }
+
+  async revokeLogoutSession(id: string): Promise<void> {
+    if (await this.store.revokeLogoutSession(id)) this.metricsService.authActiveSessions.dec();
+  }
+
+  async getSsoContext(token: string) {
+    return token ? this.store.getSsoContext(token) : null;
+  }
+
+  async revokeSsoSessionsOnce(
+    selector: SsoSessionSelector,
+    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
+  ): Promise<boolean> {
+    const result = await this.store.revokeSsoSessionsOnce(selector, receipt);
+    if (result.count) this.metricsService.authActiveSessions.dec(result.count);
+    return result.fresh;
+  }
+
+  async revokeSsoSessions(selector: SsoSessionSelector): Promise<number> {
+    const count = await this.store.revokeSsoSessions(selector);
+    if (count) this.metricsService.authActiveSessions.dec(count);
+    return count;
   }
 
   async getUserSessions(userId: number): Promise<Session[]> {

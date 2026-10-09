@@ -1,3 +1,4 @@
+import { SsoSessionRequest } from '../sso-session-request';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import { Response, Request } from 'express';
@@ -26,6 +27,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],
       ipAddress: request.ip || request.connection.remoteAddress,
+      ssoContext: (request as unknown as SsoSessionRequest).ssoSessionContext,
     });
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);

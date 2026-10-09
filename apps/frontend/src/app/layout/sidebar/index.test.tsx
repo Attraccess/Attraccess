@@ -18,13 +18,24 @@ const state = vi.hoisted(() => ({
     | null,
   throwGroups: false,
   canManageWago: true,
+  logout: vi.fn(),
+  logoutEverywhere: vi.fn(),
+  logoutPending: false,
+  canLogoutEverywhere: false,
 }));
 
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 1, username: 'operator' },
     hasPermission: (permission: string) => permission === 'resources.update' && state.canManageWago,
-    logout: vi.fn(),
+    logout: state.logout,
+    logoutEverywhere: state.logoutEverywhere,
+    logoutEverywhereLabel: 'Logout everywhere',
+    logoutUnavailableReason: 'Requires an SSO session',
+    logoutPending: state.logoutPending,
+    canLogoutEverywhere: state.canLogoutEverywhere,
+    logoutPendingLabel: 'Signing out',
+    logoutProviderNotice: 'Other apps depend on provider support',
   }),
 }));
 
@@ -81,6 +92,10 @@ beforeEach(() => {
   state.plugins = null;
   state.throwGroups = false;
   state.canManageWago = true;
+  state.logout.mockClear();
+  state.logoutEverywhere.mockClear();
+  state.logoutPending = false;
+  state.canLogoutEverywhere = false;
 });
 
 afterEach(cleanup);
@@ -297,5 +312,39 @@ describe('plugin sidebar placement', () => {
     } finally {
       error.mockRestore();
     }
+  });
+});
+
+describe('account logout actions', () => {
+  it('explains disabled central logout and keeps local logout separate', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    expect(screen.getByRole('menuitem', { name: /Logout everywhere/ })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Requires an SSO session')).toBeVisible();
+    await user.click(screen.getByRole('menuitem', { name: 'Logout' }));
+    expect(state.logout).toHaveBeenCalledOnce();
+    expect(state.logoutEverywhere).not.toHaveBeenCalled();
+  });
+
+  it('starts central logout from the collapsed menu for an SSO session', async () => {
+    state.canLogoutEverywhere = true;
+    const user = userEvent.setup();
+    renderSidebar(true);
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    expect(screen.getByText('Other apps depend on provider support')).toBeVisible();
+    await user.click(screen.getByRole('menuitem', { name: /Logout everywhere/ }));
+    expect(state.logoutEverywhere).toHaveBeenCalledOnce();
+    expect(state.logout).not.toHaveBeenCalled();
+  });
+
+  it('disables both actions while logout is pending', async () => {
+    state.canLogoutEverywhere = true;
+    state.logoutPending = true;
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    expect(screen.getByRole('menuitem', { name: 'Signing out' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('menuitem', { name: /Logout everywhere/ })).toHaveAttribute('aria-disabled', 'true');
   });
 });

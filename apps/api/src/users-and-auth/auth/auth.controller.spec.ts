@@ -1,4 +1,8 @@
 import { registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
+import { SsoLogoutService } from './sso/sso-logout.service';
+import { SettingsService } from '../../settings/settings.service';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { AuthController } from './auth.controller';
 import { Response } from 'express';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { User } from '@attraccess/database-entities';
@@ -99,6 +103,7 @@ describe('AuthController', () => {
     const mockRequest = {
       ...Object.create(Request.prototype),
       user: mockUser,
+      authSession: { id: 'stable-session', ssoContext: null },
       headers: {
         authorization: 'Bearer test-session-token',
       },
@@ -123,7 +128,7 @@ describe('AuthController', () => {
 
     expect(mockRequest.user).toBeNull();
     expect(sessionManager.logOut).toHaveBeenCalledWith(mockRequest, {}, expect.any(Function));
-    expect(fixture.sessionService.revokeSession).toHaveBeenCalledWith('test-session-token');
+    expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(fixture.cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
     expect(fixture.identityAudit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'logout', actorId: 1, subjectId: 1 }),
@@ -143,6 +148,7 @@ describe('AuthController', () => {
     const mockRequest = {
       ...Object.create(Request.prototype),
       user: mockUser,
+      authSession: { id: 'stable-session', ssoContext: null },
       headers: {},
       cookies: {
         'auth-session': 'cookie-session-token',
@@ -157,7 +163,7 @@ describe('AuthController', () => {
     await fixture.authController.endSession(mockRequest, mockResponse);
 
     expect(mockRequest.logout).toHaveBeenCalled();
-    expect(fixture.sessionService.revokeSession).toHaveBeenCalledWith('cookie-session-token');
+    expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(fixture.cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
   });
 
@@ -247,5 +253,83 @@ describe('AuthController', () => {
     });
     expect(fixture.sessionService.refreshSession).toHaveBeenCalledWith('current-session-token');
     expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'new-session-token');
+  });
+  it('central logout uses the session captured during authentication before local termination', async () => {
+    const request = {
+      user: { id: 7 },
+      authSession: { id: 'stable-session', ssoContext: null },
+      headers: { authorization: 'Bearer header-session', origin: 'https://app.example' },
+      cookies: { 'auth-session': 'cookie-session' },
+      logout: jest.fn((done: () => void) => done()),
+    } as unknown as AuthenticatedRequest;
+    const response = { setHeader: jest.fn() } as unknown as Response;
+    expect(await fixture.authController.logoutEverywhere(request, response)).toEqual({
+      kind: 'redirect',
+      redirectUrl: 'https://idp.example/logout',
+    });
+    expect(fixture.sessionService.getLogoutSession).not.toHaveBeenCalled();
+    expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
+    expect(fixture.cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(response);
+    expect(request.logout).toHaveBeenCalled();
+  });
+
+  it('always ends the local session when provider redirect preparation fails', async () => {
+    const controller = new AuthController(
+      fixture.sessionService,
+      fixture.cookieConfigService,
+      fixture.identityAudit as unknown as IdentityAuditService,
+      {
+        prepare: async () => {
+          throw new Error('Provider unavailable');
+        },
+        returnURL: async () => 'https://app.example/',
+      } as unknown as SsoLogoutService,
+      { getUrl: async () => 'https://app.example' } as SettingsService,
+    );
+    const request = {
+      user: { id: 7 },
+      authSession: { id: 'stable-session', ssoContext: null },
+      headers: {},
+      cookies: { 'auth-session': 'session' },
+      logout: (done: () => void) => done(),
+    } as unknown as AuthenticatedRequest;
+    expect(await controller.logoutEverywhere(request, { setHeader: jest.fn() } as unknown as Response)).toEqual({
+      kind: 'local_only',
+      reason: 'provider_failed',
+    });
+    expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
+  });
+
+  it('rejects API tokens and cross-origin central logout before revoking anything', async () => {
+    const response = { setHeader: jest.fn() } as unknown as Response;
+    for (const [user, headers] of [
+      [{ id: 7, apiTokenId: 12 }, { authorization: 'Bearer api-token' }],
+      [{ id: 7 }, { authorization: 'Bearer session', origin: 'https://attacker.example' }],
+    ]) {
+      const request = {
+        user,
+        authSession: { id: 'stable-session', ssoContext: null },
+        headers,
+        cookies: {},
+        logout: jest.fn(),
+      } as unknown as AuthenticatedRequest;
+      await expect(fixture.authController.logoutEverywhere(request, response)).rejects.toThrow();
+    }
+    expect(fixture.sessionService.revokeSession).not.toHaveBeenCalled();
+    expect(fixture.sessionService.revokeLogoutSession).not.toHaveBeenCalled();
+  });
+
+  it('does not create a new session when refresh loses a race with logout', async () => {
+    jest.spyOn(fixture.sessionService, 'refreshSession').mockResolvedValue(null);
+    const request = {
+      user: { id: 7 },
+      authSession: { id: 'stable-session', ssoContext: null },
+      headers: { authorization: 'Bearer ended-session' },
+      cookies: {},
+    } as unknown as AuthenticatedRequest;
+    await expect(fixture.authController.refreshSession(request, {} as Response, 'body')).rejects.toThrow(
+      'ended or expired',
+    );
+    expect(fixture.sessionService.createSession).not.toHaveBeenCalled();
   });
 });

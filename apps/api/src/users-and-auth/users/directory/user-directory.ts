@@ -1,12 +1,12 @@
 import { User, AuthenticationDetail, AuthenticationType, UserRole } from '@attraccess/database-entities';
 
-import { Brackets, FindOptionsWhere, ILike, In, SelectQueryBuilder, EntityManager } from 'typeorm';
+import { Brackets, FindOptionsWhere, ILike, In, Raw, SelectQueryBuilder, EntityManager } from 'typeorm';
 
 import { PaginationOptionsSchema } from '../../../types/request';
 
 import { PaginatedResponse } from '../../../types/response';
 
-import { UserListOptions, UpdateUserData } from '../accounts/user-accounts';
+import { UserListOptions, UpdateUserData, FindOneOptionsSchema } from '../accounts/user-accounts';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
@@ -25,6 +25,33 @@ import { SSOUsernameChangeForbiddenException } from '../errors/ssoUsernameChange
 import { UserAccounts } from '../accounts/user-accounts';
 
 export abstract class UserDirectory extends UserAccounts {
+  /** Resolve the identifier accepted by local login without ambiguous username/email queries. */
+  async findByLoginIdentifier(identifier: string): Promise<User | null> {
+    const value = identifier.trim();
+    if (!value) return null;
+
+    const options = value.includes('@') ? { email: value } : { username: value };
+    const parsed = FindOneOptionsSchema.safeParse(options);
+    if (!parsed.success) return null;
+
+    if (parsed.data.email !== undefined) {
+      // Preserve distinct existing accounts whose addresses differ only by case.
+      const exactMatch = await this.userRepository.findOne({ where: { email: parsed.data.email } });
+      if (exactMatch) return exactMatch;
+
+      // Fall back only when case-insensitive matching identifies one account.
+      // Equality keeps underscores literal, unlike a LIKE query.
+      const matches = await this.userRepository.find({
+        where: {
+          email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email.toLowerCase() }),
+        },
+        take: 2,
+      });
+      return matches.length === 1 ? matches[0] : null;
+    }
+    return this.findOne(parsed.data);
+  }
+
   async findMany(options: UserListOptions): Promise<PaginatedResponse<User>> {
     this.logger.debug(`Finding all users with options: ${JSON.stringify(options)}`);
     const paginationOptions = PaginationOptionsSchema.parse(options);

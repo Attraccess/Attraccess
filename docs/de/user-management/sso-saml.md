@@ -79,3 +79,13 @@ Konfigurieren Sie Ihren SAML-Identity-Provider mit diesen Werten:
 - [SSO Überblick](user-management/sso-overview.md)
 - [OIDC einrichten](user-management/sso-oidc.md)
 - [Berechtigungen](user-management/permissions.md)
+
+## SAML Single Logout
+
+Hinterlegen Sie die **Entity-ID des Identitätsanbieters** getrennt vom bisherigen **Service-Provider-Issuer**. Konfigurieren Sie die **Abmelde-URL** des Anbieters, dessen Signaturzertifikat sowie Signaturzertifikat und privaten Schlüssel von Attraccess. Der private Schlüssel wird verschlüsselt gespeichert. Jede Abmeldenachricht erfordert eine Signatur, auch wenn Signaturoptionen für die Anmeldung deaktiviert sind.
+
+Registrieren Sie `API_ORIGIN/api/auth/sso/SAML/PROVIDER_ID/slo` als SP-SingleLogoutService-URL für **HTTP-Redirect** und **HTTP-POST**. Verwenden Sie die exakte API-URL aus dem Anbieterformular. Hinterlegen Sie das Attraccess-Signaturzertifikat als vertrauenswürdig beim Anbieter. Attraccess sendet signierte Redirect-Anfragen und -Antworten und akzeptiert signierte Redirect- und POST-Nachrichten. SOAP- und Artifact-Bindings werden nicht unterstützt.
+
+**Überall abmelden** überträgt die ursprüngliche NameID mit Format und Qualifiern sowie alle erfassten SessionIndex-Werte. Ältere Sitzungen benötigen eine neue SSO-Anmeldung. Ohne Signaturmaterial oder nutzbare Sitzungszuordnung bleibt die zentrale Abmeldung deaktiviert; die lokale Abmeldung funktioniert weiterhin.
+
+Eingehende Anfragen müssen zu IdP-Issuer und Zieladresse passen und aktuelle Zeitstempel enthalten. Sie beenden passende NameID-Identitäten einschließlich Qualifiern, begrenzt durch gegebenenfalls mitgelieferte SessionIndex-Werte. Ohne SessionIndex werden alle Sitzungen dieser Anbieteridentität beendet. Antworten müssen zu einer offenen, gültigen Anfrage passen und werden einmalig verbraucht. Wiederholte Anfragen, unsignierte Nachrichten, ungültige Signaturen und falsche Zieladressen werden abgelehnt. Teilweise oder fehlgeschlagene Anbieterabmeldungen werden angezeigt, ohne lokale Sitzungen wiederherzustellen oder eine Abmeldung von anderen Anwendungen zu behaupten.

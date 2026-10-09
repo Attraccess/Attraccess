@@ -1,3 +1,5 @@
+import { SsoSessionRequest } from '../sso-session-request';
+import { DOMParser } from '@xmldom/xmldom';
 import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
@@ -95,6 +97,33 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       this.recordFailure(error);
       throw error;
     }
+
+    const assertionXml =
+      typeof profile.getAssertionXml === 'function' ? (profile.getAssertionXml() as string) : undefined;
+    const assertion = assertionXml ? new DOMParser().parseFromString(assertionXml, 'text/xml') : undefined;
+    const providerIssuedAt = Date.parse(assertion?.documentElement.getAttribute('IssueInstant') ?? '');
+    const indexes = assertion
+      ? Array.from(assertion.getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'AuthnStatement'))
+          .map((node) => node.getAttribute('SessionIndex'))
+          .filter((index): index is string => !!index)
+      : [];
+    (req as SsoSessionRequest).ssoSessionContext = {
+      protocol: 'SAML',
+      ...(Number.isFinite(providerIssuedAt) ? { providerIssuedAt } : {}),
+      providerId,
+      issuer: typeof profile.issuer === 'string' ? profile.issuer : undefined,
+      nameID: samlUserId,
+      ...(typeof profile.nameIDFormat === 'string' && profile.nameIDFormat
+        ? { nameIDFormat: profile.nameIDFormat }
+        : {}),
+      ...(typeof profile.nameQualifier === 'string' && profile.nameQualifier
+        ? { nameQualifier: profile.nameQualifier }
+        : {}),
+      ...(typeof profile.spNameQualifier === 'string' && profile.spNameQualifier
+        ? { spNameQualifier: profile.spNameQualifier }
+        : {}),
+      sessionIndexes: indexes.length ? indexes : typeof profile.sessionIndex === 'string' ? [profile.sessionIndex] : [],
+    };
 
     const usersService = await this.moduleRef.get(UsersService);
     const email = this.resolveEmail(profile, config);
@@ -287,7 +316,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     }
   }
 
-  protected static buildPassportConfig(
+  static buildPassportConfig(
     moduleRef: ModuleRef,
     requestOptions: SSOSamlRequestOptions,
     logger: Logger,
@@ -307,6 +336,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return {
       entryPoint: config.entryPoint,
       issuer: config.issuer,
+      idpIssuer: config.idpIssuer || undefined,
       callbackUrl: requestOptions.callbackUrl,
       idpCert: SSOSamlStrategy.toPem(config.certificate),
       audience: config.audience ?? undefined,
@@ -360,7 +390,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       }
     }
 
-    this.logger.debug('No email attribute could be resolved from the SAML assertion', profile);
+    this.logger.debug('No email attribute could be resolved from the SAML assertion');
     return undefined;
   }
 

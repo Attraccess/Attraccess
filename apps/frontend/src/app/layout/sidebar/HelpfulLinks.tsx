@@ -101,7 +101,18 @@ export interface SidebarProps {
 }
 
 export function useSidebarState({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }: SidebarProps) {
-  const { logout, user, hasPermission } = useAuth();
+  const {
+    logout,
+    logoutEverywhere,
+    logoutPending,
+    canLogoutEverywhere,
+    logoutUnavailableReason,
+    logoutEverywhereLabel,
+    logoutPendingLabel,
+    logoutProviderNotice,
+    user,
+    hasPermission,
+  } = useAuth();
   const { t, language, setLanguage } = useTranslations({
     en,
     de,
@@ -242,6 +253,13 @@ export function useSidebarState({ isOpen, toggleSidebar, isCollapsed, toggleColl
   }, [sidebarEndItems, showNavItem]);
   return {
     logout,
+    logoutEverywhere,
+    logoutPending,
+    canLogoutEverywhere,
+    logoutUnavailableReason,
+    logoutEverywhereLabel,
+    logoutPendingLabel,
+    logoutProviderNotice,
     user,
     t,
     language,

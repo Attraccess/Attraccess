@@ -83,7 +83,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
         SessionStrategy,
         { provide: AuditService, useValue: audit },
         { provide: SettingsService, useValue: new SettingsService(null, store, null) },
-        { provide: SessionService, useValue: { validateSession: async () => null } },
+        { provide: SessionService, useValue: { authenticateSession: async () => null } },
         { provide: TwoFactorService, useValue: { getStatus: async () => ({ required: false }) } },
         { provide: RbacService, useValue: { getEffectivePermissions: async () => ownerPermissions } },
         {

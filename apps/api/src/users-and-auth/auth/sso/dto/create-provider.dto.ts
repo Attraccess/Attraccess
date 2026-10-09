@@ -6,6 +6,34 @@ import { IsStringArrayRecord } from './validators';
 
 export class CreateOIDCConfigurationDto {
   @ApiProperty({
+    description: 'Provider end-session endpoint (or use issuer discovery)',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  endSessionURL?: string | null;
+
+  @ApiProperty({
+    description: 'Trusted provider JWKS endpoint (or use issuer discovery)',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  jwksURL?: string | null;
+
+  @ApiProperty({
+    description: 'Allowed asymmetric ID/logout token algorithms; defaults to RS256',
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  signingAlgorithms?: string[] | null;
+
+  @ApiProperty({
     description: 'The issuer of the provider',
     example: 'https://sso.example.com/auth/realms/example',
   })
@@ -97,6 +125,20 @@ export class CreateOIDCConfigurationDto {
 }
 
 export class CreateSAMLConfigurationDto {
+  @ApiProperty({
+    description: 'Identity Provider entity ID (not the Service Provider issuer)',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  idpIssuer?: string | null;
+
+  @ApiProperty({ description: 'Identity Provider Single Logout endpoint', required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  logoutURL?: string | null;
+
   @ApiProperty({
     description: 'Identity Provider SSO entry point URL',
     example: 'https://idp.example.com/realms/master/protocol/saml',

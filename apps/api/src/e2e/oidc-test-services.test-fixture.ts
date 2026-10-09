@@ -1,3 +1,5 @@
+import { OidcTokenVerifier } from '../users-and-auth/auth/sso/oidc/oidc-token-verifier.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import {
   AuthenticationDetail,
   Permission,
@@ -82,12 +84,16 @@ export function createOidcTestServices(dataSource: DataSource) {
     mockMetricsService,
   );
 
+  const verifier = new OidcTokenVerifier();
+  const encryption = new EncryptionService(mockConfigService);
   const mockModuleRef = {
     get: (token: unknown): unknown => {
       if (token === UsersService) return usersService;
       if (token === AuthService) return authService;
       if (token === RbacService) return rbacService;
       if (token === MetricsService) return mockMetricsService;
+      if (token === OidcTokenVerifier) return verifier;
+      if (token === EncryptionService) return encryption;
       return null;
     },
   } as unknown as ModuleRef;

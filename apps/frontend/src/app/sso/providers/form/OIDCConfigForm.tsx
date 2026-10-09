@@ -113,6 +113,37 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
         </div>
 
         <TextField
+          value={model.formValues.oidcConfiguration?.endSessionURL ?? ''}
+          onChange={(v) => model.setOidc('endSessionURL', v)}
+        >
+          <Label>{model.t('endSessionURL')}</Label>
+          <Input placeholder="https://sso.example.com/logout" />
+        </TextField>
+        <TextField
+          value={model.formValues.oidcConfiguration?.jwksURL ?? ''}
+          onChange={(v) => model.setOidc('jwksURL', v)}
+        >
+          <Label>{model.t('jwksURL')}</Label>
+          <Input placeholder="https://sso.example.com/jwks" />
+        </TextField>
+        <TextField
+          value={(model.formValues.oidcConfiguration?.signingAlgorithms ?? ['RS256']).join(', ')}
+          onChange={(v) =>
+            model.setOidc(
+              'signingAlgorithms',
+              v
+                .split(',')
+                .map((algorithm) => algorithm.trim())
+                .filter(Boolean),
+            )
+          }
+        >
+          <Label>{model.t('signingAlgorithms')}</Label>
+          <Input placeholder="RS256" />
+        </TextField>
+        <p className="text-sm text-muted">{model.t('oidcLogoutHint')}</p>
+
+        <TextField
           isRequired
           value={model.formValues.oidcConfiguration?.issuer ?? ''}
           onChange={(v) => model.setOidc('issuer', v)}

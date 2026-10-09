@@ -34,6 +34,13 @@ type Props = Pick<
   | 'cycleTheme'
   | 'theme'
   | 'logout'
+  | 'logoutEverywhere'
+  | 'logoutPending'
+  | 'canLogoutEverywhere'
+  | 'logoutUnavailableReason'
+  | 'logoutEverywhereLabel'
+  | 'logoutPendingLabel'
+  | 'logoutProviderNotice'
 >;
 
 export function SidebarAside({
@@ -55,6 +62,13 @@ export function SidebarAside({
   cycleTheme,
   theme,
   logout,
+  logoutEverywhere,
+  logoutPending,
+  canLogoutEverywhere,
+  logoutUnavailableReason,
+  logoutEverywhereLabel,
+  logoutPendingLabel,
+  logoutProviderNotice,
 }: Props) {
   return (
     <aside
@@ -157,6 +171,13 @@ export function SidebarAside({
           cycleTheme,
           theme,
           logout,
+          logoutEverywhere,
+          logoutPending,
+          canLogoutEverywhere,
+          logoutUnavailableReason,
+          logoutEverywhereLabel,
+          logoutPendingLabel,
+          logoutProviderNotice,
         }}
       />
     </aside>
@@ -168,6 +189,13 @@ export function SidebarAside({
 export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }: SidebarProps) {
   const {
     logout,
+    logoutEverywhere,
+    logoutPending,
+    canLogoutEverywhere,
+    logoutUnavailableReason,
+    logoutEverywhereLabel,
+    logoutPendingLabel,
+    logoutProviderNotice,
     user,
     t,
     language,
@@ -216,6 +244,13 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
           cycleTheme,
           theme,
           logout,
+          logoutEverywhere,
+          logoutPending,
+          canLogoutEverywhere,
+          logoutUnavailableReason,
+          logoutEverywhereLabel,
+          logoutPendingLabel,
+          logoutProviderNotice,
         }}
       />
     </>

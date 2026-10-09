@@ -126,12 +126,18 @@ describe('SSOSamlStrategy', () => {
       nameID: 'user-a',
       issuer: 'https://issuer-a.example.com',
       nameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+      nameQualifier: 'idp-a',
+      spNameQualifier: 'sp-a',
+      sessionIndex: 'first',
+      getAssertionXml: () =>
+        '<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" IssueInstant="2026-10-08T12:00:00Z"><saml:AuthnStatement SessionIndex="first"/><saml:AuthnStatement SessionIndex="second"/></saml:Assertion>',
       emailA: 'a@example.com',
     } as SamlProfile;
     const profileB = {
       nameID: 'user-b',
       issuer: 'https://issuer-b.example.com',
       nameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+      sessionIndex: 'other',
       emailB: 'b@example.com',
     } as SamlProfile;
 
@@ -153,6 +159,25 @@ describe('SSOSamlStrategy', () => {
     expect(errorB).toBeInstanceOf(AccountLinkingRequiredException);
     expect(errorB.providerId).toBe(20);
     expect(errorB.email).toBe('b@example.com');
+    expect(requestA).toHaveProperty('ssoSessionContext', {
+      protocol: 'SAML',
+      providerIssuedAt: Date.parse('2026-10-08T12:00:00Z'),
+      providerId: 10,
+      issuer: profileA.issuer,
+      nameID: 'user-a',
+      nameIDFormat: profileA.nameIDFormat,
+      nameQualifier: 'idp-a',
+      spNameQualifier: 'sp-a',
+      sessionIndexes: ['first', 'second'],
+    });
+    expect(requestB).toHaveProperty('ssoSessionContext', {
+      protocol: 'SAML',
+      providerId: 20,
+      issuer: profileB.issuer,
+      nameID: 'user-b',
+      nameIDFormat: profileB.nameIDFormat,
+      sessionIndexes: ['other'],
+    });
   });
 
   it('normalizes SAML display names for new users', async () => {

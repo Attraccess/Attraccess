@@ -35,6 +35,7 @@ export function registerAuthServiceFixture() {
           provide: UsersService,
           useValue: {
             findOne: jest.fn(),
+            findByLoginIdentifier: jest.fn(),
             updateOne: jest.fn(),
             isSSOUser: jest.fn().mockResolvedValue(false),
           },

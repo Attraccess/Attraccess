@@ -1,3 +1,5 @@
+import { SsoLogoutService } from './sso/sso-logout.service';
+import { SettingsService } from '../../settings/settings.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
@@ -35,6 +37,15 @@ export function registerAuthControllerFixture() {
             createSession: jest.fn().mockResolvedValue('test-session-token'),
             refreshSession: jest.fn().mockResolvedValue('new-session-token'),
             revokeSession: jest.fn(),
+            revokeLogoutSession: jest.fn(),
+            getLogoutSession: jest.fn().mockResolvedValue({
+              id: 'stable-session',
+              ssoContext: { protocol: 'OIDC', providerId: 1, issuer: 'https://idp.example', subject: 'person' },
+            }),
+            validateSession: jest.fn().mockResolvedValue({ id: 7 }),
+            getSsoContext: jest
+              .fn()
+              .mockResolvedValue({ protocol: 'OIDC', providerId: 1, issuer: 'https://idp.example', subject: 'person' }),
           },
         },
         {
@@ -56,6 +67,14 @@ export function registerAuthControllerFixture() {
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
         { provide: UsersService, useValue: { findOne: jest.fn() } },
+        {
+          provide: SsoLogoutService,
+          useValue: {
+            prepare: jest.fn().mockResolvedValue({ kind: 'redirect', redirectUrl: 'https://idp.example/logout' }),
+            returnURL: async () => 'https://app.example/',
+          },
+        },
+        { provide: SettingsService, useValue: { getUrl: async () => 'https://app.example' } },
         { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },
       ],

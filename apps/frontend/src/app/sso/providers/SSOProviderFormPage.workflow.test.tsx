@@ -27,6 +27,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useAuthenticationServiceCreateOneSsoProvider: () => ({ mutateAsync: state.create, isPending: false }),
   useAuthenticationServiceUpdateOneSsoProvider: () => ({ mutateAsync: state.update, isPending: false }),
   useRbacServiceListRoles: () => ({ data: [], isLoading: false }),
+  useSsoServiceGetSsoLogoutUrls: () => ({ data: undefined, isLoading: false }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -69,6 +70,9 @@ it('edits and saves an OIDC provider with credentials and claim lists through th
     ['email-claims', 'email'],
   ])
     fireEvent.change(input(`oidc-${field}`), { target: { value } });
+  fireEvent.change(screen.getByLabelText(/End-session URL/), { target: { value: 'https://idp.example/logout' } });
+  fireEvent.change(screen.getByLabelText(/JWKS URL/), { target: { value: 'https://idp.example/jwks' } });
+  fireEvent.change(screen.getByLabelText('Allowed signing algorithms'), { target: { value: ' ES256, RS256, ' } });
   expect(input('oidc-client-secret')).toHaveAttribute('type', 'password');
   fireEvent.click(document.querySelector('[data-cy="sso-provider-form-oidc-toggle-client-secret-button"]')!);
   expect(input('oidc-client-secret')).toHaveAttribute('type', 'text');
@@ -82,6 +86,9 @@ it('edits and saves an OIDC provider with credentials and claim lists through th
         type: 'OIDC',
         oidcConfiguration: expect.objectContaining({
           issuer: 'https://idp.example',
+          endSessionURL: 'https://idp.example/logout',
+          jwksURL: 'https://idp.example/jwks',
+          signingAlgorithms: ['ES256', 'RS256'],
           clientId: 'client',
           clientSecret: 'secret',
           scopes: ['openid', 'email'],

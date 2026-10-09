@@ -69,6 +69,20 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
           {t('sections.samlIdentityProvider')}
         </h3>
         <TextField
+          isRequired={!!formValues.samlConfiguration?.logoutURL}
+          value={formValues.samlConfiguration?.idpIssuer ?? ''}
+          onChange={(v) => setSaml('idpIssuer', v)}
+        >
+          <Label>{t('idpIssuer')}</Label>
+          <Input placeholder="https://idp.example.com/entity" />
+        </TextField>
+        <TextField value={formValues.samlConfiguration?.logoutURL ?? ''} onChange={(v) => setSaml('logoutURL', v)}>
+          <Label>{t('logoutURL')}</Label>
+          <Input placeholder="https://idp.example.com/slo" />
+        </TextField>
+        <p className="text-sm text-muted">{t('samlLogoutHint')}</p>
+
+        <TextField
           isRequired
           value={formValues.samlConfiguration?.entryPoint ?? ''}
           onChange={(v) => setSaml('entryPoint', v)}
@@ -183,7 +197,8 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
             data-cy="sso-provider-form-saml-sp-private-key-input"
           />
           <p className="text-xs text-default-500">
-            {providerDetails?.samlConfiguration?.spSigningKeyEncrypted
+            {(providerDetails?.samlConfiguration?.spSigningKeyEncryptionKeyId ??
+            providerDetails?.samlConfiguration?.spSigningKeyEncrypted)
               ? t('spSigningPrivateKeyHintExisting')
               : t('spSigningPrivateKeyHint')}
           </p>

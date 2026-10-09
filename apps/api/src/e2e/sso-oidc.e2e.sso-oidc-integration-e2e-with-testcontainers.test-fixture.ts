@@ -1,3 +1,4 @@
+import type { SsoSessionRequest } from '../users-and-auth/auth/sso/sso-session-request';
 import type { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
 import { User, entities } from '@attraccess/database-entities';
 import type { ModuleRef } from '@nestjs/core';
@@ -212,13 +213,19 @@ export function registerSsoOidcIntegrationE2eWithTestcontainersFixture() {
       res: { redirect: jest.fn(), cookie: jest.fn(), clearCookie: jest.fn() },
     };
 
-    return new Promise<User>((resolve, reject) => {
+    const user = await new Promise<User>((resolve, reject) => {
       (strategy as unknown as Record<string, unknown>).success = (user: User) => resolve(user);
       (strategy as unknown as Record<string, unknown>).fail = (info: unknown) =>
         reject(new Error(`Auth failed: ${JSON.stringify(info)}`));
       (strategy as unknown as Record<string, unknown>).error = reject;
       strategy.authenticate(mockCallbackReq as never, {} as never);
     });
+    const logoutContext = (mockCallbackReq as unknown as SsoSessionRequest).ssoSessionContext;
+    expect(logoutContext).toMatchObject({ protocol: 'OIDC', issuer: oidcBaseUrl });
+    if (logoutContext?.protocol !== 'OIDC') throw new Error('Verified OIDC logout context was not captured');
+    expect(logoutContext.subject).toBeTruthy();
+    expect(logoutContext.idTokenEncrypted).toMatch(/^v1\./);
+    return user;
   }
   return {
     get CALLBACK_URL() {
