@@ -1,15 +1,15 @@
 {
   "title": "Welcome back, maker!",
-  "subtitle": "Ready to bring your next project to life? Sign in to book machines and get creating.",
-  "noAccount": "First time here?",
-  "signUpButton": "Get started here",
+  "subtitle": "Sign in to book machines.",
+  "noAccount": "Don't have an account?",
+  "signUpButton": "Create an account",
   "username": "Username",
   "password": "Password",
   "twoFactorCode": "Authenticator code",
   "twoFactorHelper": "Enter the code if you already set up 2FA. Otherwise, leave it blank and you will be prompted after signing in.",
   "rememberMe": "Keep me signed in",
-  "forgotPassword": "Password slipped your mind?",
-  "signInButton": "Start making",
+  "forgotPassword": "Forgot password?",
+  "signInButton": "Sign in",
   "signingIn": "Signing in...",
   "accordion": {
     "title": "Sign in with email and password"

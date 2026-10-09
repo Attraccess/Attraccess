@@ -2,12 +2,12 @@
   "success": {
     "title": "Email Verified!",
     "message": "Your email has been successfully verified. You can now log in to your account.",
-    "goToLogin": "Go to Login"
+    "goToLogin": "Go to sign in"
   },
   "error": {
     "title": "Verification Failed",
-    "tryAgain": "Try Again",
-    "backToLogin": "Back to Login",
+    "tryAgain": "Verify email again",
+    "backToLogin": "Back to sign in",
     "errorTitle": "Error"
   },
   "resend": {
