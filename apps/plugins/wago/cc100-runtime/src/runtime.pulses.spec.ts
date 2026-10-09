@@ -381,71 +381,80 @@ describe('WagoRuntime pulse lifecycle', () => {
   });
 
   it('shuts off an accepted pulse after a newer pulse fails', async () => {
-    const snapshot = pulsedSnapshot;
-    const pulseSnapshot: Snapshot = {
-      ...snapshot,
-      logicalChannels: snapshot.logicalChannels.map((channel) => ({
-        ...channel,
-        pulse: { durationMs: 100 },
-      })),
-    };
-    let resolvePulseWrite: (() => void) | undefined;
-    let notifyPulseWriteStarted: (() => void) | undefined;
-    const pulseWriteStarted = new Promise<void>((resolve) => {
-      notifyPulseWriteStarted = resolve;
-    });
-    const writes: boolean[] = [];
-    const delayedPulseDevice = {
-      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
-        writes.push(value);
-        if (writes.length === 1) {
-          notifyPulseWriteStarted?.();
-          await new Promise<void>((resolve) => {
-            resolvePulseWrite = resolve;
-          });
-        } else if (value) throw new Error('temporary failure');
-      },
-      read: async () => false,
-    };
-    runtime = new WagoRuntime({
-      hardwareId: 'cc100-1',
-      prefix: 'attraccess/wago',
-      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
-      transport: transport,
-      device: delayedPulseDevice,
-    });
-    await runtime.start();
-    await transport.send(desired, {
-      protocolVersion: 1,
-      revision: 1,
-      contentHash: hash(pulseSnapshot),
-      snapshot: pulseSnapshot,
-    });
+    // Control the test clock so disk persistence cannot expire the pulse before both writes settle.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    try {
+      const snapshot = pulsedSnapshot;
+      const pulseSnapshot: Snapshot = {
+        ...snapshot,
+        logicalChannels: snapshot.logicalChannels.map((channel) => ({
+          ...channel,
+          pulse: { durationMs: 100 },
+        })),
+      };
+      let resolvePulseWrite: (() => void) | undefined;
+      let notifyPulseWriteStarted: (() => void) | undefined;
+      const pulseWriteStarted = new Promise<void>((resolve) => {
+        notifyPulseWriteStarted = resolve;
+      });
+      const writes: boolean[] = [];
+      const delayedPulseDevice = {
+        write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+          writes.push(value);
+          if (writes.length === 1) {
+            notifyPulseWriteStarted?.();
+            await new Promise<void>((resolve) => {
+              resolvePulseWrite = resolve;
+            });
+          } else if (value) throw new Error('temporary failure');
+        },
+        read: async () => false,
+      };
+      runtime = new WagoRuntime({
+        hardwareId: 'cc100-1',
+        prefix: 'attraccess/wago',
+        store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+        transport: transport,
+        device: delayedPulseDevice,
+      });
+      await runtime.start();
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 1,
+        contentHash: hash(pulseSnapshot),
+        snapshot: pulseSnapshot,
+      });
 
-    const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
-    await pulseWriteStarted;
-    const repeatedPulse = transport.send(
-      commands,
-      validCommand({ id: 'command-2', channelId: 'load', action: 'pulse' }),
-    );
-    resolvePulseWrite?.();
-    await pulse;
-    await repeatedPulse;
-    await new Promise((resolve) => setTimeout(resolve, 150));
+      const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
+      await pulseWriteStarted;
+      const repeatedPulse = transport.send(
+        commands,
+        validCommand({ id: 'command-2', channelId: 'load', action: 'pulse' }),
+      );
+      resolvePulseWrite?.();
+      await pulse;
+      await repeatedPulse;
+      expect(writes).toEqual([true, true]);
+      await jest.advanceTimersByTimeAsync(99);
+      expect(writes).toEqual([true, true]);
+      await jest.advanceTimersByTimeAsync(1);
 
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
-      }),
-    );
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: expect.objectContaining({ id: 'command-2', status: 'rejected', error: 'device write failed' }),
-      }),
-    );
-    expect(writes).toEqual([true, true, false]);
+      expect(transport.published).toContainEqual(
+        expect.objectContaining({
+          topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+          payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
+        }),
+      );
+      expect(transport.published).toContainEqual(
+        expect.objectContaining({
+          topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+          payload: expect.objectContaining({ id: 'command-2', status: 'rejected', error: 'device write failed' }),
+        }),
+      );
+      expect(writes).toEqual([true, true, false]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shuts off a delayed pulse after a newer pulse succeeds', async () => {
