@@ -67,7 +67,7 @@ Für kommerzielle Lizenzen und Unterstützung bei der Integration wenden Sie sic
 
 ### Aktivierung
 
-Jede Installation benötigt einen Lizenzschlüssel, auch kostenlose Installationen. Tragen Sie ihn im Feld **Lizenzschlüssel** des [Einrichtungsassistenten](setup/first-time-setup.md) oder unter **Einstellungen → Anwendungseinstellungen** ein. Alternativ können Sie die [Umgebungsvariable](installation/environment-variables.md) `LICENSE_KEY` setzen. In der Oberfläche gespeicherte Einstellungen haben Vorrang vor den Vorgaben aus Umgebungsvariablen.
+Die Aktivierung lizenzierter Funktionen benötigt einen Lizenzschlüssel, auch bei kostenlosen Installationen. Tragen Sie ihn im Feld **Lizenzschlüssel** des [Einrichtungsassistenten](setup/first-time-setup.md) oder unter **Einstellungen → Anwendungseinstellungen** ein. Bei einer neuen Installation können Sie auch die [Umgebungsvariable](installation/environment-variables.md) `LICENSE_KEY` setzen, bevor die Datenbank initialisiert wird. Bestehende Installationen verwenden den gespeicherten Schlüssel; ändern Sie ihn in den Einstellungen statt über die Umgebungsvariable.
 
 Für zulässige nicht-kommerzielle Nutzung kopieren Sie nach Prüfung der Lizenzbedingungen den folgenden speziellen Schlüssel exakt:
 

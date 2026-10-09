@@ -67,7 +67,7 @@ The linked `LICENSE.md` contains the full terms in German and takes precedence o
 
 ### Activation
 
-Every installation needs a license key, including free installations. Enter it in the **License Key** field of the [Setup Wizard](setup/first-time-setup.md) or under **Settings → Application Settings**. Alternatively, set the `LICENSE_KEY` [environment variable](installation/environment-variables.md). Settings saved in the UI override environment variable defaults.
+Activating licensed features requires a license key, including for free installations. Enter it in the **License Key** field of the [Setup Wizard](setup/first-time-setup.md) or under **Settings → Application Settings**. For a new installation, you can also set the `LICENSE_KEY` [environment variable](installation/environment-variables.md) before the database is initialized. Existing installations read the stored key; change it in Settings rather than by editing the environment variable.
 
 For qualifying non-commercial use, copy the following special key exactly after reviewing the license terms:
 
