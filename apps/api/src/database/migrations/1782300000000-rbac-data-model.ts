@@ -1,84 +1,25 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-export const PERMISSIONS = [
-  {
-    key: 'resources.read',
-    label: 'Read Resources',
-    description: 'Allows reading resource information',
-    category: 'resources',
-  },
-  {
-    key: 'resources.create',
-    label: 'Create Resources',
-    description: 'Allows creating new resources',
-    category: 'resources',
-  },
-  {
-    key: 'resources.update',
-    label: 'Update Resources',
-    description: 'Allows updating existing resources',
-    category: 'resources',
-  },
-  {
-    key: 'resources.delete',
-    label: 'Delete Resources',
-    description: 'Allows deleting resources',
-    category: 'resources',
-  },
-  {
-    key: 'resources.access.manage',
-    label: 'Manage Resource Access',
-    description: 'Allows managing who can access resources',
-    category: 'resources',
-  },
-  {
-    key: 'resources.maintenance.manage',
-    label: 'Manage Resource Maintenance',
-    description: 'Allows managing resource maintenance schedules and requests',
-    category: 'resources',
-  },
+
+const PERMISSIONS = [
+  { key: 'resources.read', label: 'Read Resources', description: 'Allows reading resource information', category: 'resources' },
+  { key: 'resources.create', label: 'Create Resources', description: 'Allows creating new resources', category: 'resources' },
+  { key: 'resources.update', label: 'Update Resources', description: 'Allows updating existing resources', category: 'resources' },
+  { key: 'resources.delete', label: 'Delete Resources', description: 'Allows deleting resources', category: 'resources' },
+  { key: 'resources.access.manage', label: 'Manage Resource Access', description: 'Allows managing who can access resources', category: 'resources' },
+  { key: 'resources.maintenance.manage', label: 'Manage Resource Maintenance', description: 'Allows managing resource maintenance schedules and requests', category: 'resources' },
   { key: 'users.read', label: 'Read Users', description: 'Allows reading user information', category: 'users' },
   { key: 'users.create', label: 'Create Users', description: 'Allows creating new users', category: 'users' },
   { key: 'users.update', label: 'Update Users', description: 'Allows updating existing users', category: 'users' },
   { key: 'users.delete', label: 'Delete Users', description: 'Allows deleting users', category: 'users' },
-  {
-    key: 'users.roles.manage',
-    label: 'Manage User Roles',
-    description: 'Allows assigning and revoking roles for users',
-    category: 'users',
-  },
-  {
-    key: 'system.settings.manage',
-    label: 'Manage System Settings',
-    description: 'Allows changing system configuration',
-    category: 'system',
-  },
-  {
-    key: 'system.sso.manage',
-    label: 'Manage SSO',
-    description: 'Allows managing SSO provider configuration',
-    category: 'system',
-  },
-  {
-    key: 'system.plugins.manage',
-    label: 'Manage Plugins',
-    description: 'Allows installing and configuring plugins',
-    category: 'system',
-  },
-  {
-    key: 'billing.read',
-    label: 'Read Billing',
-    description: 'Allows reading billing information and transactions',
-    category: 'billing',
-  },
-  {
-    key: 'billing.manage',
-    label: 'Manage Billing',
-    description: 'Allows managing billing configuration and transactions',
-    category: 'billing',
-  },
+  { key: 'users.roles.manage', label: 'Manage User Roles', description: 'Allows assigning and revoking roles for users', category: 'users' },
+  { key: 'system.settings.manage', label: 'Manage System Settings', description: 'Allows changing system configuration', category: 'system' },
+  { key: 'system.sso.manage', label: 'Manage SSO', description: 'Allows managing SSO provider configuration', category: 'system' },
+  { key: 'system.plugins.manage', label: 'Manage Plugins', description: 'Allows installing and configuring plugins', category: 'system' },
+  { key: 'billing.read', label: 'Read Billing', description: 'Allows reading billing information and transactions', category: 'billing' },
+  { key: 'billing.manage', label: 'Manage Billing', description: 'Allows managing billing configuration and transactions', category: 'billing' },
 ];
 
-export const ROLES = [
+const ROLES = [
   {
     key: 'user',
     name: 'User',
@@ -108,7 +49,13 @@ export const ROLES = [
     description: 'Can manage users and their role assignments',
     isSystemManaged: 1,
     isDefault: 0,
-    permissions: ['users.read', 'users.create', 'users.update', 'users.delete', 'users.roles.manage'],
+    permissions: [
+      'users.read',
+      'users.create',
+      'users.update',
+      'users.delete',
+      'users.roles.manage',
+    ],
   },
   {
     key: 'billing-manager',
@@ -222,10 +169,10 @@ export class RbacDataModel1782300000000 implements MigrationInterface {
       const roleId: number = rows[0].id;
 
       for (const permKey of role.permissions) {
-        await queryRunner.query(`INSERT OR IGNORE INTO "role_permission" ("roleId", "permissionKey") VALUES (?, ?)`, [
-          roleId,
-          permKey,
-        ]);
+        await queryRunner.query(
+          `INSERT OR IGNORE INTO "role_permission" ("roleId", "permissionKey") VALUES (?, ?)`,
+          [roleId, permKey],
+        );
       }
     }
 

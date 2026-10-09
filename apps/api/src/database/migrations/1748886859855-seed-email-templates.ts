@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+
 export const RESET_PASSWORD_MJML_TEMPLATE = `
 <mjml>
   <mj-head>
@@ -93,6 +94,7 @@ export const RESET_PASSWORD_MJML_TEMPLATE = `
   </mj-body>
 </mjml>
 `;
+
 // /workspace/Attraccess/apps/api/src/email/templates/verify-email.template.ts
 export const VERIFY_EMAIL_MJML_TEMPLATE = `
 <mjml>
@@ -189,8 +191,6 @@ export const VERIFY_EMAIL_MJML_TEMPLATE = `
 </mjml>
 
 `;
-
-// /workspace/Attraccess/apps/api/src/email/templates/verify-email.template.ts
 
 export class SeedEmailTemplates1748886859854 implements MigrationInterface {
   name = 'SeedEmailTemplates1748886859854';
