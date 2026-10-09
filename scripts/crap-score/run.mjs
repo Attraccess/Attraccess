@@ -1,68 +1,14 @@
 /* eslint-disable no-console -- CLI progress and diagnostics are intentional. */
+import { getCrapReport } from 'crap-score';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import istanbulCoverage from 'istanbul-lib-coverage';
-const { createCoverageMap } = istanbulCoverage;
 import { createInstrumenter } from 'istanbul-lib-instrument';
-import { getCrapReport } from 'crap-score';
-import ts from 'typescript';
 
-export const workspace = fileURLToPath(new URL('../../', import.meta.url));
-
-export function isSource(file) {
-  return (
-    /\.[cm]?[jt]sx?$/.test(file) &&
-    // Upstream OpenSCAD WebAssembly runtime, distributed unchanged with the app.
-    file !== 'apps/frontend/public/openscad/openscad.wasm.js' &&
-    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package)(\/|$)/.test(
-      file,
-    ) &&
-    !/\.(spec|test|d)\.[cm]?[jt]sx?$/.test(file) &&
-    !/(^|\/)(test-setup|jest\.setup)\.[jt]s$/.test(file) &&
-    !/^libs\/(react-query-client|companion-ws-client)\/src\/lib\//.test(file)
-  );
-}
-
-export function completeCoverage(files, reports) {
-  const coverage = createCoverageMap({});
-  for (const report of reports) coverage.merge(report);
-  const wanted = new Set(files.map((file) => path.resolve(workspace, file)));
-  coverage.filter((file) => wanted.has(file));
-  for (const file of wanted) {
-    const instrumenter = createInstrumenter({
-      // JSX is only enabled on JSX files: otherwise TS generic arrow functions are ambiguous.
-      parserPlugins: ['typescript', 'decorators-legacy', ...(/\.[jt]sx$/.test(file) ? ['jsx'] : [])],
-    });
-    const source = readFileSync(file, 'utf8');
-    instrumenter.instrumentSync(source, file);
-    const original = instrumenter.lastFileCoverage();
-    if (!coverage.files().includes(file)) {
-      coverage.addFileCoverage(original);
-    } else {
-      // TypeScript emits export getters for barrels with no source functions.
-      // They are compiler scaffolding, not first-party function declarations.
-      if (Object.keys(original.fnMap).length === 0) {
-        coverage.fileCoverageFor(file).data.fnMap = {};
-        coverage.fileCoverageFor(file).data.f = {};
-      }
-      removeEnumWrappers(coverage.fileCoverageFor(file), file, source);
-      removeExportGetters(coverage.fileCoverageFor(file), file, source);
-      repairFunctionLocations(coverage.fileCoverageFor(file).fnMap, original.fnMap);
-      repairStatementLocations(coverage.fileCoverageFor(file).statementMap, original.statementMap);
-      fillMissingFunctions(coverage.fileCoverageFor(file), original);
-    }
-    deduplicateStatements(coverage.fileCoverageFor(file));
-    deduplicateFunctions(coverage.fileCoverageFor(file));
-  }
-  const result = coverage.toJSON();
-  // Upstream indexes functions by name. Repeated methods/anonymous names must not overwrite each other.
-  for (const file of Object.values(result)) {
-    for (const [id, fn] of Object.entries(file.fnMap)) fn.name = `${fn.name}:${fn.loc.start.line}:${id}`;
-  }
-  return result;
-}
+// Source-map remapping may leave end columns null (end of line). Restore exact
+// boundaries from the original source, without changing any execution counts.
 
 export function removeEnumWrappers(coverage, file, source) {
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -100,7 +46,7 @@ export function removeEnumWrappers(coverage, file, source) {
 
 // Re-export declarations have no source functions, even in files that also
 // contain maintained functions. TypeScript's generated getters are scaffolding.
-function removeExportGetters(coverage, file, source) {
+export function removeExportGetters(coverage, file, source) {
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const ranges = ast.statements.filter(ts.isExportDeclaration).map((node) => ({
     start: node.getStart(ast),
@@ -141,22 +87,89 @@ export function fillMissingFunctions(measured, original) {
   }
 }
 
-export function repairStatementLocations(measured, original) {
-  for (const [id, statement] of Object.entries(measured)) {
-    if (statement.end.column != null) continue;
-    const matches = Object.values(original).filter(
-      (candidate) =>
-        candidate.start.line === statement.start.line &&
-        candidate.start.column === statement.start.column &&
-        candidate.end.line === statement.end.line,
-    );
-    if (matches.length > 1)
-      throw new Error(`Ambiguous statement source mapping at ${statement.start.line}:${statement.start.column}`);
-    if (matches.length === 1) measured[id] = matches[0];
-  }
+export const workspace = fileURLToPath(new URL('../../', import.meta.url));
+
+export function isSource(file) {
+  return (
+    /\.[cm]?[jt]sx?$/.test(file) &&
+    // Upstream OpenSCAD WebAssembly runtime, distributed unchanged with the app.
+    file !== 'apps/frontend/public/openscad/openscad.wasm.js' &&
+    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package)(\/|$)/.test(
+      file,
+    ) &&
+    !/\.(spec|test|d)\.[cm]?[jt]sx?$/.test(file) &&
+    !/(^|\/)(test-setup|jest\.setup)\.[jt]s$/.test(file) &&
+    !/^libs\/(react-query-client|companion-ws-client)\/src\/lib\//.test(file)
+  );
+}
+
+export function ownedFiles(root, tracked) {
+  const projects = tracked
+    .filter((file) => /(^|\/)project\.json$/.test(file))
+    .map((file) => path.dirname(file))
+    .filter((directory) => directory !== '.')
+    .sort((a, b) => b.length - a.length);
+  return tracked.filter((file) => (projects.find((directory) => file.startsWith(`${directory}/`)) ?? '.') === root);
 }
 
 // Use complete source ranges, not names or just line numbers: anonymous
+
+export function nodeCoverage(files, tests, output) {
+  if (!tests.length) return [];
+  mkdirSync(output, { recursive: true });
+  const manifest = path.join(output, 'manifest.json');
+  writeFileSync(manifest, JSON.stringify({ files: files.map((file) => path.resolve(workspace, file)), output }));
+  const loader = path.join(workspace, 'scripts/crap-score/node-coverage.mjs');
+  const env = {
+    ...process.env,
+    CRAP_NODE_MANIFEST: manifest,
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${loader}`,
+  };
+  delete env.NODE_TEST_CONTEXT;
+  execFileSync(process.execPath, ['--test', ...tests], {
+    cwd: workspace,
+    stdio: 'inherit',
+    env,
+  });
+  const reports = readdirSync(output).filter((file) => file !== 'manifest.json' && file.endsWith('.json'));
+  if (!reports.length) throw new Error('Node test runner did not produce coverage');
+  return reports.map((file) => JSON.parse(readFileSync(path.join(output, file), 'utf8')));
+}
+
+export const vitestSuites = {
+  '.': [{ cwd: workspace, args: ['--config', 'scripts/crap-score/vitest.config.mts'] }],
+  'apps/companion': [{ cwd: workspace, args: ['--config', 'apps/companion/renderer/vitest.config.mts'] }],
+  'apps/frontend': [{ cwd: workspace, args: ['--config', 'apps/frontend/vitest.config.ts'] }],
+  'apps/plugins/wago': [{ cwd: workspace, args: ['--config', 'apps/plugins/wago/frontend/vitest.config.mts'] }],
+  'apps/plugins/rabbitmq': [{ cwd: workspace, args: ['--config', 'apps/plugins/rabbitmq/frontend/vitest.config.ts'] }],
+  'apps/plugins/shelly': [{ cwd: path.join(workspace, 'apps/plugins/shelly'), args: ['--root', 'frontend'] }],
+  ...Object.fromEntries(
+    ['libs/plugins-frontend-sdk', 'libs/plugins-frontend-ui', 'libs/companion-ws-client'].map((root) => [
+      root,
+      [{ cwd: path.join(workspace, root), args: [] }],
+    ]),
+  ),
+};
+
+export function jestSuite(config) {
+  return {
+    runner: 'jest',
+    cwd: workspace,
+    args: ['--config', config, '--runInBand', '--passWithNoTests', '--testPathIgnorePatterns=\\.e2e\\.spec\\.ts$'],
+  };
+}
+
+export function suites(root) {
+  const result = (vitestSuites[root] ?? []).map((suite) => ({ runner: 'vitest', ...suite }));
+  const config = ['jest.config.ts', 'jest.config.js'].find((file) => existsSync(path.join(root, file)));
+  if (root !== '.' && config) result.unshift(jestSuite(path.join(root, config)));
+  if (root === 'apps/plugins/wago') {
+    result.push(
+      ...['audit-hooks', 'commissioning'].map((name) => jestSuite(`${root}/scripts/jest.${name}.config.cjs`)),
+    );
+  }
+  return result;
+}
 // callbacks and same-named methods can share a line and still be distinct.
 export function deduplicateFunctions(file) {
   const locations = new Map();
@@ -197,16 +210,6 @@ export function deduplicateStatements(file) {
   }
 }
 
-export function summarizeScores(functions) {
-  return {
-    functions: functions.length,
-    atLeast30: functions.filter((fn) => fn.statements.crap >= 30).length,
-    max: Math.max(0, ...functions.map((fn) => fn.statements.crap)),
-  };
-}
-
-// Source-map remapping may leave end columns null (end of line). Restore exact
-// boundaries from the original source, without changing any execution counts.
 export function repairFunctionLocations(measured, original) {
   const before = (a, b) => a.line < b.line || (a.line === b.line && a.column <= b.column);
   const contains = (outer, inner) => before(outer.start, inner.start) && before(inner.end, outer.end);
@@ -259,74 +262,81 @@ export function repairFunctionLocations(measured, original) {
   }
 }
 
-export function ownedFiles(root, tracked) {
-  const projects = tracked
-    .filter((file) => /(^|\/)project\.json$/.test(file))
-    .map((file) => path.dirname(file))
-    .filter((directory) => directory !== '.')
-    .sort((a, b) => b.length - a.length);
-  return tracked.filter((file) => (projects.find((directory) => file.startsWith(`${directory}/`)) ?? '.') === root);
-}
-
-export function nodeCoverage(files, tests, output) {
-  if (!tests.length) return [];
-  mkdirSync(output, { recursive: true });
-  const manifest = path.join(output, 'manifest.json');
-  writeFileSync(manifest, JSON.stringify({ files: files.map((file) => path.resolve(workspace, file)), output }));
-  const loader = path.join(workspace, 'scripts/crap-score/node-coverage.mjs');
-  const env = {
-    ...process.env,
-    CRAP_NODE_MANIFEST: manifest,
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${loader}`,
-  };
-  delete env.NODE_TEST_CONTEXT;
-  execFileSync(process.execPath, ['--test', ...tests], {
-    cwd: workspace,
-    stdio: 'inherit',
-    env,
-  });
-  const reports = readdirSync(output).filter((file) => file !== 'manifest.json' && file.endsWith('.json'));
-  if (!reports.length) throw new Error('Node test runner did not produce coverage');
-  return reports.map((file) => JSON.parse(readFileSync(path.join(output, file), 'utf8')));
-}
-
-const vitestSuites = {
-  '.': [{ cwd: workspace, args: ['--config', 'scripts/crap-score/vitest.config.mts'] }],
-  'apps/companion': [{ cwd: workspace, args: ['--config', 'apps/companion/renderer/vitest.config.mts'] }],
-  'apps/frontend': [{ cwd: workspace, args: ['--config', 'apps/frontend/vitest.config.ts'] }],
-  'apps/plugins/wago': [
-    { cwd: workspace, args: ['--config', 'apps/plugins/wago/frontend/vitest.config.mts'] },
-  ],
-  'apps/plugins/rabbitmq': [{ cwd: workspace, args: ['--config', 'apps/plugins/rabbitmq/frontend/vitest.config.ts'] }],
-  'apps/plugins/shelly': [{ cwd: path.join(workspace, 'apps/plugins/shelly'), args: ['--root', 'frontend'] }],
-  ...Object.fromEntries(
-    [
-      'libs/plugins-frontend-sdk',
-      'libs/plugins-frontend-ui',
-      'libs/companion-ws-client',
-    ].map((root) => [root, [{ cwd: path.join(workspace, root), args: [] }]]),
-  ),
-};
-
-function jestSuite(config) {
-  return {
-    runner: 'jest',
-    cwd: workspace,
-    args: ['--config', config, '--runInBand', '--passWithNoTests', '--testPathIgnorePatterns=\\.e2e\\.spec\\.ts$'],
-  };
-}
-
-export function suites(root) {
-  const result = (vitestSuites[root] ?? []).map((suite) => ({ runner: 'vitest', ...suite }));
-  const config = ['jest.config.ts', 'jest.config.js'].find((file) => existsSync(path.join(root, file)));
-  if (root !== '.' && config) result.unshift(jestSuite(path.join(root, config)));
-  if (root === 'apps/plugins/wago') {
-    result.push(
-      ...['audit-hooks', 'commissioning'].map((name) => jestSuite(`${root}/scripts/jest.${name}.config.cjs`)),
+export function repairStatementLocations(measured, original) {
+  for (const [id, statement] of Object.entries(measured)) {
+    if (statement.end.column != null) continue;
+    const matches = Object.values(original).filter(
+      (candidate) =>
+        candidate.start.line === statement.start.line &&
+        candidate.start.column === statement.start.column &&
+        candidate.end.line === statement.end.line,
     );
+    if (matches.length > 1)
+      throw new Error(`Ambiguous statement source mapping at ${statement.start.line}:${statement.start.column}`);
+    if (matches.length === 1) measured[id] = matches[0];
+  }
+}
+
+const { createCoverageMap } = istanbulCoverage;
+
+export function completeCoverage(files, reports) {
+  const coverage = createCoverageMap({});
+  for (const report of reports) coverage.merge(report);
+  const wanted = new Set(files.map((file) => path.resolve(workspace, file)));
+  coverage.filter((file) => wanted.has(file));
+  for (const file of wanted) {
+    const instrumenter = createInstrumenter({
+      // JSX is only enabled on JSX files: otherwise TS generic arrow functions are ambiguous.
+      parserPlugins: ['typescript', 'decorators-legacy', ...(/\.[jt]sx$/.test(file) ? ['jsx'] : [])],
+    });
+    const source = readFileSync(file, 'utf8');
+    instrumenter.instrumentSync(source, file);
+    const original = instrumenter.lastFileCoverage();
+    if (!coverage.files().includes(file)) {
+      coverage.addFileCoverage(original);
+    } else {
+      // TypeScript emits export getters for barrels with no source functions.
+      // They are compiler scaffolding, not first-party function declarations.
+      if (Object.keys(original.fnMap).length === 0) {
+        coverage.fileCoverageFor(file).data.fnMap = {};
+        coverage.fileCoverageFor(file).data.f = {};
+      }
+      removeEnumWrappers(coverage.fileCoverageFor(file), file, source);
+      removeExportGetters(coverage.fileCoverageFor(file), file, source);
+      repairFunctionLocations(coverage.fileCoverageFor(file).fnMap, original.fnMap);
+      repairStatementLocations(coverage.fileCoverageFor(file).statementMap, original.statementMap);
+      fillMissingFunctions(coverage.fileCoverageFor(file), original);
+    }
+    deduplicateStatements(coverage.fileCoverageFor(file));
+    deduplicateFunctions(coverage.fileCoverageFor(file));
+  }
+  const result = coverage.toJSON();
+  // Upstream indexes functions by name. Repeated methods/anonymous names must not overwrite each other.
+  for (const file of Object.values(result)) {
+    for (const [id, fn] of Object.entries(file.fnMap)) fn.name = `${fn.name}:${fn.loc.start.line}:${id}`;
   }
   return result;
 }
+import ts from 'typescript';
+
+// Re-export declarations have no source functions, even in files that also
+// contain maintained functions. TypeScript's generated getters are scaffolding.
+// Use complete source ranges, not names or just line numbers: anonymous
+// callbacks and same-named methods can share a line and still be distinct.
+// Runners can map the same statement with a concrete end column or an
+// end-of-line sentinel. Repairing those ranges after merging must not leave a
+// second, uncovered copy of a statement another runner already exercised.
+
+export function summarizeScores(functions) {
+  return {
+    functions: functions.length,
+    atLeast30: functions.filter((fn) => fn.statements.crap >= 30).length,
+    max: Math.max(0, ...functions.map((fn) => fn.statements.crap)),
+  };
+}
+
+// Source-map remapping may leave end columns null (end of line). Restore exact
+// boundaries from the original source, without changing any execution counts.
 
 export async function run(root, outputDirectory) {
   process.chdir(workspace);

@@ -1,5 +1,3 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   SystemEvent,
   SystemEventHandler,
@@ -7,6 +5,8 @@ import {
   SystemEventResponse,
   SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
+import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 const SYSTEM_EVENT_PREFIX = 'plugin.system.';
 
@@ -41,7 +41,7 @@ export class PluginEventsService {
    */
   public async emitAsync<E extends SystemEvent>(
     event: E,
-    payload: SystemEventPayload[E]
+    payload: SystemEventPayload[E],
   ): Promise<Array<SystemEventResponse[E] | void>> {
     return (await this.events.emitAsync(busName(event), payload)) as Array<SystemEventResponse[E] | void>;
   }
@@ -56,7 +56,10 @@ export class PluginEventsService {
       try {
         return await handler(payload);
       } catch (error) {
-        this.logger.error(`Plugin handler for "${event}" failed; error isolated from core flow`, (error as Error).stack);
+        this.logger.error(
+          `Plugin handler for "${event}" failed; error isolated from core flow`,
+          (error as Error).stack,
+        );
         return undefined;
       }
     };

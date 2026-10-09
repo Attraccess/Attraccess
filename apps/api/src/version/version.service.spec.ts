@@ -3,30 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import axios from 'axios';
 import { User, Resource, Project, ResourceUsage, ResourceUsageAction, Session } from '@attraccess/database-entities';
-import { GithubReleaseApiResponse, VersionService } from './version.service';
+import { VersionService } from './version.service';
 import { IsNull } from 'typeorm';
+import { buildRelease, makeRepo } from './version.test-fixture';
 
 jest.mock('axios');
 
 const axiosMock = axios as jest.Mocked<typeof axios>;
-
-function buildRelease(overrides: Partial<GithubReleaseApiResponse> = {}): GithubReleaseApiResponse {
-  return {
-    tag_name: 'v1.0.0',
-    name: 'Release 1.0.0',
-    body: 'Notes',
-    html_url: 'https://github.com/Attraccess/Attraccess/releases/tag/v1.0.0',
-    published_at: '2026-01-01T00:00:00Z',
-    draft: false,
-    prerelease: false,
-    ...overrides,
-  };
-}
-
-function makeRepo(countValue = 0) {
-  return { count: jest.fn().mockResolvedValue(countValue) };
-}
-
 describe('VersionService', () => {
   let service: VersionService;
   let configService: { get: jest.Mock };
@@ -101,7 +84,12 @@ describe('VersionService', () => {
       expect(result.projectsTotal).toBe(3);
       expect(result.activeResourceUsageSessions).toBe(2);
       expect(usageRepository.count).toHaveBeenCalledWith({
-        where: { endTime: IsNull(), lifecyclePending: false, isFinalized: true, usageAction: ResourceUsageAction.Usage },
+        where: {
+          endTime: IsNull(),
+          lifecyclePending: false,
+          isFinalized: true,
+          usageAction: ResourceUsageAction.Usage,
+        },
       });
       expect(result.activeAuthSessions).toBe(7);
     });

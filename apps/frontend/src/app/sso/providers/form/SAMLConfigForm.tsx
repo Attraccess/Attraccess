@@ -1,18 +1,14 @@
 import { Description, Input, InputGroup, Label, TextArea, TextField, Tooltip, TooltipContent } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Button } from '../../../../components/button';
+import { Button } from '../../../../components/button/index';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
 import de from '../de.json';
 
-interface SAMLConfigFormProps {
-  form: SSOProviderFormApi;
-}
-
-export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
+export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
   const { t } = useTranslations({ en, de });
   const {
     formValues,
@@ -28,6 +24,43 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
     roles,
     isLoadingRoles,
   } = form;
+  return {
+    t,
+    formValues,
+    setSaml,
+    emailAttributeKeysInput,
+    setEmailAttributeKeysInput,
+    showSamlProvisioningSecret,
+    setShowSamlProvisioningSecret,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
+    handleSamlToggleChange,
+    providerDetails,
+    roles,
+    isLoadingRoles,
+  } as const;
+}
+
+export interface SAMLConfigFormProps {
+  form: SSOProviderFormApi;
+}
+
+export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
+  const {
+    t,
+    formValues,
+    setSaml,
+    emailAttributeKeysInput,
+    setEmailAttributeKeysInput,
+    showSamlProvisioningSecret,
+    setShowSamlProvisioningSecret,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
+    handleSamlToggleChange,
+    providerDetails,
+    roles,
+    isLoadingRoles,
+  } = useSAMLConfigFormState({ form });
 
   return (
     <>
@@ -204,4 +237,4 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
       </section>
     </>
   );
-};
+}

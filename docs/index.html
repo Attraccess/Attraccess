@@ -1,642 +1,136 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de" data-theme="light">
-<head>
-  <meta charset="UTF-8">
-  <title>Attraccess Dokumentation</title>
-  <meta name="description" content="Offizielle Dokumentation für Attraccess – Zugangsverwaltung für Makerspaces und Werkstätten">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-  <link rel="icon" href="_media/favicon.ico">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Attraccess Dokumentation</title>
+    <meta
+      name="description"
+      content="Offizielle Dokumentation für Attraccess – Zugangsverwaltung für Makerspaces und Werkstätten"
+    />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+    <link rel="icon" href="_media/favicon.ico" />
 
-  <!-- Docsify Themeable -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0.9.0/dist/css/theme-simple.css" integrity="sha384-IuZucGNxm+6VGvZLv3+oxh1kE70WlIXci7p3g/Dtchij0oKFb9s8zG9GYnIkl8CB" crossorigin="anonymous">
+    <!-- Docsify Themeable -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/docsify-themeable@0.9.0/dist/css/theme-simple.css"
+      integrity="sha384-IuZucGNxm+6VGvZLv3+oxh1kE70WlIXci7p3g/Dtchij0oKFb9s8zG9GYnIkl8CB"
+      crossorigin="anonymous"
+    />
 
-  <style>
-    /* ===== Attraccess Light Theme (default) ===== */
-    :root {
-      color-scheme: light;
-      --theme-color: #256D7B;
-      --theme-color-foreground: #fff;
+    <link rel="stylesheet" href="./assets/theme.css" />
+    <link rel="stylesheet" href="./assets/navigation.css" />
+    <link rel="stylesheet" href="./assets/content.css" />
+    <link rel="stylesheet" href="./assets/responsive.css" />
+  </head>
+  <body>
+    <div id="app">Laden...</div>
 
-      /* Cover */
-      --cover-background-image: none;
-      --cover-background-color: #fff;
-      --cover-color: var(--base-color);
-      --cover-heading-color: var(--theme-color);
-      --cover-blockquote-color: var(--blockquote-color);
-      --cover-button-background: transparent;
-      --cover-button-background--hover: var(--table-head-background);
-      --cover-button-border: 1px solid var(--theme-color);
-      --cover-button-color: var(--theme-color);
-      --cover-button-color--hover: var(--link-color--hover);
-      --cover-button-primary-background: var(--theme-color);
-      --cover-button-primary-background--hover: var(--link-color--hover);
-      --cover-button-primary-border: 1px solid var(--theme-color);
-      --cover-button-primary-color: var(--theme-color-foreground);
-      --cover-button-primary-color--hover: var(--theme-color-foreground);
+    <!-- Language Switcher -->
+    <div class="lang-switcher" id="langSwitcher">
+      <a href="#" data-lang="de" class="active">DE</a>
+      <a href="#" data-lang="en">EN</a>
+    </div>
 
-      /* Sidebar */
-      --sidebar-background: #f4f6f6;
-      --sidebar-border-color: #d6dede;
-      --sidebar-width: 260px;
-      --sidebar-name-color: var(--theme-color);
-      --sidebar-name-font-weight: 700;
-      --sidebar-nav-link-color: #364449;
-      --sidebar-nav-link-color--active: var(--theme-color);
-      --sidebar-nav-link-font-weight--active: 600;
-      --sidebar-nav-link-border-color--active: var(--theme-color);
-      --sidebar-toggle-background: var(--theme-color);
+    <!-- Dark Mode Toggle -->
+    <button
+      class="theme-toggle"
+      id="themeToggle"
+      type="button"
+      title="Farbmodus wechseln"
+      aria-label="Farbmodus wechseln"
+      aria-pressed="false"
+    >
+      🌙
+    </button>
 
-      /* Content */
-      --base-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      --base-font-size: 16px;
-      --base-line-height: 1.7;
-      --base-color: #202b30;
-      --base-background-color: #ffffff;
-      --heading-color: var(--base-color);
-      --heading-h1-color: var(--base-color);
-      --heading-h2-color: var(--base-color);
-      --heading-h3-color: var(--base-color);
-      --heading-h4-color: var(--base-color);
-      --link-color: var(--theme-color);
-      --link-color--hover: #1c5560;
-      --blockquote-border-color: var(--theme-color);
-      --blockquote-color: #536369;
+    <script src="./assets/app.js"></script>
 
-      /* Code */
-      --code-font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
-      --code-inline-background: #eef3f3;
-      --code-inline-color: var(--theme-color);
-      --code-block-background: #f4f6f6;
-      --code-block-color: var(--base-color);
-      --code-block-border-radius: 6px;
+    <!-- Docsify -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js"
+      integrity="sha384-KaHhgnx/OTLoJ4J33SSJsF4x1pk4I7q3s5ZOfIDHJYl6IG7Oyn2vNDsHiWJe46fD"
+      crossorigin="anonymous"
+    ></script>
 
-      /* Table */
-      --table-head-background: #f4f6f6;
-      --table-head-color: var(--base-color);
-      --table-body-background: #ffffff;
-      --table-row-odd-background: #fafbfb;
-      --table-cell-border-color: #d6dede;
+    <!-- Plugins -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/search.min.js"
+      integrity="sha384-LthJPBJ4RGco78kBY+EmKz5rmISZ5vrtAu3+l2ALQ2mrZHOe6Wyf6knyKjeC4cL6"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/zoom-image.min.js"
+      integrity="sha384-fYBaBAsdPMjWt1AuA+txMoztHnl+zLgObSvwddIabbfUp+36gf/vNOKx88f37zix"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2.1.1/dist/docsify-copy-code.min.js"
+      integrity="sha384-t4d9b4/0dEBkoJ5e77XEPBrqJ790jbFQFmEaTbBqIlTDeGosM1AbZvC1NQwqTg+5"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify-pagination@2.10.1/dist/docsify-pagination.min.js"
+      integrity="sha384-uFEp18/1vv2dYlO64J2lOcnbhirAQZPtruqAZZ7PZYoXenm5c+tIs3AqSMjVMRe8"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify-tabs@1.5.2/dist/docsify-tabs.min.js"
+      integrity="sha384-HDIipu8ms1FDLRotH7OldFKGJ9VBMz20a5b2xgQPSreYM7AGnFfRv3k9sKRgqRs5"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify-plugin-flexible-alerts@1.1.1/dist/docsify-plugin-flexible-alerts.min.js"
+      integrity="sha384-UwaoRTRxt1BoL/u+ucAgzz4PML/diz+5Jd69XmVMhl0pxqSUpm71h+4myV1gjm9h"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/docsify-sidebar-collapse@1.3.3/dist/docsify-sidebar-collapse.min.js"
+      integrity="sha384-0QSd60AAYEZ+wryDHvqZ58jqMWuwUCbtfBsgg51Ks/1CjXMs1QJFk815X4w3nAbD"
+      crossorigin="anonymous"
+    ></script>
 
-      /* Notice / Alerts */
-      --notice-tip-border-color: #17c964;
-      --notice-important-border-color: var(--theme-color);
-
-      /* Pagination */
-      --pagination-border-color: #d6dede;
-      --pagination-title-color: var(--theme-color);
-
-      /* Search */
-      --search-background: #f4f6f6;
-      --search-input-background: #ffffff;
-      --search-input-border-color: #d6dede;
-      --search-input-border-radius: 4px;
-      --search-result-keyword-color: var(--theme-color);
-    }
-
-    /* ===== Attraccess Dark Theme ===== */
-    /* Applied on html element so :root variables are overridden */
-    html[data-theme="dark"] {
-      color-scheme: dark;
-      --theme-color: #79bac6;
-      --theme-color-foreground: #172125;
-
-      /* Cover */
-      --cover-background-color: #172125;
-
-      /* Sidebar */
-      --sidebar-background: #1e2a2f;
-      --sidebar-border-color: #36464c;
-      --sidebar-nav-link-color: #d3dede;
-
-      /* Content */
-      --base-color: #edf2f2;
-      --base-background-color: #172125;
-      --link-color--hover: #a1d2db;
-      --blockquote-color: #b2c1c5;
-
-      /* Code */
-      --code-inline-background: #26363c;
-      --code-block-background: #1e2a2f;
-
-      /* Table */
-      --table-head-background: #26363c;
-      --table-body-background: #172125;
-      --table-row-odd-background: #1e2a2f;
-      --table-cell-border-color: #36464c;
-
-      /* Pagination */
-      --pagination-border-color: #36464c;
-
-      /* Search */
-      --search-background: #1e2a2f;
-      --search-input-background: #26363c;
-      --search-input-border-color: #536369;
-    }
-
-    /* ===== Cover Page ===== */
-    section.cover {
-      background: var(--cover-background-color) !important;
-      border-top: 6px solid var(--theme-color);
-      border-bottom: 1px solid var(--sidebar-border-color);
-    }
-    section.cover .mask {
-      display: none !important;
-    }
-    section.cover .cover-main {
-      position: relative;
-      z-index: 2;
-      max-width: 700px;
-    }
-    section.cover .cover-main > p:last-child a {
-      border-radius: 4px;
-      padding: 10px 28px;
-      font-weight: 600;
-      transition: background-color 0.15s ease, color 0.15s ease;
-    }
-    section.cover img {
-      width: 120px;
-      border-radius: 6px;
-    }
-
-    /* ===== Language Switcher ===== */
-    .lang-switcher {
-      position: fixed;
-      top: 12px;
-      right: 80px;
-      z-index: 100;
-      display: flex;
-      gap: 4px;
-      background: var(--sidebar-background);
-      border: 1px solid var(--sidebar-border-color);
-      border-radius: 6px;
-      padding: 3px;
-      font-size: 13px;
-    }
-    .lang-switcher a {
-      padding: 4px 10px;
-      border-radius: 4px;
-      text-decoration: none;
-      color: var(--sidebar-nav-link-color);
-      transition: all 0.15s ease;
-    }
-    .lang-switcher a.active {
-      background: var(--theme-color);
-      color: var(--theme-color-foreground);
-    }
-    .lang-switcher a:hover:not(.active) {
-      background: var(--table-head-background);
-    }
-
-    /* ===== Dark Mode Toggle ===== */
-    .theme-toggle {
-      position: fixed;
-      top: 12px;
-      right: 16px;
-      z-index: 100;
-      background: var(--sidebar-background);
-      border: 1px solid var(--sidebar-border-color);
-      border-radius: 4px;
-      padding: 4px 10px;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
-      transition: all 0.15s ease;
-    }
-    .theme-toggle:hover {
-      background: var(--table-head-background);
-    }
-    a:focus-visible,
-    button:focus-visible,
-    input:focus-visible {
-      outline: 2px solid var(--theme-color);
-      outline-offset: 3px;
-    }
-
-    /* ===== Content Styling ===== */
-    .markdown-section {
-      max-width: 820px;
-    }
-    .markdown-section h1 {
-      font-weight: 700;
-      color: var(--heading-h1-color) !important;
-      border-bottom: 2px solid var(--theme-color);
-      padding-bottom: 8px;
-    }
-    .markdown-section h2 {
-      font-weight: 600;
-      color: var(--heading-h2-color) !important;
-      margin-top: 2.5em;
-    }
-    .markdown-section h3 {
-      font-weight: 600;
-      color: var(--heading-h3-color) !important;
-    }
-    .markdown-section h4 {
-      font-weight: 600;
-      color: var(--heading-h4-color) !important;
-    }
-    .markdown-section p,
-    .markdown-section li {
-      color: var(--base-color);
-    }
-    .markdown-section strong {
-      color: var(--heading-color);
-    }
-    .markdown-section a {
-      color: var(--link-color) !important;
-    }
-    .markdown-section a:hover {
-      color: var(--link-color--hover) !important;
-    }
-    .markdown-section table {
-      display: table;
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .markdown-section table th {
-      font-weight: 600;
-      text-align: left;
-      background: var(--table-head-background);
-      color: var(--table-head-color);
-    }
-    .markdown-section table td {
-      color: var(--base-color);
-    }
-    .markdown-section table td,
-    .markdown-section table th {
-      padding: 10px 14px;
-      border: 1px solid var(--table-cell-border-color);
-    }
-    .markdown-section table tr:nth-child(odd) td {
-      background: var(--table-row-odd-background);
-    }
-    .markdown-section img {
-      border-radius: 6px;
-    }
-    .markdown-section blockquote {
-      color: var(--blockquote-color);
-      border-left-color: var(--blockquote-border-color);
-    }
-    .markdown-section code {
-      background: var(--code-inline-background) !important;
-      color: var(--code-inline-color) !important;
-    }
-    .markdown-section pre code {
-      background: var(--code-block-background) !important;
-      color: var(--code-block-color) !important;
-    }
-
-    /* Alert/callout boxes */
-    .markdown-section .tip,
-    .markdown-section .warn,
-    .markdown-section .note {
-      border-radius: 6px;
-      padding: 16px 20px;
-    }
-
-    /* Flexible alerts dark mode */
-    html[data-theme="dark"] .markdown-section .alert {
-      background-color: var(--sidebar-background);
-      color: var(--base-color);
-    }
-    html[data-theme="dark"] .markdown-section .alert p {
-      color: var(--base-color);
-    }
-
-    /* Sidebar logo */
-    .app-name-link img {
-      max-width: 32px;
-      vertical-align: middle;
-      margin-right: 8px;
-    }
-
-    /* Dark mode: force sidebar and toggle colors */
-    html[data-theme="dark"] .sidebar {
-      background: var(--sidebar-background) !important;
-      border-right-color: var(--sidebar-border-color) !important;
-    }
-    html[data-theme="dark"] .sidebar-toggle {
-      background: var(--sidebar-background) !important;
-    }
-    html[data-theme="dark"] .search input {
-      background: var(--search-input-background) !important;
-      border-color: var(--search-input-border-color) !important;
-      color: var(--base-color) !important;
-    }
-    html[data-theme="dark"] .search .matching-post {
-      border-color: var(--sidebar-border-color) !important;
-    }
-
-    /* Sidebar top-level nav items — pointer cursor for collapsible sections */
-    .sidebar-nav > ul > li > p {
-      cursor: pointer;
-    }
-
-    /* GitHub corner — move to top-left to avoid overlap with lang/theme toggles */
-    .github-corner {
-      position: fixed !important;
-      top: 0;
-      right: auto !important;
-      left: 0;
-      z-index: 30;
-    }
-    .github-corner svg {
-      transform: scaleX(-1);
-    }
-
-    /* ===== Mobile Responsive ===== */
-    /* Use 767px to avoid conflict with Docsify's 768px sidebar breakpoint */
-    @media (max-width: 767px) {
-      /* Hide GitHub corner on mobile — it overlaps sidebar toggle and content */
-      .github-corner {
-        display: none !important;
-      }
-
-      /* Push content right to clear the sidebar toggle strip (32px wide) */
-      section.content {
-        padding-left: 40px !important;
-        padding-right: 8px !important;
-      }
-      .markdown-section {
-        padding: 0 8px !important;
-        max-width: 100% !important;
-        font-size: 15px;
-      }
-
-      /* Scale down headings for small screens */
-      .markdown-section h1 {
-        font-size: 1.6em;
-        word-break: break-word;
-      }
-      .markdown-section h2 {
-        font-size: 1.3em;
-        margin-top: 1.8em;
-      }
-      .markdown-section h3 {
-        font-size: 1.15em;
-      }
-      .markdown-section h4 {
-        font-size: 1.05em;
-      }
-
-      /* Tables: horizontal scroll on overflow */
-      .markdown-section table {
-        display: block;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        width: 100%;
-      }
-      .markdown-section table th,
-      .markdown-section table td {
-        padding: 8px 10px;
-        font-size: 14px;
-        white-space: nowrap;
-      }
-
-      /* Code blocks: prevent overflow */
-      .markdown-section pre {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        border-radius: 6px;
-        padding: 12px !important;
-        font-size: 13px;
-      }
-      /* Inline code: wrap long examples while keeping fenced blocks scrollable */
-      .markdown-section :not(pre) > code {
-        white-space: normal !important;
-        overflow-wrap: anywhere;
-      }
-
-      /* Images: constrain to viewport */
-      .markdown-section img {
-        max-width: 100%;
-        height: auto;
-      }
-
-      /* Cover page refinements */
-      section.cover {
-        padding: 20px 16px !important;
-      }
-      section.cover .cover-main {
-        max-width: 100%;
-        padding: 0 8px;
-      }
-      section.cover .cover-main h1 {
-        font-size: 2em !important;
-      }
-      section.cover img {
-        width: 80px;
-        border-radius: 6px;
-      }
-      section.cover .cover-main > p:last-child a {
-        display: block;
-        margin: 8px 0;
-        text-align: center;
-        padding: 12px 20px;
-      }
-
-      /* Lang switcher + theme toggle: bottom bar on mobile */
-      .lang-switcher,
-      .theme-toggle {
-        position: fixed;
-        top: auto;
-        bottom: 16px;
-        z-index: 100;
-      }
-      .lang-switcher {
-        right: 16px;
-        left: auto;
-      }
-      .theme-toggle {
-        right: auto;
-        left: 16px;
-        padding: 6px 12px;
-      }
-
-      /* Alert/callout boxes: tighter padding */
-      .markdown-section .tip,
-      .markdown-section .warn,
-      .markdown-section .note {
-        padding: 12px 14px;
-      }
-
-      /* Blockquotes */
-      .markdown-section blockquote {
-        margin-left: 0;
-        margin-right: 0;
-        padding: 8px 14px;
-      }
-
-      /* Bottom padding so pagination clears the floating toggles */
-      .docsify-pagination-container {
-        margin-bottom: 56px !important;
-      }
-    }
-
-    /* Tablet adjustments (768px = Docsify sidebar visible breakpoint) */
-    @media (min-width: 768px) and (max-width: 1024px) {
-      .markdown-section {
-        max-width: 100%;
-        padding-right: 24px !important;
-      }
-      .markdown-section h1 {
-        font-size: 1.8em;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div id="app">Laden...</div>
-
-  <!-- Language Switcher -->
-  <div class="lang-switcher" id="langSwitcher">
-    <a href="#" data-lang="de" class="active">DE</a>
-    <a href="#" data-lang="en">EN</a>
-  </div>
-
-  <!-- Dark Mode Toggle -->
-  <button class="theme-toggle" id="themeToggle" type="button" title="Farbmodus wechseln" aria-label="Farbmodus wechseln" aria-pressed="false">🌙</button>
-
-  <script>
-    // ===== i18n: language detected from localStorage or browser =====
-    var currentLang = (function() {
-      var stored = localStorage.getItem('attraccess-docs-lang');
-      if (stored === 'de' || stored === 'en') return stored;
-      var browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
-      return browserLang.startsWith('de') ? 'de' : 'en';
-    })();
-    localStorage.setItem('attraccess-docs-lang', currentLang);
-
-    // Strip language prefix from hash if present (basePath handles language routing)
-    (function() {
-      var hash = window.location.hash || '';
-      var match = hash.match(/^#\/(de|en)(\/.*)?$/);
-      if (match) {
-        currentLang = match[1];
-        localStorage.setItem('attraccess-docs-lang', currentLang);
-        var rest = match[2] || '/';
-        window.location.replace(window.location.pathname + '#' + rest);
-      }
-    })();
-
-    // ===== Dark Mode — set on html element so :root CSS variables work =====
-    var savedTheme = localStorage.getItem('attraccess-docs-theme');
-    var theme = savedTheme === 'dark' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', theme);
-
-    // ===== Resolve base path: works at site root (GitHub Pages) and under /docs/ (Docker) =====
-    var docsBase = (function() {
-      var path = window.location.pathname;
-      if (path.charAt(path.length - 1) !== '/') path += '/';
-      return path;
-    })();
-
-    // ===== Docsify Configuration =====
-    window.$docsify = {
-      name: '<img src="' + docsBase + '_media/logo.png" alt="Logo" width="28"> Attraccess',
-      repo: 'https://github.com/Attraccess/Attraccess',
-      homepage: 'home.md',
-      loadSidebar: '_sidebar.md',
-      loadNavbar: false,
-      coverpage: 'coverpage.md',
-      onlyCover: false,
-      subMaxLevel: 3,
-      auto2top: true,
-      basePath: docsBase + currentLang + '/',
-      search: {
-        maxAge: 86400000,
-        paths: 'auto',
-        placeholder: currentLang === 'de' ? 'Suchen...' : 'Search...',
-        noData: currentLang === 'de' ? 'Keine Ergebnisse' : 'No results',
-        depth: 4,
-        hideOtherSidebarContent: false,
-        namespace: 'attraccess-docs-' + currentLang
-      },
-      pagination: {
-        previousText: currentLang === 'de' ? 'Zurück' : 'Previous',
-        nextText: currentLang === 'de' ? 'Weiter' : 'Next',
-        crossChapter: true,
-        crossChapterText: true
-      },
-      copyCode: {
-        buttonText: currentLang === 'de' ? 'Kopieren' : 'Copy',
-        errorText: currentLang === 'de' ? 'Fehler' : 'Error',
-        successText: currentLang === 'de' ? 'Kopiert!' : 'Copied!'
-      },
-      themeable: {
-        readyTransition: true,
-        responsiveTables: true
-      },
-      tabs: {
-        persist: true,
-        sync: true,
-        theme: 'classic'
-      },
-      routerMode: 'hash',
-      plugins: [
-        function(hook, vm) {
-          hook.doneEach(function() {
-            updateLangSwitcher();
-          });
-        }
-      ]
-    };
-
-    // ===== Language Switching =====
-    function updateLangSwitcher() {
-      var links = document.querySelectorAll('.lang-switcher a');
-      links.forEach(function(link) {
-        link.classList.toggle('active', link.getAttribute('data-lang') === currentLang);
-      });
-    }
-    updateLangSwitcher();
-
-    document.getElementById('langSwitcher').addEventListener('click', function(e) {
-      e.preventDefault();
-      var langEl = e.target.closest ? e.target.closest('a[data-lang]') : e.target;
-      var lang = langEl ? langEl.getAttribute('data-lang') : null;
-      if (!lang || lang === currentLang) return;
-      localStorage.setItem('attraccess-docs-lang', lang);
-      window.location.reload();
-    });
-
-    // ===== Theme Toggle — set on html element =====
-    var toggleBtn = document.getElementById('themeToggle');
-    toggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
-    toggleBtn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
-    toggleBtn.setAttribute('aria-label', currentLang === 'de' ? 'Farbmodus wechseln' : 'Toggle color mode');
-
-    toggleBtn.addEventListener('click', function() {
-      var current = document.documentElement.getAttribute('data-theme');
-      var next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('attraccess-docs-theme', next);
-      toggleBtn.textContent = next === 'dark' ? '☀️' : '🌙';
-      toggleBtn.setAttribute('aria-pressed', next === 'dark' ? 'true' : 'false');
-    });
-  </script>
-
-  <!-- Docsify -->
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js" integrity="sha384-KaHhgnx/OTLoJ4J33SSJsF4x1pk4I7q3s5ZOfIDHJYl6IG7Oyn2vNDsHiWJe46fD" crossorigin="anonymous"></script>
-
-  <!-- Plugins -->
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/search.min.js" integrity="sha384-LthJPBJ4RGco78kBY+EmKz5rmISZ5vrtAu3+l2ALQ2mrZHOe6Wyf6knyKjeC4cL6" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/zoom-image.min.js" integrity="sha384-fYBaBAsdPMjWt1AuA+txMoztHnl+zLgObSvwddIabbfUp+36gf/vNOKx88f37zix" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2.1.1/dist/docsify-copy-code.min.js" integrity="sha384-t4d9b4/0dEBkoJ5e77XEPBrqJ790jbFQFmEaTbBqIlTDeGosM1AbZvC1NQwqTg+5" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2.10.1/dist/docsify-pagination.min.js" integrity="sha384-uFEp18/1vv2dYlO64J2lOcnbhirAQZPtruqAZZ7PZYoXenm5c+tIs3AqSMjVMRe8" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1.5.2/dist/docsify-tabs.min.js" integrity="sha384-HDIipu8ms1FDLRotH7OldFKGJ9VBMz20a5b2xgQPSreYM7AGnFfRv3k9sKRgqRs5" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-plugin-flexible-alerts@1.1.1/dist/docsify-plugin-flexible-alerts.min.js" integrity="sha384-UwaoRTRxt1BoL/u+ucAgzz4PML/diz+5Jd69XmVMhl0pxqSUpm71h+4myV1gjm9h" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-sidebar-collapse@1.3.3/dist/docsify-sidebar-collapse.min.js" integrity="sha384-0QSd60AAYEZ+wryDHvqZ58jqMWuwUCbtfBsgg51Ks/1CjXMs1QJFk815X4w3nAbD" crossorigin="anonymous"></script>
-
-  <!-- Syntax Highlighting -->
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js" integrity="sha384-9WmlN8ABpoFSSHvBGGjhvB3E/D8UkNB9HpLJjBQFC2VSQsM1odiQDv4NbEo+7l15" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js" integrity="sha384-RhrmFFMb0ZCHImjFMpR/UE3VEtIVTCtNrtKQqXCzqXZNJala02N3UbVhi+qzw3CY" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js" integrity="sha384-D44bgYYKvaiDh4cOGlj1dbSDpSctn2FSUj118HZGmZEShZcO2v//Q5vvhNy206pp" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js" integrity="sha384-PeOqKNW/piETaCg8rqKFy+Pm6KEk7e36/5YZE5XO/OaFdO+/Aw3O8qZ9qDPKVUgx" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js" integrity="sha384-AKAiycghK0jDCjD+aavMHzDkLzRR7Yzcwh3+xL/295cvyVMe+cxQfyQC8xxGGcI8" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js" integrity="sha384-44ggPevoK6FC5kDMdbbWoMCAFkSCwaRoXXtKMkslR2lf8Ra3OSzCRrFIyeK+TQBi" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-c.min.js" integrity="sha384-gaD4ncierlmWk42Z3BmTp37/z+Dqt8V4Wf74UjTvFeo+M+SgnEI6Ysd98pWhksQv" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-cpp.min.js" integrity="sha384-NiOrAquf32LSG3Vuig99LKS03EZPUuM8a51NOp+XXsqx08hUVo3wbNWALY7K/2J8" crossorigin="anonymous"></script>
-</body>
+    <!-- Syntax Highlighting -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"
+      integrity="sha384-9WmlN8ABpoFSSHvBGGjhvB3E/D8UkNB9HpLJjBQFC2VSQsM1odiQDv4NbEo+7l15"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"
+      integrity="sha384-RhrmFFMb0ZCHImjFMpR/UE3VEtIVTCtNrtKQqXCzqXZNJala02N3UbVhi+qzw3CY"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"
+      integrity="sha384-D44bgYYKvaiDh4cOGlj1dbSDpSctn2FSUj118HZGmZEShZcO2v//Q5vvhNy206pp"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"
+      integrity="sha384-PeOqKNW/piETaCg8rqKFy+Pm6KEk7e36/5YZE5XO/OaFdO+/Aw3O8qZ9qDPKVUgx"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"
+      integrity="sha384-AKAiycghK0jDCjD+aavMHzDkLzRR7Yzcwh3+xL/295cvyVMe+cxQfyQC8xxGGcI8"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js"
+      integrity="sha384-44ggPevoK6FC5kDMdbbWoMCAFkSCwaRoXXtKMkslR2lf8Ra3OSzCRrFIyeK+TQBi"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-c.min.js"
+      integrity="sha384-gaD4ncierlmWk42Z3BmTp37/z+Dqt8V4Wf74UjTvFeo+M+SgnEI6Ysd98pWhksQv"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-cpp.min.js"
+      integrity="sha384-NiOrAquf32LSG3Vuig99LKS03EZPUuM8a51NOp+XXsqx08hUVo3wbNWALY7K/2J8"
+      crossorigin="anonymous"
+    ></script>
+  </body>
 </html>

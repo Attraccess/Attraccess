@@ -1,6 +1,16 @@
 {
   "extends": "../../../../tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
+  "compilerOptions": {
+    "types": ["node"]
+  },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.test-utils.ts",
+    "src/**/*.test-cases.ts",
+    "src/**/*.test-fixture.ts",
+    "src/**/*.test-helpers.ts",
+    "src/**/*.spec.*.ts",
+    "src/**/*.test.*.ts"
+  ]
 }

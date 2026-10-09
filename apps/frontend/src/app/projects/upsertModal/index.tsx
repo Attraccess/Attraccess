@@ -149,7 +149,9 @@ export function UpsertProjectModal(props: Props) {
       {children(open)}
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
-          <DrawerHeading className="text-lg font-semibold">{projectId ? t('title.update') : t('title.create')}</DrawerHeading>
+          <DrawerHeading className="text-lg font-semibold">
+            {projectId ? t('title.update') : t('title.create')}
+          </DrawerHeading>
         </DrawerHeader>
 
         <DrawerBody>

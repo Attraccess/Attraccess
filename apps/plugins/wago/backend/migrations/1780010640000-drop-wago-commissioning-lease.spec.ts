@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { WagoCommissioningLease1780000000011 } from '../wago-commissioning-lease.migration';
+import { WagoCommissioningLease1780000000011 } from '../commissioning/sessions/lease.migration';
 import { DropWagoCommissioningLease1780010640000 } from './1780010640000-drop-wago-commissioning-lease';
 
 it('drops persisted interrupted coordinator state on upgrade', async () => {

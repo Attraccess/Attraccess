@@ -1,7 +1,5 @@
 'use strict';
 
-const BASE_URL = 'https://dns.hetzner.com/api/v1';
-
 function log(message) {
   // eslint-disable-next-line no-console
   console.log(`[hetzner] ${message}`);
@@ -29,6 +27,8 @@ function requireEnv(name) {
   return value;
 }
 
+const BASE_URL = 'https://dns.hetzner.com/api/v1';
+
 async function httpJson(url, init = {}) {
   const headers = init.headers ? { ...init.headers } : {};
   headers['Auth-API-Token'] = requireEnv('HETZNER_API_TOKEN');
@@ -47,13 +47,6 @@ async function httpJson(url, init = {}) {
 async function getZoneName(zoneId) {
   const data = await httpJson(`${BASE_URL}/zones/${zoneId}`);
   return data?.zone?.name || '';
-}
-
-function normalizeName(rawName, zoneName) {
-  if (!rawName || rawName === '@') return '@';
-  if (rawName === zoneName) return '@';
-  const suffix = `.${zoneName}`;
-  return rawName.endsWith(suffix) ? rawName.slice(0, -suffix.length) : rawName;
 }
 
 async function getRecord(zoneId, name) {
@@ -148,6 +141,13 @@ function pickLanIPv4() {
   return '';
 }
 
+function normalizeName(rawName, zoneName) {
+  if (!rawName || rawName === '@') return '@';
+  if (rawName === zoneName) return '@';
+  const suffix = `.${zoneName}`;
+  return rawName.endsWith(suffix) ? rawName.slice(0, -suffix.length) : rawName;
+}
+
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -157,10 +157,10 @@ async function main() {
   if (!enabled) {
     log('disabled; set HETZNER_DNS_UPDATER_ENABLED=true to enable');
     // Keep container alive when disabled
-    // eslint-disable-next-line no-constant-condition
+
     while (true) {
       // 24h sleep chunks
-      // eslint-disable-next-line no-await-in-loop
+
       await sleep(24 * 60 * 60 * 1000);
     }
   }
@@ -185,27 +185,25 @@ async function main() {
   const wildcardName = plainLabel === '@' ? '*' : `*.${plainLabel}`;
 
   // Loop forever
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     const ip = pickLanIPv4();
     if (!ip) {
       log('could not determine LAN IP; retrying in 60s');
-      // eslint-disable-next-line no-await-in-loop
+
       await sleep(60 * 1000);
-      // eslint-disable-next-line no-continue
+
       continue;
     }
 
     try {
-      // eslint-disable-next-line no-await-in-loop
       await upsertARecord(zoneId, plainLabel, ip, ttl);
-      // eslint-disable-next-line no-await-in-loop
+
       await upsertARecord(zoneId, wildcardName, ip, ttl);
     } catch (err) {
       log(`error during upsert: ${String(err.message || err)}`);
     }
 
-    // eslint-disable-next-line no-await-in-loop
     await sleep(intervalSec * 1000);
   }
 }

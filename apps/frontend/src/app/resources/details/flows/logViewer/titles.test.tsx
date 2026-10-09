@@ -11,7 +11,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock('../flowContext', () => ({ useFlowContext: () => ({ liveLogs: state.logs }) }));
+vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.logs }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourceFlowsServiceGetResourceFlow: () => ({ data: { nodes: state.nodes } }),
   useResourceFlowsServiceGetNodeSchemas: () => ({ data: state.schemas }),

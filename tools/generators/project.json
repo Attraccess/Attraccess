@@ -4,13 +4,7 @@
   "sourceRoot": "tools/generators/src",
   "projectType": "library",
   "tags": ["type:tool", "scope:core"],
-  "implicitDependencies": [
-    "frontend",
-    "companion",
-    "ui",
-    "plugins-frontend-ui",
-    "plugins-frontend-sdk"
-  ],
+  "implicitDependencies": ["frontend", "companion", "ui", "plugins-frontend-ui", "plugins-frontend-sdk"],
   "targets": {
     "test": {
       "inputs": [
@@ -52,7 +46,8 @@
             "output": "."
           }
         ]
-      }
+      },
+      "inputs": ["production", "!{projectRoot}/src/**/*.test-utils.ts", "^production"]
     },
     "crap-score": {
       "executor": "nx:run-commands",

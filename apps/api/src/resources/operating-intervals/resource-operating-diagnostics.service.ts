@@ -1,33 +1,68 @@
 // Diagnostics over the authoritative machine operating timeline (ATT-1024).
 // All views are derived directly from `resource_operating_interval` rows; there are no persisted
 // aggregates yet, so verification recomputes derived durations from the timeline and compares.
+import { ResourceFlowNode, ResourceOperatingInterval, ResourceFlowNodeType } from '@attraccess/database-entities';
+
 import { Injectable } from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResourceFlowNode, ResourceFlowNodeType, ResourceOperatingInterval } from '@attraccess/database-entities';
-import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+
+import { In, IsNull, MoreThan, Repository } from 'typeorm';
+
 import {
   OperatingDataQualityFailureKind,
   OperatingMetricsRecorder,
 } from '../../metrics/instrumentation/operating/operating.helper';
-import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
+
 import {
   OperatingDataQualityIssueDto,
   OperatingDataQualityReportDto,
   OperatingStateDto,
-  OperatingTimelineVerificationCheckDto,
   OperatingTimelineVerificationDto,
   OperatingTransitionDto,
   OperatingTransitionPageDto,
 } from './dtos/operating-diagnostics-response.dto';
 
-/** A resource with tracking configured but no transition for this long is reported as stale. */
+import { verifyTimeline as verifyTimelineImplementation } from './operating-timeline-verification';
+
+import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
+
+export /** A resource with tracking configured but no transition for this long is reported as stale. */
 const STALE_SIGNAL_DAYS = 7;
-const DAY_MS = 24 * 60 * 60_000;
-const SAMPLE_LIMIT = 10;
-const TRACKING_NODE_TYPES = [
+
+export const DAY_MS = 24 * 60 * 60_000;
+
+export const SAMPLE_LIMIT = 10;
+
+export const TRACKING_NODE_TYPES = [
   ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING,
   ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE,
 ];
+
+/** Total length of the union of [start, end) ranges, ignoring empty or inverted ranges. */
+export function unionDurationMs(ranges: { start: number; end: number }[]): number {
+  const sorted = ranges.filter((range) => range.end > range.start).sort((left, right) => left.start - right.start);
+  let total = 0;
+  let cursor: number | null = null;
+  let currentEnd: number | null = null;
+
+  for (const range of sorted) {
+    if (cursor === null || currentEnd === null || range.start >= currentEnd) {
+      if (cursor !== null && currentEnd !== null) {
+        total += currentEnd - cursor;
+      }
+      cursor = range.start;
+      currentEnd = range.end;
+    } else if (range.end > currentEnd) {
+      currentEnd = range.end;
+    }
+  }
+
+  if (cursor !== null && currentEnd !== null) {
+    total += currentEnd - cursor;
+  }
+  return total;
+}
 
 @Injectable()
 export class ResourceOperatingDiagnosticsService {
@@ -169,102 +204,15 @@ export class ResourceOperatingDiagnosticsService {
    * (ATT-1024 keeps views derived), so verification covers the derived view; the response says so.
    */
   async verifyTimeline(resourceId: number, from: Date, to: Date): Promise<OperatingTimelineVerificationDto> {
-    const intervals = await this.intervalRepository.find({
-      where: [
-        { resourceId, startTime: LessThan(to), endTime: IsNull() },
-        { resourceId, startTime: LessThan(to), endTime: MoreThan(from) },
-      ],
-      order: { startTime: 'ASC' },
-    });
-
-    const recomputedOperatingDurationMs = unionDurationMs(
-      intervals.map((interval) => ({
-        start: Math.max(interval.startTime.getTime(), from.getTime()),
-        end: Math.min((interval.endTime ?? to).getTime(), to.getTime()),
-      })),
-    );
-
-    const summary = await this.attributionService.getForResource(resourceId, to, from);
-
-    // ATT-1027 semantics: null durations mean "operating data unavailable" (the resource never
-    // produced an interval row), which is distinct from a measured 0. Verification leans on that:
-    // an unavailable view is consistent exactly when the timeline recomputes to zero.
-    const { operatingDataAvailable } = summary;
-    const reported = summary.operatingDurationMs;
-    const attributed = summary.attributedOperatingDurationMs;
-    const unattributed = summary.unattributedOperatingDurationMs;
-
-    const operatingMatches = operatingDataAvailable
-      ? recomputedOperatingDurationMs === reported
-      : reported === null && recomputedOperatingDurationMs === 0;
-    const partitionMatches = operatingDataAvailable
-      ? attributed !== null && unattributed !== null && reported !== null && attributed + unattributed === reported
-      : attributed === null && unattributed === null;
-    const withinMatches = operatingDataAvailable
-      ? attributed !== null && reported !== null && attributed <= reported
-      : attributed === null;
-
-    const checks: OperatingTimelineVerificationCheckDto[] = [
+    const getContextOwner = () => this;
+    return verifyTimelineImplementation(
       {
-        name: 'operating-duration-matches',
-        passed: operatingMatches,
-        detail: operatingMatches
-          ? null
-          : `Recomputed ${recomputedOperatingDurationMs}ms from ${intervals.length} interval rows, derived view reports ${reported === null ? 'unavailable' : `${reported}ms`}`,
+        intervalRepository: getContextOwner().intervalRepository,
+        attributionService: getContextOwner().attributionService,
       },
-      {
-        name: 'attribution-partition-matches',
-        passed: partitionMatches,
-        detail: partitionMatches
-          ? null
-          : `Attributed ${attributed}ms + unattributed ${unattributed}ms != operating ${reported}ms`,
-      },
-      {
-        name: 'attributions-within-operating-duration',
-        passed: withinMatches,
-        detail: withinMatches ? null : `Attributed ${attributed}ms exceeds operating ${reported}ms`,
-      },
-    ];
-
-    return {
       resourceId,
       from,
       to,
-      consistent: checks.every((check) => check.passed),
-      recomputedOperatingDurationMs,
-      operatingDataAvailable,
-      reportedOperatingDurationMs: reported,
-      reportedAttributedDurationMs: attributed,
-      reportedUnattributedDurationMs: unattributed,
-      intervalCount: intervals.length,
-      aggregatesPresent: false,
-      note: 'No persisted aggregates exist; derived views are computed directly from the authoritative interval rows and verified against them.',
-      checks,
-    };
+    );
   }
-}
-
-/** Total length of the union of [start, end) ranges, ignoring empty or inverted ranges. */
-export function unionDurationMs(ranges: { start: number; end: number }[]): number {
-  const sorted = ranges.filter((range) => range.end > range.start).sort((left, right) => left.start - right.start);
-  let total = 0;
-  let cursor: number | null = null;
-  let currentEnd: number | null = null;
-
-  for (const range of sorted) {
-    if (cursor === null || currentEnd === null || range.start >= currentEnd) {
-      if (cursor !== null && currentEnd !== null) {
-        total += currentEnd - cursor;
-      }
-      cursor = range.start;
-      currentEnd = range.end;
-    } else if (range.end > currentEnd) {
-      currentEnd = range.end;
-    }
-  }
-
-  if (cursor !== null && currentEnd !== null) {
-    total += currentEnd - cursor;
-  }
-  return total;
 }

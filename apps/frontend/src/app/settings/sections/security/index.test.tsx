@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
@@ -13,6 +12,7 @@ import {
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SecuritySection } from './index';
+import userEvent from '@testing-library/user-event';
 
 const feedback = vi.hoisted(() => ({
   invalidate: vi.fn(() => Promise.resolve()),
@@ -120,7 +120,6 @@ describe('SecuritySection', () => {
 
   const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
   const saveButton = () => screen.getByRole('button', { name: 'saveBar.save' });
-
   it('absorbs all four former destinations into one section', () => {
     // Login throttling was an inline form on /users/security, the password policy a page of its
     // own, 2FA and signup domains header modals. If any of these stops rendering here, that
@@ -374,6 +373,7 @@ describe('SecuritySection', () => {
 
     expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toHaveValue('7');
   });
+
   it('updates cached settings after saves and reports failures for each backend', async () => {
     render(<SecuritySection />);
     const cases = [

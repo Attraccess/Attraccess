@@ -2,8 +2,8 @@
 // FEATURE: System notification preferences
 import { useLiveUpdates } from '../../utils/live-updates';
 
-import { SystemNotificationLiveEvent } from '../../utils/live-update-types';
-export type { SystemNotificationLiveEvent } from '../../utils/live-update-types';
+import { SystemNotificationLiveEvent } from '../../utils/live-updates/types';
+export type { SystemNotificationLiveEvent } from '../../utils/live-updates/types';
 
 interface Props {
   onNotification: (notification: SystemNotificationLiveEvent) => void;

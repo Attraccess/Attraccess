@@ -173,6 +173,20 @@ bool LedController::isCircularRing() const
     return false;
 #endif
 }
+#endif
+
+#ifdef HAS_WS2812_LED
+
+#include "led.hpp"
+#include "../platform.hpp"
+#include "../settings/settings.hpp"
+
+#ifndef PIN_WS2812_DATA
+#define PIN_WS2812_DATA 38
+#endif
+#ifndef WS2812_LED_COUNT
+#define WS2812_LED_COUNT 8
+#endif
 
 uint16_t LedController::wrapIndex(int16_t i) const
 {
@@ -327,6 +341,21 @@ void LedController::runLinearAnimation()
         break;
     }
 }
+
+#endif
+
+#ifdef HAS_WS2812_LED
+
+#include "led.hpp"
+#include "../platform.hpp"
+#include "../settings/settings.hpp"
+
+#ifndef PIN_WS2812_DATA
+#define PIN_WS2812_DATA 38
+#endif
+#ifndef WS2812_LED_COUNT
+#define WS2812_LED_COUNT 8
+#endif
 
 void LedController::setAll(uint32_t color)
 {

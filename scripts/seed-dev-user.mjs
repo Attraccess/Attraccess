@@ -1,48 +1,15 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- Preserve operational diagnostics and CLI output. */
 // Seeds local development data directly after migrations have created the SQLite schema.
 // Usage: pnpm seed:dev -- [--demo] [--fixture path/to/fixture.json] [--username admin] [--password password]
-import sqlite3pkg from 'sqlite3';
-import bcrypt from 'bcrypt';
+import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import sqlite3pkg from 'sqlite3';
 import { assertUsageIntegrity } from './usage-integrity.mjs';
+import bcrypt from 'bcrypt';
 
-const sqlite3 = sqlite3pkg.verbose();
-
-const DEMO_FIXTURE = {
-  resourceGroups: [{ name: 'Demo Workshop', description: 'Resources used for local development.' }],
-  resources: [
-    {
-      name: 'Demo 3D Printer',
-      type: 'machine',
-      description: 'A safe local-development resource.',
-      groups: ['Demo Workshop'],
-    },
-  ],
-  roles: [
-    {
-      key: 'demo-resource-user',
-      name: 'Demo Resource User',
-      description: 'Can view the local demo resource.',
-      permissions: ['resources.read'],
-    },
-  ],
-};
-
-function parseArgs(argv) {
-  const out = {};
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      out[key] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
-    }
-  }
-  return out;
-}
-
-function run(db, sql, params = []) {
+export function run(db, sql, params = []) {
   return new Promise((resolve, reject) => {
     db.run(sql, params, function callback(error) {
       if (error) reject(error);
@@ -51,45 +18,27 @@ function run(db, sql, params = []) {
   });
 }
 
-function get(db, sql, params = []) {
+export function get(db, sql, params = []) {
   return new Promise((resolve, reject) => {
     db.get(sql, params, (error, row) => (error ? reject(error) : resolve(row)));
   });
 }
 
-function all(db, sql, params = []) {
+export function all(db, sql, params = []) {
   return new Promise((resolve, reject) => {
     db.all(sql, params, (error, rows) => (error ? reject(error) : resolve(rows)));
   });
 }
 
-async function hasTable(db, table) {
+export async function hasTable(db, table) {
   return Boolean(await get(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table]));
 }
 
-async function getColumns(db, table) {
+export async function getColumns(db, table) {
   return (await all(db, `PRAGMA table_info("${table}")`)).map((row) => row.name);
 }
 
-function localDatabasePath(repoRoot, requestedPath) {
-  const storageDir = path.resolve(repoRoot, 'storage');
-  const dbPath = path.resolve(requestedPath || path.join(storageDir, 'attraccess.sqlite'));
-  return { dbPath, isLocal: dbPath === storageDir || dbPath.startsWith(`${storageDir}${path.sep}`) };
-}
-
-function loadFixture(fixturePath) {
-  try {
-    const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
-    if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) {
-      throw new Error('fixture must be a JSON object');
-    }
-    return fixture;
-  } catch (error) {
-    throw new Error(`Could not read fixture ${fixturePath}: ${error.message}`);
-  }
-}
-
-async function upsertAdmin(db, { username, email, password }) {
+export async function upsertAdmin(db, { username, email, password }) {
   const userColumns = await getColumns(db, 'user');
   if (userColumns.length === 0) throw new Error('user table missing - start the API so migrations run');
 
@@ -143,7 +92,7 @@ async function upsertAdmin(db, { username, email, password }) {
   return seededUserId;
 }
 
-async function assignRole(db, username, roleKey) {
+export async function assignRole(db, username, roleKey) {
   const user = await get(db, 'SELECT id FROM "user" WHERE username = ?', [username]);
   const role = await get(db, 'SELECT id FROM "role" WHERE key = ?', [roleKey]);
   if (!user) throw new Error(`Fixture user not found: ${username}`);
@@ -157,7 +106,39 @@ async function assignRole(db, username, roleKey) {
   }
 }
 
-async function applyFixture(db, fixture) {
+export const DEMO_FIXTURE = {
+  resourceGroups: [{ name: 'Demo Workshop', description: 'Resources used for local development.' }],
+  resources: [
+    {
+      name: 'Demo 3D Printer',
+      type: 'machine',
+      description: 'A safe local-development resource.',
+      groups: ['Demo Workshop'],
+    },
+  ],
+  roles: [
+    {
+      key: 'demo-resource-user',
+      name: 'Demo Resource User',
+      description: 'Can view the local demo resource.',
+      permissions: ['resources.read'],
+    },
+  ],
+};
+
+export function loadFixture(fixturePath) {
+  try {
+    const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+    if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) {
+      throw new Error('fixture must be a JSON object');
+    }
+    return fixture;
+  } catch (error) {
+    throw new Error(`Could not read fixture ${fixturePath}: ${error.message}`);
+  }
+}
+
+export async function applyFixture(db, fixture) {
   await applyResourceGroups(db, fixture.resourceGroups ?? []);
   await applyResources(db, fixture.resources ?? []);
   await applyRoles(db, fixture.roles ?? []);
@@ -168,7 +149,7 @@ async function applyFixture(db, fixture) {
   }
 }
 
-async function applyResourceGroups(db, entries) {
+export async function applyResourceGroups(db, entries) {
   for (const group of entries) {
     if (!group.name) throw new Error('Every resource group requires a name');
     const existing = await get(db, 'SELECT id FROM resource_group WHERE name = ?', [group.name]);
@@ -185,7 +166,7 @@ async function applyResourceGroups(db, entries) {
   }
 }
 
-async function applyResources(db, entries) {
+export async function applyResources(db, entries) {
   for (const resource of entries) {
     if (!resource.name || !['machine', 'door'].includes(resource.type)) {
       throw new Error('Every resource requires a name and a type of machine or door');
@@ -222,7 +203,7 @@ async function applyResources(db, entries) {
   }
 }
 
-async function applyRoles(db, entries) {
+export async function applyRoles(db, entries) {
   for (const role of entries) {
     if (!role.key || !role.name || !Array.isArray(role.permissions)) {
       throw new Error('Every role requires key, name, and permissions');
@@ -265,6 +246,26 @@ async function applyRoles(db, entries) {
   }
 }
 
+const sqlite3 = sqlite3pkg.verbose();
+
+function parseArgs(argv) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg.startsWith('--')) {
+      const key = arg.slice(2);
+      out[key] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
+    }
+  }
+  return out;
+}
+
+function localDatabasePath(repoRoot, requestedPath) {
+  const storageDir = path.resolve(repoRoot, 'storage');
+  const dbPath = path.resolve(requestedPath || path.join(storageDir, 'attraccess.sqlite'));
+  return { dbPath, isLocal: dbPath === storageDir || dbPath.startsWith(`${storageDir}${path.sep}`) };
+}
+
 async function main() {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const args = parseArgs(process.argv.slice(2));
@@ -305,7 +306,7 @@ async function main() {
     await run(db, 'COMMIT');
     console.log(`Seeded local admin user id=${userId}`);
     console.log(`  username: ${username}`);
-    console.log(`  password: ${password}`);
+    console.log('  password: supplied via command arguments or the documented development default');
     console.log(`  email:    ${email}`);
     if (args.demo) console.log('  demo fixture: applied');
     if (fixture) console.log(`  fixture: applied from ${args.fixture}`);

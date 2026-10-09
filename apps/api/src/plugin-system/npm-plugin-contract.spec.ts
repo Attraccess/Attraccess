@@ -1,5 +1,5 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
-import { parseNpmPluginPackage } from './npm-plugin-contract';
+import { parseNpmPluginPackage } from './npm/contract-validation';
 
 const validPackage = {
   name: '@attraccess/plugin-example',
@@ -25,21 +25,31 @@ describe('parseNpmPluginPackage', () => {
   it('maps the npm contract into the existing loader manifest', () => {
     const { manifest } = parseNpmPluginPackage(validPackage, '1.9.0');
     expect(manifest).toMatchObject({
-      name: '@attraccess/plugin-example', version: '1.2.3', permissions: [PluginPermission.DATABASE_ACCESS],
-      main: { backend: { directory: 'dist', entryPoint: 'index.js' }, frontend: { directory: 'frontend', entryPoint: 'remoteEntry.js', styles: 'style.css' } },
+      name: '@attraccess/plugin-example',
+      version: '1.2.3',
+      permissions: [PluginPermission.DATABASE_ACCESS],
+      main: {
+        backend: { directory: 'dist', entryPoint: 'index.js' },
+        frontend: { directory: 'frontend', entryPoint: 'remoteEntry.js', styles: 'style.css' },
+      },
     });
   });
 
   it('accepts unrelated standard npm package manifest fields', () => {
-    expect(() => parseNpmPluginPackage({
-      ...validPackage,
-      main: 'dist/index.js',
-      files: ['dist'],
-      exports: { '.': './dist/index.js' },
-      type: 'commonjs',
-      dependencies: { lodash: '^4.17.21' },
-      engines: { node: '>=20' },
-    }, '1.9.0')).not.toThrow();
+    expect(() =>
+      parseNpmPluginPackage(
+        {
+          ...validPackage,
+          main: 'dist/index.js',
+          files: ['dist'],
+          exports: { '.': './dist/index.js' },
+          type: 'commonjs',
+          dependencies: { lodash: '^4.17.21' },
+          engines: { node: '>=20' },
+        },
+        '1.9.0',
+      ),
+    ).not.toThrow();
   });
 
   it('accepts prerelease hosts covered by the declared compatibility ranges', () => {
@@ -52,7 +62,12 @@ describe('parseNpmPluginPackage', () => {
     [{ ...validPackage, attraccess: { ...validPackage.attraccess, host: '^2.0.0' } }],
     [{ ...validPackage, scripts: { postinstall: 'node setup.js' } }],
     [{ ...validPackage, attraccess: { ...validPackage.attraccess, backend: '../index.js' } }],
-    [{ ...validPackage, peerDependencies: { ...validPackage.peerDependencies, '@attraccess/plugins-backend-sdk': '^2.0.0' } }],
+    [
+      {
+        ...validPackage,
+        peerDependencies: { ...validPackage.peerDependencies, '@attraccess/plugins-backend-sdk': '^2.0.0' },
+      },
+    ],
   ])('rejects an unsafe or incompatible package', (pkg) => {
     expect(() => parseNpmPluginPackage(pkg, '1.9.0')).toThrow();
   });

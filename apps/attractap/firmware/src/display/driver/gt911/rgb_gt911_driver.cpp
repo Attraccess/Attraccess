@@ -11,70 +11,6 @@
 #include "../../../ioexpander/ioexpander.hpp"
 #endif
 
-// st7701_type1_init_operations (formerly from Arduino_GFX) with the 180° flip
-// done in the panel itself instead of in software (ATT-554 item 2):
-//   - BK0 0xC7 (SDIR) = 0x04: source scan S960->S1 (X mirror)
-//   - MADCTL 0x36 = 0x10 (ML): line scan bottom->top (Y mirror)
-// A software `rotation 2` would force every LVGL flush through a per-pixel
-// reversed-index copy into the PSRAM framebuffer; with the flip in hardware
-// the flush is a plain row copy. Touch coordinates are mirrored in readTouch().
-//
-// The esp_lcd_st7701 driver writes MADCTL/COLMOD from panel_dev_config before
-// this table runs; the explicit 0x36/0x3A entries below overwrite them with
-// the intended values (the driver logs a benign warning for each).
-static const st7701_lcd_init_cmd_t st7701_type1_flip180_init_cmds[] = {
-    // {cmd, data, data_bytes, delay_ms}
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x10}, 5, 0}, // BK0 select
-
-    {0xC0, (uint8_t[]){0x3B, 0x00}, 2, 0},
-    {0xC1, (uint8_t[]){0x0D, 0x02}, 2, 0},
-    {0xC2, (uint8_t[]){0x31, 0x05}, 2, 0},
-    {0xC7, (uint8_t[]){0x04}, 1, 0}, // SDIR: X mirror (180° flip, part 1)
-    {0xCD, (uint8_t[]){0x08}, 1, 0},
-
-    // Positive Voltage Gamma Control
-    {0xB0, (uint8_t[]){0x00, 0x11, 0x18, 0x0E, 0x11, 0x06, 0x07, 0x08, 0x07, 0x22, 0x04, 0x12, 0x0F, 0xAA, 0x31, 0x18}, 16, 0},
-    // Negative Voltage Gamma Control
-    {0xB1, (uint8_t[]){0x00, 0x11, 0x19, 0x0E, 0x12, 0x07, 0x08, 0x08, 0x08, 0x22, 0x04, 0x11, 0x11, 0xA9, 0x32, 0x18}, 16, 0},
-
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x11}, 5, 0}, // BK1 select
-
-    {0xB0, (uint8_t[]){0x60}, 1, 0}, // Vop=4.7375v
-    {0xB1, (uint8_t[]){0x32}, 1, 0}, // VCOM=32
-    {0xB2, (uint8_t[]){0x07}, 1, 0}, // VGH=15v
-    {0xB3, (uint8_t[]){0x80}, 1, 0},
-    {0xB5, (uint8_t[]){0x49}, 1, 0}, // VGL=-10.17v
-    {0xB7, (uint8_t[]){0x85}, 1, 0},
-    {0xB8, (uint8_t[]){0x21}, 1, 0}, // AVDD=6.6 & AVCL=-4.6
-    {0xC1, (uint8_t[]){0x78}, 1, 0},
-    {0xC2, (uint8_t[]){0x78}, 1, 0},
-
-    {0xE0, (uint8_t[]){0x00, 0x1B, 0x02}, 3, 0},
-    {0xE1, (uint8_t[]){0x08, 0xA0, 0x00, 0x00, 0x07, 0xA0, 0x00, 0x00, 0x00, 0x44, 0x44}, 11, 0},
-    {0xE2, (uint8_t[]){0x11, 0x11, 0x44, 0x44, 0xED, 0xA0, 0x00, 0x00, 0xEC, 0xA0, 0x00, 0x00}, 12, 0},
-    {0xE3, (uint8_t[]){0x00, 0x00, 0x11, 0x11}, 4, 0},
-    {0xE4, (uint8_t[]){0x44, 0x44}, 2, 0},
-    {0xE5, (uint8_t[]){0x0A, 0xE9, 0xD8, 0xA0, 0x0C, 0xEB, 0xD8, 0xA0, 0x0E, 0xED, 0xD8, 0xA0, 0x10, 0xEF, 0xD8, 0xA0}, 16, 0},
-    {0xE6, (uint8_t[]){0x00, 0x00, 0x11, 0x11}, 4, 0},
-    {0xE7, (uint8_t[]){0x44, 0x44}, 2, 0},
-    {0xE8, (uint8_t[]){0x09, 0xE8, 0xD8, 0xA0, 0x0B, 0xEA, 0xD8, 0xA0, 0x0D, 0xEC, 0xD8, 0xA0, 0x0F, 0xEE, 0xD8, 0xA0}, 16, 0},
-    {0xEB, (uint8_t[]){0x02, 0x00, 0xE4, 0xE4, 0x88, 0x00, 0x40}, 7, 0},
-    {0xEC, (uint8_t[]){0x3C, 0x00}, 2, 0},
-    {0xED, (uint8_t[]){0xAB, 0x89, 0x76, 0x54, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x20, 0x45, 0x67, 0x98, 0xBA}, 16, 0},
-
-    //-----------VAP & VAN---------------
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x13}, 5, 0},
-    {0xE5, (uint8_t[]){0xE4}, 1, 0},
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x00}, 5, 0},
-
-    {0x36, (uint8_t[]){0x10}, 1, 0}, // MADCTL ML: Y mirror (180° flip, part 2)
-    {0x21, (uint8_t[]){0x00}, 0, 0}, // IPS inversion on
-    {0x3A, (uint8_t[]){0x60}, 1, 0}, // COLMOD: RGB666
-
-    {0x11, (uint8_t[]){0x00}, 0, 120}, // Sleep Out + 120 ms
-    {0x29, (uint8_t[]){0x00}, 0, 0},   // Display On
-};
-
 #ifdef HAS_IO_EXPANDER
 RgbGt911Driver::RgbGt911Driver(Logger &logger, IOExpander *ioExpander)
     : logger(logger), ioExpander(ioExpander) {}
@@ -82,9 +18,88 @@ RgbGt911Driver::RgbGt911Driver(Logger &logger, IOExpander *ioExpander)
 RgbGt911Driver::RgbGt911Driver(Logger &logger) : logger(logger) {}
 #endif
 
+void RgbGt911Driver::flush(const lv_area_t *area, uint8_t *px_map)
+{
+    if (!initialized || !panel)
+    {
+        return;
+    }
+
+    esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px_map);
+}
+
+bool RgbGt911Driver::readTouch(TouchPoint &point)
+{
+    point.pressed = false;
+
+    if (!initialized || !touchInitialized)
+    {
+        return false;
+    }
+
+    int16_t rawX = 0;
+    int16_t rawY = 0;
+    int touched = 0;
+    bool stale = false;
+    {
+        // One GT911 point read = one atomic conversation on the shared bus, so
+        // it can never interleave with a PN532 exchange on the NFC task
+        // (ATT-554 crash: interleaved transactions wedged the I2C driver).
+        // NOTE: we already hold lv_lock here (LVGL indev read) — I2CBusGuard is
+        // a leaf lock, NFC code never takes lv_lock while holding it.
+        I2CBusGuard busGuard;
+        touched = touch.getPoint(rawX, rawY, stale);
+    }
+
+    if (touched <= 0)
+    {
+        // The GT911 scans every 5-15 ms while LVGL polls every 15 ms
+        // (LV_DEF_REFR_PERIOD); a poll can land before the controller has a
+        // fresh sample. Treating that as "finger lifted" splits one press into
+        // several press/release pairs — each pair is a CLICKED event, so
+        // switches toggled right back and taps got swallowed (ATT-541). Hold
+        // the last known press through stale polls; a real release is a fresh
+        // empty sample and is still reported immediately. The hold window is
+        // capped so a wedged controller/bus cannot leave a press stuck.
+        if (stale && lastTouchPressed && (millis() - lastFreshSampleMs) <= TOUCH_STALE_HOLD_MS)
+        {
+            point = lastTouchPoint;
+            point.pressed = true;
+            return true;
+        }
+        if (!stale)
+        {
+            lastFreshSampleMs = millis();
+        }
+        lastTouchPressed = false;
+        return false;
+    }
+
+    lastFreshSampleMs = millis();
+
+    logger.debugf("Touch detected: touched=%d, x=%d, y=%d", touched, rawX, rawY);
+
+    // The 180° flip lives in the panel init sequence (no software rotation), so
+    // the GT911 still reports coordinates in the unflipped orientation: mirror
+    // both axes to match what is on screen.
+    point.x = (int16_t)(screenWidth - 1) - rawX;
+    point.y = (int16_t)(screenHeight - 1) - rawY;
+    point.pressed = true;
+
+    lastTouchPoint = point;
+    lastTouchPressed = true;
+    return true;
+}
+
+#ifdef HAS_IO_EXPANDER
+#include "../../../ioexpander/ioexpander.hpp"
+#endif
+
+#include "st7701_flip180_commands.hpp"
+
 bool RgbGt911Driver::begin()
 {
-    logger.infof("RgbGt911Driver::begin() starting at t=%lu ms", millis());
+    logger.infof("RgbGt911Driver::begin() starting at t=%lu ms", static_cast<unsigned long>(millis()));
 
     // === TOUCH INIT FIRST (before display, matching Waveshare V4 demo) ===
     // The GT911 is an I2C device independent of the display hardware.
@@ -118,7 +133,7 @@ bool RgbGt911Driver::begin()
 
     if (touchFound)
     {
-        logger.infof("GT911 touch init SUCCESS at t=%lu ms", millis());
+        logger.infof("GT911 touch init SUCCESS at t=%lu ms", static_cast<unsigned long>(millis()));
         touchInitialized = true;
     }
     else
@@ -127,7 +142,7 @@ bool RgbGt911Driver::begin()
     }
 
     // === DISPLAY INIT SECOND ===
-    logger.infof("Initializing ST7701 RGB display at t=%lu ms...", millis());
+    logger.infof("Initializing ST7701 RGB display at t=%lu ms...", static_cast<unsigned long>(millis()));
 
     // Panel init commands go over bit-banged 3-wire SPI on dedicated GPIOs
     // (the old Arduino_SWSPI bus).
@@ -224,81 +239,8 @@ bool RgbGt911Driver::begin()
     screenHeight = 480;
 
     logger.infof("Display init DONE at t=%lu ms: %ux%u",
-                 millis(), (unsigned)screenWidth, (unsigned)screenHeight);
+                 static_cast<unsigned long>(millis()), (unsigned)screenWidth, (unsigned)screenHeight);
 
     initialized = true;
-    return true;
-}
-
-void RgbGt911Driver::flush(const lv_area_t *area, uint8_t *px_map)
-{
-    if (!initialized || !panel)
-    {
-        return;
-    }
-
-    esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px_map);
-}
-
-bool RgbGt911Driver::readTouch(TouchPoint &point)
-{
-    point.pressed = false;
-
-    if (!initialized || !touchInitialized)
-    {
-        return false;
-    }
-
-    int16_t rawX = 0;
-    int16_t rawY = 0;
-    int touched = 0;
-    bool stale = false;
-    {
-        // One GT911 point read = one atomic conversation on the shared bus, so
-        // it can never interleave with a PN532 exchange on the NFC task
-        // (ATT-554 crash: interleaved transactions wedged the I2C driver).
-        // NOTE: we already hold lv_lock here (LVGL indev read) — I2CBusGuard is
-        // a leaf lock, NFC code never takes lv_lock while holding it.
-        I2CBusGuard busGuard;
-        touched = touch.getPoint(rawX, rawY, stale);
-    }
-
-    if (touched <= 0)
-    {
-        // The GT911 scans every 5-15 ms while LVGL polls every 15 ms
-        // (LV_DEF_REFR_PERIOD); a poll can land before the controller has a
-        // fresh sample. Treating that as "finger lifted" splits one press into
-        // several press/release pairs — each pair is a CLICKED event, so
-        // switches toggled right back and taps got swallowed (ATT-541). Hold
-        // the last known press through stale polls; a real release is a fresh
-        // empty sample and is still reported immediately. The hold window is
-        // capped so a wedged controller/bus cannot leave a press stuck.
-        if (stale && lastTouchPressed && (millis() - lastFreshSampleMs) <= TOUCH_STALE_HOLD_MS)
-        {
-            point = lastTouchPoint;
-            point.pressed = true;
-            return true;
-        }
-        if (!stale)
-        {
-            lastFreshSampleMs = millis();
-        }
-        lastTouchPressed = false;
-        return false;
-    }
-
-    lastFreshSampleMs = millis();
-
-    logger.debugf("Touch detected: touched=%d, x=%d, y=%d", touched, rawX, rawY);
-
-    // The 180° flip lives in the panel init sequence (no software rotation), so
-    // the GT911 still reports coordinates in the unflipped orientation: mirror
-    // both axes to match what is on screen.
-    point.x = (int16_t)(screenWidth - 1) - rawX;
-    point.y = (int16_t)(screenHeight - 1) - rawY;
-    point.pressed = true;
-
-    lastTouchPoint = point;
-    lastTouchPressed = true;
     return true;
 }

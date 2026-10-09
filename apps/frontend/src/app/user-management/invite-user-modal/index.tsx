@@ -13,25 +13,21 @@ import {
   Tabs,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
+import { Button } from '../../../components/button/index';
 import { StandardDrawer } from '../../../components/standardDrawer';
+import { ApiError, useUsersServiceFindManyKey, useUsersServiceInviteUser } from '@attraccess/react-query-client';
+import { CsvInvite } from './csv-invite/index';
+import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../../components/UsernameInput/index';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { ApiError, useUsersServiceFindManyKey, useUsersServiceInviteUser } from '@attraccess/react-query-client';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
-import { CsvInvite } from './csv-invite';
-import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../../components/UsernameInput';
 
-interface Props {
-  children: (onOpen: () => void) => React.ReactNode;
-}
-
-export function InviteUserModal(props: Props) {
+export function useInviteUserModalState(props: Props) {
   const { children } = props;
   const { isOpen, open, close } = useOverlayState();
   const { t, tExists } = useTranslations({
@@ -120,6 +116,53 @@ export function InviteUserModal(props: Props) {
   }, [inviteUser, trimmedEmail, trimmedUsername, usernameError]);
 
   const [tab, setTab] = useState<'single' | 'csv'>('single');
+  return {
+    children,
+    isOpen,
+    open,
+    close,
+    t,
+    tExists,
+    toast,
+    username,
+    setUsername,
+    email,
+    setEmail,
+    formRef,
+    usernameValidationMessages,
+    canSubmit,
+    isPending,
+    onSubmit,
+    tab,
+    setTab,
+  } as const;
+}
+
+export interface Props {
+  children: (onOpen: () => void) => React.ReactNode;
+}
+
+export function InviteUserModal(props: Props) {
+  const {
+    children,
+    isOpen,
+    open,
+    close,
+    t,
+    tExists,
+    toast,
+    username,
+    setUsername,
+    email,
+    setEmail,
+    formRef,
+    usernameValidationMessages,
+    canSubmit,
+    isPending,
+    onSubmit,
+    tab,
+    setTab,
+  } = useInviteUserModalState(props);
 
   return (
     <>
@@ -195,12 +238,7 @@ export function InviteUserModal(props: Props) {
             <Button variant="secondary" onPress={close}>
               {t('actions.cancel')}
             </Button>
-            <Button
-              variant="primary"
-              onPress={onSubmit}
-              isPending={isPending}
-              isDisabled={!canSubmit}
-            >
+            <Button variant="primary" onPress={onSubmit} isPending={isPending} isDisabled={!canSubmit}>
               {t('actions.invite')}
             </Button>
           </DrawerFooter>

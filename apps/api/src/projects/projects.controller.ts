@@ -1,7 +1,6 @@
 import {
-  Body,
   Controller,
-  Delete,
+  Body,
   Get,
   Param,
   ParseIntPipe,
@@ -11,40 +10,145 @@ import {
   Req,
   UploadedFile,
   UseInterceptors,
+  Delete,
 } from '@nestjs/common';
-import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ProjectsService } from './projects.service';
-import { Auth, AuthenticatedRequest, Project } from '@attraccess/plugins-backend-sdk';
-import { ProjectInvitation } from '@attraccess/database-entities';
-import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
-import { FindManyProjectsResponseDto } from './dto/find-many-response.dto';
-import { CreateProjectDto } from './dto/create.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { FileUpload } from '../common/types/file-upload.types';
-import { ProjectUsageService } from './project-usage.service';
-import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
-import { ProjectUsageHistoryResponseDto } from './dto/project-usage-history-response.dto';
-import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
-import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
+
+import { ApiTags, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FileStorageService } from '../common/services/file-storage.service';
-import { UpdateProjectDto } from './dto/update.dto';
+
 import { ProjectAccessService } from './project-access.service';
+
+import { ProjectUsageService } from './project-usage.service';
+
+import { ProjectsService } from './projects.service';
+
+import { Auth, AuthenticatedRequest, Project } from '@attraccess/plugins-backend-sdk';
+
+import { FileInterceptor } from '@nestjs/platform-express';
+
+import { FileUpload } from '../common/types/file-upload.types';
+
+import { CreateProjectDto } from './dto/create.dto';
+
+import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
+
 import { ProjectWithAccessDto } from './dto/project-access.dto';
-import { ProjectMembersResponseDto } from './dto/project-members-response.dto';
-import { CreateProjectInvitationDto } from './dto/create-project-invitation.dto';
+
+import { ProjectUsageHistoryResponseDto } from './dto/project-usage-history-response.dto';
+
+import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
+
+import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
+
+import { UpdateProjectDto } from './dto/update.dto';
+
 import { computeNextPage } from '../types/response';
+
+import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
+
+import { FindManyProjectsResponseDto } from './dto/find-many-response.dto';
+
+import { ProjectInvitation } from '@attraccess/database-entities';
+
+import { CreateProjectInvitationDto } from './dto/create-project-invitation.dto';
+
+import { ProjectMembersResponseDto } from './dto/project-members-response.dto';
 
 @ApiTags('Projects')
 @Controller('projects')
 export class ProjectsController {
   constructor(
-    private readonly projectsService: ProjectsService,
-    private readonly fileStorageService: FileStorageService,
-    private readonly projectUsageService: ProjectUsageService,
-    private readonly projectAccessService: ProjectAccessService,
+    protected readonly projectsService: ProjectsService,
+    protected readonly fileStorageService: FileStorageService,
+    protected readonly projectUsageService: ProjectUsageService,
+    protected readonly projectAccessService: ProjectAccessService,
   ) {}
 
-  private transformProject(project: ProjectWithAccessDto | Project): ProjectWithAccessDto {
+  @Post()
+  @Auth()
+  @ApiOperation({ summary: 'Create a project', operationId: 'createProject' })
+  @ApiResponse({ status: 201, description: 'The project was created successfully.', type: ProjectWithAccessDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('logo'))
+  async create(
+    @Req() req: AuthenticatedRequest,
+    @Body() data: CreateProjectDto,
+    @UploadedFile() logo?: FileUpload,
+  ): Promise<Project> {
+    if (logo) {
+      data.logo = logo;
+    }
+    const project = await this.projectsService.create(
+      req.user.id,
+      data,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
+    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, project.id);
+    return this.transformProject(projectWithAccess);
+  }
+
+  @Put(':id')
+  @Auth()
+  @ApiOperation({ summary: 'Update a project', operationId: 'updateProject' })
+  @ApiResponse({ status: 200, description: 'The project was updated successfully.', type: ProjectWithAccessDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('logo'))
+  async update(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: UpdateProjectDto,
+    @UploadedFile() logo?: FileUpload,
+  ): Promise<Project> {
+    if (logo) {
+      data.logo = logo;
+    }
+    const project = await this.projectsService.updateOne(
+      req.user.id,
+      id,
+      data,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
+    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, project.id);
+    return this.transformProject(projectWithAccess);
+  }
+
+  @Get(':id/usage/history')
+  @Auth()
+  @ApiOperation({ summary: 'Get usage history for a project', operationId: 'getProjectUsageHistory' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usage history retrieved successfully.',
+    type: ProjectUsageHistoryResponseDto,
+  })
+  async getUsageHistory(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: GetProjectUsageHistoryQueryDto,
+  ): Promise<ProjectUsageHistoryResponseDto> {
+    return await this.projectUsageService.getProjectUsageHistory(req.user.id, id, query);
+  }
+
+  @Get(':id/usage/stats')
+  @Auth()
+  @ApiOperation({ summary: 'Get aggregated usage statistics for a project', operationId: 'getProjectUsageStats' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usage statistics retrieved successfully.',
+    type: ProjectUsageStatsDto,
+  })
+  async getUsageStats(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: ProjectUsageStatsQueryDto,
+  ): Promise<ProjectUsageStatsDto> {
+    return await this.projectUsageService.getProjectUsageStats(req.user.id, id, query);
+  }
+
+  protected transformProject(project: ProjectWithAccessDto | Project): ProjectWithAccessDto {
     const transformedProject = {
       ...project,
       logo: project.logo ? this.fileStorageService.getPublicPath(`projects/${project.id}`, project.logo) : null,
@@ -90,7 +194,12 @@ export class ProjectsController {
   @ApiResponse({ status: 204, description: 'The project has been successfully deleted.' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   async deleteOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
-    await this.projectsService.deleteOne(req.user.id, id, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    await this.projectsService.deleteOne(
+      req.user.id,
+      id,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 
   @Post(':id/archive')
@@ -102,7 +211,12 @@ export class ProjectsController {
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ProjectWithAccessDto> {
-    await this.projectsService.archiveOne(req.user.id, id, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    await this.projectsService.archiveOne(
+      req.user.id,
+      id,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
     const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
     return this.transformProject(projectWithAccess);
   }
@@ -116,82 +230,14 @@ export class ProjectsController {
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ProjectWithAccessDto> {
-    await this.projectsService.unarchiveOne(req.user.id, id, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    await this.projectsService.unarchiveOne(
+      req.user.id,
+      id,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
     const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
     return this.transformProject(projectWithAccess);
-  }
-
-  @Post()
-  @Auth()
-  @ApiOperation({ summary: 'Create a project', operationId: 'createProject' })
-  @ApiResponse({ status: 201, description: 'The project was created successfully.', type: ProjectWithAccessDto })
-  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('logo'))
-  async create(
-    @Req() req: AuthenticatedRequest,
-    @Body() data: CreateProjectDto,
-    @UploadedFile() logo?: FileUpload,
-  ): Promise<Project> {
-    if (logo) {
-      data.logo = logo;
-    }
-    const project = await this.projectsService.create(req.user.id, data, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
-    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, project.id);
-    return this.transformProject(projectWithAccess);
-  }
-
-  @Put(':id')
-  @Auth()
-  @ApiOperation({ summary: 'Update a project', operationId: 'updateProject' })
-  @ApiResponse({ status: 200, description: 'The project was updated successfully.', type: ProjectWithAccessDto })
-  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('logo'))
-  async update(
-    @Req() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: UpdateProjectDto,
-    @UploadedFile() logo?: FileUpload,
-  ): Promise<Project> {
-    if (logo) {
-      data.logo = logo;
-    }
-    const project = await this.projectsService.updateOne(req.user.id, id, data, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
-    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, project.id);
-    return this.transformProject(projectWithAccess);
-  }
-
-  @Get(':id/usage/history')
-  @Auth()
-  @ApiOperation({ summary: 'Get usage history for a project', operationId: 'getProjectUsageHistory' })
-  @ApiResponse({
-    status: 200,
-    description: 'Usage history retrieved successfully.',
-    type: ProjectUsageHistoryResponseDto,
-  })
-  async getUsageHistory(
-    @Req() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: GetProjectUsageHistoryQueryDto,
-  ): Promise<ProjectUsageHistoryResponseDto> {
-    return await this.projectUsageService.getProjectUsageHistory(req.user.id, id, query);
-  }
-
-  @Get(':id/usage/stats')
-  @Auth()
-  @ApiOperation({ summary: 'Get aggregated usage statistics for a project', operationId: 'getProjectUsageStats' })
-  @ApiResponse({
-    status: 200,
-    description: 'Usage statistics retrieved successfully.',
-    type: ProjectUsageStatsDto,
-  })
-  async getUsageStats(
-    @Req() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: ProjectUsageStatsQueryDto,
-  ): Promise<ProjectUsageStatsDto> {
-    return await this.projectUsageService.getProjectUsageStats(req.user.id, id, query);
   }
 
   @Get(':id/members')
@@ -220,7 +266,13 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('memberId', ParseIntPipe) memberId: number,
   ): Promise<void> {
-    await this.projectsService.removeMember(req.user.id, id, memberId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    await this.projectsService.removeMember(
+      req.user.id,
+      id,
+      memberId,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 
   @Get(':id/invitations')
@@ -245,7 +297,12 @@ export class ProjectsController {
     @Body() data: CreateProjectInvitationDto,
   ): Promise<ProjectInvitation> {
     return await this.projectsService.createProjectInvitation(
-      req.user.id, id, data.invitedUserId, data.role, req.user.authenticationMethod ?? 'session', req.user.apiTokenId,
+      req.user.id,
+      id,
+      data.invitedUserId,
+      data.role,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
     );
   }
 
@@ -258,7 +315,13 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.resendProjectInvitation(req.user.id, id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    return await this.projectsService.resendProjectInvitation(
+      req.user.id,
+      id,
+      invitationId,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 
   @Delete(':id/invitations/:invitationId')
@@ -270,6 +333,12 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.cancelProjectInvitation(req.user.id, id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    return await this.projectsService.cancelProjectInvitation(
+      req.user.id,
+      id,
+      invitationId,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 }

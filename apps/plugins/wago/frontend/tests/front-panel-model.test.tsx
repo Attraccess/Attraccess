@@ -1,8 +1,8 @@
 // Verifies terminal identities and device bindings across front panel edits.
 // FEATURE: WAGO front panel configuration preserves routing and profile contracts.
 import { describe, expect, it } from 'vitest';
-import { DIGITAL_TERMINALS } from '../../backend/configuration-digital';
-import { validateEditorSnapshot } from '../../backend/configuration-editor';
+import { DIGITAL_TERMINALS } from '../../backend/configuration/digital';
+import { validateEditorSnapshot } from '../../backend/configuration/editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import {
   addDevice,

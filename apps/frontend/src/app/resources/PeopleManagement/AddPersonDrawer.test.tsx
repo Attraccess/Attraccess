@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { AddPersonDrawer } from './AddPersonDrawer';
 
 // The embedded UserSearch picker fetches users through the generated client;

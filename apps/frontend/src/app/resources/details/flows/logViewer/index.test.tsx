@@ -22,7 +22,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useDateTimeFormatter: () => (date: string) => date,
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
-vi.mock('../flowContext', () => ({ useFlowContext: () => ({ liveLogs: state.live }) }));
+vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.live }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
   useResourceFlowsServiceGetFlowLogRecordingStatusKey: 'recording',

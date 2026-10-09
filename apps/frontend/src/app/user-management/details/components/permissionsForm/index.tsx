@@ -1,40 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { Button } from '../../../../../components/button';
+import { Button } from '../../../../../components/button/index';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
+import { Separator, Chip } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useToastMessage } from '../../../../../components/toastProvider';
 import {
-  ApiError,
   SSOProvider,
-  User,
   UserRole,
+  ApiError,
   useRbacServiceListRoles,
   useUsersServiceGetUserRoleAssignments,
   useUsersServiceAssignRoleToUser,
   useUsersServiceRevokeRoleFromUser,
   useUsersServiceGetUserRoleAssignmentsKey,
+  User,
 } from '@attraccess/react-query-client';
+import { useEffect, useState } from 'react';
+import { useToastMessage } from '../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { Chip, Separator } from '@heroui/react';
 import { useRbacCatalogTranslations } from '../../../../../hooks/useRbacCatalogTranslations';
-
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 
-// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
-const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
-
-interface UserPermissionFormProps {
-  user: User;
-  ssoManagedProviders?: string[];
-  ssoManagedPermissionKeys?: Set<string>;
-  providersById?: Map<number, SSOProvider>;
-  roleIdToAssign?: number;
-}
-
-function SsoAssignmentBadges({
+export function SsoAssignmentBadges({
   assignments,
   providersById,
   t,
@@ -61,13 +49,24 @@ function SsoAssignmentBadges({
   );
 }
 
-export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
+export // 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
+const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
+
+export interface UserPermissionFormProps {
+  user: User;
+  ssoManagedProviders?: string[];
+  ssoManagedPermissionKeys?: Set<string>;
+  providersById?: Map<number, SSOProvider>;
+  roleIdToAssign?: number;
+}
+
+export function useUserPermissionFormState({
   user,
   ssoManagedProviders,
   ssoManagedPermissionKeys,
   providersById,
   roleIdToAssign,
-}) => {
+}: UserPermissionFormProps) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -173,6 +172,57 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
       toast.success({ title: t('messages.updated') });
     }
   };
+  return {
+    t,
+    roleName,
+    isSsoManaged,
+    isRoleSsoManaged,
+    ssoProvidersLabel,
+    isLoadingRoles,
+    isLoadingUserRoles,
+    isSaving,
+    manageableRoles,
+    selectedRoleIds,
+    ssoAssignmentsByRoleId,
+    ssoOnlyRoles,
+    allManageableSsoManaged,
+    handleRoleToggle,
+    handleSave,
+    providersById,
+  };
+}
+
+// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
+export function UserPermissionForm({
+  user,
+  ssoManagedProviders,
+  ssoManagedPermissionKeys,
+  providersById,
+  roleIdToAssign,
+}: UserPermissionFormProps) {
+  const {
+    t,
+    roleName,
+    isSsoManaged,
+    isRoleSsoManaged,
+    ssoProvidersLabel,
+    isLoadingRoles,
+    isLoadingUserRoles,
+    isSaving,
+    manageableRoles,
+    selectedRoleIds,
+    ssoAssignmentsByRoleId,
+    ssoOnlyRoles,
+    allManageableSsoManaged,
+    handleRoleToggle,
+    handleSave,
+  } = useUserPermissionFormState({
+    user,
+    ssoManagedProviders,
+    ssoManagedPermissionKeys,
+    providersById,
+    roleIdToAssign,
+  });
 
   if (isLoadingRoles || isLoadingUserRoles) {
     return (
@@ -247,4 +297,4 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
       </div>
     </div>
   );
-};
+}

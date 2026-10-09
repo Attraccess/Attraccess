@@ -22,7 +22,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
 const { useAuth } = await import('../../hooks/useAuth');
 const { useAllRoutes } = await import('./index');
 const { useRoutesWithAuthElements } = await import('../app');
-const { Sidebar } = await import('../layout/sidebar');
+const { Sidebar } = await import('../layout/sidebar/index');
 
 function mockOperator(granted: SystemPermission[]) {
   vi.mocked(useAuth).mockReturnValue({

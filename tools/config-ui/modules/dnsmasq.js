@@ -1,42 +1,25 @@
 'use strict';
 
 const fs = require('fs');
+
 const path = require('path');
-const { spawn } = require('child_process');
-const crypto = require('crypto');
 
 const DATA_DIR = process.env.DNS_DATA_DIR || '/data';
+
 const RECORDS_FILE = path.join(DATA_DIR, 'dns-records.json');
+
 const SETTINGS_FILE = path.join(DATA_DIR, 'dns-settings.json');
+
 const DNSMASQ_CONF_DIR = '/etc/dnsmasq.d';
+
 const DNSMASQ_CONF_FILE = path.join(DNSMASQ_CONF_DIR, 'records.conf');
+
 const DNSMASQ_HOSTS_FILE = path.join(DNSMASQ_CONF_DIR, 'custom-hosts');
+
 const LISTEN_ADDRESS = process.env.DNS_LISTEN_ADDRESS || '';
 
 function log(message) {
   console.log(`[dnsmasq] ${message}`);
-}
-
-const HOSTNAME_PATTERN =
-  /^(\*\.)?(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-const IPV4_PATTERN = /^(25[0-5]|2[0-4]\d|[01]?\d?\d)(\.(25[0-5]|2[0-4]\d|[01]?\d?\d)){3}$/;
-const IPV6_PATTERN = /^[0-9a-fA-F:]+$/;
-
-function isValidHostname(value) {
-  return typeof value === 'string' && HOSTNAME_PATTERN.test(value);
-}
-
-function isValidIp(value) {
-  if (typeof value !== 'string') return false;
-  if (IPV4_PATTERN.test(value)) return true;
-  return IPV6_PATTERN.test(value) && value.includes(':');
-}
-
-function getEnvBoolean(name, defaultValue = false) {
-  const raw = process.env[name];
-  if (raw == null) return defaultValue;
-  const normalized = String(raw).trim().toLowerCase();
-  return normalized === 'true' || normalized === '1' || normalized === 'yes';
 }
 
 function loadJson(filePath, fallback) {
@@ -125,9 +108,23 @@ function writeDnsmasqConfig(records, settings) {
   }
 }
 
+function getEnvBoolean(name, defaultValue = false) {
+  const raw = process.env[name];
+  if (raw == null) return defaultValue;
+  const normalized = String(raw).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+module.exports.getEnvBoolean = getEnvBoolean;
+
+const { spawn } = require('child_process');
+
 let dnsmasqProcess = null;
+
 let restartTimer = null;
+
 let stopped = false;
+
 const RESTART_DELAY_MS = Number(process.env.DNS_RESTART_DELAY_MS) || 5000;
 
 // ponytail: fixed 5s retry, no backoff. The boot failure is transient — at reboot
@@ -235,6 +232,29 @@ function getDnsmasqStatus() {
     return { running: false, pid: null };
   }
 }
+
+const crypto = require('crypto');
+
+const HOSTNAME_PATTERN =
+  /^(\*\.)?(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+const IPV4_PATTERN = /^(25[0-5]|2[0-4]\d|[01]?\d?\d)(\.(25[0-5]|2[0-4]\d|[01]?\d?\d)){3}$/;
+
+const IPV6_PATTERN = /^[0-9a-fA-F:]+$/;
+
+function isValidHostname(value) {
+  return typeof value === 'string' && HOSTNAME_PATTERN.test(value);
+}
+
+function isValidIp(value) {
+  if (typeof value !== 'string') return false;
+  if (IPV4_PATTERN.test(value)) return true;
+  return IPV6_PATTERN.test(value) && value.includes(':');
+}
+
+// ponytail: fixed 5s retry, no backoff. The boot failure is transient — at reboot
+// the LAN interface (listen-address + bind-interfaces) or port 53 isn't free yet,
+// which clears within seconds. Add backoff if a permanent misconfig spams the log.
 
 async function createRecord(req, res, helpers) {
   const body = await helpers.readBody(req);

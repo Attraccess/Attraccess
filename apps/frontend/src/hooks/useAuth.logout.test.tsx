@@ -7,6 +7,7 @@ import { useAuth } from './useAuth';
 import { useDateTimePreferences } from '@attraccess/plugins-frontend-ui';
 import { useDateTimePreferencesSync } from './useDateTimePreferencesSync';
 import { restoreAuthentication } from '../utils/auth-session';
+import * as liveUpdates from '../utils/live-updates';
 
 const messages = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), info: vi.fn() }));
 vi.mock('../components/toastProvider', () => ({ useToastMessage: () => messages }));
@@ -19,6 +20,7 @@ const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  vi.spyOn(liveUpdates, 'stopLiveUpdates');
   window.history.replaceState(null, '', '/');
   requestLog = [];
   OpenAPI.BASE = 'http://localhost';
@@ -51,6 +53,7 @@ afterEach(() => {
   useDateTimePreferences.setState({ userId: null, dateTimeLocale: null });
   OpenAPI.BASE = originalBase;
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 function mount() {
   return renderHook(() => [useAuth(), useAuth()], {
@@ -213,6 +216,7 @@ it.each([false, true])(
     await waitFor(() => expect(hook.result.current[0].canLogoutEverywhere).toBe(true));
     const identityRequests = requestLog.filter(({ path }) => path === '/api/users/me').length;
     act(() => (central ? hook.result.current[0].logoutEverywhere() : hook.result.current[0].logout()));
+    expect(liveUpdates.stopLiveUpdates).toHaveBeenCalledOnce();
     await waitFor(() => expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null }));
     act(() => client.setQueryData(UseUsersServiceGetCurrentKeyFn(), user));
     await act(async () => {

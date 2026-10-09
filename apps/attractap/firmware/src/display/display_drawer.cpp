@@ -1,5 +1,5 @@
 #include "display.hpp"
-#include "display/theme.hpp"
+#include "theme.hpp"
 #include <functional>
 #include "shared/powerOff/powerOffButton.hpp"
 

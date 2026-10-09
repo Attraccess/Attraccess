@@ -1,6 +1,9 @@
+import { User } from '@attraccess/database-entities';
+
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
 import {
   BadRequestException,
-  Body,
   Controller,
   Delete,
   ForbiddenException,
@@ -9,41 +12,54 @@ import {
   Optional,
   Param,
   ParseIntPipe,
-  Patch,
-  Post,
   Query,
   Req,
   UseInterceptors,
+  Body,
+  Patch,
+  Post,
 } from '@nestjs/common';
+
 import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
-import { User } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
-import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
-import { UsersService } from './users.service';
-import { UserPasswordService } from './user-password.service';
-import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
-import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
-import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
-import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
-import { ChangeUsernameDto } from './dtos/changeUsername.dto';
-import { ChangeEmailDto } from './dtos/changeEmail.dto';
-import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
-import { mapEmailSendError } from './email-send-error.util';
-import { computeNextPage } from '../../types/response';
+
 import { IdentityAuditService } from '../../audit/identity-audit.service';
+
+import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+
+import { computeNextPage } from '../../types/response';
+
+import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
+
+import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
+
+import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+
+import { UserPasswordService } from './user-password.service';
+
+import { UsersService } from './users.service';
 import { randomUUID } from 'node:crypto';
+
+import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
+
+import { ChangeEmailDto } from './dtos/changeEmail.dto';
+
+import { ChangeUsernameDto } from './dtos/changeUsername.dto';
+
+import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
+
+import { mapEmailSendError } from './email-send-error.util';
 
 @ApiTags('Users')
 @Controller('users')
 @UseInterceptors(AuthRateLimitInterceptor)
 export class UsersAdminController {
-  private readonly logger = new Logger(UsersAdminController.name);
-
   constructor(
-    private readonly usersService: UsersService,
-    private readonly passwordService: UserPasswordService,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
+    protected readonly usersService: UsersService,
+    protected readonly passwordService: UserPasswordService,
+    @Optional() protected readonly identityAudit?: IdentityAuditService,
   ) {}
+
+  protected readonly logger = new Logger(UsersAdminController.name);
 
   @Auth()
   @Get(':id')
@@ -243,22 +259,24 @@ export class UsersAdminController {
     return user;
   }
 
-  private record(
+  protected record(
     action: 'user_deleted' | 'user_updated',
     subjectId: number,
     request: AuthenticatedRequest,
     field?: 'username' | 'email' | 'password' | 'billingFactor',
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-      subjectId,
-      details: field ? { field } : {},
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    })).then(() => undefined);
+    return Promise.resolve(
+      this.identityAudit?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectId,
+        details: field ? { field } : {},
+        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+      }),
+    ).then(() => undefined);
   }
 }

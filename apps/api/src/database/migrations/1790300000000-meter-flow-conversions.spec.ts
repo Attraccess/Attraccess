@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import { MeterFlowConversions1790300000000 } from './1790300000000-meter-flow-conversions';
-import { compileFlowTemplate } from '../../resources/flows/flow-template';
+import { compileFlowTemplate } from '../../resources/flows/execution/flow-template';
 import { toMeterValue } from '../../resources/metering/quantity';
 
 describe('meter flow conversion migration', () => {

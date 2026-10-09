@@ -1,14 +1,13 @@
-import { PluginService } from '../plugin-system/plugin.service';
 import { EmailTemplateType, MqttServer } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { SettingsController } from '../settings/settings.controller';
-import { EmailTemplateController } from '../email-template/email-template.controller';
 import { EmailLayoutController } from '../email-layout/email-layout.controller';
+import { EmailTemplateController } from '../email-template/email-template.controller';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
-import { PluginController } from '../plugin-system/plugin.controller';
 import { InstalledNpmPlugin, NpmPluginAuditState } from '../plugin-system/npm-plugin.service';
-import { projectAdministrationAuditEvent } from './audit-administration-policy';
-
+import { PluginController } from '../plugin-system/plugin.controller';
+import { PluginService } from '../plugin-system/plugin.service';
+import { SettingsController } from '../settings/settings.controller';
+import { projectAdministrationAuditEvent } from './policies/administration';
 const req = { user: { id: 42, authenticationMethod: 'api-token', apiTokenId: 9 } } as AuthenticatedRequest;
 const secret = 'SECRET_MUST_NOT_BE_RECORDED';
 const plugin = {
@@ -23,10 +22,10 @@ const plugin = {
   installPath: '/private/plugins/example',
   classification: 'community',
 } as InstalledNpmPlugin;
-
 function recorder() {
   return { recordAdministration: jest.fn().mockResolvedValue(undefined) };
 }
+
 function recorded(audit: ReturnType<typeof recorder>) {
   const events = audit.recordAdministration.mock.calls.map(([event]) => event);
   for (const event of events) expect(projectAdministrationAuditEvent(event)).not.toBeNull();
@@ -246,9 +245,10 @@ describe('administration lifecycle hooks', () => {
       updateRequestedSpec: jest.fn().mockResolvedValue(plugin),
       updateOverride: jest.fn().mockResolvedValue(plugin),
       updateVersionPolicy: jest.fn().mockResolvedValue(plugin),
-      checkInstalled: jest
-        .fn()
-        .mockResolvedValue({ ...plugin, updateCheck: { candidate: '2.1.0', state: 'available', error: secret } }),
+      checkInstalled: jest.fn().mockResolvedValue({
+        ...plugin,
+        updateCheck: { candidate: '2.1.0', state: 'available', error: secret },
+      }),
       setUpdatePolicy: jest.fn().mockResolvedValue({
         checksEnabled: true,
         mode: 'minor',

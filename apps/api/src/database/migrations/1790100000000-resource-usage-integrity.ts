@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { recoverOrphanedUsages, USAGE_RECOVERY_TABLE_SQL } from '../resource-usage-integrity';
-import { activeUsageSql } from '../../resources/usage/active-usage';
+import { activeUsageSql } from '../../resources/usage/sessions/active-usage';
 
 export class ResourceUsageIntegrity1790100000000 implements MigrationInterface {
   name = 'ResourceUsageIntegrity1790100000000';

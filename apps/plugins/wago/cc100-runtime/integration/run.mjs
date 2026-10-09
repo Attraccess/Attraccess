@@ -1,4 +1,5 @@
 import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -15,6 +16,10 @@ function run(command, args, env = process.env) {
 function argument(name) {
   return process.argv.find((value) => value.startsWith(`--${name}=`))?.slice(name.length + 3);
 }
+function backendSource(sourceRoot, currentPath, legacyPath) {
+  const current = join(sourceRoot, 'apps/plugins/wago/backend', currentPath);
+  return existsSync(current) ? current : join(sourceRoot, 'apps/plugins/wago/backend', legacyPath);
+}
 async function snapshot(ref, label, directories) {
   const commit = execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {
     cwd: root,
@@ -28,9 +33,7 @@ async function snapshot(ref, label, directories) {
   })
     .trim()
     .split('\n');
-  for (const path of paths.filter(
-    (path) => path.endsWith('.ts') || path === 'apps/plugins/wago/cc100-runtime/manifest.json',
-  )) {
+  for (const path of paths.filter((path) => /\.(?:ts|json)$/.test(path))) {
     const target = join(destination, path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, execFileSync('git', ['show', `${commit}:${path}`], { cwd: root }));
@@ -41,31 +44,42 @@ try {
   const backend = 'apps/plugins/wago/backend';
   const measurementContract = 'apps/plugins/wago/measurement-contract.ts';
   const runtime = 'apps/plugins/wago/cc100-runtime';
-  const sharedSources = [
+  const contracts = [
     measurementContract,
     'apps/plugins/wago/channel-behavior.ts',
     'apps/plugins/wago/modbus',
     'apps/plugins/wago/shared',
   ];
-  const flowRoot = argument('flow-ref')
-    ? await snapshot(argument('flow-ref'), 'flow', [backend, ...sharedSources])
-    : root;
-  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [runtime, backend, ...sharedSources]);
+  const flowRoot = argument('flow-ref') ? await snapshot(argument('flow-ref'), 'flow', [backend, ...contracts]) : root;
+  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [runtime, backend, ...contracts]);
   const runtimeRoot = argument('runtime-ref')
-    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, ...sharedSources])
+    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, ...contracts])
     : root;
   for (const stagedRoot of [mainRoot, ...(runtimeRoot !== root ? [runtimeRoot] : [])]) {
     await symlink(join(root, 'node_modules'), join(stagedRoot, 'node_modules'), 'dir');
-    // Only the owned entrypoint/device are overlaid. Runtime modules are exact git blobs.
-    for (const file of ['simulator.ts', 'simulator-device.ts'])
-      await writeFile(join(stagedRoot, runtime, 'src', file), await readFile(join(root, runtime, 'src', file)));
+    // Overlay the owned simulator and its extracted helpers. Production runtime
+    // modules remain exact git blobs from the selected source revision.
+    for (const file of [
+      'simulator.ts',
+      'simulator/device.ts',
+      'simulator/identity.ts',
+      'simulator/inspection.ts',
+      'simulator/mqtt.ts',
+      'simulator/settings.ts',
+      'simulator/state.ts',
+      'simulator/transport.ts',
+    ]) {
+      const target = join(stagedRoot, runtime, 'src', file);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, await readFile(join(root, runtime, 'src', file)));
+    }
     const config = join(stagedRoot, 'tsconfig.simulator.json');
     await writeFile(
       config,
       JSON.stringify({
         extends: join(root, 'tsconfig.base.json'),
         compilerOptions: { rootDir: '/', types: ['node'], typeRoots: [join(root, 'node_modules/@types')] },
-        include: [`${runtime}/src/simulator.ts`, `${runtime}/src/simulator-device.ts`],
+        include: [`${runtime}/src/simulator.ts`, `${runtime}/src/simulator/device.ts`],
       }),
     );
     run('pnpm', ['exec', 'tsc', '--noEmit', '-p', config]);
@@ -91,6 +105,8 @@ try {
       platform: 'node',
       target: 'node24',
       nodePaths: [join(root, 'node_modules')],
+      tsconfig:
+        sourceRoot === root ? join(root, runtime, 'tsconfig.json') : join(sourceRoot, 'tsconfig.simulator.json'),
     });
   run(
     'pnpm',
@@ -98,8 +114,8 @@ try {
     {
       ...process.env,
       WAGO_INTEGRATION_TEMP: temporary,
-      WAGO_INTEGRATION_FLOW_SOURCE: join(flowRoot, backend, 'wago-flow.service.ts'),
-      WAGO_INTEGRATION_MAIN_SOURCE: join(mainRoot, backend, 'wago.service.ts'),
+      WAGO_INTEGRATION_FLOW_SOURCE: backendSource(flowRoot, 'flow/service.ts', 'wago-flow.service.ts'),
+      WAGO_INTEGRATION_MAIN_SOURCE: backendSource(mainRoot, 'controllers/service.ts', 'wago.service.ts'),
       WAGO_INTEGRATION_LIFECYCLE_ONLY: process.argv.includes('--lifecycle-only') ? '1' : '0',
     },
   );

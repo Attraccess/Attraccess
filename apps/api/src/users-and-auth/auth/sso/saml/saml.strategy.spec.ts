@@ -1,39 +1,18 @@
-import { EncryptionService } from '../../../../encryption/encryption.service';
-import { PassportSamlConfig } from '@node-saml/passport-saml';
+import { registerSsosamlStrategyFixture, type SamlProfile } from './saml.strategy.ssosaml-strategy.test-fixture';
 import { ModuleRef } from '@nestjs/core';
-import { SSOProvider, SSOProviderSAMLConfiguration, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { SSOSamlStrategy } from './saml.strategy';
+import { RbacService } from './../../../rbac/rbac.service';
+import { UsersService } from './../../../users/users.service';
+import { SSOService } from './../sso.service';
+import { SsoAuditService } from './../../../../audit/sso-audit.service';
+import { EncryptionService } from './../../../../encryption/encryption.service';
+import { PassportSamlConfig } from '@node-saml/passport-saml';
 import { SSOSamlRequest } from './saml.types';
-import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
-import { RbacService } from '../../../rbac/rbac.service';
-import { UsersService } from '../../../users/users.service';
-import { SSOService } from '../sso.service';
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
-
-type SamlProfile = Record<string, unknown>;
+import { AccountLinkingRequiredException } from './../oidc/exceptions/account-linking-required.exception';
 
 describe('SSOSamlStrategy', () => {
-  const buildRequest = (providerId: number, emailKey: string): SSOSamlRequest => {
-    const samlConfiguration = {
-      entryPoint: 'https://idp.example.com/sso',
-      issuer: 'https://sp.example.com',
-      certificate: 'CERTIFICATE',
-      signRequest: false,
-      wantAssertionsSigned: false,
-      wantAuthnResponseSigned: true,
-      forceAuthn: false,
-      emailAttributeKeys: [emailKey],
-      ssoProviderId: providerId,
-    } as SSOProviderSAMLConfiguration;
-
-    return {
-      ssoSamlOptions: {
-        providerId,
-        samlConfiguration,
-        callbackUrl: `https://api.example.com/auth/sso/SAML/${providerId}/callback`,
-      },
-    } as SSOSamlRequest;
-  };
+  const fixture = registerSsosamlStrategyFixture();
 
   it.each([
     { custom: 'preferred@example.com', email: 'base@example.com' },
@@ -49,7 +28,7 @@ describe('SSOSamlStrategy', () => {
         .mockResolvedValueOnce({ id: 9, authenticationDetails: [{}] }),
     };
     const strategy = new SSOSamlStrategy({ get: () => usersService } as unknown as ModuleRef);
-    const request = buildRequest(10, 'custom');
+    const request = fixture.buildRequest(10, 'custom');
     request.ssoSamlOptions.samlConfiguration.emailAttributeKeys = ['', 'custom'];
     await expect(strategy.validate(request, { nameID: 'subject', ...attributes } as SamlProfile)).rejects.toMatchObject(
       { email: 'preferred@example.com' },
@@ -63,7 +42,7 @@ describe('SSOSamlStrategy', () => {
     const usersService = { findOne: jest.fn() };
     const strategy = new SSOSamlStrategy({ get: () => usersService } as unknown as ModuleRef);
     await expect(
-      strategy.validate(buildRequest(10, 'custom'), {
+      strategy.validate(fixture.buildRequest(10, 'custom'), {
         nameID: 'subject',
         emails: [],
         attributes: { custom: 12 },
@@ -86,7 +65,7 @@ describe('SSOSamlStrategy', () => {
         ),
       } as unknown as ModuleRef;
       const strategy = new SSOSamlStrategy(moduleRef);
-      const request = buildRequest(10, 'email');
+      const request = fixture.buildRequest(10, 'email');
       Object.assign(request.ssoSamlOptions.samlConfiguration, {
         signRequest: true,
         spSigningKeyEncrypted: 'ciphertext',
@@ -140,8 +119,8 @@ describe('SSOSamlStrategy', () => {
 
     const strategy = new SSOSamlStrategy(moduleRef);
 
-    const requestA = buildRequest(10, 'emailA');
-    const requestB = buildRequest(20, 'emailB');
+    const requestA = fixture.buildRequest(10, 'emailA');
+    const requestB = fixture.buildRequest(20, 'emailB');
 
     const profileA = {
       nameID: 'user-a',
@@ -220,7 +199,7 @@ describe('SSOSamlStrategy', () => {
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(30, 'email');
+    const request = fixture.buildRequest(30, 'email');
     const profile = {
       nameID: 'user-1',
       issuer: 'https://issuer.example.com',
@@ -283,7 +262,7 @@ describe('SSOSamlStrategy', () => {
       ),
     } as unknown as ModuleRef;
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(30, 'email');
+    const request = fixture.buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
 
     await strategy.validate(request, {
@@ -342,7 +321,7 @@ describe('SSOSamlStrategy', () => {
       ),
     } as unknown as ModuleRef;
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(30, 'email');
+    const request = fixture.buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
 
     await expect(
@@ -369,7 +348,7 @@ describe('SSOSamlStrategy', () => {
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(30, 'email');
+    const request = fixture.buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['attraccess_admin'] };
 
     const profile = {
@@ -400,7 +379,7 @@ describe('SSOSamlStrategy', () => {
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(40, 'email');
+    const request = fixture.buildRequest(40, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = {
       'user-manager': ['attraccess_admin'],
     };
@@ -445,7 +424,7 @@ describe('SSOSamlStrategy', () => {
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(30, 'email');
+    const request = fixture.buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = {
       'user-manager': ['attraccess_admin'],
       'billing-manager': ['billing-role'],
@@ -493,7 +472,7 @@ describe('SSOSamlStrategy', () => {
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(30, 'email');
+    const request = fixture.buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['attraccess_admin'] };
 
     const profile = {
@@ -529,7 +508,7 @@ describe('SSOSamlStrategy', () => {
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
-    const request = buildRequest(31, 'email');
+    const request = fixture.buildRequest(31, 'email');
     // Admin emptied the mapping table → stored config is {} — sync must still run so roles
     // granted under the old mapping get revoked at next login.
     request.ssoSamlOptions.samlConfiguration.roleMappings = {};

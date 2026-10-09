@@ -1,10 +1,10 @@
-import type { ComponentProps } from 'react';
+import { ComponentProps } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceTabsLayout } from './ResourceTabsLayout';
 import { createMockResource } from '../../../../test-utils/fixtures';
-import type { ResourceQrCode } from '../qrcode';
+import { ResourceQrCode } from '../qrcode';
 const state = vi.hoisted(() => ({
   update: true,
   canDelete: true,

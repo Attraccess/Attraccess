@@ -1,42 +1,36 @@
-import { ResourceRetrainingService, RetrainingPolicy } from './resourceRetraining.service';
+import { registerResourceRetrainingServiceEvaluateFixture } from './resourceRetraining.service.resource-retraining-service-evaluate.test-fixture';
+import { registerResourceRetrainingServiceStatusAggregationFixture } from './resourceRetraining.service.resource-retraining-service-status-aggregation.test-fixture';
+import { ResourceRetrainingService } from './resourceRetraining.service';
 import { IntroductionHistoryAction } from '@attraccess/database-entities';
 
 describe('ResourceRetrainingService.evaluate', () => {
-  let service: ResourceRetrainingService;
-
-  const DAY = 24 * 60 * 60 * 1000;
-  const trainedAt = new Date('2026-01-01T00:00:00.000Z');
-
-  const policy = (overrides: Partial<RetrainingPolicy> = {}): RetrainingPolicy => ({
-    retrainingMaxAgeDays: null,
-    retrainingMaxInactivityDays: null,
-    retrainingBlocksAccess: false,
-    ...overrides,
-  });
-
-  beforeEach(() => {
-    service = new ResourceRetrainingService(
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-    );
-  });
+  const fixture = registerResourceRetrainingServiceEvaluateFixture();
 
   it('does not apply when no thresholds are configured', () => {
-    const result = service.evaluate(policy(), trainedAt, null, new Date('2030-01-01T00:00:00.000Z'));
+    const result = fixture.service.evaluate(
+      fixture.policy(),
+      fixture.trainedAt,
+      null,
+      new Date('2030-01-01T00:00:00.000Z'),
+    );
     expect(result.applies).toBe(false);
     expect(result.isDue).toBe(false);
   });
 
   it('becomes due once the max training age has passed', () => {
-    const p = policy({ retrainingMaxAgeDays: 365 });
-    const before = service.evaluate(p, trainedAt, null, new Date(trainedAt.getTime() + 364 * DAY));
-    const after = service.evaluate(p, trainedAt, null, new Date(trainedAt.getTime() + 366 * DAY));
+    const p = fixture.policy({ retrainingMaxAgeDays: 365 });
+    const before = fixture.service.evaluate(
+      p,
+      fixture.trainedAt,
+      null,
+      new Date(fixture.trainedAt.getTime() + 364 * fixture.DAY),
+    );
+    const after = fixture.service.evaluate(
+      p,
+      fixture.trainedAt,
+      null,
+      new Date(fixture.trainedAt.getTime() + 366 * fixture.DAY),
+    );
 
     expect(before.applies).toBe(true);
     expect(before.isDue).toBe(false);
@@ -45,11 +39,21 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('uses last usage as the inactivity baseline', () => {
-    const p = policy({ retrainingMaxInactivityDays: 30 });
+    const p = fixture.policy({ retrainingMaxInactivityDays: 30 });
     const lastUsedAt = new Date('2026-06-01T00:00:00.000Z');
 
-    const fresh = service.evaluate(p, trainedAt, lastUsedAt, new Date(lastUsedAt.getTime() + 29 * DAY));
-    const stale = service.evaluate(p, trainedAt, lastUsedAt, new Date(lastUsedAt.getTime() + 31 * DAY));
+    const fresh = fixture.service.evaluate(
+      p,
+      fixture.trainedAt,
+      lastUsedAt,
+      new Date(lastUsedAt.getTime() + 29 * fixture.DAY),
+    );
+    const stale = fixture.service.evaluate(
+      p,
+      fixture.trainedAt,
+      lastUsedAt,
+      new Date(lastUsedAt.getTime() + 31 * fixture.DAY),
+    );
 
     expect(fresh.isDue).toBe(false);
     expect(stale.isDue).toBe(true);
@@ -57,25 +61,40 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('falls back to trainedAt for inactivity when there is no usage', () => {
-    const p = policy({ retrainingMaxInactivityDays: 30 });
-    const result = service.evaluate(p, trainedAt, null, new Date(trainedAt.getTime() + 31 * DAY));
+    const p = fixture.policy({ retrainingMaxInactivityDays: 30 });
+    const result = fixture.service.evaluate(
+      p,
+      fixture.trainedAt,
+      null,
+      new Date(fixture.trainedAt.getTime() + 31 * fixture.DAY),
+    );
     expect(result.isDue).toBe(true);
     expect(result.reason).toBe('inactivity');
   });
 
   it('reports the soonest trigger when both are configured', () => {
-    const p = policy({ retrainingMaxAgeDays: 365, retrainingMaxInactivityDays: 30 });
-    const lastUsedAt = new Date(trainedAt.getTime() + 10 * DAY);
+    const p = fixture.policy({ retrainingMaxAgeDays: 365, retrainingMaxInactivityDays: 30 });
+    const lastUsedAt = new Date(fixture.trainedAt.getTime() + 10 * fixture.DAY);
 
-    const result = service.evaluate(p, trainedAt, lastUsedAt, new Date(trainedAt.getTime() + 45 * DAY));
+    const result = fixture.service.evaluate(
+      p,
+      fixture.trainedAt,
+      lastUsedAt,
+      new Date(fixture.trainedAt.getTime() + 45 * fixture.DAY),
+    );
     expect(result.isDue).toBe(true);
     expect(result.reason).toBe('inactivity');
-    expect(result.dueAt?.getTime()).toBe(lastUsedAt.getTime() + 30 * DAY);
+    expect(result.dueAt?.getTime()).toBe(lastUsedAt.getTime() + 30 * fixture.DAY);
   });
 
   it('passes through the blocksAccess flag', () => {
-    const p = policy({ retrainingMaxAgeDays: 1, retrainingBlocksAccess: true });
-    const result = service.evaluate(p, trainedAt, null, new Date(trainedAt.getTime() + 2 * DAY));
+    const p = fixture.policy({ retrainingMaxAgeDays: 1, retrainingBlocksAccess: true });
+    const result = fixture.service.evaluate(
+      p,
+      fixture.trainedAt,
+      null,
+      new Date(fixture.trainedAt.getTime() + 2 * fixture.DAY),
+    );
     expect(result.blocksAccess).toBe(true);
   });
 
@@ -84,21 +103,19 @@ describe('ResourceRetrainingService.evaluate', () => {
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
     const service = new ResourceRetrainingService(
       {
-        findOne: jest
-          .fn()
-          .mockResolvedValue({
-            id: 1,
-            name: 'Lathe',
-            retrainingMaxAgeDays: 1,
-            retrainingMaxInactivityDays: null,
-            retrainingBlocksAccess: true,
-          }),
+        findOne: jest.fn().mockResolvedValue({
+          id: 1,
+          name: 'Lathe',
+          retrainingMaxAgeDays: 1,
+          retrainingMaxInactivityDays: null,
+          retrainingBlocksAccess: true,
+        }),
       } as never,
       null as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
       introductionRepository as never,
       {
-        findOne: jest.fn().mockResolvedValue({ createdAt: trainedAt, action: IntroductionHistoryAction.GRANT }),
+        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
       } as never,
       null as never,
       null as never,
@@ -130,21 +147,19 @@ describe('ResourceRetrainingService.evaluate', () => {
     };
     const service = new ResourceRetrainingService(
       {
-        findOne: jest
-          .fn()
-          .mockResolvedValue({
-            id: 1,
-            name: 'Lathe',
-            retrainingMaxAgeDays: 1,
-            retrainingMaxInactivityDays: null,
-            retrainingBlocksAccess: true,
-          }),
+        findOne: jest.fn().mockResolvedValue({
+          id: 1,
+          name: 'Lathe',
+          retrainingMaxAgeDays: 1,
+          retrainingMaxInactivityDays: null,
+          retrainingBlocksAccess: true,
+        }),
       } as never,
       null as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
       introductionRepository as never,
       {
-        findOne: jest.fn().mockResolvedValue({ createdAt: trainedAt, action: IntroductionHistoryAction.GRANT }),
+        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
       } as never,
       null as never,
       email as never,
@@ -182,21 +197,19 @@ describe('ResourceRetrainingService.evaluate', () => {
     const email = { sendUserRetrainingEmail: jest.fn() };
     const service = new ResourceRetrainingService(
       {
-        findOne: jest
-          .fn()
-          .mockResolvedValue({
-            id: 1,
-            name: 'Lathe',
-            retrainingMaxAgeDays: 1,
-            retrainingMaxInactivityDays: null,
-            retrainingBlocksAccess: true,
-          }),
+        findOne: jest.fn().mockResolvedValue({
+          id: 1,
+          name: 'Lathe',
+          retrainingMaxAgeDays: 1,
+          retrainingMaxInactivityDays: null,
+          retrainingBlocksAccess: true,
+        }),
       } as never,
       null as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
       introductionRepository as never,
       {
-        findOne: jest.fn().mockResolvedValue({ createdAt: trainedAt, action: IntroductionHistoryAction.GRANT }),
+        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
       } as never,
       null as never,
       email as never,
@@ -245,21 +258,19 @@ describe('ResourceRetrainingService.evaluate', () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
     const service = new ResourceRetrainingService(
       {
-        findOne: jest
-          .fn()
-          .mockResolvedValue({
-            id: 1,
-            name: 'Lathe',
-            retrainingMaxAgeDays: 1,
-            retrainingMaxInactivityDays: null,
-            retrainingBlocksAccess: true,
-          }),
+        findOne: jest.fn().mockResolvedValue({
+          id: 1,
+          name: 'Lathe',
+          retrainingMaxAgeDays: 1,
+          retrainingMaxInactivityDays: null,
+          retrainingBlocksAccess: true,
+        }),
       } as never,
       null as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
       { update: jest.fn() } as never,
       {
-        findOne: jest.fn().mockResolvedValue({ createdAt: trainedAt, action: IntroductionHistoryAction.GRANT }),
+        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
       } as never,
       null as never,
       null as never,
@@ -267,42 +278,18 @@ describe('ResourceRetrainingService.evaluate', () => {
     );
 
     await (service as never as { notifyIfDue: (introduction: object, now: Date) => Promise<void> }).notifyIfDue(
-      { id: 3, resourceId: 1, receiverUserId: 2, retrainingRequiredAuditedAt: trainedAt },
+      { id: 3, resourceId: 1, receiverUserId: 2, retrainingRequiredAuditedAt: fixture.trainedAt },
       new Date('2026-01-03T00:00:00.000Z'),
     );
 
     expect(audit.recordResource).not.toHaveBeenCalled();
   });
 });
-
 describe('ResourceRetrainingService status aggregation', () => {
-  const trainedAt = new Date('2020-01-01T00:00:00Z');
-  const policy = { retrainingMaxAgeDays: 1, retrainingMaxInactivityDays: null, retrainingBlocksAccess: true };
-  const setup = () => {
-    const resources = { findOne: jest.fn().mockResolvedValue({ id: 1, ...policy }) };
-    const groups = { findOne: jest.fn().mockResolvedValue({ id: 2, ...policy, resources: [{ id: 1 }] }) };
-    const usage = { findOne: jest.fn().mockResolvedValue(null) };
-    const introductions = {
-      findOne: jest.fn().mockResolvedValue({ id: 3, resourceId: 1, receiverUserId: 4, createdAt: trainedAt }),
-    };
-    const history = {
-      findOne: jest.fn().mockResolvedValue({ action: IntroductionHistoryAction.GRANT, createdAt: trainedAt }),
-    };
-    const resourceGroups = { getGroupsOfResource: jest.fn().mockResolvedValue([{ id: 2 }]) };
-    const service = new ResourceRetrainingService(
-      resources as never,
-      groups as never,
-      usage as never,
-      introductions as never,
-      history as never,
-      resourceGroups as never,
-      {} as never,
-      {} as never,
-    );
-    return { service, resources, groups, usage, introductions, history, resourceGroups };
-  };
+  const fixture = registerResourceRetrainingServiceStatusAggregationFixture();
+
   it('combines expired resource and group introductions into a blocked status', async () => {
-    const { service } = setup();
+    const { service } = fixture.setup();
     expect(await service.getResourceRetrainingStatus(1, 4)).toMatchObject({
       hasIntroduction: true,
       applies: true,
@@ -311,48 +298,57 @@ describe('ResourceRetrainingService status aggregation', () => {
       reason: 'age',
     });
   });
+
   it('keeps a fresh group introduction usable when the resource introduction is expired', async () => {
-    const { service, groups } = setup();
-    groups.findOne.mockResolvedValue({ id: 2, ...policy, retrainingMaxAgeDays: 100000, resources: [{ id: 1 }] });
+    const { service, groups } = fixture.setup();
+    groups.findOne.mockResolvedValue({
+      id: 2,
+      ...fixture.policy,
+      retrainingMaxAgeDays: 100000,
+      resources: [{ id: 1 }],
+    });
     expect(await service.getResourceRetrainingStatus(1, 4)).toMatchObject({
       hasIntroduction: true,
       isDue: false,
       blocksAccess: false,
     });
   });
+
   it('reports no applicable policy without incorrectly dropping an existing introduction', async () => {
-    const { service, resources, groups } = setup();
-    resources.findOne.mockResolvedValue({ id: 1, ...policy, retrainingMaxAgeDays: null });
-    groups.findOne.mockResolvedValue({ id: 2, ...policy, retrainingMaxAgeDays: null, resources: [] });
+    const { service, resources, groups } = fixture.setup();
+    resources.findOne.mockResolvedValue({ id: 1, ...fixture.policy, retrainingMaxAgeDays: null });
+    groups.findOne.mockResolvedValue({ id: 2, ...fixture.policy, retrainingMaxAgeDays: null, resources: [] });
     expect(await service.getResourceRetrainingStatus(1, 4)).toMatchObject({
       hasIntroduction: true,
       applies: false,
       isDue: false,
     });
   });
+
   it('reports missing or revoked introductions as unavailable', async () => {
-    const { service, introductions, history } = setup();
+    const { service, introductions, history } = fixture.setup();
     introductions.findOne.mockResolvedValue(null);
     expect(await service.getResourceRetrainingStatus(1, 4)).toMatchObject({ hasIntroduction: false });
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
-    introductions.findOne.mockResolvedValue({ id: 3, resourceId: 1, receiverUserId: 4, createdAt: trainedAt });
+    introductions.findOne.mockResolvedValue({ id: 3, resourceId: 1, receiverUserId: 4, createdAt: fixture.trainedAt });
     history.findOne.mockResolvedValue(null);
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
   });
+
   it('evaluates individual resource and group introductions and tolerates deleted targets', async () => {
-    const { service, introductions, resources, groups } = setup();
+    const { service, introductions, resources, groups } = fixture.setup();
     expect(await service.getIntroductionRetrainingStatus(3)).toMatchObject({ isDue: true });
     introductions.findOne.mockResolvedValue({
       id: 3,
       resourceId: null,
       resourceGroupId: 2,
       receiverUserId: 4,
-      createdAt: trainedAt,
+      createdAt: fixture.trainedAt,
     });
     expect(await service.getIntroductionRetrainingStatus(3)).toMatchObject({ isDue: true });
     groups.findOne.mockResolvedValue(null);
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
-    introductions.findOne.mockResolvedValue({ id: 3, resourceId: 1, receiverUserId: 4, createdAt: trainedAt });
+    introductions.findOne.mockResolvedValue({ id: 3, resourceId: 1, receiverUserId: 4, createdAt: fixture.trainedAt });
     resources.findOne.mockResolvedValue(null);
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
   });

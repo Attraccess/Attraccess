@@ -20,6 +20,15 @@ const contextKey = Symbol.for('attraccess.plugin.live-updates.context');
 const contexts = globalThis as typeof globalThis & { [contextKey]?: Context<PluginLiveUpdatesClient | null> };
 const LiveContext = (contexts[contextKey] ??= createContext<PluginLiveUpdatesClient | null>(null));
 
+const identityKey = Symbol.for('attraccess.plugin.live-updates.identity');
+const identities = globalThis as typeof globalThis & { [identityKey]?: Context<string | null> };
+const IdentityContext = (identities[identityKey] ??= createContext<string | null>(null));
+
+/** Host integration: use the loaded manifest name for both npm and ZIP plugins. */
+export function PluginLiveUpdatesIdentityProvider({ name, children }: { name: string; children: ReactNode }) {
+  return <IdentityContext.Provider value={name}>{children}</IdentityContext.Provider>;
+}
+
 /** Host integration only. No plugin opens its own transport. */
 export function PluginLiveUpdatesProvider({
   client,
@@ -42,10 +51,12 @@ export function usePluginLiveUpdates<T>(props: {
   onUnavailable?: () => void;
 }) {
   const client = useContext(LiveContext);
-  const latest = useRef({ props, client });
-  latest.current = { props, client };
+  const identity = useContext(IdentityContext);
+  const plugin = identity ?? props.plugin;
+  const latest = useRef({ props, client, plugin });
+  latest.current = { props, client, plugin };
   const unsubscribe = useRef<(() => void) | null>(null);
-  const { plugin, topic, identifier, enabled = true } = props;
+  const { topic, identifier, enabled = true } = props;
   useEffect(() => {
     if (!client || !enabled) return;
     let active = true;
@@ -53,7 +64,7 @@ export function usePluginLiveUpdates<T>(props: {
       active &&
       latest.current.client === client &&
       latest.current.props.enabled !== false &&
-      latest.current.props.plugin === plugin &&
+      latest.current.plugin === plugin &&
       latest.current.props.topic === topic &&
       latest.current.props.identifier === identifier;
     const remove = client.subscribe(

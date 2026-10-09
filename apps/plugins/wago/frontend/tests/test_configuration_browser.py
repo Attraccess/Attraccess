@@ -6,7 +6,6 @@ import unittest
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import Mock
-
 from playwright.sync_api import sync_playwright, expect
 from browser_fixture import ARTIFACTS
 from isolated_browser_fixture import IsolatedWagoFixture, ORIGIN
@@ -108,14 +107,6 @@ class ConfigurationBrowser(unittest.TestCase):
         self.dialog.locator("summary", has_text="Wiring label").click()
         self.dialog.get_by_role("textbox", name=re.compile(r"^Physical\ point\ label\*?$")).fill("Cabinet output A")
 
-    def test_long_channel_names_fit_list_and_terminal_map(self):
-        name = "Workshop" * 15
-        self.add_channel(name)
-        for view in ["Channel list", "Terminal map"]:
-            self.button(view).click()
-            self.assertLessEqual(self.page.locator("html").evaluate("el => el.scrollWidth - el.clientWidth"), 1)
-        expect(self.button("DO1: " + name)).to_be_visible()
-
     def save(self):
         self.button("Save draft").click()
         expect(self.dialog.get_by_text("Draft saved. Review and publish separately to send it to the controller.", exact=True)).to_be_visible()
@@ -146,6 +137,8 @@ class ConfigurationBrowser(unittest.TestCase):
 
     def custom_profile(self):
         self.external("Device profiles")
+        # The focused editor opens the first profile; select the legacy map used by these scenarios.
+        self.choose("Edit profile", "WAGO 879-3000 — UNQUALIFIED / map unverified v1")
         self.dialog.get_by_role("button", name=re.compile("^Duplicate WAGO 879-3000")).click()
         return self.dialog.locator("details").filter(has=self.page.locator("summary", has_text="(custom)"))
 
@@ -267,6 +260,14 @@ class ConfigurationBrowser(unittest.TestCase):
         expect(self.dialog.get_by_role("textbox", name=re.compile(r"^Channel\ name\*?$"))).to_have_value("Workshop light")
         self.assertEqual(self.fixture.count("/draft"), 0)
         self.assertEqual(self.fixture.count("/publish"), 0)
+
+    def test_long_channel_names_fit_list_and_terminal_map(self):
+        name = "Workshop" * 15
+        self.add_channel(name)
+        for view in ["Channel list", "Terminal map"]:
+            self.button(view).click()
+            self.assertLessEqual(self.page.locator("html").evaluate("el => el.scrollWidth - el.clientWidth"), 1)
+        expect(self.button("DO1: " + name)).to_be_visible()
 
     def test_first_digital_setup_save_and_reload(self):
         self.add_output()

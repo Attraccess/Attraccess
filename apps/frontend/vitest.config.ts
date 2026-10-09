@@ -1,4 +1,4 @@
-import { configDefaults, defineConfig } from 'vitest/config';
+import { configDefaults, coverageConfigDefaults, defineConfig } from 'vitest/config';
 import path from 'node:path';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
@@ -24,6 +24,10 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: [path.join(__dirname, 'src/test-utils/setup.ts')],
+    coverage: {
+      // Split hoisted mock modules are test helpers; Istanbul breaks their hoisting transform.
+      exclude: [...coverageConfigDefaults.exclude, '**/*.test.hoisted.{ts,tsx}'],
+    },
     testTimeout: 20000,
     hookTimeout: 20000,
     // ponytail: retry flaky modal+userEvent tests that timeout under concurrent load

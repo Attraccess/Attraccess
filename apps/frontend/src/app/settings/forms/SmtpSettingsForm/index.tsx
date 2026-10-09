@@ -1,8 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ApiError,
   SmtpServiceType,
+  ApiError,
   useSettingsServiceApplyFirstTimeSetupSettings,
   useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
@@ -10,11 +8,13 @@ import {
   useSettingsServiceGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../../../../components/PasswordInput';
+import { Button } from '../../../../components/button/index';
+import { PasswordInput } from '../../../../components/PasswordInput/index';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
-import { Select } from '../../../../components/select';
+import { Select } from '../../../../components/select/index';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
@@ -29,7 +29,7 @@ export type SmtpSettingsFormProps = {
   endpoint: 'first-time-setup' | 'settings';
 };
 
-export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
+export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -46,15 +46,15 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
   const [smtpFrom, setSmtpFrom] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, { enabled: variant === 'standalone' });
+  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, {
+    enabled: variant === 'standalone',
+  });
 
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;
     const service = settings.smtp.service;
     const nextService: SmtpServiceType =
-      service === SmtpServiceType.SMTP || service === SmtpServiceType.OUTLOOK365
-        ? service
-        : SmtpServiceType.SMTP;
+      service === SmtpServiceType.SMTP || service === SmtpServiceType.OUTLOOK365 ? service : SmtpServiceType.SMTP;
     setSmtpService(nextService);
     if (nextService === SmtpServiceType.OUTLOOK365) {
       setSmtpHost(settings.smtp.host ?? 'smtp.office365.com');
@@ -91,11 +91,12 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
           baseTranslationKey: 'api',
         });
       },
-    }
+    };
   }, [endpoint, variant, t, tExists, toast, queryClient, onNext]);
 
   const { mutate: saveSettings, isPending: isSavingNormal } = useSettingsServiceUpdateSystemSettings(mutateConfig);
-  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } = useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
+  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } =
+    useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
 
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
 
@@ -115,14 +116,25 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
           from: smtpFrom,
         },
       },
-    }
+    };
 
     if (endpoint === 'first-time-setup') {
       saveSettingsFirstTimeSetup(payload);
     } else {
       saveSettings(payload);
     }
-  }, [endpoint, smtpService, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFrom, saveSettings, saveSettingsFirstTimeSetup]);
+  }, [
+    endpoint,
+    smtpService,
+    smtpHost,
+    smtpPort,
+    smtpSecure,
+    smtpUser,
+    smtpPass,
+    smtpFrom,
+    saveSettings,
+    saveSettingsFirstTimeSetup,
+  ]);
 
   const smtpServiceOptions = [
     { key: SmtpServiceType.SMTP, label: t('service.smtp') },
@@ -130,6 +142,54 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
   ];
 
   const showLoading = variant === 'standalone' && isLoading;
+  return {
+    t,
+    formRef,
+    smtpService,
+    setSmtpService,
+    smtpHost,
+    setSmtpHost,
+    smtpPort,
+    setSmtpPort,
+    smtpSecure,
+    setSmtpSecure,
+    smtpUser,
+    setSmtpUser,
+    smtpFrom,
+    setSmtpFrom,
+    smtpPass,
+    setSmtpPass,
+    isSaving,
+    handleSubmit,
+    smtpServiceOptions,
+    showLoading,
+    variant,
+  } as const;
+}
+
+export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
+  const {
+    t,
+    formRef,
+    smtpService,
+    setSmtpService,
+    smtpHost,
+    setSmtpHost,
+    smtpPort,
+    setSmtpPort,
+    smtpSecure,
+    setSmtpSecure,
+    smtpUser,
+    setSmtpUser,
+    smtpFrom,
+    setSmtpFrom,
+    smtpPass,
+    setSmtpPass,
+    isSaving,
+    handleSubmit,
+    smtpServiceOptions,
+    showLoading,
+  } = useSmtpSettingsFormState({ variant, endpoint, onNext });
 
   if (showLoading) {
     return (
@@ -163,31 +223,17 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         items={smtpServiceOptions}
         isRequired
       />
-      <TextField
-        isRequired
-        isDisabled={smtpService !== SmtpServiceType.SMTP}
-        value={smtpHost}
-        onChange={setSmtpHost}
-      >
+      <TextField isRequired isDisabled={smtpService !== SmtpServiceType.SMTP} value={smtpHost} onChange={setSmtpHost}>
         <Label>{t('inputs.host.label')}</Label>
         <Input />
         <Description>{t('inputs.host.description')}</Description>
       </TextField>
-      <TextField
-        isRequired
-        isDisabled={smtpService !== SmtpServiceType.SMTP}
-        value={smtpPort}
-        onChange={setSmtpPort}
-      >
+      <TextField isRequired isDisabled={smtpService !== SmtpServiceType.SMTP} value={smtpPort} onChange={setSmtpPort}>
         <Label>{t('inputs.port.label')}</Label>
         <Input type="number" min={1} />
         <Description>{t('inputs.port.description')}</Description>
       </TextField>
-      <LabeledSwitch
-        isSelected={smtpSecure}
-        onChange={setSmtpSecure}
-        isDisabled={smtpService !== SmtpServiceType.SMTP}
-      >
+      <LabeledSwitch isSelected={smtpSecure} onChange={setSmtpSecure} isDisabled={smtpService !== SmtpServiceType.SMTP}>
         {t('inputs.secure.label')}
       </LabeledSwitch>
       <TextField value={smtpUser} onChange={setSmtpUser}>
@@ -207,11 +253,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         <Input />
         <Description>{t('inputs.from.description')}</Description>
       </TextField>
-      <Button variant="primary"
-        onPress={handleSubmit}
-        isPending={isSaving}
-        isDisabled={showLoading}
-      >
+      <Button variant="primary" onPress={handleSubmit} isPending={isSaving} isDisabled={showLoading}>
         {variant === 'wizard' ? t('actions.next') : t('actions.save')}
       </Button>
       <input type="submit" hidden />

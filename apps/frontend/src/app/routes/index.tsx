@@ -1,71 +1,106 @@
+import { PluginLiveUpdatesIdentityProvider, RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { Spinner } from '@heroui/react';
+import { Suspense, lazy, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { ResourceTabsLayout } from '../resources/details/layout/ResourceTabsLayout';
-import { ResourceOverviewTab } from '../resources/details/overview/ResourceOverviewTab';
+import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
+import AccountPage from '../account/index';
+import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage/index';
+import { AttractapList } from '../attractap/AttractapList/index';
+import { RfidCardList, UserRfidCardsPage } from '../attractap/RfidCardList/index';
+import { BalenaPage } from '../balena/index';
+import { BillingAdministrationPage } from '../billing/administration/index';
+import { SumUpPage } from '../billing/administration/sumup/index';
+import { BillingDashboardPage } from '../billing/dashboard/index';
+import ChangelogPage from '../changelog/ChangelogPage';
+import { ConfirmDeleteAccount } from '../confirm-delete-account/index';
+import { CsvExport } from '../csv-export/index';
+import { Dependencies } from '../dependencies/index';
+import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
+import FirstTimeSetupPage from '../first-time-setup/index';
+import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { KioskLayout } from '../kiosk/layout/KioskLayout';
 import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
-import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
-import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
-import { ResourcePeopleTab } from '../resources/details/people/ResourcePeopleTab';
-import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
-import { lazy, Suspense, useMemo } from 'react';
-import { Spinner } from '@heroui/react';
-import { MqttServersPage, EditMqttServerPage } from '../mqtt';
-import { SSOProviderFormPage } from '../sso/providers/SSOProviderFormPage';
-import { UserManagementPage } from '../user-management';
-import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
-import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
+import { MessagesPage } from '../messaging/index';
+import { EditMqttServerPage, MqttServersPage } from '../mqtt/index';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
-import { AttractapList } from '../attractap/AttractapList';
-import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage';
-import { RfidCardList, UserRfidCardsPage } from '../attractap/RfidCardList';
-import { CsvExport } from '../csv-export';
-import { DocumentationEditor, DocumentationView } from '../resources/documentation';
-import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
-import { ResourceGroupEditPage } from '../resource-groups';
-import { ResourceOverview } from '../resourceOverview';
-import { Dependencies } from '../dependencies';
-import { UserManagementDetailsPage } from '../user-management/details';
-import FlowsPage from '../resources/details/flows';
-import { MaintenanceHubPage } from '../resources/details/maintenance-hub';
-import { FormEditorPage, FormListPage } from '../resources/details/forms';
+import { ProjectDetailsPage } from '../projects/details/index';
+import { ProjectTeamPage } from '../projects/details/team/index';
+import { ProjectsListPage } from '../projects/index';
+import { ResourceGroupEditPage } from '../resource-groups/index';
+import { ResourceOverview } from '../resourceOverview/index';
 import { ResourceDiagnosticsTab } from '../resources/details/diagnostics/ResourceDiagnosticsTab';
+import FlowsPage from '../resources/details/flows/index';
+import { FormEditorPage, FormListPage } from '../resources/details/forms/index';
+import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
+import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
+import { ResourceTabsLayout } from '../resources/details/layout/ResourceTabsLayout';
+import { MaintenanceHubPage } from '../resources/details/maintenance-hub/index';
+import { ResourceOverviewTab } from '../resources/details/overview/ResourceOverviewTab';
+import { ResourcePeopleTab } from '../resources/details/people/ResourcePeopleTab';
+import { DocumentationEditor, DocumentationView } from '../resources/documentation/index';
 import { ResourceSettingsPage } from '../resources/settings/ResourceSettingsPage';
 import { ResourceSettingsSection } from '../resources/settings/ResourceSettingsSection';
-import AccountPage from '../account';
-import { ConfirmDeleteAccount } from '../confirm-delete-account';
-import ChangelogPage from '../changelog/ChangelogPage';
-import { BillingDashboardPage } from '../billing/dashboard';
-import { BillingAdministrationPage } from '../billing/administration';
-import { SumUpPage } from '../billing/administration/sumup';
-import { BalenaPage } from '../balena';
-import { ProjectsListPage } from '../projects';
-import { MessagesPage } from '../messaging';
-import { ProjectDetailsPage } from '../projects/details';
-import { ProjectTeamPage } from '../projects/details/team';
-import { SettingsLayout } from '../settings/layout/SettingsLayout';
 import { SettingsIndexPage } from '../settings/layout/SettingsIndexPage';
+import { SettingsLayout } from '../settings/layout/SettingsLayout';
 import { SETTINGS_SECTION_PERMISSIONS } from '../settings/layout/settingsSections';
-import { GeneralSection } from '../settings/sections/general';
-import { MonitoringSection } from '../settings/sections/monitoring';
-import { AboutSection } from '../settings/sections/about';
-import { RolesSection } from '../settings/sections/roles';
-import { SsoSection } from '../settings/sections/sso';
-import { EmailSection } from '../settings/sections/email';
-import { MessagingSection } from '../settings/sections/messaging';
-import { PluginsSection } from '../settings/sections/plugins';
-import { AuditLogSection } from '../settings/sections/audit-log';
-// Not lazy: the strength preview is evaluated server-side, so this section pulls in nothing the
-// main bundle does not already carry — and a Suspense boundary here only buys a spinner.
-import { SecuritySection } from '../settings/sections/security';
-import FirstTimeSetupPage from '../first-time-setup';
+import { AboutSection } from '../settings/sections/about/index';
+import { AuditLogSection } from '../settings/sections/audit-log/index';
+import { EmailSection } from '../settings/sections/email/index';
+import { GeneralSection } from '../settings/sections/general/index';
+import { MessagingSection } from '../settings/sections/messaging/index';
+import { MonitoringSection } from '../settings/sections/monitoring/index';
+import { PluginsSection } from '../settings/sections/plugins/index';
+import { RolesSection } from '../settings/sections/roles/index';
+import { SecuritySection } from '../settings/sections/security/index';
+import { SsoSection } from '../settings/sections/sso/index';
+import { SSOProviderFormPage } from '../sso/providers/SSOProviderFormPage';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
+import { UserManagementDetailsPage } from '../user-management/details/index';
+import { UserManagementPage } from '../user-management/index';
 
-const CompanionSettingsPage = lazy(() => import('../settings/companion'));
-const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
+export function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): RouteConfig[] {
+  const plugin = pluginManifest.plugin;
+  const pluginName = plugin.getPluginName();
+
+  let routes: RouteConfig[] | undefined;
+  try {
+    routes = plugin.getRoutes?.();
+  } catch (error) {
+    console.error(`Attraccess Plugin System: getRoutes() of plugin "${pluginName}" threw`, error);
+    return [];
+  }
+
+  if (!routes) {
+    return [];
+  }
+
+  if (!Array.isArray(routes)) {
+    console.error(`Attraccess Plugin System: getRoutes() of plugin "${pluginName}" did not return an array`);
+    return [];
+  }
+
+  // Wrap each plugin route element so a throwing render can't crash the app shell.
+  return routes.map((route) => ({
+    ...route,
+    element: (
+      <PluginRouteBoundary pluginName={pluginName}>
+        <PluginLiveUpdatesIdentityProvider name={pluginManifest.name}>
+          {route.element}
+        </PluginLiveUpdatesIdentityProvider>
+      </PluginRouteBoundary>
+    ),
+  }));
+}
+
+export const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
+
 // GrapesJS is heavy — keep the visual template editor out of the main bundle
-const EditEmailTemplatePage = lazy(() => import('../email-templates/edit'));
+export const EditEmailTemplatePage = lazy(() => import('../email-templates/edit'));
+
+export const CompanionSettingsPage = lazy(() => import('../settings/companion'));
+
 // three.js + the OpenSCAD loader are large; keep them out of the main bundle.
-const PrintablesPage = lazy(() => import('../printables'));
+export const PrintablesPage = lazy(() => import('../printables'));
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -289,12 +324,6 @@ const coreRoutes: RouteConfig[] = [
     element: <SumUpPage />,
     authRequired: 'billing.manage',
   },
-  // Settings shell (ATT-864). Section routes are flat and wrap their own layout, as RouteConfig
-  // has no nested-route form; the registry in settings/layout/settingsSections.ts is what keeps
-  // these paths and the directory in agreement.
-  // Any one of the section permissions gets in: the shell is the only route to SSO and Plugins now,
-  // so gating it on `system.settings.manage` alone would lock out the operators those sections
-  // exist for. The index page lists only the sections they may actually open.
   {
     path: '/settings',
     element: <SettingsIndexPage />,
@@ -327,9 +356,6 @@ const coreRoutes: RouteConfig[] = [
     ),
     authRequired: 'system.settings.manage',
   },
-  // Templates and the shared layout are sub-routes of Email rather than sections of their own: both
-  // are full-screen editors. Keep the editors outside SettingsLayout so their h-full canvases
-  // inherit the app content area's height instead of collapsing inside a content-sized wrapper.
   {
     path: '/settings/email/templates',
     element: (
@@ -342,7 +368,13 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/settings/email/templates/:type',
     element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center p-8">
+            <Spinner size="sm" />
+          </div>
+        }
+      >
         <EditEmailTemplatePage />
       </Suspense>
     ),
@@ -351,7 +383,13 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/settings/email/layout',
     element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center p-8">
+            <Spinner size="sm" />
+          </div>
+        }
+      >
         <EmailLayoutPage />
       </Suspense>
     ),
@@ -402,9 +440,6 @@ const coreRoutes: RouteConfig[] = [
     ),
     authRequired: 'system.sso.manage',
   },
-  // The provider form is a sub-route of the section rather than a section of its own — same shape as
-  // the email editors above. Without these the in-shell targets `useSsoProvidersBasePath` produces
-  // have nowhere to resolve.
   {
     path: '/settings/sso/providers/new',
     element: (
@@ -444,7 +479,13 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/devices/companion',
     element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center p-8">
+            <Spinner size="sm" />
+          </div>
+        }
+      >
         <CompanionSettingsPage />
       </Suspense>
     ),
@@ -463,7 +504,13 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/printables',
     element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center p-8">
+            <Spinner size="sm" />
+          </div>
+        }
+      >
         <PrintablesPage />
       </Suspense>
     ),
@@ -485,34 +532,6 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
 ];
-
-function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): RouteConfig[] {
-  const plugin = pluginManifest.plugin;
-  const pluginName = plugin.getPluginName();
-
-  let routes: RouteConfig[] | undefined;
-  try {
-    routes = plugin.getRoutes?.();
-  } catch (error) {
-    console.error(`Attraccess Plugin System: getRoutes() of plugin "${pluginName}" threw`, error);
-    return [];
-  }
-
-  if (!routes) {
-    return [];
-  }
-
-  if (!Array.isArray(routes)) {
-    console.error(`Attraccess Plugin System: getRoutes() of plugin "${pluginName}" did not return an array`);
-    return [];
-  }
-
-  // Wrap each plugin route element so a throwing render can't crash the app shell.
-  return routes.map((route) => ({
-    ...route,
-    element: <PluginRouteBoundary pluginName={pluginName}>{route.element}</PluginRouteBoundary>,
-  }));
-}
 
 export function useAllRoutes() {
   const { plugins: pluginManifests } = usePluginState();

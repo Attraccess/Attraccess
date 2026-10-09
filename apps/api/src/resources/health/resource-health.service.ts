@@ -1,21 +1,31 @@
 // Manages resource health state tracking with mutable status and source lifecycle tracking
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
 import {
   Resource,
-  ResourceHealthSource,
   ResourceHealthState,
   ResourceHealthStatus,
+  ResourceHealthSource,
 } from '@attraccess/database-entities';
+
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
-import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
-import { AuditService } from '../../audit/audit.service';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { In, Repository } from 'typeorm';
+
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
-interface ReportInput {
+import { AuditService } from '../../audit/audit.service';
+
+import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
+
+import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
+
+import { clearEntry as clearEntryImplementation } from './resource-health-clear';
+
+export interface ReportInput {
   resourceId: number;
   identifier?: string | null;
   status: ResourceHealthStatus;
@@ -81,16 +91,18 @@ export class ResourceHealthService {
     }
 
     if (previousStatus !== input.status) {
-      await this.audit.recordResource({
-        action: 'health.transition',
-        ...(input.auditOrigin ?? { actorId: null }),
-        subjectId: input.resourceId,
-        details: {
-          previousStatus: previousStatus ?? 'none',
-          status: input.status,
-          healthSource: input.source,
-        },
-      }).catch(() => undefined);
+      await this.audit
+        .recordResource({
+          action: 'health.transition',
+          ...(input.auditOrigin ?? { actorId: null }),
+          subjectId: input.resourceId,
+          details: {
+            previousStatus: previousStatus ?? 'none',
+            status: input.status,
+            healthSource: input.source,
+          },
+        })
+        .catch(() => undefined);
       this.logger.log(
         `Resource ${input.resourceId} health changed (identifier="${identifier}"): ${
           previousStatus ?? 'none'
@@ -150,43 +162,25 @@ export class ResourceHealthService {
     return count > 0;
   }
 
-  async clearEntry(resourceId: number, entryId: number, auditOrigin: ResourceAuditOrigin = {
-    actorId: null,
-  }): Promise<void> {
-    const entry = await this.healthRepository.findOne({
-      where: { id: entryId, resourceId },
-    });
-    if (!entry) {
-      throw new NotFoundException(`Health entry ${entryId} not found for resource ${resourceId}`);
-    }
-
-    await this.healthRepository.remove(entry);
-
-    if (entry.status === ResourceHealthStatus.UNHEALTHY) {
-      await this.audit.recordResource({
-        action: 'health.transition',
-        ...auditOrigin,
-        subjectId: resourceId,
-        details: {
-          previousStatus: entry.status,
-          status: ResourceHealthStatus.HEALTHY,
-          healthSource: entry.source,
-        },
-      }).catch(() => undefined);
-      this.logger.log(
-        `Resource ${resourceId} health entry cleared (identifier="${entry.identifier}"): ${entry.status} -> cleared`,
-      );
-      this.eventEmitter.emit(
-        ResourceHealthChangedEvent.EVENT_NAME,
-        new ResourceHealthChangedEvent(
-          resourceId,
-          entry.identifier,
-          ResourceHealthStatus.HEALTHY,
-          null,
-          entry.status,
-        ),
-      );
-    }
+  async clearEntry(
+    resourceId: number,
+    entryId: number,
+    auditOrigin: ResourceAuditOrigin = {
+      actorId: null,
+    },
+  ): Promise<void> {
+    const getContextOwner = () => this;
+    return clearEntryImplementation(
+      {
+        healthRepository: getContextOwner().healthRepository,
+        audit: getContextOwner().audit,
+        logger: getContextOwner().logger,
+        eventEmitter: getContextOwner().eventEmitter,
+      },
+      resourceId,
+      entryId,
+      auditOrigin,
+    );
   }
 
   private toDto(entry: ResourceHealthState) {
@@ -197,9 +191,10 @@ export class ResourceHealthService {
       status: entry.status,
       reason: entry.reason,
       source: entry.source,
-      lastReportedAt: entry.lastReportedAt instanceof Date
-        ? entry.lastReportedAt.toISOString()
-        : new Date(entry.lastReportedAt).toISOString(),
+      lastReportedAt:
+        entry.lastReportedAt instanceof Date
+          ? entry.lastReportedAt.toISOString()
+          : new Date(entry.lastReportedAt).toISOString(),
     };
   }
 }

@@ -1,38 +1,45 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import {
-  ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleDurationBasis,
-  ResourceMaintenanceScheduleTriggerType,
-  ResourceMaintenanceScheduleUsageHoursConfig,
-  ResourceMaintenanceScheduleUsageCountConfig,
-  ResourceMaintenanceScheduleTimeIntervalConfig,
-  ResourceMaintenance,
   Resource,
-  ResourceType,
+  ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleTimeIntervalConfig,
+  ResourceMaintenanceScheduleUsageCountConfig,
+  ResourceMaintenanceScheduleUsageHoursConfig,
+  ResourceMaintenanceScheduleTriggerType,
   UsageDurationUnit,
+  ResourceMaintenance,
+  ResourceMaintenanceScheduleDurationBasis,
+  ResourceType,
 } from '@attraccess/database-entities';
-import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
-import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
+
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { Repository } from 'typeorm';
+
 import { AuditService } from '../../audit/audit.service';
+
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
+
+import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
+
+import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
 
 @Injectable()
 export class MaintenanceScheduleService {
   constructor(
     @InjectRepository(ResourceMaintenanceSchedule)
-    private readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
+    protected readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
     @InjectRepository(ResourceMaintenanceScheduleUsageHoursConfig)
-    private readonly usageHoursConfigRepository: Repository<ResourceMaintenanceScheduleUsageHoursConfig>,
+    protected readonly usageHoursConfigRepository: Repository<ResourceMaintenanceScheduleUsageHoursConfig>,
     @InjectRepository(ResourceMaintenanceScheduleUsageCountConfig)
-    private readonly usageCountConfigRepository: Repository<ResourceMaintenanceScheduleUsageCountConfig>,
+    protected readonly usageCountConfigRepository: Repository<ResourceMaintenanceScheduleUsageCountConfig>,
     @InjectRepository(ResourceMaintenanceScheduleTimeIntervalConfig)
-    private readonly timeIntervalConfigRepository: Repository<ResourceMaintenanceScheduleTimeIntervalConfig>,
+    protected readonly timeIntervalConfigRepository: Repository<ResourceMaintenanceScheduleTimeIntervalConfig>,
     @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    private readonly audit: AuditService,
-    private readonly evaluator: MaintenanceScheduleEvaluatorService,
+    protected readonly resourceRepository: Repository<Resource>,
+    protected readonly audit: AuditService,
+    protected readonly evaluator: MaintenanceScheduleEvaluatorService,
   ) {}
 
   async findAllByResourceId(resourceId: number): Promise<ResourceMaintenanceSchedule[]> {
@@ -53,6 +60,77 @@ export class MaintenanceScheduleService {
       throw new NotFoundException('Maintenance schedule not found');
     }
     return schedule;
+  }
+
+  protected scheduleDetails(schedule: ResourceMaintenanceSchedule): Record<string, string | number> {
+    const details: Record<string, string | number> = {
+      scheduleId: schedule.id,
+      enabled: schedule.enabled ? 1 : 0,
+      triggerType: schedule.triggerType,
+    };
+    if (schedule.name) details.name = schedule.name.slice(0, 512);
+    if (schedule.usageHoursConfig) {
+      details.usageDuration = schedule.usageHoursConfig.duration;
+      details.usageUnit = schedule.usageHoursConfig.unit;
+    }
+    if (schedule.usageCountConfig) details.usageThreshold = schedule.usageCountConfig.thresholdSessions;
+    if (schedule.timeIntervalConfig) {
+      details.usageDuration = schedule.timeIntervalConfig.duration;
+      details.usageUnit = schedule.timeIntervalConfig.unit;
+    }
+    return details;
+  }
+
+  protected async removeConfigsForSchedule(scheduleId: number): Promise<void> {
+    await this.usageHoursConfigRepository.delete({ scheduleId });
+    await this.usageCountConfigRepository.delete({ scheduleId });
+    await this.timeIntervalConfigRepository.delete({ scheduleId });
+  }
+
+  protected async upsertConfigForSchedule(
+    scheduleId: number,
+    triggerType: ResourceMaintenanceScheduleTriggerType,
+    configs: {
+      usageHoursConfig?: { duration: number; unit: UsageDurationUnit };
+      usageCountConfig?: { thresholdSessions: number };
+      timeIntervalConfig?: { duration: number; unit: UsageDurationUnit };
+    },
+  ): Promise<void> {
+    switch (triggerType) {
+      case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS:
+        if (configs.usageHoursConfig) {
+          await this.usageHoursConfigRepository.save(
+            this.usageHoursConfigRepository.create({
+              scheduleId,
+              duration: configs.usageHoursConfig.duration,
+              unit: configs.usageHoursConfig.unit,
+            }),
+          );
+        }
+        break;
+      case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT:
+        if (configs.usageCountConfig) {
+          await this.usageCountConfigRepository.save(
+            this.usageCountConfigRepository.create({
+              scheduleId,
+              thresholdSessions: configs.usageCountConfig.thresholdSessions,
+            }),
+          );
+        }
+        break;
+      case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL:
+        if (configs.timeIntervalConfig) {
+          const { duration, unit } = configs.timeIntervalConfig;
+          await this.timeIntervalConfigRepository.save(
+            this.timeIntervalConfigRepository.create({
+              scheduleId,
+              duration,
+              unit,
+            }),
+          );
+        }
+        break;
+    }
   }
 
   async create(
@@ -175,7 +253,7 @@ export class MaintenanceScheduleService {
     });
   }
 
-  private async ensureResourceExists(resourceId: number): Promise<Resource> {
+  protected async ensureResourceExists(resourceId: number): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
@@ -183,83 +261,12 @@ export class MaintenanceScheduleService {
     return resource;
   }
 
-  private validateDurationBasis(resource: Resource, basis?: ResourceMaintenanceScheduleDurationBasis): void {
+  protected validateDurationBasis(resource: Resource, basis?: ResourceMaintenanceScheduleDurationBasis): void {
     if (
       basis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION &&
       resource.type !== ResourceType.Machine
     ) {
       throw new BadRequestException('Operating duration is only supported for machine resources');
-    }
-  }
-
-  private scheduleDetails(schedule: ResourceMaintenanceSchedule): Record<string, string | number> {
-    const details: Record<string, string | number> = {
-      scheduleId: schedule.id,
-      enabled: schedule.enabled ? 1 : 0,
-      triggerType: schedule.triggerType,
-    };
-    if (schedule.name) details.name = schedule.name.slice(0, 512);
-    if (schedule.usageHoursConfig) {
-      details.usageDuration = schedule.usageHoursConfig.duration;
-      details.usageUnit = schedule.usageHoursConfig.unit;
-    }
-    if (schedule.usageCountConfig) details.usageThreshold = schedule.usageCountConfig.thresholdSessions;
-    if (schedule.timeIntervalConfig) {
-      details.usageDuration = schedule.timeIntervalConfig.duration;
-      details.usageUnit = schedule.timeIntervalConfig.unit;
-    }
-    return details;
-  }
-
-  private async removeConfigsForSchedule(scheduleId: number): Promise<void> {
-    await this.usageHoursConfigRepository.delete({ scheduleId });
-    await this.usageCountConfigRepository.delete({ scheduleId });
-    await this.timeIntervalConfigRepository.delete({ scheduleId });
-  }
-
-  private async upsertConfigForSchedule(
-    scheduleId: number,
-    triggerType: ResourceMaintenanceScheduleTriggerType,
-    configs: {
-      usageHoursConfig?: { duration: number; unit: UsageDurationUnit };
-      usageCountConfig?: { thresholdSessions: number };
-      timeIntervalConfig?: { duration: number; unit: UsageDurationUnit };
-    },
-  ): Promise<void> {
-    switch (triggerType) {
-      case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS:
-        if (configs.usageHoursConfig) {
-          await this.usageHoursConfigRepository.save(
-            this.usageHoursConfigRepository.create({
-              scheduleId,
-              duration: configs.usageHoursConfig.duration,
-              unit: configs.usageHoursConfig.unit,
-            }),
-          );
-        }
-        break;
-      case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT:
-        if (configs.usageCountConfig) {
-          await this.usageCountConfigRepository.save(
-            this.usageCountConfigRepository.create({
-              scheduleId,
-              thresholdSessions: configs.usageCountConfig.thresholdSessions,
-            }),
-          );
-        }
-        break;
-      case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL:
-        if (configs.timeIntervalConfig) {
-          const { duration, unit } = configs.timeIntervalConfig;
-          await this.timeIntervalConfigRepository.save(
-            this.timeIntervalConfigRepository.create({
-              scheduleId,
-              duration,
-              unit,
-            }),
-          );
-        }
-        break;
     }
   }
 }

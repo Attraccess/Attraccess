@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import {
+  EmailTemplateType,
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerUpdate as useUpdateEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerResetToDefault as useResetTemplateToDefault,
   useEmailLayoutServiceEmailLayoutControllerFindGlobal as useFindGlobalEmailLayout,
-  EmailTemplateType,
 } from '@attraccess/react-query-client';
 import {
   DrawerBody,
@@ -25,19 +23,20 @@ import {
 } from '@heroui/react';
 import { ArrowLeft, Braces, Languages, RotateCcw } from 'lucide-react';
 import { buttonVariants } from '@heroui/styles';
-import { Button } from '../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useToastMessage } from '../../../components/toastProvider';
+import { Button } from '../../../components/button/index';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { StandardModal } from '../../../components/standardModal';
 import { MjmlVisualEditor } from './MjmlVisualEditor';
 import { TranslationsSection } from './TranslationsSection';
 import { CHROME_CLASS, extractTemplateFragment, splitHead, wrapInLayoutChrome } from './mjmlLayout';
-
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useToastMessage } from '../../../components/toastProvider';
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
 
-export function EditEmailTemplatePage() {
+export function useEditEmailTemplatePageState() {
   const navigate = useNavigate();
   const basePath = '/settings/email';
   const { t, language } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
@@ -150,6 +149,57 @@ export function EditEmailTemplatePage() {
     setTranslationsContent(subject + '\n' + body);
     setTranslationsOpen(true);
   }, [subject]);
+  return {
+    navigate,
+    basePath,
+    t,
+    language,
+    templateType,
+    initialBodyRef,
+    headMjmlRef,
+    isWrappedRef,
+    editorSeed,
+    handleBodyChange,
+    updateTemplate,
+    onSave,
+    resetConfirmOpen,
+    setResetConfirmOpen,
+    resetTemplate,
+    onResetConfirm,
+    variables,
+    copyVariable,
+    translationsOpen,
+    setTranslationsOpen,
+    translationsContent,
+    openTranslations,
+  } as const;
+}
+
+export function EditEmailTemplatePage() {
+  const {
+    navigate,
+    basePath,
+    t,
+    language,
+    templateType,
+    initialBodyRef,
+    headMjmlRef,
+    isWrappedRef,
+    editorSeed,
+    handleBodyChange,
+    updateTemplate,
+    onSave,
+    resetConfirmOpen,
+    setResetConfirmOpen,
+    resetTemplate,
+    onResetConfirm,
+    variables,
+    copyVariable,
+    translationsOpen,
+    setTranslationsOpen,
+    translationsContent,
+    openTranslations,
+  } = useEditEmailTemplatePageState();
 
   return (
     <div className="h-full flex flex-col gap-3" data-cy="edit-email-template-page">

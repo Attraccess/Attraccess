@@ -53,6 +53,9 @@ describe('SSO provider form', () => {
       type: SSOProviderType.OIDC,
       oidcConfiguration: {
         issuer: 'https://idp.example',
+        endSessionURL: 'https://idp.example/logout',
+        jwksURL: 'https://idp.example/jwks',
+        signingAlgorithms: ['ES256'],
         authorizationURL: 'https://idp.example/auth',
         tokenURL: 'https://idp.example/token',
         userInfoURL: 'https://idp.example/userinfo',
@@ -68,9 +71,16 @@ describe('SSO provider form', () => {
     expect(result.current.formValues).toMatchObject({
       name: 'Organization',
       type: SSOProviderType.OIDC,
-      oidcConfiguration: { clientId: 'app', clientSecret: 'existing' },
+      oidcConfiguration: {
+        clientId: 'app',
+        clientSecret: 'existing',
+        endSessionURL: 'https://idp.example/logout',
+        jwksURL: 'https://idp.example/jwks',
+        signingAlgorithms: ['ES256'],
+      },
     });
     expect(result.current.scopesInput).toBe('openid, email');
+    expect(result.current.signingAlgorithmsInput).toBe('ES256');
     expect(result.current.usernameClaimPathsInput).toBe('preferred_username');
     expect(result.current.emailClaimPathsInput).toBe('email');
     expect(result.current.samlRoleMappingEntries).toEqual([]);
@@ -83,6 +93,8 @@ describe('SSO provider form', () => {
       samlConfiguration: {
         entryPoint: 'https://idp.example/sso',
         issuer: 'urn:test',
+        idpIssuer: 'urn:idp',
+        logoutURL: 'https://idp.example/logout',
         certificate: 'idp-cert',
         signRequest: true,
         spSigningCertificate: 'stored-cert',
@@ -95,6 +107,8 @@ describe('SSO provider form', () => {
     const { result } = renderHook(() => useSSOProviderForm(8));
     expect(result.current.formValues.samlConfiguration).toMatchObject({
       entryPoint: 'https://idp.example/sso',
+      idpIssuer: 'urn:idp',
+      logoutURL: 'https://idp.example/logout',
       signRequest: true,
       spSigningCertificate: 'stored-cert',
       spSigningPrivateKey: '',
@@ -111,15 +125,19 @@ describe('SSO provider form', () => {
       result.current.setOidc('clientId', 'client');
       result.current.setOidc('clientSecret', 'secret');
       result.current.setScopesInput(' openid, email, , ');
+      result.current.setSigningAlgorithmsInput(' ES256, PS256, , ');
     });
     act(() =>
       result.current.onAutoDiscovery({
         issuer: 'https://idp.example',
+        end_session_endpoint: 'https://idp.example/logout',
+        jwks_uri: 'https://idp.example/jwks',
         authorization_endpoint: 'https://idp.example/auth',
         token_endpoint: 'https://idp.example/token',
         userinfo_endpoint: 'https://idp.example/info',
       }),
     );
+    expect(result.current.signingAlgorithmsInput).toBe(' ES256, PS256, , ');
     await act(() => result.current.handleSubmit());
     expect(state.create).toHaveBeenCalledWith({
       requestBody: expect.objectContaining({
@@ -128,6 +146,9 @@ describe('SSO provider form', () => {
           clientId: 'client',
           clientSecret: 'secret',
           scopes: ['openid', 'email'],
+          endSessionURL: 'https://idp.example/logout',
+          jwksURL: 'https://idp.example/jwks',
+          signingAlgorithms: ['ES256', 'PS256'],
           issuer: 'https://idp.example',
         }),
       }),
@@ -170,6 +191,57 @@ describe('SSO provider form', () => {
     await act(() => result.current.handleSubmit());
     expect(state.create).not.toHaveBeenCalled();
     expect(state.error).toHaveBeenCalledWith({ title: 'errorGeneric', description: 'signingMaterialsMissing' });
+  });
+  it('saves cleared optional OIDC logout endpoints and defaults empty algorithms', async () => {
+    const { result } = renderHook(() => useSSOProviderForm(7));
+    act(() => {
+      result.current.setOidc('endSessionURL', '  ');
+      result.current.setOidc('jwksURL', '');
+      result.current.setOidc('signingAlgorithms', []);
+    });
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[0][0].requestBody.oidcConfiguration).toMatchObject({
+      endSessionURL: null,
+      jwksURL: null,
+      signingAlgorithms: ['RS256'],
+    });
+  });
+  it('requires signing material for SAML logout even when login signing is disabled', async () => {
+    const { result } = renderHook(() => useSSOProviderForm());
+    act(() => {
+      result.current.handleSelectChange(SSOProviderType.SAML);
+      result.current.setSaml('logoutURL', 'https://idp.example/logout');
+    });
+    expect(result.current.formValues.samlConfiguration?.signRequest).toBe(false);
+    expect(result.current.isSaveDisabled).toBe(true);
+    await act(() => result.current.handleSubmit());
+    expect(state.create).not.toHaveBeenCalled();
+    expect(state.error).toHaveBeenCalledWith({ title: 'errorGeneric', description: 'signingMaterialsMissing' });
+  });
+  it('keeps stored SAML logout signing keys when editing blank private-key input', async () => {
+    state.provider = {
+      id: 8,
+      name: 'SAML',
+      type: SSOProviderType.SAML,
+      samlConfiguration: {
+        entryPoint: 'https://idp.example/sso',
+        issuer: 'urn:app',
+        idpIssuer: 'urn:idp',
+        logoutURL: 'https://idp.example/logout',
+        signRequest: false,
+        spSigningCertificate: 'stored-cert',
+        spSigningKeyEncryptionKeyId: 'key-id',
+      },
+    };
+    const { result } = renderHook(() => useSSOProviderForm(8));
+    expect(result.current.isSaveDisabled).toBe(false);
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[0][0].requestBody.samlConfiguration).toMatchObject({
+      idpIssuer: 'urn:idp',
+      logoutURL: 'https://idp.example/logout',
+      signRequest: false,
+    });
+    expect(state.update.mock.calls[0][0].requestBody.samlConfiguration).not.toHaveProperty('spSigningPrivateKey');
   });
   it('keeps the form open when saving fails', async () => {
     state.create.mockRejectedValueOnce(new Error('provider conflict'));

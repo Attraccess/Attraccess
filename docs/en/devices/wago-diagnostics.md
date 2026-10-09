@@ -8,7 +8,7 @@ Applied configuration is not proof of physical I/O readiness. Diagnostics consum
 
 - `GET /api/wago/controllers/:id/diagnostics`: requires `resources.update`; missing controllers return 404. Registered through `WagoDiagnosticsController` in `backend/plugin.ts`, independently of the main controller.
 - `WagoDiagnostics` in `apps/plugins/wago/diagnostics-types.ts`: shared response contract for connectivity, draft/publication/application, runtime metadata, channels, faults, correlated acknowledgements, flow references and recent events.
-- `useWagoDiagnostics(controllerId: number | null)` in `frontend/src/diagnostics.ts`: TanStack query result; null disables requests; key `['wago', 'diagnostics', controllerId]`; five-second polling; one retry. Hosts must provide the existing QueryClient context.
+- `useWagoDiagnostics(controllerId: number | null)` in `frontend/src/diagnostics/diagnostics.ts`: TanStack query result; null disables requests; key `['wago', 'diagnostics', controllerId]`; five-second polling; one retry. Hosts must provide the existing QueryClient context.
 - `WagoStatus({ diagnostics: WagoDiagnostics })`: pure status view for embedding in commissioning/configuration screens; it does not fetch.
 - `ControllerDiagnostics({ controllerId: number, onConfigure?: () => void })`: complete polling view with its own render-error boundary and request-error presentation.
 - `WagoDiagnosticsBoundary`: isolates an embedded diagnostics subtree. Remount to retry after a render failure. This boundary does not cover failures loading the plugin bundle itself.

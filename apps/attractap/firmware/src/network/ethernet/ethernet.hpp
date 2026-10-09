@@ -5,7 +5,7 @@
 #include "esp_netif.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
-#include "state/state.hpp"
+#include "../../state/state.hpp"
 #include "../../logger/logger.hpp"
 #include "../../settings/settings.hpp"
 

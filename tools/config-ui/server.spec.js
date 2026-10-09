@@ -72,6 +72,27 @@ test('reports missing UI assets', async () => {
   });
   expect((await request('/')).status).toBe(500);
 });
+test.each([
+  ['/style.css', 'text/css; charset=utf-8'],
+  ['/controls.css', 'text/css; charset=utf-8'],
+  ['/app.js', 'text/javascript; charset=utf-8'],
+  ['/dns.js', 'text/javascript; charset=utf-8'],
+  ['/prometheus.js', 'text/javascript; charset=utf-8'],
+])('serves authenticated asset %s with its content type', async (url, contentType) => {
+  expect((await request(url, '')).status).toBe(401);
+  const response = await request(`${url}?fresh=1`);
+  expect(response.status).toBe(200);
+  expect(response.headers['Content-Type']).toBe(contentType);
+  expect(fs.readFileSync).toHaveBeenLastCalledWith(expect.stringContaining(`/public${url}`), 'utf-8');
+});
+test.each(['/server.js', '/modules/dnsmasq.js', '/../server.js', '/%2e%2e/server.js'])(
+  'keeps non-public file %s outside the asset whitelist',
+  async (url) => {
+    const reads = fs.readFileSync.mock.calls.length;
+    expect((await request(url)).status).toBe(404);
+    expect(fs.readFileSync.mock.calls.length).toBe(reads);
+  },
+);
 test('lists registered modules', async () => {
   const response = await request('/api/modules?fresh=1');
   expect(JSON.parse(response.body)).toEqual([
