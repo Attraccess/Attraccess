@@ -1,6 +1,6 @@
 #include "connectionConfigurationScreen.hpp"
-#include "display/theme.hpp"
-#include "display/fonts/attractap_fonts.hpp"
+#include "../../theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
@@ -35,68 +35,78 @@ void ConnectionConfigurationScreen::init()
    lv_obj_remove_flag(this->tabs, LV_OBJ_FLAG_SCROLLABLE);
    DisplayTheme::applyScreen(this->tabs);
 
-   lv_obj_t *wifiTab = lv_tabview_add_tab(this->tabs, "WLAN");
-   lv_obj_set_flex_flow(wifiTab, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(wifiTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   this->createWifiTab(networkConfig);
 
-   lv_obj_t *labelForWifiSelectNetwork = lv_label_create(wifiTab);
-   lv_obj_set_width(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForWifiSelectNetwork, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForWifiSelectNetwork, "WLAN Netzwerk");
-   lv_obj_set_style_text_color(labelForWifiSelectNetwork, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->createApiTab(apiConfig);
 
-   this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
-   DisplayTheme::field(this->wifiSelectNetwork);
-   lv_dropdown_set_options(this->wifiSelectNetwork, "Suche WLANs...");
-   lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
-   lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
-   lv_obj_add_flag(this->wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_add_event_cb(this->wifiSelectNetwork, &ConnectionConfigurationScreen::onWifiDropdownEvent, LV_EVENT_VALUE_CHANGED, this);
+   this->createDeviceTab(deviceConfig);
 
-   this->labelForWifiSSID = lv_label_create(wifiTab);
-   lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->labelForWifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->labelForWifiSSID, LV_ALIGN_CENTER);
-   lv_label_set_text(this->labelForWifiSSID, "SSID*");
-   lv_obj_set_style_text_color(this->labelForWifiSSID, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   this->labelForWifiSSIDDefaultColor = lv_obj_get_style_text_color(this->labelForWifiSSID, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->pinLockOverlay = this->pinInputPage.init("Entsperren mit PIN", this->screen);
+   lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
+   lv_obj_set_style_arc_width(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_height(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_align(this->pinLockOverlay, LV_ALIGN_CENTER);
+   lv_obj_set_width(this->pinLockOverlay, lv_pct(100));
+   lv_obj_set_height(this->pinLockOverlay, lv_pct(100));
+   lv_obj_set_x(this->pinLockOverlay, 0);
+   lv_obj_set_y(this->pinLockOverlay, 0);
 
-   this->wifiSSID = lv_textarea_create(wifiTab);
-   DisplayTheme::field(this->wifiSSID);
-   lv_obj_set_width(this->wifiSSID, lv_pct(100));
-   lv_obj_set_height(this->wifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->wifiSSID, LV_ALIGN_CENTER);
-   lv_textarea_set_placeholder_text(this->wifiSSID, "SSID");
-   lv_textarea_set_one_line(this->wifiSSID, true);
-   lv_obj_add_event_cb(this->wifiSSID, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
-   lv_textarea_set_text(this->wifiSSID, networkConfig.ssid.c_str());
+   if (!this->pinLockEnabled)
+   {
+      lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
+   }
+}
 
-   this->labelForWifiPassword = lv_label_create(wifiTab);
-   lv_obj_set_width(this->labelForWifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->labelForWifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->labelForWifiPassword, LV_ALIGN_CENTER);
-   lv_label_set_text(this->labelForWifiPassword, "Passwort*");
-   lv_obj_set_style_text_color(this->labelForWifiPassword, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   this->labelForWifiPasswordDefaultColor = lv_obj_get_style_text_color(this->labelForWifiPassword, LV_PART_MAIN | LV_STATE_DEFAULT);
+lv_obj_t *ConnectionConfigurationScreen::getScreen()
+{
+   return this->screen;
+}
 
-   this->wifiPassword = lv_textarea_create(wifiTab);
-   DisplayTheme::field(this->wifiPassword);
-   lv_obj_set_width(this->wifiPassword, lv_pct(100));
-   lv_obj_set_height(this->wifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->wifiPassword, LV_ALIGN_CENTER);
-   lv_textarea_set_placeholder_text(this->wifiPassword, "Password");
-   lv_textarea_set_one_line(this->wifiPassword, true);
-   lv_textarea_set_password_mode(this->wifiPassword, true);
-   lv_obj_add_event_cb(this->wifiPassword, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
-   lv_textarea_set_text(this->wifiPassword, networkConfig.password.c_str());
+std::string ConnectionConfigurationScreen::getName()
+{
+   return "ConnectionConfigurationScreen";
+}
 
-   lv_obj_t *containerForSaveButtonWifi = this->createSaveContainer(wifiTab);
-   this->createSaveButton(containerForSaveButtonWifi);
+void ConnectionConfigurationScreen::onScreenLeave()
+{
+#ifdef HAS_POWER_BUTTON
+   PowerOffButton::hideConfirm();
+#endif
+}
 
-   this->startWifiScan();
+void ConnectionConfigurationScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->pinLockOverlay = nullptr;
+   this->tabs = nullptr;
+   this->keyboard = nullptr;
+   this->wifiSSID = nullptr;
+   this->wifiPassword = nullptr;
+   this->wifiSelectNetwork = nullptr;
+   this->serverHostname = nullptr;
+   this->labelForWifiSSID = nullptr;
+   this->labelForWifiPassword = nullptr;
+   this->labelForServerHostname = nullptr;
+   this->useSSLSwitch = nullptr;
+   this->labelForUseSSLSwitch = nullptr;
+   this->resetCertButton = nullptr;
+   this->resetCertLabel = nullptr;
+   this->devicePin = nullptr;
+   this->labelForDevicePin = nullptr;
+   this->beeperEnabled = nullptr;
+   this->wifiScanRequested = false;
+   this->wifiScanCompleted = false;
+   this->wifiDropdownHasNetworks = false;
+   this->wifiScanStartMs = 0;
+}
 
+void ConnectionConfigurationScreen::createApiTab(const AttraccessApiConfig &apiConfig)
+{
    lv_obj_t *apiTab = lv_tabview_add_tab(this->tabs, "API");
    lv_obj_set_flex_flow(apiTab, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(apiTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -176,6 +186,10 @@ void ConnectionConfigurationScreen::init()
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
 
+}
+
+void ConnectionConfigurationScreen::createDeviceTab(const DeviceConfig &deviceConfig)
+{
    // Device tab
    lv_obj_t *deviceTab = lv_tabview_add_tab(this->tabs, "Gerät");
    lv_obj_set_style_text_font(lv_tabview_get_tab_bar(this->tabs), &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
@@ -241,66 +255,70 @@ void ConnectionConfigurationScreen::init()
 
    this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { return this->onPinLockConfirmCallback(pin); });
-   this->pinLockOverlay = this->pinInputPage.init("Entsperren mit PIN", this->screen);
-   lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
-   lv_obj_set_style_arc_width(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_height(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_align(this->pinLockOverlay, LV_ALIGN_CENTER);
-   lv_obj_set_width(this->pinLockOverlay, lv_pct(100));
-   lv_obj_set_height(this->pinLockOverlay, lv_pct(100));
-   lv_obj_set_x(this->pinLockOverlay, 0);
-   lv_obj_set_y(this->pinLockOverlay, 0);
-
-   if (!this->pinLockEnabled)
-   {
-      lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
-   }
 }
 
-lv_obj_t *ConnectionConfigurationScreen::getScreen()
+void ConnectionConfigurationScreen::createWifiTab(const NetworkConfig &networkConfig)
 {
-   return this->screen;
-}
+   lv_obj_t *wifiTab = lv_tabview_add_tab(this->tabs, "WLAN");
+   lv_obj_set_flex_flow(wifiTab, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(wifiTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-std::string ConnectionConfigurationScreen::getName()
-{
-   return "ConnectionConfigurationScreen";
-}
+   lv_obj_t *labelForWifiSelectNetwork = lv_label_create(wifiTab);
+   lv_obj_set_width(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
+   lv_obj_set_height(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
+   lv_obj_set_align(labelForWifiSelectNetwork, LV_ALIGN_CENTER);
+   lv_label_set_text(labelForWifiSelectNetwork, "WLAN Netzwerk");
+   lv_obj_set_style_text_color(labelForWifiSelectNetwork, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-void ConnectionConfigurationScreen::onScreenLeave()
-{
-#ifdef HAS_POWER_BUTTON
-   PowerOffButton::hideConfirm();
-#endif
-}
+   this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
+   DisplayTheme::field(this->wifiSelectNetwork);
+   lv_dropdown_set_options(this->wifiSelectNetwork, "Suche WLANs...");
+   lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
+   lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
+   lv_obj_add_flag(this->wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_add_event_cb(this->wifiSelectNetwork, &ConnectionConfigurationScreen::onWifiDropdownEvent, LV_EVENT_VALUE_CHANGED, this);
 
-void ConnectionConfigurationScreen::destroy()
-{
-   if (!this->screen)
-   {
-      return;
-   }
-   lv_obj_del(this->screen);
-   this->screen = nullptr;
-   this->pinLockOverlay = nullptr;
-   this->tabs = nullptr;
-   this->keyboard = nullptr;
-   this->wifiSSID = nullptr;
-   this->wifiPassword = nullptr;
-   this->wifiSelectNetwork = nullptr;
-   this->serverHostname = nullptr;
-   this->labelForWifiSSID = nullptr;
-   this->labelForWifiPassword = nullptr;
-   this->labelForServerHostname = nullptr;
-   this->useSSLSwitch = nullptr;
-   this->labelForUseSSLSwitch = nullptr;
-   this->resetCertButton = nullptr;
-   this->resetCertLabel = nullptr;
-   this->devicePin = nullptr;
-   this->labelForDevicePin = nullptr;
-   this->beeperEnabled = nullptr;
-   this->wifiScanRequested = false;
-   this->wifiScanCompleted = false;
-   this->wifiDropdownHasNetworks = false;
-   this->wifiScanStartMs = 0;
+   this->labelForWifiSSID = lv_label_create(wifiTab);
+   lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->labelForWifiSSID, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->labelForWifiSSID, LV_ALIGN_CENTER);
+   lv_label_set_text(this->labelForWifiSSID, "SSID*");
+   lv_obj_set_style_text_color(this->labelForWifiSSID, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->labelForWifiSSIDDefaultColor = lv_obj_get_style_text_color(this->labelForWifiSSID, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->wifiSSID = lv_textarea_create(wifiTab);
+   DisplayTheme::field(this->wifiSSID);
+   lv_obj_set_width(this->wifiSSID, lv_pct(100));
+   lv_obj_set_height(this->wifiSSID, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiSSID, LV_ALIGN_CENTER);
+   lv_textarea_set_placeholder_text(this->wifiSSID, "SSID");
+   lv_textarea_set_one_line(this->wifiSSID, true);
+   lv_obj_add_event_cb(this->wifiSSID, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
+   lv_textarea_set_text(this->wifiSSID, networkConfig.ssid.c_str());
+
+   this->labelForWifiPassword = lv_label_create(wifiTab);
+   lv_obj_set_width(this->labelForWifiPassword, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->labelForWifiPassword, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->labelForWifiPassword, LV_ALIGN_CENTER);
+   lv_label_set_text(this->labelForWifiPassword, "Passwort*");
+   lv_obj_set_style_text_color(this->labelForWifiPassword, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->labelForWifiPasswordDefaultColor = lv_obj_get_style_text_color(this->labelForWifiPassword, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->wifiPassword = lv_textarea_create(wifiTab);
+   DisplayTheme::field(this->wifiPassword);
+   lv_obj_set_width(this->wifiPassword, lv_pct(100));
+   lv_obj_set_height(this->wifiPassword, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiPassword, LV_ALIGN_CENTER);
+   lv_textarea_set_placeholder_text(this->wifiPassword, "Password");
+   lv_textarea_set_one_line(this->wifiPassword, true);
+   lv_textarea_set_password_mode(this->wifiPassword, true);
+   lv_obj_add_event_cb(this->wifiPassword, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
+   lv_textarea_set_text(this->wifiPassword, networkConfig.password.c_str());
+
+   lv_obj_t *containerForSaveButtonWifi = this->createSaveContainer(wifiTab);
+   this->createSaveButton(containerForSaveButtonWifi);
+
+   this->startWifiScan();
+
 }

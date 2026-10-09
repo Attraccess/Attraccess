@@ -1,9 +1,9 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../modbus/model';
-import { WagoService } from './wago.service';
-import { canonicalSnapshot, configurationHash, type WagoConfigurationSnapshot } from './configuration';
-import type { WagoConfigurationDraft } from './wago-configuration-draft.entity';
-import type { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { type WagoConfigurationSnapshot, canonicalSnapshot, configurationHash } from './configuration/model';
+import type { WagoConfigurationDraft } from './configuration/draft.entity';
+import type { WagoConfigurationRevision } from './configuration/revision.entity';
+import { WagoService } from './controllers/service';
 
 describe('configuration editor service boundaries', () => {
   const snapshot: WagoConfigurationSnapshot = {
@@ -323,7 +323,7 @@ describe('configuration editor service boundaries', () => {
       expect(JSON.parse(published.presetProvenance ?? '{}').editor).toEqual(metadata);
       expect(JSON.parse(String(mqtt.publish.mock.calls[0][2]))).toMatchObject({
         contentHash: configurationHash(snapshot),
-        snapshot,
+        snapshot: snapshot,
       });
     },
   );
@@ -525,6 +525,7 @@ describe('configuration editor service boundaries', () => {
       if (change !== 'unchanged') expect(revisions[0]).toEqual(original);
     },
   );
+
   it('binds forced publication to the reviewed references, independent of query order', async () => {
     const { service, flowQuery, mqtt } = fixture();
     await service.saveDraft(1, snapshot);
@@ -763,7 +764,10 @@ describe('configuration editor service boundaries', () => {
     expect(audit.record).not.toHaveBeenCalled();
     await service.saveDraft(
       1,
-      { ...snapshot, logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }] },
+      {
+        ...snapshot,
+        logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }],
+      },
       metadata,
       principal,
     );
@@ -894,6 +898,7 @@ describe('configuration editor service boundaries', () => {
       expect.objectContaining({ details: { sourceRevision: 1, revision: 2 } }),
     );
   });
+
   it('preserves visual names when the persisted preset endpoint changes an existing draft', async () => {
     const { service, draft } = fixture();
     await service.saveDraft(1, snapshot, { names: { output: 'Named output' }, presets: [] });
@@ -910,6 +915,7 @@ describe('configuration editor service boundaries', () => {
       presets: [application],
     });
   });
+
   it('audits validated profile persistence using only the saved profile identity and counts', async () => {
     const { service, audit } = fixture();
     const principal = { userId: 7, authenticationMethod: 'session' as const };

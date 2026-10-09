@@ -2,7 +2,7 @@
 
 #ifdef HAS_LVGL_DISPLAY
 #ifndef SUPERVISION_FLOW_TEST
-#include "platform.hpp"
+#include "../platform.hpp"
 #include "../display/display.hpp"
 #endif
 
@@ -166,6 +166,14 @@ void SupervisionFlow::onResolved(const API::SupervisionResolvedResult &result) {
     enqueueEvent(event);
 }
 
+#endif
+
+#ifdef HAS_LVGL_DISPLAY
+#ifndef SUPERVISION_FLOW_TEST
+#include "../platform.hpp"
+#include "../display/display.hpp"
+#endif
+
 void SupervisionFlow::enqueueEvent(const Event &event) {
     if (eventQueue == nullptr) {
         logger.error("Unable to queue supervision event: queue unavailable");
@@ -321,6 +329,14 @@ void SupervisionFlow::processEvent(const Event &event) {
     }
 }
 
+#endif
+
+#ifdef HAS_LVGL_DISPLAY
+#ifndef SUPERVISION_FLOW_TEST
+#include "../platform.hpp"
+#include "../display/display.hpp"
+#endif
+
 void SupervisionFlow::showError(bool terminal, uint32_t now) {
     beeper.errorBeep();
     phase = Phase::Error;
@@ -401,4 +417,5 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
     }
     return Outcome::None;
 }
+
 #endif

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SSOProviderFormPage } from './SSOProviderFormPage';
@@ -70,6 +71,9 @@ it('edits and saves an OIDC provider with credentials and claim lists through th
     ['email-claims', 'email'],
   ])
     fireEvent.change(input(`oidc-${field}`), { target: { value } });
+  fireEvent.change(screen.getByLabelText(/End-session URL/), { target: { value: 'https://idp.example/logout' } });
+  fireEvent.change(screen.getByLabelText(/JWKS URL/), { target: { value: 'https://idp.example/jwks' } });
+  fireEvent.change(screen.getByLabelText('Allowed signing algorithms'), { target: { value: ' ES256, RS256, ' } });
   expect(input('oidc-client-secret')).toHaveAttribute('type', 'password');
   fireEvent.click(document.querySelector('[data-cy="sso-provider-form-oidc-toggle-client-secret-button"]')!);
   expect(input('oidc-client-secret')).toHaveAttribute('type', 'text');
@@ -83,6 +87,9 @@ it('edits and saves an OIDC provider with credentials and claim lists through th
         type: 'OIDC',
         oidcConfiguration: expect.objectContaining({
           issuer: 'https://idp.example',
+          endSessionURL: 'https://idp.example/logout',
+          jwksURL: 'https://idp.example/jwks',
+          signingAlgorithms: ['ES256', 'RS256'],
           clientId: 'client',
           clientSecret: 'secret',
           scopes: ['openid', 'email'],
@@ -120,6 +127,60 @@ it('loads existing providers with a fixed protocol and saves updates', async () 
     expect(state.update).toHaveBeenCalledWith(
       expect.objectContaining({ id: 8, requestBody: expect.objectContaining({ name: 'Renamed' }) }),
     ),
+  );
+});
+it.each([
+  { mode: 'create', id: 'new', initial: ['RS256'], added: 'ES256' },
+  { mode: 'update', id: '8', initial: ['ES256', 'PS256'], added: 'RS256' },
+])('preserves delimiters when typing multiple signing algorithms on $mode', async ({ mode, id, initial, added }) => {
+  if (mode === 'update') {
+    state.provider = {
+      id: 8,
+      name: 'Existing',
+      type: 'OIDC',
+      oidcConfiguration: {
+        issuer: 'https://idp.example',
+        clientId: 'client',
+        clientSecret: 'secret',
+        signingAlgorithms: initial,
+      },
+    };
+  }
+  mount(id);
+  const user = userEvent.setup();
+  const algorithms = screen.getByLabelText('Allowed signing algorithms');
+  const initialText = initial.join(', ');
+  expect(algorithms).toHaveValue(initialText);
+  await user.type(algorithms, ',');
+  expect(algorithms).toHaveValue(`${initialText},`);
+  await user.type(algorithms, ` ${added}, `);
+  expect(algorithms).toHaveValue(`${initialText}, ${added}, `);
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  const mutation = mode === 'update' ? state.update : state.create;
+  await waitFor(() =>
+    expect(mutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestBody: expect.objectContaining({
+          oidcConfiguration: expect.objectContaining({ signingAlgorithms: [...initial, added] }),
+        }),
+      }),
+    ),
+  );
+});
+it('keeps the signing-algorithm input empty while editing and applies the default on save', async () => {
+  mount();
+  const user = userEvent.setup();
+  const algorithms = screen.getByLabelText('Allowed signing algorithms');
+  await user.clear(algorithms);
+  expect(algorithms).toHaveValue('');
+  // Invoke Save while the input is still focused, without depending on blur to parse it.
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(state.create).toHaveBeenCalledWith({
+      requestBody: expect.objectContaining({
+        oidcConfiguration: expect.objectContaining({ signingAlgorithms: ['RS256'] }),
+      }),
+    }),
   );
 });
 it('enforces permission, license and provider loading gates', () => {

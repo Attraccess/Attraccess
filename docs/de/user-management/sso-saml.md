@@ -8,6 +8,11 @@ SAML (Security Assertion Markup Language) wird häufig in Unternehmens- und Bild
 - Ein SAML-fähiger Identity Provider
 - Berechtigung **Systemkonfiguration verwalten**
 
+SAML-Status-Cookies verwenden immer `Secure`, `HttpOnly` und `SameSite=Lax`. Die
+Attraccess-Website muss HTTPS verwenden, auch bei lokalen Installationen. Wenn TLS
+an einem Reverse Proxy endet, konfigurieren Sie `TRUST_PROXY` für diesen Proxy,
+damit Attraccess sichere Anfragen erkennt. Über HTTP wird kein SAML-Status-Cookie gesetzt.
+
 ## Anbieter anlegen
 
 1. Öffnen Sie **Einstellungen** in der Seitenleiste und wählen Sie den Bereich **Single Sign-on**

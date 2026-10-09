@@ -1,37 +1,55 @@
 import { LiveUpdatesProvider } from '../utils/live-updates';
-import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
-import { Unauthorized } from './unauthorized/unauthorized';
-import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
-import { Layout } from './layout/layout';
+import { TwoFactorGate } from './two-factor-gate/index';
+import { KioskGuard } from './kiosk/KioskGuard';
+import { useNavigate, Outlet, Route, Routes } from 'react-router-dom';
+import { PropsWithChildren, useMemo, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useAllRoutes } from './routes';
-import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
-import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
-import { hasRequiredPermissions } from './routes/routeAccess';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './app.de.json';
 import en from './app.en.json';
-import { ResetPassword } from './reset-password/resetPassword';
-import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
-import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AccessDenied } from './unauthorized/accessDenied';
-import { configureApiClient } from '../api';
-import { AcceptInvitation } from './accept-invitation';
-import { TwoFactorGate } from './two-factor-gate';
-import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
+import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge/index';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
-import { KioskGuard } from './kiosk/KioskGuard';
-import { useDateTimePreferencesSync } from '../hooks/useDateTimePreferencesSync';
-import { useLocaleSync } from '../hooks/useLocaleSync';
-import { NotFound } from './not-found';
 import { ThemeToggle } from '../components/themeToggle';
-import { SessionBillingSummary } from './billing/sessionSummary';
+import { SessionBillingSummary } from './billing/sessionSummary/index';
+import { Layout } from './layout/layout';
+import { useAllRoutes } from './routes/index';
+import { VerifyEmail } from './verify-email/index';
+import { ResetPassword } from './reset-password/resetPassword';
+import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
+import { AcceptInvitation } from './accept-invitation/index';
+import { NotFound } from './not-found/index';
+import { BootScreen } from '../components/bootScreen/index';
+import { configureApiClient } from '../api/index';
+import { useLocaleSync } from '../hooks/useLocaleSync';
+import { useDateTimePreferencesSync } from '../hooks/useDateTimePreferencesSync';
+import { Unauthorized } from './unauthorized/unauthorized';
+import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { hasRequiredPermissions } from './routes/routeAccess';
+import { AccessDenied } from './unauthorized/accessDenied';
+
+export function useIsTouchDevice() {
+  const [isTouch, setIsTouch] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia('(pointer: coarse)');
+    const handler = (event: MediaQueryListEvent) => setIsTouch(event.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  return isTouch;
+}
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
@@ -75,25 +93,65 @@ export function useRoutesWithAuthElements(routes: RouteConfig[]) {
   );
 }
 
-function useIsTouchDevice() {
-  const [isTouch, setIsTouch] = useState(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia('(pointer: coarse)').matches
-      : false,
+// Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
+export function AppRoutes() {
+  const { isAuthenticated } = useAuth();
+  const allRoutes = useAllRoutes();
+
+  const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
+  const layoutRoutes = useMemo(() => allRoutes.filter((r) => !r.noLayout), [allRoutes]);
+
+  const bareRouteElements = useRoutesWithAuthElements(bareRoutes);
+  const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
+
+  return (
+    <Routes>
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route
+        path="/accept-invitation"
+        element={
+          <UnauthorizedLayout>
+            <AcceptInvitation />
+          </UnauthorizedLayout>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <UnauthorizedLayout>
+            <ResetPassword />
+          </UnauthorizedLayout>
+        }
+      />
+
+      {bareRouteElements}
+
+      <Route
+        element={
+          <Layout>
+            <Outlet />
+          </Layout>
+        }
+      >
+        {layoutRouteElements}
+        {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
+            layout route never rendered and the document came up blank (ATT-869). */}
+        <Route path="*" element={<NotFound isAuthenticated={isAuthenticated} />} />
+      </Route>
+    </Routes>
   );
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia('(pointer: coarse)');
-    const handler = (event: MediaQueryListEvent) => setIsTouch(event.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-
-  return isTouch;
 }
 
-function AppLayout(props: PropsWithChildren) {
+export function AppContent() {
+  return (
+    <TwoFactorGate>
+      <KioskGuard />
+      <AppRoutes />
+    </TwoFactorGate>
+  );
+}
+
+export function AppLayout(props: PropsWithChildren) {
   const { isAuthenticated, needsTwoFactorSetup, user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -152,64 +210,6 @@ function AppLayout(props: PropsWithChildren) {
   );
 }
 
-// Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
-export function AppRoutes() {
-  const { isAuthenticated } = useAuth();
-  const allRoutes = useAllRoutes();
-
-  const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
-  const layoutRoutes = useMemo(() => allRoutes.filter((r) => !r.noLayout), [allRoutes]);
-
-  const bareRouteElements = useRoutesWithAuthElements(bareRoutes);
-  const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
-
-  return (
-    <Routes>
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route
-        path="/accept-invitation"
-        element={
-          <UnauthorizedLayout>
-            <AcceptInvitation />
-          </UnauthorizedLayout>
-        }
-      />
-      <Route
-        path="/reset-password"
-        element={
-          <UnauthorizedLayout>
-            <ResetPassword />
-          </UnauthorizedLayout>
-        }
-      />
-
-      {bareRouteElements}
-
-      <Route
-        element={
-          <Layout>
-            <Outlet />
-          </Layout>
-        }
-      >
-        {layoutRouteElements}
-        {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
-            layout route never rendered and the document came up blank (ATT-869). */}
-        <Route path="*" element={<NotFound isAuthenticated={isAuthenticated} />} />
-      </Route>
-    </Routes>
-  );
-}
-
-function AppContent() {
-  return (
-    <TwoFactorGate>
-      <KioskGuard />
-      <AppRoutes />
-    </TwoFactorGate>
-  );
-}
-
 export function App() {
   const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
   useLocaleSync();
@@ -224,4 +224,6 @@ export function App() {
   );
 }
 
+// Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
+// Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
 export default App;

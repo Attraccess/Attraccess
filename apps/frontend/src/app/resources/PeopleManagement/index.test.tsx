@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { cleanup, render, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, vi, expect, it } from 'vitest';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { PeopleManagement } from './index';
 import type { AddPersonDrawer } from './AddPersonDrawer';
@@ -146,6 +146,7 @@ function mount(props: Partial<ComponentProps<typeof PeopleManagement>> = {}) {
     </MemoryRouter>,
   );
 }
+
 const subtitleCases = [
   ['en', 'resource', false, 'Manage introducers, maintainers and introductions for this resource'],
   ['en', 'resource', true, 'Manage introducers, maintainers and introductions for this resource'],
@@ -181,6 +182,7 @@ it.each(subtitleCases)(
     else expect(addIntroduction).toBeNull();
   },
 );
+
 it('renders people, limits inherited-role removal, and handles history and introduction changes', async () => {
   mount();
   expect(screen.getByText('Alex')).toBeTruthy();
@@ -204,6 +206,7 @@ it('renders people, limits inherited-role removal, and handles history and intro
   fireEvent.click(screen.getByText('Submit reason'));
   await waitFor(() => expect(state.grantIntroduction).toHaveBeenCalledWith(2, ''));
 });
+
 it.each([false, true])('dispatches all add modes and clears comment drafts (hideHeader=%s)', async (hideHeader) => {
   mount({ hideHeader });
   for (const [label, mode, mutation] of [
@@ -226,12 +229,23 @@ it.each([false, true])('dispatches all add modes and clears comment drafts (hide
   fireEvent.click(screen.getByRole('button', { name: 'Grant introduction' }));
   expect(screen.getByLabelText('Add comment')).toHaveValue('');
 });
+
 it('filters roles and introduced users with distinct memberships', async () => {
   const original = state.rows;
   state.rows = [
     ...original,
-    { ...original[0], user: { id: 4, username: 'Introducer only' }, isMaintainer: false, hasValidIntroduction: false },
-    { ...original[0], user: { id: 5, username: 'Maintainer only' }, isIntroducer: false, hasValidIntroduction: false },
+    {
+      ...original[0],
+      user: { id: 4, username: 'Introducer only' },
+      isMaintainer: false,
+      hasValidIntroduction: false,
+    },
+    {
+      ...original[0],
+      user: { id: 5, username: 'Maintainer only' },
+      isIntroducer: false,
+      hasValidIntroduction: false,
+    },
     { ...original[0], user: { id: 6, username: 'Introduced only' }, isIntroducer: false, isMaintainer: false },
   ];
   try {
@@ -257,6 +271,7 @@ it('filters roles and introduced users with distinct memberships', async () => {
     state.rows = original;
   }
 });
+
 it('hides modification controls for read-only viewers while retaining history', () => {
   mount({ canManageIntroducers: false, canManageIntroductions: false });
   expect(screen.queryByRole('button', { name: 'Grant introduction' })).toBeNull();
@@ -264,6 +279,7 @@ it('hides modification controls for read-only viewers while retaining history', 
   expect(screen.queryByRole('button', { name: 'Revoke maintainer status' })).toBeNull();
   expect(screen.getAllByRole('button', { name: 'View history' })).toHaveLength(2);
 });
+
 it('allows group-scoped role removal and cancelling an introduction change', () => {
   mount({ target: { type: 'group', id: 4 }, canManageIntroductions: true, canManageIntroducers: true });
   expect(screen.getAllByRole('button', { name: 'Revoke introducer status' })).toHaveLength(2);
@@ -274,6 +290,7 @@ it('allows group-scoped role removal and cancelling an introduction change', () 
   expect(screen.getByLabelText('Reason')).toHaveValue('');
   expect(state.revokeIntroduction).not.toHaveBeenCalled();
 });
+
 it('shows loading and fetch failure states without stale people', () => {
   state.loading = true;
   const view = mount();

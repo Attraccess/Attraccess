@@ -1,16 +1,10 @@
 'use strict';
 
-const http = require('http');
 const fs = require('fs');
+
 const path = require('path');
+
 const crypto = require('crypto');
-
-const ADMIN_PORT = Number(process.env.CONFIG_UI_PORT) || 5380;
-const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
-
-function log(message) {
-  console.log(`[config-ui] ${message}`);
-}
 
 function timingSafeEqual(a, b) {
   const bufA = Buffer.from(String(a));
@@ -78,12 +72,6 @@ function readBody(req) {
   });
 }
 
-function parseRoute(url) {
-  const [pathname] = url.split('?');
-  const parts = pathname.split('/').filter(Boolean);
-  return { pathname, parts };
-}
-
 function loadJson(filePath, fallback) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -95,6 +83,36 @@ function loadJson(filePath, fallback) {
 function saveJson(filePath, data) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+const WEAK_PASSWORDS = new Set([
+  'admin',
+  'attraccess',
+  'change-me',
+  'change-me-before-deploying',
+  'changeme',
+  'password',
+  'root',
+]);
+
+function isWeakPassword(value) {
+  if (typeof value !== 'string' || value.length === 0) return true;
+  if (value.length < 12) return true;
+  return WEAK_PASSWORDS.has(value.toLowerCase());
+}
+
+const http = require('http');
+
+const ADMIN_PORT = Number(process.env.CONFIG_UI_PORT) || 5380;
+
+function log(message) {
+  console.log(`[config-ui] ${message}`);
+}
+
+function parseRoute(url) {
+  const [pathname] = url.split('?');
+  const parts = pathname.split('/').filter(Boolean);
+  return { pathname, parts };
 }
 
 const modules = [];
@@ -126,11 +144,20 @@ async function handleRequest(req, res) {
   const { pathname, parts } = parseRoute(req.url);
   const method = req.method;
 
-  if (method === 'GET' && pathname === '/') {
+  const assets = {
+    '/': ['index.html', 'text/html; charset=utf-8'],
+    '/style.css': ['style.css', 'text/css; charset=utf-8'],
+    '/controls.css': ['controls.css', 'text/css; charset=utf-8'],
+    '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
+    '/dns.js': ['dns.js', 'text/javascript; charset=utf-8'],
+    '/prometheus.js': ['prometheus.js', 'text/javascript; charset=utf-8'],
+  };
+  if (method === 'GET' && Object.hasOwn(assets, pathname)) {
+    const [file, contentType] = assets[pathname];
     try {
-      const html = fs.readFileSync(INDEX_HTML_PATH, 'utf-8');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      const content = fs.readFileSync(path.join(__dirname, 'public', file), 'utf-8');
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
     } catch {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Admin UI not found');
@@ -148,22 +175,6 @@ async function handleRequest(req, res) {
   sendJson(res, 404, { error: 'not found' });
 }
 
-const WEAK_PASSWORDS = new Set([
-  'admin',
-  'attraccess',
-  'change-me',
-  'change-me-before-deploying',
-  'changeme',
-  'password',
-  'root',
-]);
-
-function isWeakPassword(value) {
-  if (typeof value !== 'string' || value.length === 0) return true;
-  if (value.length < 12) return true;
-  return WEAK_PASSWORDS.has(value.toLowerCase());
-}
-
 function main() {
   if (!process.env.CONFIG_UI_PASSWORD) {
     log('refusing to start: CONFIG_UI_PASSWORD is not set');
@@ -171,7 +182,9 @@ function main() {
   }
   if (isWeakPassword(process.env.CONFIG_UI_PASSWORD) && process.env.CONFIG_UI_ALLOW_WEAK_PASSWORD !== 'true') {
     log('refusing to start: CONFIG_UI_PASSWORD is too short or a well-known default.');
-    log('Set a password of at least 12 characters, or explicitly set CONFIG_UI_ALLOW_WEAK_PASSWORD=true to override (not recommended outside ephemeral dev).');
+    log(
+      'Set a password of at least 12 characters, or explicitly set CONFIG_UI_ALLOW_WEAK_PASSWORD=true to override (not recommended outside ephemeral dev).',
+    );
     process.exit(1);
   }
 
@@ -197,7 +210,9 @@ function main() {
 
   const shutdown = (signal) => {
     log(`received ${signal}, shutting down`);
-    modules.forEach((m) => { if (m.shutdown) m.shutdown(); });
+    modules.forEach((m) => {
+      if (m.shutdown) m.shutdown();
+    });
     server.close();
     process.exit(0);
   };

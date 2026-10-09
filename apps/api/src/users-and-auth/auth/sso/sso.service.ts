@@ -1,25 +1,33 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository } from 'typeorm';
 import {
   SSOProvider,
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   SSOProviderType,
 } from '@attraccess/database-entities';
+
+import { Injectable, BadRequestException } from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { Repository, DeepPartial } from 'typeorm';
+
+import { EncryptionService } from '../../../encryption/encryption.service';
+
+import { LicenseService, LicenseModuleType } from '../../../license/license.service';
+
 import {
   CreateSSOProviderDto,
   CreateSAMLConfigurationDto,
   CreateOIDCConfigurationDto,
 } from './dto/create-sso-provider.dto';
+
 import {
   UpdateSSOProviderDto,
   UpdateSAMLConfigurationDto,
   UpdateOIDCConfigurationDto,
 } from './dto/update-sso-provider.dto';
+
 import { SSOProviderNotFoundException } from './errors';
-import { LicenseModuleType, LicenseService } from '../../../license/license.service';
-import { EncryptionService } from '../../../encryption/encryption.service';
 
 import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from './logout-endpoints';
 
@@ -27,13 +35,13 @@ import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from './logout-endpoints';
 export class SSOService {
   public constructor(
     @InjectRepository(SSOProvider)
-    private ssoProviderRepository: Repository<SSOProvider>,
+    protected ssoProviderRepository: Repository<SSOProvider>,
     @InjectRepository(SSOProviderOIDCConfiguration)
-    private oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>,
+    protected oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>,
     @InjectRepository(SSOProviderSAMLConfiguration)
-    private samlConfigRepository: Repository<SSOProviderSAMLConfiguration>,
-    private licenseService: LicenseService,
-    private readonly encryptionService: EncryptionService,
+    protected samlConfigRepository: Repository<SSOProviderSAMLConfiguration>,
+    protected licenseService: LicenseService,
+    protected readonly encryptionService: EncryptionService,
   ) {}
 
   public async getAllProviders(): Promise<SSOProvider[]> {
@@ -165,85 +173,7 @@ export class SSOService {
     });
   }
 
-  private validateOidcLogoutConfig(config: {
-    endSessionURL?: string | null;
-    jwksURL?: string | null;
-    signingAlgorithms?: string[] | null;
-  }): void {
-    for (const endpoint of [config.endSessionURL, config.jwksURL]) if (endpoint) trustedEndpoint(endpoint);
-    if (config.signingAlgorithms?.some((algorithm) => !OIDC_SIGNING_ALGORITHMS.includes(algorithm))) {
-      throw new BadRequestException('Unsupported OIDC signing algorithm');
-    }
-  }
-
-  private async createOIDCConfiguration(
-    providerId: number,
-    config: CreateOIDCConfigurationDto,
-    repository = this.oidcConfigRepository,
-  ): Promise<SSOProviderOIDCConfiguration> {
-    this.validateOidcLogoutConfig(config);
-    const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
-    const newConfig = repository.create({
-      ...config,
-      clientSecret: encryptedSecret,
-      ssoProviderId: providerId,
-    });
-
-    return repository.save(newConfig);
-  }
-
-  private async updateOIDCConfiguration(
-    providerId: number,
-    updateConfig: UpdateOIDCConfigurationDto,
-    repository = this.oidcConfigRepository,
-  ): Promise<SSOProviderOIDCConfiguration> {
-    this.validateOidcLogoutConfig(updateConfig);
-    const payload: Partial<SSOProviderOIDCConfiguration> = {};
-    for (const key of ['endSessionURL', 'jwksURL', 'signingAlgorithms'] as const) {
-      if (updateConfig[key] !== undefined) Object.assign(payload, { [key]: updateConfig[key] });
-    }
-
-    if (typeof updateConfig.issuer !== 'undefined') {
-      payload.issuer = updateConfig.issuer;
-    }
-    if (typeof updateConfig.authorizationURL !== 'undefined') {
-      payload.authorizationURL = updateConfig.authorizationURL;
-    }
-    if (typeof updateConfig.tokenURL !== 'undefined') {
-      payload.tokenURL = updateConfig.tokenURL;
-    }
-    if (typeof updateConfig.userInfoURL !== 'undefined') {
-      payload.userInfoURL = updateConfig.userInfoURL;
-    }
-    if (typeof updateConfig.clientId !== 'undefined') {
-      payload.clientId = updateConfig.clientId;
-    }
-    if (typeof updateConfig.clientSecret !== 'undefined' && updateConfig.clientSecret !== null) {
-      const trimmed = updateConfig.clientSecret.trim();
-      if (trimmed) {
-        payload.clientSecret = this.encryptionService.encrypt(trimmed);
-      }
-      // empty string means "unchanged" — the frontend never receives the real secret back
-    }
-    if (typeof updateConfig.scopes !== 'undefined') {
-      payload.scopes = updateConfig.scopes;
-    }
-    if (typeof updateConfig.usernameClaimPaths !== 'undefined') {
-      payload.usernameClaimPaths = updateConfig.usernameClaimPaths;
-    }
-    if (typeof updateConfig.emailClaimPaths !== 'undefined') {
-      payload.emailClaimPaths = updateConfig.emailClaimPaths;
-    }
-    if (typeof updateConfig.roleMappings !== 'undefined') {
-      // explicit null clears the column
-      payload.roleMappings = updateConfig.roleMappings;
-    }
-
-    await repository.update({ ssoProviderId: providerId }, payload);
-    return repository.findOne({ where: { ssoProviderId: providerId } });
-  }
-
-  private async createSAMLConfiguration(
+  protected async createSAMLConfiguration(
     providerId: number,
     config: CreateSAMLConfigurationDto,
     repository = this.samlConfigRepository,
@@ -281,7 +211,7 @@ export class SSOService {
     return repository.save(newConfig);
   }
 
-  private async updateSAMLConfiguration(
+  protected async updateSAMLConfiguration(
     providerId: number,
     config: UpdateSAMLConfigurationDto,
     repository = this.samlConfigRepository,
@@ -374,11 +304,130 @@ export class SSOService {
     return repository.findOne({ where: { ssoProviderId: providerId } });
   }
 
+  protected normalizeCertificate(cert: string): string {
+    return cert
+      .replace(/-----BEGIN CERTIFICATE-----/g, '')
+      .replace(/-----END CERTIFICATE-----/g, '')
+      .replace(/\s+/g, '')
+      .trim();
+  }
+
+  protected encryptPrivateKey(privateKey: string): string {
+    const canonical = this.canonicalizePrivateKey(privateKey);
+    return this.encryptionService.encrypt(canonical);
+  }
+
+  protected canonicalizePrivateKey(privateKey: string): string {
+    const trimmed = privateKey.trim();
+    const beginMatch = trimmed.match(/-----BEGIN ([^-]+)-----/);
+    const blockLabel = beginMatch?.[1] ?? 'PRIVATE KEY';
+    const body = trimmed
+      .replace(/-----BEGIN [^-]+-----/g, '')
+      .replace(/-----END [^-]+-----/g, '')
+      .replace(/\s+/g, '');
+    const chunked = body.match(/.{1,64}/g)?.join('\n') ?? body;
+    return `-----BEGIN ${blockLabel}-----\n${chunked}\n-----END ${blockLabel}-----`;
+  }
+
+  protected getEncryptionKeyId(): string {
+    return 'default';
+  }
+
+  protected ensureSigningMaterialAvailability(
+    shouldSignRequests: boolean,
+    spCertificate?: string | null,
+    encryptedPrivateKey?: string | null,
+  ): void {
+    if (shouldSignRequests && (!spCertificate || !encryptedPrivateKey)) {
+      throw new BadRequestException(
+        'Signing AuthnRequests requires providing both a Service Provider certificate and private key.',
+      );
+    }
+  }
+
+  private validateOidcLogoutConfig(config: {
+    endSessionURL?: string | null;
+    jwksURL?: string | null;
+    signingAlgorithms?: string[] | null;
+  }): void {
+    for (const endpoint of [config.endSessionURL, config.jwksURL]) if (endpoint) trustedEndpoint(endpoint);
+    if (config.signingAlgorithms?.some((algorithm) => !OIDC_SIGNING_ALGORITHMS.includes(algorithm))) {
+      throw new BadRequestException('Unsupported OIDC signing algorithm');
+    }
+  }
+
+  protected async createOIDCConfiguration(
+    providerId: number,
+    config: CreateOIDCConfigurationDto,
+    repository = this.oidcConfigRepository,
+  ): Promise<SSOProviderOIDCConfiguration> {
+    this.validateOidcLogoutConfig(config);
+    const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
+    const newConfig = repository.create({
+      ...config,
+      clientSecret: encryptedSecret,
+      ssoProviderId: providerId,
+    });
+
+    return repository.save(newConfig);
+  }
+
+  protected async updateOIDCConfiguration(
+    providerId: number,
+    updateConfig: UpdateOIDCConfigurationDto,
+    repository = this.oidcConfigRepository,
+  ): Promise<SSOProviderOIDCConfiguration> {
+    this.validateOidcLogoutConfig(updateConfig);
+    const payload: Partial<SSOProviderOIDCConfiguration> = {};
+    for (const key of ['endSessionURL', 'jwksURL', 'signingAlgorithms'] as const) {
+      if (updateConfig[key] !== undefined) Object.assign(payload, { [key]: updateConfig[key] });
+    }
+
+    if (typeof updateConfig.issuer !== 'undefined') {
+      payload.issuer = updateConfig.issuer;
+    }
+    if (typeof updateConfig.authorizationURL !== 'undefined') {
+      payload.authorizationURL = updateConfig.authorizationURL;
+    }
+    if (typeof updateConfig.tokenURL !== 'undefined') {
+      payload.tokenURL = updateConfig.tokenURL;
+    }
+    if (typeof updateConfig.userInfoURL !== 'undefined') {
+      payload.userInfoURL = updateConfig.userInfoURL;
+    }
+    if (typeof updateConfig.clientId !== 'undefined') {
+      payload.clientId = updateConfig.clientId;
+    }
+    if (typeof updateConfig.clientSecret !== 'undefined' && updateConfig.clientSecret !== null) {
+      const trimmed = updateConfig.clientSecret.trim();
+      if (trimmed) {
+        payload.clientSecret = this.encryptionService.encrypt(trimmed);
+      }
+      // empty string means "unchanged" — the frontend never receives the real secret back
+    }
+    if (typeof updateConfig.scopes !== 'undefined') {
+      payload.scopes = updateConfig.scopes;
+    }
+    if (typeof updateConfig.usernameClaimPaths !== 'undefined') {
+      payload.usernameClaimPaths = updateConfig.usernameClaimPaths;
+    }
+    if (typeof updateConfig.emailClaimPaths !== 'undefined') {
+      payload.emailClaimPaths = updateConfig.emailClaimPaths;
+    }
+    if (typeof updateConfig.roleMappings !== 'undefined') {
+      // explicit null clears the column
+      payload.roleMappings = updateConfig.roleMappings;
+    }
+
+    await repository.update({ ssoProviderId: providerId }, payload);
+    return repository.findOne({ where: { ssoProviderId: providerId } });
+  }
+
   /**
    * Decrypts provider secrets in place for use in the app. Assumes stored values
    * are already encrypted (see migration EncryptSensitiveData).
    */
-  private decryptProviderSecrets(provider?: SSOProvider | null): void {
+  protected decryptProviderSecrets(provider?: SSOProvider | null): void {
     if (!provider) {
       return;
     }
@@ -391,47 +440,6 @@ export class SSOService {
       provider.samlConfiguration.provisioningSecret =
         this.encryptionService.decryptIfEncrypted(provider.samlConfiguration.provisioningSecret) ??
         provider.samlConfiguration.provisioningSecret;
-    }
-  }
-
-  private normalizeCertificate(cert: string): string {
-    return cert
-      .replace(/-----BEGIN CERTIFICATE-----/g, '')
-      .replace(/-----END CERTIFICATE-----/g, '')
-      .replace(/\s+/g, '')
-      .trim();
-  }
-
-  private encryptPrivateKey(privateKey: string): string {
-    const canonical = this.canonicalizePrivateKey(privateKey);
-    return this.encryptionService.encrypt(canonical);
-  }
-
-  private canonicalizePrivateKey(privateKey: string): string {
-    const trimmed = privateKey.trim();
-    const beginMatch = trimmed.match(/-----BEGIN ([^-]+)-----/);
-    const blockLabel = beginMatch?.[1] ?? 'PRIVATE KEY';
-    const body = trimmed
-      .replace(/-----BEGIN [^-]+-----/g, '')
-      .replace(/-----END [^-]+-----/g, '')
-      .replace(/\s+/g, '');
-    const chunked = body.match(/.{1,64}/g)?.join('\n') ?? body;
-    return `-----BEGIN ${blockLabel}-----\n${chunked}\n-----END ${blockLabel}-----`;
-  }
-
-  private getEncryptionKeyId(): string {
-    return 'default';
-  }
-
-  private ensureSigningMaterialAvailability(
-    shouldSignRequests: boolean,
-    spCertificate?: string | null,
-    encryptedPrivateKey?: string | null,
-  ): void {
-    if (shouldSignRequests && (!spCertificate || !encryptedPrivateKey)) {
-      throw new BadRequestException(
-        'Signing AuthnRequests requires providing both a Service Provider certificate and private key.',
-      );
     }
   }
 }

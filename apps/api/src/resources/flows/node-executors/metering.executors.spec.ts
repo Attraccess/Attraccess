@@ -1,4 +1,4 @@
-import { compileFlowTemplate } from '../flow-template';
+import { compileFlowTemplate } from '../execution/flow-template';
 import { ResourceFlowNode } from '@attraccess/database-entities';
 import { MeteringReadyExecutor } from './metering-ready.executor';
 import { MeteringReportExecutor } from './metering-report.executor';

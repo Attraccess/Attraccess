@@ -49,8 +49,8 @@ export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
           {mode === 'introducer'
             ? t('addModal.title.introducer')
             : mode === 'maintainer'
-            ? t('addModal.title.maintainer')
-            : t('addModal.title.introduction')}
+              ? t('addModal.title.maintainer')
+              : t('addModal.title.introduction')}
         </DrawerHeading>
       </DrawerHeader>
       <DrawerBody className="flex flex-col gap-4">

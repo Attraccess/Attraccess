@@ -8,9 +8,13 @@ describe('AuditController', () => {
 
     await controller.list({ domain: 'project', action: 'project.member.added', eventPrefix: 'project.' });
 
-    expect(audit.list).toHaveBeenCalledWith(expect.objectContaining({
-      domain: 'project', action: 'project.member.added', eventPrefix: 'project.',
-    }));
+    expect(audit.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: 'project',
+        action: 'project.member.added',
+        eventPrefix: 'project.',
+      }),
+    );
   });
 
   it('rejects an unrecognized project action filter', async () => {

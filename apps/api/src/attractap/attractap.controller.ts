@@ -1,106 +1,66 @@
+import { Attractap, Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
 import {
+  Body,
+  ClassSerializerInterceptor,
   Controller,
+  Delete,
   Get,
   Inject,
+  Logger,
+  NotFoundException,
   Param,
   ParseIntPipe,
-  Post,
-  Req,
   Patch,
-  Body,
-  NotFoundException,
-  Logger,
-  ClassSerializerInterceptor,
+  Req,
   UseInterceptors,
-  Delete,
   StreamableFile,
+  Post,
 } from '@nestjs/common';
-import { AttractapGateway } from './websockets/websocket.gateway';
-import { AuthenticatedRequest, Auth, Attractap } from '@attraccess/plugins-backend-sdk';
-import { ApiOperation, ApiResponse, ApiParam, ApiTags, ApiBody, ApiProduces } from '@nestjs/swagger';
-import { WebsocketService } from './websockets/websocket.service';
-import { AttractapService } from './attractap.service';
-import { EnrollNfcCardDto } from './dtos/enroll-rfid-card.dto';
-import { ResetNfcCardDto } from './dtos/reset-rfid-card.dto';
-import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
-import { EnrollNfcCardResponseDto } from './dtos/enroll-rfid-card-response.dto';
-import { ResetNfcCardResponseDto } from './dtos/reset-rfid-card-response.dto';
-import { UpdateReaderDto } from './dtos/update-reader.dto';
-import { AttractapCrashReportDto } from './dtos/crash-report.dto';
-import { RequiresLicense } from '../license/require-license.decorator';
+
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags, ApiProduces } from '@nestjs/swagger';
+
 import { LicenseModuleType } from '../license/license.service';
+
+import { RequiresLicense } from '../license/require-license.decorator';
+
+import { AttractapService } from './attractap.service';
+
+import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
+
+import { UpdateReaderDto } from './dtos/update-reader.dto';
+
+import { AttractapGateway } from './websockets/websocket.gateway';
+
+import { WebsocketService } from './websockets/websocket.service';
 import { CardAccessService } from './card-access.service';
+
+import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+
+import { EnrollNfcCardResponseDto } from './dtos/enroll-rfid-card-response.dto';
+
+import { EnrollNfcCardDto } from './dtos/enroll-rfid-card.dto';
+
+import { ResetNfcCardResponseDto } from './dtos/reset-rfid-card-response.dto';
+
+import { ResetNfcCardDto } from './dtos/reset-rfid-card.dto';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
 @UseInterceptors(ClassSerializerInterceptor)
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class AttractapController {
-  private readonly logger = new Logger(AttractapController.name);
-
   public constructor(
     @Inject(AttractapGateway)
-    private readonly attractapGateway: AttractapGateway,
+    protected readonly attractapGateway: AttractapGateway,
     @Inject(WebsocketService)
-    private readonly websocketService: WebsocketService,
+    protected readonly websocketService: WebsocketService,
     @Inject(AttractapService)
-    private readonly attractapService: AttractapService,
-    private readonly cardAccess: CardAccessService,
+    protected readonly attractapService: AttractapService,
+    protected readonly cardAccess: CardAccessService,
   ) {}
 
-  @Post('enroll-nfc-card')
-  @Auth()
-  @ApiOperation({ summary: 'Enroll a new NFC card', operationId: 'enrollNfcCard' })
-  @ApiBody({ type: EnrollNfcCardDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Enrollment initiated, continue on Reader',
-    type: EnrollNfcCardResponseDto,
-  })
-  async enrollNfcCard(
-    @Body() enrollData: EnrollNfcCardDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<EnrollNfcCardResponseDto> {
-    const userId = await this.cardAccess.resolveUserId(req.user, enrollData.userId);
-    await this.attractapGateway.startEnrollOfNewNfcCard({
-      readerId: enrollData.readerId,
-      userId,
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod ?? 'session',
-      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
-    });
-
-    return {
-      message: 'Enrollment initiated, continue on Reader',
-    };
-  }
-
-  @Post('reset-nfc-card')
-  @Auth()
-  @ApiOperation({ summary: 'Reset an NFC card', operationId: 'resetNfcCard' })
-  @ApiBody({ type: ResetNfcCardDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Reset initiated, continue on Reader',
-    type: ResetNfcCardResponseDto,
-  })
-  async resetNfcCard(
-    @Body() resetData: ResetNfcCardDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<ResetNfcCardResponseDto> {
-    await this.cardAccess.getCardForManagement(resetData.cardId, req.user);
-    await this.attractapGateway.startResetOfNfcCard({
-      readerId: resetData.readerId,
-      cardId: resetData.cardId,
-      userId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod ?? 'session',
-      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
-    });
-
-    return {
-      message: 'Reset initiated, continue on Reader',
-    };
-  }
+  protected readonly logger = new Logger(AttractapController.name);
 
   @Patch(':readerId')
   @Auth('resources.update')
@@ -162,6 +122,25 @@ export class AttractapController {
     return await this.attractapService.findReaderById(readerId);
   }
 
+  @Delete(':readerId')
+  @Auth('resources.delete')
+  @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
+  @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
+  @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
+  public async deleteReader(
+    @Param('readerId', ParseIntPipe) readerId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<void> {
+    const deleted = await this.attractapService.deleteReader(readerId);
+    if (deleted) {
+      await this.attractapService.recordReaderDeregistration(readerId, {
+        userId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod ?? 'session',
+        ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+      });
+    }
+  }
+
   @Get(':readerId/crash-reports')
   @Auth('resources.update')
   @ApiOperation({ summary: 'Get crash reports for a reader', operationId: 'getReaderCrashReports' })
@@ -202,22 +181,57 @@ export class AttractapController {
     });
   }
 
-  @Delete(':readerId')
-  @Auth('resources.delete')
-  @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
-  @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
-  @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
-  async deleteReader(
-    @Param('readerId', ParseIntPipe) readerId: number,
+  @Post('enroll-nfc-card')
+  @Auth()
+  @ApiOperation({ summary: 'Enroll a new NFC card', operationId: 'enrollNfcCard' })
+  @ApiBody({ type: EnrollNfcCardDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Enrollment initiated, continue on Reader',
+    type: EnrollNfcCardResponseDto,
+  })
+  public async enrollNfcCard(
+    @Body() enrollData: EnrollNfcCardDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<void> {
-    const deleted = await this.attractapService.deleteReader(readerId);
-    if (deleted) {
-      await this.attractapService.recordReaderDeregistration(readerId, {
-        userId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod ?? 'session',
-        ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
-      });
-    }
+  ): Promise<EnrollNfcCardResponseDto> {
+    const userId = await this.cardAccess.resolveUserId(req.user, enrollData.userId);
+    await this.attractapGateway.startEnrollOfNewNfcCard({
+      readerId: enrollData.readerId,
+      userId,
+      actorId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+    });
+
+    return {
+      message: 'Enrollment initiated, continue on Reader',
+    };
+  }
+
+  @Post('reset-nfc-card')
+  @Auth()
+  @ApiOperation({ summary: 'Reset an NFC card', operationId: 'resetNfcCard' })
+  @ApiBody({ type: ResetNfcCardDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Reset initiated, continue on Reader',
+    type: ResetNfcCardResponseDto,
+  })
+  public async resetNfcCard(
+    @Body() resetData: ResetNfcCardDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResetNfcCardResponseDto> {
+    await this.cardAccess.getCardForManagement(resetData.cardId, req.user);
+    await this.attractapGateway.startResetOfNfcCard({
+      readerId: resetData.readerId,
+      cardId: resetData.cardId,
+      userId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+    });
+
+    return {
+      message: 'Reset initiated, continue on Reader',
+    };
   }
 }

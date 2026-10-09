@@ -1,24 +1,22 @@
-import { LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { PropsWithChildren, useCallback, useEffect, useRef } from 'react';
-import { createPluginStore, PluginProvider as PluginProviderBase, RendererPlugin } from 'react-pluggable';
+import { PluginProvider as PluginProviderBase, RendererPlugin, createPluginStore } from 'react-pluggable';
+import { LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import usePluginState from './plugin.state';
-import {
-  __federation_method_getRemote,
-  __federation_method_setRemote,
-  // eslint-disable-next-line
-  // @ts-ignore
-} from 'virtual:__federation__';
+// The federation runtime is injected by Vite.
+// @ts-expect-error -- Vite supplies the virtual federation module at build time.
+import { __federation_method_getRemote, __federation_method_setRemote } from 'virtual:__federation__';
 import {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
   setApiBaseUrl,
 } from '@attraccess/plugins-frontend-sdk';
+import { getBaseUrl } from '../../api/index';
 import { ToastType, useToastMessage } from '../../components/toastProvider';
 import { useAuth } from '../../hooks/useAuth';
-import { getBaseUrl } from '../../api';
 
-const pluginStore = createPluginStore();
-export function PluginProvider(props: PropsWithChildren) {
+export const pluginStore = createPluginStore();
+
+export function usePluginProviderStateInputs(props: PropsWithChildren) {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
   const addPlugin = usePluginState((s) => s.addPlugin);
   const removePlugin = usePluginState((s) => s.removePlugin);
@@ -67,7 +65,25 @@ export function PluginProvider(props: PropsWithChildren) {
       pluginStore.removeFunction('notificationToast');
     };
   }, []);
+  return {
+    refetchPlugins,
+    addPlugin,
+    removePlugin,
+    isInstalled,
+    plugins,
+    toast,
+    user,
+    toastRef,
+    arePluginsLoaded,
+    loadingPlugins,
+    loadedManifests,
+    warnedFailures,
+    props,
+  } as const;
+}
 
+export function usePluginProviderStateLoadPlugin(model: ReturnType<typeof usePluginProviderStateInputs>) {
+  const { addPlugin, isInstalled } = model;
   const loadPlugin = useCallback(
     async (pluginManifest: LoadedPluginManifest, plugin?: AttraccessFrontendPlugin) => {
       try {
@@ -145,15 +161,28 @@ export function PluginProvider(props: PropsWithChildren) {
   );
 
   useEffect(() => {
-    plugins.forEach((plugin) => {
+    model.plugins.forEach((plugin) => {
       plugin.plugin.onApiEndpointChange(getBaseUrl());
       plugin.plugin.onApiAuthStateChange({
         authToken: '', // No longer using tokens - authentication is handled by cookies
-        user: user as unknown as AttraccessFrontendPluginAuthData['user'],
+        user: model.user as unknown as AttraccessFrontendPluginAuthData['user'],
       });
     });
-  }, [plugins, user]);
+  }, [model.plugins, model.user]);
+  return { ...model, loadPlugin } as const;
+}
 
+export function usePluginProviderStateOutput(model: ReturnType<typeof usePluginProviderStateLoadPlugin>) {
+  const {
+    loadingPlugins,
+    refetchPlugins,
+    warnedFailures,
+    toastRef,
+    loadedManifests,
+    loadPlugin,
+    removePlugin,
+    arePluginsLoaded,
+  } = model;
   const loadAllPlugins = useCallback(async () => {
     if (loadingPlugins.current) return;
     loadingPlugins.current = true;
@@ -236,7 +265,16 @@ export function PluginProvider(props: PropsWithChildren) {
       loadingPlugins.current = false;
       console.debug('Attraccess Plugin System: All plugins loaded');
     }
-  }, [loadPlugin, refetchPlugins, removePlugin]);
+  }, [
+    loadPlugin,
+    refetchPlugins,
+    removePlugin,
+    loadingPlugins,
+    warnedFailures,
+    toastRef,
+    loadedManifests,
+    arePluginsLoaded,
+  ]);
 
   useEffect(() => {
     console.debug('Attraccess Plugin System: Refetching plugins');
@@ -248,7 +286,18 @@ export function PluginProvider(props: PropsWithChildren) {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [loadAllPlugins]);
+  }, [loadAllPlugins, arePluginsLoaded]);
+  return { props: model.props };
+}
+
+export function usePluginProviderState(props: PropsWithChildren) {
+  const usePluginProviderStateInputsModel = usePluginProviderStateInputs(props);
+  const usePluginProviderStateLoadPluginModel = usePluginProviderStateLoadPlugin(usePluginProviderStateInputsModel);
+  return usePluginProviderStateOutput(usePluginProviderStateLoadPluginModel);
+}
+
+export function PluginProvider(props: PropsWithChildren) {
+  usePluginProviderState(props);
 
   return <PluginProviderBase pluginStore={pluginStore}>{props.children}</PluginProviderBase>;
 }

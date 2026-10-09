@@ -1,7 +1,7 @@
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { useOperatingDuration } from './operatingDuration';
 
 vi.mock('../../api', () => ({ getBaseUrl: () => '' }));

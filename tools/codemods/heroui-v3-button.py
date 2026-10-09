@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
-# Codemod migrating HeroUI v2 Button props to v3 variants and isPending
-# FEATURE: HeroUI v3 migration tooling for Button component refactor
-
 import re
-from pathlib import Path
 
-ROOT = Path(__file__).parents[2]
-SEARCH_DIRS = [
-    ROOT / "apps" / "frontend" / "src",
-    ROOT / "libs",
-]
-EXCLUDE_DIRS = {"node_modules", ".nx", "dist", "__pycache__"}
+from pathlib import Path
 
 COLOR_VARIANT_MAP = {
     ("primary", "solid"): "primary",
@@ -71,18 +62,10 @@ COLOR_VARIANT_MAP = {
 }
 
 OLD_VARIANTS = {"solid", "flat", "light", "bordered", "shadow", "faded", "ghost"}
+
 KNOWN_COLORS = {"primary", "default", "secondary", "danger", "warning", "success"}
+
 ISLOADING_RE = re.compile(r'\bisLoading=')
-
-
-def find_tsx_files(dirs):
-    for d in dirs:
-        if not d.exists():
-            continue
-        for p in d.rglob("*.tsx"):
-            if not any(ex in p.parts for ex in EXCLUDE_DIRS):
-                yield p
-
 
 def scan_button_tags(text):
     """Yield (start, end, attrs_str, close) for each <Button ...> opening tag."""
@@ -128,23 +111,35 @@ def scan_button_tags(text):
             pos += 1
         i = start + 1
 
-
 def extract_static(attrs_str, attr_name):
     m = re.search(r'(?<!\w)' + attr_name + r'=["\']([^"\']*)["\']', attrs_str)
     return m.group(1) if m else None
 
-
 def has_dynamic(attrs_str, attr_name):
     return bool(re.search(r'(?<!\w)' + attr_name + r'=\{', attrs_str))
-
 
 def strip_static_attr(attrs_str, attr_name):
     return re.sub(r'\s+' + attr_name + r'=["\'][^"\']*["\']', '', attrs_str)
 
-
 def get_line_number(text, pos):
     return text[:pos].count('\n') + 1
 
+ROOT = Path(__file__).parents[2]
+
+SEARCH_DIRS = [
+    ROOT / "apps" / "frontend" / "src",
+    ROOT / "libs",
+]
+
+EXCLUDE_DIRS = {"node_modules", ".nx", "dist", "__pycache__"}
+
+def find_tsx_files(dirs):
+    for d in dirs:
+        if not d.exists():
+            continue
+        for p in d.rglob("*.tsx"):
+            if not any(ex in p.parts for ex in EXCLUDE_DIRS):
+                yield p
 
 def process_file(path):
     original = path.read_text(encoding="utf-8")
@@ -217,7 +212,6 @@ def process_file(path):
 
     return changes, dynamic_locs
 
-
 def main():
     total_changes = 0
     total_files = 0
@@ -252,7 +246,6 @@ def main():
         print("\nDynamic cases (need manual review):")
         for loc in all_dynamic:
             print(f"  {loc}")
-
 
 if __name__ == "__main__":
     main()

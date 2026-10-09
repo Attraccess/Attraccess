@@ -20,7 +20,7 @@ vi.mock('../../../../../components/toastProvider', () => ({
 }));
 
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
-  useResourceFormsSubmission: () => ({ requestForms, modal: null }),
+  useResourceFormsSubmission: () => ({ requestForms, modal: null, clearFormsDraft: vi.fn() }),
 }));
 
 // Stand-ins that expose exactly the two things this test cares about: a way to press Start, and

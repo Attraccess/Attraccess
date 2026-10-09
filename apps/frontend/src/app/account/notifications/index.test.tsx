@@ -2,10 +2,9 @@ import { ApiError } from '@attraccess/react-query-client';
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationPreferencesForm } from './index';
-
+import userEvent from '@testing-library/user-event';
 const hoisted = vi.hoisted(() => ({
   mutate: vi.fn(),
   mutationOptions: {} as { onError: (error: unknown) => void },
@@ -247,6 +246,7 @@ describe('NotificationPreferencesForm', () => {
 
     expect(screen.getByTestId('notifications-resource_health-push')).toHaveAttribute('aria-pressed', 'true');
   });
+
   it('requires an explicit action to enable this device after deferring the prompt', async () => {
     hoisted.pushState.isSubscribed = false;
     hoisted.pushState.permission = 'default';
@@ -277,6 +277,7 @@ describe('NotificationPreferencesForm', () => {
       }),
     );
   });
+
   it('can register an existing browser subscription for this account and retry a failed registration', async () => {
     // A previous account or failed upsert may leave a browser subscription behind.
     hoisted.pushState.isSubscribed = true;

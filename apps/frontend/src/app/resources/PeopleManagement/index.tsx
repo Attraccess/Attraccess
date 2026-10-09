@@ -1,22 +1,23 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
-import { useOverlayState } from '@heroui/react';
-import { Button } from '../../../components/button';
+import { Button } from '../../../components/button/index';
 import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
-import { User } from '@attraccess/react-query-client';
-import { type UserIdentity, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Select } from '../../../components/select';
+import { Select } from '../../../components/select/index';
 import { AddPersonDrawer } from './AddPersonDrawer';
 import { HistoryModalLoader } from './HistoryModalLoader';
 import { IntroductionCommentModal } from './IntroductionCommentModal';
 import { PeopleHeader } from './PeopleHeader';
 import { PeopleTable } from './PeopleTable';
+import { FilterMode, PeopleManagementProps, AddMode } from './types';
+import { useOverlayState } from '@heroui/react';
+import { User } from '@attraccess/react-query-client';
+import type { UserIdentity } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { usePeopleMutations } from './usePeopleMutations';
 import { usePeopleRows } from './usePeopleRows';
-import { AddMode, FilterMode, PeopleManagementProps } from './types';
 import en from './en.json';
 import de from './de.json';
 
-export function PeopleManagement(
+export function usePeopleManagementState(
   props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
 ) {
   const { target, canManageIntroducers, canManageIntroductions, hideHeader, className, ...rest } = props;
@@ -102,6 +103,82 @@ export function PeopleManagement(
     },
     [openHistory],
   );
+  return {
+    target,
+    canManageIntroducers,
+    canManageIntroductions,
+    hideHeader,
+    className,
+    rest,
+    t,
+    filter,
+    setFilter,
+    addMode,
+    addComment,
+    setAddComment,
+    isAddOpen,
+    closeAdd,
+    setRevokeContext,
+    revokeComment,
+    setRevokeComment,
+    isRevokeOpen,
+    closeRevoke,
+    historyUserId,
+    setHistoryUserId,
+    isHistoryOpen,
+    closeHistory,
+    rows,
+    isLoading,
+    hasError,
+    mutations,
+    filteredRows,
+    handleAddOpen,
+    resetAddState,
+    handleAdd,
+    handleIntroductionToggle,
+    handleRevokeSubmit,
+    handleHistoryOpen,
+  } as const;
+}
+
+export function PeopleManagement(
+  props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
+) {
+  const {
+    target,
+    canManageIntroducers,
+    canManageIntroductions,
+    hideHeader,
+    className,
+    rest,
+    t,
+    filter,
+    setFilter,
+    addMode,
+    addComment,
+    setAddComment,
+    isAddOpen,
+    closeAdd,
+    setRevokeContext,
+    revokeComment,
+    setRevokeComment,
+    isRevokeOpen,
+    closeRevoke,
+    historyUserId,
+    setHistoryUserId,
+    isHistoryOpen,
+    closeHistory,
+    isLoading,
+    hasError,
+    mutations,
+    filteredRows,
+    handleAddOpen,
+    resetAddState,
+    handleAdd,
+    handleIntroductionToggle,
+    handleRevokeSubmit,
+    handleHistoryOpen,
+  } = usePeopleManagementState(props);
 
   if (hasError) {
     return (

@@ -1,8 +1,8 @@
+import type { PluginMqttMessage, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 import { Injectable, LoggerService } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttMessageEvent } from '../mqtt/mqtt-message.event';
-import type { PluginMqttMessage, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 
 const MAX_QUEUED_MESSAGES_PER_SUBSCRIPTION = 100;
 

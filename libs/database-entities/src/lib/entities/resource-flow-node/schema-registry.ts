@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ResourceFlowNodeType } from './node-type';
-import type { ExternalEffectFailureBehavior } from './external-effect-policy';
+import { ExternalEffectFailureBehavior } from './external-effect-policy';
 import { HttpRequestNodeDataSchema } from './http-schema';
 import {
   MqttSendMessageNodeDataSchema,

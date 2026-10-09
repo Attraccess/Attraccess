@@ -25,7 +25,7 @@ vi.mock('../billing/dashboard/summary/live-updates', () => ({
     state.live = options;
   },
 }));
-vi.mock('./sidebar', () => ({
+vi.mock('./sidebar/index', () => ({
   Sidebar: ({
     isOpen,
     isCollapsed,

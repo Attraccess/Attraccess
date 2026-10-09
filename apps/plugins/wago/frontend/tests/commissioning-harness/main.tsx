@@ -3,8 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@heroui/styles/css';
 import '../../src/styles.css';
-import { ControllersPage } from '../../src/ControllersPage';
-import { ConfigurationPage } from '../../src/ConfigurationPage';
+import { ControllersPage } from '../../src/controllers/Page';
+import { ConfigurationPage } from '../../src/configuration/ConfigurationPage';
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 const root = document.getElementById('root');

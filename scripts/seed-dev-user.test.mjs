@@ -1,17 +1,20 @@
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import sqlite3 from 'sqlite3';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { execFileSync, spawnSync } from 'node:child_process';
 import bcrypt from 'bcrypt';
 
 const script = path.resolve('scripts/seed-dev-user.mjs');
+
 const execute = (db, sql) =>
   new Promise((resolve, reject) => db.exec(sql, (error) => (error ? reject(error) : resolve())));
+
 const rows = (db, sql) =>
   new Promise((resolve, reject) => db.all(sql, (error, values) => (error ? reject(error) : resolve(values))));
+
 const close = (db) => new Promise((resolve, reject) => db.close((error) => (error ? reject(error) : resolve())));
 
 async function database() {

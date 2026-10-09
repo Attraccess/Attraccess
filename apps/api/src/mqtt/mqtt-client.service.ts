@@ -1,41 +1,58 @@
-import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
-import * as mqtt from 'mqtt';
-import { MqttClient } from 'mqtt';
+
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { MqttMessageEvent } from './mqtt-message.event';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import * as mqtt from 'mqtt';
+
+import { MqttClient } from 'mqtt';
+
+import { Repository } from 'typeorm';
+
 import { EncryptionService } from '../encryption/encryption.service';
-import { MetricsService } from '../metrics/metrics.service';
+
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
-type SubscriptionQos = 0 | 1 | 2;
+import { MetricsService } from '../metrics/metrics.service';
 
-interface TopicSubscription {
+import { MqttMessageEvent } from './mqtt-message.event';
+
+export type SubscriptionQos = 0 | 1 | 2;
+
+export interface TopicSubscription {
   qosCounts: Map<SubscriptionQos | undefined, number>;
   effectiveQos?: SubscriptionQos;
 }
 
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {
-  private clients: Map<number, MqttClient> = new Map();
-  private connectionPromises: Map<number, Promise<MqttClient>> = new Map();
-  private readonly connectionVersions = new Map<number, number>();
-  private readonly connectionCancellations = new Map<number, Set<() => void>>();
-  private destroyed = false;
-  private subscriptions: Map<number, Map<string, TopicSubscription>> = new Map();
-  private subscriptionOperations: Map<number, Map<string, Promise<void>>> = new Map();
-  private readonly logger = new Logger(MqttClientService.name);
-
   constructor(
     @InjectRepository(MqttServer)
-    private readonly mqttServerRepository: Repository<MqttServer>,
-    private readonly eventEmitter: EventEmitter2,
-    private readonly encryptionService: EncryptionService,
-    private readonly metricsService: MetricsService,
-    private readonly externalCallTimer: ExternalCallTimer,
+    protected readonly mqttServerRepository: Repository<MqttServer>,
+    protected readonly eventEmitter: EventEmitter2,
+    protected readonly encryptionService: EncryptionService,
+    protected readonly metricsService: MetricsService,
+    protected readonly externalCallTimer: ExternalCallTimer,
   ) {}
+
+  protected clients: Map<number, MqttClient> = new Map();
+
+  protected connectionPromises: Map<number, Promise<MqttClient>> = new Map();
+
+  protected readonly connectionVersions = new Map<number, number>();
+
+  protected readonly connectionCancellations = new Map<number, Set<() => void>>();
+
+  protected destroyed = false;
+
+  protected subscriptions: Map<number, Map<string, TopicSubscription>> = new Map();
+
+  protected subscriptionOperations: Map<number, Map<string, Promise<void>>> = new Map();
+
+  protected readonly logger = new Logger(MqttClientService.name);
 
   async onModuleDestroy() {
     this.destroyed = true;
@@ -65,7 +82,7 @@ export class MqttClientService implements OnModuleDestroy {
     await this.getOrCreateClient(serverId, true);
   }
 
-  private async getOrCreateClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
+  protected async getOrCreateClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     if (this.destroyed) throw new Error('MQTT connections have stopped');
     // If there's an existing connection being established, wait for it
     if (this.connectionPromises.has(serverId)) {
@@ -97,7 +114,7 @@ export class MqttClientService implements OnModuleDestroy {
     }
   }
 
-  private waitForReconnect(serverId: number, client: MqttClient): Promise<MqttClient> {
+  protected waitForReconnect(serverId: number, client: MqttClient): Promise<MqttClient> {
     return new Promise((resolve, reject) => {
       const cancellations = this.connectionCancellations.get(serverId) ?? new Set<() => void>();
       this.connectionCancellations.set(serverId, cancellations);
@@ -118,7 +135,194 @@ export class MqttClientService implements OnModuleDestroy {
     });
   }
 
-  private async createClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
+  async subscribe(serverId: number, topic: string, qos?: 0 | 1 | 2, requireAcknowledgement = false): Promise<void> {
+    // Track desired subscriptions so they can be (re)applied on connect/reconnect
+    if (!this.subscriptions.has(serverId)) {
+      this.subscriptions.set(serverId, new Map());
+    }
+    const serverTopics = this.subscriptions.get(serverId);
+    const existingSubscription = serverTopics.get(topic);
+    if (existingSubscription) {
+      existingSubscription.qosCounts.set(qos, (existingSubscription.qosCounts.get(qos) ?? 0) + 1);
+    } else {
+      serverTopics.set(topic, { qosCounts: new Map([[qos, 1]]) });
+    }
+
+    try {
+      await this.reconcileSubscription(serverId, topic, true);
+    } catch (error) {
+      if (requireAcknowledgement) {
+        throw error;
+      }
+      // The client will keep trying to connect and will subscribe on next connect.
+      this.logger.warn(
+        `Will subscribe to topic ${topic} for server ${serverId} once connection is available: ${error?.message ?? error}`,
+      );
+    }
+  }
+
+  async unsubscribe(serverId: number, topic: string, qos?: SubscriptionQos): Promise<void> {
+    const topics = this.subscriptions.get(serverId);
+    const subscription = topics?.get(topic);
+    if (!subscription) {
+      return;
+    }
+    const qosCount = subscription.qosCounts.get(qos);
+    if (!qosCount) {
+      return;
+    }
+    const client = this.clients.get(serverId);
+    if (qosCount === 1) {
+      subscription.qosCounts.delete(qos);
+    } else {
+      subscription.qosCounts.set(qos, qosCount - 1);
+    }
+
+    if (subscription.qosCounts.size === 0) {
+      topics.delete(topic);
+      if (topics.size === 0) {
+        this.subscriptions.delete(serverId);
+      }
+    }
+
+    // A pending subscribe operation will see the updated desired state.
+    if (!client?.connected) {
+      return;
+    }
+
+    await this.reconcileSubscription(serverId, topic, false);
+  }
+
+  /** Serializes broker changes so the last desired QoS always wins. */
+  protected reconcileSubscription(serverId: number, topic: string, connect: boolean): Promise<void> {
+    const operations = this.subscriptionOperations.get(serverId) ?? new Map<string, Promise<void>>();
+    this.subscriptionOperations.set(serverId, operations);
+    const previous = operations.get(topic) ?? Promise.resolve();
+    const operation = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const version = this.connectionVersions.get(serverId) ?? 0;
+        const subscription = this.subscriptions.get(serverId)?.get(topic);
+        const client = connect ? await this.getOrCreateClient(serverId, true) : this.clients.get(serverId);
+
+        if (!subscription) {
+          if (!client?.connected) {
+            return;
+          }
+          await new Promise<void>((resolve, reject) => {
+            client.unsubscribe(topic, (error) => (error ? reject(error) : resolve()));
+          });
+          return;
+        }
+
+        const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+        // State may have changed while resolving the server or opening a connection.
+        if (this.subscriptions.get(serverId)?.get(topic) !== subscription) {
+          return;
+        }
+        const effectiveQos = this.effectiveQos(subscription, server?.defaultSubscribeQos as SubscriptionQos);
+        if (subscription.effectiveQos === effectiveQos || !client?.connected) {
+          return;
+        }
+        await this.externalCallTimer.time(
+          'mqtt',
+          'subscribe',
+          () =>
+            new Promise<void>((resolve, reject) => {
+              client.subscribe(topic, { qos: effectiveQos }, (error) => (error ? reject(error) : resolve()));
+            }),
+        );
+        if (version === (this.connectionVersions.get(serverId) ?? 0)) subscription.effectiveQos = effectiveQos;
+      });
+    operations.set(topic, operation);
+    void operation
+      .finally(() => {
+        if (operations.get(topic) !== operation) {
+          return;
+        }
+        operations.delete(topic);
+        if (operations.size === 0) {
+          this.subscriptionOperations.delete(serverId);
+        }
+      })
+      .catch(() => undefined);
+    return operation;
+  }
+
+  protected effectiveQos(subscription: TopicSubscription, defaultQos?: SubscriptionQos): SubscriptionQos {
+    return Math.max(
+      ...Array.from(subscription.qosCounts.entries(), ([qos, count]) => (count > 0 ? (qos ?? defaultQos ?? 0) : 0)),
+    ) as SubscriptionQos;
+  }
+
+  async publish(
+    serverId: number,
+    topic: string,
+    message: string | Buffer,
+    options?: { qos?: 0 | 1 | 2; retain?: boolean },
+    completion?: { awaitAcknowledgement?: boolean; acknowledgementTimeoutSeconds?: number },
+  ): Promise<void> {
+    try {
+      const [client, server] = await Promise.all([
+        this.getOrCreateClient(serverId),
+        this.mqttServerRepository.findOneBy({ id: serverId }),
+      ]);
+
+      if (!server) {
+        throw new Error(`MQTT server with ID ${serverId} not found`);
+      }
+
+      const qos: 0 | 1 | 2 = (options?.qos ?? (server.defaultPublishQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
+      const retain: boolean = options?.retain ?? Boolean(server.defaultPublishRetain ?? false);
+      const startPublish = () =>
+        new Promise<void>((resolve, reject) => {
+          client.publish(topic, message, { qos, retain }, (error) => {
+            if (error) {
+              this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
+              reject(error);
+            } else {
+              this.logger.debug(`Published to topic ${topic}: ${message.toString()}`);
+              resolve();
+            }
+          });
+        });
+
+      if (completion?.awaitAcknowledgement === false) {
+        // The flow continues after dispatch, while the background operation still records metrics.
+        void this.externalCallTimer.time('mqtt', 'publish', startPublish).catch(() => undefined);
+        return;
+      }
+
+      const completionTimeout = completion?.acknowledgementTimeoutSeconds;
+      return this.externalCallTimer.time('mqtt', 'publish', () => {
+        const publish = startPublish();
+        if (!completionTimeout) {
+          return publish;
+        }
+
+        let acknowledgementTimeout: ReturnType<typeof setTimeout> | undefined;
+        return Promise.race([
+          publish,
+          new Promise<never>((_resolve, reject) => {
+            acknowledgementTimeout = setTimeout(() => {
+              const error = new Error(`MQTT publish acknowledgement timed out after ${completionTimeout} seconds`);
+              error.name = 'MqttAcknowledgementTimeoutError';
+              reject(error);
+            }, completionTimeout * 1000);
+          }),
+        ]).finally(() => {
+          if (acknowledgementTimeout) {
+            clearTimeout(acknowledgementTimeout);
+          }
+        });
+      });
+    } catch (error) {
+      this.logger.error(`Failed to publish to MQTT server ${serverId}`, error);
+      throw error;
+    }
+  }
+
+  protected async createClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     const version = this.connectionVersions.get(serverId) ?? 0;
     const server = await this.mqttServerRepository.findOneBy({ id: serverId });
 
@@ -273,12 +477,12 @@ export class MqttClientService implements OnModuleDestroy {
     });
   }
 
-  private updateHealthyServerCount(): void {
+  protected updateHealthyServerCount(): void {
     const healthyCount = Array.from(this.clients.values()).filter((c) => c.connected).length;
     this.metricsService.mqttServersHealthy.set(healthyCount);
   }
 
-  private async resolveServerPassword(server: MqttServer): Promise<string | null> {
+  protected async resolveServerPassword(server: MqttServer): Promise<string | null> {
     if (!server.password) {
       return null;
     }
@@ -291,192 +495,5 @@ export class MqttClientService implements OnModuleDestroy {
     const encrypted = this.encryptionService.encrypt(plaintext);
     await this.mqttServerRepository.update(server.id, { password: encrypted });
     return plaintext;
-  }
-
-  async publish(
-    serverId: number,
-    topic: string,
-    message: string | Buffer,
-    options?: { qos?: 0 | 1 | 2; retain?: boolean },
-    completion?: { awaitAcknowledgement?: boolean; acknowledgementTimeoutSeconds?: number },
-  ): Promise<void> {
-    try {
-      const [client, server] = await Promise.all([
-        this.getOrCreateClient(serverId),
-        this.mqttServerRepository.findOneBy({ id: serverId }),
-      ]);
-
-      if (!server) {
-        throw new Error(`MQTT server with ID ${serverId} not found`);
-      }
-
-      const qos: 0 | 1 | 2 = (options?.qos ?? (server.defaultPublishQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
-      const retain: boolean = options?.retain ?? Boolean(server.defaultPublishRetain ?? false);
-      const startPublish = () =>
-        new Promise<void>((resolve, reject) => {
-          client.publish(topic, message, { qos, retain }, (error) => {
-            if (error) {
-              this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
-              reject(error);
-            } else {
-              this.logger.debug(`Published to topic ${topic}: ${message.toString()}`);
-              resolve();
-            }
-          });
-        });
-
-      if (completion?.awaitAcknowledgement === false) {
-        // The flow continues after dispatch, while the background operation still records metrics.
-        void this.externalCallTimer.time('mqtt', 'publish', startPublish).catch(() => undefined);
-        return;
-      }
-
-      const completionTimeout = completion?.acknowledgementTimeoutSeconds;
-      return this.externalCallTimer.time('mqtt', 'publish', () => {
-        const publish = startPublish();
-        if (!completionTimeout) {
-          return publish;
-        }
-
-        let acknowledgementTimeout: ReturnType<typeof setTimeout> | undefined;
-        return Promise.race([
-          publish,
-          new Promise<never>((_resolve, reject) => {
-            acknowledgementTimeout = setTimeout(() => {
-              const error = new Error(`MQTT publish acknowledgement timed out after ${completionTimeout} seconds`);
-              error.name = 'MqttAcknowledgementTimeoutError';
-              reject(error);
-            }, completionTimeout * 1000);
-          }),
-        ]).finally(() => {
-          if (acknowledgementTimeout) {
-            clearTimeout(acknowledgementTimeout);
-          }
-        });
-      });
-    } catch (error) {
-      this.logger.error(`Failed to publish to MQTT server ${serverId}`, error);
-      throw error;
-    }
-  }
-
-  async subscribe(serverId: number, topic: string, qos?: 0 | 1 | 2, requireAcknowledgement = false): Promise<void> {
-    // Track desired subscriptions so they can be (re)applied on connect/reconnect
-    if (!this.subscriptions.has(serverId)) {
-      this.subscriptions.set(serverId, new Map());
-    }
-    const serverTopics = this.subscriptions.get(serverId);
-    const existingSubscription = serverTopics.get(topic);
-    if (existingSubscription) {
-      existingSubscription.qosCounts.set(qos, (existingSubscription.qosCounts.get(qos) ?? 0) + 1);
-    } else {
-      serverTopics.set(topic, { qosCounts: new Map([[qos, 1]]) });
-    }
-
-    try {
-      await this.reconcileSubscription(serverId, topic, true);
-    } catch (error) {
-      if (requireAcknowledgement) {
-        throw error;
-      }
-      // The client will keep trying to connect and will subscribe on next connect.
-      this.logger.warn(
-        `Will subscribe to topic ${topic} for server ${serverId} once connection is available: ${error?.message ?? error}`,
-      );
-    }
-  }
-
-  async unsubscribe(serverId: number, topic: string, qos?: SubscriptionQos): Promise<void> {
-    const topics = this.subscriptions.get(serverId);
-    const subscription = topics?.get(topic);
-    if (!subscription) {
-      return;
-    }
-    const qosCount = subscription.qosCounts.get(qos);
-    if (!qosCount) {
-      return;
-    }
-    const client = this.clients.get(serverId);
-    if (qosCount === 1) {
-      subscription.qosCounts.delete(qos);
-    } else {
-      subscription.qosCounts.set(qos, qosCount - 1);
-    }
-
-    if (subscription.qosCounts.size === 0) {
-      topics.delete(topic);
-      if (topics.size === 0) {
-        this.subscriptions.delete(serverId);
-      }
-    }
-
-    // A pending subscribe operation will see the updated desired state.
-    if (!client?.connected) {
-      return;
-    }
-
-    await this.reconcileSubscription(serverId, topic, false);
-  }
-
-  /** Serializes broker changes so the last desired QoS always wins. */
-  private reconcileSubscription(serverId: number, topic: string, connect: boolean): Promise<void> {
-    const operations = this.subscriptionOperations.get(serverId) ?? new Map<string, Promise<void>>();
-    this.subscriptionOperations.set(serverId, operations);
-    const previous = operations.get(topic) ?? Promise.resolve();
-    const operation = previous
-      .catch(() => undefined)
-      .then(async () => {
-        const version = this.connectionVersions.get(serverId) ?? 0;
-        const subscription = this.subscriptions.get(serverId)?.get(topic);
-        const client = connect ? await this.getOrCreateClient(serverId, true) : this.clients.get(serverId);
-
-        if (!subscription) {
-          if (!client?.connected) {
-            return;
-          }
-          await new Promise<void>((resolve, reject) => {
-            client.unsubscribe(topic, (error) => (error ? reject(error) : resolve()));
-          });
-          return;
-        }
-
-        const server = await this.mqttServerRepository.findOneBy({ id: serverId });
-        // State may have changed while resolving the server or opening a connection.
-        if (this.subscriptions.get(serverId)?.get(topic) !== subscription) {
-          return;
-        }
-        const effectiveQos = this.effectiveQos(subscription, server?.defaultSubscribeQos as SubscriptionQos);
-        if (subscription.effectiveQos === effectiveQos || !client?.connected) {
-          return;
-        }
-        await this.externalCallTimer.time(
-          'mqtt',
-          'subscribe',
-          () =>
-            new Promise<void>((resolve, reject) => {
-              client.subscribe(topic, { qos: effectiveQos }, (error) => (error ? reject(error) : resolve()));
-            }),
-        );
-        if (version === (this.connectionVersions.get(serverId) ?? 0)) subscription.effectiveQos = effectiveQos;
-      });
-    operations.set(topic, operation);
-    void operation
-      .finally(() => {
-        if (operations.get(topic) !== operation) {
-          return;
-        }
-        operations.delete(topic);
-        if (operations.size === 0) {
-          this.subscriptionOperations.delete(serverId);
-        }
-      })
-      .catch(() => undefined);
-    return operation;
-  }
-
-  private effectiveQos(subscription: TopicSubscription, defaultQos?: SubscriptionQos): SubscriptionQos {
-    return Math.max(
-      ...Array.from(subscription.qosCounts.entries(), ([qos, count]) => (count > 0 ? (qos ?? defaultQos ?? 0) : 0)),
-    ) as SubscriptionQos;
   }
 }

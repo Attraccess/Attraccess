@@ -237,8 +237,12 @@ describe('audit admin workflows', () => {
     expect(within(dialog).getByText('Audit verification client')).toBeInTheDocument();
     expect(within(dialog).getByText('audit.enabled')).toBeInTheDocument();
   });
+
   it('explains missing snapshots and preserves changed-field metadata', async () => {
-    list.mockResolvedValue({ items: [{ ...entry, details: { changedFields: '["password"]' } }], nextCursor: null });
+    list.mockResolvedValue({
+      items: [{ ...entry, details: { changedFields: '["password"]' } }],
+      nextCursor: null,
+    });
     mount();
     await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
     const dialog = await screen.findByRole('dialog');
@@ -247,6 +251,7 @@ describe('audit admin workflows', () => {
     const changedFields = within(dialog).getByText(/\[\s*"password"\s*\]/);
     expect(JSON.parse(changedFields.textContent ?? '')).toEqual(['password']);
   });
+
   it('keeps malformed change metadata visible and identifies current names in the event details', async () => {
     list.mockResolvedValue({
       items: [
@@ -267,6 +272,7 @@ describe('audit admin workflows', () => {
     expect(within(dialog).getByText('#7')).toBeInTheDocument();
     expect(within(dialog).getByText('resource #2')).toBeInTheDocument();
   });
+
   it('opens a readable change comparison and exposes only changed fields', async () => {
     mount();
     await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));

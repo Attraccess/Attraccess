@@ -1,41 +1,252 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
-  TextField,
-  FieldError,
-  Input,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
   DrawerHeading,
+  TextField,
+  FieldError,
+  Input,
   TextArea,
 } from '@heroui/react';
 import { StandardDrawer } from '../../../../components/standardDrawer';
-import { Select } from '../../../../components/select';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
+import { FormFieldType, FormSubmissionRequestDto, FormResponseDto } from '@attraccess/react-query-client';
 import {
-  ResourceFormAction,
   parseFieldOptions,
+  ResourceFormAction,
   FieldOptions,
   TextFieldOptions,
   NumberFieldOptions,
 } from '../../details/forms/types';
 import en from '../translations/en.json';
 import de from '../translations/de.json';
+import { Select } from '../../../../components/select/index';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 
-interface ResourceFormsModalProps {
+export interface ResourceFormsModalProps {
   isOpen: boolean;
   action: ResourceFormAction;
   forms: FormResponseDto[];
+  initialSubmissions?: FormSubmissionRequestDto[];
   onSubmit: (payload: FormSubmissionRequestDto[]) => void;
   onCancel: () => void;
 }
 
-type FieldValue = string | boolean;
+export function extractSelectOptions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const unique = new Set<string>();
+  const result: string[] = [];
+  raw.forEach((option) => {
+    if (typeof option !== 'string') {
+      return;
+    }
+    const trimmed = option.trim();
+    if (!trimmed || unique.has(trimmed)) {
+      return;
+    }
+    unique.add(trimmed);
+    result.push(trimmed);
+  });
+  return result;
+}
 
-export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }: ResourceFormsModalProps) {
+export type FieldValue = string | boolean;
+
+export function fieldHasValue(type: FormFieldType, value: FieldValue | undefined) {
+  if (type === FormFieldType.BOOLEAN) {
+    return typeof value === 'boolean';
+  }
+  if (type === FormFieldType.SELECT) {
+    return typeof value === 'string' && value.trim().length > 0;
+  }
+  return Boolean(value && String(value).trim().length > 0);
+}
+
+export function normalizeValue(
+  type: FormFieldType,
+  rawValue: FieldValue | undefined,
+  t: (key: string) => string,
+  errors: Record<number, string | null>,
+  fieldId: number,
+  selectOptions?: string[],
+) {
+  switch (type) {
+    case FormFieldType.TEXT:
+      return String(rawValue);
+    case FormFieldType.NUMBER: {
+      const numericValue = Number(rawValue);
+      if (Number.isNaN(numericValue)) {
+        errors[fieldId] = t('modal.numberInvalid');
+        return undefined;
+      }
+      return numericValue;
+    }
+    case FormFieldType.BOOLEAN:
+      return Boolean(rawValue);
+    case FormFieldType.SELECT: {
+      const value = typeof rawValue === 'string' ? rawValue : '';
+      if (!selectOptions?.length) {
+        errors[fieldId] = t('modal.selectUnavailable');
+        return undefined;
+      }
+      if (!selectOptions.includes(value)) {
+        errors[fieldId] = t('modal.selectInvalid');
+        return undefined;
+      }
+      return value;
+    }
+    default:
+      return rawValue ?? '';
+  }
+}
+
+export function renderTextInput(
+  options: TextFieldOptions,
+  value: FieldValue | undefined,
+  onChange: (value: FieldValue) => void,
+  error?: string | null,
+) {
+  if (options.multiline) {
+    return (
+      <div className="space-y-1">
+        <TextArea
+          value={(value as string) ?? ''}
+          placeholder={options.placeholder ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={Boolean(error)}
+        />
+        {error && (
+          <p className="flex items-start gap-1 text-sm font-medium text-danger">
+            <span aria-hidden="true">⚠</span>
+            <span>{error}</span>
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
+      <Input placeholder={options.placeholder ?? ''} />
+      {error && <FieldError>{error}</FieldError>}
+    </TextField>
+  );
+}
+
+export function renderNumberInput(
+  options: NumberFieldOptions,
+  value: FieldValue | undefined,
+  onChange: (value: FieldValue) => void,
+  error?: string | null,
+) {
+  const min = typeof options.min === 'number' ? options.min : undefined;
+  const max = typeof options.max === 'number' ? options.max : undefined;
+  const step = typeof options.step === 'number' ? options.step : undefined;
+
+  return (
+    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
+      <Input type="number" min={min} max={max} step={step} />
+      {error && <FieldError>{error}</FieldError>}
+    </TextField>
+  );
+}
+
+export function renderBooleanInput(
+  value: FieldValue | undefined,
+  onChange: (value: FieldValue) => void,
+  error: string | null | undefined,
+  t: (key: string) => string,
+) {
+  const isChecked = value === true;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-default-500">{t('modal.booleanNo')}</span>
+        <LabeledSwitch
+          isSelected={isChecked}
+          onChange={(checked) => onChange(checked)}
+          aria-label={t('modal.booleanLabel')}
+          className={error ? 'text-danger' : undefined}
+        />
+        <span className="text-xs text-default-500">{t('modal.booleanYes')}</span>
+      </div>
+      {error && (
+        <p className="flex items-start gap-1 text-sm font-medium text-danger">
+          <span aria-hidden="true">⚠</span>
+          <span>{error}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function renderSelectInput(
+  options: string[],
+  value: FieldValue | undefined,
+  onChange: (value: FieldValue) => void,
+  error: string | null | undefined,
+  t: (key: string) => string,
+  fieldName: string,
+) {
+  const selectedKey = typeof value === 'string' && options.includes(value) ? value : '';
+
+  return (
+    <Select
+      placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
+      isDisabled={!options.length}
+      aria-label={fieldName}
+      value={selectedKey}
+      onChange={(key) => onChange(key ?? '')}
+      items={options.map((option) => ({ key: option, label: option }))}
+    />
+  );
+}
+
+export function renderFieldInput(
+  field: FormResponseDto['fields'][number],
+  options: FieldOptions,
+  selectOptions: string[] | undefined,
+  value: FieldValue | undefined,
+  onChange: (value: FieldValue) => void,
+  error: string | null | undefined,
+  t: (key: string) => string,
+) {
+  switch (field.type) {
+    case FormFieldType.TEXT:
+      return renderTextInput(options as TextFieldOptions, value, onChange, error);
+    case FormFieldType.NUMBER:
+      return renderNumberInput(options as NumberFieldOptions, value, onChange, error);
+    case FormFieldType.BOOLEAN:
+      return renderBooleanInput(value, onChange, error, t);
+    case FormFieldType.SELECT:
+      return renderSelectInput(selectOptions ?? [], value, onChange, error, t, field.name);
+    default:
+      return (
+        <TextField
+          value={(value as string) ?? ''}
+          onChange={onChange as (v: string) => void}
+          isInvalid={Boolean(error)}
+        >
+          <Input />
+          {error && <FieldError>{error}</FieldError>}
+        </TextField>
+      );
+  }
+}
+
+export function ResourceFormsModal({
+  isOpen,
+  action,
+  forms,
+  initialSubmissions,
+  onSubmit,
+  onCancel,
+}: ResourceFormsModalProps) {
   const { t } = useTranslations({ en, de });
   const [values, setValues] = useState<Record<number, FieldValue>>({});
   const [errors, setErrors] = useState<Record<number, string | null>>({});
@@ -49,6 +260,14 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
 
     setValues((prev) => {
       const next = { ...prev };
+      initialSubmissions?.forEach((submission) => {
+        const form = forms.find(({ id }) => id === submission.formId);
+        submission.answers.forEach(({ fieldId, value }) => {
+          if (form?.fields.some(({ id }) => id === fieldId)) {
+            next[fieldId] = typeof value === 'boolean' ? value : String(value);
+          }
+        });
+      });
       forms.forEach((form) => {
         form.fields.forEach((field) => {
           if (field.type === FormFieldType.BOOLEAN) {
@@ -63,7 +282,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
       return next;
     });
     setErrors({});
-  }, [forms, isOpen]);
+  }, [forms, isOpen, initialSubmissions]);
 
   const modalTitle = useMemo(() => {
     switch (action) {
@@ -146,8 +365,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
             {form.fields.map((field) => {
               const rawOptions = field.options as Record<string, unknown> | null | undefined;
               const parsedOptions = parseFieldOptions(field.type, rawOptions ?? null);
-              const selectOptions =
-                field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
+              const selectOptions = field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
 
               return (
                 <div key={field.id} className="space-y-2">
@@ -183,207 +401,4 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
       </DrawerFooter>
     </StandardDrawer>
   );
-}
-
-function renderFieldInput(
-  field: FormResponseDto['fields'][number],
-  options: FieldOptions,
-  selectOptions: string[] | undefined,
-  value: FieldValue | undefined,
-  onChange: (value: FieldValue) => void,
-  error: string | null | undefined,
-  t: (key: string) => string,
-) {
-  switch (field.type) {
-    case FormFieldType.TEXT:
-      return renderTextInput(options as TextFieldOptions, value, onChange, error);
-    case FormFieldType.NUMBER:
-      return renderNumberInput(options as NumberFieldOptions, value, onChange, error);
-    case FormFieldType.BOOLEAN:
-      return renderBooleanInput(value, onChange, error, t);
-    case FormFieldType.SELECT:
-      return renderSelectInput(selectOptions ?? [], value, onChange, error, t, field.name);
-    default:
-      return (
-        <TextField
-          value={(value as string) ?? ''}
-          onChange={onChange as (v: string) => void}
-          isInvalid={Boolean(error)}
-        >
-          <Input />
-          {error && <FieldError>{error}</FieldError>}
-        </TextField>
-      );
-  }
-}
-
-function fieldHasValue(type: FormFieldType, value: FieldValue | undefined) {
-  if (type === FormFieldType.BOOLEAN) {
-    return typeof value === 'boolean';
-  }
-  if (type === FormFieldType.SELECT) {
-    return typeof value === 'string' && value.trim().length > 0;
-  }
-  return Boolean(value && String(value).trim().length > 0);
-}
-
-function normalizeValue(
-  type: FormFieldType,
-  rawValue: FieldValue | undefined,
-  t: (key: string) => string,
-  errors: Record<number, string | null>,
-  fieldId: number,
-  selectOptions?: string[],
-) {
-  switch (type) {
-    case FormFieldType.TEXT:
-      return String(rawValue);
-    case FormFieldType.NUMBER: {
-      const numericValue = Number(rawValue);
-      if (Number.isNaN(numericValue)) {
-        errors[fieldId] = t('modal.numberInvalid');
-        return undefined;
-      }
-      return numericValue;
-    }
-    case FormFieldType.BOOLEAN:
-      return Boolean(rawValue);
-    case FormFieldType.SELECT: {
-      const value = typeof rawValue === 'string' ? rawValue : '';
-      if (!selectOptions?.length) {
-        errors[fieldId] = t('modal.selectUnavailable');
-        return undefined;
-      }
-      if (!selectOptions.includes(value)) {
-        errors[fieldId] = t('modal.selectInvalid');
-        return undefined;
-      }
-      return value;
-    }
-    default:
-      return rawValue ?? '';
-  }
-}
-
-function renderTextInput(
-  options: TextFieldOptions,
-  value: FieldValue | undefined,
-  onChange: (value: FieldValue) => void,
-  error?: string | null,
-) {
-  if (options.multiline) {
-    return (
-      <div className="space-y-1">
-        <TextArea
-          value={(value as string) ?? ''}
-          placeholder={options.placeholder ?? ''}
-          onChange={(e) => onChange(e.target.value)}
-          aria-invalid={Boolean(error)}
-        />
-        {error && (
-          <p className="flex items-start gap-1 text-sm font-medium text-danger">
-            <span aria-hidden="true">⚠</span>
-            <span>{error}</span>
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
-      <Input placeholder={options.placeholder ?? ''} />
-      {error && <FieldError>{error}</FieldError>}
-    </TextField>
-  );
-}
-
-function renderNumberInput(
-  options: NumberFieldOptions,
-  value: FieldValue | undefined,
-  onChange: (value: FieldValue) => void,
-  error?: string | null,
-) {
-  const min = typeof options.min === 'number' ? options.min : undefined;
-  const max = typeof options.max === 'number' ? options.max : undefined;
-  const step = typeof options.step === 'number' ? options.step : undefined;
-
-  return (
-    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
-      <Input type="number" min={min} max={max} step={step} />
-      {error && <FieldError>{error}</FieldError>}
-    </TextField>
-  );
-}
-
-function renderBooleanInput(
-  value: FieldValue | undefined,
-  onChange: (value: FieldValue) => void,
-  error: string | null | undefined,
-  t: (key: string) => string,
-) {
-  const isChecked = value === true;
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-default-500">{t('modal.booleanNo')}</span>
-        <LabeledSwitch
-          isSelected={isChecked}
-          onChange={(checked) => onChange(checked)}
-          aria-label={t('modal.booleanLabel')}
-          className={error ? 'text-danger' : undefined}
-        />
-        <span className="text-xs text-default-500">{t('modal.booleanYes')}</span>
-      </div>
-      {error && (
-        <p className="flex items-start gap-1 text-sm font-medium text-danger">
-          <span aria-hidden="true">⚠</span>
-          <span>{error}</span>
-        </p>
-      )}
-    </div>
-  );
-}
-
-function renderSelectInput(
-  options: string[],
-  value: FieldValue | undefined,
-  onChange: (value: FieldValue) => void,
-  error: string | null | undefined,
-  t: (key: string) => string,
-  fieldName: string,
-) {
-  const selectedKey = typeof value === 'string' && options.includes(value) ? value : '';
-
-  return (
-    <Select
-      placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
-      isDisabled={!options.length}
-      aria-label={fieldName}
-      value={selectedKey}
-      onChange={(key) => onChange(key ?? '')}
-      items={options.map((option) => ({ key: option, label: option }))}
-    />
-  );
-}
-
-function extractSelectOptions(raw: unknown): string[] {
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  const unique = new Set<string>();
-  const result: string[] = [];
-  raw.forEach((option) => {
-    if (typeof option !== 'string') {
-      return;
-    }
-    const trimmed = option.trim();
-    if (!trimmed || unique.has(trimmed)) {
-      return;
-    }
-    unique.add(trimmed);
-    result.push(trimmed);
-  });
-  return result;
 }

@@ -1,12 +1,12 @@
 import '@testing-library/jest-dom/vitest';
-import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route, Link } from 'react-router-dom';
+import { render, waitFor, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getApiBaseUrl, type AttraccessFrontendPlugin } from '@attraccess/plugins-frontend-sdk';
+import { type AttraccessFrontendPlugin, getApiBaseUrl } from '@attraccess/plugins-frontend-sdk';
 import { PluginProvider } from './plugin-provider';
 import usePluginState from './plugin.state';
+import React from 'react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route, Link } from 'react-router-dom';
 
 const hoisted = vi.hoisted(() => ({
   setRemoteMock: vi.fn(),
@@ -251,6 +251,7 @@ describe('PluginProvider', () => {
 
   // The SDK's preconfigured client reads the origin off `window`, so it has to
   // be published before a plugin bundle can run a module-level request.
+
   it('publishes the API base URL before loading plugin bundles', async () => {
     const { name } = primeManifest();
     let baseUrlDuringLoad: string | undefined;

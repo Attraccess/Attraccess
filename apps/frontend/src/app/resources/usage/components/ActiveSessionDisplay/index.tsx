@@ -48,10 +48,11 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
   const queryClient = useQueryClient();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
-  const { requestForms, modal: formsModal } = useResourceFormsSubmission(resourceId);
+  const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
 
   const endSession = useResourcesServiceResourceUsageEndSession({
     onSuccess: () => {
+      clearFormsDraft();
       recordUsefulAction();
       setIsNotesModalOpen(false);
 

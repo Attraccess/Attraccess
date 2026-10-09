@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
 import {
   Form,
   TextField,
@@ -11,9 +10,10 @@ import {
   DrawerHeading,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
+import { Button } from '../../../components/button/index';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { StandardDrawer } from '../../../components/standardDrawer';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
@@ -29,9 +29,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { useToastMessage } from '../../../components/toastProvider';
 
-type FormData = CreateResourceGroupDto | UpdateResourceGroupDto;
+export type FormData = CreateResourceGroupDto | UpdateResourceGroupDto;
 
-// Define a more specific type for the expected error structure from the API
+export // Define a more specific type for the expected error structure from the API
 interface ApiValidationError {
   errors?: {
     [key: string]: string[];
@@ -39,14 +39,14 @@ interface ApiValidationError {
   message?: string; // General error message field
 }
 
-interface Props {
+export interface Props {
   children: (onOpen: () => void) => React.ReactNode;
   /** If provided, the modal will be in edit mode */
   resourceGroup?: ResourceGroup;
   onUpserted?: (resourceGroup: ResourceGroup) => void;
 }
 
-export function ResourceGroupUpsertModal(props: Readonly<Props>) {
+export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
   const { isOpen, open, setOpen, close: closeDisclosure } = useOverlayState();
   const { t } = useTranslations({
     en,
@@ -195,6 +195,42 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const getFieldError = (fieldName: keyof FormData) => {
     return apiErrors[fieldName]?.[0];
   };
+  return {
+    isOpen,
+    open,
+    setOpen,
+    closeDisclosure,
+    t,
+    nameInputRef,
+    formData,
+    setFormData,
+    setApiErrors,
+    isEditMode,
+    mutation,
+    handleSubmit,
+    getFieldError,
+    props,
+  };
+}
+
+// Define a more specific type for the expected error structure from the API
+
+export function ResourceGroupUpsertModal(props: Readonly<Props>) {
+  const {
+    isOpen,
+    open,
+    setOpen,
+    closeDisclosure,
+    t,
+    nameInputRef,
+    formData,
+    setFormData,
+    setApiErrors,
+    isEditMode,
+    mutation,
+    handleSubmit,
+    getFieldError,
+  } = useResourceGroupUpsertModalState(props);
 
   return (
     <>
@@ -202,7 +238,9 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <Form onSubmit={handleSubmit} data-cy="resource-group-upsert-modal" className="contents">
           <DrawerHeader>
-            <DrawerHeading className="text-lg font-semibold">{isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}</DrawerHeading>
+            <DrawerHeading className="text-lg font-semibold">
+              {isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}
+            </DrawerHeading>
           </DrawerHeader>
 
           <DrawerBody className="w-full space-y-4">
@@ -290,11 +328,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
           </DrawerBody>
 
           <DrawerFooter>
-            <Button
-              variant="secondary"
-              onPress={closeDisclosure}
-              data-cy="resource-group-upsert-modal-cancel-button"
-            >
+            <Button variant="secondary" onPress={closeDisclosure} data-cy="resource-group-upsert-modal-cancel-button">
               {t('cancelButton')}
             </Button>
             <Button

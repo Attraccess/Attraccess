@@ -5,61 +5,87 @@ import {
   ResourceBillingConfiguration,
   ResourceFlowNodeType,
 } from '@attraccess/plugins-backend-sdk';
+
 import {
   Body,
   Controller,
-  Delete,
   ForbiddenException,
   Get,
   Logger,
   Param,
   ParseIntPipe,
   Post,
-  Query,
   Req,
   Request,
   Sse,
+  Query,
+  Delete,
 } from '@nestjs/common';
-import { LicenseModuleType } from '../license/license.service';
-import { RequiresLicense } from '../license/require-license.decorator';
+
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { BillingService } from './billing.service';
-import { PaginationOptionsDto } from '../types/request';
-import { ModifyBalanceDto } from './dto/modify-balance.dto';
-import { TransactionsDto } from './dto/transactions.dto';
-import { UsageTransactionDto } from './dto/usage-transaction.dto';
-import { BalanceDto } from './dto/balance.dto';
-import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
-import { SetSumUpApiKeyDto } from './dto/sumup/set-sumup-apiKey.dto';
-import { BillingConfigurationDto } from './dto/configuration.dto';
-import { SumUpService } from './sumup.service';
-import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
-import { PairSumUpReaderDto } from './dto/sumup/pair-sumup-reader.dto';
-import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
-import { SumupTopUpDto } from './dto/sumup/top-up.dto';
-import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
+
 import { Observable } from 'rxjs';
+
 import { finalize } from 'rxjs/operators';
-import { LiveNotificationsService } from './liveNotificationsService';
-import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
-import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
-import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
-import { RefundTransactionDto } from './dto/refund-transaction.dto';
+
+import { LicenseModuleType } from '../license/license.service';
+
+import { RequiresLicense } from '../license/require-license.decorator';
+
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
+
+import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
+
+import { BillingService } from './charges/billing.service';
+
+import { BalanceDto } from './dto/balance.dto';
+
+import { BillingConfigurationDto } from './dto/configuration.dto';
+
+import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
+
+import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
+
+import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
+
+import { LiveNotificationsService } from './live-notifications/live-notifications.service';
+
+import { SumUpService } from './sumup/sumup.service';
+import { PaginationOptionsDto } from '../types/request';
+
+import { ModifyBalanceDto } from './dto/modify-balance.dto';
+
+import { RefundTransactionDto } from './dto/refund-transaction.dto';
+
+import { TransactionsDto } from './dto/transactions.dto';
+
+import { UsageTransactionDto } from './dto/usage-transaction.dto';
+
+import { PairSumUpReaderDto } from './dto/sumup/pair-sumup-reader.dto';
+
+import { SetSumUpApiKeyDto } from './dto/sumup/set-sumup-apiKey.dto';
+
+import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
+
+import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
+
+import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
+
+import { SumupTopUpDto } from './dto/sumup/top-up.dto';
 
 @RequiresLicense(LicenseModuleType.BILLING)
 @ApiTags('Billing')
 @Controller()
 export class BillingController {
-  private readonly logger = new Logger(BillingController.name);
-
   constructor(
-    private readonly billingService: BillingService,
-    private readonly sumUpService: SumUpService,
-    private readonly liveNotificationsService: LiveNotificationsService,
-    private readonly flowsService: ResourceFlowsService,
-    private readonly sse: SseInstrumentation,
+    protected readonly billingService: BillingService,
+    protected readonly sumUpService: SumUpService,
+    protected readonly liveNotificationsService: LiveNotificationsService,
+    protected readonly flowsService: ResourceFlowsService,
+    protected readonly sse: SseInstrumentation,
   ) {}
+
+  protected readonly logger = new Logger(BillingController.name);
 
   @Get('/users/:userId/billing/balance')
   @Auth()
@@ -75,6 +101,91 @@ export class BillingController {
 
     const balance = await this.billingService.getBalance(userId);
     return { value: balance };
+  }
+
+  @Get('/resources/:resourceId/billing/configuration')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get the billing configuration for a resource',
+    operationId: 'getResourceBillingConfiguration',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The billing configuration for the resource.',
+    type: ResourceBillingConfigurationDto,
+  })
+  async getResourceBillingConfiguration(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+  ): Promise<ResourceBillingConfigurationDto> {
+    const config = await this.billingService.getResourceBillingConfiguration(resourceId);
+
+    const additionalItemsFlowNodes = await this.flowsService.getNodes(
+      resourceId,
+      ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+    );
+
+    return {
+      configuration: config,
+      additionalItems: additionalItemsFlowNodes.map((node) => ({
+        name: (node.data.name ?? '') as string,
+        unitPrice: (node.data.unitPrice ?? 0) as number,
+        quantity: (node.data.quantity ?? 0) as number,
+      })),
+      isBillingEnabled: await this.billingService.isBillingEnabled(resourceId),
+    };
+  }
+
+  @Post('/resources/:resourceId/billing/configuration')
+  @Auth('billing.manage')
+  @ApiOperation({
+    summary: 'Update the billing configuration for a resource',
+    operationId: 'updateResourceBillingConfiguration',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The billing configuration for the resource has been updated.',
+    type: ResourceBillingConfiguration,
+  })
+  async updateResourceBillingConfiguration(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Body() body: UpdateResourceBillingConfigurationDto,
+  ): Promise<ResourceBillingConfiguration> {
+    return await this.billingService.updateResourceBillingConfiguration(resourceId, body);
+  }
+
+  @Post('/billing/configuration')
+  @Auth('billing.manage')
+  @ApiOperation({
+    summary: 'Set the billing configuration',
+    operationId: 'setBillingConfiguration',
+  })
+  @ApiResponse({ status: 200, description: 'The billing configuration has been set.', type: BillingConfigurationDto })
+  async setBillingConfiguration(@Body() body: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
+    return await this.billingService.setConfiguration(body);
+  }
+
+  @Get('/billing/configuration')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get the billing configuration',
+    operationId: 'getBillingConfiguration',
+  })
+  @ApiResponse({ status: 200, description: 'The current billing configuration.', type: BillingConfigurationDto })
+  async getBillingConfiguration(): Promise<BillingConfigurationDto> {
+    return await this.billingService.getConfiguration();
+  }
+
+  @Sse('/billing/transactions/live')
+  @Auth()
+  async streamEvents(@Request() request: AuthenticatedRequest): Promise<Observable<{ data: BillingTransaction }>> {
+    this.logger.log(`Client connected to SSE for user ${request.user.id}`);
+
+    const { id: userId } = request.user;
+    const subject = this.liveNotificationsService.getTransactionSubject(userId);
+    return this.sse.wrap(
+      'billing',
+      subject.asObservable().pipe(finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId))),
+    );
   }
 
   @Get('/users/:userId/billing/transactions')
@@ -138,54 +249,19 @@ export class BillingController {
     return await this.billingService.createManualTransaction(userId, request.user.id, body.amount);
   }
 
-  @Get('/resources/:resourceId/billing/configuration')
-  @Auth()
-  @ApiOperation({
-    summary: 'Get the billing configuration for a resource',
-    operationId: 'getResourceBillingConfiguration',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'The billing configuration for the resource.',
-    type: ResourceBillingConfigurationDto,
-  })
-  async getResourceBillingConfiguration(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-  ): Promise<ResourceBillingConfigurationDto> {
-    const config = await this.billingService.getResourceBillingConfiguration(resourceId);
-
-    const additionalItemsFlowNodes = await this.flowsService.getNodes(
-      resourceId,
-      ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
-    );
-
-    return {
-      configuration: config,
-      additionalItems: additionalItemsFlowNodes.map((node) => ({
-        name: (node.data.name ?? '') as string,
-        unitPrice: (node.data.unitPrice ?? 0) as number,
-        quantity: (node.data.quantity ?? 0) as number,
-      })),
-      isBillingEnabled: await this.billingService.isBillingEnabled(resourceId),
-    };
-  }
-
-  @Post('/resources/:resourceId/billing/configuration')
+  @Post('/billing/transactions/:transactionId/refund')
   @Auth('billing.manage')
   @ApiOperation({
-    summary: 'Update the billing configuration for a resource',
-    operationId: 'updateResourceBillingConfiguration',
+    summary: 'Refund a billing transaction',
+    operationId: 'refundTransaction',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'The billing configuration for the resource has been updated.',
-    type: ResourceBillingConfiguration,
-  })
-  async updateResourceBillingConfiguration(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() body: UpdateResourceBillingConfigurationDto,
-  ): Promise<ResourceBillingConfiguration> {
-    return await this.billingService.updateResourceBillingConfiguration(resourceId, body);
+  @ApiResponse({ status: 200, description: 'The billing transaction has been refunded.', type: BillingTransaction })
+  async refundTransaction(
+    @Request() request: AuthenticatedRequest,
+    @Param('transactionId', ParseIntPipe) transactionId: number,
+    @Body() data: RefundTransactionDto,
+  ) {
+    return await this.billingService.refundTransaction(request.user.id, transactionId, data);
   }
 
   @Post('/billing/sumup/configuration/api-key')
@@ -198,28 +274,6 @@ export class BillingController {
   async setSumUpApiKey(@Body() body: SetSumUpApiKeyDto): Promise<string> {
     await this.sumUpService.setApiKey(body.apiKey);
     return 'OK';
-  }
-
-  @Post('/billing/configuration')
-  @Auth('billing.manage')
-  @ApiOperation({
-    summary: 'Set the billing configuration',
-    operationId: 'setBillingConfiguration',
-  })
-  @ApiResponse({ status: 200, description: 'The billing configuration has been set.', type: BillingConfigurationDto })
-  async setBillingConfiguration(@Body() body: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
-    return await this.billingService.setConfiguration(body);
-  }
-
-  @Get('/billing/configuration')
-  @Auth()
-  @ApiOperation({
-    summary: 'Get the billing configuration',
-    operationId: 'getBillingConfiguration',
-  })
-  @ApiResponse({ status: 200, description: 'The current billing configuration.', type: BillingConfigurationDto })
-  async getBillingConfiguration(): Promise<BillingConfigurationDto> {
-    return await this.billingService.getConfiguration();
   }
 
   @Get('/billing/sumup/configuration')
@@ -293,33 +347,5 @@ export class BillingController {
     await this.sumUpService.handleTransactionCallback(data);
 
     return { message: 'OK' };
-  }
-
-  @Sse('/billing/transactions/live')
-  @Auth()
-  async streamEvents(@Request() request: AuthenticatedRequest): Promise<Observable<{ data: BillingTransaction }>> {
-    this.logger.log(`Client connected to SSE for user ${request.user.id}`);
-
-    const { id: userId } = request.user;
-    const subject = this.liveNotificationsService.getTransactionSubject(userId);
-    return this.sse.wrap(
-      'billing',
-      subject.asObservable().pipe(finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId))),
-    );
-  }
-
-  @Post('/billing/transactions/:transactionId/refund')
-  @Auth('billing.manage')
-  @ApiOperation({
-    summary: 'Refund a billing transaction',
-    operationId: 'refundTransaction',
-  })
-  @ApiResponse({ status: 200, description: 'The billing transaction has been refunded.', type: BillingTransaction })
-  async refundTransaction(
-    @Request() request: AuthenticatedRequest,
-    @Param('transactionId', ParseIntPipe) transactionId: number,
-    @Body() data: RefundTransactionDto,
-  ) {
-    return await this.billingService.refundTransaction(request.user.id, transactionId, data);
   }
 }

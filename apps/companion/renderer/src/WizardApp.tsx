@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
 import { ThemeToggle } from '@attraccess/ui';
-import type { Step, Permissions, CompanionSettings } from './types';
+import { useEffect, useState } from 'react';
+import { DoneStep } from './steps/DoneStep';
 import { LoadingStep } from './steps/LoadingStep';
 import { PermissionsStep } from './steps/PermissionsStep';
-import { PinSetupStep } from './steps/PinSetupStep';
 import { PinEntryStep } from './steps/PinEntryStep';
-import { UrlStep } from './steps/UrlStep';
+import { PinSetupStep } from './steps/PinSetupStep';
 import { RegisterStep } from './steps/RegisterStep';
-import { DoneStep } from './steps/DoneStep';
 import { SettingsStep } from './steps/SettingsStep';
+import { UrlStep } from './steps/UrlStep';
+import type { CompanionSettings, Permissions, Step } from './types';
 
-export function WizardApp() {
+export function useWizardAppState() {
   const [step, setStep] = useState<Step>('loading');
   const [serverUrl, setServerUrl] = useState('');
   const [connectError, setConnectError] = useState('');
@@ -172,6 +172,67 @@ export function WizardApp() {
       setConnecting(false);
     }
   }
+  return {
+    step,
+    setStep,
+    serverUrl,
+    setServerUrl,
+    connectError,
+    statusText,
+    connecting,
+    deviceId,
+    perms,
+    pendingAction,
+    registered,
+    connected,
+    pinInput,
+    setPinInput,
+    pinConfirm,
+    setPinConfirm,
+    pinSetupError,
+    pinEntry,
+    setPinEntry,
+    pinEntryError,
+    appSettings,
+    setAppSettings,
+    handleGrantAccessibility,
+    handleSetPin,
+    handleVerifyPin,
+    handleDisconnect,
+    handleConnect,
+  } as const;
+}
+
+export function WizardApp() {
+  const {
+    step,
+    setStep,
+    serverUrl,
+    setServerUrl,
+    connectError,
+    statusText,
+    connecting,
+    deviceId,
+    perms,
+    pendingAction,
+    registered,
+    connected,
+    pinInput,
+    setPinInput,
+    pinConfirm,
+    setPinConfirm,
+    pinSetupError,
+    pinEntry,
+    setPinEntry,
+    pinEntryError,
+    appSettings,
+    setAppSettings,
+    handleGrantAccessibility,
+    handleSetPin,
+    handleVerifyPin,
+    handleDisconnect,
+    handleConnect,
+  } = useWizardAppState();
 
   return (
     <div className="flex h-full flex-col bg-background">

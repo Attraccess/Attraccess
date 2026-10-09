@@ -1,6 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, Matches, Max, Min } from 'class-validator';
-import { AUDIT_DOMAIN_QUERY_PATTERN, CORE_AUDIT_DOMAINS, CoreAuditDomain } from '../../audit/audit-domains';
+import { AUDIT_DOMAIN_QUERY_PATTERN, CORE_AUDIT_DOMAINS, CoreAuditDomain } from '../../audit/policies/domains';
 
 export class AuditSettingsDto {
   @ApiProperty({ default: true })

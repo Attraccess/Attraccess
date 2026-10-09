@@ -2,8 +2,8 @@
 
 #include "../IScreen.hpp"
 #include "../../../api/api.hpp"
-#include "display/shared/sessionHeader.hpp"
-#include "display/shared/actionOverlay.hpp"
+#include "../../shared/sessionHeader.hpp"
+#include "../../shared/actionOverlay.hpp"
 #include "resourceListAction.hpp"
 #include <functional>
 

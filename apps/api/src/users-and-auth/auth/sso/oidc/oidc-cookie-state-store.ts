@@ -1,12 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Request, Response } from 'express';
 import * as crypto from 'crypto';
-import { SettingsService } from '../../../../settings/settings.service';
+import { Request, Response } from 'express';
 import { AppConfigType } from '../../../../config/app.config';
-
-export const OIDC_STATE_COOKIE_NAME = 'oidc-state';
-
+import { SettingsService } from '../../../../settings/settings.service';
 /** Request key where redirectTo from OIDC state is attached after callback verification. */
 export const SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY = '_ssoOidcRedirectFromState';
 
@@ -28,7 +25,7 @@ export function getRedirectToFromRequest(
   const candidate = (typeof fromState === 'string' ? fromState : undefined) ?? redirectToQuery;
   return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate : undefined;
 }
-
+export const OIDC_STATE_COOKIE_NAME = 'oidc-state';
 /** How long (ms) the oidc-state cookie is valid — enough to complete the IdP login flow. */
 const OIDC_STATE_COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -70,9 +67,7 @@ export class OidcCookieStateStore {
     const appConfig = this.configService.get<AppConfigType>('app');
     this.secret = appConfig?.AUTH_SESSION_SECRET ?? '';
     if (!this.secret) {
-      this.logger.error(
-        'AUTH_SESSION_SECRET is not configured — OIDC state cookies will use an empty signing key.',
-      );
+      this.logger.error('AUTH_SESSION_SECRET is not configured — OIDC state cookies will use an empty signing key.');
     }
   }
 
@@ -135,11 +130,7 @@ export class OidcCookieStateStore {
    * Implements the `StateStore#verify(req, handle, cb)` interface from
    * passport-openidconnect.
    */
-  verify(
-    req: Request,
-    handle: string,
-    cb: (err: Error | null, ctx: unknown, appState?: unknown) => void,
-  ): void {
+  verify(req: Request, handle: string, cb: (err: Error | null, ctx: unknown, appState?: unknown) => void): void {
     const cookieValue = (req.cookies as Record<string, string | undefined>)[OIDC_STATE_COOKIE_NAME];
 
     // Single-use: clear regardless of success or failure
@@ -175,8 +166,9 @@ export class OidcCookieStateStore {
     };
 
     if (payload.appState && typeof payload.appState === 'object' && 'redirectTo' in (payload.appState as object)) {
-      (req as unknown as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] =
-        (payload.appState as { redirectTo?: string }).redirectTo;
+      (req as unknown as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] = (
+        payload.appState as { redirectTo?: string }
+      ).redirectTo;
     }
 
     cb(null, ctx, payload.appState);
@@ -198,9 +190,7 @@ export class OidcCookieStateStore {
     const sig = value.slice(dotIdx + 1);
 
     try {
-      const expected = Buffer.from(
-        crypto.createHmac('sha256', this.secret).update(data).digest('base64url'),
-      );
+      const expected = Buffer.from(crypto.createHmac('sha256', this.secret).update(data).digest('base64url'));
       const actual = Buffer.from(sig);
 
       if (expected.length !== actual.length) return null;

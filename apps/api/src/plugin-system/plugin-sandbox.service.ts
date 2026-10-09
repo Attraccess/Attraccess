@@ -1,22 +1,15 @@
-import { Injectable, Logger, Type } from '@nestjs/common';
-import { Resource, Setting, User } from '@attraccess/database-entities';
+import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sdk';
 import {
   isPluginPermission,
-  MqttServerConnectionConfig,
-  MqttCredentialProvisioningHostProvider,
   PluginContext,
-  PluginFlowsContext,
-  PluginSecretsContext,
   PluginPermission,
   PluginPermissionError,
-  SystemEvent,
-  SystemEventHandler,
-  SystemEventPayload,
-  SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
-import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sdk';
+import { Injectable, Logger } from '@nestjs/common';
+import { createGuardedContext as createGuardedContextImplementation } from './runtime/guarded-context';
+import { Resource, Setting, User } from '@attraccess/database-entities';
 
-const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
+export const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
   ['emit', PluginPermission.EMIT_EVENTS],
   ['emitAsync', PluginPermission.EMIT_EVENTS],
   ['on', PluginPermission.LISTEN_EVENTS],
@@ -34,13 +27,13 @@ const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
   ['waitFor', PluginPermission.LISTEN_EVENTS],
 ]);
 
-const ENTITY_PERMISSIONS: Array<{ target: EntityTarget<ObjectLiteral>; permission: PluginPermission }> = [
+export const ENTITY_PERMISSIONS: Array<{ target: EntityTarget<ObjectLiteral>; permission: PluginPermission }> = [
   { target: User, permission: PluginPermission.READ_USERS },
   { target: Resource, permission: PluginPermission.ACCESS_RESOURCES },
   { target: Setting, permission: PluginPermission.READ_SETTINGS },
 ];
 
-function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
+export function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
   if (typeof entity === 'string') {
     return entity;
   }
@@ -51,7 +44,10 @@ function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
   return named.options?.name ?? named.name ?? 'UnknownEntity';
 }
 
-function permissionForEntity<T extends ObjectLiteral>(base: PluginContext, entity: EntityTarget<T>): PluginPermission {
+export function permissionForEntity<T extends ObjectLiteral>(
+  base: PluginContext,
+  entity: EntityTarget<T>,
+): PluginPermission {
   const direct = ENTITY_PERMISSIONS.find((candidate) => candidate.target === entity);
   if (direct) {
     return direct.permission;
@@ -122,75 +118,15 @@ export class PluginSandboxService {
    * deny-by-default: only explicitly modelled capabilities are reachable.
    */
   public static createGuardedContext(base: PluginContext, declared: PluginPermission[]): PluginContext {
-    const pluginName = base.manifest.name;
-    const granted = new Set(declared);
-
-    const require = (permission: PluginPermission, capability: string): void => {
-      if (!granted.has(permission)) {
-        throw new PluginPermissionError(pluginName, capability, permission);
-      }
-    };
-
-    const guardedEvents = PluginSandboxService.guardEvents(base, pluginName, require);
-
-    return {
-      manifest: base.manifest,
-      audit: base.audit,
-      liveUpdates: base.liveUpdates,
-      logger: base.logger,
-      mqtt: {
-        subscribe(serverId, topicFilter, handler) {
-          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.subscribe(${serverId}, ${topicFilter})`);
-          return base.mqtt.subscribe(serverId, topicFilter, handler);
-        },
-        publish(serverId, topic, payload, options) {
-          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.publish(${serverId}, ${topic})`);
-          return base.mqtt.publish(serverId, topic, payload, options);
-        },
-        refreshConnection(serverId) {
-          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.refreshConnection(${serverId})`);
-          if (!base.mqtt.refreshConnection) throw new Error('MQTT connection refresh is unavailable in this host');
-          return base.mqtt.refreshConnection(serverId);
-        },
+    const getContextOwner = () => this;
+    return createGuardedContextImplementation(
+      {
+        guardEvents: getContextOwner().guardEvents.bind(getContextOwner()),
+        assertRepositoryPermission: getContextOwner().assertRepositoryPermission.bind(getContextOwner()),
       },
-      events: guardedEvents,
-      get dataSource() {
-        require(PluginPermission.DATABASE_ACCESS, 'dataSource');
-        return base.dataSource;
-      },
-      getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>) {
-        PluginSandboxService.assertRepositoryPermission(base, declared, entity);
-        return base.getRepository(entity);
-      },
-      get<T>(token: Type<T> | string | symbol): T {
-        require(PluginPermission.RESOLVE_HOST_PROVIDERS, `get(${String(token)})`);
-        return base.get<T>(token);
-      },
-      onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription {
-        require(PluginPermission.LISTEN_EVENTS, `onEvent(${event})`);
-        return base.onEvent(event, handler);
-      },
-      emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
-        require(PluginPermission.EMIT_EVENTS, `emitEvent(${event})`);
-        base.emitEvent(event, payload);
-      },
-      getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
-        require(PluginPermission.ACCESS_MQTT_SERVERS, `getMqttServerConfig(${serverId})`);
-        return base.getMqttServerConfig(serverId);
-      },
-      getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider {
-        require(PluginPermission.ACCESS_MQTT_SERVERS, 'getMqttCredentialProvisioning()');
-        return base.getMqttCredentialProvisioning();
-      },
-      get flows(): PluginFlowsContext {
-        require(PluginPermission.TRIGGER_FLOWS, 'flows.trigger()');
-        return base.flows;
-      },
-      get secrets(): PluginSecretsContext {
-        require(PluginPermission.MANAGE_SECRETS, 'secrets');
-        return base.secrets;
-      },
-    };
+      base,
+      declared,
+    );
   }
 
   private static guardEvents(

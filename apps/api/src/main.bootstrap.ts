@@ -1,27 +1,165 @@
+import { Logger, Module, ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe, ClassSerializerInterceptor, Logger, Module } from '@nestjs/common';
-import { WsAdapter } from '@nestjs/platform-ws';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import session from 'express-session';
-import { ConfigModule as NestConfigModule, ConfigService } from '@nestjs/config';
-import appConfiguration, { AppConfigType } from './config/app.config';
 import { DataSource } from 'typeorm';
-import { PluginService } from './plugin-system/plugin.service';
-import { PluginModule } from './plugin-system/plugin.module';
+import appConfiguration, { AppConfigType } from './config/app.config';
+import { StorageConfigType } from './config/storage.config';
+import { initializeProcessLogging, withLoggingLifecycle } from './logging/process-logging';
 import { NpmPluginService } from './plugin-system/npm-plugin.service';
 import { PluginMigrationService } from './plugin-system/plugin-migration.service';
-import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
-import { readFile, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import { createCA, createCert } from 'mkcert';
-import { join } from 'path';
-import { StorageConfigType } from './config/storage.config';
+import { PluginModule } from './plugin-system/plugin.module';
+import { PluginService } from './plugin-system/plugin.service';
+import { SettingsService } from './settings/settings.service';
+import { WsAdapter } from '@nestjs/platform-ws';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
-import { SettingsService } from './settings/settings.service';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
-import { initializeProcessLogging, withLoggingLifecycle } from './logging/process-logging';
+import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
+import { existsSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
+import { createCA, createCert } from 'mkcert';
+import { join } from 'path';
+
+/** SAML state may carry authentication context. HTTPS is required even when
+ * the configured application URL is missing, HTTP, or later changed. Express
+ * uses the configured trust-proxy policy when TLS terminates at a proxy. */
+export function samlSession(secret: string) {
+  return session({
+    secret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: true, httpOnly: true, sameSite: 'lax' },
+  });
+}
+
+export function configureBootstrapApi(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
+  const globalPrefix = appConfig.GLOBAL_PREFIX;
+  app.setGlobalPrefix(globalPrefix);
+
+  app.useWebSocketAdapter(new WsAdapter(app));
+
+  // Only SAML state uses a session; OIDC uses its own signed state cookie.
+  app.use(samlSession(appConfig.AUTH_SESSION_SECRET));
+
+  bootstrapLogger.log(`🚀 Application is running with global prefix: ${globalPrefix}`);
+  bootstrapLogger.log(`📝 Enabled log levels: ${appConfig.LOG_LEVELS.join(', ')}`);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
+
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get('Reflector')));
+
+  const config = new DocumentBuilder()
+    .setTitle('Attraccess API')
+    .setDescription('The Attraccess API used to manage machine and tool access in a Makerspace or FabLab')
+    .setVersion(appConfig.VERSION)
+    .addBearerAuth()
+    .addApiKey({
+      type: 'apiKey',
+      in: 'header',
+      name: 'x-api-key',
+    })
+    .build();
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, documentFactory);
+
+  return { globalPrefix, documentFactory };
+}
+
+export function configureBootstrapHttp(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
+  // Plugin configurations can include large device profiles and a previous
+  // draft for conflict detection, exceeding Express's default 100 KiB limit.
+  app.useBodyParser('json', { limit: '10mb' });
+
+  // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told
+  // how many proxy hops to trust. Without this, auth rate limiting buckets every request under the
+  // proxy IP. Opt-in via TRUST_PROXY (default off) so a misconfiguration can never be self-spoofed.
+  const trustProxyRaw = appConfig.TRUST_PROXY;
+  const trustProxyValid = isValidTrustProxyValue(trustProxyRaw);
+  if (trustProxyRaw && !trustProxyValid) {
+    bootstrapLogger.warn(
+      `Invalid TRUST_PROXY value "${trustProxyRaw}"; trusting no proxy. ` +
+        'Use a hop count (e.g. "1"), "true"/"false", or a comma-separated list of IPs/CIDRs/presets (loopback, linklocal, uniquelocal).',
+    );
+  }
+  const trustProxy = trustProxyValid ? resolveTrustProxySetting(trustProxyRaw) : false;
+  try {
+    app.set('trust proxy', trustProxy);
+    bootstrapLogger.log(`Express "trust proxy" set to: ${JSON.stringify(trustProxy)}`);
+  } catch (error) {
+    bootstrapLogger.error(`Failed to apply TRUST_PROXY "${trustProxyRaw}"; trusting no proxy.`, error as Error);
+    app.set('trust proxy', false);
+  }
+
+  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
+
+  app.use(cookieParser());
+
+  app.enableCors({
+    origin: (requestOrigin, callback) => {
+      // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+
+      return callback(null, requestOrigin);
+    },
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    credentials: true, // Allow cookies to be sent
+  });
+}
+
+export async function loadBootstrapTls(
+  appConfig: AppConfigType,
+  storageConfig: StorageConfigType,
+  backendUrlFromDb: string | undefined,
+  bootstrapLogger: Logger,
+) {
+  let httpsOptions: undefined | HttpsOptions = undefined;
+
+  let sslCertFile: string | undefined;
+  let sslKeyFile: string | undefined;
+
+  if (appConfig.SSL_GENERATE_SELF_SIGNED_CERTIFICATES) {
+    const storageDir = storageConfig.root;
+    const host = backendUrlFromDb ?? appConfig.ATTRACCESS_URL;
+    if (!host) {
+      throw new Error(
+        'Backend URL is required to generate self-signed certificates. Configure it in Settings or set ATTRACCESS_URL.',
+      );
+    }
+    const hostUrl = new URL(host);
+    const domain = hostUrl.hostname;
+
+    if (!existsSync(`${domain}.pem`) || !existsSync(`${domain}.key`)) {
+      bootstrapLogger.log('Generating self-signed certificates...');
+      await generateSelfSignedCertificates(storageDir, domain);
+    }
+
+    sslCertFile = join(storageDir, `${domain}.pem`);
+    sslKeyFile = join(storageDir, `${domain}.key`);
+  }
+
+  if (sslCertFile && sslKeyFile) {
+    httpsOptions = {
+      cert: await readFile(sslCertFile),
+      key: await readFile(sslKeyFile),
+    };
+  }
+
+  return httpsOptions;
+}
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -133,37 +271,7 @@ export async function bootstrap() {
   // must not receive repositories from the closed configuration DataSource.
   PluginModule.resetHostReferences();
 
-  let httpsOptions: undefined | HttpsOptions = undefined;
-
-  let sslCertFile: string | undefined;
-  let sslKeyFile: string | undefined;
-
-  if (appConfig.SSL_GENERATE_SELF_SIGNED_CERTIFICATES) {
-    const storageDir = storageConfig.root;
-    const host = backendUrlFromDb ?? appConfig.ATTRACCESS_URL;
-    if (!host) {
-      throw new Error(
-        'Backend URL is required to generate self-signed certificates. Configure it in Settings or set ATTRACCESS_URL.',
-      );
-    }
-    const hostUrl = new URL(host);
-    const domain = hostUrl.hostname;
-
-    if (!existsSync(`${domain}.pem`) || !existsSync(`${domain}.key`)) {
-      bootstrapLogger.log('Generating self-signed certificates...');
-      await generateSelfSignedCertificates(storageDir, domain);
-    }
-
-    sslCertFile = join(storageDir, `${domain}.pem`);
-    sslKeyFile = join(storageDir, `${domain}.key`);
-  }
-
-  if (sslCertFile && sslKeyFile) {
-    httpsOptions = {
-      cert: await readFile(sslCertFile),
-      key: await readFile(sslKeyFile),
-    };
-  }
+  const httpsOptions = await loadBootstrapTls(appConfig, storageConfig, backendUrlFromDb, bootstrapLogger);
 
   const app = await NestFactory.create<NestExpressApplication>(withLoggingLifecycle(AppModule), {
     logger: routingLogger,
@@ -172,47 +280,7 @@ export async function bootstrap() {
   });
   bootstrapLogger.log('Main application instance created.');
 
-  // Plugin configurations can include large device profiles and a previous
-  // draft for conflict detection, exceeding Express's default 100 KiB limit.
-  app.useBodyParser('json', { limit: '10mb' });
-
-  // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told
-  // how many proxy hops to trust. Without this, auth rate limiting buckets every request under the
-  // proxy IP. Opt-in via TRUST_PROXY (default off) so a misconfiguration can never be self-spoofed.
-  const trustProxyRaw = appConfig.TRUST_PROXY;
-  const trustProxyValid = isValidTrustProxyValue(trustProxyRaw);
-  if (trustProxyRaw && !trustProxyValid) {
-    bootstrapLogger.warn(
-      `Invalid TRUST_PROXY value "${trustProxyRaw}"; trusting no proxy. ` +
-        'Use a hop count (e.g. "1"), "true"/"false", or a comma-separated list of IPs/CIDRs/presets (loopback, linklocal, uniquelocal).',
-    );
-  }
-  const trustProxy = trustProxyValid ? resolveTrustProxySetting(trustProxyRaw) : false;
-  try {
-    app.set('trust proxy', trustProxy);
-    bootstrapLogger.log(`Express "trust proxy" set to: ${JSON.stringify(trustProxy)}`);
-  } catch (error) {
-    bootstrapLogger.error(`Failed to apply TRUST_PROXY "${trustProxyRaw}"; trusting no proxy.`, error as Error);
-    app.set('trust proxy', false);
-  }
-
-  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
-
-  app.use(cookieParser());
-
-  app.enableCors({
-    origin: (requestOrigin, callback) => {
-      // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
-      if (!requestOrigin) {
-        return callback(null, true);
-      }
-
-      return callback(null, requestOrigin);
-    },
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
-    credentials: true, // Allow cookies to be sent
-  });
+  configureBootstrapHttp(app, appConfig, bootstrapLogger);
 
   if (skipDatabaseMigrations) {
     bootstrapLogger.log('Skipping database migrations.');
@@ -247,57 +315,7 @@ export async function bootstrap() {
     }
   }
 
-  const globalPrefix = appConfig.GLOBAL_PREFIX;
-  app.setGlobalPrefix(globalPrefix);
-
-  app.useWebSocketAdapter(new WsAdapter(app));
-
-  const appUrl = skipDatabaseMigrations ? appConfig.ATTRACCESS_URL : await app.get(SettingsService).getUrl();
-
-  // Session middleware is used for SAML SSO state persistence only (not for regular auth).
-  // OIDC state is handled by OidcCookieStateStore (a signed oidc-state cookie) instead.
-  // Cookie is explicitly SameSite=Lax so it survives IdP redirects (cross-site top-level navigations).
-  app.use(
-    session({
-      secret: appConfig.AUTH_SESSION_SECRET,
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        sameSite: 'lax', // must be lax — strict would block SAML IdP redirect callbacks
-        secure: appUrl?.startsWith('https://') ?? false,
-        httpOnly: true,
-      },
-    }),
-  );
-
-  bootstrapLogger.log(`🚀 Application is running with global prefix: ${globalPrefix}`);
-  bootstrapLogger.log(`📝 Enabled log levels: ${appConfig.LOG_LEVELS.join(', ')}`);
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
-
-  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get('Reflector')));
-
-  const config = new DocumentBuilder()
-    .setTitle('Attraccess API')
-    .setDescription('The Attraccess API used to manage machine and tool access in a Makerspace or FabLab')
-    .setVersion(appConfig.VERSION)
-    .addBearerAuth()
-    .addApiKey({
-      type: 'apiKey',
-      in: 'header',
-      name: 'x-api-key',
-    })
-    .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory);
+  const { globalPrefix, documentFactory } = await configureBootstrapApi(app, appConfig, bootstrapLogger);
 
   const port = appConfig.PORT;
   // Listening and related logging will be handled by startListening function

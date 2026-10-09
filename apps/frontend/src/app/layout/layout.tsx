@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Sidebar } from './sidebar';
+import { Sidebar } from './sidebar/index';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
 import { UpdateNotificationBanner } from '../../components/UpdateNotificationBanner';

@@ -1,36 +1,37 @@
 // Reusable schedule form body for the maintenance hub drawer
 // FEATURE: Maintenance Hub - schedule create/edit form without overlay state
+
 import { Alert, AlertContent, AlertTitle, Form, Input, Label, TextField } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { Select } from '../../../../components/select';
+import { Button } from '../../../../components/button/index';
+import { Select } from '../../../../components/select/index';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ResourceMaintenanceScheduleTriggerType,
+  UsageDurationUnit,
   useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule,
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
   useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule,
   useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule,
-  UsageDurationUnit,
 } from '@attraccess/react-query-client';
+import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness/index';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness';
 import de from './de.json';
 import en from './en.json';
 
-const TRIGGER_OPTIONS = [
+export const DURATION_BASIS_OPTIONS = [
+  { value: 'SESSION_DURATION', labelKey: 'SESSION_DURATION' },
+  { value: 'ATTRIBUTABLE_OPERATING_DURATION', labelKey: 'ATTRIBUTABLE_OPERATING_DURATION' },
+] as const;
+
+export const TRIGGER_OPTIONS = [
   { value: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS, labelKey: 'USAGE_HOURS' },
   { value: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT, labelKey: 'USAGE_COUNT' },
   { value: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL, labelKey: 'TIME_INTERVAL' },
 ] as const;
 
-const DURATION_BASIS_OPTIONS = [
-  { value: 'SESSION_DURATION', labelKey: 'SESSION_DURATION' },
-  { value: 'ATTRIBUTABLE_OPERATING_DURATION', labelKey: 'ATTRIBUTABLE_OPERATING_DURATION' },
-] as const;
-
-interface Props {
+export interface Props {
   resourceId: number;
   supportsOperatingDuration: boolean;
   scheduleId?: number;
@@ -38,7 +39,7 @@ interface Props {
   onCancel: () => void;
 }
 
-export function ScheduleForm(props: Props) {
+export function useScheduleFormState(props: Props) {
   const { resourceId, supportsOperatingDuration, scheduleId, onSaved, onCancel } = props;
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
@@ -153,6 +154,71 @@ export function ScheduleForm(props: Props) {
     create,
     update,
   ]);
+  return {
+    resourceId,
+    supportsOperatingDuration,
+    onCancel,
+    t,
+    formRef,
+    name,
+    setName,
+    triggerType,
+    setTriggerType,
+    usageHoursDuration,
+    setUsageHoursDuration,
+    usageHoursUnit,
+    setUsageHoursUnit,
+    durationBasis,
+    setDurationBasis,
+    usesOperatingDuration,
+    trackingReadiness,
+    thresholdSessions,
+    setThresholdSessions,
+    timeIntervalDuration,
+    setTimeIntervalDuration,
+    timeIntervalUnit,
+    setTimeIntervalUnit,
+    enabled,
+    setEnabled,
+    isCreating,
+    isUpdating,
+    error,
+    onSubmit,
+  } as const;
+}
+
+export function ScheduleForm(props: Props) {
+  const {
+    resourceId,
+    supportsOperatingDuration,
+    onCancel,
+    t,
+    formRef,
+    name,
+    setName,
+    triggerType,
+    setTriggerType,
+    usageHoursDuration,
+    setUsageHoursDuration,
+    usageHoursUnit,
+    setUsageHoursUnit,
+    durationBasis,
+    setDurationBasis,
+    usesOperatingDuration,
+    trackingReadiness,
+    thresholdSessions,
+    setThresholdSessions,
+    timeIntervalDuration,
+    setTimeIntervalDuration,
+    timeIntervalUnit,
+    setTimeIntervalUnit,
+    enabled,
+    setEnabled,
+    isCreating,
+    isUpdating,
+    error,
+    onSubmit,
+  } = useScheduleFormState(props);
 
   return (
     <Form
