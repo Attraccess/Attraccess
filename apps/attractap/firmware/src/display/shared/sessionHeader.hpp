@@ -85,8 +85,12 @@ public:
         const int32_t remaining = static_cast<int32_t>(deadline - (paused ? frozenAt : millis()));
         const int seconds = std::clamp<int32_t>((std::max<int32_t>(remaining, 0) + 999) / 1000, 0, 30);
         setDynamicLabelTextIfChanged(userLabel, username.c_str());
-        const std::string time = paused ? "Pausiert" : std::to_string(seconds) + " s";
-        setDynamicLabelTextIfChanged(timeLabel, time.c_str());
+        if (paused) {
+            FirmwareI18n::setLabel(timeLabel, FirmwareI18n::Message::Paused);
+        } else {
+            const std::string time = std::to_string(seconds) + " s";
+            setDynamicLabelTextIfChanged(timeLabel, time.c_str());
+        }
         if (lastSeconds != seconds || lastPaused != paused) {
             lv_bar_set_value(bar, seconds, LV_ANIM_OFF);
             lv_obj_set_style_bg_color(bar, !paused && seconds <= 5 ? DisplayTheme::warning() : DisplayTheme::primary(), LV_PART_INDICATOR);

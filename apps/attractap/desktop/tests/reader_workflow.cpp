@@ -506,16 +506,25 @@ int main(int argc, char **argv) {
         server.push("READER_LANGUAGE", std::string("{\"language\":\"") + language + "\"}");
         pump(0); // Exercise API-to-display settling without relying on elapsed time.
     };
-    // Refresh existing top-layer controls through the production display loop.
-    Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("CARD_NOT_ACTIVE"));
+    // Exercise the API parser and application error callback, then refresh the popup.
+    server.push("BILLING_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})");
     pump();
     assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Card is inactive")));
     defaultLanguage("de");
     assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Karte ist nicht aktiv")));
     display.capture(output, "i18n-popup-german");
+    Display::hidePopup();
+    server.push("BILLING_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Karte ist nicht aktiv")));
     defaultLanguage("en");
     assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Card is inactive")));
     display.capture(output, "i18n-popup-english");
+    Display::hidePopup();
+    server.push("BILLING_TOPUP", R"({"error":"UNKNOWN_READER_ERROR"})"); pump();
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Something went wrong. Please try again.")));
+    defaultLanguage("de");
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Something went wrong. Please try again.")));
+    defaultLanguage("en");
     Display::hidePopup();
     // A real driver touch sequence opens the maintenance drawer.
     display.touch = {240, 10, true}; pump();
@@ -609,6 +618,23 @@ int main(int argc, char **argv) {
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
     assert(State::getActiveLanguage() == "en");
     display.capture(output, "i18n-user-english-default-german");
+    Display::resourceListScreen.setSessionTimeoutPaused(true);
+    pump();
+    auto *pausedLabel = requireLabel(lv_screen_active(), "Paused");
+    assert(FirmwareI18n::isLocalizedLabel(pausedLabel));
+    display.capture(output, "i18n-paused-english");
+    // Change the active user locale without rebuilding the header.
+    State::setUserLanguage(true, "de"); pump();
+    assert(label(lv_screen_active(), "Pausiert") == pausedLabel);
+    display.capture(output, "i18n-paused-german");
+    State::setUserLanguage(true, "en"); pump();
+    assert(label(lv_screen_active(), "Paused") == pausedLabel);
+    Display::resourceListScreen.setSessionTimeoutPaused(false);
+    pump();
+    assert(!FirmwareI18n::isLocalizedLabel(pausedLabel));
+    const std::string countdown = lv_label_get_text(pausedLabel);
+    assert(countdown.ends_with(" s") && std::stoi(countdown) <= 30);
+    assert(!label(lv_screen_active(), "Paused") && !label(lv_screen_active(), "Pausiert"));
     click("Sign out");
     assert(State::getActiveLanguage() == "de");
     username = "Alex"; userLocale = ""; login();

@@ -153,7 +153,8 @@ void API::processIncomingMessage(const char *buf, size_t len)
                     this->logger.error((std::string("Reader reported error: ") + err).c_str());
                     if (this->errorCallback)
                     {
-                        this->errorCallback("Fehler", translateReaderError(err).c_str());
+                        // The application owns localization; keep the code intact.
+                        this->errorCallback("Fehler", err.c_str());
                     }
                 }
                 // Do not process further

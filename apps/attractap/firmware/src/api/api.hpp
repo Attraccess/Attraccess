@@ -358,7 +358,8 @@ public:
     // Clear the locked TLS certificate decision (device settings button).
     void resetCertificateTrust();
 
-    // Error callback for server responses carrying an error field
+    // Error callback for server responses carrying an error field.
+    // For server errors, message is the raw code; the application localizes it.
     void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
     // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)
     void setActionResultCallback(std::function<void(const ActionResult &)> callback);
