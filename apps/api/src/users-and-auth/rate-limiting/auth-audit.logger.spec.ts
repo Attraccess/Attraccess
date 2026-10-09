@@ -46,6 +46,15 @@ describe('AuthAuditLogger', () => {
     );
   });
 
+  it.each(['invalid_credentials', 'rate_limited', 'account_locked'] as const)(
+    'redacts email identifiers from %s application logs',
+    async (outcome) => {
+      await logger.log({ type: 'login', outcome, ip: '1.2.3.4', username: 'Alice@Example.com' });
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('username=[redacted]'));
+      expect(warnSpy.mock.calls[0][0]).not.toContain('Alice@Example.com');
+    },
+  );
+
   it('does not persist unsupported legacy event types', () => {
     logger.log({ type: 'api_token', outcome: 'success', ip: '2.2.2.2', userId: 42 });
     expect(record).not.toHaveBeenCalled();

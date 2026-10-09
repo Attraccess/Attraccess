@@ -1,3 +1,4 @@
+import { SsoSessionRequest } from './sso-session-request';
 import {
   Body,
   Controller,
@@ -750,6 +751,7 @@ export class SSOController {
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],
       ipAddress: request.ip || request.connection.remoteAddress,
+      ssoContext: (request as unknown as SsoSessionRequest).ssoSessionContext,
     });
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);

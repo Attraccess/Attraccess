@@ -37,6 +37,7 @@ export const AppEnvSchema = z
     LOG_FILE_PATH: z.string().optional(),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
     ATTRACCESS_URL: z.string().url().optional(),
+    ATTRACCESS_FRONTEND_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
     VERSION: z.string().default(resolveAppVersion()),
     COMMIT_SHA: z.string().optional(),

@@ -74,3 +74,13 @@ Configure your SAML identity provider with these values:
 - [SSO Overview](user-management/sso-overview.md)
 - [OIDC Setup](user-management/sso-oidc.md)
 - [Permissions](user-management/permissions.md)
+
+## SAML Single Logout
+
+Set the **Identity Provider entity ID** separately from the existing **Service Provider issuer**. Configure the IdP **logout URL**, IdP signing certificate, and Attraccess signing certificate/private key. The private key is stored encrypted. Every logout exchange requires a signature, even when login assertion/request signing options are disabled.
+
+Register `API_ORIGIN/api/auth/sso/SAML/PROVIDER_ID/slo` as the SP SingleLogoutService URL for **HTTP-Redirect** and **HTTP-POST**. Use the exact API URL shown by the provider form. Trust the Attraccess signing certificate at the IdP. Attraccess sends signed Redirect requests/responses and accepts signed Redirect and POST messages. SOAP and Artifact bindings are not supported.
+
+**Logout everywhere** sends the original NameID, its format and qualifiers, and all captured SessionIndex values. A new SSO login is required for older sessions. Without signing material or usable session correlation, central logout remains disabled and local logout still works.
+
+Incoming requests must match the IdP issuer, destination and fresh timestamps. They revoke matching NameID identities, including qualifiers, limited by any supplied SessionIndex values. With no SessionIndex, all sessions for that provider identity are ended. Responses must match an outstanding, unexpired request and are consumed once. Replayed requests, unsigned messages, invalid signatures and mismatched destinations are rejected. Partial or failed provider logout is reported without restoring the local session or claiming that other applications were logged out.

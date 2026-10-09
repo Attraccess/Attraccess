@@ -1,7 +1,7 @@
 import { PropsWithChildren } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LogOutIcon } from 'lucide-react';
-import { Button, ProgressBar } from '@heroui/react';
+import { Button, ProgressBar, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttraccessLogo } from '@attraccess/ui';
 import { useAutoLogoff } from '../hooks/useAutoLogoff';
@@ -41,7 +41,17 @@ export function KioskLayout({ children }: PropsWithChildren) {
 
   // Only count down once a user is signed in — there's no session to end on the
   // login screen, so the bar must not run there.
-  const { isAuthenticated, logout } = useAuth();
+  const {
+    isAuthenticated,
+    logout,
+    logoutEverywhere,
+    logoutPending,
+    canLogoutEverywhere,
+    logoutUnavailableReason,
+    logoutEverywhereLabel,
+    logoutPendingLabel,
+    logoutProviderNotice,
+  } = useAuth();
   const { t } = useTranslations({ en, de });
   const { remaining } = useAutoLogoff(isAuthenticated ? autoLogoffSeconds : null);
 
@@ -49,28 +59,45 @@ export function KioskLayout({ children }: PropsWithChildren) {
     // #root is overflow:hidden (app-shell scroll strategy), so the kiosk needs
     // its own scroll container — otherwise content taller than the viewport
     // (e.g. the windowed resource panel) is clipped with nowhere to scroll.
-    // Inner min-h-screen keeps content centered when it fits, grows when it
-    // doesn't, and the outer h-screen container scrolls.
+    // The sticky header reserves its own height so wrapped logout controls
+    // cannot overlap longer resource pages. The content centers in the remaining space.
     <div className="h-screen overflow-y-auto bg-background">
       {/* Blanks the login screen after inactivity; auto-logoff covers the authenticated case. */}
-      <KioskScreensaver enabled={!isAuthenticated} />
-      <div className="min-h-screen flex flex-col items-center justify-center gap-10 p-4">
+      <KioskScreensaver enabled={!isAuthenticated && !logoutPending} />
+      <div className="min-h-screen flex flex-col">
         {autoLogoffSeconds && remaining !== null && <AutoLogoffBar fraction={remaining / autoLogoffSeconds} />}
-        {isAuthenticated && (
-          <>
-            <Button variant="ghost" size="sm" onPress={logout} className="fixed top-3 left-3 z-50">
-              <LogOutIcon className="w-4 h-4" />
-              {t('signOut')}
-            </Button>
-            <div className="fixed top-3 right-3 z-50">
-              <ThemeToggle />
+        {(isAuthenticated || logoutPending) && (
+          <div className="sticky top-0 z-40 flex items-start justify-between gap-4 bg-background p-3">
+            <div className="flex min-w-0 flex-col gap-1 max-w-[65vw]">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="ghost" size="sm" isDisabled={logoutPending} onPress={logout}>
+                  <LogOutIcon className="w-4 h-4" />
+                  {logoutPending ? logoutPendingLabel : t('signOut')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isDisabled={logoutPending || !canLogoutEverywhere}
+                  onPress={logoutEverywhere}
+                  aria-describedby="kiosk-central-logout-hint"
+                >
+                  <LogOutIcon className="w-4 h-4" />
+                  {logoutEverywhereLabel}
+                </Button>
+              </div>
+              <p id="kiosk-central-logout-hint" className="text-xs text-muted">
+                {canLogoutEverywhere ? logoutProviderNotice : logoutUnavailableReason}
+              </p>
             </div>
-          </>
+            <ThemeToggle />
+          </div>
         )}
-        <div className="flex items-center">
-          <AttraccessLogo className="h-16 w-auto" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-10 p-4">
+          <div className="flex items-center">
+            <AttraccessLogo className="h-16 w-auto" />
+          </div>
+          {logoutPending ? <Spinner aria-label={logoutPendingLabel} /> : children}
         </div>
-        {children}
       </div>
     </div>
   );
