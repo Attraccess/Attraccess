@@ -23,6 +23,9 @@ import {
 } from '@attraccess/database-entities';
 import type { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
 import { SSOOIDCStrategy } from '../users-and-auth/auth/sso/oidc/oidc.strategy';
+import { OidcTokenVerifier } from '../users-and-auth/auth/sso/oidc/oidc-token-verifier.service';
+import type { SsoSessionRequest } from '../users-and-auth/auth/sso/sso-session-request';
+import { EncryptionService } from '../encryption/encryption.service';
 import { UsersService } from '../users-and-auth/users/users.service';
 import { AuthService } from '../users-and-auth/auth/auth.service';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
@@ -184,12 +187,16 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
       mockMetricsService,
     );
 
+    const verifier = new OidcTokenVerifier();
+    const encryption = new EncryptionService(mockConfigService);
     mockModuleRef = {
       get: (token: unknown): unknown => {
         if (token === UsersService) return usersService;
         if (token === AuthService) return authService;
         if (token === RbacService) return rbacService;
         if (token === MetricsService) return mockMetricsService;
+        if (token === OidcTokenVerifier) return verifier;
+        if (token === EncryptionService) return encryption;
         return null;
       },
     } as unknown as ModuleRef;
@@ -320,13 +327,19 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
       res: { redirect: jest.fn(), cookie: jest.fn(), clearCookie: jest.fn() },
     };
 
-    return new Promise<User>((resolve, reject) => {
+    const user = await new Promise<User>((resolve, reject) => {
       (strategy as unknown as Record<string, unknown>).success = (user: User) => resolve(user);
       (strategy as unknown as Record<string, unknown>).fail = (info: unknown) =>
         reject(new Error(`Auth failed: ${JSON.stringify(info)}`));
       (strategy as unknown as Record<string, unknown>).error = reject;
       strategy.authenticate(mockCallbackReq as never, {} as never);
     });
+    const logoutContext = (mockCallbackReq as unknown as SsoSessionRequest).ssoSessionContext;
+    expect(logoutContext).toMatchObject({ protocol: 'OIDC', issuer: oidcBaseUrl });
+    if (logoutContext?.protocol !== 'OIDC') throw new Error('Verified OIDC logout context was not captured');
+    expect(logoutContext.subject).toBeTruthy();
+    expect(logoutContext.idTokenEncrypted).toMatch(/^v1\./);
+    return user;
   }
 
   it('creates a new user on first OIDC login', async () => {

@@ -29,6 +29,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
   name,
   required,
   placeholder,
+  autoComplete,
   'data-cy': dataCy,
   ...fieldProps
 }) => {
@@ -50,6 +51,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
           name={name}
           required={required}
           placeholder={placeholder}
+          autoComplete={autoComplete}
           data-cy={dataCy}
         />
         <InputGroup.Suffix>

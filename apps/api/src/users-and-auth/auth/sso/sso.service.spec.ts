@@ -190,6 +190,9 @@ describe('SsoService', () => {
           userInfoURL: 'https://new-issuer.com/userinfo',
           clientId: 'new-client-id',
           clientSecret: 'new-client-secret',
+          endSessionURL: 'https://new-issuer.com/logout',
+          jwksURL: 'https://new-issuer.com/jwks',
+          signingAlgorithms: ['RS256'],
         },
       };
 
@@ -200,6 +203,14 @@ describe('SsoService', () => {
         type: createProviderDto.type,
       });
       expect(ssoProviderRepository.save).toHaveBeenCalled();
+      expect(oidcConfigRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endSessionURL: 'https://new-issuer.com/logout',
+          jwksURL: 'https://new-issuer.com/jwks',
+          signingAlgorithms: ['RS256'],
+          clientSecret: 'enc:new-client-secret',
+        }),
+      );
       expect(result).toEqual(mockSSOProviderWithOIDCConfig);
     });
 
@@ -309,6 +320,28 @@ describe('SsoService', () => {
     });
   });
 
+  it('updates, preserves omitted and clears nullable OIDC logout settings independently', async () => {
+    const settings = {
+      endSessionURL: 'https://idp.example/logout',
+      jwksURL: 'https://idp.example/jwks',
+      signingAlgorithms: ['RS256'],
+    };
+    await service.updateProvider(1, { oidcConfiguration: settings });
+    expect(oidcConfigRepository.update).toHaveBeenLastCalledWith({ ssoProviderId: 1 }, settings);
+    await service.updateProvider(1, { oidcConfiguration: { clientId: 'changed-client' } });
+    expect(oidcConfigRepository.update).toHaveBeenLastCalledWith({ ssoProviderId: 1 }, { clientId: 'changed-client' });
+    await service.updateProvider(1, {
+      oidcConfiguration: { endSessionURL: null, jwksURL: null, signingAlgorithms: null },
+    });
+    expect(oidcConfigRepository.update).toHaveBeenLastCalledWith(
+      { ssoProviderId: 1 },
+      { endSessionURL: null, jwksURL: null, signingAlgorithms: null },
+    );
+    await expect(service.updateProvider(1, { oidcConfiguration: { signingAlgorithms: ['HS256'] } })).rejects.toThrow(
+      'Unsupported',
+    );
+  });
+
   describe('updateOIDCConfiguration roleMappings handling', () => {
     const baseOidcUpdate = {
       issuer: 'https://test-issuer.com',
@@ -393,6 +426,19 @@ describe('SsoService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('requires the IdP issuer and signing material when enabling SAML logout', async () => {
+      await expect(
+        callCreateSAMLConfiguration({ ...baseSamlConfig, logoutURL: 'https://idp.example/logout' }),
+      ).rejects.toThrow('IdP issuer');
+      await expect(
+        callCreateSAMLConfiguration({
+          ...baseSamlConfig,
+          idpIssuer: 'https://idp.example',
+          logoutURL: 'https://idp.example/logout',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('encrypts private key material when provided', async () => {
       jest.spyOn(samlConfigRepository, 'create');
 
@@ -423,6 +469,8 @@ describe('SsoService', () => {
       await update(1, {
         entryPoint: 'https://new-idp.example/sso',
         issuer: 'new-issuer',
+        idpIssuer: 'https://new-idp.example',
+        logoutURL: 'https://new-idp.example/logout',
         certificate: '-----BEGIN CERTIFICATE-----IDPCERT-----END CERTIFICATE-----',
         audience: 'audience',
         signRequest: true,
@@ -440,6 +488,8 @@ describe('SsoService', () => {
         expect.objectContaining({
           entryPoint: 'https://new-idp.example/sso',
           issuer: 'new-issuer',
+          idpIssuer: 'https://new-idp.example',
+          logoutURL: 'https://new-idp.example/logout',
           certificate: 'IDPCERT',
           audience: 'audience',
           signRequest: true,

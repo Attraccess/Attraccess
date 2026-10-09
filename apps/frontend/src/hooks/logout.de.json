@@ -1,0 +1,18 @@
+{
+  "logoutEverywhere": "Überall abmelden",
+  "pending": "Abmeldung läuft…",
+  "providerNotice": "Fordert beim SSO-Anbieter auch die Abmeldung von anderen Anwendungen an.",
+  "checking": "Verfügbarkeit der zentralen Abmeldung wird geprüft…",
+  "reasons": {
+    "local_session": "Die zentrale Abmeldung erfordert eine neue SSO-Sitzung. Die lokale Abmeldung ist verfügbar.",
+    "provider_unavailable": "Die zentrale Abmeldung ist nicht eingerichtet oder der Anbieter ist nicht erreichbar.",
+    "missing_correlation": "Melden Sie sich erneut über SSO an, um die zentrale Abmeldung zu aktivieren.",
+    "provider_failed": "Sie sind hier abgemeldet. Die Abmeldung beim Anbieter konnte nicht gestartet werden."
+  },
+  "networkError": "Abmeldung konnte nicht bestätigt werden",
+  "networkErrorDescription": "Die Verbindung ist fehlgeschlagen. Ihre Serversitzung könnte noch aktiv sein. Laden Sie die Seite bei bestehender Verbindung neu und versuchen Sie es erneut.",
+  "localOnly": "Von Attraccess abgemeldet",
+  "callbackFailed": "Die Abmeldung beim Anbieter wurde nicht abgeschlossen. Sie bleiben von Attraccess abgemeldet.",
+  "callbackPartial": "Der Anbieter meldet eine teilweise Abmeldung. In anderen Anwendungen könnten Sie noch angemeldet sein.",
+  "callbackReturned": "Sie sind von Attraccess abgemeldet. Die Abmeldung von anderen Anwendungen hängt vom Anbieter ab."
+}

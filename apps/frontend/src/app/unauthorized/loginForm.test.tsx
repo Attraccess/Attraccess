@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginForm } from './loginForm';
@@ -41,32 +41,40 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   },
 }));
 
-vi.mock('../../hooks/useAuth', () => ({
-  useLogin: () => ({
-    mutate: loginMock,
-    isPending: pending.login,
-    error: loginError,
-  }),
-}));
+vi.mock('../../utils/live-updates', () => ({ resumeLiveUpdates: vi.fn(), stopLiveUpdates: vi.fn() }));
 
-vi.mock('@attraccess/react-query-client', () => ({
-  ApiError: class ApiError extends Error {
-    body: Record<string, unknown>;
-    constructor(message: string, body: Record<string, unknown>) {
-      super(message);
-      this.body = body;
-    }
-  },
-  useUsersServiceIsLocalSignupEnabled: () => ({
-    data: { value: signup.enabled },
-    isLoading: false,
-  }),
-  useUsersServiceResendVerificationEmail: (options: { onSuccess?: () => void; onError?: (error: unknown) => void }) => {
-    resendOnSuccess = options?.onSuccess;
-    resendOnError = options?.onError;
-    return { mutate: resendMutateMock, isPending: pending.resend };
-  },
-}));
+vi.mock('@attraccess/react-query-client', async () => {
+  const { useMutation } = await import('@tanstack/react-query');
+  return {
+    UseUsersServiceGetCurrentKeyFn: () => ['current-user'],
+    useAuthenticationServiceCreateSession: (options: { onSuccess?: () => void }) => {
+      const mutation = useMutation({
+        mutationFn: (data: { requestBody: unknown }) => loginMock(data.requestBody),
+        onSuccess: options.onSuccess,
+      });
+      return { ...mutation, isPending: mutation.isPending || pending.login, error: mutation.error ?? loginError };
+    },
+    ApiError: class ApiError extends Error {
+      body: Record<string, unknown>;
+      constructor(message: string, body: Record<string, unknown>) {
+        super(message);
+        this.body = body;
+      }
+    },
+    useUsersServiceIsLocalSignupEnabled: () => ({
+      data: { value: signup.enabled },
+      isLoading: false,
+    }),
+    useUsersServiceResendVerificationEmail: (options: {
+      onSuccess?: () => void;
+      onError?: (error: unknown) => void;
+    }) => {
+      resendOnSuccess = options?.onSuccess;
+      resendOnError = options?.onError;
+      return { mutate: resendMutateMock, isPending: pending.resend };
+    },
+  };
+});
 
 vi.mock('../../utils/apiError', () => ({
   getTranslationKeyForApiError: ({ error }: { error: { body?: { message?: string } } }) => {
@@ -138,8 +146,8 @@ describe('LoginForm – resend verification email', () => {
   });
 
   it.each([
-    ['en', 'Sign in with email and password', 'Create an account'],
-    ['de', 'Anmelden mit E-Mail und Passwort', 'Konto erstellen'],
+    ['en', 'Sign in with email or username and password', 'Create an account'],
+    ['de', 'Anmelden mit E-Mail oder Benutzername und Passwort', 'Konto erstellen'],
   ] as const)(
     'keeps the disabled-signup accordion action descriptive in %s',
     (language, accordionLabel, signupLabel) => {
@@ -338,5 +346,193 @@ describe('LoginForm – resend verification email', () => {
     expect(screen.getByLabelText(labels.en.username)).toBeInTheDocument();
     expect(screen.getByLabelText(labels.en.password)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+});
+
+function apiFailure(message: string) {
+  return Object.assign(new Error(message), { body: { message } });
+}
+
+async function submitCredentials(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText('Email or username'), 'alice@example.com');
+  await user.type(screen.getByLabelText('Password'), ' password ');
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+}
+
+describe('LoginForm credential and authenticator steps', () => {
+  beforeEach(() => {
+    signup.enabled = true;
+    locale.current = 'en';
+    pending.login = false;
+    pending.resend = false;
+    loginMock.mockReset();
+    loginError = null;
+  });
+
+  it('keeps local login available through the accordion when signup is disabled', async () => {
+    signup.enabled = false;
+    const user = userEvent.setup();
+    renderLogin();
+    expect(screen.queryByRole('button', { name: 'Create an account' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sign in with email or username and password' }));
+    expect(screen.getByLabelText('Email or username')).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Authenticator code' })).not.toBeInTheDocument();
+  });
+
+  it('starts with credentials only and submits actual autofilled form values without a code', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
+    const identifier = screen.getByLabelText('Email or username');
+    const password = screen.getByLabelText('Password');
+    expect(identifier).toHaveAttribute('name', 'username');
+    expect(identifier).toHaveAttribute('autocomplete', 'username');
+    expect(password).toHaveAttribute('autocomplete', 'current-password');
+    expect(password).toHaveAttribute('type', 'password');
+    // Password managers may fill native input values without firing React events.
+    (identifier as HTMLInputElement).value = 'alice@example.com';
+    (password as HTMLInputElement).value = ' password ';
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(loginMock).toHaveBeenCalledWith({ username: 'alice@example.com', password: ' password ', tokenLocation: 'cookie' });
+    expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
+  });
+
+  it('keeps native autofill visible and masked when the authenticator step opens', async () => {
+    loginMock.mockRejectedValue(apiFailure('TwoFactorRequired'));
+    const user = userEvent.setup();
+    renderLogin();
+    const identifier = screen.getByLabelText('Email or username');
+    const password = screen.getByLabelText('Password');
+    (identifier as HTMLInputElement).value = 'alice@example.com';
+    (password as HTMLInputElement).value = ' password ';
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await screen.findByRole('textbox', { name: 'Authenticator code' });
+    expect(screen.getByLabelText('Email or username')).toBe(identifier);
+    expect(screen.getByLabelText('Password')).toBe(password);
+    expect(identifier).toHaveValue('alice@example.com');
+    expect(password).toHaveValue(' password ');
+    expect(password).toHaveAttribute('type', 'password');
+  });
+
+  it.each(['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'TwoFactorInvalidCode', 'TwoFactorRequiredExtra'])('does not challenge on %s', async (message) => {
+    loginMock.mockRejectedValue(apiFailure(message));
+    const user = userEvent.setup();
+    renderLogin();
+    await submitCredentials(user);
+    expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
+    expect(screen.getByText(message === 'UserEmailNotVerifiedException' ? 'Email not verified' : 'Server Error')).toBeInTheDocument();
+  });
+
+  it('focuses one named code control, preserves credentials, pastes leading zeroes and retries invalid codes', async () => {
+    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockRejectedValueOnce(apiFailure('TwoFactorInvalidCode')).mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderLogin();
+    const identifier = screen.getByLabelText('Email or username');
+    const password = screen.getByLabelText('Password');
+    await submitCredentials(user);
+    const code = screen.getByRole('textbox', { name: 'Authenticator code' });
+    expect(screen.getByRole('group', { name: 'Authenticator code' })).toBeInTheDocument();
+    expect(code).toHaveFocus();
+    expect(code).toHaveAttribute('autocomplete', 'one-time-code');
+    expect(screen.queryByText('Server Error')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Email or username')).toBe(identifier);
+    expect(screen.getByLabelText('Password')).toBe(password);
+    expect(identifier).toHaveAttribute('readonly');
+    expect(password).toHaveAttribute('readonly');
+    expect(password).toHaveValue(' password ');
+    await user.paste('012345');
+    await user.click(screen.getByRole('button', { name: 'Verify code' }));
+    expect(loginMock).toHaveBeenLastCalledWith({ username: 'alice@example.com', password: ' password ', twoFactorCode: '012345', tokenLocation: 'cookie' });
+    expect(code).toBeInTheDocument();
+    expect(screen.getByText('Server Error')).toBeInTheDocument();
+    await user.click(code);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.paste('065432');
+    await user.click(screen.getByRole('button', { name: 'Verify code' }));
+    expect(loginMock).toHaveBeenLastCalledWith(expect.objectContaining({ twoFactorCode: '065432' }));
+  });
+
+  it('clears the previous code and error when credentials change', async () => {
+    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired'))
+      .mockRejectedValueOnce(apiFailure('TwoFactorInvalidCode'))
+      .mockRejectedValueOnce(apiFailure('TwoFactorRequired'));
+    const user = userEvent.setup();
+    renderLogin();
+    await submitCredentials(user);
+    await user.paste('012345');
+    await user.click(screen.getByRole('button', { name: 'Verify code' }));
+    expect(screen.getByText('Server Error')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Change email, username or password' }));
+    expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
+    const identifier = screen.getByLabelText('Email or username');
+    expect(identifier).toHaveFocus();
+    expect(identifier).not.toHaveAttribute('readonly');
+    expect(screen.queryByText('Server Error')).not.toBeInTheDocument();
+    await user.clear(identifier);
+    await user.type(identifier, 'bob');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(loginMock).toHaveBeenLastCalledWith({ username: 'bob', password: ' password ', tokenLocation: 'cookie' });
+    expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toHaveValue('');
+  });
+
+  it.each(['TooManyAuthAttemptsException', 'network failure', 'UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'])('handles %s during the code step', async (message) => {
+    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockRejectedValueOnce(apiFailure(message));
+    const user = userEvent.setup();
+    renderLogin();
+    await submitCredentials(user);
+    await user.paste('012345');
+    await user.click(screen.getByRole('button', { name: 'Verify code' }));
+    if (['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'].includes(message)) {
+      expect(screen.queryByRole('textbox', { name: 'Authenticator code' })).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Email or username')).not.toHaveAttribute('readonly');
+      expect(screen.getByLabelText('Password')).not.toHaveAttribute('readonly');
+      loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired'));
+      await user.click(screen.getByRole('button', { name: 'Sign in' }));
+      expect(loginMock).toHaveBeenLastCalledWith({ username: 'alice@example.com', password: ' password ', tokenLocation: 'cookie' });
+      expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toHaveValue('');
+    } else expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Sign in', 'Verify code', 'Authenticator code'],
+    ['de', 'Anmelden', 'Code bestätigen', 'Authenticator-Code'],
+  ] as const)('keeps the authenticator action visibly named while pending in %s', async (language, signIn, verifyCode, codeLabel) => {
+    locale.current = language;
+    let finish: (() => void) | undefined;
+    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockImplementationOnce(
+      () => new Promise<void>((resolve) => { finish = resolve; }),
+    );
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText(labels[language].username), 'alice@example.com');
+    await user.type(screen.getByLabelText(labels[language].password), 'password');
+    await user.click(screen.getByRole('button', { name: signIn }));
+    await screen.findByRole('textbox', { name: codeLabel });
+    await user.paste('012345');
+    await user.click(screen.getByRole('button', { name: verifyCode }));
+    await waitFor(() => expect(loginMock).toHaveBeenCalledTimes(2));
+    const button = screen.getByRole('button', { name: verifyCode });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent(verifyCode);
+    await act(async () => finish?.());
+  });
+
+  it('blocks incomplete-code Enter and duplicate requests, including switching while pending', async () => {
+    let finish: (() => void) | undefined;
+    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const user = userEvent.setup();
+    const { container } = renderLogin();
+    await submitCredentials(user);
+    await user.paste('012');
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+    expect(loginMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Verify code' })).toBeDisabled();
+    await user.paste('345');
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+    await waitFor(() => expect(loginMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: 'Change email, username or password' })).toBeDisabled();
+    expect(screen.getByLabelText('Password')).toBeDisabled();
+    await act(async () => finish?.());
   });
 });

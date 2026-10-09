@@ -3,16 +3,15 @@
   "subtitle": "Sign in to book machines.",
   "noAccount": "Don't have an account?",
   "signUpButton": "Create an account",
-  "username": "Username",
+  "username": "Email or username",
   "password": "Password",
   "twoFactorCode": "Authenticator code",
-  "twoFactorHelper": "Enter the code if you already set up 2FA. Otherwise, leave it blank and you will be prompted after signing in.",
   "rememberMe": "Keep me signed in",
   "forgotPassword": "Forgot password?",
   "signInButton": "Sign in",
   "signingIn": "Signing in...",
   "accordion": {
-    "title": "Sign in with email and password"
+    "title": "Sign in with email or username and password"
   },
   "resendVerification": {
     "prompt": "Didn't receive the verification email or link expired? Enter your email to get a new one.",
@@ -20,5 +19,8 @@
     "button": "Resend verification email",
     "successTitle": "Email sent!",
     "successMessage": "If an account with that email exists and is not yet verified, a new verification link has been sent."
-  }
+  },
+  "twoFactorInstruction": "Enter the six-digit code from your authenticator app to finish signing in.",
+  "verifyCode": "Verify code",
+  "changeCredentials": "Change email, username or password"
 }

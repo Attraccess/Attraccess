@@ -2,72 +2,235 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { OpenAPI, UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
-import { useDateTimePreferences } from '@attraccess/plugins-frontend-ui';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useAuth } from './useAuth';
+import { useDateTimePreferences } from '@attraccess/plugins-frontend-ui';
 import { useDateTimePreferencesSync } from './useDateTimePreferencesSync';
+import { restoreAuthentication } from '../utils/auth-session';
 
-const originalConfig = { ...OpenAPI };
-let queryClient: QueryClient;
+const messages = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), info: vi.fn() }));
+vi.mock('../components/toastProvider', () => ({ useToastMessage: () => messages }));
+let client: QueryClient;
+let requestLog: { path: string; method: string }[];
+let finish: (response: Response) => void;
+let fail: (error: Error) => void;
+const originalBase = OpenAPI.BASE;
+const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 
+beforeEach(async () => {
+  vi.clearAllMocks();
+  window.history.replaceState(null, '', '/');
+  requestLog = [];
+  OpenAPI.BASE = 'http://localhost';
+  client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  client.setQueryData(UseUsersServiceGetCurrentKeyFn(), { id: 7, username: 'fixture' });
+  const mutation = client.getMutationCache().build(client, {
+    mutationFn: async (variables: { secret: string }) => ({ secret: variables.secret }),
+  });
+  await mutation.execute({ secret: 'private-mutation-data' });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      requestLog.push({ path, method: init?.method ?? 'GET' });
+      if (path === '/api/users/me') return json({ id: 7, username: 'fixture' });
+      if (path === '/api/auth/two-factor') return json({ required: false, enabled: false });
+      if (path === '/api/auth/session/logout-capability') return json({ available: true });
+      if (path === '/api/auth/session/logout-everywhere' || path === '/api/auth/session')
+        return new Promise<Response>((resolve, reject) => {
+          finish = resolve;
+          fail = reject;
+        });
+      throw new Error(`Unexpected request ${url}`);
+    }),
+  );
+});
 afterEach(() => {
   cleanup();
-  queryClient?.clear();
+  client.clear();
   useDateTimePreferences.setState({ userId: null, dateTimeLocale: null });
-  Object.assign(OpenAPI, originalConfig);
+  OpenAPI.BASE = originalBase;
   vi.unstubAllGlobals();
 });
-
-it('keeps every auth consumer and shared formatting signed out while logout is pending', async () => {
-  OpenAPI.BASE = 'http://localhost';
-  const user = { id: 1, username: 'account-a', dateTimeLocale: 'en-GB' };
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-  queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), user);
-  let releaseLogout: (response: Response) => void;
-  const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-    const path = new URL(url).pathname;
-    if (path === '/api/auth/session' && init.method === 'DELETE') {
-      return new Promise<Response>((resolve) => {
-        releaseLogout = resolve;
-      });
-    }
-    const data = path === '/api/users/me' ? user : { required: false, enabled: false };
-    return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
+function mount() {
+  return renderHook(() => [useAuth(), useAuth()], {
+    wrapper: ({ children }) => (
+      <MemoryRouter>
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      </MemoryRouter>
+    ),
   });
-  vi.stubGlobal('fetch', fetchMock);
-  const { result } = renderHook(
-    () => {
-      useDateTimePreferencesSync();
-      return { menu: useAuth(), otherConsumer: useAuth() };
-    },
-    {
-      wrapper: ({ children }) => (
-        <MemoryRouter>
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-        </MemoryRouter>
-      ),
-    },
-  );
-  await waitFor(() => expect(useDateTimePreferences.getState().dateTimeLocale).toBe('en-GB'));
-  act(() => result.current.menu.logout());
-  await waitFor(() => expect(releaseLogout).toBeDefined());
-  await waitFor(() => expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null }));
+}
 
-  // A late response or another consumer updating the cache must not rehydrate A.
-  act(() => queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), user));
-  await act(async () => {
-    await queryClient.invalidateQueries({ queryKey: UseUsersServiceGetCurrentKeyFn() });
+it('keeps local logout separate, disables duplicate submissions across hook users and clears protected cache after success', async () => {
+  const hook = mount();
+  await waitFor(() => expect(hook.result.current[0].canLogoutEverywhere).toBe(true));
+  client.setQueryData(['private-data'], 'sensitive-fixture');
+  act(() => {
+    hook.result.current[0].logout();
+    hook.result.current[1].logoutEverywhere();
   });
-  expect(result.current.menu.user).toBeNull();
-  expect(result.current.otherConsumer.isAuthenticated).toBe(false);
-  expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null });
-  expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === '/api/users/me')).toHaveLength(0);
-
-  // A failed logout leaves the existing server session usable, rather than
-  // disabling authentication queries permanently.
-  await act(async () => {
-    releaseLogout(new Response(JSON.stringify({ message: 'Logout failed' }), { status: 500 }));
-  });
-  await waitFor(() => expect(result.current.menu.user?.id).toBe(user.id));
-  await waitFor(() => expect(useDateTimePreferences.getState().dateTimeLocale).toBe('en-GB'));
+  await waitFor(() => expect(hook.result.current[1].logoutPending).toBe(true));
+  expect(requestLog.filter((request) => request.path === '/api/auth/session')).toEqual([
+    { path: '/api/auth/session', method: 'DELETE' },
+  ]);
+  expect(requestLog.some((request) => request.path.endsWith('logout-everywhere'))).toBe(false);
+  await act(async () => finish(json({})));
+  await waitFor(() => expect(hook.result.current.every((auth) => !auth.isAuthenticated)).toBe(true));
+  expect(client.getQueryData(['private-data'])).toBeUndefined();
+  expect(client.getMutationCache().getAll()).toHaveLength(0);
+  act(() => hook.result.current[1].logoutEverywhere());
+  expect(requestLog.filter((request) => request.path.endsWith('logout-everywhere'))).toHaveLength(0);
 });
+
+it('starts provider logout through the central endpoint and explains a local-only result', async () => {
+  const hook = mount();
+  await waitFor(() => expect(hook.result.current[0].canLogoutEverywhere).toBe(true));
+  act(() => {
+    hook.result.current[0].logoutEverywhere();
+    hook.result.current[1].logoutEverywhere();
+  });
+  await waitFor(() =>
+    expect(requestLog.filter((request) => request.path.endsWith('logout-everywhere'))).toHaveLength(1),
+  );
+  await act(async () => finish(json({ kind: 'local_only', reason: 'provider_failed' })));
+  await waitFor(() => expect(hook.result.current.every((auth) => !auth.isAuthenticated)).toBe(true));
+  expect(messages.warning).toHaveBeenCalled();
+  expect(requestLog.some((request) => request.method === 'DELETE')).toBe(false);
+});
+
+it('keeps every hook signed out after a lost response and reports that server logout is unconfirmed', async () => {
+  const hook = mount();
+  await waitFor(() => expect(hook.result.current[0].isAuthenticated).toBe(true));
+  act(() => hook.result.current[0].logoutEverywhere());
+  await waitFor(() => expect(fail).toBeTypeOf('function'));
+  await act(async () => fail(new Error('Network unavailable')));
+  await waitFor(() => expect(hook.result.current.every((auth) => !auth.isAuthenticated)).toBe(true));
+  expect(messages.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Logout could not be confirmed' }));
+  expect(client.getQueryData(['auth-logout-status'])).toBe('ended');
+  expect(client.getMutationCache().getAll()).toHaveLength(0);
+});
+
+it.each(['failed', 'partial', 'returned'])(
+  'does not claim sign-out from a fabricated %s outcome URL',
+  async (outcome) => {
+    window.history.replaceState(null, '', `/?ssoLogout=${outcome}`);
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current[0].isAuthenticated).toBe(true));
+    expect(messages.info).not.toHaveBeenCalled();
+  },
+);
+
+const resultToken = 'r'.repeat(43);
+function mockReturn(outcome: string, authenticated: boolean, valid = true) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      requestLog.push({ path, method: init?.method ?? 'GET' });
+      if (path === '/api/auth/sso/logout-result')
+        return valid ? json({ result: outcome }) : new Response('{}', { status: 400 });
+      if (path === '/api/users/me')
+        return authenticated ? json({ id: 7, username: 'fixture' }) : new Response('{}', { status: 401 });
+      if (path === '/api/auth/two-factor') return json({ required: false, enabled: false });
+      if (path === '/api/auth/session/logout-capability') return json({ available: true });
+      throw new Error(`Unexpected request ${url}`);
+    }),
+  );
+  window.history.replaceState(null, '', `/?ssoLogout=${resultToken}`);
+}
+
+it.each(['failed', 'partial', 'returned'])(
+  'shows a verified %s return once after confirming local sign-out',
+  async (outcome) => {
+    client.clear();
+    mockReturn(outcome, false);
+    const hook = mount();
+    await waitFor(() => expect(messages.info).toHaveBeenCalledTimes(1));
+    expect(requestLog.filter(({ path }) => path === '/api/auth/sso/logout-result')).toHaveLength(1);
+    expect(hook.result.current[0].isAuthenticated).toBe(false);
+    expect(window.location.search).toBe('');
+    hook.unmount();
+    window.history.replaceState(null, '', `/?ssoLogout=${resultToken}`);
+    mount();
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(messages.info).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('does not claim sign-out for a valid old result when the browser has signed in again', async () => {
+  mockReturn('partial', true);
+  const hook = mount();
+  await waitFor(() => expect(window.location.search).toBe(''));
+  expect(hook.result.current[0].isAuthenticated).toBe(true);
+  expect(messages.info).not.toHaveBeenCalled();
+});
+
+it('ignores fabricated or consumed result tokens even when signed out', async () => {
+  client.clear();
+  mockReturn('partial', false, false);
+  mount();
+  await waitFor(() => expect(window.location.search).toBe(''));
+  expect(messages.info).not.toHaveBeenCalled();
+});
+
+// Retain the date-formatting reset introduced on main for both logout actions.
+it.each([false, true])(
+  'keeps shared formatting reset during logout and after failure (central: %s)',
+  async (central) => {
+    const user = { id: 7, username: 'fixture', dateTimeLocale: 'en-GB' };
+    client.setQueryData(UseUsersServiceGetCurrentKeyFn(), user);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const path = new URL(url).pathname;
+        requestLog.push({ path, method: init?.method ?? 'GET' });
+        if (path === '/api/auth/session' || path === '/api/auth/session/logout-everywhere') {
+          return new Promise<Response>((resolve) => {
+            finish = resolve;
+          });
+        }
+        if (path === '/api/users/me') return json(user);
+        if (path === '/api/auth/session/logout-capability') return json({ available: true });
+        if (path === '/api/auth/two-factor') return json({ required: false, enabled: false });
+        throw new Error(`Unexpected request ${url}`);
+      }),
+    );
+    const hook = renderHook(
+      () => {
+        useDateTimePreferencesSync();
+        return [useAuth(), useAuth()];
+      },
+      {
+        wrapper: ({ children }) => (
+          <MemoryRouter>
+            <QueryClientProvider client={client}>{children}</QueryClientProvider>
+          </MemoryRouter>
+        ),
+      },
+    );
+    await waitFor(() => expect(useDateTimePreferences.getState().dateTimeLocale).toBe('en-GB'));
+    await waitFor(() => expect(hook.result.current[0].canLogoutEverywhere).toBe(true));
+    const identityRequests = requestLog.filter(({ path }) => path === '/api/users/me').length;
+    act(() => (central ? hook.result.current[0].logoutEverywhere() : hook.result.current[0].logout()));
+    await waitFor(() => expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null }));
+    act(() => client.setQueryData(UseUsersServiceGetCurrentKeyFn(), user));
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: UseUsersServiceGetCurrentKeyFn() });
+    });
+    expect(hook.result.current.every((auth) => auth.user === null && !auth.isAuthenticated)).toBe(true);
+    expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null });
+    expect(requestLog.filter(({ path }) => path === '/api/users/me')).toHaveLength(identityRequests);
+    // A failed response cannot prove the server retained the session. Keep the
+    // established sign-out safeguard until authentication is explicitly restored.
+    await act(async () => finish(new Response('{}', { status: 500 })));
+    await waitFor(() => expect(messages.error).toHaveBeenCalled());
+    expect(hook.result.current.every((auth) => !auth.isAuthenticated)).toBe(true);
+    expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null });
+    await act(async () => {
+      await restoreAuthentication(client);
+    });
+    await waitFor(() => expect(hook.result.current.every((auth) => auth.isAuthenticated)).toBe(true));
+    expect(useDateTimePreferences.getState()).toEqual({ userId: user.id, dateTimeLocale: 'en-GB' });
+  },
+);
