@@ -52,6 +52,7 @@ ConnectionConfigurationScreen Display::connectionConfigurationScreen;
 InitScreen Display::initScreen;
 Lockscreen Display::lockscreen;
 NoResourcesScreen Display::noResourcesScreen;
+SessionSummaryScreen Display::sessionSummaryScreen;
 ResourceListScreen Display::resourceListScreen;
 ResourceDetailsScreen Display::resourceDetailsScreen;
 EnrollmentScreen Display::enrollmentScreen;
@@ -67,6 +68,7 @@ lv_obj_t *Display::activePopup = nullptr;
 lv_timer_t *Display::popupAutoCloseTimer = nullptr;
 
 lv_obj_t *Display::drawerBackdrop = nullptr;
+lv_obj_t *Display::drawerGrabber = nullptr;
 lv_obj_t *Display::drawerPanel = nullptr;
 bool Display::drawerOpen = false;
 lv_obj_t *Display::rebootConfirmOverlay = nullptr;

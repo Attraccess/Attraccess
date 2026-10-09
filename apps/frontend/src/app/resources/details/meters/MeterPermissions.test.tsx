@@ -27,7 +27,8 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseResourceMeteringServiceListResourceMetersKeyFn: () => ['meters'],
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   useTranslations: () => ({
     t: (key: keyof typeof en, params?: Record<string, string>) =>
       Object.entries(params ?? {}).reduce((out, [name, value]) => out.replaceAll(`{{${name}}}`, value), en[key]),

@@ -267,6 +267,13 @@ void Application::setup() {
       auto *self = payload->self;
       const auto &result = payload->result;
       if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
+        if (result.success && result.type == "STOP_RESOURCE_USAGE_SESSION" &&
+            self->pendingActionType == PENDING_ACTION_STOP_SESSION && result.hasDuration &&
+            result.hasOwnership && result.endedOwnSession) {
+          self->beginSessionSummary(result);
+          delete payload;
+          return;
+        }
         self->finishReaderAction(result.success);
         if (result.success) {
           self->onActionResult(result.type);
@@ -356,7 +363,7 @@ void Application::setup() {
 
   // Hidden maintenance drawer (pull down from the top edge)
   Display::setDrawerAvailableCallback([this]() {
-    return !this->cardAuthenticationPending && this->pendingUiAction.empty() &&
+    return !this->sessionSummaryActive && !this->cardAuthenticationPending && this->pendingUiAction.empty() &&
            !this->waitingForResourceRefresh && !this->hasPendingFormRequest &&
            this->state != APPLICATION_STATE_SUPERVISION;
   });
@@ -557,6 +564,12 @@ void Application::setup() {
 #endif
 
   auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength) {
+#ifdef HAS_LVGL_DISPLAY
+    if (this->sessionSummaryActive) {
+      this->sessionSummaryDismissRequested = true;
+      return; // consume this presentation; do not authenticate the next member
+    }
+#endif
     this->logger.infof("Card detected: %s",
                        hexToString(uid, uidLength).c_str());
 

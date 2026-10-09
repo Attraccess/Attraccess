@@ -8,7 +8,10 @@ const state = vi.hoisted(() => ({
   toast: vi.fn(),
   query: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: (key: string) => key }),
+}));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: state.toast }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   OpenAPI: { BASE: 'https://api.test' },
@@ -19,7 +22,7 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 const report = {
   id: 9,
-  createdAt: '2026-09-22T10:00:00Z',
+  createdAt: '2026-09-22T10:00:37Z',
   heapFreeBytes: 2048,
   largestFreeBlockBytes: 512,
   uptimeBeforeResetMs: 3661000,
@@ -68,6 +71,18 @@ it('renders firmware mismatches, formatted telemetry, heap trend, and expandable
     { id: 8, createdAt: report.createdAt, resetReason: 'Power on', symbolicationStatus: 'unavailable' },
   ];
   const { container } = render(<AttractapDiagnostics readerId={7} />);
+  expect(
+    screen.getAllByText(
+      new Intl.DateTimeFormat('en', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).format(new Date(report.createdAt)),
+    ).length,
+  ).toBeGreaterThan(0);
   expect(screen.getByText('firmwareMismatch')).toBeTruthy();
   expect(screen.getByText('fields.heapFree: 2.0 KB')).toBeTruthy();
   expect(screen.getByText('fields.largestBlock: 512 B')).toBeTruthy();

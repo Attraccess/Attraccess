@@ -12,10 +12,16 @@ import {
   CreateSAMLConfigurationDto,
   CreateOIDCConfigurationDto,
 } from './dto/create-sso-provider.dto';
-import { UpdateSSOProviderDto, UpdateSAMLConfigurationDto, UpdateOIDCConfigurationDto } from './dto/update-sso-provider.dto';
+import {
+  UpdateSSOProviderDto,
+  UpdateSAMLConfigurationDto,
+  UpdateOIDCConfigurationDto,
+} from './dto/update-sso-provider.dto';
 import { SSOProviderNotFoundException } from './errors';
 import { LicenseModuleType, LicenseService } from '../../../license/license.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
+
+import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from './logout-endpoints';
 
 @Injectable()
 export class SSOService {
@@ -28,7 +34,7 @@ export class SSOService {
     private samlConfigRepository: Repository<SSOProviderSAMLConfiguration>,
     private licenseService: LicenseService,
     private readonly encryptionService: EncryptionService,
-  ) { }
+  ) {}
 
   public async getAllProviders(): Promise<SSOProvider[]> {
     const providers = await this.ssoProviderRepository.find({
@@ -54,7 +60,7 @@ export class SSOService {
 
   public async getProviderByTypeAndIdWithConfiguration(
     ssoType: SSOProviderType,
-    providerId: number
+    providerId: number,
   ): Promise<SSOProvider | null> {
     const relations: string[] = [];
 
@@ -89,11 +95,19 @@ export class SSOService {
       switch (createDto.type) {
         case SSOProviderType.OIDC:
           if (!createDto.oidcConfiguration) throw new BadRequestException('Missing OIDC configuration payload');
-          await this.createOIDCConfiguration(provider.id, createDto.oidcConfiguration, manager.getRepository(SSOProviderOIDCConfiguration));
+          await this.createOIDCConfiguration(
+            provider.id,
+            createDto.oidcConfiguration,
+            manager.getRepository(SSOProviderOIDCConfiguration),
+          );
           break;
         case SSOProviderType.SAML:
           if (!createDto.samlConfiguration) throw new BadRequestException('Missing SAML configuration payload');
-          await this.createSAMLConfiguration(provider.id, createDto.samlConfiguration, manager.getRepository(SSOProviderSAMLConfiguration));
+          await this.createSAMLConfiguration(
+            provider.id,
+            createDto.samlConfiguration,
+            manager.getRepository(SSOProviderSAMLConfiguration),
+          );
           break;
         default:
           throw new BadRequestException(`Unsupported SSO provider type: ${createDto.type}`);
@@ -115,10 +129,18 @@ export class SSOService {
 
     return this.ssoProviderRepository.manager.transaction(async (manager) => {
       if (provider.type === SSOProviderType.OIDC && updateDto.oidcConfiguration) {
-        await this.updateOIDCConfiguration(provider.id, updateDto.oidcConfiguration, manager.getRepository(SSOProviderOIDCConfiguration));
+        await this.updateOIDCConfiguration(
+          provider.id,
+          updateDto.oidcConfiguration,
+          manager.getRepository(SSOProviderOIDCConfiguration),
+        );
       }
       if (provider.type === SSOProviderType.SAML && updateDto.samlConfiguration) {
-        await this.updateSAMLConfiguration(provider.id, updateDto.samlConfiguration, manager.getRepository(SSOProviderSAMLConfiguration));
+        await this.updateSAMLConfiguration(
+          provider.id,
+          updateDto.samlConfiguration,
+          manager.getRepository(SSOProviderSAMLConfiguration),
+        );
       }
       if (updateDto.name) await manager.getRepository(SSOProvider).update(provider.id, { name: updateDto.name });
       const updated = await manager.getRepository(SSOProvider).findOne({
@@ -135,10 +157,23 @@ export class SSOService {
     await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
     await this.ssoProviderRepository.manager.transaction(async (manager) => {
-      if (provider.oidcConfiguration) await manager.getRepository(SSOProviderOIDCConfiguration).delete(provider.oidcConfiguration.id);
-      if (provider.samlConfiguration) await manager.getRepository(SSOProviderSAMLConfiguration).delete(provider.samlConfiguration.id);
+      if (provider.oidcConfiguration)
+        await manager.getRepository(SSOProviderOIDCConfiguration).delete(provider.oidcConfiguration.id);
+      if (provider.samlConfiguration)
+        await manager.getRepository(SSOProviderSAMLConfiguration).delete(provider.samlConfiguration.id);
       await manager.getRepository(SSOProvider).delete(id);
     });
+  }
+
+  private validateOidcLogoutConfig(config: {
+    endSessionURL?: string | null;
+    jwksURL?: string | null;
+    signingAlgorithms?: string[] | null;
+  }): void {
+    for (const endpoint of [config.endSessionURL, config.jwksURL]) if (endpoint) trustedEndpoint(endpoint);
+    if (config.signingAlgorithms?.some((algorithm) => !OIDC_SIGNING_ALGORITHMS.includes(algorithm))) {
+      throw new BadRequestException('Unsupported OIDC signing algorithm');
+    }
   }
 
   private async createOIDCConfiguration(
@@ -146,6 +181,7 @@ export class SSOService {
     config: CreateOIDCConfigurationDto,
     repository = this.oidcConfigRepository,
   ): Promise<SSOProviderOIDCConfiguration> {
+    this.validateOidcLogoutConfig(config);
     const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
     const newConfig = repository.create({
       ...config,
@@ -161,7 +197,11 @@ export class SSOService {
     updateConfig: UpdateOIDCConfigurationDto,
     repository = this.oidcConfigRepository,
   ): Promise<SSOProviderOIDCConfiguration> {
+    this.validateOidcLogoutConfig(updateConfig);
     const payload: Partial<SSOProviderOIDCConfiguration> = {};
+    for (const key of ['endSessionURL', 'jwksURL', 'signingAlgorithms'] as const) {
+      if (updateConfig[key] !== undefined) Object.assign(payload, { [key]: updateConfig[key] });
+    }
 
     if (typeof updateConfig.issuer !== 'undefined') {
       payload.issuer = updateConfig.issuer;
@@ -208,7 +248,10 @@ export class SSOService {
     config: CreateSAMLConfigurationDto,
     repository = this.samlConfigRepository,
   ): Promise<SSOProviderSAMLConfiguration> {
-    const shouldSignRequests = Boolean(config.signRequest);
+    if (config.logoutURL) trustedEndpoint(config.logoutURL);
+    if (config.logoutURL && !config.idpIssuer?.trim())
+      throw new BadRequestException('SAML logout requires an IdP issuer');
+    const shouldSignRequests = Boolean(config.signRequest || config.logoutURL);
     const normalizedCertificate = this.normalizeCertificate(config.certificate);
     const normalizedSpSigningCertificate = config.spSigningCertificate
       ? this.normalizeCertificate(config.spSigningCertificate)
@@ -243,6 +286,7 @@ export class SSOService {
     config: UpdateSAMLConfigurationDto,
     repository = this.samlConfigRepository,
   ): Promise<SSOProviderSAMLConfiguration> {
+    if (config.logoutURL) trustedEndpoint(config.logoutURL);
     const existing = await repository.findOne({ where: { ssoProviderId: providerId } });
     if (!existing) {
       throw new BadRequestException('SAML configuration not found for provider');
@@ -250,6 +294,9 @@ export class SSOService {
 
     type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
     const payload: Partial<SAMLConfigEntity> = {};
+    for (const key of ['idpIssuer', 'logoutURL'] as const) {
+      if (config[key] !== undefined) Object.assign(payload, { [key]: config[key] });
+    }
 
     if (typeof config.entryPoint !== 'undefined') {
       payload.entryPoint = config.entryPoint;
@@ -318,7 +365,10 @@ export class SSOService {
         ? payload.spSigningKeyEncrypted
         : (existing.spSigningKeyEncrypted ?? null);
 
-    this.ensureSigningMaterialAvailability(Boolean(nextSignRequest), nextSigningCert, nextSigningKey);
+    const nextLogoutURL = config.logoutURL === undefined ? existing.logoutURL : config.logoutURL;
+    const nextIdpIssuer = config.idpIssuer === undefined ? existing.idpIssuer : config.idpIssuer;
+    if (nextLogoutURL && !nextIdpIssuer?.trim()) throw new BadRequestException('SAML logout requires an IdP issuer');
+    this.ensureSigningMaterialAvailability(Boolean(nextSignRequest || nextLogoutURL), nextSigningCert, nextSigningKey);
 
     await repository.update({ ssoProviderId: providerId }, payload);
     return repository.findOne({ where: { ssoProviderId: providerId } });

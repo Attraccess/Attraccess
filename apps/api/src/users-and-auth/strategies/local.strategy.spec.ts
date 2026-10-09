@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { LocalStrategy } from './local.strategy';
 import { AuthService } from '../auth/auth.service';
 import { TwoFactorService } from '../auth/two-factor.service';
-import { User } from '@attraccess/database-entities';
+import { AuthenticationType, User } from '@attraccess/database-entities';
 
 describe('LocalStrategy', () => {
   let localStrategy: LocalStrategy;
@@ -18,7 +18,7 @@ describe('LocalStrategy', () => {
         {
           provide: AuthService,
           useValue: {
-            getUserByUsernameAndAuthenticationDetails: jest.fn(),
+            getUserByLoginIdentifierAndAuthenticationDetails: jest.fn(),
           },
         },
         {
@@ -38,7 +38,7 @@ describe('LocalStrategy', () => {
   it('should return a user if validation is successful', async () => {
     const user: Partial<User> = { id: 1, username: 'testuser' }; // Mock user object
     jest
-      .spyOn(authService, 'getUserByUsernameAndAuthenticationDetails')
+      .spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails')
       .mockResolvedValue(user as User);
 
     const result = await localStrategy.validate({ body: {} } as Request, 'testuser', 'password2');
@@ -48,11 +48,29 @@ describe('LocalStrategy', () => {
 
   it('should throw an UnauthorizedException if validation fails', async () => {
     jest
-      .spyOn(authService, 'getUserByUsernameAndAuthenticationDetails')
+      .spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails')
       .mockResolvedValue(null);
 
     await expect(localStrategy.validate({ body: {} } as Request, 'testuser', 'wrongpassword')).rejects.toThrow(
       UnauthorizedException,
     );
+    expect(twoFactorService.assertTwoFactorForLogin).not.toHaveBeenCalled();
   });
+  it.each(['TwoFactorRequired', 'TwoFactorInvalidCode'])('propagates %s only after credentials pass', async (message) => {
+    const user = { id: 7 } as User;
+    jest.spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails').mockResolvedValue(user);
+    jest.spyOn(twoFactorService, 'assertTwoFactorForLogin').mockRejectedValue(new UnauthorizedException(message));
+    await expect(localStrategy.validate({ body: { twoFactorCode: '012345' } } as Request, ' user@example.com ', ' password ')).rejects.toThrow(message);
+    expect(authService.getUserByLoginIdentifierAndAuthenticationDetails).toHaveBeenCalledWith('user@example.com', {
+      type: AuthenticationType.LOCAL_PASSWORD, details: { password: ' password ' },
+    });
+    expect(twoFactorService.assertTwoFactorForLogin).toHaveBeenCalledWith(user, '012345');
+  });
+  it('returns the user after a valid code', async () => {
+    const user = { id: 7 } as User;
+    jest.spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails').mockResolvedValue(user);
+    await expect(localStrategy.validate({ body: { twoFactorCode: '012345' } } as Request, 'user', 'password')).resolves.toBe(user);
+    expect(twoFactorService.assertTwoFactorForLogin).toHaveBeenCalledWith(user, '012345');
+  });
+
 });

@@ -440,10 +440,21 @@ void DemoWebsocket::handleStartSession(uint32_t resourceId, uint32_t projectId, 
 void DemoWebsocket::handleStopSession(uint32_t resourceId)
 {
     int idx = sessionIndexForResource(resourceId);
-    if (idx >= 0)
-        _sessions[idx] = DemoSession{};
-
-    respondActionSuccess("STOP_RESOURCE_USAGE_SESSION");
+    JsonDocument doc;
+    doc["event"] = "EVENT";
+    doc["data"]["type"] = "STOP_RESOURCE_USAGE_SESSION";
+    auto payload = doc["data"]["payload"].to<JsonObject>();
+    payload["success"] = true;
+    payload["requestId"] = _actionRequestId;
+    payload["endedOwnSession"] = idx >= 0 && _sessions[idx].active && _sessions[idx].user == _currentUser;
+    if (idx >= 0 && _sessions[idx].active) {
+        const auto elapsed = time(nullptr) - _sessions[idx].startEpoch;
+        payload["durationSeconds"] = elapsed > 0 ? elapsed : 0;
+    }
+    if (idx >= 0) _sessions[idx] = DemoSession{};
+    std::string response;
+    serializeJson(doc, response);
+    enqueue(response);
     respondResourceList();
 }
 

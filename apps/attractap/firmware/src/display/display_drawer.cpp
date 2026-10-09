@@ -143,7 +143,8 @@ void Display::initDrawer()
                      });
 
     // Subtle top-edge grabber as an affordance for the otherwise hidden gesture.
-    lv_obj_t *grabber = lv_obj_create(top);
+    Display::drawerGrabber = lv_obj_create(top);
+    lv_obj_t *grabber = Display::drawerGrabber;
     lv_obj_remove_style_all(grabber);
     lv_obj_set_size(grabber, 46, 5);
     lv_obj_set_align(grabber, LV_ALIGN_TOP_MID);

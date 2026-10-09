@@ -1,7 +1,7 @@
 import { Spinner } from '@heroui/react';
 import { Gauge } from 'lucide-react';
 import { useResourceMeteringServiceListResourceMeters } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FlatSection } from '../../../../components/flatSection';
 import { useAuth } from '../../../../hooks/useAuth';
 import { MeterNameEditor } from './MeterNameEditor';
@@ -10,6 +10,7 @@ import en from './en.json';
 import de from './de.json';
 
 export function MetersCard({ resourceId, className }: { resourceId: number; className?: string }) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { t } = useTranslations({ en, de });
   const format = useMeterValueFormatter();
   const { hasPermission } = useAuth();
@@ -54,9 +55,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
               </div>
             </dl>
             {meter.latestObservedAt && (
-              <p className="text-xs text-muted">
-                {t('asOf', { time: new Date(meter.latestObservedAt).toLocaleString() })}
-              </p>
+              <p className="text-xs text-muted">{t('asOf', { time: formatDateTime(meter.latestObservedAt) })}</p>
             )}
           </div>
         ))}

@@ -90,6 +90,34 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
           </AuthentikDiscoveryDialog>
         </div>
 
+        <TextField
+          value={formValues.oidcConfiguration?.endSessionURL ?? ''}
+          onChange={(v) => setOidc('endSessionURL', v)}
+        >
+          <Label>{t('endSessionURL')}</Label>
+          <Input placeholder="https://sso.example.com/logout" />
+        </TextField>
+        <TextField value={formValues.oidcConfiguration?.jwksURL ?? ''} onChange={(v) => setOidc('jwksURL', v)}>
+          <Label>{t('jwksURL')}</Label>
+          <Input placeholder="https://sso.example.com/jwks" />
+        </TextField>
+        <TextField
+          value={(formValues.oidcConfiguration?.signingAlgorithms ?? ['RS256']).join(', ')}
+          onChange={(v) =>
+            setOidc(
+              'signingAlgorithms',
+              v
+                .split(',')
+                .map((algorithm) => algorithm.trim())
+                .filter(Boolean),
+            )
+          }
+        >
+          <Label>{t('signingAlgorithms')}</Label>
+          <Input placeholder="RS256" />
+        </TextField>
+        <p className="text-sm text-muted">{t('oidcLogoutHint')}</p>
+
         <TextField isRequired value={formValues.oidcConfiguration?.issuer ?? ''} onChange={(v) => setOidc('issuer', v)}>
           <Label>{t('issuer')}</Label>
           <Input

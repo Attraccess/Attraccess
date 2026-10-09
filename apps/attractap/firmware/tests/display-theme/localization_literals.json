@@ -129,5 +129,12 @@
   "shared/powerOff/powerOffButton.cpp": {
     "FirmwareI18n::setDynamicLabel(icon, symbol)": "Language-neutral LVGL icon glyph, separate from the localized action caption.",
     "FirmwareI18n::Text::literal(LV_SYMBOL_POWER)": "Language-neutral LVGL power icon glyph."
+  },
+  "screens/sessionSummary/sessionSummaryScreen.cpp": {
+    "FirmwareI18n::Text::literal(name)": "Server-supplied cardholder name within the translated greeting; preserve exact contents.",
+    "FirmwareI18n::Text::literal(duration)": "Formatted numeric session duration; preserve exact value.",
+    "FirmwareI18n::Text::literal(charge)": "Server-supplied formatted amount and currency; preserve exact value.",
+    "FirmwareI18n::Text::literal(\"Attractap\")": "Language-neutral product name.",
+    "FirmwareI18n::Text::literal(FIRMWARE_VARIANT_FRIENDLY_NAME)": "Build-provided device variant name; preserve exact contents."
   }
 }

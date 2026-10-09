@@ -2,7 +2,7 @@
 
 This page explains the different ways to log in to Attraccess.
 
-## Login with Username and Password
+## Login with Email or Username and Password
 
 1. Open Attraccess in your browser
 2. Enter your **username or email address**
@@ -24,9 +24,9 @@ If your workshop has configured a Single Sign-On (SSO) provider, you will see ad
 
 ## Two-Factor Authentication (2FA)
 
-If two-factor authentication is enabled on your account, you will be asked for an additional code after entering your password.
+If two-factor authentication is enabled on your account, you will be asked for an additional code after submitting your email or username and password.
 
-1. Enter your username and password as usual
+1. Enter your email or username and password, then click **Log In**
 2. Open your **authenticator app** (e.g., Google Authenticator, Microsoft Authenticator, Authy)
 3. Enter the **six-digit code** displayed in the app
 4. Click **Verify**

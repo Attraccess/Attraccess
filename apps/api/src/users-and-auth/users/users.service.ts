@@ -1,3 +1,4 @@
+import { DateTimePreferences, validateDateTimeLocale } from '@attraccess/shared';
 import { BadRequestException, Injectable, Logger, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import {
   Repository,
@@ -8,6 +9,7 @@ import {
   EntityManager,
   Brackets,
   SelectQueryBuilder,
+  Raw,
 } from 'typeorm';
 import {
   AuthenticationDetail,
@@ -200,6 +202,31 @@ export class UsersService {
     return (
       typeof message === 'string' && message.toLowerCase().includes('unique') && message.toLowerCase().includes('email')
     );
+  }
+
+  /** Resolve the identifier accepted by local login without ambiguous username/email queries. */
+  async findByLoginIdentifier(identifier: string): Promise<User | null> {
+    const value = identifier.trim();
+    if (!value) return null;
+
+    const options = value.includes('@') ? { email: value } : { username: value };
+    const parsed = FindOneOptionsSchema.safeParse(options);
+    if (!parsed.success) return null;
+
+    if (parsed.data.email !== undefined) {
+      // Preserve distinct existing accounts whose addresses differ only by case.
+      const exactMatch = await this.userRepository.findOne({ where: { email: parsed.data.email } });
+      if (exactMatch) return exactMatch;
+
+      // Fall back only when case-insensitive matching identifies one account.
+      // Equality keeps underscores literal, unlike a LIKE query.
+      const matches = await this.userRepository.find({
+        where: { email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email.toLowerCase() }) },
+        take: 2,
+      });
+      return matches.length === 1 ? matches[0] : null;
+    }
+    return this.findOne(parsed.data);
   }
 
   async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
@@ -1044,6 +1071,17 @@ export class UsersService {
     } else {
       await this.dataSource.transaction(run);
     }
+  }
+
+  async updateDateTimePreferences(userId: number, preferences: DateTimePreferences): Promise<User> {
+    const validation = preferences.dateTimeLocale === null ? null : validateDateTimeLocale(preferences.dateTimeLocale);
+    if (validation?.error) {
+      throw new BadRequestException(`Invalid or unsupported date/time locale: ${validation.error}`);
+    }
+    await this.userRepository.update(userId, { dateTimeLocale: validation?.locale ?? null });
+    const updated = await this.findOne({ id: userId });
+    if (!updated) throw new UserNotFoundException(userId);
+    return updated;
   }
 
   async updateLocale(userId: number, locale: string): Promise<User> {

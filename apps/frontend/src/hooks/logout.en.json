@@ -1,0 +1,18 @@
+{
+  "logoutEverywhere": "Logout everywhere",
+  "pending": "Signing out…",
+  "providerNotice": "Also requests sign-out from other applications at your SSO provider.",
+  "checking": "Checking central logout availability…",
+  "reasons": {
+    "local_session": "Central logout requires a new SSO session. Local logout is available.",
+    "provider_unavailable": "Central logout is not configured or the provider is unavailable.",
+    "missing_correlation": "Sign in again through SSO to enable central logout.",
+    "provider_failed": "You are signed out here. Provider logout could not be started."
+  },
+  "networkError": "Logout could not be confirmed",
+  "networkErrorDescription": "The connection failed. Your server session may still be active. Reload and try again when connected.",
+  "localOnly": "Signed out of Attraccess",
+  "callbackFailed": "Provider logout did not complete. You remain signed out of Attraccess.",
+  "callbackPartial": "The provider reported partial logout. Some other applications may still be signed in.",
+  "callbackReturned": "You are signed out of Attraccess. Sign-out in other applications depends on your provider."
+}

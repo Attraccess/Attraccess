@@ -26,7 +26,7 @@ describe('SessionStrategy', () => {
 
   beforeEach(async () => {
     const mockSessionService = {
-      validateSession: jest.fn(),
+      authenticateSession: jest.fn(),
     };
     const mockTwoFactorService = {
       getStatus: jest.fn(),
@@ -119,12 +119,15 @@ describe('SessionStrategy', () => {
         path: '/api/users/me',
       } as Request;
 
-      sessionService.validateSession.mockResolvedValue(mockUser);
+      sessionService.authenticateSession.mockResolvedValue({
+        user: mockUser,
+        session: { id: 'stable-session', ssoContext: null },
+      });
 
       const result = await strategy.validate(mockRequest);
 
       expect(result).toEqual(mockUser);
-      expect(sessionService.validateSession).toHaveBeenCalledWith('valid-session-token');
+      expect(sessionService.authenticateSession).toHaveBeenCalledWith('valid-session-token');
     });
 
     it('should validate user with valid session token from cookie', async () => {
@@ -136,12 +139,15 @@ describe('SessionStrategy', () => {
         path: '/api/users/me',
       } as Request;
 
-      sessionService.validateSession.mockResolvedValue(mockUser);
+      sessionService.authenticateSession.mockResolvedValue({
+        user: mockUser,
+        session: { id: 'stable-session', ssoContext: null },
+      });
 
       const result = await strategy.validate(mockRequest);
 
       expect(result).toEqual(mockUser);
-      expect(sessionService.validateSession).toHaveBeenCalledWith('valid-session-token');
+      expect(sessionService.authenticateSession).toHaveBeenCalledWith('valid-session-token');
     });
 
     it('should prioritize Authorization header over cookie', async () => {
@@ -155,12 +161,15 @@ describe('SessionStrategy', () => {
         path: '/api/users/me',
       } as Request;
 
-      sessionService.validateSession.mockResolvedValue(mockUser);
+      sessionService.authenticateSession.mockResolvedValue({
+        user: mockUser,
+        session: { id: 'stable-session', ssoContext: null },
+      });
 
       const result = await strategy.validate(mockRequest);
 
       expect(result).toEqual(mockUser);
-      expect(sessionService.validateSession).toHaveBeenCalledWith('header-token');
+      expect(sessionService.authenticateSession).toHaveBeenCalledWith('header-token');
     });
 
     it('should throw UnauthorizedException when no token is provided', async () => {
@@ -173,7 +182,7 @@ describe('SessionStrategy', () => {
         new UnauthorizedException('No session token provided'),
       );
 
-      expect(sessionService.validateSession).not.toHaveBeenCalled();
+      expect(sessionService.authenticateSession).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException when session is invalid', async () => {
@@ -185,13 +194,13 @@ describe('SessionStrategy', () => {
         path: '/api/users/me',
       } as Request;
 
-      sessionService.validateSession.mockResolvedValue(null);
+      sessionService.authenticateSession.mockResolvedValue(null);
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(
         new UnauthorizedException('Invalid or expired session'),
       );
 
-      expect(sessionService.validateSession).toHaveBeenCalledWith('invalid-token');
+      expect(sessionService.authenticateSession).toHaveBeenCalledWith('invalid-token');
     });
 
     it('should handle malformed Authorization header', async () => {
@@ -206,7 +215,7 @@ describe('SessionStrategy', () => {
         new UnauthorizedException('No session token provided'),
       );
 
-      expect(sessionService.validateSession).not.toHaveBeenCalled();
+      expect(sessionService.authenticateSession).not.toHaveBeenCalled();
     });
 
     it('should handle empty Bearer token', async () => {
@@ -221,7 +230,7 @@ describe('SessionStrategy', () => {
         new UnauthorizedException('No session token provided'),
       );
 
-      expect(sessionService.validateSession).not.toHaveBeenCalled();
+      expect(sessionService.authenticateSession).not.toHaveBeenCalled();
     });
 
     it('should handle session service throwing error', async () => {
@@ -233,11 +242,11 @@ describe('SessionStrategy', () => {
         path: '/api/users/me',
       } as Request;
 
-      sessionService.validateSession.mockRejectedValue(new Error('Database error'));
+      sessionService.authenticateSession.mockRejectedValue(new Error('Database error'));
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow('Database error');
 
-      expect(sessionService.validateSession).toHaveBeenCalledWith('valid-token');
+      expect(sessionService.authenticateSession).toHaveBeenCalledWith('valid-token');
     });
 
     it('should block access when 2FA setup is required', async () => {
@@ -249,7 +258,10 @@ describe('SessionStrategy', () => {
         path: '/api/resources',
       } as Request;
 
-      sessionService.validateSession.mockResolvedValue(mockUser);
+      sessionService.authenticateSession.mockResolvedValue({
+        user: mockUser,
+        session: { id: 'stable-session', ssoContext: null },
+      });
       twoFactorService.getStatus.mockResolvedValue({
         enabled: false,
         required: true,

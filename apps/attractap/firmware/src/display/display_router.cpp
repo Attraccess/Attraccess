@@ -67,6 +67,17 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     }
 
     Display::activeScreen = screen;
+    if (Display::drawerGrabber) {
+        if (screen == &Display::sessionSummaryScreen) lv_obj_add_flag(Display::drawerGrabber, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_remove_flag(Display::drawerGrabber, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (Display::deviceNameLabel) {
+        auto *footer = lv_obj_get_parent(Display::deviceNameLabel);
+        if (screen == &Display::sessionSummaryScreen) lv_obj_add_flag(footer, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_remove_flag(footer, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    Display::updateNetworkQualityOverlay();
 
     lv_screen_load_anim(targetRoot, Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();

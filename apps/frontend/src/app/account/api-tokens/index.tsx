@@ -1,3 +1,4 @@
+import { LocaleDateField } from '../../../components/localeDateField';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Input,
@@ -61,9 +62,14 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const [name, setName] = useState('');
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
   const [expiresAt, setExpiresAt] = useState('');
+  const [expiryValid, setExpiryValid] = useState(true);
   const [secret, setSecret] = useState<string | null>(null);
-  const { data: tokenPage, isPending: isLoadingTokens, isError: isTokenListError, refetch: refetchTokens } =
-    useApiTokensServiceListApiTokens<ApiTokenPage>({ limit: PAGE_SIZE, page });
+  const {
+    data: tokenPage,
+    isPending: isLoadingTokens,
+    isError: isTokenListError,
+    refetch: refetchTokens,
+  } = useApiTokensServiceListApiTokens<ApiTokenPage>({ limit: PAGE_SIZE, page });
   const { mutateAsync: createApiToken, isPending: isCreating } = useApiTokensServiceCreateApiToken<CreatedApiToken>();
   const { mutateAsync: revokeApiToken, isPending: isRevoking } = useApiTokensServiceRevokeApiToken();
   const availablePermissionDetails = useMemo(
@@ -76,6 +82,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   }, [isTokenListError, showToast, t]);
 
   const createToken = async () => {
+    if (!expiryValid) return;
     try {
       const created = await createApiToken({
         requestBody: {
@@ -143,21 +150,35 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         <TableScrollContainer>
           <TableContent aria-label={t('title')}>
             <TableHeader>
-              <TableColumn id="name" isRowHeader>{t('columns.name')}</TableColumn>
+              <TableColumn id="name" isRowHeader>
+                {t('columns.name')}
+              </TableColumn>
               <TableColumn id="permissions">{t('columns.permissions')}</TableColumn>
               <TableColumn id="lastUsed">{t('columns.lastUsed')}</TableColumn>
               <TableColumn id="expires">{t('columns.expires')}</TableColumn>
-              <TableColumn id="actions"><span className="sr-only">{t('columns.actions')}</span></TableColumn>
+              <TableColumn id="actions">
+                <span className="sr-only">{t('columns.actions')}</span>
+              </TableColumn>
             </TableHeader>
             <TableBody items={apiTokens} renderEmptyState={() => <EmptyState message={t('empty')} />}>
               {(apiToken) => (
                 <TableRow key={apiToken.id} id={apiToken.id}>
                   <TableCell>{apiToken.name}</TableCell>
                   <TableCell>{apiToken.permissionKeys.join(', ')}</TableCell>
-                  <TableCell>{apiToken.lastUsedAt ? <DateTimeDisplay date={apiToken.lastUsedAt} /> : t('neverUsed')}</TableCell>
-                  <TableCell>{apiToken.expiresAt ? <DateTimeDisplay date={apiToken.expiresAt} /> : t('neverExpires')}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" isIconOnly aria-label={t('actions.revoke', { name: apiToken.name })} onPress={() => revokeToken(apiToken)} isDisabled={isRevoking}>
+                    {apiToken.lastUsedAt ? <DateTimeDisplay date={apiToken.lastUsedAt} /> : t('neverUsed')}
+                  </TableCell>
+                  <TableCell>
+                    {apiToken.expiresAt ? <DateTimeDisplay date={apiToken.expiresAt} /> : t('neverExpires')}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      isIconOnly
+                      aria-label={t('actions.revoke', { name: apiToken.name })}
+                      onPress={() => revokeToken(apiToken)}
+                      isDisabled={isRevoking}
+                    >
                       <Trash2 size={16} className="text-danger" />
                     </Button>
                   </TableCell>
@@ -207,11 +228,21 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
           drawerClearCategoryLabel={t('picker.clearCategory')}
         />
       </div>
-      <TextField value={expiresAt} onChange={setExpiresAt} isDisabled={isCreating}>
-        <Label>{t('expiryLabel')}</Label>
-        <Input type="date" />
-      </TextField>
-      <Button onPress={createToken} isPending={isCreating} isDisabled={!name.trim() || permissionKeys.size === 0 || isCreating} data-cy="api-token-create-button">
+      <LocaleDateField
+        clearLabel={t('clearExpiry')}
+        label={t('expiryLabel')}
+        value={expiresAt}
+        onChange={setExpiresAt}
+        onValidityChange={setExpiryValid}
+        errorMessage={t('invalidDate')}
+        isDisabled={isCreating}
+      />
+      <Button
+        onPress={createToken}
+        isPending={isCreating}
+        isDisabled={!name.trim() || permissionKeys.size === 0 || !expiryValid || isCreating}
+        data-cy="api-token-create-button"
+      >
         <KeyRound size={16} />
         {t('actions.create')}
       </Button>

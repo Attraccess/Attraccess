@@ -1,9 +1,13 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+// @vitest-environment jsdom
+import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
+
+// Allow query notifications to settle when the shared CI/dev host is busy.
+configure({ asyncUtilTimeout: 10000 });
 
 const { list, getMeta, getSettings, updateSettings, permissions } = vi.hoisted(() => ({
   list: vi.fn(),
@@ -48,9 +52,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => permissions.has(permission) }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', async () => {
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
   const { get } = await import('lodash-es');
   return {
+    ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
     useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
       language: 'en',
       t: (key: string) => get(en, key, key),
@@ -60,7 +65,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
 
 const entry: AuditEntryDto = {
   id: 52,
-  at: '2026-09-13T12:00:00.000Z',
+  at: '2026-09-13T12:00:37.000Z',
   domain: 'resource',
   pluginId: 'core',
   action: 'maintenance_schedule.updated',
@@ -105,7 +110,21 @@ function mount() {
   );
 }
 beforeEach(() => {
-  // happy-dom does not implement the Web Animations API used by HeroUI's tab indicator.
+  // jsdom lacks the layout observers and animation API used by HeroUI's tabs.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {
+        /* No layout in jsdom. */
+      }
+      unobserve() {
+        /* No layout in jsdom. */
+      }
+      disconnect() {
+        /* No layout in jsdom. */
+      }
+    },
+  );
   if (!Element.prototype.getAnimations)
     Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] });
   vi.clearAllMocks();
@@ -120,9 +139,62 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   client?.clear();
+  vi.unstubAllGlobals();
 });
 
 describe('audit admin workflows', () => {
+  it.each(['From', 'To'])(
+    'blocks applying an incomplete %s date until completed or cleared',
+    async (label) => {
+      const user = userEvent.setup();
+      mount();
+      await screen.findByRole('button', { name: 'View event #52' });
+      const field = within(screen.getAllByRole('group', { name: label })[0]);
+      const apply = screen.getByRole('button', { name: 'Apply filters' });
+      for (const [segment, value] of [
+        ['month', '11'],
+        ['day', '23'],
+        ['year', '2026'],
+        ['hour', '05'],
+        ['minute', '45'],
+        ['AM/PM', 'a'],
+      ]) {
+        await user.click(field.getByRole('spinbutton', { name: new RegExp(`^${segment},`) }));
+        await user.keyboard(value);
+      }
+      expect(apply).toBeEnabled();
+      await user.click(field.getByRole('spinbutton', { name: /^day,/ }));
+      await user.keyboard('{Backspace}{Backspace}');
+      expect(apply).toBeDisabled();
+      expect(screen.getByText('Enter valid dates.')).toBeInTheDocument();
+      const requestsBefore = list.mock.calls.length;
+      await user.click(apply);
+      // Guard the submit handler too, including submissions that bypass the button.
+      const filterForm = apply.closest('form');
+      if (!filterForm) throw new Error('Missing filter form');
+      fireEvent.submit(filterForm);
+      expect(list).toHaveBeenCalledTimes(requestsBefore);
+      await user.click(field.getByRole('spinbutton', { name: /^day,/ }));
+      await user.keyboard('24');
+      expect(apply).toBeEnabled();
+      await user.click(apply);
+      const key = label.toLowerCase();
+      await waitFor(() =>
+        expect(list).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            [key]: new Date('2026-11-24T05:45').toISOString(),
+          }),
+        ),
+      );
+      await user.click(field.getByRole('spinbutton', { name: /^day,/ }));
+      await user.keyboard('{Backspace}{Backspace}');
+      await user.click(field.getByRole('button', { name: `Clear date: ${label}` }));
+      expect(apply).toBeEnabled();
+      await user.click(apply);
+      await waitFor(() => expect(list.mock.lastCall?.[0]).not.toHaveProperty(key));
+    },
+    60000,
+  );
   it('shows localized settings and preserves API-token and request provenance in the details', async () => {
     list.mockResolvedValue({
       items: [
@@ -144,6 +216,18 @@ describe('audit admin workflows', () => {
     mount();
     await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
     const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        new Intl.DateTimeFormat('en', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }).format(new Date(entry.at)),
+      ),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText('Audit logging')).toBeInTheDocument();
     expect(within(dialog).getByText('settings.updated')).toBeInTheDocument();
     expect(within(dialog).getByText('setting #123456')).toBeInTheDocument();
@@ -226,6 +310,22 @@ describe('audit admin workflows', () => {
     );
   });
 
+  it('clears partially typed dates when resetting all filters', async () => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: 'View event #52' });
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'resource.' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'resource.' })));
+    const from = within(screen.getAllByRole('group', { name: 'From' })[0]);
+    await user.click(from.getByRole('spinbutton', { name: /^month,/ }));
+    await user.keyboard('11');
+    expect(screen.getByRole('button', { name: 'Apply filters' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /Clear filters/ }));
+    expect(screen.getByRole('button', { name: 'Apply filters' })).toBeEnabled();
+    expect(screen.queryByText('Enter valid dates.')).not.toBeInTheDocument();
+  });
+
   it('preserves other domains when a plugin domain is switched off, saves and displays persisted settings', async () => {
     mount();
     await userEvent.click(await screen.findByRole('tab', { name: 'Logging settings' }));
@@ -274,6 +374,13 @@ describe('audit admin workflows', () => {
 
 it('exports filtered audit entries as CSV and revokes the download URL', async () => {
   list.mockResolvedValue({ items: [entry], nextCursor: null });
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn();
+      static revokeObjectURL = vi.fn();
+    },
+  );
   const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:audit-export');
   const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
   const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (

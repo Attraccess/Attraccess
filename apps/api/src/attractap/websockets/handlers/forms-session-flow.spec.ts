@@ -68,9 +68,14 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
   let formsHandler: AttractapFormsHandler;
   let sessionHandler: AttractapSessionHandler;
   let startSession: jest.Mock;
+  let endSession: jest.Mock;
 
   beforeEach(async () => {
     startSession = jest.fn().mockResolvedValue({ id: 999 });
+    endSession = jest
+      .fn()
+      .mockResolvedValue({ id: 999, userId: 7, startTime: new Date(0), endTime: new Date(1426999) });
+    form.isRequiredOnResourceUsageEnd = false;
 
     const formRepo = { find: jest.fn().mockResolvedValue([form]), findOne: jest.fn().mockResolvedValue(form) };
     const resourceRepo = { findOne: jest.fn().mockResolvedValue({ id: RESOURCE_ID } as Resource) };
@@ -87,7 +92,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
         { provide: ResourceActionGuard, useValue: { validateResourceAction: jest.fn().mockResolvedValue(true) } },
         { provide: AttractapService, useValue: { findReaderById: jest.fn().mockResolvedValue(null) } },
         { provide: UsersService, useValue: { findOne: jest.fn().mockResolvedValue({ id: 7 }) } },
-        { provide: ResourceUsageService, useValue: { startSession } },
+        { provide: ResourceUsageService, useValue: { startSession, endSession } },
         { provide: ResourceFlowsExecutorService, useValue: {} },
         { provide: SumUpService, useValue: { getIsEnabled: jest.fn().mockResolvedValue(false) } },
         { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
@@ -148,6 +153,42 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
     expect(sentTypes(socket)).not.toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
     expect(startSession).toHaveBeenCalledTimes(1);
     expect(sentTypes(socket)).toContain(AttractapEventType.START_RESOURCE_USAGE_SESSION);
+  });
+
+  it('returns elapsed duration only after the required end form is complete', async () => {
+    form.isRequiredOnResourceUsageEnd = true;
+    const socket = makeSocket();
+    const request = { payload: { resourceId: RESOURCE_ID, requestId: 17 } } as AttractapEvent['data'];
+    await sessionHandler.handleStopResourceUsageSession(socket, request);
+    expect(endSession).not.toHaveBeenCalled();
+    expect(sentTypes(socket)).toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
+    for (const [offset, answers] of [
+      [0, [{ fieldId: 11, value: 'Alice' }]],
+      [1, []],
+      [2, [{ fieldId: 13, value: true }]],
+      [3, [{ fieldId: 14, value: 'red' }]],
+    ] as const) {
+      await formsHandler.handleResourceUsageFormSubmitPage(socket, {
+        payload: {
+          resourceId: RESOURCE_ID,
+          requestId: 17,
+          action: ResourceFormAction.END,
+          formId: FORM_ID,
+          offset,
+          answers,
+        },
+      } as unknown as AttractapEvent['data']);
+    }
+    socket.sendMessage.mockClear();
+    await sessionHandler.handleStopResourceUsageSession(socket, request);
+    expect(endSession).toHaveBeenCalledTimes(1);
+    expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload).toEqual({
+      success: true,
+      requestId: 17,
+      endedOwnSession: true,
+      durationSeconds: 1426,
+    });
+    expect(sentTypes(socket)).not.toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
   });
 
   it('starts with an empty form after cancellation', async () => {

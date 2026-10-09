@@ -1,3 +1,6 @@
+import { SsoSessionRequest } from '../sso-session-request';
+import { OidcTokenVerifier, OidcVerificationUnavailableError } from './oidc-token-verifier.service';
+import { EncryptionService } from '../../../../encryption/encryption.service';
 import { Profile, Strategy } from 'passport-openidconnect';
 import { get } from 'lodash-es';
 import { PassportStrategy } from '@nestjs/passport';
@@ -24,7 +27,7 @@ export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
 export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true) {
+export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
   private readonly logger = new Logger(SSOOIDCStrategy.name);
   private readonly config: SSOProviderOIDCConfiguration;
 
@@ -40,6 +43,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     const scopeWithoutOpenid = configuredScopes.filter((s) => s.trim().toLowerCase() !== 'openid');
 
     super({
+      passReqToCallback: true,
       issuer: config.issuer,
       authorizationURL: config.authorizationURL,
       userInfoURL: config.userInfoURL,
@@ -110,29 +114,48 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     }
   }
 
-  private parseIdTokenClaims(idToken?: string): Record<string, unknown> | undefined {
-    if (!idToken) {
-      return undefined;
-    }
-
-    const parts = idToken.split('.');
-    if (parts.length < 2) {
-      this.logger.warn('OIDC id_token format invalid; skipping claim extraction');
-      return undefined;
-    }
-
+  // Explicit six-argument Passport verify callback: req, issuer, profile, context, id_token, done.
+  async validate(
+    req: SsoSessionRequest,
+    issuer: string,
+    profile: Profile,
+    context: unknown,
+    idToken: string,
+  ): Promise<User> {
+    const verifier = this.moduleRef.get(OidcTokenVerifier, { strict: false });
+    let claims: Record<string, unknown> | undefined;
     try {
-      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-      const payload = Buffer.from(padded, 'base64').toString('utf8');
-      return JSON.parse(payload) as Record<string, unknown>;
+      claims = await verifier.verify(idToken, this.config);
+      if (claims.sub !== profile.id || issuer !== this.config.issuer || 'events' in claims)
+        throw new UnauthorizedException('Invalid OIDC identity');
+      const encryption = this.moduleRef.get(EncryptionService, { strict: false });
+      req.ssoSessionContext = {
+        protocol: 'OIDC',
+        providerId: this.config.ssoProviderId,
+        issuer: this.config.issuer,
+        subject: profile.id,
+        providerIssuedAt: Number(claims.iat) * 1000,
+        ...(typeof claims.sid === 'string' && claims.sid ? { sid: claims.sid } : {}),
+        idTokenEncrypted: encryption.encrypt(idToken),
+      };
     } catch (error) {
-      this.logger.warn(`Failed to parse id_token claims: ${String(error)}`);
-      return undefined;
+      // Old providers without usable discovery/JWKS retain their existing OAuth login path,
+      // but cannot participate in logout correlation. Explicit JWKS configuration fails closed.
+      if (this.config.jwksURL || !(error instanceof OidcVerificationUnavailableError))
+        throw new UnauthorizedException('OIDC ID token verification failed');
+      this.logger.warn('OIDC ID token could not be verified; central logout unavailable for this session');
+      delete req.ssoSessionContext;
+      claims = undefined;
     }
+    return this.validateProfile(issuer, profile, context, claims);
   }
 
-  async validate(_issuer: string, profile: Profile, _context?: unknown, idToken?: string): Promise<User> {
+  async validateProfile(
+    _issuer: string,
+    profile: Profile,
+    _context?: unknown,
+    idTokenClaims?: Record<string, unknown>,
+  ): Promise<User> {
     this.logger.log(`Validating OIDC profile for issuer: ${_issuer}`);
 
     const oidcUserId = profile.id;
@@ -151,7 +174,6 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     const claimSources: unknown[] = [profile];
     const raw = profile && '_json' in profile && profile._json ? profile._json : undefined;
     if (raw) claimSources.push(raw);
-    const idTokenClaims = this.parseIdTokenClaims(idToken);
     if (idTokenClaims) claimSources.push(idTokenClaims);
 
     // Resolve email via configured or default paths
