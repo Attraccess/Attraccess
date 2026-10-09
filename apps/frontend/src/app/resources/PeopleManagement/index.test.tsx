@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { cleanup, render, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, vi, expect, it } from 'vitest';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { PeopleManagement } from './index';
 import type { AddPersonDrawer } from './AddPersonDrawer';
 import type { IntroductionCommentModal } from './IntroductionCommentModal';
@@ -136,6 +137,8 @@ beforeEach(() => {
     state[name].mockResolvedValue(undefined);
 });
 afterEach(cleanup);
+const originalLanguage = useTranslationState.getState().language;
+afterEach(() => useTranslationState.getState().setLanguage(originalLanguage));
 function mount(props: Partial<ComponentProps<typeof PeopleManagement>> = {}) {
   return render(
     <MemoryRouter>
@@ -143,6 +146,42 @@ function mount(props: Partial<ComponentProps<typeof PeopleManagement>> = {}) {
     </MemoryRouter>,
   );
 }
+
+const subtitleCases = [
+  ['en', 'resource', false, 'Manage introducers, maintainers and introductions for this resource'],
+  ['en', 'resource', true, 'Manage introducers, maintainers and introductions for this resource'],
+  ['en', 'group', false, 'Manage introducers, maintainers and introductions for this group'],
+  ['en', 'group', true, 'Manage introducers, maintainers and introductions for this group'],
+  ['de', 'resource', false, 'Einweiser, Wartende und Einweisungen für diese Ressource verwalten'],
+  ['de', 'resource', true, 'Einweiser, Wartende und Einweisungen für diese Ressource verwalten'],
+  ['de', 'group', false, 'Einweiser, Wartende und Einweisungen für diese Gruppe verwalten'],
+  ['de', 'group', true, 'Einweiser, Wartende und Einweisungen für diese Gruppe verwalten'],
+] as const;
+it.each(subtitleCases)('renders the %s %s subtitle (actions=%s)', (language, targetType, hasActions, subtitle) => {
+  useTranslationState.getState().setLanguage(language);
+  mount({ target: { type: targetType, id: 7 }, canManageIntroducers: hasActions, canManageIntroductions: false });
+  expect(screen.getByText(subtitle)).toBeTruthy();
+});
+it.each(subtitleCases)(
+  'hides the %s %s header while retaining people and actions (actions=%s)',
+  (language, targetType, hasActions, subtitle) => {
+    useTranslationState.getState().setLanguage(language);
+    mount({
+      target: { type: targetType, id: 7 },
+      hideHeader: true,
+      canManageIntroducers: hasActions,
+      canManageIntroductions: hasActions,
+    });
+    expect(screen.queryByText(subtitle)).toBeNull();
+    expect(screen.queryByText(language === 'en' ? 'People & Permissions' : 'Personen & Berechtigungen')).toBeNull();
+    expect(screen.getByText('Alex')).toBeTruthy();
+    const addIntroduction = screen.queryByRole('button', {
+      name: language === 'en' ? 'Grant introduction' : 'Einweisung gewähren',
+    });
+    if (hasActions) expect(addIntroduction).toBeTruthy();
+    else expect(addIntroduction).toBeNull();
+  },
+);
 
 it('renders people, limits inherited-role removal, and handles history and introduction changes', async () => {
   mount();
