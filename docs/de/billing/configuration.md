@@ -20,6 +20,7 @@ Sie können die folgenden Optionen pro Ressource kombinieren:
 | **Credits pro Nutzung**        | Eine pauschale Anzahl von Credits, die pro Nutzungssitzung berechnet wird. Die Dauer spielt keine Rolle.                          |
 | **Credits pro Minute**         | Credits für jede angefangene Minute der Nutzungssitzung.                                                                          |
 | **Credits pro Betriebsminute** | Credits für jede angefangene Minute des aufgezeichneten Maschinenbetriebs, die der Sitzung zugeordnet ist. Standardwert ist null. |
+| **Preis pro Messwert**            | Optionaler Preis für jeden benannten Zähler. Standardwert ist null.     |
 
 > [!TIP]
 > Die Gebühren werden addiert. Beispiel: 10 Credits pro Nutzung + 2 Credits pro Sitzungsminute für eine 30-minütige Sitzung + 3 Credits pro Betriebsminute für 10 Minuten Maschinenbetrieb = 10 + 60 + 30 = 100 Credits, vor Anwendung des Abrechnungsfaktors des Benutzers.
@@ -27,6 +28,12 @@ Sie können die folgenden Optionen pro Ressource kombinieren:
 Sitzungsdauer und Betriebsdauer werden unabhängig voneinander auf volle Minuten aufgerundet. Genau eine Minute bleibt eine abgerechnete Minute; eine aufgezeichnete Dauer von null bleibt null. Für die Betriebsdauer sind aufgezeichnete Betriebszustände aus [Flows](flows/node-types.md) erforderlich. Der Start einer Sitzung allein belegt keinen Maschinenbetrieb.
 
 Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers werden beim Sitzungsstart gespeichert. Spätere Konfigurationsänderungen gelten für neue Sitzungen. Der gespeicherte Faktor wird auf die Summe aller Sitzungsposten angewendet, einschließlich zusätzlicher Abrechnungsposten aus Flows.
+
+## Zählerverbrauch
+
+Jeder benannte Zähler kann in den Abrechnungseinstellungen einen Preis pro Messwert erhalten. Mehrere Zähler können gemeinsam abgerechnet werden. Namen und Preise werden beim Sitzungsstart gespeichert. Nur Sitzungsverbrauch wird berechnet; Leerlaufverbrauch erhöht den Gesamtverbrauch. Ein Preis von null deaktiviert nur die Abrechnung.
+
+Siehe [Zähler und verbrauchsbasierte Abrechnung](flows/energy-metering.md) für Einrichtung, Meldemodi, Migration und Abrechnung.
 
 ## Beispielkonfigurationen
 
@@ -41,7 +48,7 @@ Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers 
 Das aktuelle Credit-Guthaben jedes Benutzers wird auf dessen Kontoseite angezeigt. Administratoren mit der Berechtigung **Abrechnung verwalten** koennen die Guthaben aller Benutzer einsehen und anpassen.
 
 > [!NOTE]
-> Sind alle drei Tarife auf null gesetzt, fallen keine automatischen Nutzungsgebühren an. Flows können weiterhin zusätzliche Abrechnungsposten hinzufügen.
+> Sind alle Tarife auf null gesetzt, fallen keine automatischen Nutzungsgebühren an. Flows können weiterhin zusätzliche Abrechnungsposten hinzufügen.
 
 ## Erforderliche Berechtigung
 
@@ -50,6 +57,7 @@ Die Konfiguration der Abrechnungseinstellungen erfordert die Berechtigung **Abre
 ## Siehe auch
 
 - [Abrechnung Ueberblick](billing/overview.md) -- Wie die Abrechnung funktioniert
+- [Zähler](flows/energy-metering.md) -- Zählereinrichtung und Verbrauchsabrechnung
 - [Transaktionen](billing/transactions.md) -- Transaktionshistorie einsehen
 - [Ressourcen-Detailseite](resources/resource-details.md) -- Ressourcenkonfiguration
 - [Berechtigungen](user-management/permissions.md) -- Systemberechtigungen

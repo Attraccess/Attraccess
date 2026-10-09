@@ -45,6 +45,7 @@ public:
     void destroy() override;
 
     void setResourceAndUsageDetails(const API::ResourceBrief &resource);
+    void setUsageStats(const API::UsageStats &stats);
     void setSessionTimeoutTime(uint32_t sessionTimeoutTime);
     void setSessionTimeoutPaused(bool paused);
     void extendSessionTimeoutBy(uint32_t ms);
@@ -78,9 +79,9 @@ public:
     void setFormsCancelCallback(std::function<void()> callback);
 
     // UI helpers for async actions
-    void showActionProgress(const char *text);
+    void showActionProgress(const FirmwareI18n::Text &text);
     void hideActionProgress();
-    void showSuccessToast(const char *text, uint16_t ms = 1200);
+    void showSuccessToast(const FirmwareI18n::Text &text, uint16_t ms = 1200);
 
     void setProjects(const API::ProjectsOfUserResponse &projects);
 
@@ -91,7 +92,7 @@ private:
     std::string loginUsernameCache;
     SessionHeader sessionHeader;
     ActionOverlay actionOverlay;
-    std::string actionTitle;
+    FirmwareI18n::Text actionTitle;
 
     lv_obj_t *sessionDetailsContainer = nullptr;
     time_t sessionStartTime = 0;
@@ -193,6 +194,13 @@ private:
     std::function<void()> formPageBackCallback;
     std::function<void()> formsCancelCallback;
 
+    void updateUsageStatsDisplay();
+    lv_obj_t *usageStatsContainer = nullptr;
+    lv_obj_t *meterValue = nullptr;
+    lv_obj_t *operatingValue = nullptr;
+    API::UsageStats usageStats{};
+    bool usageStatsValid = false;
+    uint32_t usageStatsReceivedAt = 0;
     void updateElapsedTimeDisplay();
     lv_obj_t *elapsedTime = nullptr;
 
@@ -223,8 +231,8 @@ private:
     void updateSelectButtonStyles(FormFieldWidget &widget);
     void updateSelectOptionLayout(FormFieldWidget &widget);
 
-    lv_obj_t *noIntroductionPanel;
-    lv_obj_t *introducersListLabel;
+    lv_obj_t *noIntroductionPanel = nullptr;
+    lv_obj_t *introducersListLabel = nullptr;
     lv_obj_t *maintenancePanel = nullptr;
     lv_obj_t *maintenanceIntroducersLabel = nullptr;
     lv_obj_t *healthPanel = nullptr;

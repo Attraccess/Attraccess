@@ -1,7 +1,7 @@
 // NodeCatalogPanel: responsive container hosting CatalogContent in sidebar and mobile overlay
 // FEATURE: Node catalog redesign — top-level panel
 import { forwardRef, useCallback, useImperativeHandle } from 'react';
-import { DrawerBody, DrawerHeader, useOverlayState, Button, Spinner } from '@heroui/react';
+import { DrawerBody, DrawerHeader, DrawerHeading, useOverlayState, Button, Spinner } from '@heroui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
@@ -119,7 +119,7 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
 
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           {loadingSpinner ?? (

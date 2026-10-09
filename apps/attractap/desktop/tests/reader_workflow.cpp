@@ -1,6 +1,6 @@
 #include "application/application.hpp"
 #include "profile_store.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstring>
@@ -86,6 +86,14 @@ lv_obj_t *label(lv_obj_t *root, const char *text) {
     return nullptr;
 }
 
+lv_obj_t *requireLabel(lv_obj_t *root, const char *text) {
+    auto *found = label(root, text);
+    if (!found)
+        throw std::runtime_error(std::string("Missing label: ") + text +
+                                 "; active language: " + State::getActiveLanguage());
+    return found;
+}
+
 int main(int argc, char **argv) {
     const bool timeouts = argc > 1 && std::string(argv[1]) == "--timeouts";
     const std::filesystem::path output = argc > 1 && !timeouts ? argv[1] : "";
@@ -112,13 +120,29 @@ int main(int argc, char **argv) {
     setQuality(State::NETWORK_QUALITY_GOOD);
     auto pump = [&](uint32_t duration = 60) {
         const auto end = millis() + duration;
-        do { application.loop(); lv_timer_handler(); std::this_thread::sleep_for(std::chrono::milliseconds(5)); }
-        while (static_cast<int32_t>(end - millis()) > 0);
+        unsigned iterations = 0;
+        // Display refresh precedes API processing in the application loop.
+        // Always allow the following tick to render received state, even if
+        // a loaded host consumed the entire wall-clock interval in one tick.
+        do {
+            application.loop(); lv_timer_handler();
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            ++iterations;
+        } while (iterations < 2 || static_cast<int32_t>(end - millis()) > 0);
     };
     auto click = [&](const char *text, bool popup = false) {
         auto *found = label(popup ? lv_layer_top() : lv_screen_active(), text);
         if (!found) throw std::runtime_error(std::string("Missing button: ") + text);
-        assert(!lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED));
+        // Screen transitions can leave controls disabled until their animation finishes.
+        const auto readyDeadline = millis() + 2000;
+        while (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED) &&
+               static_cast<int32_t>(readyDeadline - millis()) > 0) {
+            pump();
+            found = label(popup ? lv_layer_top() : lv_screen_active(), text);
+            if (!found) throw std::runtime_error(std::string("Button disappeared: ") + text);
+        }
+        if (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED))
+            throw std::runtime_error(std::string("Button stayed disabled: ") + text);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_PRESSED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_RELEASED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_CLICKED, nullptr);
@@ -127,6 +151,7 @@ int main(int argc, char **argv) {
     unsigned listVersion = 0;
     std::string username = "Alex";
     bool active = false, supervised = false;
+    uint32_t activeUsageId = 99;
     std::string longDescription =
         "RFI 5-2 · Angstrom Engineering · Åmod · evaporation tool with a long description that must remain readable in details. ";
     while (longDescription.size() < 600)
@@ -148,28 +173,41 @@ int main(int argc, char **argv) {
             r["type"] = id == 3 ? "door" : "machine";
             r["isHealthy"] = true;
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
-            if (id == 1 && active) { r["activeUsageSession"]["user"]["username"] = username; r["activeUsageSession"]["startTime"] = "2026-09-22T07:00:00Z"; }
+            if (id == 1 && active) {
+                r["activeUsageSession"]["id"] = activeUsageId;
+                r["activeUsageSession"]["user"]["username"] = username;
+                char startTime[32];
+                const auto start = time(nullptr) - 1426;
+                std::strftime(startTime, sizeof(startTime), "%Y-%m-%dT%H:%M:%SZ", gmtime(&start));
+                r["activeUsageSession"]["startTime"] = startTime;
+            }
         }
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
         pump();
     };
     lv_obj_t *drawerSettingsBeforeLogin = nullptr;
+    std::string userLocale = "de";
     auto login = [&](bool refresh = true) {
         nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
         if (drawerSettingsBeforeLogin) {
-            assert(!lv_obj_is_visible(label(lv_layer_top(), FirmwareI18n::translate("Wartung"))));
+            assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))));
             lv_obj_send_event(drawerSettingsBeforeLogin, LV_EVENT_CLICKED, nullptr);
             pump();
             assert(lv_screen_active() == Display::resourceListScreen.getScreen());
             drawerSettingsBeforeLogin = nullptr;
         }
-        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","language":"de","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
+        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\",\"language\":\"" + userLocale + R"(","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
         pump(250); nfc.setPresent(0, false);
         if (refresh) list();
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
         pump();
     };
-    list(false, true); pump(2100);
+    list(false, true);
+    // Wait for the boot delay and screen animation to complete on loaded runners.
+    const auto bootDeadline = millis() + 10000;
+    while (lv_screen_active() != Display::resourceListScreen.getScreen() &&
+           static_cast<int32_t>(bootDeadline - millis()) > 0)
+        pump();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     auto *networkBadge = lv_obj_get_parent(label(lv_layer_top(), "OK NET"));
     assert(lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
@@ -200,8 +238,8 @@ int main(int argc, char **argv) {
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 140, true}; pump();
     display.touch.pressed = false; pump();
-    assert(lv_obj_is_visible(label(lv_layer_top(), FirmwareI18n::translate("Wartung"))));
-    drawerSettingsBeforeLogin = lv_obj_get_parent(label(lv_layer_top(), FirmwareI18n::translate("Einstellungen")));
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))));
+    drawerSettingsBeforeLogin = lv_obj_get_parent(label(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Settings, State::getActiveLanguage())));
     login();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Alex"));
@@ -217,7 +255,7 @@ int main(int argc, char **argv) {
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 140, true}; pump();
     display.touch.pressed = false; pump();
-    assert(!lv_obj_is_visible(label(lv_layer_top(), FirmwareI18n::translate("Wartung"))));
+    assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))));
     display.capture(output, "03-pending-start");
     server.push("START_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
     assert(server.count("REQUEST_RESOURCE_LIST") > 0);
@@ -238,6 +276,43 @@ int main(int argc, char **argv) {
     assert(lv_obj_get_height(fullDescription) == 28);
     lv_area_t fullDescriptionBounds;
     lv_obj_get_coords(fullDescription, &fullDescriptionBounds);
+    assert(server.count("RESOURCE_USAGE_STATS") == 1);
+    const auto statsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    assert(server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["resourceId"].as<uint32_t>() == 1);
+    auto stats = [&](uint32_t request, uint32_t usage, const char *values) {
+        server.push("RESOURCE_USAGE_STATS", "{\"resourceId\":1,\"requestId\":" + std::to_string(request) +
+            ",\"usage\":{\"id\":" + std::to_string(usage) + "," + values + "}}");
+        pump();
+    };
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    display.capture(output, "05c-usage-stats-waiting");
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9007199254740993.125\",\"creditsPerUnit\":9007199254740991,\"formattedRate\":\"90.071.992.547.409,91 EUR\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: 9007199254740993.125\n90.071.992.547.409,91 EUR / Wert"));
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":null,\"creditsPerUnit\":0,\"formattedRate\":\"0,00 EUR\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: Warte auf Messwert\n0,00 EUR / Wert"));
+    stats(statsRequest, 99,
+          "\"meters\":[{\"name\":\"Energy (kWh)\",\"value\":\"0.125\",\"creditsPerUnit\":30,\"formattedRate\":\"0,30 EUR\"},"
+          "{\"name\":\"Heartbeats\",\"value\":\"0\",\"creditsPerUnit\":0,\"formattedRate\":\"0,00 EUR\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
+    assert(label(lv_screen_active(), "Energy (kWh): 0.125\n0,30 EUR / Wert\nHeartbeats: 0\n0,00 EUR / Wert"));
+    display.capture(output, "05f-usage-stats-captured-rates");
+    stats(statsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.125\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
+    assert(label(lv_screen_active(), "Heartbeats: 0.125"));
+    assert(label(lv_screen_active(), "00:02:03 · Läuft"));
+    display.capture(output, "05d-usage-stats-running");
+    // Replies for earlier requests or another usage cannot overwrite the displayed reading.
+    stats(statsRequest - 1, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    stats(statsRequest, 100, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    assert(label(lv_screen_active(), "Heartbeats: 0.125"));
+    stats(statsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0\"}],\"operatingDurationMs\":0,\"isOperating\":false");
+    assert(label(lv_screen_active(), "Heartbeats: 0"));
+    assert(label(lv_screen_active(), "00:00:00 · Leerlauf"));
+    display.capture(output, "05e-usage-stats-idle");
+    stats(statsRequest, 99, "\"meters\":[],\"operatingDurationMs\":null,\"isOperating\":null");
+    assert(label(lv_screen_active(), "Keine Daten"));
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(statsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.125\"}],\"operatingDurationMs\":123000,\"isOperating\":true");
     display.capture(output, "05-details-running");
     const auto beforeMarquee = display.pixels;
     pump(1200);
@@ -247,6 +322,34 @@ int main(int argc, char **argv) {
         for (int x = fullDescriptionBounds.x1; x <= fullDescriptionBounds.x2; ++x)
             marqueeMoved |= beforeMarquee[y * 480 + x] != display.pixels[y * 480 + x];
     assert(marqueeMoved);
+    lv_obj_send_event(lv_screen_active(), LV_EVENT_PRESSED, nullptr);
+    const auto pollsBefore = server.count("RESOURCE_USAGE_STATS");
+    pump(10000);
+    assert(server.count("RESOURCE_USAGE_STATS") > pollsBefore);
+    const auto latestStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    stats(latestStatsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.250\"}],\"operatingDurationMs\":130000,\"isOperating\":false");
+    assert(label(lv_screen_active(), "Heartbeats: 0.250"));
+    // Changing sessions clears A's cached reading before B's reply arrives.
+    activeUsageId = 100; list();
+    const auto replacementStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    assert(replacementStatsRequest != latestStatsRequest);
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(latestStatsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    assert(label(lv_screen_active(), "Warte auf Messwert"));
+    stats(replacementStatsRequest, 100, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.500\"}]");
+    stats(latestStatsRequest, 99, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    server.push("RESOURCE_USAGE_STATS", "{\"resourceId\":1,\"requestId\":" + std::to_string(latestStatsRequest) + ",\"usage\":null}");
+    pump();
+    assert(label(lv_screen_active(), "Heartbeats: 0.500"));
+    // Ending a session while its lookup is outstanding keeps the panel hidden.
+    activeUsageId = 101; list();
+    const auto endingStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
+    active = false; list();
+    stats(endingStatsRequest, 101, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Warte auf Messwert")));
+    active = true; activeUsageId = 99; list();
+    stats(server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>(), 99,
+          "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.250\"}],\"operatingDurationMs\":130000,\"isOperating\":false");
     auto *backButton = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
     auto *logoutButton = lv_obj_get_parent(label(lv_screen_active(), "Abmelden"));
     assert(lv_obj_get_parent(backButton) == lv_obj_get_parent(logoutButton));
@@ -294,16 +397,21 @@ int main(int argc, char **argv) {
     assert(server.count("RESOURCE_USAGE_FORM_SUBMIT_PAGE") == 1);
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":true})"); pump();
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeForm + 2);
-    server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
+    server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"billingSummary":{"amount":1250,"total":"12,50 EUR"}})"); pump();
+    assert(label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
+    assert(label(lv_layer_top(), "12,50 EUR"));
     active = false; list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Start"));
     display.capture(output, "06c-form-completed-stop");
+    display.capture(output, "06d-session-billing-summary");
+    click("OK", true);
+    assert(!label(lv_layer_top(), "12,50 EUR"));
     // A separately running usage is unaffected by reader logout.
     active = true; list();
     const auto stopsBeforeLogout = server.count("STOP_RESOURCE_USAGE_SESSION");
     click("Abmelden");
-    assert(!label(lv_screen_active(), "Alex") || !lv_obj_is_visible(label(lv_screen_active(), "Alex")));
+    assert(!label(lv_screen_active(), "Alex") || !lv_obj_is_visible(requireLabel(lv_screen_active(), "Alex")));
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeLogout);
     display.capture(output, "07-logout-usage-preserved");
     click("CNC Fräse");
@@ -318,7 +426,7 @@ int main(int argc, char **argv) {
     assert(server.last("UNLOCK_DOOR")["data"]["payload"]["resourceId"].as<int>() == 3);
     server.push("UNLOCK_DOOR", R"({"error":"Denied by test"})"); pump(); list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(label(lv_layer_top(), "Denied by test"));
+    assert(label(lv_layer_top(), "Something went wrong. Please try again."));
     display.capture(output, "10-action-error");
     Display::hidePopup();
     active = false; supervised = true; list(); click("Aufsicht");
@@ -349,18 +457,19 @@ int main(int argc, char **argv) {
     server.push("RESOURCE_LIST", R"({"revision":1,"authenticatedUsername":"Alex","resources":[]})"); pump();
     assert(label(lv_screen_active(), "Stop"));
     // A newer broadcast can overtake the matching refresh without trapping input.
-    click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
+    click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"billingSummary":{"amount":0,"total":"0,00 EUR"}})"); pump();
+    assert(!label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
     active = false; list(true, false, false);
     const auto refreshId = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
     server.push("RESOURCE_LIST", "{\"revision\":" + std::to_string(listVersion - 1) + ",\"requestId\":" + std::to_string(refreshId) + ",\"resources\":[]}"); pump();
     assert(label(lv_screen_active(), "Start"));
-    assert(!lv_obj_is_visible(label(lv_screen_active(), "Status wird geladen")));
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Status wird geladen")));
     active = true; list();
     State::setWebsocketState(false, "reader.test", 80, false); pump();
     State::setWebsocketState(true, "reader.test", 80, false);
     State::setApiState(true, "Test reader"); list(false); pump();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
     display.capture(output, "12-reconnected-signed-out");
     // Both the personalized identity and usage owner retain all 32 characters.
     username = "abcdefghijklmnopqrstuvwxyz012345";
@@ -369,7 +478,7 @@ int main(int argc, char **argv) {
     click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
     active = false; list();
     assert(label(lv_screen_active(), "Start"));
-    assert(!lv_obj_is_visible(label(lv_screen_active(), "Status wird geladen")));
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Status wird geladen")));
     click("Abmelden"); username = "Alex"; active = true; list(false);
     login(); click("Abmelden");
     login(false);
@@ -384,11 +493,193 @@ int main(int argc, char **argv) {
     assert(server.count("START_RESOURCE_USAGE_SESSION") == unsupervisedStarts);
     pump(1100); click("Abbrechen"); list(); click(LV_SYMBOL_LEFT); click("Abmelden");
     supervised = false; active = true; list(false);
+    // Real API parser, NFC verification, application callbacks and display loop.
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"en-US"})"); pump();
+    assert(State::getActiveLanguage() == "en" && !State::getApiState().userAuthenticated);
+    assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
+    assert(label(lv_layer_top(), "Attractap vdesktop"));
+    // Finish the preceding journey's screen retirement before testing new
+    // overlays. Writing capture files must not decide when that cleanup runs.
+    pump(1100);
+    display.capture(output, "i18n-default-english");
+    const auto defaultLanguage = [&](const char *language) {
+        server.push("READER_LANGUAGE", std::string("{\"language\":\"") + language + "\"}");
+        pump(0); // Exercise API-to-display settling without relying on elapsed time.
+    };
+    // Refresh existing top-layer controls through the production display loop.
+    Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("CARD_NOT_ACTIVE"));
+    pump();
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Card is inactive")));
+    defaultLanguage("de");
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Karte ist nicht aktiv")));
+    display.capture(output, "i18n-popup-german");
+    defaultLanguage("en");
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Card is inactive")));
+    display.capture(output, "i18n-popup-english");
+    Display::hidePopup();
+    // A real driver touch sequence opens the maintenance drawer.
+    display.touch = {240, 10, true}; pump();
+    display.touch = {240, 150, true}; pump();
+    display.touch.pressed = false; pump();
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Maintenance")));
+    defaultLanguage("de");
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Wartung")));
+    display.capture(output, "i18n-drawer-german");
+    defaultLanguage("en");
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Maintenance")));
+    display.capture(output, "i18n-drawer-english");
+    click("Reboot", true);
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Reboot device?")));
+    defaultLanguage("de");
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Gerät neu starten?")));
+    for (const char *caption : {"Gerät neu starten?", "Das Lesegerät wird jetzt neu gestartet."}) {
+        lv_font_glyph_dsc_t glyph{};
+        const auto *font = lv_obj_get_style_text_font(requireLabel(lv_layer_top(), caption), LV_PART_MAIN);
+        assert(lv_font_get_glyph_dsc(font, &glyph, 0x00E4, 0) && !glyph.is_placeholder);
+    }
+    display.capture(output, "i18n-reboot-german");
+    defaultLanguage("en");
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Reboot device?")));
+    display.capture(output, "i18n-reboot-english");
+    click("Cancel", true);
+    assert(!label(lv_layer_top(), "Reboot device?"));
+    // Display-module fixtures keep dialogs open while real API locale messages
+    // drive the normal display loop. Authentication itself is exercised below.
+    {
+        ResourceDetailsScreen dialogs;
+        API::ResourceBrief resource{};
+        resource.id = 1; resource.isHealthy = true;
+        std::strcpy(resource.name, "Maintenance");
+        dialogs.setResourceAndUsageDetails(resource);
+        dialogs.setUserDetails({"Fixture user", true, true, true, false});
+        Display::transitionToScreen(&dialogs);
+        API::ProjectsOfUserResponse projects{};
+        projects.page = 2; projects.limit = 10; projects.total = 50; projects.count = 1;
+        projects.items[0] = {42, "Maintenance %s"};
+        dialogs.setProjects(projects);
+        auto *projectButton = lv_obj_get_parent(label(dialogs.getScreen(), "Choose project"));
+        lv_obj_send_event(projectButton, LV_EVENT_CLICKED, nullptr);
+        const auto refreshDialogs = [&](const char *language) {
+            server.push("READER_LANGUAGE", std::string("{\"language\":\"") + language + "\"}");
+            api.loop(); Display::loop(); lv_timer_handler();
+        };
+        refreshDialogs("de");
+        assert(label(lv_layer_top(), "Seite 2 von 5"));
+        assert(label(lv_layer_top(), "Maintenance %s"));
+        display.capture(output, "i18n-project-dialog-german");
+        refreshDialogs("en");
+        assert(label(lv_layer_top(), "Page 2 of 5"));
+        assert(label(lv_layer_top(), "Maintenance %s"));
+        display.capture(output, "i18n-project-dialog-english");
+        auto *closeProject = lv_obj_get_parent(label(lv_layer_top(), LV_SYMBOL_CLOSE));
+        lv_obj_send_event(closeProject, LV_EVENT_CLICKED, nullptr);
+        API::ResourceUsageFormRequest request{};
+        request.resourceId = 1; request.action = API::ResourceUsageFormActionType::START;
+        request.resourceName = "Maintenance"; request.formCount = 1;
+        request.forms[0] = {1, "Notes %s", 1};
+        dialogs.showFormsModal(request);
+        API::ResourceUsageFormFieldsPage page{};
+        page.formId = 1; page.fieldCount = 1;
+        page.fields[0].id = 5; page.fields[0].name = "Maintenance";
+        page.fields[0].type = API::ResourceUsageFormFieldType::TEXT;
+        page.fields[0].isRequired = true;
+        dialogs.renderFormField(page, false, true, 2, 3);
+        auto *submit = lv_obj_get_parent(label(lv_layer_top(), "Submit"));
+        lv_obj_send_event(submit, LV_EVENT_CLICKED, nullptr);
+        refreshDialogs("de");
+        assert(label(lv_layer_top(), "Pflichtfeld"));
+        display.capture(output, "i18n-form-dialog-german");
+        refreshDialogs("en");
+        assert(label(lv_layer_top(), "Required field"));
+        assert(label(lv_layer_top(), "Please complete before starting\nMaintenance - Notes %s"));
+        display.capture(output, "i18n-form-dialog-english");
+        dialogs.hideFormsModal();
+        Display::transitionToScreen(&Display::resourceListScreen);
+        pump(1100); // Retire the fixture through the production screen router.
+        dialogs.destroy();
+    }
+    userLocale = "de_AT"; login();
+    assert(State::getActiveLanguage() == "de" && State::getApiState().userAuthenticated);
+    server.push("READER_LANGUAGE", R"({"language":"de-!!!"})"); pump();
+    assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "de");
+    click("Abmelden");
+    assert(State::getActiveLanguage() == "en" && label(lv_screen_active(), "Tap RFID card or open a resource"));
+    userLocale = "en-US"; username = "Robin"; login();
+    assert(State::getActiveLanguage() == "en");
+    server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
+    assert(State::getActiveLanguage() == "en");
+    display.capture(output, "i18n-user-english-default-german");
+    click("Sign out");
+    assert(State::getActiveLanguage() == "de");
+    username = "Alex"; userLocale = ""; login();
+    assert(State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
+    click("Sign out");
+    // Resource-first authentication uses the verified cardholder locale.
+    list(false); click("Lasercutter"); userLocale = "en"; login(false);
+    assert(State::getActiveLanguage() == "en" && lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    assert(label(lv_screen_active(), "Choose project"));
+    display.capture(output, "i18n-resource-first-english");
+    State::setWebsocketState(false, "reader.test", 80, false); pump();
+    assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "de");
+    State::setWebsocketState(true, "reader.test", 80, false);
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"en"})"); list(false); pump();
+    assert(State::getActiveLanguage() == "en");
+    // A failed NFC verification cannot activate the advertised language.
+    nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
+    server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Wrong card","language":"de","keyNo":0,"key":"11111111111111111111111111111111"})"); pump();
+    assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
+    assert(label(lv_layer_top(), "Sign-in failed"));
+    display.capture(output, "i18n-failed-verification-default");
+    Display::hidePopup(); nfc.setPresent(0, false); pump();
+    server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
+    // API rejection clears the session and keeps the most recent default.
+    userLocale = "en"; login();
+    server.push("READER_UNAUTHORIZED", R"({"message":"PLEASE_REREGISTER"})"); pump();
+    assert(!State::getApiState().authenticated && !State::getApiState().userAuthenticated);
+    assert(State::getActiveLanguage() == "de");
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":""})"); list(false); pump();
+    assert(State::getActiveLanguage() == "en");
+    Settings::saveNetworkConfig("Maintenance %s", "test-password");
+    Display::transitionToScreen(&Display::connectionConfigurationScreen);
+    Display::loop();
+    assert(label(lv_screen_active(), "Device"));
+    display.capture(output, "i18n-configuration-pin-english");
+    // The PIN prompt is covered separately; inspect the actual configuration
+    // controls after unlocking, including retained data and the selected tab.
+    Display::connectionConfigurationScreen.disablePinLock();
+    auto *configurationTabs = lv_obj_get_child(lv_screen_active(), 0);
+    assert(lv_obj_check_type(configurationTabs, &lv_tabview_class));
+    const auto captureConfiguration = [&](const char *language) {
+        for (uint32_t tab = 0; tab < 3; ++tab) {
+            lv_tabview_set_active(configurationTabs, tab, LV_ANIM_OFF);
+            Display::loop();
+            const std::string name = std::string("i18n-configuration-") + language + "-" + std::to_string(tab);
+            display.capture(output, name.c_str());
+        }
+    };
+    captureConfiguration("english");
+    assert(lv_tabview_get_tab_active(configurationTabs) == 2);
+    server.push("READER_LANGUAGE", R"({"language":"de"})"); api.loop(); Display::loop();
+    assert(label(lv_screen_active(), "Gerät"));
+    assert(label(lv_screen_active(), "Maintenance %s"));
+    assert(lv_tabview_get_tab_active(configurationTabs) == 2);
+    captureConfiguration("german");
+    server.push("READER_LANGUAGE", R"({"language":"en"})"); api.loop(); Display::loop();
+    assert(label(lv_screen_active(), "Device"));
+    assert(label(lv_screen_active(), "Maintenance %s"));
+    assert(lv_tabview_get_tab_active(configurationTabs) == 2);
+    captureConfiguration("english");
+    server.push("READER_LANGUAGE", R"({"language":"de"})"); api.loop(); Display::loop();
+    Display::transitionToScreen(&Display::resourceListScreen); pump();
+    userLocale = "de"; username = "Alex"; list(false);
     if (timeouts) {
+        server.push("READER_LANGUAGE", R"({"language":"en"})"); pump();
         login();
         const auto stopsBeforeTimeout = server.count("STOP_RESOURCE_USAGE_SESSION");
         pump(31050);
-        assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
+        assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
+        server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
         assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeTimeout);
         std::cout << "PASS idle login expiry preserves running usage" << std::endl;
         active = false; login(); click("Start");
@@ -397,11 +688,11 @@ int main(int argc, char **argv) {
         assert(label(lv_screen_active(), "Pausiert"));
         // An unconfirmed action gets a fresh 30-second status-refresh window.
         pump(30500);
-        assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         assert(label(lv_screen_active(), "Status wird geladen"));
         assert(label(lv_layer_top(), "Aktion nicht bestätigt"));
         Display::hidePopup(); active = true; list();
-        assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         std::cout << "PASS action pauses the real 30-second login timeout" << std::endl;
         click("Abmelden");
         nfc.setPresent(0, true); pump(); nfc.setPresent(0, false); pump();
@@ -411,7 +702,7 @@ int main(int argc, char **argv) {
         server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})"); pump();
         pump(31050);
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-        assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         assert(label(lv_layer_top(), "Anmeldung fehlgeschlagen"));
         std::cout << "PASS lifted card authentication expires and recovers" << std::endl;
     }

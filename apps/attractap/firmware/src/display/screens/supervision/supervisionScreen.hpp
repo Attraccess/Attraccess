@@ -39,8 +39,8 @@ public:
     {
         uint32_t deadlineMs = 0;
         std::string requesterName;
-        std::string statusMessage;
-        std::string supervisorHint;
+        FirmwareI18n::Text statusMessage;
+        FirmwareI18n::Text supervisorHint;
         Status status = STATUS_WAITING;
     };
 

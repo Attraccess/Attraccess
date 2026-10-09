@@ -1,4 +1,4 @@
-import { Alert, AlertContent, AlertDescription, Button, ModalBody, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, ModalBody, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
 import { HeartHandshakeIcon } from 'lucide-react';
 import { AlertStatusIcon } from '../AlertStatusIcon';
 import { StandardModal } from '../standardModal';
@@ -46,7 +46,9 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
       >
         {({ close: modalClose }) => (
           <>
-            <ModalHeader>{t('modal.title')}</ModalHeader>
+            <ModalHeader>
+              <ModalHeading>{t('modal.title')}</ModalHeading>
+            </ModalHeader>
             <ModalBody>
               <p className="text-sm">
                 <I18nTransComponent
@@ -73,7 +75,7 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
                 </AlertContent>
               </Alert>
             </ModalBody>
-            <ModalFooter>
+            <ModalFooter className="flex-wrap">
               <Button variant="ghost" onPress={modalClose} data-cy="community-license-cancel">
                 {t('modal.cancel')}
               </Button>

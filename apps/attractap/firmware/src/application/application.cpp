@@ -95,6 +95,16 @@ void Application::setup() {
   this->api.onDeviceName(
       [this](std::string deviceName) { Display::setDeviceName(deviceName); });
 #endif
+#ifdef HAS_LVGL_DISPLAY
+  this->api.setUsageStatsCallback([this](const API::UsageStats &stats) {
+    lv_lock();
+    if (this->unlocked && this->resourceIsSelected && stats.resourceId == this->selectedResourceId &&
+        this->cardAuthenticationData.username == this->resourceList.authenticatedUsername)
+      Display::resourceDetailsScreen.setUsageStats(stats);
+    lv_unlock();
+  });
+#endif
+
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
 #ifdef HAS_LVGL_DISPLAY
@@ -120,7 +130,7 @@ void Application::setup() {
         if (!this->cardAuthenticationPending || this->unlocked) return;
 #endif
         if (response.error.length() > 0) {
-          State::setUserLanguage("");
+          State::setUserLanguage(false);
           this->logger.errorf("Authentication failed: %s",
                               response.error.c_str());
           this->beeper.errorBeep();
@@ -134,7 +144,7 @@ void Application::setup() {
         }
 
         if (response.keyLen != 16) {
-          State::setUserLanguage("");
+          State::setUserLanguage(false);
           this->logger.error("Invalid key bytes provided");
           this->beeper.errorBeep();
           this->nfc.enableCardDetection();
@@ -188,7 +198,7 @@ void Application::setup() {
                 },
                 []() {});
           } else {
-            Display::showErrorPopup("Fehler", translateReaderError("INSUFFICIENT_BALANCE"));
+            Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("INSUFFICIENT_BALANCE"));
           }
           delete p;
         },
@@ -213,15 +223,16 @@ void Application::setup() {
     // Ensure UI operations on LVGL thread
     struct ErrPayload {
       Application *self;
-      std::string t;
-      std::string m;
+      FirmwareI18n::Text t;
+      FirmwareI18n::Text m;
     };
     ErrPayload *p = new ErrPayload();
     if (!p)
       return;
     p->self = this;
-    p->t = title;
-    p->m = message;
+    p->t = FirmwareI18n::Message::Error;
+    this->logger.errorf("Reader error %s: %s", title, message);
+    p->m = FirmwareI18n::readerError(message);
     Display::asyncCall(
         [](void *u) {
           auto *pl = (ErrPayload *)u;
@@ -257,13 +268,19 @@ void Application::setup() {
       const auto &result = payload->result;
       if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
         self->finishReaderAction(result.success);
-        if (result.success) self->onActionResult(result.type);
+        if (result.success) {
+          self->onActionResult(result.type);
+          if (!result.billingTotal.empty()) {
+            self->restartSessionTimeout();
+            Display::showBillingSummary(result.billingTotal);
+          }
+        }
         else {
           self->handleFormsCancel();
           if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
             Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
           } else {
-            Display::showErrorPopup("Aktion fehlgeschlagen", result.error.empty() ? "Bitte erneut versuchen." : translateReaderError(result.error));
+            Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
           }
         }
       }
@@ -414,13 +431,8 @@ void Application::setup() {
   this->api.setEnrollNewCardErrorCallback([this](std::string error) {
     // Runs on the websocket task. Copy into the fixed buffer, then publish via
     // the volatile flag (set last) so the main loop reads a complete message.
-    if (error == "CARD_ALREADY_ENROLLED") {
-      strlcpy(this->enrollErrorMessage, "Karte ist bereits\nregistriert",
-              sizeof(this->enrollErrorMessage));
-    } else {
-      strlcpy(this->enrollErrorMessage, translateReaderError(error).c_str(),
-              sizeof(this->enrollErrorMessage));
-    }
+    strlcpy(this->enrollErrorMessage, error.c_str(),
+            sizeof(this->enrollErrorMessage));
     this->enrollErrorPending = true;
   });
 
@@ -583,7 +595,7 @@ void Application::setup() {
       this->resourceListUpdated = true;
       this->selectedResourceChanged = true;
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
-      else Display::resourceListScreen.showActionProgress("Karte wird geprüft", "Einen Moment bitte ...");
+      else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
       lv_unlock();
       this->api.requestCardAuthenticationData(uid, uidLength, this->authenticationResourceId);
 #else
@@ -680,6 +692,7 @@ void Application::loop() {
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
+  this->pollUsageStats();
   lv_unlock();
 #else
   this->processState();

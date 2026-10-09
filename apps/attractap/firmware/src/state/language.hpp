@@ -11,7 +11,19 @@ inline std::string supported(std::string locale)
         if (character == '_') character = '-';
         else if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
     }
-    return locale.substr(0, locale.find('-')) == "de" ? "de" : "en";
+    const auto start = locale.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "en";
+    locale = locale.substr(start, locale.find_last_not_of(" \t\r\n") - start + 1);
+    const auto separator = locale.find('-');
+    const auto base = locale.substr(0, separator);
+    if (base != "de" && base != "en") return "en";
+    if (separator != std::string::npos) {
+        const auto region = locale.substr(separator + 1);
+        const bool alpha = region.size() == 2 && region[0] >= 'a' && region[0] <= 'z' && region[1] >= 'a' && region[1] <= 'z';
+        const bool numeric = region.size() == 3 && region.find_first_not_of("0123456789") == std::string::npos;
+        if (!alpha && !numeric) return "en";
+    }
+    return base;
 }
 
 inline std::string active(bool userAuthenticated, const std::string &userLanguage, const std::string &defaultLanguage)
@@ -31,15 +43,15 @@ struct Session
     bool userAuthenticated = false;
 
     void setDefault(const std::string &locale) { defaultLanguage = supported(locale); }
-    void setUser(const std::string &locale)
+    void setUser(bool authenticated, const std::string &locale = "")
     {
-        userAuthenticated = !locale.empty();
+        userAuthenticated = authenticated;
         userLanguage = supported(locale);
     }
     void setApi(bool authenticated, const std::string &locale)
     {
         if (!locale.empty()) setDefault(locale);
-        if (!authenticated) setUser("");
+        if (!authenticated) setUser(false);
     }
     std::string active() const { return Language::active(userAuthenticated, userLanguage, defaultLanguage); }
 };

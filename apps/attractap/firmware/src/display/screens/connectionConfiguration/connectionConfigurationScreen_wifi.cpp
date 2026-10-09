@@ -6,9 +6,9 @@
 
 // WiFi network scanning + dropdown population.
 
-static const char *WIFI_DROPDOWN_LOADING = "Suche WLANs...";
-static const char *WIFI_DROPDOWN_EMPTY = "Keine Netzwerke gefunden";
-static const char *WIFI_DROPDOWN_SCAN_FAILED = "WLAN Scan fehlgeschlagen";
+static constexpr auto WIFI_DROPDOWN_LOADING = FirmwareI18n::Message::SearchingForWiFiNetworks;
+static constexpr auto WIFI_DROPDOWN_EMPTY = FirmwareI18n::Message::NoNetworksFound;
+static constexpr auto WIFI_DROPDOWN_SCAN_FAILED = FirmwareI18n::Message::WiFiScanFailed;
 static const uint32_t WIFI_SCAN_TIMEOUT_MS = 10000;
 
 void ConnectionConfigurationScreen::loop()

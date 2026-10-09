@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfügbar. Wartungsarbeiten dürfen nur von den unten aufgeführten Personen durchgeführt werden.";
+static constexpr auto MAINTENANCE_INFO_TEXT = FirmwareI18n::Message::ThisResourceIsUnavailableDuringMaintenanceOnlyThePeopleListedBelowMayPerformMain;
 
 void ResourceDetailsScreen::init()
 {
@@ -17,7 +17,10 @@ void ResourceDetailsScreen::init()
       return;
    }
    this->screen = lv_obj_create(NULL);
-   lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
+   // Detail panels can exceed the display height, especially with many tutors.
+   lv_obj_add_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_scroll_dir(this->screen, LV_DIR_VER);
+   lv_obj_set_scrollbar_mode(this->screen, LV_SCROLLBAR_MODE_AUTO);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    DisplayTheme::applyScreen(this->screen);
@@ -97,7 +100,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForSessionStartTime, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForSessionStartTime, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForSessionStartTime, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForSessionStartTime, "Startzeit");
+   FirmwareI18n::setLabel(labelForSessionStartTime, FirmwareI18n::Message::StartTime);
    lv_obj_set_style_text_color(labelForSessionStartTime, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForSessionStartTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -105,7 +108,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->sessionStartTimeLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->sessionStartTimeLabel, "??.??. ??:??");
+   FirmwareI18n::setLabel(this->sessionStartTimeLabel, FirmwareI18n::Text::literal("??.??. ??:??"));
    lv_obj_set_style_text_font(this->sessionStartTimeLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->sessionStartTimeLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -127,7 +130,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(labelForCurrentUser, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(labelForCurrentUser, LV_FLEX_FLOW_ROW);
    lv_obj_set_flex_align(labelForCurrentUser, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   FirmwareI18n::setLabel(labelForCurrentUser, "Nutzer");
+   FirmwareI18n::setLabel(labelForCurrentUser, FirmwareI18n::Message::User);
    lv_obj_set_style_text_color(labelForCurrentUser, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForCurrentUser, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -137,7 +140,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->currentUser, LV_ALIGN_CENTER);
    lv_label_set_long_mode(this->currentUser, LV_LABEL_LONG_SCROLL_CIRCULAR);
    lv_obj_set_style_text_align(this->currentUser, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   FirmwareI18n::setLabel(this->currentUser, "JappyJan");
+   FirmwareI18n::setLabel(this->currentUser, FirmwareI18n::Text::literal("JappyJan"));
     lv_obj_set_style_text_font(this->currentUser, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->currentUser, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -155,7 +158,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForElapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForElapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForElapsedTime, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForElapsedTime, "Dauer");
+   FirmwareI18n::setLabel(labelForElapsedTime, FirmwareI18n::Message::Duration);
    lv_obj_set_style_text_color(labelForElapsedTime, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForElapsedTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -163,7 +166,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->elapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_height(this->elapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_align(this->elapsedTime, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->elapsedTime, "00:23:46");
+   FirmwareI18n::setLabel(this->elapsedTime, FirmwareI18n::Text::literal("00:23:46"));
    lv_obj_set_style_text_font(this->elapsedTime, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->elapsedTime, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -200,7 +203,7 @@ void ResourceDetailsScreen::init()
    lv_obj_add_event_cb(this->projectsButton, &ResourceDetailsScreen::onProjectsButtonClick, LV_EVENT_CLICKED, this);
 
     this->projectsButtonLabel = lv_label_create(this->projectsButton);
-    FirmwareI18n::setLabel(this->projectsButtonLabel, "Projekt wählen");
+    FirmwareI18n::setLabel(this->projectsButtonLabel, FirmwareI18n::Message::ChooseProject);
     lv_obj_set_align(this->projectsButtonLabel, LV_ALIGN_CENTER);
     lv_obj_set_style_text_align(this->projectsButtonLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -214,7 +217,7 @@ void ResourceDetailsScreen::init()
    lv_obj_add_event_cb(this->clearProjectButton, &ResourceDetailsScreen::onClearProjectSelectionClick, LV_EVENT_CLICKED, this);
 
    lv_obj_t *clearProjectLabel = lv_label_create(this->clearProjectButton);
-   FirmwareI18n::setLabel(clearProjectLabel, "X");
+   FirmwareI18n::setLabel(clearProjectLabel, FirmwareI18n::Text::literal("X"));
    lv_obj_set_align(clearProjectLabel, LV_ALIGN_CENTER);
    lv_obj_set_style_text_align(clearProjectLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    this->updateClearProjectButtonState();
@@ -233,14 +236,14 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->startSessionButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->startSessionButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->startSessionButtonLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->startSessionButtonLabel, "Ressource verwenden");
+   FirmwareI18n::setLabel(this->startSessionButtonLabel, FirmwareI18n::Message::UseResource);
    lv_obj_set_style_text_font(this->startSessionButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    this->stopOtherUserNote = lv_label_create(this->sessionControls);
    lv_obj_set_width(this->stopOtherUserNote, lv_pct(100));
    lv_obj_set_height(this->stopOtherUserNote, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->stopOtherUserNote, LV_LABEL_LONG_WRAP);
-   FirmwareI18n::setLabel(this->stopOtherUserNote, "Achtung: Sie beenden die laufende Sitzung eines anderen Nutzers.");
+   FirmwareI18n::setLabel(this->stopOtherUserNote, FirmwareI18n::Message::WarningYouAreEndingAnotherUserSActiveSession);
    lv_obj_set_style_text_color(this->stopOtherUserNote, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->stopOtherUserNote, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN);
@@ -259,7 +262,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->stopSessionButtonLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->stopSessionButtonLabel, "Sitzung beenden");
+   FirmwareI18n::setLabel(this->stopSessionButtonLabel, FirmwareI18n::Message::EndSession);
 
    this->doorControls = lv_obj_create(this->sessionControls);
    lv_obj_remove_style_all(this->doorControls);
@@ -285,7 +288,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForLockDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForLockDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForLockDoorButton, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForLockDoorButton, "Abschliessen");
+   FirmwareI18n::setLabel(labelForLockDoorButton, FirmwareI18n::Message::Lock);
 
    lv_obj_t *unlockDoorButton = lv_button_create(this->doorControls);
    lv_obj_set_height(unlockDoorButton, 50);
@@ -300,7 +303,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForUnlockDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForUnlockDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForUnlockDoorButton, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForUnlockDoorButton, "Aufschliessen");
+   FirmwareI18n::setLabel(labelForUnlockDoorButton, FirmwareI18n::Message::Unlock);
 
    lv_obj_t *unlatchDoorButton = lv_button_create(this->doorControls);
    lv_obj_set_height(unlatchDoorButton, 50);
@@ -315,7 +318,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForUnlatchDoorButton, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForUnlatchDoorButton, "Falle öffnen");
+   FirmwareI18n::setLabel(labelForUnlatchDoorButton, FirmwareI18n::Message::ReleaseLatch);
    lv_obj_set_style_text_font(labelForUnlatchDoorButton, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    this->flowButtonsContainer = lv_obj_create(this->sessionControls);
@@ -329,6 +332,39 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_pad_top(this->flowButtonsContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_SCROLLABLE);
+
+   this->usageStatsContainer = lv_obj_create(this->screen);
+   DisplayTheme::applySurface(this->usageStatsContainer);
+   lv_obj_set_width(this->usageStatsContainer, lv_pct(100));
+   lv_obj_set_height(this->usageStatsContainer, LV_SIZE_CONTENT);
+   lv_obj_set_flex_flow(this->usageStatsContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_remove_flag(this->usageStatsContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_all(this->usageStatsContainer, 12, LV_PART_MAIN);
+   lv_obj_set_style_pad_row(this->usageStatsContainer, 8, LV_PART_MAIN);
+   auto *statsTitle = lv_label_create(this->usageStatsContainer);
+   FirmwareI18n::setLabel(statsTitle, FirmwareI18n::Message::CurrentUsage);
+   lv_obj_set_style_text_font(statsTitle, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
+   auto createStat = [this](const FirmwareI18n::Text &title) {
+      auto *row = lv_obj_create(this->usageStatsContainer);
+      lv_obj_remove_style_all(row);
+      lv_obj_set_width(row, lv_pct(100));
+      lv_obj_set_height(row, LV_SIZE_CONTENT);
+      lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+      lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+      auto *label = lv_label_create(row);
+      FirmwareI18n::setLabel(label, title);
+      lv_obj_set_style_text_color(label, DisplayTheme::muted(), LV_PART_MAIN);
+      lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
+      auto *value = lv_label_create(row);
+      lv_obj_set_width(value, lv_pct(62));
+      lv_label_set_long_mode(value, LV_LABEL_LONG_WRAP);
+      lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+      lv_obj_set_style_text_font(value, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
+      return value;
+   };
+   this->meterValue = createStat(FirmwareI18n::Message::Meter);
+   this->operatingValue = createStat(FirmwareI18n::Message::OperatingTime);
+   lv_obj_add_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN);
 
    this->noIntroductionPanel = lv_obj_create(this->screen);
    lv_obj_set_width(this->noIntroductionPanel, lv_pct(100));
@@ -346,16 +382,17 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(noIntroductionInfoLabel, lv_pct(100));
    lv_obj_set_height(noIntroductionInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(noIntroductionInfoLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(noIntroductionInfoLabel, "Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Bitte wenden Sie sich an einen der unten aufgeführten Einweiser.");
+   FirmwareI18n::setLabel(noIntroductionInfoLabel, FirmwareI18n::Message::YouNeedAnIntroductionBeforeUsingThisResourcePleaseContactOneOfTheIntroducersList);
    lv_obj_set_style_text_font(noIntroductionInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(noIntroductionInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(noIntroductionInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->introducersListLabel = lv_label_create(this->noIntroductionPanel);
-   lv_obj_set_width(this->introducersListLabel, LV_SIZE_CONTENT);
+   lv_obj_set_width(this->introducersListLabel, lv_pct(100));
+   lv_label_set_long_mode(this->introducersListLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_height(this->introducersListLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setLabel(this->introducersListLabel, "???");
+    FirmwareI18n::setLabel(this->introducersListLabel, FirmwareI18n::Text::literal("???"));
     lv_obj_set_style_text_font(this->introducersListLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->maintenancePanel = lv_obj_create(this->screen);
@@ -384,7 +421,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->maintenanceIntroducersLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, "???");
+    FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, FirmwareI18n::Text::literal("???"));
     lv_obj_set_style_text_font(this->maintenanceIntroducersLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->healthPanel = lv_obj_create(this->screen);
@@ -404,7 +441,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(healthInfoLabel, lv_pct(100));
    lv_obj_set_height(healthInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(healthInfoLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(healthInfoLabel, "Diese Ressource ist derzeit nicht betriebsbereit und kann nicht verwendet werden.");
+   FirmwareI18n::setLabel(healthInfoLabel, FirmwareI18n::Message::ThisResourceIsCurrentlyUnavailableAndCannotBeUsed);
    lv_obj_set_style_text_color(healthInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(healthInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -413,16 +450,19 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(this->healthReasonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->healthReasonLabel, LV_ALIGN_CENTER);
    lv_label_set_long_mode(this->healthReasonLabel, LV_LABEL_LONG_WRAP);
-   FirmwareI18n::setLabel(this->healthReasonLabel, "");
+   FirmwareI18n::setLabel(this->healthReasonLabel, FirmwareI18n::Text::literal(""));
     lv_obj_set_style_text_color(this->healthReasonLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->healthReasonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->applyCachedState();
-   if (this->actionInProgress) this->showActionProgress(this->actionTitle.c_str());
+   if (this->actionInProgress) this->showActionProgress(this->actionTitle);
 }
 void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief &resource)
 {
+   if (!this->resourceCacheValid || this->resourceCache.id != resource.id ||
+       this->resourceCache.activeUsageId != resource.activeUsageId || !resource.hasActiveUsage)
+      this->usageStatsValid = false;
    this->resourceCache = resource;
    this->resourceCacheValid = true;
 
@@ -437,12 +477,12 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    std::string introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
-      if (resource.introducers.empty()) FirmwareI18n::setLabel(this->introducersListLabel, "-- kein Einweiser verfügbar --");
+      if (resource.introducers.empty()) FirmwareI18n::setLabel(this->introducersListLabel, FirmwareI18n::Message::NoIntroducerAvailable);
       else FirmwareI18n::setDynamicLabel(this->introducersListLabel, introducersText.c_str());
    }
    if (this->maintenanceIntroducersLabel)
    {
-      if (resource.introducers.empty()) FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, "-- kein Einweiser verfügbar --");
+      if (resource.introducers.empty()) FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, FirmwareI18n::Message::NoIntroducerAvailable);
       else FirmwareI18n::setDynamicLabel(this->maintenanceIntroducersLabel, introducersText.c_str());
    }
 
@@ -452,7 +492,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       if (resource.healthReason[0] != '\0')
          FirmwareI18n::setDynamicLabel(this->healthReasonLabel, resource.healthReason);
       else
-         FirmwareI18n::setLabel(this->healthReasonLabel, "Kein Grund angegeben.");
+         FirmwareI18n::setLabel(this->healthReasonLabel, FirmwareI18n::Message::NoReasonProvided);
    }
 
    // Toggle sections based on type and usage
@@ -523,6 +563,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    }
 
    this->updateElapsedTimeDisplay();
+   this->updateUsageStatsDisplay();
    this->refreshAccessState();
 }
 std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
@@ -646,13 +687,13 @@ void ResourceDetailsScreen::refreshAccessState()
          if (this->stopSessionButtonLabel)
          {
             FirmwareI18n::setLabel(this->stopSessionButtonLabel,
-                              isForeignStop ? "Fremde Sitzung beenden" : "Sitzung beenden");
+                              isForeignStop ? FirmwareI18n::Message::EndOtherUserSSession : FirmwareI18n::Message::EndSession);
          }
 
          if (this->startSessionButtonLabel)
          {
             FirmwareI18n::setLabel(this->startSessionButtonLabel,
-                              isTakeover ? "Übernehmen" : "Ressource verwenden");
+                              isTakeover ? FirmwareI18n::Message::TakeOver : FirmwareI18n::Message::UseResource);
          }
          // Takeover retains its warning role; starting is a primary action.
          lv_color_t startBgColor = isTakeover ? DisplayTheme::warning() : DisplayTheme::primary();
@@ -668,6 +709,7 @@ void ResourceDetailsScreen::refreshAccessState()
 }
 void ResourceDetailsScreen::loop()
 {
+   this->updateUsageStatsDisplay();
    this->updateElapsedTimeDisplay();
    this->updateSessionTimeoutIndicator();
 }
@@ -722,6 +764,9 @@ void ResourceDetailsScreen::destroy()
    this->formsNextLabel = nullptr;
    this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
+   this->usageStatsContainer = nullptr;
+   this->meterValue = nullptr;
+   this->operatingValue = nullptr;
 
    this->noIntroductionPanel = nullptr;
    this->introducersListLabel = nullptr;
@@ -817,6 +862,7 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
    sessionHeader.setUser(userDetails.username);
 
    this->refreshAccessState();
+   this->updateUsageStatsDisplay();
 }
 void ResourceDetailsScreen::onScreenLeave()
 {

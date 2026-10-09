@@ -1,3 +1,4 @@
+import { CardAccessService } from './card-access.service';
 import { AttractapController } from './attractap.controller';
 import { AttractapService } from './attractap.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
@@ -15,6 +16,7 @@ describe('AttractapController', () => {
     {} as AttractapGateway,
     {} as WebsocketService,
     attractapService as unknown as AttractapService,
+    {} as CardAccessService,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -34,7 +36,9 @@ describe('AttractapController', () => {
     await controller.deleteReader(3, request);
 
     expect(attractapService.recordReaderDeregistration).toHaveBeenCalledWith(3, {
-      userId: 7, authenticationMethod: 'api-token', apiTokenId: 9,
+      userId: 7,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
     });
   });
 

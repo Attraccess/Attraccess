@@ -1,9 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceMeteringService } from '../../../resources/metering/resource-metering.service';
+import { ResourceOperatingAttributionService } from '../../../resources/operating-intervals/resource-operating-attribution.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceFlowsExecutorService } from '../../../resources/flows/resource-flows-executor.service';
 import { SumUpService } from '../../../billing/sumup.service';
+import { BillingService } from '../../../billing/billing.service';
+import { dbCurrencyToUserCurrency, formatCredits } from '@attraccess/shared';
 import { ResourceInUseError } from '../../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { FlowExecutionError } from '../../../resources/flows/errors/flow-execution.error';
@@ -11,7 +15,12 @@ import { ResourceActionGuard } from './resource-action.guard';
 import { ResourceListService } from './resource-list.service';
 import { AttractapFormsHandler } from './forms.handler';
 import { SupervisionService } from '../../../resources/supervision/supervision.service';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import {
+  AuthenticatedWebSocket,
+  AttractapEvent,
+  AttractapEventType,
+  ResourceUsageStatsPayload,
+} from '../websocket.types';
 
 @Injectable()
 export class AttractapSessionHandler {
@@ -29,6 +38,9 @@ export class AttractapSessionHandler {
   @Inject(SumUpService)
   private sumUpService: SumUpService;
 
+  @Inject(BillingService)
+  private billingService: BillingService;
+
   @Inject(ResourceActionGuard)
   private resourceActionGuard: ResourceActionGuard;
 
@@ -40,6 +52,76 @@ export class AttractapSessionHandler {
 
   @Inject(SupervisionService)
   private supervisionService: SupervisionService;
+
+  @Inject(ResourceMeteringService)
+  private meteringService: ResourceMeteringService;
+
+  @Inject(ResourceOperatingAttributionService)
+  private operatingAttributionService: ResourceOperatingAttributionService;
+
+  public async handleResourceUsageStats(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { resourceId } = data.payload ?? {};
+    const userId = socket.state.lastAuthenticatedUserId;
+    if (
+      !(await this.resourceActionGuard.validateResourceAction(
+        socket,
+        resourceId,
+        AttractapEventType.RESOURCE_USAGE_STATS,
+        data.payload?.requestId,
+      ))
+    )
+      return;
+
+    try {
+      const usage = await this.resourceUsageService.getActiveSession(resourceId);
+      // Live session readings belong to the current user, just like the active-session web UI.
+      if (!usage || usage.userId !== userId) {
+        await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
+        return;
+      }
+      const asOf = new Date();
+      const [meter, operating, billingConfiguration] = await Promise.all([
+        this.meteringService.getLive(resourceId),
+        this.operatingAttributionService.getForResource(resourceId, asOf, usage.startTime),
+        this.billingService.getConfiguration(),
+      ]);
+      if (socket.state.lastAuthenticatedUserId !== userId) return;
+      await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, {
+        resourceId,
+        usage: {
+          id: usage.id,
+          operatingDurationMs: operating.operatingDataAvailable
+            ? operating.attributions.reduce(
+                (total, entry) => total + (entry.usageId === usage.id ? entry.durationMs : 0),
+                0,
+              )
+            : null,
+          isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
+          // Catalog entries include captured terms with unavailable values for skipped free meters.
+          // Never attach a new session's meter reading to an earlier usage snapshot.
+          meters: meter.meters
+            .filter((entry) => entry.session?.usageId === usage.id)
+            .map((entry) => ({
+              id: entry.id,
+              name: entry.session.meterName,
+              creditsPerUnit: entry.session.creditsPerUnit,
+              formattedRate: this.formatMeterRate(entry.session.creditsPerUnit, billingConfiguration),
+              value: entry.session.latestValue,
+            })),
+        },
+      } satisfies ResourceUsageStatsPayload);
+    } catch (error) {
+      this.logger.warn(`Failed to load live usage stats: ${error.message}`);
+      await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
+    }
+  }
+
+  private formatMeterRate(creditsPerUnit: number, configuration: { minorUnit: number; currency: string }): string {
+    return `${formatCredits(creditsPerUnit, configuration.minorUnit, {
+      locale: 'de-DE',
+      minimumFractionDigits: configuration.minorUnit,
+    })} ${configuration.currency}`;
+  }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId, projectId, forceTakeOver } = data.payload as {
@@ -152,7 +234,7 @@ export class AttractapSessionHandler {
     }
 
     try {
-      await this.resourceUsageService.endSession(
+      const usage = await this.resourceUsageService.endSession(
         resourceId,
         user,
         { formSubmissions },
@@ -161,7 +243,28 @@ export class AttractapSessionHandler {
         },
       );
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
-      await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true });
+      // Billing lookup failures must not turn an already-ended session into a failed action.
+      let billingSummary: { amount: number; total: string } | undefined;
+      try {
+        if (usage?.userId === user.id) {
+          const charge = await this.billingService.getResourceUsageCharge(usage.id, user.id);
+          if (charge && charge.amount !== 0) {
+            const configuration = await this.billingService.getConfiguration();
+            const amount = -charge.amount;
+            const total = new Intl.NumberFormat('de-DE', {
+              minimumFractionDigits: configuration.minorUnit,
+              maximumFractionDigits: configuration.minorUnit,
+            }).format(dbCurrencyToUserCurrency(amount, configuration.minorUnit));
+            billingSummary = { amount, total: `${total} ${configuration.currency}` };
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to load session billing summary: ${error.message}`);
+      }
+      await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, {
+        success: true,
+        ...(billingSummary ? { billingSummary } : {}),
+      });
     } catch (error) {
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });

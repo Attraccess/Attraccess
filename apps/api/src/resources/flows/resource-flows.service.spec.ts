@@ -158,6 +158,12 @@ describe('plugin node configuration schemas', () => {
       configSchema: schema,
     });
     expect(resolve).toHaveBeenCalledWith({ controllerId: 7 }, { resourceId: 1 });
+    expect(
+      await service.resolveNodeSchema(1, 'plugin.schema-test.dynamic', { controllerId: 7 }, 'preview'),
+    ).toMatchObject({
+      configSchema: { properties: {}, preview: [] },
+    });
+    expect(resolve).toHaveBeenLastCalledWith({ controllerId: 7 }, { resourceId: 1, purpose: 'preview' });
     expect(await service.resolveNodeSchema(1, 'plugin.schema-test.static', {})).toMatchObject({ configSchema: schema });
     await expect(service.resolveNodeSchema(1, 'plugin.schema-test.empty', {})).rejects.toThrow('does not provide');
     await expect(service.resolveNodeSchema(1, 'plugin.schema-test.missing', {})).rejects.toThrow('not found');

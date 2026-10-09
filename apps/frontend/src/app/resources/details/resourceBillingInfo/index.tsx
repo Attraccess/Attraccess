@@ -12,6 +12,7 @@ import {
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
+  useResourceMeteringServiceListResourceMeters,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
   useLicenseServiceGetLicenseInformation,
@@ -25,6 +26,9 @@ import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { FlatSection } from '../../../../components/flatSection';
+import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
+import { LiveSessionBilling } from './metering/LiveSessionBilling';
+import { EnergySettlementNotices, MeterSetupNotice } from './metering/MeterNotices';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
@@ -43,6 +47,7 @@ export function ResourceBillingInfo(props: Props) {
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const formatNumber = useNumberFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const { user: currentUser, hasPermission } = useAuth();
   const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 }, undefined, {
@@ -91,14 +96,21 @@ export function ResourceBillingInfo(props: Props) {
     );
   }, [resourceBillingConfiguration, configuration]);
 
+  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId }, undefined, {
+    refetchInterval: 10_000,
+  });
+  const hasMeterRates = meters.some((meter) => meter.creditsPerUnit > 0);
+  const hasMeterSessions = meters.some((meter) => meter.session != null);
+
   const isFree = useMemo(() => {
     return (
       creditsPerUsage === 0 &&
       creditsPerMinute === 0 &&
       creditsPerOperatingMinute === 0 &&
+      !hasMeterRates &&
       resourceBillingConfiguration?.additionalItems.length === 0
     );
-  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, resourceBillingConfiguration]);
+  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, hasMeterRates, resourceBillingConfiguration]);
 
   const [exampleSessionMinutes, setExampleSessionMinutes] = useState(10);
   const [exampleOperatingMinutes, setExampleOperatingMinutes] = useState(10);
@@ -143,9 +155,9 @@ export function ResourceBillingInfo(props: Props) {
     if (!license?.modules.includes('billing')) return false;
     if (!resourceBillingConfiguration) return false;
     if (resource?.type !== 'machine') return false;
-    if (isFree && !hasPermission('billing.manage')) return false;
+    if (isFree && !hasMeterSessions && !hasPermission('billing.manage')) return false;
     return true;
-  }, [license, resourceBillingConfiguration, resource, isFree, hasPermission]);
+  }, [license, resourceBillingConfiguration, resource, isFree, hasMeterSessions, hasPermission]);
 
   useEffect(() => {
     onVisibilityChange?.(isVisible);
@@ -167,12 +179,12 @@ export function ResourceBillingInfo(props: Props) {
     return <Skeleton className="h-10 w-full" />;
   }
 
-  if (isFree && !hasPermission('billing.manage')) {
+  if (isFree && !hasMeterSessions && !hasPermission('billing.manage')) {
     return null;
   }
 
-  const dlClass = 'grid grid-cols-[1fr_max-content] gap-x-4 gap-y-2 text-sm items-center';
-  const valueClass = 'text-right whitespace-nowrap';
+  const dlClass = 'grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-center [&>dt]:wrap-anywhere';
+  const valueClass = 'text-right min-w-0 wrap-anywhere';
 
   const billingContent = (
     <div className="flex flex-col gap-3">
@@ -205,6 +217,23 @@ export function ResourceBillingInfo(props: Props) {
             currency: configuration.currency,
           })}
         </dd>
+        {meters
+          .filter((meter) => meter.creditsPerUnit > 0)
+          .map((meter) => (
+            <Fragment key={meter.id}>
+              <dt>
+                {meter.name}
+                <br />
+                <small>{t('perUnit')}</small>
+              </dt>
+              <dd className={cn(valueClass, 'text-warning')}>
+                {t('billingValue', {
+                  credits: formatCredits(meter.creditsPerUnit),
+                  currency: configuration.currency,
+                })}
+              </dd>
+            </Fragment>
+          ))}
         {resourceBillingConfiguration.additionalItems.map((item) => (
           <Fragment key={JSON.stringify(item)}>
             <dt>{item.name}</dt>
@@ -221,6 +250,19 @@ export function ResourceBillingInfo(props: Props) {
           </Fragment>
         ))}
       </dl>
+
+      <MeterSetupNotice resourceId={resourceId} />
+      <EnergySettlementNotices resourceId={resourceId} />
+
+      <div className="border-t border-divider pt-3 empty:hidden">
+        <LiveSessionBilling
+          resourceId={resourceId}
+          currency={configuration.currency}
+          minorUnit={configuration.minorUnit}
+          dlClass={dlClass}
+          valueClass={valueClass}
+        />
+      </div>
 
       <dl className={cn(dlClass, 'border-t border-divider pt-3')}>
         <dt className="flex flex-col gap-2">

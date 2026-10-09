@@ -28,6 +28,37 @@ function configuration(): ModbusConfiguration {
   };
 }
 describe('Modbus persisted configuration', () => {
+  it('offers the 879-3020 4PS map alongside compatible legacy profiles', () => {
+    expect(BUILTIN_MODBUS_PROFILES.map((profile) => profile.id)).toEqual([
+      'wago-879-3020',
+      'wago-879-3000',
+      'wago-879-3000-unverified',
+      'wago-879-1300-unverified',
+    ]);
+    const meter = BUILTIN_MODBUS_PROFILES[0];
+    expect(meter.actions).toEqual([]);
+    expect(
+      meter.measurements.slice(0, 5).map(({ id, address, scale, unit }) => ({ id, address, scale, unit })),
+    ).toEqual([
+      { id: 'active-power', address: 0x5012, scale: 1000, unit: 'watt' },
+      { id: 'import-energy', address: 0x600c, scale: 1000, unit: 'watt-hour' },
+      { id: 'export-energy', address: 0x6018, scale: 1000, unit: 'watt-hour' },
+      { id: 'voltage-l1', address: 0x5002, scale: 1, unit: 'volt' },
+      { id: 'current-l1', address: 0x500c, scale: 1, unit: 'ampere' },
+    ]);
+    for (const measurement of meter.measurements.slice(0, 5)) {
+      expect(measurement).toEqual(
+        expect.objectContaining({
+          functionCode: 3,
+          addressBase: 0,
+          dataType: 'float32',
+          byteOrder: 'big',
+          wordOrder: 'big',
+          decimalPlaces: 3,
+        }),
+      );
+    }
+  });
   it.each([
     null,
     {},

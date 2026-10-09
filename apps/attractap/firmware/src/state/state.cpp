@@ -214,10 +214,10 @@ State::ApiState State::getApiState()
     return state;
 }
 
-void State::setUserLanguage(std::string language)
+void State::setUserLanguage(bool authenticated, std::string language)
 {
     StateLock lock(state_mutex);
-    language_session.setUser(language);
+    language_session.setUser(authenticated, language);
 }
 
 void State::setDefaultLanguage(std::string language)

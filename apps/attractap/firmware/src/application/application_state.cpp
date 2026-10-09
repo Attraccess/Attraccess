@@ -182,7 +182,7 @@ void Application::processState() {
                        outcome == SupervisionFlow::Outcome::UnlockAndStartSession;
       if (outcome == SupervisionFlow::Outcome::UnlockAndStartSession) {
         this->pendingUiStartedAt = millis();
-        this->showReaderActionProgress("Nutzung wird gestartet");
+        this->showReaderActionProgress(FirmwareI18n::Message::StartingUsage);
         if (this->actionInProgressCount == 0) this->beginActionPause();
         this->pendingActionType = PENDING_ACTION_START_SESSION;
         this->pendingActionResourceId = this->selectedResourceId;
@@ -219,7 +219,7 @@ void Application::processState() {
   // waiting for its key). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
-    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte NFC-Karte erneut auflegen.");
+    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
   }
 #endif
 
@@ -299,14 +299,14 @@ void Application::processState() {
       now - this->pendingUiStartedAt > 60000) {
     this->finishReaderAction(false);
     this->handleFormsCancel();
-    Display::showErrorPopup("Aktion nicht bestätigt", "Der Ressourcenstatus wird neu geladen. Bitte vor einem erneuten Versuch prüfen.");
+    Display::showErrorPopup(FirmwareI18n::Message::ActionNotConfirmed, FirmwareI18n::Message::ResourceStatusIsBeingRefreshedCheckItBeforeTryingAgain);
   }
   // Finishing an action starts a new refresh timer; do not subtract its newer
   // timestamp from the earlier sample and wrap the unsigned elapsed duration.
   now = millis();
   if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
     this->logoutReader();
-    Display::showErrorPopup("Status nicht verfügbar", "Bitte erneut anmelden, um den aktuellen Ressourcenstatus zu laden.");
+    Display::showErrorPopup(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
   }
   if (this->unlocked) {
     uint32_t effectivePause = this->accumulatedPauseMs;
@@ -416,6 +416,8 @@ void Application::processState() {
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::beginEnrollment() {
+  this->unlocked = false;
+  State::setUserLanguage(false);
   // WAIT_FOR_CARD rides the normal card-detection loop, which re-arms the
   // reader reliably across removals/re-presentations. (The earlier poll-only
   // approach wedged the PN532 after the auth performed for an already-enrolled
@@ -447,6 +449,7 @@ void Application::exitEnrollment() {
   this->enrollPhase = ENROLL_PHASE_NONE;
   this->externalState = EXTERNAL_STATE_NONE;
   this->unlocked = false;
+  State::setUserLanguage(false);
   // Hand back to the generic screen routing; next processState() iteration
   // re-evaluates and transitions to the correct idle screen (lock / list /
   // no-resources), re-enabling card detection on the way.
@@ -481,7 +484,7 @@ void Application::processEnrollment() {
     this->enrollErrorPending = false;
     this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-    Display::enrollmentScreen.setStatusMessage(this->enrollErrorMessage);
+    Display::enrollmentScreen.setStatusMessage(FirmwareI18n::readerError(this->enrollErrorMessage));
     this->enrollPhase = ENROLL_PHASE_ERROR;
     this->enrollPhaseChangedMs = now;
     return;
@@ -514,7 +517,7 @@ void Application::processEnrollment() {
       this->beeper.errorBeep();
       Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
       Display::enrollmentScreen.setStatusMessage(
-          "Karte konnte nicht\nvorbereitet werden");
+          FirmwareI18n::Message::CouldNotPrepareCard);
       this->enrollPhase = ENROLL_PHASE_ERROR;
       this->enrollPhaseChangedMs = now;
       this->nfc.resetCardPresence();
@@ -548,7 +551,7 @@ void Application::processEnrollment() {
       this->beeper.errorBeep();
       Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
       Display::enrollmentScreen.setStatusMessage(
-          "Karte konnte nicht\ngeschrieben werden");
+          FirmwareI18n::Message::CouldNotWriteCard);
       this->enrollPhase = ENROLL_PHASE_ERROR;
     }
     this->enrollPhaseChangedMs = now;
@@ -582,6 +585,8 @@ void Application::processEnrollment() {
 }
 
 void Application::beginReset() {
+  this->unlocked = false;
+  State::setUserLanguage(false);
   // Mirrors beginEnrollment(): WAIT_FOR_CARD rides the normal card-detection
   // loop (reliable re-arm across removals); detection is disabled only for the
   // authenticate + write once a card is actually picked.
@@ -606,6 +611,7 @@ void Application::exitReset() {
   this->resetPhase = RESET_PHASE_NONE;
   this->externalState = EXTERNAL_STATE_NONE;
   this->unlocked = false;
+  State::setUserLanguage(false);
   // Hand back to the generic screen routing; next processState() iteration
   // re-evaluates and transitions to the correct idle screen.
   this->state = APPLICATION_STATE_INIT;
@@ -667,7 +673,7 @@ void Application::processReset() {
       this->beeper.errorBeep();
       Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
       Display::resetScreen.setStatusMessage(
-          "Karte konnte nicht\nzurückgesetzt werden");
+          FirmwareI18n::Message::CouldNotResetCard);
       this->resetPhase = RESET_PHASE_ERROR;
     }
     this->resetPhaseChangedMs = now;

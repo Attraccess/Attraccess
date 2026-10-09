@@ -1,3 +1,4 @@
+import { WebSocket } from 'ws';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AttractapGateway } from './websocket.gateway';
 import { WebsocketService } from './websocket.service';
@@ -5,6 +6,7 @@ import { AttractapService } from '../attractap.service';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import { AttractapFirmwareService } from '../firmware.service';
 import { SumUpService } from '../../billing/sumup.service';
+import { BillingService } from '../../billing/billing.service';
 import { LicenseService } from '../../license/license.service';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
@@ -19,6 +21,8 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './we
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { WS_METRICS } from '../../metrics/definitions/tokens';
+import { ResourceMeteringService } from '../../resources/metering/resource-metering.service';
+import { ResourceOperatingAttributionService } from '../../resources/operating-intervals/resource-operating-attribution.service';
 import { ResourceListService } from './handlers/resource-list.service';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { AttractapAuthHandler } from './handlers/auth.handler';
@@ -77,6 +81,24 @@ describe('AttractapGateway', () => {
   let licenseService: { verifyLicense: jest.Mock };
   let attractapService: { updateLastReaderConnection: jest.Mock; findReaderById: jest.Mock };
 
+  it('sends language updates only to open authenticated readers', async () => {
+    const authenticated = createMockSocket({ id: 'authenticated', readerId: 42, readyState: WebSocket.OPEN });
+    const unauthenticated = createMockSocket({ id: 'unauthenticated', readyState: WebSocket.OPEN });
+    const missingIdentity = createMockSocket({ id: 'missing', readerId: undefined, readyState: WebSocket.OPEN });
+    const closed = createMockSocket({ id: 'closed', readerId: 43, readyState: WebSocket.CLOSED });
+    for (const socket of [authenticated, unauthenticated, missingIdentity, closed])
+      websocketService.sockets.set(socket.id, socket);
+    await gateway.updateReaderLanguage('en');
+    expect(authenticated.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { type: AttractapEventType.READER_LANGUAGE, payload: { language: 'en' } } }),
+    );
+    for (const socket of [unauthenticated, missingIdentity, closed]) expect(socket.sendMessage).not.toHaveBeenCalled();
+    (authenticated.sendMessage as jest.Mock).mockClear();
+    authenticated.readerId = null;
+    await gateway.updateReaderLanguage('de');
+    expect(authenticated.sendMessage).not.toHaveBeenCalled();
+  });
+
   beforeEach(async () => {
     licenseService = {
       verifyLicense: jest.fn().mockResolvedValue(undefined),
@@ -95,6 +117,7 @@ describe('AttractapGateway', () => {
         { provide: UsersService, useValue: {} },
         { provide: AttractapFirmwareService, useValue: {} },
         { provide: SumUpService, useValue: {} },
+        { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
         { provide: LicenseService, useValue: licenseService },
         { provide: ResourceUsageService, useValue: {} },
         { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
@@ -121,6 +144,8 @@ describe('AttractapGateway', () => {
         AttractapCardHandler,
         AttractapFormsHandler,
         AttractapSessionHandler,
+        { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
+        { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
         AttractapBillingHandler,
         AttractapProjectsHandler,
         AttractapSupervisionHandler,

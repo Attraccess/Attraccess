@@ -44,7 +44,9 @@ it('loads existing URLs and preserves the stored license when the secret field i
   fireEvent.change(screen.getByLabelText('inputs.publicInternetUrl.label'), { target: { value: '' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
-    requestBody: { app: { url: 'https://app.example', publicInternetUrl: undefined, licenseKey: undefined, attractapLanguage: 'de' } },
+    requestBody: {
+      app: { url: 'https://app.example', publicInternetUrl: undefined, licenseKey: undefined, attractapLanguage: 'de' },
+    },
   });
 });
 it('submits a new license and clears it only after successful save', () => {
@@ -53,7 +55,12 @@ it('submits a new license and clears it only after successful save', () => {
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
     requestBody: {
-      app: { url: 'https://app.example', publicInternetUrl: 'https://public.example', licenseKey: 'new-license', attractapLanguage: 'de' },
+      app: {
+        url: 'https://app.example',
+        publicInternetUrl: 'https://public.example',
+        licenseKey: 'new-license',
+        attractapLanguage: 'de',
+      },
     },
   });
   act(() => state.options.onError(new Error('failed')));
@@ -75,7 +82,12 @@ it('validates the wizard URL and advances after first-time setup succeeds', () =
   expect(state.setup).toHaveBeenCalledWith(
     expect.objectContaining({
       requestBody: {
-        app: { url: 'https://configured.example', publicInternetUrl: window.location.origin, licenseKey: undefined, attractapLanguage: 'en' },
+        app: {
+          url: 'https://configured.example',
+          publicInternetUrl: window.location.origin,
+          licenseKey: undefined,
+          attractapLanguage: 'en',
+        },
       },
     }),
   );
@@ -89,12 +101,12 @@ it('suggests German for a German setup browser locale and English for unsupporte
   try {
     Object.defineProperty(window.navigator, 'language', { configurable: true, value: 'de-AT' });
     const german = render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
-    expect(screen.getByLabelText('inputs.attractapLanguage.label')).toHaveValue('de');
+    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('Deutsch');
     german.unmount();
 
     Object.defineProperty(window.navigator, 'language', { configurable: true, value: 'fr-CA' });
     render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
-    expect(screen.getByLabelText('inputs.attractapLanguage.label')).toHaveValue('en');
+    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
   } finally {
     if (language) Object.defineProperty(window.navigator, 'language', language);
   }
@@ -104,4 +116,37 @@ it('shows loading state before settings arrive', () => {
   render(<AppSettingsForm variant="standalone" endpoint="settings" />);
   expect(screen.getByText('loading')).toBeTruthy();
   expect(screen.queryByRole('button')).toBeNull();
+});
+
+it('submits an explicit setup choice from the HeroUI selector', async () => {
+  render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
+  fireEvent.click(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ }));
+  fireEvent.click(await screen.findByRole('option', { name: 'Deutsch' }));
+  fireEvent.click(screen.getByRole('button', { name: 'actions.next' }));
+  expect(state.setup).toHaveBeenCalledWith(
+    expect.objectContaining({ requestBody: { app: expect.objectContaining({ attractapLanguage: 'de' }) } }),
+  );
+});
+it('keeps an unsaved language choice during background refetches', async () => {
+  const view = render(<AppSettingsForm variant="standalone" endpoint="settings" />);
+  fireEvent.click(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ }));
+  fireEvent.click(await screen.findByRole('option', { name: 'English' }));
+  state.settings = { app: { url: 'https://app.example', attractapLanguage: 'de' } };
+  view.rerender(<AppSettingsForm variant="standalone" endpoint="settings" />);
+  expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
+  fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
+  expect(state.save).toHaveBeenCalledWith(
+    expect.objectContaining({ requestBody: { app: expect.objectContaining({ attractapLanguage: 'en' }) } }),
+  );
+});
+it.each(['en-US', 'fr-CA', 'de-!!!', 'de-'])('suggests English for setup browser locale %s', (locale) => {
+  const original = Object.getOwnPropertyDescriptor(window.navigator, 'language');
+  Object.defineProperty(window.navigator, 'language', { configurable: true, value: locale });
+  try {
+    render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
+    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
+  } finally {
+    if (original) Object.defineProperty(window.navigator, 'language', original);
+    else Reflect.deleteProperty(window.navigator, 'language');
+  }
 });

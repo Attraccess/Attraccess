@@ -4,6 +4,7 @@ import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceSessionStartedEvent,
+  ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
@@ -19,12 +20,7 @@ import { ResourceGroupNotFoundException } from '../../resources/groups/errors/gr
 describe('WebSocketEventService', () => {
   let service: WebSocketEventService;
   let gateway: jest.Mocked<
-    Pick<
-      AttractapGateway,
-      | 'sendResourceList'
-      | 'disconnectReader'
-      | 'sendResourceListToReadersWithResources'
-    >
+    Pick<AttractapGateway, 'sendResourceList' | 'disconnectReader' | 'sendResourceListToReadersWithResources'>
   >;
   let resourceGroupsService: jest.Mocked<Pick<ResourceGroupsService, 'getOne'>>;
 
@@ -83,6 +79,12 @@ describe('WebSocketEventService', () => {
     });
   });
 
+  it('refreshes reader ownership when a usage session ends from another client', async () => {
+    const event = { usage: { resourceId: 10 } } as ResourceUsageSessionEndedEvent;
+    await service.onResourceUsageEnded(event);
+    expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([10]);
+  });
+
   describe('onResourceUsageTakenOver', () => {
     it('calls sendResourceListToReadersWithResources with the resource id', async () => {
       const event = { resource: { id: 20 } } as unknown as ResourceUsageSessionTakenOverEvent;
@@ -134,7 +136,9 @@ describe('WebSocketEventService', () => {
     it('does not refresh readers when the group no longer exists', async () => {
       resourceGroupsService.getOne.mockRejectedValue(new ResourceGroupNotFoundException({ id: 5 }));
 
-      await expect(service.onResourceGroupIntroducerChanged(new ResourceGroupIntroducerChangedEvent(5))).resolves.toBeUndefined();
+      await expect(
+        service.onResourceGroupIntroducerChanged(new ResourceGroupIntroducerChangedEvent(5)),
+      ).resolves.toBeUndefined();
 
       expect(gateway.sendResourceListToReadersWithResources).not.toHaveBeenCalled();
     });

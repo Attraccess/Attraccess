@@ -1,7 +1,7 @@
 # Firmware Display Theme Host Harness
 
 Headless **real LVGL 9.3.0** software rendering at 480 x 480. This compiles the
-production `DisplayTheme` and screen `.cpp` files directly. There is no SDL,
+production `DisplayTheme` and screen `.cpp` files directly. The introducer parser test also uses real ArduinoJson 7.0.4. There is no SDL,
 browser rendering, copied screen implementation, ESP-IDF build, or device access.
 
 ## Run
@@ -66,28 +66,39 @@ warnings may also appear in a host build.
 | Supervision | Waiting, verifying, success, error; public `View` fixture; hint; cancel visibility and time-based cancel guard |
 | PIN | Production field/numeric keyboard, real keyboard value-change callbacks entering `1234`, valid/rejected/short PIN and cancel behavior, per-key state rendering |
 | Localization catalog | Every catalog entry translated and rendered through LVGL in German and English, across paginated 480 x 480 framebuffer captures |
-| Production screen localization audit | `audit_localization.py` inventories every production display `.cpp` and `.hpp` unit under `src/display`, including shared components and overlays, and prints text-writing/localization helper call sites with source lines. It includes the `setLabelTextIfChanged` helper used by periodically updated init and resource-list labels. Firmware-authored UI text routes through `FirmwareI18n`; raw writes are reviewed as supplied values (project names, form descriptions/options, resource names, form previews/editor placeholders) or the PIN's numeric placeholder. The harness additionally renders production boot, init, enrollment, reset, supervision, PIN, lockscreen, resource-list, no-resources, demo resource-list, and firmware-update screens. |
+| Forms and projects | Production project pagination and form validation/editor callbacks; retained names, server hints, entered values and selections when switching languages in both directions |
+| Demo settings | Production registered-card rows and role picker in both languages; supplied names and card identifiers stay literal |
+| Power-off dialog | Production v2 confirmation dialog in both languages, separate power icon, cancel and confirm callbacks; no physical power control |
+| Production screen localization audit | `audit_localization.py` inventories every production display `.cpp` and `.hpp` unit under `src/display`, including shared components and overlays, and rejects raw visible-text writes. Firmware-authored UI text uses stable `Message` identifiers through `FirmwareI18n`; explicit literal writes are classified in `localization_literals.json` as supplied values (project names, form descriptions/options, resource names, form previews/editor placeholders) or the PIN's numeric placeholder. The harness additionally renders production boot, init, enrollment, reset, supervision, PIN, lockscreen, resource-list, no-resources, demo resource-list, and firmware-update screens. |
 
 Production `IScreen::init()` idempotence and normal screen teardown are exercised.
-There are **19 test groups**. The reported check count
+The test groups include localization and live usage statistics. The reported check count
 includes individual logo pixels, not just behavioral assertions. Widget gallery
 frames are labeled `widgets-*`; they exercise the production theme but are not
-claimed to be firmware screens. All other screen fixtures use production layouts.
+claimed to be firmware screens. The `demo-*-fixtures` frames similarly check demo
+data in a label fixture. Other screen fixtures use production layouts.
+
+The inherited 18px font retains LVGL's ASCII metrics and icons, with Latin-1
+fallback for German text. Error fixtures ending in `authored-error` exercise
+catalog error messages. Other error and hint fixtures deliberately contain
+supplied German text, which must remain unchanged in an English interface.
 
 The catalog render verifies both translations for every catalog entry and
 captures them through production LVGL at the supported harness resolution. The
 source audit complements those captures. Run it from the repository root with
 `python3 apps/attractap/firmware/tests/display-theme/audit_localization.py`.
-It derives its inventory from the production source tree (rather than a manually
-maintained file list), includes shared display `.cpp` and `.hpp` components, and
-prints text writer and localization helper call sites, including
-`setLabelTextIfChanged`. Review those call sites alongside
-the catalog test: server/device supplied values must remain dynamic, while
-firmware-authored labels and prompts must use `FirmwareI18n`. The rendering
-suite exercises representative production layouts and dynamic-content paths;
-it does not claim complete screen-by-screen
-rendering coverage: physical touch or
-NFC, RTOS scheduling, memory pressure on the ESP32, display panel/DMA/byte
+It derives its inventory from the production source tree, including shared display
+components. It checks catalog identifiers, English fallbacks and formatting
+arguments, rejects raw visible-text setters, and requires every explicit literal
+path to have a current explanation in `localization_literals.json`.
+
+Use `Message` for firmware-authored captions, `Text::format` for a message with
+retained arguments, and `Text::literal` for supplied data. Register textarea
+placeholders, dropdown options and tab captions explicitly. Replacing a binding
+with literal data removes its old localization source; deletion releases it.
+The rendering suite exercises representative production layouts and dynamic
+content paths. It does not claim complete screen-by-screen rendering coverage:
+physical touch or NFC, RTOS scheduling, memory pressure on the ESP32, display panel/DMA/byte
 swapping, networking or TLS, the display router, drawers/overlays/popups, and
 several production screens are not rendered by this harness. Nonblank frame
 checks and repeatability are smoke tests, not proof that every label is
@@ -170,3 +181,20 @@ ffmpeg -f rawvideo -pixel_format rgba -video_size 480x480 \
   -i apps/attractap/firmware/tests/display-theme/output/boot.rgba \
   -frames:v 1 -update 1 apps/attractap/firmware/tests/display-theme/output/boot.png
 ```
+
+## Introducer list regression (ATT-1113)
+
+The production resource details screen renders 30 long tutor names for an ordinary
+unintroduced user, both available and occupied. The test scrolls to the last name,
+checks wrapping, and replaces the list with a refreshed assignment. The four
+`introducers-{available,occupied}-{top,bottom}.rgba` fixtures show those states.
+Pending actions cover the full viewport when opened at the bottom of the list
+and while scrolling back to the top, in both occupancy states. The two
+`introducers-{available,occupied}-pending.rgba` fixtures show the fixed overlay.
+Clock formatting is deterministic in this host harness; device input and transport
+still require a physical reader check.
+
+`resource-introducers-parser` compiles the production parsing helper with real
+ArduinoJson and round-trips 40 long UTF-8 names through serialized JSON, excludes
+invalid entries, and verifies empty/replacement lists. Its pinned dependency is
+fetched into the host build directory, separately from the screen header shims.

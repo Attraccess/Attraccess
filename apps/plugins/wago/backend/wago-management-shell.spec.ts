@@ -90,6 +90,9 @@ async function prepared() {
 }
 
 describe('executable isolated management shell fixtures', () => {
+  // These fixtures spawn real tools while modelling remote time/uptime. Keep
+  // their wall-clock budget separate from the asserted deadline/retry bounds.
+  jest.setTimeout(30000);
   it('adds only the generated public key, preserves the snapshot, and restores exactly on explicit recovery', async () => {
     await prepared();
     await run('install');
@@ -269,7 +272,7 @@ describe('executable isolated management shell fixtures', () => {
     await expect(run('commit')).rejects.toBeDefined();
     await run('rollback');
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
-  }, 10000);
+  }, 30000);
 
   it('kills an in-flight install at its remote deadline and leaves it recoverable', async () => {
     await prepared();

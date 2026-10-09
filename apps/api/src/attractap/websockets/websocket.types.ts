@@ -22,6 +22,7 @@ export enum AttractapEventType {
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_RESOURCE_LIST = 'REQUEST_RESOURCE_LIST',
+  RESOURCE_USAGE_STATS = 'RESOURCE_USAGE_STATS',
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
   CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
   // Two-card supervision (ATT-493): a non-introduced user taps first, then a
@@ -81,6 +82,24 @@ export interface ResourceThumbnailDescriptorPayload {
   contentLength: number;
 }
 
+export interface ResourceUsageStatsPayload {
+  resourceId: number;
+  usage: {
+    id: number;
+    operatingDurationMs: number | null;
+    isOperating: boolean | null;
+    meters: {
+      id: number;
+      /** Meter name and rate captured at session start. */
+      name: string;
+      creditsPerUnit: number;
+      formattedRate: string;
+      /** Decimal quantities stay strings to preserve their full precision. */
+      value: string | null;
+    }[];
+  } | null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class AttractapEvent<TPayload = any | undefined> {
   public readonly event = 'EVENT';
@@ -112,12 +131,15 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   sendMessage: (message: AttractapMessage) => Promise<boolean>;
   sendBinaryData: (data: Buffer) => void;
   state: {
+    /** Only the latest reader authentication attempt may restore its identity. */
+    readerAuthenticationAttempt?: symbol;
     lastAuthenticatedUserId: number | null;
     enrollment: {
       userId: number;
       auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
     } | null;
     enrollNewCardData: {
+      userId: number;
       key: string;
       keyNo: number;
       cardUID: string;

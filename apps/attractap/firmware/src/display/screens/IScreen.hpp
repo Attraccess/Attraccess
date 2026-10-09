@@ -15,19 +15,13 @@
  * (ATT-554 item 5). Compare against the current text first; screen loop()
  * implementations must use this instead of raw lv_label_set_text().
  */
-static inline void setLabelTextIfChanged(lv_obj_t *label, const char *text)
+static inline void setLabelTextIfChanged(lv_obj_t *label, const FirmwareI18n::Text &text)
 {
-    if (label == nullptr || text == nullptr)
-    {
-        return;
-    }
-    const char *current = lv_label_get_text(label);
-    const char *localizedText = FirmwareI18n::translate(text);
-    if (current != nullptr && strcmp(current, localizedText) == 0)
-    {
-        return;
-    }
     FirmwareI18n::setLabel(label, text);
+}
+static inline void setDynamicLabelTextIfChanged(lv_obj_t *label, const char *text)
+{
+    FirmwareI18n::setDynamicLabel(label, text);
 }
 
 class IScreen

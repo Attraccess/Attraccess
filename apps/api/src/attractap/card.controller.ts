@@ -1,20 +1,37 @@
-import { Controller, Get, Inject, Post, Req, Body, Patch, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  Post,
+  Req,
+  Body,
+  Patch,
+  Param,
+  Query,
+  ParseIntPipe,
+  UseInterceptors,
+  ClassSerializerInterceptor,
+  SerializeOptions,
+} from '@nestjs/common';
 import { Auth, AuthenticatedRequest, NFCCard } from '@attraccess/plugins-backend-sdk';
-import { ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { AttractapService } from './attractap.service';
 import { AppKeyRequestDto } from './dtos/app-key-request.dto';
 import { AppKeyResponseDto } from './dtos/app-key-response.dto';
-import { NfcCardSetActiveStateDto } from './dtos/nfc-card-set-active-state.dto';
+import { NfcCardSetActiveStateDto } from './dtos/rfid-card-set-active-state.dto';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { LicenseModuleType } from '../license/license.service';
+import { CardAccessService } from './card-access.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/cards')
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
+@UseInterceptors(ClassSerializerInterceptor)
 export class AttractapNfcCardsController {
   public constructor(
     @Inject(AttractapService)
-    private readonly attractapService: AttractapService
+    private readonly attractapService: AttractapService,
+    private readonly cardAccess: CardAccessService,
   ) {}
 
   @Post('keys')
@@ -28,7 +45,7 @@ export class AttractapNfcCardsController {
   })
   async getAppKeyByUid(
     @Body() appKeyRequest: AppKeyRequestDto,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<AppKeyResponseDto> {
     const key = await this.attractapService.generateNTAG424Key({
       keyNo: appKeyRequest.keyNo,
@@ -43,25 +60,41 @@ export class AttractapNfcCardsController {
 
   @Get()
   @Auth()
-  @ApiOperation({ summary: 'Get all of your cards', operationId: 'getAllCards' })
+  @ApiOperation({ summary: "Get your cards or manage another user's cards", operationId: 'getAllCards' })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    type: Number,
+    description: 'Card owner; defaults to yourself. Requires users.rfid-cards.manage for another user.',
+  })
   @ApiResponse({
     status: 200,
     description: 'The list of all cards',
     type: [NFCCard],
   })
-  async getCards(@Req() req: AuthenticatedRequest): Promise<NFCCard[]> {
-    return await this.attractapService.getNFCCardsByUserId(req.user.id);
+  async getCards(
+    @Req() req: AuthenticatedRequest,
+    @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
+  ): Promise<NFCCard[]> {
+    const ownerId = await this.cardAccess.resolveUserId(req.user, userId);
+    return await this.attractapService.getNFCCardsByUserId(ownerId);
   }
 
   @Patch('/:id/active')
   @Auth()
+  @SerializeOptions({ type: NFCCard })
   @ApiOperation({ summary: 'Activate or deactivate an NFC card', operationId: 'toggleCardActive' })
   @ApiResponse({
     status: 200,
     description: 'The updated NFC card',
     type: NFCCard,
   })
-  async toggleCardActive(@Param('id') id: number, @Body() data: NfcCardSetActiveStateDto): Promise<NFCCard> {
+  async toggleCardActive(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: NfcCardSetActiveStateDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<NFCCard> {
+    await this.cardAccess.getCardForManagement(id, req.user);
     if (data.active) {
       return await this.attractapService.activateNFCCard(id);
     } else {

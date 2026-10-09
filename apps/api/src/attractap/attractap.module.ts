@@ -5,6 +5,7 @@ import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
+import { CardAccessService } from './card-access.service';
 import 'sqlite3';
 import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
@@ -39,6 +40,8 @@ import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
 import { SupervisionModule } from '../resources/supervision/supervision.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
+import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
 
@@ -63,8 +66,11 @@ import { SettingsModule } from '../settings/settings.module';
     NotificationsModule,
     AuditModule,
     SettingsModule,
+    ResourceMeteringModule,
+    ResourceOperatingAttributionModule,
   ],
   providers: [
+    CardAccessService,
     AttractapService,
     WebsocketService,
     AttractapGateway,

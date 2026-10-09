@@ -45,6 +45,38 @@ describe('GeneralSection', () => {
   const urlField = () => screen.getByLabelText('inputs.url.label');
   const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
 
+  it('saves a language-only edit and protects it during refetches', async () => {
+    const view = render(<GeneralSection />);
+    await userEvent.click(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'English' }));
+    expect(saveBar(view.container)).toBeInTheDocument();
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: '', attractapLanguage: 'de' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    view.rerender(<GeneralSection />);
+    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(saveSettings).toHaveBeenCalledWith({
+      requestBody: {
+        app: {
+          url: 'https://example.org',
+          publicInternetUrl: null,
+          licenseKey: undefined,
+          attractapLanguage: 'en',
+        },
+      },
+    });
+    view.unmount();
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: '', attractapLanguage: 'en' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    const reloaded = render(<GeneralSection />);
+    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
+    expect(saveBar(reloaded.container)).toBeNull();
+  });
+
   it('shows no save bar until something is edited', () => {
     const { container } = render(<GeneralSection />);
 
@@ -117,7 +149,14 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' } },
+      requestBody: {
+        app: {
+          url: 'https://example.org/app',
+          publicInternetUrl: null,
+          licenseKey: undefined,
+          attractapLanguage: 'de',
+        },
+      },
     });
   });
 
@@ -136,7 +175,9 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' } },
+      requestBody: {
+        app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' },
+      },
     });
   });
 
@@ -230,7 +271,14 @@ describe('GeneralSection — Enter key', () => {
     await userEvent.type(field, '/app{Enter}');
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' } },
+      requestBody: {
+        app: {
+          url: 'https://example.org/app',
+          publicInternetUrl: null,
+          licenseKey: undefined,
+          attractapLanguage: 'de',
+        },
+      },
     });
   });
 });

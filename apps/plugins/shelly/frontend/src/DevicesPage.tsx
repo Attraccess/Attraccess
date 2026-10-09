@@ -60,26 +60,25 @@ import {
   type ShellyDevice,
 } from './api';
 
-function generationLabel(generation: number | null): string {
-  if (generation === null) return 'Unknown';
-  return generation === 1 ? 'Gen 1' : `Gen ${generation}+`;
-}
+import { useShellyTranslations } from './i18n';
 
 function AuthChip({ state }: { state: AuthState }) {
+  const { t } = useShellyTranslations();
   const map = {
-    none: { color: 'success' as const, label: 'No auth' },
-    required: { color: 'warning' as const, label: 'Auth required' },
-    unknown: { color: 'default' as const, label: 'Unknown' },
+    none: { color: 'success' as const },
+    required: { color: 'warning' as const },
+    unknown: { color: 'default' as const },
   };
-  const { color, label } = map[state];
+  const { color } = map[state];
   return (
     <Chip variant="soft" color={color} size="sm" className="sh:whitespace-nowrap">
-      {label}
+      {t(`auth.${state}`)}
     </Chip>
   );
 }
 
 function ProbeErrorIndicator({ message }: { message: string }) {
+  const { t } = useShellyTranslations();
   return (
     <Tooltip>
       <Tooltip.Trigger>
@@ -87,14 +86,14 @@ function ProbeErrorIndicator({ message }: { message: string }) {
           variant="ghost"
           size="sm"
           isIconOnly
-          aria-label={`Probe failed: ${message}`}
+          aria-label={t('devices.probeError', { message })}
           className="sh:h-6 sh:w-6 sh:min-w-6 sh:text-warning"
           data-cy="shelly-device-probe-error"
         >
           <TriangleAlertIcon className="sh:h-4 sh:w-4" />
         </Button>
       </Tooltip.Trigger>
-      <Tooltip.Content>Probe failed: {message}</Tooltip.Content>
+      <Tooltip.Content>{t('devices.probeError', { message })}</Tooltip.Content>
     </Tooltip>
   );
 }
@@ -116,6 +115,7 @@ export function RowActions({
   onReprobe: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useShellyTranslations();
   return (
     <div className="sh:flex sh:flex-row sh:items-center sh:justify-end sh:gap-1 sh:whitespace-nowrap">
       <Tooltip>
@@ -124,7 +124,7 @@ export function RowActions({
             variant="ghost"
             size="sm"
             isIconOnly
-            aria-label="View device info"
+            aria-label={t('devices.info')}
             isDisabled={isBusy}
             onPress={onInfo}
             data-cy={`shelly-device-info-${deviceId}`}
@@ -132,7 +132,7 @@ export function RowActions({
             <InfoIcon className="sh:h-4 sh:w-4" />
           </Button>
         </Tooltip.Trigger>
-        <Tooltip.Content>View device info</Tooltip.Content>
+        <Tooltip.Content>{t('devices.info')}</Tooltip.Content>
       </Tooltip>
       <Dropdown>
         <DropdownTrigger>
@@ -140,7 +140,7 @@ export function RowActions({
             variant="ghost"
             size="sm"
             isIconOnly
-            aria-label="More actions"
+            aria-label={t('devices.more')}
             isPending={isBusy}
             data-cy={`shelly-device-menu-${deviceId}`}
           >
@@ -148,15 +148,15 @@ export function RowActions({
           </Button>
         </DropdownTrigger>
         <DropdownPopover>
-          <DropdownMenu aria-label="Device actions">
+          <DropdownMenu aria-label={t('devices.deviceActions')}>
             <DropdownItem id="firmware" onPress={onFirmware} data-cy={`shelly-device-firmware-${deviceId}`}>
-              <CpuIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Manage firmware
+              <CpuIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> {t('devices.manageFirmware')}
             </DropdownItem>
             <DropdownItem id="auth" onPress={onAuth} data-cy={`shelly-device-auth-${deviceId}`}>
-              <KeyRoundIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Set admin password
+              <KeyRoundIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> {t('devices.password')}
             </DropdownItem>
             <DropdownItem id="reprobe" onPress={onReprobe} data-cy={`shelly-device-reprobe-${deviceId}`}>
-              <RefreshCwIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Re-probe device
+              <RefreshCwIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> {t('devices.reprobe')}
             </DropdownItem>
             <DropdownItem
               id="delete"
@@ -164,7 +164,7 @@ export function RowActions({
               className="sh:text-danger"
               data-cy={`shelly-device-delete-${deviceId}`}
             >
-              <Trash2Icon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Delete device
+              <Trash2Icon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> {t('devices.delete')}
             </DropdownItem>
           </DropdownMenu>
         </DropdownPopover>
@@ -174,20 +174,20 @@ export function RowActions({
 }
 
 function EmptyDevices({ onAdd }: { onAdd: () => void }) {
+  const { t } = useShellyTranslations();
   return (
     <div className="sh:flex sh:flex-col sh:items-center sh:justify-center sh:gap-3 sh:px-4 sh:py-12">
       <MehIcon size={36} className="sh:text-default-300" />
-      <p className="sh:text-sm sh:text-default-500">
-        No devices yet. Run discovery, or add your first Shelly by its IP.
-      </p>
+      <p className="sh:text-sm sh:text-default-500">{t('devices.empty')}</p>
       <Button variant="secondary" size="sm" onPress={onAdd} data-cy="shelly-add-open-empty">
-        <PlusIcon className="sh:h-4 sh:w-4" /> Add device
+        <PlusIcon className="sh:h-4 sh:w-4" /> {t('devices.add')}
       </Button>
     </div>
   );
 }
 
 export function DevicesPage() {
+  const { t, language } = useShellyTranslations();
   const [devices, setDevices] = useState<ShellyDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -267,22 +267,22 @@ export function DevicesPage() {
         <div className="sh:flex sh:items-center sh:gap-3">
           <WifiIcon className="sh:h-6 sh:w-6 sh:text-accent-soft-foreground" />
           <div>
-            <h1 className="sh:text-2xl sh:font-bold">Shelly Devices</h1>
-            <p className="sh:mt-1 sh:text-sm sh:text-muted">Discovered and manually added Shelly devices.</p>
+            <h1 className="sh:text-2xl sh:font-bold">{t('devices.title')}</h1>
+            <p className="sh:mt-1 sh:text-sm sh:text-muted">{t('devices.description')}</p>
           </div>
         </div>
         <div className="sh:flex sh:flex-wrap sh:gap-2">
           <Button variant="secondary" onPress={discoverDrawer.open} data-cy="shelly-discover-open">
-            <SearchIcon className="sh:h-4 sh:w-4" /> Discover
+            <SearchIcon className="sh:h-4 sh:w-4" /> {t('devices.discover')}
           </Button>
           <Button variant="primary" onPress={addDrawer.open} data-cy="shelly-add-open">
-            <PlusIcon className="sh:h-4 sh:w-4" /> Add device
+            <PlusIcon className="sh:h-4 sh:w-4" /> {t('devices.add')}
           </Button>
         </div>
       </div>
 
       {pageError && (
-        <StatusAlert status="danger" title="Failed to load devices">
+        <StatusAlert status="danger" title={t('devices.loadError')}>
           {pageError}
         </StatusAlert>
       )}
@@ -294,21 +294,23 @@ export function DevicesPage() {
       ) : (
         <Table data-cy="shelly-device-table">
           <TableScrollContainer>
-            <TableContent aria-label="Shelly devices">
+            <TableContent aria-label={t('devices.table')}>
               <TableHeader>
-                <TableColumn isRowHeader>Device</TableColumn>
-                <TableColumn className="sh:hidden sh:sm:table-cell sh:md:hidden sh:lg:table-cell">Address</TableColumn>
-                <TableColumn className="sh:hidden sh:lg:table-cell">Model</TableColumn>
-                <TableColumn className="sh:hidden sh:sm:table-cell">Auth</TableColumn>
-                <TableColumn className="sh:hidden sh:xl:table-cell">Firmware</TableColumn>
-                <TableColumn className="sh:text-end">Actions</TableColumn>
+                <TableColumn isRowHeader>{t('devices.device')}</TableColumn>
+                <TableColumn className="sh:hidden sh:sm:table-cell sh:md:hidden sh:lg:table-cell">
+                  {t('devices.address')}
+                </TableColumn>
+                <TableColumn className="sh:hidden sh:lg:table-cell">{t('devices.model')}</TableColumn>
+                <TableColumn className="sh:hidden sh:sm:table-cell">{t('devices.auth')}</TableColumn>
+                <TableColumn className="sh:hidden sh:xl:table-cell">{t('devices.firmware')}</TableColumn>
+                <TableColumn className="sh:text-end">{t('devices.actions')}</TableColumn>
               </TableHeader>
               {/* `dependencies` is required: without it react-aria caches the rendered
                   rows, and the row closure keeps the firmware/busy state it was first
                   rendered with. */}
               <TableBody
                 items={devices}
-                dependencies={[firmware, rowBusyId]}
+                dependencies={[firmware, rowBusyId, language]}
                 renderEmptyState={() => <EmptyDevices onAdd={addDrawer.open} />}
               >
                 {(device) => (
@@ -337,7 +339,11 @@ export function DevicesPage() {
                           {device.model ?? '—'}
                         </span>
                         <Chip variant="soft" size="sm" className="sh:whitespace-nowrap">
-                          {generationLabel(device.generation)}
+                          {device.generation === null
+                            ? t('devices.unknown')
+                            : t(device.generation === 1 ? 'devices.generation' : 'devices.generationPlus', {
+                                generation: device.generation,
+                              })}
                         </Chip>
                       </div>
                     </TableCell>
@@ -391,20 +397,17 @@ export function DevicesPage() {
           <ModalContainer size="sm">
             <ModalDialog>
               <ModalHeader>
-                <ModalHeading>Delete device</ModalHeading>
+                <ModalHeading>{t('devices.delete')}</ModalHeading>
               </ModalHeader>
               <ModalBody>
-                <p>
-                  Remove <span className="sh:font-semibold">{deleteTarget?.name}</span> ({deleteTarget?.ipAddress}) from
-                  the registry? The device itself is not changed.
-                </p>
+                <p>{t('devices.deleteDescription', { name: deleteTarget?.name, address: deleteTarget?.ipAddress })}</p>
               </ModalBody>
               <ModalFooter>
                 <Button variant="secondary" onPress={() => setDeleteTarget(null)} data-cy="shelly-delete-cancel">
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button variant="danger" onPress={confirmDelete} isPending={deleting} data-cy="shelly-delete-confirm">
-                  <Trash2Icon className="sh:h-4 sh:w-4" /> Delete
+                  <Trash2Icon className="sh:h-4 sh:w-4" /> {t('common.delete')}
                 </Button>
               </ModalFooter>
             </ModalDialog>

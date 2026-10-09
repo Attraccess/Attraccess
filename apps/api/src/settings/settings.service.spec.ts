@@ -1,3 +1,6 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { validate } from 'class-validator';
+import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
@@ -23,12 +26,19 @@ import { METRICS_TOGGLE_INVALIDATOR } from './metrics-toggle-invalidator.token';
 
 describe('SettingsService', () => {
   let service: SettingsService;
-  let store: { getPlainSetting: jest.Mock; getSecretSetting: jest.Mock; setPlainSetting: jest.Mock; setSecretSetting: jest.Mock };
+  let events: { emit: jest.Mock };
+  let store: {
+    getPlainSetting: jest.Mock;
+    getSecretSetting: jest.Mock;
+    setPlainSetting: jest.Mock;
+    setSecretSetting: jest.Mock;
+  };
   let smtpSettings: { getSettings: jest.Mock };
   let userRepository: { count: jest.Mock };
   let invalidator: { refresh: jest.Mock };
 
   beforeEach(async () => {
+    events = { emit: jest.fn() };
     store = {
       getPlainSetting: jest.fn().mockResolvedValue(null),
       getSecretSetting: jest.fn().mockResolvedValue({ configured: false, value: null }),
@@ -42,6 +52,7 @@ describe('SettingsService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         SettingsService,
+        { provide: EventEmitter2, useValue: events },
         { provide: SettingsStoreService, useValue: store },
         { provide: SmtpSettingsService, useValue: smtpSettings },
         { provide: getRepositoryToken(User), useValue: userRepository },
@@ -71,11 +82,41 @@ describe('SettingsService', () => {
     expect(await service.getAttractapLanguage()).toBe('en');
   });
 
-  it.each(['de-DE', 'de_AT', 'en-US', 'fr-FR'])('normalizes saved Attractap language %s in both settings reads', async (stored) => {
+  it.each([
+    [null, 'de'],
+    ['', 'en'],
+    ['de-DE', 'de'],
+    [' DE_at ', 'de'],
+    ['de-123', 'de'],
+    ['en-US', 'en'],
+    ['fr-FR', 'en'],
+    ['de-!!!', 'en'],
+    ['de-', 'en'],
+    ['de--DE', 'en'],
+    ['de_DE_extra', 'en'],
+  ])('resolves stored language %s in both read methods', async (stored, expected) => {
     store.getPlainSetting.mockResolvedValue(stored);
-    const expected = stored.toLowerCase().startsWith('de') ? 'de' : 'en';
     expect(await service.getAttractapLanguage()).toBe(expected);
     expect((await service.getAppSettings()).attractapLanguage).toBe(expected);
+  });
+
+  it('announces only successfully persisted language changes', async () => {
+    await service.updateAppSettings({ attractapLanguage: 'en' });
+    expect(events.emit).toHaveBeenCalledWith('settings.attractap-language', 'en');
+    events.emit.mockClear();
+    store.setPlainSetting.mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(service.updateAppSettings({ attractapLanguage: 'de' })).rejects.toThrow('storage unavailable');
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
+  it.each(['de-DE', 'de-', 'fr', '', null])('rejects invalid new language selections %s', async (value) => {
+    const dto = Object.assign(new UpdateAppSettingsDto(), { attractapLanguage: value });
+    expect(await validate(dto)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'attractapLanguage' })]),
+    );
+  });
+  it.each(['de', 'en'])('accepts canonical new language selection %s', async (value) => {
+    expect(await validate(Object.assign(new UpdateAppSettingsDto(), { attractapLanguage: value }))).toEqual([]);
   });
 
   it('persists every authentication rate-limit option and returns the resolved policy', async () => {

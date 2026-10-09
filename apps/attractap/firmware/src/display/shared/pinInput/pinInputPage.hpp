@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lvgl.h>
+#include "display/messages.hpp"
 #include <functional>
 #include <string>
 #include "../../../logger/logger.hpp"
@@ -10,7 +11,7 @@ class PinInputPage
 public:
     PinInputPage() : logger("PinInputPage") {}
 
-    lv_obj_t *init(const char *title, lv_obj_t *parent = NULL);
+    lv_obj_t *init(const FirmwareI18n::Text &title, lv_obj_t *parent = NULL);
     void setOnConfirmCallback(std::function<bool(std::string)> onConfirmCallback);
     void setOnCancelCallback(std::function<void()> onCancelCallback);
 

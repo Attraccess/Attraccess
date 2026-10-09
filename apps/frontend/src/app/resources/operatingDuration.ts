@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useResourceMaintenancesServiceCanManageMaintenance } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
-import { useSSE } from '../../utils/sse';
+import { useLiveUpdates } from '../../utils/live-updates';
 
 export interface OperatingDurationSummary {
   sessionDurationMs: number;
@@ -43,9 +43,10 @@ export function useCanViewOperatingDuration(resourceId: number) {
 }
 
 export function useOperatingDuration(resourceId: number, enabled: boolean, range?: OperatingDurationRange) {
+  const isZeroDuration = !!range && range.start.getTime() === range.end.getTime();
   const query = useQuery({
     queryKey: ['resource-operating-attribution', resourceId, range?.start, range?.end],
-    enabled,
+    enabled: enabled && !isZeroDuration,
     queryFn: async () => {
       const params = range && new URLSearchParams({ start: range.start.toISOString(), end: range.end.toISOString() });
       // eslint-disable-next-line no-restricted-syntax -- The generated client has no query hook for this range-dependent request.
@@ -62,8 +63,9 @@ export function useOperatingDuration(resourceId: number, enabled: boolean, range
   });
 
   const shouldSubscribe = enabled && !range;
-  useSSE({
-    path: `/api/resources/${resourceId}/events`,
+  useLiveUpdates({
+    topic: 'resource',
+    resourceId,
     onUpdate: () => query.refetch(),
     enabled: shouldSubscribe,
   });

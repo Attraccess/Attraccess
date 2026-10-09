@@ -43,7 +43,7 @@ void ResetScreen::init()
    lv_obj_t *title = lv_label_create(this->screen);
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   FirmwareI18n::setLabel(title, "Karte zurücksetzen");
+   FirmwareI18n::setLabel(title, FirmwareI18n::Message::ResetCard);
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -77,7 +77,7 @@ void ResetScreen::init()
 
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(cancelLabel, "Abbrechen");
+   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -116,24 +116,24 @@ void ResetScreen::applyStatus()
       return;
    }
 
-   const char *text = "";
+   FirmwareI18n::Text text;
    lv_color_t color = DisplayTheme::text();
    switch (this->status)
    {
    case STATUS_WAITING:
-      text = "Karte an den Leser halten";
+      text = FirmwareI18n::Message::HoldCardToReaderAlt;
       color = DisplayTheme::text();
       break;
    case STATUS_WRITING:
-      text = "Karte wird zurückgesetzt...\nbitte nicht bewegen";
+      text = FirmwareI18n::Message::ResettingCardPleaseKeepItStill;
       color = DisplayTheme::warning();
       break;
    case STATUS_SUCCESS:
-      text = "Karte zurückgesetzt!";
+      text = FirmwareI18n::Message::CardReset;
       color = DisplayTheme::success();
       break;
    case STATUS_ERROR:
-      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : "Fehler";
+      text = !this->statusMessageOverride.empty() ? this->statusMessageOverride : FirmwareI18n::Text(FirmwareI18n::Message::Error);
       color = DisplayTheme::danger();
       break;
    }
@@ -181,12 +181,12 @@ void ResetScreen::setStatus(Status status)
    this->status = status;
    if (status != STATUS_ERROR)
    {
-      this->statusMessageOverride = "";
+      this->statusMessageOverride.clear();
    }
    this->applyStatus();
 }
 
-void ResetScreen::setStatusMessage(const std::string &message)
+void ResetScreen::setStatusMessage(const FirmwareI18n::Text &message)
 {
    this->statusMessageOverride = message;
    this->applyStatus();

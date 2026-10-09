@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   callbacks: {} as Record<string, { onSuccess: () => void; onError: (error: Error) => void }>,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
+  useAccessControlServiceResourceIntroductionsGetPeopleKey: 'resourceIntroductions',
   useResourcesServiceResourceGroupsGetOne: () => ({ data: state.group, isLoading: state.loading, error: state.error }),
   useResourcesServiceResourceGroupsUpdateOne: (callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.update = callbacks;

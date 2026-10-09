@@ -39,7 +39,7 @@ void DemoSettingsScreen::init()
     lv_obj_set_style_pad_hor(titleBar, 16, LV_PART_MAIN);
 
     lv_obj_t *title = lv_label_create(titleBar);
-    FirmwareI18n::setLabel(title, "Demo Einstellungen");
+    FirmwareI18n::setLabel(title, FirmwareI18n::Message::DemoSettings);
     lv_obj_set_style_text_color(title, DisplayTheme::onPrimarySoft(), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, LV_PART_MAIN);
 
@@ -60,7 +60,7 @@ void DemoSettingsScreen::init()
     DisplayTheme::button(addBtn);
     lv_obj_add_event_cb(addBtn, &DemoSettingsScreen::onAddCardBtn, LV_EVENT_CLICKED, this);
     lv_obj_t *addLbl = lv_label_create(addBtn);
-    FirmwareI18n::setLabel(addLbl, "Karte hinzufügen");
+    FirmwareI18n::setLabel(addLbl, FirmwareI18n::Message::AddCard);
     lv_obj_set_align(addLbl, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(addLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(addLbl, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
@@ -68,6 +68,13 @@ void DemoSettingsScreen::init()
 #ifdef HAS_POWER_BUTTON
     // Power-off button (V4 hardware with SYS_EN latch only).
     PowerOffButton::create(actions, [this]() { if (_powerOffCb) _powerOffCb(); });
+    // Give the translated heading its own row when the additional power
+    // control would make the title and action group overlap.
+    lv_obj_set_height(titleBar, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(titleBar, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(titleBar, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_width(title, lv_pct(100));
+    lv_obj_set_width(actions, lv_pct(100));
 #endif
 
     // Scrollable card list area — grows to fill all space below the title bar.
@@ -140,7 +147,7 @@ void DemoSettingsScreen::rebuildCardList()
     if (count == 0)
     {
         lv_obj_t *emptyLbl = lv_label_create(_cardList);
-        FirmwareI18n::setLabel(emptyLbl, "Noch keine Karten registriert.");
+        FirmwareI18n::setLabel(emptyLbl, FirmwareI18n::Message::NoCardsRegisteredYet);
         lv_obj_set_style_text_color(emptyLbl, DisplayTheme::muted(), LV_PART_MAIN);
         lv_obj_set_style_text_font(emptyLbl, &lv_font_montserrat_20, LV_PART_MAIN);
         return;
@@ -153,12 +160,13 @@ void DemoSettingsScreen::rebuildCardList()
         // Row container
         lv_obj_t *row = lv_obj_create(_cardList);
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(row, lv_pct(100), 60);
+        lv_obj_set_size(row, lv_pct(100), 72);
         DisplayTheme::applySurface(row);
         lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_hor(row, 12, LV_PART_MAIN);
+        lv_obj_set_style_pad_ver(row, 6, LV_PART_MAIN);
 
         // UID label
         char uidShort[15]; // max 14 hex chars for 7-byte UID + null (GCC 14 -Wformat-truncation)
@@ -189,11 +197,11 @@ void DemoSettingsScreen::rebuildCardList()
         FirmwareI18n::setDynamicLabel(nameLbl, displayName);
         lv_label_set_long_mode(nameLbl, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_color(nameLbl, DisplayTheme::text(), LV_PART_MAIN);
-        lv_obj_set_style_text_font(nameLbl, &lv_font_montserrat_20, LV_PART_MAIN);
+        lv_obj_set_style_text_font(nameLbl, &attractap_font_montserrat_latin1_20, LV_PART_MAIN);
 
         lv_obj_t *roleLbl = lv_label_create(nameCol);
         lv_obj_set_width(roleLbl, lv_pct(100));
-        FirmwareI18n::setLabel(roleLbl, DemoStore::roleName(card.role));
+        FirmwareI18n::setLabel(roleLbl, card.role == DemoStore::UserRole::NO_PERMISSION ? FirmwareI18n::Text(FirmwareI18n::Message::NoAccess) : card.role == DemoStore::UserRole::INTRODUCED ? FirmwareI18n::Text(FirmwareI18n::Message::Introduced) : FirmwareI18n::Text::literal("Admin"));
         lv_color_t roleColor = DisplayTheme::muted();
         switch (card.role) {
         case DemoStore::UserRole::INTRODUCED: roleColor = DisplayTheme::success(); break;
@@ -210,7 +218,7 @@ void DemoSettingsScreen::rebuildCardList()
         _delPayloads[i] = {this, i};
         lv_obj_add_event_cb(delBtn, &DemoSettingsScreen::onDeleteCardBtn, LV_EVENT_CLICKED, &_delPayloads[i]);
         lv_obj_t *delBtnInner = lv_label_create(delBtn);
-        FirmwareI18n::setLabel(delBtnInner, "Löschen");
+        FirmwareI18n::setLabel(delBtnInner, FirmwareI18n::Message::Delete);
         lv_obj_set_align(delBtnInner, LV_ALIGN_CENTER);
         lv_obj_set_style_text_color(delBtnInner, DisplayTheme::onPrimary(), LV_PART_MAIN);
         lv_obj_set_style_text_font(delBtnInner, &attractap_font_montserrat_latin1_14, LV_PART_MAIN);
@@ -239,7 +247,7 @@ void DemoSettingsScreen::showScanOverlay()
     lv_obj_set_style_pad_row(_scanOverlay, 24, LV_PART_MAIN);
 
     lv_obj_t *lbl = lv_label_create(_scanOverlay);
-    FirmwareI18n::setLabel(lbl, "Karte ans Lesegerät halten...");
+    FirmwareI18n::setLabel(lbl, FirmwareI18n::Message::HoldCardToReader);
     lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, &attractap_font_montserrat_latin1_24, LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
@@ -249,7 +257,7 @@ void DemoSettingsScreen::showScanOverlay()
     DisplayTheme::button(cancelBtn);
     lv_obj_add_event_cb(cancelBtn, &DemoSettingsScreen::onCancelScanBtn, LV_EVENT_CLICKED, this);
     lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
-    FirmwareI18n::setLabel(cancelLbl, "Abbrechen");
+    FirmwareI18n::setLabel(cancelLbl, FirmwareI18n::Message::Cancel);
     lv_obj_set_align(cancelLbl, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(cancelLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(cancelLbl, &lv_font_montserrat_20, LV_PART_MAIN);
@@ -293,20 +301,18 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     lv_obj_set_style_pad_all(_rolePicker, 20, LV_PART_MAIN);
     lv_obj_set_style_pad_row(_rolePicker, 14, LV_PART_MAIN);
 
-    char titleBuf[64];
-    snprintf(titleBuf, sizeof(titleBuf), "Rolle für Karte %s", uid.c_str());
     lv_obj_t *titleLbl = lv_label_create(_rolePicker);
-    FirmwareI18n::setLabel(titleLbl, titleBuf);
+    FirmwareI18n::setLabel(titleLbl, FirmwareI18n::Text::format(FirmwareI18n::Message::RoleForCard, {FirmwareI18n::Text::literal(uid)}));
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN);
     lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_20, LV_PART_MAIN);
     lv_label_set_long_mode(titleLbl, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(titleLbl, lv_pct(100));
 
-    struct RoleEntry { const char *label; DemoStore::UserRole role; lv_color_t color; };
+    struct RoleEntry { FirmwareI18n::Text label; DemoStore::UserRole role; lv_color_t color; };
     static const RoleEntry roles[] = {
-        { "Kein Zugang",  DemoStore::UserRole::NO_PERMISSION, DisplayTheme::danger()  },
-        { "Eingewiesen",  DemoStore::UserRole::INTRODUCED,    DisplayTheme::success() },
-        { "Admin",        DemoStore::UserRole::ADMIN,        DisplayTheme::warning() },
+        { FirmwareI18n::Message::NoAccessAlt,  DemoStore::UserRole::NO_PERMISSION, DisplayTheme::danger()  },
+        { FirmwareI18n::Message::IntroducedAlt,  DemoStore::UserRole::INTRODUCED,    DisplayTheme::success() },
+        { FirmwareI18n::Text::literal("Admin"),        DemoStore::UserRole::ADMIN,        DisplayTheme::warning() },
     };
 
     for (uint8_t j = 0; j < 3; j++)

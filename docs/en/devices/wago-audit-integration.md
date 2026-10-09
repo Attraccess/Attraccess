@@ -174,8 +174,8 @@ The profile contract matches ATT-1059 / Modbus commit `20ef1db4`: `profileId` is
 string with a nonempty `trim()` result and original JavaScript `.length` at most
 160 (UTF-16 code units); `profileVersion` is a safe integer in `1..1000000`.
 Accepted IDs are preserved verbatim, never trimmed, truncated, coerced or
-restricted to UUID/ASCII syntax. Built-in references include
-`wago-879-3000-unverified` and `wago-879-1300-unverified`, version 1; custom IDs
+restricted to UUID/ASCII syntax. The sole built-in reference is
+`wago-879-3020`, version 1; custom IDs
 are user-editable strings. Invalid fields and extra keys at every level are
 dropped, not copied into error metadata. The length check is not secret detection:
 IDs must come from validated domain identities, never arbitrary request text or
@@ -229,7 +229,7 @@ Commissioning PR #1817 at `f136365b` emits through the same host bridge. Its
 `auditCommissioning` helper uses `wago.commissioning` subjects (the persisted
 session ID) for `wago.commissioning.install`, `recover`, `security_inspect`,
 `security_review`, `security_apply`, `security_recover`, `platform_inspect`,
-`platform_activate`, `platform_recover`, and `lease_recover`. Details are empty.
+`platform_activate` and `platform_recover`. Details are empty.
 Automatic claim instead emits `wago.claim` against the real `wago.controller` ID.
 The authenticated initiating principal is persisted in commissioning sessions;
 legacy sessions without a valid initiator must not invent one.

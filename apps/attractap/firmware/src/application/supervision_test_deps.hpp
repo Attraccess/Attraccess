@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include "../display/messages.hpp"
 
 inline size_t strlcpy(char *destination, const char *source, size_t size) {
     const size_t length = std::strlen(source);
@@ -109,8 +110,8 @@ public:
     struct View {
         uint32_t deadlineMs = 0;
         std::string requesterName;
-        std::string statusMessage;
-        std::string supervisorHint;
+        FirmwareI18n::Text statusMessage;
+        FirmwareI18n::Text supervisorHint;
         Status status = STATUS_WAITING;
     };
     View lastView;

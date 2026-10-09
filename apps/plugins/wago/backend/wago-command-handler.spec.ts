@@ -15,6 +15,9 @@ describe('WAGO command form', () => {
     }),
   });
   const appliedRevision = jest.fn();
+  const draftLookup = jest.fn().mockResolvedValue({
+    presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }),
+  });
   const query = {
     select: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
@@ -25,9 +28,7 @@ describe('WAGO command form', () => {
     context: {
       dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
       getRepository: () => ({
-        findOneBy: async () => ({
-          presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }),
-        }),
+        findOneBy: draftLookup,
       }),
     } as unknown as PluginContext,
     controllers: () =>
@@ -41,6 +42,42 @@ describe('WAGO command form', () => {
   });
 
   beforeEach(() => appliedRevision.mockResolvedValue(revision));
+
+  it.each([true, false])('previews the selected device, channel and set %s operation', async (value) => {
+    const schema = await handler.schema({ controllerId: 1, channelId: 'lamp', action: 'set', value }, 2);
+    expect(schema.preview).toMatchObject([
+      { label: 'Device', value: 'Workshop' },
+      { label: 'Channel', value: 'lamp' },
+      { label: 'Action', value: value ? 'Turn ON' : 'Turn OFF' },
+    ]);
+  });
+
+  it('previews a pulse using the applied channel name and duration', async () => {
+    const schema = await handler.schema({ controllerId: 1, channelId: 'door-lock', action: 'pulse' }, 2);
+    expect(schema.preview).toMatchObject([
+      { label: 'Device', value: 'Workshop' },
+      { label: 'Channel', value: 'Workshop door lock' },
+      { label: 'Action', value: 'Pulse · 500 ms' },
+    ]);
+  });
+
+  it('resolves canvas summaries without draft or cross-resource reference queries', async () => {
+    draftLookup.mockClear();
+    query.getMany.mockClear();
+    appliedRevision.mockResolvedValueOnce({
+      ...revision,
+      presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Applied door' } } }),
+    });
+    const schema = await handler.schema({ controllerId: 1, channelId: 'door-lock', action: 'pulse' }, 2, true);
+    expect(schema.properties).toEqual({});
+    expect(schema.preview).toMatchObject([
+      { label: 'Device', value: 'Workshop' },
+      { label: 'Channel', value: 'Applied door' },
+      { label: 'Action', value: 'Pulse · 500 ms' },
+    ]);
+    expect(draftLookup).not.toHaveBeenCalled();
+    expect(query.getMany).not.toHaveBeenCalled();
+  });
 
   it('lists only output channels and shows cross-resource conflict help', async () => {
     const schema = await handler.schema({ controllerId: 1, channelId: 'door-lock', action: 'set' }, 2);
@@ -93,6 +130,20 @@ describe('WAGO command form', () => {
     ]);
     expect(await handler.validate({ ...config, channelId: 'lamp', action: 'set', value: true })).toEqual([]);
     expect(await handler.validate({ ...config, channelId: 'door-lock', action: 'pulse' })).toEqual([]);
+  });
+
+  it('allows release only for manual commands on an applied output', async () => {
+    const config = { controllerId: 1, expectedConfigurationRevision: 3, action: 'release', channelId: 'door-lock' };
+    expect(await handler.validate(config)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'action' })]),
+    );
+    expect(await handler.validate(config, new Map(), true)).toEqual([]);
+    expect(await handler.validate({ ...config, channelId: 'door-contact' }, new Map(), true)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'channelId' })]),
+    );
+    expect(await handler.validate({ ...config, expectedConfigurationRevision: 2 }, new Map(), true)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'expectedConfigurationRevision' })]),
+    );
   });
 
   it('keeps an unapplied controller incomplete with actionable help', async () => {

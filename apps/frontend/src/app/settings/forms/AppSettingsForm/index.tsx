@@ -1,3 +1,4 @@
+import { Select } from '../../../../components/select';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -35,21 +36,24 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
+  const hasEditedLanguage = useRef(false);
 
   const [url, setUrl] = useState(window.location.origin);
   const [publicInternetUrl, setPublicInternetUrl] = useState(window.location.origin);
   const [licenseKey, setLicenseKey] = useState('');
-  const browserLanguage = (navigator.language || '').toLowerCase().split(/[-_]/, 1)[0];
-  const [attractapLanguage, setAttractapLanguage] = useState<'en' | 'de'>(browserLanguage === 'de' ? 'de' : 'en');
+  const browserIsGerman = /^de(?:[-_](?:[a-z]{2}|[0-9]{3}))?$/i.test(navigator.language || '');
+  const [attractapLanguage, setAttractapLanguage] = useState<'en' | 'de'>(browserIsGerman ? 'de' : 'en');
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, { enabled: variant === 'standalone' });
+  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, {
+    enabled: variant === 'standalone',
+  });
 
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;
     setUrl(settings.app.url ?? '');
     setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
     setLicenseKey('');
-    setAttractapLanguage((settings.app as typeof settings.app & { attractapLanguage?: 'en' | 'de' }).attractapLanguage ?? 'de');
+    if (!hasEditedLanguage.current) setAttractapLanguage(settings.app.attractapLanguage ?? 'de');
   }, [variant, settings]);
 
   const mutateConfig = useMemo(() => {
@@ -63,6 +67,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         if (endpoint === 'first-time-setup') {
           queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
         }
+        hasEditedLanguage.current = false;
         setLicenseKey('');
         if (variant === 'wizard') onNext?.();
       },
@@ -74,11 +79,12 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           baseTranslationKey: 'api',
         });
       },
-    }
+    };
   }, [endpoint, variant, t, tExists, toast, queryClient, onNext]);
 
   const { mutate: saveSettings, isPending: isSavingNormal } = useSettingsServiceUpdateSystemSettings(mutateConfig);
-  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } = useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
+  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } =
+    useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
 
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
 
@@ -133,13 +139,22 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         <Input type="url" />
         <Description>{t('inputs.publicInternetUrl.description')}</Description>
       </TextField>
-      <label className="flex flex-col gap-1">
-        <span>{t('inputs.attractapLanguage.label')}</span>
-        <select aria-label={t('inputs.attractapLanguage.label')} value={attractapLanguage} onChange={(event) => setAttractapLanguage(event.target.value as 'en' | 'de')} className="rounded-medium border border-default-300 bg-default-100 px-3 py-2">
-          <option value="en">English</option>
-          <option value="de">Deutsch</option>
-        </select>
-      </label>
+      <Select
+        label={t('inputs.attractapLanguage.label')}
+        value={attractapLanguage}
+        onChange={(next) => {
+          if (next === 'en' || next === 'de') {
+            hasEditedLanguage.current = true;
+            setAttractapLanguage(next);
+          }
+        }}
+        items={[
+          { key: 'en', label: 'English' },
+          { key: 'de', label: 'Deutsch' },
+        ]}
+        isDisabled={isSaving}
+        fullWidth
+      />
       {variant === 'standalone' && (
         <>
           <PasswordInput
@@ -152,11 +167,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           <CommunityLicenseButton onAccept={setLicenseKey} isDisabled={isSaving} />
         </>
       )}
-      <Button variant="primary"
-        onPress={handleSubmit}
-        isPending={isSaving}
-        isDisabled={showLoading}
-      >
+      <Button variant="primary" onPress={handleSubmit} isPending={isSaving} isDisabled={showLoading}>
         {variant === 'wizard' ? t('actions.next') : t('actions.save')}
       </Button>
       <input type="submit" hidden />

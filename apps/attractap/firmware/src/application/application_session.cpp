@@ -58,8 +58,8 @@ void Application::handleResourceListUpdate(
     Display::resourceListScreen.hideActionProgress();
     Display::resourceDetailsScreen.hideActionProgress();
     if (!this->actionCompletionMessage.empty()) {
-      if (this->returnToListAfterAction) Display::resourceListScreen.showSuccessToast(this->actionCompletionMessage.c_str());
-      else Display::resourceDetailsScreen.showSuccessToast(this->actionCompletionMessage.c_str());
+      if (this->returnToListAfterAction) Display::resourceListScreen.showSuccessToast(this->actionCompletionMessage);
+      else Display::resourceDetailsScreen.showSuccessToast(this->actionCompletionMessage);
     }
     this->returnToListAfterAction = false;
     this->actionCompletionMessage.clear();
@@ -175,7 +175,7 @@ void Application::handleResourceDetailsButtonClick(
     }
 
     this->showReaderActionProgress(
-        isTakeover ? "Übernehme Sitzung" : "Starte Sitzung");
+        isTakeover ? FirmwareI18n::Message::TakingOverSession : FirmwareI18n::Message::StartingSession);
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -190,7 +190,7 @@ void Application::handleResourceDetailsButtonClick(
   }
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
     this->pendingUiAction = "STOP_RESOURCE_USAGE_SESSION";
-    this->showReaderActionProgress("Nutzung wird beendet");
+    this->showReaderActionProgress(FirmwareI18n::Message::EndingUsage);
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_STOP_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -202,25 +202,25 @@ void Application::handleResourceDetailsButtonClick(
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
     this->pendingUiAction = "LOCK_DOOR";
-    this->showReaderActionProgress("Sperre Tür");
+    this->showReaderActionProgress(FirmwareI18n::Message::LockingDoor);
     this->beginActionPause();
     this->api.lockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
     this->pendingUiAction = "UNLOCK_DOOR";
-    this->showReaderActionProgress("Entsperre Tür");
+    this->showReaderActionProgress(FirmwareI18n::Message::UnlockingDoor);
     this->beginActionPause();
     this->api.unlockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
     this->pendingUiAction = "UNLATCH_DOOR";
-    this->showReaderActionProgress("Öffne Tür-Riegel");
+    this->showReaderActionProgress(FirmwareI18n::Message::ReleasingDoorLatch);
     this->beginActionPause();
     this->api.unlatchDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
     this->pendingUiAction = "TRIGGER_FLOW_BUTTON";
-    this->showReaderActionProgress("Aktion Ausführen");
+    this->showReaderActionProgress(FirmwareI18n::Message::RunningAction);
     this->beginActionPause();
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;
@@ -289,6 +289,7 @@ void Application::resetSessionOnDisconnect() {
   }
 
   this->logger.info("Connectivity lost; resetting session state");
+  Display::hidePopup();
 
   // Ensure any in-progress UI overlays are dismissed
   Display::resourceDetailsScreen.hideActionProgress();
@@ -325,6 +326,7 @@ void Application::resetSessionOnDisconnect() {
   this->selectedResourceChanged = false;
 
   this->unlocked = false;
+  State::setUserLanguage(false);
   this->externalState = EXTERNAL_STATE_NONE;
   this->nfc.enableCardDetection();
 }
@@ -371,12 +373,12 @@ void Application::handleResourceListAction(const API::ResourceBrief &resource, R
   this->handleResourceDetailsButtonClick({&Display::resourceDetailsScreen, type, {}});
 }
 
-void Application::showReaderActionProgress(const char *title) {
+void Application::showReaderActionProgress(const FirmwareI18n::Text &title) {
   if (this->returnToListAfterAction && !this->resourceIsSelected) {
     const char *name = "";
     for (uint16_t i = 0; i < this->resourceList.count; ++i)
       if (this->resourceList.items[i].id == this->pendingUiResourceId) name = this->resourceList.items[i].name;
-    Display::resourceListScreen.showActionProgress(title, name);
+    Display::resourceListScreen.showActionProgress(title, FirmwareI18n::Text::literal(name));
   } else Display::resourceDetailsScreen.showActionProgress(title);
 }
 
@@ -389,18 +391,19 @@ void Application::finishReaderAction(bool success) {
   Display::resourceDetailsScreen.hideFormsModal();
   if (this->returnToListAfterAction) this->resourceIsSelected = false;
   this->actionCompletionMessage = success
-      ? type == "START_RESOURCE_USAGE_SESSION" ? "Nutzung gestartet"
-      : type == "STOP_RESOURCE_USAGE_SESSION" ? "Nutzung beendet" : "Aktion bestätigt"
-      : "";
+      ? FirmwareI18n::Text(type == "START_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageStarted
+      : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded : FirmwareI18n::Message::ActionConfirmed)
+      : FirmwareI18n::Text();
   // Keep input blocked until fresh ownership/availability arrives, so a fast
   // second tap cannot act on the row's pre-action state.
-  this->showReaderActionProgress("Status wird geladen");
+  this->showReaderActionProgress(FirmwareI18n::Message::LoadingStatus);
   this->api.cancelResourceAction();
   this->resourceRefreshRequestId = this->api.requestResourceList();
 }
 
 void Application::logoutReader() {
-  State::setUserLanguage("");
+  State::setUserLanguage(false);
+  Display::hidePopup();
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;
@@ -429,10 +432,33 @@ void Application::finishCardAuthentication(bool success) {
     this->restartSessionTimeout();
     this->selectedResourceChanged = true;
   } else {
-    State::setUserLanguage("");
+    State::setUserLanguage(false);
     this->externalState = EXTERNAL_STATE_NONE;
     this->state = APPLICATION_STATE_INIT;
     this->nfc.enableCardDetection();
   }
 }
+void Application::pollUsageStats() {
+  const API::ResourceBrief *resource = nullptr;
+  if (this->unlocked && this->resourceIsSelected && this->state == APPLICATION_STATE_UNLOCKED &&
+      this->cardAuthenticationData.username == this->resourceList.authenticatedUsername) {
+    for (uint16_t i = 0; i < this->resourceList.count; ++i)
+      if (this->resourceList.items[i].id == this->selectedResourceId) resource = &this->resourceList.items[i];
+  }
+  if (!resource || !resource->hasActiveUsage || !resource->activeUsageId ||
+      this->cardAuthenticationData.username != resource->activeUser) {
+    this->usageStatsResourceId = 0;
+    this->usageStatsUsageId = 0;
+    return;
+  }
+  const uint32_t now = millis();
+  if (this->usageStatsResourceId != resource->id || this->usageStatsUsageId != resource->activeUsageId ||
+      now - this->usageStatsRequestedAt >= 10000) {
+    this->usageStatsResourceId = resource->id;
+    this->usageStatsUsageId = resource->activeUsageId;
+    this->usageStatsRequestedAt = now;
+    this->api.requestUsageStats(resource->id);
+  }
+}
+
 #endif

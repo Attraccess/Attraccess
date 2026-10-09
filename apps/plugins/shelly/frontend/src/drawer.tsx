@@ -17,6 +17,7 @@ import {
 } from '@heroui/react';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useShellyTranslations } from './i18n';
 
 const DRAWER_DIALOG_CLASSNAME = 'sh:md:max-w-2xl sh:md:mx-auto sh:bg-surface-secondary';
 const FIELD_CONTRAST_STYLE: CSSProperties = {
@@ -87,8 +88,9 @@ export function PasswordFieldRow({
   dataCy?: string;
   autoComplete?: string;
 }) {
+  const { t } = useShellyTranslations();
   const [visible, setVisible] = useState(false);
-  const toggleLabel = visible ? 'Hide password' : 'Show password';
+  const toggleLabel = t(visible ? 'password.hide' : 'password.show');
 
   // Masking is the browser's job via input[type=password]. Never derive the
   // displayed value from `value` — a controlled input that rewrites its own

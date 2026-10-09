@@ -1,5 +1,5 @@
 import { memo, useCallback, useState, useEffect } from 'react';
-import { ModalBody, ModalFooter, ModalHeader, Spinner, useOverlayState } from '@heroui/react';
+import { ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner, useOverlayState } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { StandardModal } from '../../../components/standardModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -127,7 +127,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
         {({ close }) => (
           <>
             <ModalHeader className="flex justify-between items-center">
-              <div>{t('title')}</div>
+              <ModalHeading>{t('title')}</ModalHeading>
               <div className="flex gap-1">
                 {canUpdateResources && (
                   <Button

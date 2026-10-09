@@ -41,6 +41,9 @@ export interface RabbitmqPermissionsModalProps {
   onSaved: () => void;
 }
 
+import { useRabbitmqTranslations } from './i18n';
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+
 interface PermissionRow extends RabbitmqPermission {
   // Rows added via "Add vhost" don't exist on the broker until saved — their
   // remove button only drops the row locally.
@@ -60,6 +63,7 @@ function PermissionEditor({
   onSave: () => void;
   onRemove: () => void;
 }) {
+  const { t } = useRabbitmqTranslations();
   return (
     <div
       className="rmq:flex rmq:flex-col rmq:gap-3 rmq:rounded-lg rmq:border rmq:border-default-200 rmq:dark:border-default-100 rmq:p-3"
@@ -67,13 +71,13 @@ function PermissionEditor({
     >
       <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-2">
         <span className="rmq:text-sm rmq:font-semibold rmq:text-default-700">
-          Vhost <code>{row.vhost}</code>
+          {t('form.vhost')} <code>{row.vhost}</code>
         </span>
         <Button
           isIconOnly
           size="sm"
           variant="ghost"
-          aria-label={`Remove permissions on ${row.vhost}`}
+          aria-label={t('permissions.remove', { vhost: row.vhost })}
           onPress={onRemove}
           isDisabled={busy}
           data-cy={`rabbitmq-permissions-remove-button-${row.vhost}`}
@@ -84,20 +88,20 @@ function PermissionEditor({
 
       <div className="rmq:grid rmq:grid-cols-1 rmq:md:grid-cols-3 rmq:gap-3">
         <TextField value={row.configure} onChange={(v) => onChange({ ...row, configure: v })}>
-          <Label>Configure</Label>
+          <Label>{t('permissions.configure')}</Label>
           <Input autoComplete="off" data-cy={`rabbitmq-permissions-configure-input-${row.vhost}`} />
         </TextField>
         <TextField value={row.write} onChange={(v) => onChange({ ...row, write: v })}>
-          <Label>Write</Label>
+          <Label>{t('permissions.write')}</Label>
           <Input autoComplete="off" data-cy={`rabbitmq-permissions-write-input-${row.vhost}`} />
         </TextField>
         <TextField value={row.read} onChange={(v) => onChange({ ...row, read: v })}>
-          <Label>Read</Label>
+          <Label>{t('permissions.read')}</Label>
           <Input autoComplete="off" data-cy={`rabbitmq-permissions-read-input-${row.vhost}`} />
         </TextField>
       </div>
 
-      <div className="rmq:flex rmq:justify-end rmq:gap-2">
+      <div className="rmq:flex rmq:flex-wrap rmq:justify-end rmq:gap-2">
         <Button
           size="sm"
           variant="ghost"
@@ -105,7 +109,7 @@ function PermissionEditor({
           isDisabled={busy}
           data-cy={`rabbitmq-permissions-mqtt-defaults-button-${row.vhost}`}
         >
-          Use MQTT defaults
+          {t('permissions.defaults')}
         </Button>
         <Button
           size="sm"
@@ -114,7 +118,7 @@ function PermissionEditor({
           isPending={busy}
           data-cy={`rabbitmq-permissions-save-button-${row.vhost}`}
         >
-          Save
+          {t('common.save')}
         </Button>
       </div>
     </div>
@@ -129,10 +133,11 @@ export function RabbitmqPermissionsModal({
   onClose,
   onSaved,
 }: RabbitmqPermissionsModalProps) {
+  const { t, tMessage } = useRabbitmqTranslations();
   const [rows, setRows] = useState<PermissionRow[]>([]);
   const [newVhost, setNewVhost] = useState('');
   const [busyVhost, setBusyVhost] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | TranslationMessage | null>(null);
 
   // Re-seed from the user whenever the modal opens.
   useEffect(() => {
@@ -167,7 +172,7 @@ export function RabbitmqPermissionsModal({
       updateRow(index, { ...row, persisted: true });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Saving permissions failed.');
+      setError(err instanceof Error ? err.message : { key: 'permissions.saveError' });
     } finally {
       setBusyVhost(null);
     }
@@ -186,7 +191,7 @@ export function RabbitmqPermissionsModal({
       setRows((current) => current.filter((_, i) => i !== index));
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Removing permissions failed.');
+      setError(err instanceof Error ? err.message : { key: 'permissions.removeError' });
     } finally {
       setBusyVhost(null);
     }
@@ -198,7 +203,7 @@ export function RabbitmqPermissionsModal({
       return;
     }
     if (rows.some((row) => row.vhost === vhost)) {
-      setError(`Permissions for vhost "${vhost}" are already listed.`);
+      setError({ key: 'permissions.duplicate', data: { vhost } });
       return;
     }
     setRows((current) => [...current, { vhost, persisted: false, ...DEFAULT_MQTT_PERMISSIONS }]);
@@ -220,12 +225,12 @@ export function RabbitmqPermissionsModal({
         <ModalContainer size="lg">
           <ModalDialog>
             <ModalHeader>
-              <ModalHeading>Permissions of "{user.name}"</ModalHeading>
+              <ModalHeading>{t('permissions.title', { name: user.name })}</ModalHeading>
             </ModalHeader>
             <ModalBody className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
               {rows.length === 0 && (
                 <p className="rmq:text-sm rmq:text-default-500" data-cy="rabbitmq-permissions-empty">
-                  This user has no permissions on any vhost — it cannot connect yet.
+                  {t('permissions.empty')}
                 </p>
               )}
 
@@ -242,7 +247,10 @@ export function RabbitmqPermissionsModal({
 
               <div className="rmq:flex rmq:items-end rmq:gap-2">
                 <TextField value={newVhost} onChange={setNewVhost} className="rmq:flex-1">
-                  <Label>Add vhost{unusedVhosts.length > 0 ? ` (available: ${unusedVhosts.join(', ')})` : ''}</Label>
+                  <Label>
+                    {t('permissions.addVhost')}
+                    {unusedVhosts.length > 0 ? t('form.available', { vhosts: unusedVhosts.join(', ') }) : ''}
+                  </Label>
                   <Input placeholder="/" autoComplete="off" data-cy="rabbitmq-permissions-add-vhost-input" />
                 </TextField>
                 <Button
@@ -252,21 +260,21 @@ export function RabbitmqPermissionsModal({
                   data-cy="rabbitmq-permissions-add-vhost-button"
                 >
                   <PlusIcon className="rmq:w-4 rmq:h-4" />
-                  Add
+                  {t('permissions.add')}
                 </Button>
               </div>
 
               {error && (
                 <Alert status="danger" data-cy="rabbitmq-permissions-error-alert">
                   <AlertContent>
-                    <AlertDescription>{error}</AlertDescription>
+                    <AlertDescription>{tMessage(error)}</AlertDescription>
                   </AlertContent>
                 </Alert>
               )}
             </ModalBody>
             <ModalFooter>
               <Button variant="secondary" onPress={onClose} data-cy="rabbitmq-permissions-close-button">
-                Close
+                {t('common.close')}
               </Button>
             </ModalFooter>
           </ModalDialog>

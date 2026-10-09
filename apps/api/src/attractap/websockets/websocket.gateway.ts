@@ -7,7 +7,7 @@ import {
   OnGatewayConnection,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Server } from 'ws';
+import { Server, WebSocket } from 'ws';
 import { closeSync } from 'fs';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
@@ -444,6 +444,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.sessionHandler.handleStartResourceUsageSession(socket, eventData),
     [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
       this.sessionHandler.handleStopResourceUsageSession(socket, eventData),
+    [AttractapEventType.RESOURCE_USAGE_STATS]: (socket, eventData) =>
+      this.sessionHandler.handleResourceUsageStats(socket, eventData),
     [AttractapEventType.LOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleLockDoor(socket, eventData),
     [AttractapEventType.UNLOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlockDoor(socket, eventData),
     [AttractapEventType.UNLATCH_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlatchDoor(socket, eventData),
@@ -496,8 +498,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @OnEvent('settings.attractap-language')
   async updateReaderLanguage(language: 'en' | 'de') {
-    const readers = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId !== null);
-    await Promise.all(readers.map((socket) => socket.sendMessage(new AttractapEvent(AttractapEventType.READER_LANGUAGE, { language }))));
+    const readers = Array.from(this.websocketService.sockets.values()).filter(
+      (socket) => typeof socket.readerId === 'number' && socket.readerId > 0 && socket.readyState === WebSocket.OPEN,
+    );
+    await Promise.all(
+      readers.map((socket) => socket.sendMessage(new AttractapEvent(AttractapEventType.READER_LANGUAGE, { language }))),
+    );
   }
 
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {
@@ -516,6 +522,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   public async startEnrollOfNewNfcCard(data: {
     readerId: number;
     userId: number;
+    actorId?: number;
     authenticationMethod?: 'session' | 'api-token';
     apiTokenId?: number;
   }) {

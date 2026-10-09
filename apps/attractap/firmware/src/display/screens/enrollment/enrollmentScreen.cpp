@@ -45,7 +45,7 @@ void EnrollmentScreen::init()
    this->titleLabel = title;
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   FirmwareI18n::setLabel(title, State::getActiveLanguage() == "en" ? "Register new card" : "Neue Karte registrieren");
+   FirmwareI18n::setLabel(title, FirmwareI18n::Message::RegisterNewCard);
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -80,7 +80,7 @@ void EnrollmentScreen::init()
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    this->cancelLabel = cancelLabel;
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(cancelLabel, State::getActiveLanguage() == "en" ? "Cancel" : "Abbrechen");
+   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -95,8 +95,8 @@ void EnrollmentScreen::loop()
    if (language != this->renderedLanguage)
    {
       this->renderedLanguage = language;
-      if (this->titleLabel) FirmwareI18n::setLabel(this->titleLabel, language == "en" ? "Register new card" : "Neue Karte registrieren");
-      if (this->cancelLabel) FirmwareI18n::setLabel(this->cancelLabel, language == "en" ? "Cancel" : "Abbrechen");
+      if (this->titleLabel) FirmwareI18n::setLabel(this->titleLabel, FirmwareI18n::Message::RegisterNewCard);
+      if (this->cancelLabel) FirmwareI18n::setLabel(this->cancelLabel, FirmwareI18n::Message::Cancel);
       this->applyStatus();
    }
 }
@@ -127,25 +127,24 @@ void EnrollmentScreen::applyStatus()
       return;
    }
 
-   const bool english = State::getActiveLanguage() == "en";
-   const char *text = "";
+      FirmwareI18n::Text text;
    lv_color_t color = DisplayTheme::text();
    switch (this->status)
    {
    case STATUS_WAITING:
-      text = english ? "Hold card to reader" : "Karte an den Leser halten";
+      text = FirmwareI18n::Message::HoldCardToReaderAlt;
       color = DisplayTheme::text();
       break;
    case STATUS_WRITING:
-      text = english ? "Writing card...\nplease keep it still" : "Karte wird beschrieben...\nbitte nicht bewegen";
+      text = FirmwareI18n::Message::WritingCardPleaseKeepItStill;
       color = DisplayTheme::warning();
       break;
    case STATUS_SUCCESS:
-      text = english ? "Card registered!" : "Karte registriert!";
+      text = FirmwareI18n::Message::CardRegistered;
       color = DisplayTheme::success();
       break;
    case STATUS_ERROR:
-      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : (english ? "Error" : "Fehler");
+      text = !this->statusMessageOverride.empty() ? this->statusMessageOverride : FirmwareI18n::Text(FirmwareI18n::Message::Error);
       color = DisplayTheme::danger();
       break;
    }
@@ -193,12 +192,12 @@ void EnrollmentScreen::setStatus(Status status)
    this->status = status;
    if (status != STATUS_ERROR)
    {
-      this->statusMessageOverride = "";
+      this->statusMessageOverride.clear();
    }
    this->applyStatus();
 }
 
-void EnrollmentScreen::setStatusMessage(const std::string &message)
+void EnrollmentScreen::setStatusMessage(const FirmwareI18n::Text &message)
 {
    this->statusMessageOverride = message;
    this->applyStatus();

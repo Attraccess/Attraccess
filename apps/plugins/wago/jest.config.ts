@@ -5,6 +5,8 @@ module.exports = {
   // Frontend specs run through the Vitest target which this target depends on.
   // Loading them here compiles Vitest's ESM-only helpers through Jest's CJS runtime.
   testMatch: ['<rootDir>/backend/**/*.spec.ts'],
+  // Several backend specs launch many shell processes; cap Jest's workers so
+  // the process-heavy fixtures do not exhaust the host during Nx validation.
   transform: { '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }] },
   moduleFileExtensions: ['ts', 'tsx', 'js'],
   // Backend fixtures spawn shell and utility subprocesses; avoid multiplying

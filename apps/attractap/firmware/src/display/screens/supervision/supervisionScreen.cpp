@@ -42,7 +42,7 @@ void SupervisionScreen::init()
    lv_obj_t *title = lv_label_create(this->screen);
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   FirmwareI18n::setLabel(title, "Aufsicht erforderlich");
+   FirmwareI18n::setLabel(title, FirmwareI18n::Message::SupervisionRequired);
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -71,7 +71,7 @@ void SupervisionScreen::init()
    lv_obj_set_width(this->hintLabel, lv_pct(100));
    lv_obj_set_height(this->hintLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->hintLabel, LV_LABEL_LONG_WRAP);
-   FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint.c_str());
+   FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint);
    lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -89,7 +89,7 @@ void SupervisionScreen::init()
 
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(cancelLabel, "Abbrechen");
+   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
    lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -128,24 +128,24 @@ void SupervisionScreen::applyStatus()
       return;
    }
 
-   const char *text = "";
+   FirmwareI18n::Text text;
    lv_color_t color = DisplayTheme::text();
    switch (this->view.status)
    {
    case STATUS_WAITING:
-      text = "Aufsichts-Karte auflegen";
+      text = FirmwareI18n::Message::TapSupervisorCard;
       color = DisplayTheme::text();
       break;
    case STATUS_VERIFYING:
-      text = "Karte gelesen...\nbitte nicht bewegen";
+      text = FirmwareI18n::Message::CardReadPleaseKeepItStill;
       color = DisplayTheme::warning();
       break;
    case STATUS_SUCCESS:
-      text = "Freigegeben!";
+      text = FirmwareI18n::Message::Approved;
       color = DisplayTheme::success();
       break;
    case STATUS_ERROR:
-      text = this->view.statusMessage.length() > 0 ? this->view.statusMessage.c_str() : "Fehler";
+      text = !this->view.statusMessage.empty() ? this->view.statusMessage : FirmwareI18n::Text(FirmwareI18n::Message::Error);
       color = DisplayTheme::danger();
       break;
    }
@@ -178,7 +178,7 @@ void SupervisionScreen::render(const View &view)
    this->timeoutTime = view.deadlineMs;
    if (this->hintLabel)
    {
-       FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint.c_str());
+       FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint);
    }
    if (this->requesterNameLabel)
    {

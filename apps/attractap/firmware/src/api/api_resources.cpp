@@ -2,6 +2,7 @@
 // FEATURE: api-resources
 
 #include "api.hpp"
+#include "resource_introducers.hpp"
 #include <functional>
 #include <string.h>
 #include <string>
@@ -121,6 +122,7 @@ void API::onResourceList(JsonObject data)
         if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
         {
             dst.hasActiveUsage = true;
+            dst.activeUsageId = aus["id"] | 0u;
             const char *username = aus["user"]["username"].as<const char *>();
             strlcpy(dst.activeUser, username ? username : "", sizeof(dst.activeUser));
             const char *startIso = aus["startTime"].as<const char *>();
@@ -137,19 +139,7 @@ void API::onResourceList(JsonObject data)
         }
 
         // Parse introducers: array of strings (usernames)
-        JsonArray introducers = resource["introducers"].as<JsonArray>();
-        if (!introducers.isNull())
-        {
-            dst.introducers.reserve(introducers.size());
-            for (JsonVariant v : introducers)
-            {
-                const char *introName = v.is<const char *>() ? v.as<const char *>() : nullptr;
-                if (introName && introName[0] != '\0')
-                {
-                    dst.introducers.emplace_back(introName);
-                }
-            }
-        }
+        dst.introducers = parseResourceIntroducers(resource["introducers"].as<JsonArrayConst>());
 
         // Parse flowButtons: array of { id, label }
         dst.flowButtonCount = 0;
@@ -285,4 +275,46 @@ void API::unlatchDoor(uint32_t resourceId)
 void API::setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback)
 {
     this->ledBrightnessChangedCallback = callback;
+}
+
+void API::requestUsageStats(uint32_t resourceId)
+{
+    JsonDocument doc;
+    auto payload = doc.to<JsonObject>();
+    usageStatsRequestId = ++nextRequestId;
+    payload["requestId"] = usageStatsRequestId.load();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("RESOURCE_USAGE_STATS", payload);
+}
+
+void API::setUsageStatsCallback(std::function<void(const UsageStats &)> callback)
+{
+    usageStatsCallback = std::move(callback);
+}
+
+void API::onUsageStats(JsonObject data)
+{
+    auto payload = data["payload"].as<JsonObject>();
+    if (!usageStatsCallback || (payload["requestId"] | 0u) != usageStatsRequestId.load()) return;
+    UsageStats stats;
+    stats.resourceId = payload["resourceId"] | 0u;
+    auto usage = payload["usage"].as<JsonObject>();
+    stats.usageId = usage["id"] | 0u;
+    if (usage["operatingDurationMs"].is<int64_t>() && usage["operatingDurationMs"].as<int64_t>() >= 0)
+        stats.operatingDurationMs = usage["operatingDurationMs"].as<int64_t>();
+    if (usage["isOperating"].is<bool>()) stats.isOperating = usage["isOperating"].as<bool>() ? 1 : 0;
+    for (auto meter : usage["meters"].as<JsonArray>()) {
+        const char *name = meter["name"].as<const char *>();
+        const char *value = meter["value"].as<const char *>();
+        if (name) {
+            UsageStats::MeterValue reading{};
+            reading.name = name;
+            reading.value = value ? value : "";
+            if (meter["creditsPerUnit"].is<int64_t>() && meter["creditsPerUnit"].as<int64_t>() >= 0)
+                reading.creditsPerUnit = meter["creditsPerUnit"].as<int64_t>();
+            reading.formattedRate = meter["formattedRate"] | "";
+            stats.meters.push_back(std::move(reading));
+        }
+    }
+    usageStatsCallback(stats);
 }

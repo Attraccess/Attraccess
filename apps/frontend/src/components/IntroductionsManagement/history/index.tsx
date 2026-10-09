@@ -4,6 +4,7 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   Table,
   TableBody,
   TableCell,
@@ -61,7 +62,9 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
     >
       {({ close }) => (
         <>
-          <ModalHeader>{t('modal.title')}</ModalHeader>
+          <ModalHeader>
+            <ModalHeading>{t('modal.title')}</ModalHeading>
+          </ModalHeader>
           <ModalBody>
             <Table>
               <TableScrollContainer>

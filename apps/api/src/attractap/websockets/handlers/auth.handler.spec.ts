@@ -63,6 +63,7 @@ describe('AttractapAuthHandler', () => {
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
     (handler as any).settingsService = { getAttractapLanguage: jest.fn().mockResolvedValue('de') };
+    (handler as any).websocketService = { sockets: new Map() };
   });
 
   describe('handleReaderRegister', () => {
@@ -77,7 +78,10 @@ describe('AttractapAuthHandler', () => {
 
       expect(mockAttractapService.createNewReader).toHaveBeenCalledWith('fw-1.2.3');
       expect(mockAudit.recordAttractap).toHaveBeenCalledWith({
-        action: 'reader.registered', actorId: null, authenticationMethod: null, subjectId: 99,
+        action: 'reader.registered',
+        actorId: null,
+        authenticationMethod: null,
+        subjectId: 99,
         details: { source: 'reader-websocket' },
       });
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
@@ -114,7 +118,9 @@ describe('AttractapAuthHandler', () => {
       mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 7 }, token: 'another-token' });
       mockAudit.recordAttractap.mockRejectedValueOnce(new Error('audit unavailable'));
 
-      await expect(handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data'])).resolves.toBeUndefined();
+      await expect(
+        handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data']),
+      ).resolves.toBeUndefined();
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ payload: { id: 7, token: 'another-token' } }) }),
@@ -124,6 +130,49 @@ describe('AttractapAuthHandler', () => {
 
   describe('handleAuthentication', () => {
     const data = { payload: { id: 42, token: 'client-token' } } as AttractapEvent['data'];
+
+    it('revokes the previous reader identity when reauthentication fails', async () => {
+      mockSocket.readerId = 99;
+      mockSocket.readerName = 'Old reader';
+      mockAttractapService.findReaderById.mockResolvedValueOnce(null);
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockSocket.readerName).toBeNull();
+      expect(mockMetricsService.attractapReaderConnected.set).toHaveBeenCalledWith(
+        { reader_id: '99', reader_name: 'Old reader' },
+        0,
+      );
+    });
+
+    it('keeps another authenticated connection marked online when revoking the old identity', async () => {
+      mockSocket.readerId = 99;
+      (handler as any).websocketService.sockets.set('other', { id: 'other', readerId: 99 });
+      mockAttractapService.findReaderById.mockResolvedValueOnce(null);
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockMetricsService.attractapReaderConnected.set).not.toHaveBeenCalled();
+    });
+
+    it('does not restore an identity from an older authentication attempt after a newer rejection', async () => {
+      let finishLookup = (_reader: unknown): void => {
+        throw new Error('The earlier authentication lookup has not started');
+      };
+      mockAttractapService.findReaderById
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            finishLookup = resolve;
+          }),
+        )
+        .mockResolvedValueOnce(null);
+      const olderAttempt = handler.handleAuthentication(mockSocket as any, data);
+      await handler.handleAuthentication(mockSocket as any, data);
+      finishLookup({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      await olderAttempt;
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockSocket.sendMessage).toHaveBeenCalledTimes(1);
+      expect(mockVerifyToken).not.toHaveBeenCalled();
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+    });
 
     it('sends READER_UNAUTHORIZED and does not set readerId when reader is not found', async () => {
       mockAttractapService.findReaderById.mockResolvedValue(null);

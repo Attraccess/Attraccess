@@ -1,9 +1,10 @@
 import { performance } from 'node:perf_hooks';
 import { randomBytes } from 'node:crypto';
 import type { WagoCommissioningClockReport } from '../shared/commissioning';
+import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../shared/clock';
 
 export const CLOCK_LIMITS = { timeoutMs: 30_000, maxOutputBytes: 4096 };
-export const CLOCK_TOLERANCE_SECONDS = 5;
+export const CLOCK_TOLERANCE_SECONDS = CONTROLLER_CLOCK_TOLERANCE_MS / 1000;
 const MAX_SKEW_SECONDS = 10 * 366 * 86400;
 // Owner-provided read-only FW31 cc100-clock-source.txt: config_clock source
 // lines 203-207 document these UTC arguments; lines 331-345 check date/hwclock

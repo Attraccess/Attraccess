@@ -134,7 +134,7 @@ lv_obj_t *ConnectionConfigurationScreen::createSaveButton(lv_obj_t *parent)
    lv_obj_set_width(label, LV_SIZE_CONTENT);
    lv_obj_set_height(label, LV_SIZE_CONTENT);
    lv_obj_set_align(label, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(label, "Speichern");
+   FirmwareI18n::setLabel(label, FirmwareI18n::Message::Save);
    lv_obj_set_style_text_opa(label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    return save;
@@ -178,7 +178,7 @@ void ConnectionConfigurationScreen::onResetCertificateButtonEvent(lv_event_t *e)
    // One-shot feedback: relabel and disable until the screen is rebuilt.
    if (self->resetCertLabel)
    {
-      FirmwareI18n::setLabel(self->resetCertLabel, "Zurückgesetzt");
+      FirmwareI18n::setLabel(self->resetCertLabel, FirmwareI18n::Message::Reset);
    }
    if (self->resetCertButton)
    {

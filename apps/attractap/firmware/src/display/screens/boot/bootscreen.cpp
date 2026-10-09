@@ -14,7 +14,7 @@ void BootScreen::init()
 
     // Main title
     lv_obj_t *title_label = lv_label_create(this->screen);
-    FirmwareI18n::setLabel(title_label, "Attraccess");
+    FirmwareI18n::setLabel(title_label, FirmwareI18n::Text::literal("Attraccess"));
     lv_obj_set_style_text_font(title_label, &lv_font_montserrat_48, 0);
     lv_obj_set_style_text_color(title_label, DisplayTheme::text(), 0);
     lv_obj_align(title_label, LV_ALIGN_CENTER, 0, -60);

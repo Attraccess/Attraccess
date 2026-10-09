@@ -36,7 +36,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_remove_flag(this->tabs, LV_OBJ_FLAG_SCROLLABLE);
    DisplayTheme::applyScreen(this->tabs);
 
-   lv_obj_t *wifiTab = lv_tabview_add_tab(this->tabs, FirmwareI18n::translate("WLAN"));
+   lv_obj_t *wifiTab = FirmwareI18n::addTab(this->tabs, FirmwareI18n::Message::WiFi);
    lv_obj_set_flex_flow(wifiTab, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(wifiTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
@@ -44,12 +44,12 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForWifiSelectNetwork, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForWifiSelectNetwork, "WLAN Netzwerk");
+   FirmwareI18n::setLabel(labelForWifiSelectNetwork, FirmwareI18n::Message::WiFiNetwork);
    lv_obj_set_style_text_color(labelForWifiSelectNetwork, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
    DisplayTheme::field(this->wifiSelectNetwork);
-   FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, "Suche WLANs...");
+   FirmwareI18n::setDropdownOptions(this->wifiSelectNetwork, FirmwareI18n::Message::SearchingForWiFiNetworks);
    lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
    lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
@@ -60,7 +60,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForWifiSSID, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForWifiSSID, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->labelForWifiSSID, "SSID*");
+   FirmwareI18n::setLabel(this->labelForWifiSSID, FirmwareI18n::Message::Ssid);
    lv_obj_set_style_text_color(this->labelForWifiSSID, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForWifiSSIDDefaultColor = lv_obj_get_style_text_color(this->labelForWifiSSID, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -69,7 +69,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->wifiSSID, lv_pct(100));
    lv_obj_set_height(this->wifiSSID, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiSSID, LV_ALIGN_CENTER);
-   lv_textarea_set_placeholder_text(this->wifiSSID, FirmwareI18n::translate("SSID"));
+   FirmwareI18n::setPlaceholder(this->wifiSSID, FirmwareI18n::Message::SsidAlt);
    lv_textarea_set_one_line(this->wifiSSID, true);
    lv_obj_add_event_cb(this->wifiSSID, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
    lv_textarea_set_text(this->wifiSSID, networkConfig.ssid.c_str());
@@ -78,7 +78,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->labelForWifiPassword, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForWifiPassword, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForWifiPassword, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->labelForWifiPassword, "Passwort*");
+   FirmwareI18n::setLabel(this->labelForWifiPassword, FirmwareI18n::Message::Password);
    lv_obj_set_style_text_color(this->labelForWifiPassword, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForWifiPasswordDefaultColor = lv_obj_get_style_text_color(this->labelForWifiPassword, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -87,7 +87,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->wifiPassword, lv_pct(100));
    lv_obj_set_height(this->wifiPassword, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiPassword, LV_ALIGN_CENTER);
-   lv_textarea_set_placeholder_text(this->wifiPassword, FirmwareI18n::translate("Password"));
+   FirmwareI18n::setPlaceholder(this->wifiPassword, FirmwareI18n::Message::PasswordAlt);
    lv_textarea_set_one_line(this->wifiPassword, true);
    lv_textarea_set_password_mode(this->wifiPassword, true);
    lv_obj_add_event_cb(this->wifiPassword, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
@@ -98,7 +98,7 @@ void ConnectionConfigurationScreen::init()
 
    this->startWifiScan();
 
-   lv_obj_t *apiTab = lv_tabview_add_tab(this->tabs, FirmwareI18n::translate("API"));
+   lv_obj_t *apiTab = FirmwareI18n::addTab(this->tabs, FirmwareI18n::Message::Api);
    lv_obj_set_flex_flow(apiTab, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(apiTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
@@ -106,7 +106,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->labelForServerHostname, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForServerHostname, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForServerHostname, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->labelForServerHostname, "Attraccess API URL");
+   FirmwareI18n::setLabel(this->labelForServerHostname, FirmwareI18n::Message::AttraccessApiUrl);
    lv_obj_set_style_text_color(this->labelForServerHostname, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForServerHostnameDefaultColor = lv_obj_get_style_text_color(this->labelForServerHostname, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -115,7 +115,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->serverHostname, lv_pct(100));
    lv_obj_set_height(this->serverHostname, LV_SIZE_CONTENT);
    lv_obj_set_align(this->serverHostname, LV_ALIGN_CENTER);
-   lv_textarea_set_placeholder_text(this->serverHostname, FirmwareI18n::translate("bsp.: deine-domain.de oder 192.168.1.100:3000"));
+   FirmwareI18n::setPlaceholder(this->serverHostname, FirmwareI18n::Message::EGYourDomainComOr19216811003000);
    lv_textarea_set_one_line(this->serverHostname, true);
    lv_obj_add_event_cb(this->serverHostname, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
 
@@ -148,14 +148,14 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->labelForUseSSLSwitch, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForUseSSLSwitch, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForUseSSLSwitch, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->labelForUseSSLSwitch, "SSL verwenden");
+   FirmwareI18n::setLabel(this->labelForUseSSLSwitch, FirmwareI18n::Message::UseSsl);
    lv_obj_set_style_text_color(this->labelForUseSSLSwitch, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *sslInfoLabel = lv_label_create(apiTab);
    lv_obj_set_width(sslInfoLabel, lv_pct(100));
    lv_obj_set_height(sslInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(sslInfoLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstützt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
+   FirmwareI18n::setLabel(sslInfoLabel, FirmwareI18n::Message::SelfSignedCertificatesAreNotCurrentlySupportedAConnectionWithoutSslIsVeryInsecur);
    lv_obj_set_style_text_font(sslInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(sslInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -171,22 +171,15 @@ void ConnectionConfigurationScreen::init()
 
    this->resetCertLabel = lv_label_create(this->resetCertButton);
    lv_obj_set_align(this->resetCertLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->resetCertLabel, "Zertifikat zurücksetzen");
+   FirmwareI18n::setLabel(this->resetCertLabel, FirmwareI18n::Message::ResetCertificate);
    lv_obj_set_style_text_font(this->resetCertLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
 
    // Device tab
-   lv_obj_t *deviceTab = lv_tabview_add_tab(this->tabs, FirmwareI18n::translate("Gerät"));
+   lv_obj_t *deviceTab = FirmwareI18n::addTab(this->tabs, FirmwareI18n::Message::Device);
    // Tab labels are owned by LVGL's separate tab bar. Register their stable
-   // German keys so the standard language refresh can update them in place.
-   const char *tabKeys[] = {"WLAN", "API", "Gerät"};
-   lv_obj_t *tabBar = lv_tabview_get_tab_bar(this->tabs);
-   for (uint32_t i = 0; i < 3 && i < lv_obj_get_child_count(tabBar); ++i) {
-      lv_obj_t *button = lv_obj_get_child(tabBar, i);
-      if (lv_obj_get_child_count(button) > 0) FirmwareI18n::setLabel(lv_obj_get_child(button, 0), tabKeys[i]);
-   }
    lv_obj_set_style_text_font(lv_tabview_get_tab_bar(this->tabs), &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_flex_flow(deviceTab, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(deviceTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -195,7 +188,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->labelForDevicePin, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForDevicePin, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForDevicePin, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->labelForDevicePin, "Geräte PIN*");
+   FirmwareI18n::setLabel(this->labelForDevicePin, FirmwareI18n::Message::DevicePinAlt);
    lv_obj_set_style_text_font(this->labelForDevicePin, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(this->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForDevicePinDefaultColor = lv_obj_get_style_text_color(this->labelForDevicePin, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -205,7 +198,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->devicePin, lv_pct(100));
    lv_obj_set_height(this->devicePin, LV_SIZE_CONTENT);
    lv_obj_set_align(this->devicePin, LV_ALIGN_CENTER);
-   lv_textarea_set_placeholder_text(this->devicePin, FirmwareI18n::translate("Mind. 4 Ziffern"));
+   FirmwareI18n::setPlaceholder(this->devicePin, FirmwareI18n::Message::AtLeast4Digits);
    lv_textarea_set_one_line(this->devicePin, true);
    lv_obj_add_event_cb(this->devicePin, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
    lv_textarea_set_text(this->devicePin, deviceConfig.passCode.c_str());
@@ -214,7 +207,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(labelForBeeperEnabled, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForBeeperEnabled, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForBeeperEnabled, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(labelForBeeperEnabled, "Beeper");
+   FirmwareI18n::setLabel(labelForBeeperEnabled, FirmwareI18n::Message::Beeper);
    lv_obj_set_style_text_color(labelForBeeperEnabled, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->beeperEnabled = lv_switch_create(deviceTab);
@@ -250,7 +243,7 @@ void ConnectionConfigurationScreen::init()
 
    this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { return this->onPinLockConfirmCallback(pin); });
-   this->pinLockOverlay = this->pinInputPage.init("Entsperren mit PIN", this->screen);
+   this->pinLockOverlay = this->pinInputPage.init(FirmwareI18n::Message::UnlockWithPin, this->screen);
    lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
    lv_obj_set_style_arc_width(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_height(this->pinLockOverlay, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);

@@ -1,8 +1,8 @@
 # Using the Attractap Reader
 
-Use your NFC card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
+Use your RFID card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
 
-You need an NFC card linked to your Attraccess account. If you do not have one yet, ask your workshop team to register a card for you.
+You need an RFID card linked to your Attraccess account. If you do not have one yet, ask your workshop team to register a card for you.
 
 ## Sign in with your card
 
@@ -27,6 +27,12 @@ While the reader processes an action, the controls are temporarily unavailable. 
 ### Choose a project
 
 To record machine usage against a project, tap the machine's name to open its details, tap **Projekt wählen** (Choose project), and select your project before starting there. Starting directly from the list records the usage without a project.
+
+## View live usage stats
+
+While signed in, tap the name of the machine you are using. Its details show the session duration and an **Aktuelle Nutzung** (Current usage) panel with consumed energy in **kWh**, machine operating time, and running or idle status. Readings refresh every 10 seconds while you view the details.
+
+Energy readings require configured metering; operating time requires operating-state tracking. **Warte auf Messwert** means no current energy reading is available, and **Keine Daten** means operating-time data is unavailable. Missing readings are not counted as zero. Stats disappear when your usage ends or you sign out.
 
 ## Stop a machine
 
@@ -92,5 +98,5 @@ After signing out, you can scan your card again to continue. Any running machine
 ## Related guides
 
 - [Using Resources](end-user/using-resources.md) – Use machines and tools from the Attraccess app
-- [NFC Cards](attractap/nfc-cards.md) – Register and manage cards
+- [RFID Cards](attractap/rfid-cards.md) – Register and manage cards
 - [Introductions](resources/introductions.md) – How access to a resource is granted

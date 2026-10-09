@@ -1,3 +1,4 @@
+import { activeUsageSql } from './usage/active-usage';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesService } from './resources.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -299,32 +300,20 @@ describe('ResourcesService', () => {
       it('should filter resources currently in use by specific user', async () => {
         await service.listResources({ onlyInUseByUserId: 10 });
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
-          'resource.usages',
-          'usage',
-          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
-        );
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(expect.any(Brackets));
       });
 
       it('should not add in-use filter when onlyInUseByUserId is undefined', async () => {
         await service.listResources();
 
-        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith(
-          'resource.usages',
-          'usage',
-          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
-        );
+        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
       });
 
       it('should filter resources currently in use (onlyInUse)', async () => {
         await service.listResources({ onlyInUse: true });
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
-          'resource.usages',
-          'usage',
-          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
-        );
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
       });
@@ -335,7 +324,7 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
           'resource.usages',
           'usage',
-          'usage.lifecyclePending = FALSE',
+          activeUsageSql('usage'),
         );
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
       });
@@ -346,7 +335,7 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
           'resource.usages',
           'usage',
-          'usage.lifecyclePending = FALSE',
+          activeUsageSql('usage'),
         );
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
@@ -418,11 +407,7 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [1, 2, 3] });
 
         // Verify all joins for both in-use and permission filtering
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
-          'resource.usages',
-          'usage',
-          'usage.endTime IS NULL AND usage.lifecyclePending = FALSE',
-        );
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', activeUsageSql('usage'));
         expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introducers', 'introducer');
 
         // Verify result structure
@@ -458,7 +443,7 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
           'resource.usages',
           'usage',
-          'usage.lifecyclePending = FALSE',
+          activeUsageSql('usage'),
         );
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
 

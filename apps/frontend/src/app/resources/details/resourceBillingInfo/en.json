@@ -17,6 +17,9 @@
   "perOperatingMinute": {
     "label": "Per attributable operating minute"
   },
+  "perKwh": {
+    "label": "Per kWh"
+  },
   "example": {
     "label": "Example cost",
     "sessionDuration": {

@@ -81,6 +81,7 @@ describe('BillingService', () => {
         {
           provide: getRepositoryToken(ResourceBillingConfiguration),
           useValue: {
+            manager: { count: jest.fn().mockResolvedValue(0) },
             findOneBy: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
@@ -134,6 +135,26 @@ describe('BillingService', () => {
     auditService = module.get(AuditService);
   });
 
+  describe('getTransaction', () => {
+    it('restricts transaction lookup to its owner', async () => {
+      billingTransactionRepository.findOne.mockResolvedValue(null);
+
+      expect(await service.getTransaction(123, 2)).toBeNull();
+      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 123, userId: 2 } }),
+      );
+    });
+  });
+
+  it.each([null, { id: 7 }])('finds only the owner’s transaction ID for a usage (%s)', async (transaction) => {
+    billingTransactionRepository.findOne.mockResolvedValue(transaction);
+    expect(await service.getTransactionIdForUsage(8, 2)).toBe(transaction?.id ?? null);
+    expect(billingTransactionRepository.findOne).toHaveBeenCalledWith({
+      where: { resourceUsageId: 8, userId: 2 },
+      select: ['id'],
+    });
+  });
+
   it.each([100, -100])('creates an opposite-sign refund for transaction amount %s', async (amount) => {
     const original = { id: 4, userId: 7, amount } as BillingTransaction;
     const refund = {
@@ -152,7 +173,7 @@ describe('BillingService', () => {
       status: BillingTransactionStatus.Completed,
       refundOfId: 4,
     });
-    expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(original);
+    expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(refund);
     expect(auditService.recordBillingTransaction).toHaveBeenCalledWith(
       expect.objectContaining({ transactionId: 5, source: 'refund', amount: refund.amount }),
     );
@@ -333,6 +354,36 @@ describe('BillingService', () => {
         );
       }
     });
+
+    it.each([
+      { charge: 45, factor: 50, amount: 22 },
+      { charge: Number.MAX_SAFE_INTEGER - 2, factor: 67, amount: 6034823500676463 },
+      { charge: 100, factor: 12.5, amount: 12 },
+    ])(
+      'settles $charge credits at $factor% without floating-point rounding errors',
+      async ({ charge, factor, amount }) => {
+        const usage = {
+          id: 22,
+          startTime: new Date('2026-09-20T09:00:00Z'),
+          endTime: new Date('2026-09-20T09:00:00Z'),
+          creditsPerUsage: charge,
+          sessionDurationCreditsPerMinute: 0,
+          operatingDurationCreditsPerMinute: 0,
+          billingFactor: factor,
+          resource: { id: 205 },
+          userId: 25,
+          user: { id: 25, billingFactor: 100 },
+        } as ResourceUsage;
+        jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({} as ResourceBillingConfiguration);
+        const manager = createMockManager();
+        const transaction = await service.chargeForResourceUsage(usage, manager as never);
+        expect(transaction.amount).toBe(-amount);
+        expect(manager.save).toHaveBeenCalledWith(
+          BillingTransactionItem,
+          expect.objectContaining({ name: 'BILLING_FACTOR', unitPrice: -(charge - amount) }),
+        );
+      },
+    );
 
     it.each([
       { durationMs: 0, roundedMinutes: 0 },
@@ -960,6 +1011,19 @@ describe('BillingService', () => {
       await expect(service.updateResourceBillingConfiguration(1, { creditsPerMinute: 2.2 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
+    });
+
+    it('treats a captured meter rate alone as billing being enabled', async () => {
+      jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 0,
+        creditsPerMinute: 0,
+        creditsPerOperatingMinute: 0,
+      } as ResourceBillingConfiguration);
+      await expect(
+        service.isBillingEnabled(1, undefined, {
+          meterRates: [{ meterId: 1, name: 'Heartbeat', creditsPerUnit: 3 }],
+        } as ResourceUsage),
+      ).resolves.toBe(true);
     });
 
     it('allows partial update without validating undefined fields', async () => {

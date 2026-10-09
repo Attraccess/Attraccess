@@ -94,7 +94,7 @@ public:
 
     // Empty means no new server default was received (for example on disconnect).
     static void setApiState(bool authenticated, std::string deviceName, std::string defaultLanguage = "");
-    static void setUserLanguage(std::string language);
+    static void setUserLanguage(bool authenticated, std::string language = "");
     static void setDefaultLanguage(std::string language);
     static std::string getActiveLanguage();
     struct ApiState

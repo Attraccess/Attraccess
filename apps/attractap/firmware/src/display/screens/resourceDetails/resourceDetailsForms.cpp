@@ -8,8 +8,8 @@
 #include <stdio.h>
 #include <cstdlib>
 
-static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
-static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
+static constexpr auto SELECT_FIELD_NO_OPTIONS = FirmwareI18n::Message::NoOptionsAvailable;
+static constexpr auto SELECT_FIELD_INVALID = FirmwareI18n::Message::InvalidSelection;
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
 
 // Form values must remain unchanged for submission, so prepare a separate
@@ -152,16 +152,16 @@ void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &
    {
       lv_obj_clean(this->formsModalList);
       lv_obj_t *loading = lv_label_create(this->formsModalList);
-      FirmwareI18n::setLabel(loading, "Laden...");
+      FirmwareI18n::setLabel(loading, FirmwareI18n::Message::Loading);
       lv_obj_set_style_text_color(loading, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    if (this->formsModalErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal(""));
    }
    if (this->formsModalProgressLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalProgressLabel, "");
+      FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal(""));
    }
    if (this->formsBackButton)
    {
@@ -213,7 +213,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
    }
    if (this->formsNextLabel)
    {
-      FirmwareI18n::setLabel(this->formsNextLabel, isLast ? "Absenden" : "Weiter");
+      FirmwareI18n::setLabel(this->formsNextLabel, isLast ? FirmwareI18n::Message::Submit : FirmwareI18n::Message::Next);
    }
 
    this->closeFormsEditor(false);
@@ -238,7 +238,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
    }
    if (this->formsModalErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungültig.");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, shown ? FirmwareI18n::Message::PleaseCorrectYourInput : FirmwareI18n::Message::InvalidInput);
    }
 }
 void ResourceDetailsScreen::hideFormsModal()
@@ -291,7 +291,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
    this->formsModalProgressLabel = lv_label_create(header);
-   FirmwareI18n::setLabel(this->formsModalProgressLabel, "");
+   FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal(""));
    lv_obj_set_style_text_color(this->formsModalProgressLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -301,7 +301,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_size(cancelBtn, 34, 34);
    DisplayTheme::secondaryButton(cancelBtn);
    lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
-   FirmwareI18n::setLabel(cancelLabel, LV_SYMBOL_CLOSE);
+   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE));
    lv_obj_center(cancelLabel);
    lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
 
@@ -335,14 +335,14 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(content, 1);
 
    this->formsBreadcrumbLabel = lv_label_create(content);
-   FirmwareI18n::setLabel(this->formsBreadcrumbLabel, "");
+   FirmwareI18n::setLabel(this->formsBreadcrumbLabel, FirmwareI18n::Text::literal(""));
     lv_obj_set_style_text_color(this->formsBreadcrumbLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsModalErrorLabel = lv_label_create(content);
-   FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
+   FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal(""));
     lv_obj_set_style_text_color(this->formsModalErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->formsModalErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -376,7 +376,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_all(backBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::secondaryButton(backBtn);
    lv_obj_t *backLabel = lv_label_create(backBtn);
-   FirmwareI18n::setLabel(backLabel, "Zurück");
+   FirmwareI18n::setLabel(backLabel, FirmwareI18n::Message::Back);
    lv_obj_set_style_text_font(backLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
@@ -388,7 +388,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_all(nextBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::button(nextBtn);
    this->formsNextLabel = lv_label_create(nextBtn);
-   FirmwareI18n::setLabel(this->formsNextLabel, "Weiter");
+   FirmwareI18n::setLabel(this->formsNextLabel, FirmwareI18n::Message::Next);
    lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
    this->formsNextSpinner = lv_spinner_create(nextBtn);
    lv_obj_set_style_arc_color(this->formsNextSpinner, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -433,7 +433,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_column(editorHeader, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->formsEditorTitleLabel = lv_label_create(editorHeader);
-   FirmwareI18n::setLabel(this->formsEditorTitleLabel, "");
+   FirmwareI18n::setLabel(this->formsEditorTitleLabel, FirmwareI18n::Text::literal(""));
    lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
    lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(this->formsEditorTitleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -444,7 +444,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_size(editorCancelBtn, 34, 34);
    DisplayTheme::secondaryButton(editorCancelBtn);
    lv_obj_t *editorCancelLabel = lv_label_create(editorCancelBtn);
-   FirmwareI18n::setLabel(editorCancelLabel, LV_SYMBOL_CLOSE);
+   FirmwareI18n::setLabel(editorCancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE));
    lv_obj_center(editorCancelLabel);
    lv_obj_add_event_cb(editorCancelBtn, &ResourceDetailsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
 
@@ -529,7 +529,7 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *)
       {
          lv_obj_clear_flag(this->formsNextLabel, LV_OBJ_FLAG_HIDDEN);
          lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
-         FirmwareI18n::setLabel(this->formsNextLabel, this->formsIsLastField ? "Absenden" : "Weiter");
+         FirmwareI18n::setLabel(this->formsNextLabel, this->formsIsLastField ? FirmwareI18n::Message::Submit : FirmwareI18n::Message::Next);
       }
    }
 }
@@ -545,7 +545,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
    if (this->formsModalErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal(""));
    }
 
    if (!this->formsModalPage || this->formsModalPage->fieldCount == 0)
@@ -553,22 +553,22 @@ void ResourceDetailsScreen::buildCurrentFormField()
       return;
    }
 
-   std::string pageTitle = "Bitte Formular ausfüllen";
+   FirmwareI18n::Text pageTitle = FirmwareI18n::Message::PleaseCompleteTheForm;
    std::string resourceName = "";
 
    if (this->formsModalMeta)
    {
       if (this->formsModalMeta->action == API::ResourceUsageFormActionType::START)
       {
-         pageTitle = "Bitte vor dem Start ausfüllen";
+         pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeStarting;
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::END)
       {
-         pageTitle = "Bitte vor dem Ende ausfüllen";
+         pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeEnding;
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::TAKEOVER)
       {
-         pageTitle = "Bitte vor der Übernahme ausfüllen";
+         pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeTakingOver;
       }
 
       if (this->formsModalMeta->resourceName.length() > 0)
@@ -594,7 +594,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
    // first line, resource + form scope on the second.
    if (this->formsBreadcrumbLabel)
    {
-      std::string breadcrumb = pageTitle;
+
       std::string scope = resourceName;
       if (formName.length() > 0)
       {
@@ -606,9 +606,9 @@ void ResourceDetailsScreen::buildCurrentFormField()
       }
       if (scope.length() > 0)
       {
-         breadcrumb += "\n" + scope;
+         pageTitle = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {pageTitle, FirmwareI18n::Text::literal(scope)});
       }
-      FirmwareI18n::setLabel(this->formsBreadcrumbLabel, breadcrumb.c_str());
+      FirmwareI18n::setLabel(this->formsBreadcrumbLabel, pageTitle);
    }
 
    {
@@ -638,7 +638,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          if (field.description.length() > 0)
          {
             lv_obj_t *desc = lv_label_create(fieldContainer);
-            lv_label_set_text(desc, field.description.c_str());
+            FirmwareI18n::setDynamicLabel(desc, field.description.c_str());
              lv_obj_set_style_text_color(desc, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
              lv_obj_set_style_text_font(desc, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -712,7 +712,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
-                  lv_label_set_text(optLabel, displayValue.c_str());
+                  FirmwareI18n::setDynamicLabel(optLabel, displayValue.c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -774,7 +774,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_label_set_long_mode(valueLabel, multiline ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
 
             lv_obj_t *editIcon = lv_label_create(preview);
-            FirmwareI18n::setLabel(editIcon, LV_SYMBOL_EDIT);
+            FirmwareI18n::setLabel(editIcon, FirmwareI18n::Text::literal(LV_SYMBOL_EDIT));
             lv_obj_set_style_text_color(editIcon, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
             lv_obj_add_event_cb(preview, &ResourceDetailsScreen::onFieldPreviewClick, LV_EVENT_CLICKED, this);
@@ -782,7 +782,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
 
          widget.errorLabel = lv_label_create(fieldContainer);
-         FirmwareI18n::setLabel(widget.errorLabel, "");
+         FirmwareI18n::setLabel(widget.errorLabel, FirmwareI18n::Text::literal(""));
           lv_obj_set_style_text_color(widget.errorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
           lv_obj_set_style_text_font(widget.errorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
       }
@@ -808,7 +808,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       FormFieldWidget &widget = this->formFieldWidgets[i];
 
-      auto setError = [&](const char *msg)
+      auto setError = [&](FirmwareI18n::Text msg)
       {
          if (widget.errorLabel)
          {
@@ -823,7 +823,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
          // Required boolean fields must be checked (true)
          if (widget.isRequired && !isChecked)
          {
-            setError("Pflichtfeld");
+            setError(FirmwareI18n::Message::RequiredField);
             continue;
          }
          API::FormSubmissionAnswer &answer = outPage.answers[outPage.answerCount++];
@@ -839,7 +839,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
          {
             if (widget.isRequired)
             {
-               setError("Pflichtfeld");
+               setError(FirmwareI18n::Message::RequiredField);
             }
             continue;
          }
@@ -865,7 +865,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
       {
          if (widget.isRequired)
          {
-            setError("Pflichtfeld");
+            setError(FirmwareI18n::Message::RequiredField);
          }
          continue;
       }
@@ -889,7 +889,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       if (this->formsModalErrorLabel)
       {
-         FirmwareI18n::setLabel(this->formsModalErrorLabel, "Bitte markierte Felder ausfüllen.");
+         FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Message::PleaseCompleteTheHighlightedFields);
       }
       return false;
    }
@@ -929,12 +929,12 @@ void ResourceDetailsScreen::clearFormFieldErrors()
    {
       if (this->formFieldWidgets[i].errorLabel)
       {
-         FirmwareI18n::setLabel(this->formFieldWidgets[i].errorLabel, "");
+         FirmwareI18n::setLabel(this->formFieldWidgets[i].errorLabel, FirmwareI18n::Text::literal(""));
       }
    }
    if (this->formsModalErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal(""));
    }
 }
 void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
@@ -948,7 +948,7 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
    if (trimmed.length() == 0)
    {
       // Empty: show the field placeholder (or a generic hint) in muted gray.
-      const char *hint = "Antippen zum Eingeben";
+      const char *hint = "";
       bool useTranslatedHint = true;
       if (widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
           widget.definition->options.text.hasPlaceholder && widget.definition->options.text.placeholder.length() > 0)
@@ -956,8 +956,8 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
          hint = widget.definition->options.text.placeholder.c_str();
          useTranslatedHint = false;
       }
-      if (useTranslatedHint) FirmwareI18n::setLabel(widget.previewLabel, hint);
-      else lv_label_set_text(widget.previewLabel, hint);
+      if (useTranslatedHint) FirmwareI18n::setLabel(widget.previewLabel, FirmwareI18n::Message::TapToEnter);
+      else FirmwareI18n::setDynamicLabel(widget.previewLabel, hint);
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
@@ -1009,7 +1009,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
    {
       placeholder = widget.definition->options.text.placeholder.c_str();
    }
-   lv_textarea_set_placeholder_text(this->formsEditorTextarea, placeholder);
+   FirmwareI18n::setDynamicPlaceholder(this->formsEditorTextarea, placeholder);
    this->formsEditorInitialText = makeLVGLDisplayText(widget.textValue);
    lv_textarea_set_text(this->formsEditorTextarea, this->formsEditorInitialText.c_str());
    lv_textarea_set_cursor_pos(this->formsEditorTextarea, LV_TEXTAREA_CURSOR_LAST);

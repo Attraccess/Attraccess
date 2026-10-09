@@ -8,12 +8,14 @@
 // Owned by a screen; covers its complete input area while a request is pending.
 class ActionOverlay {
 public:
-    void show(lv_obj_t *screen, const char *title, const char *resource) {
+    void show(lv_obj_t *screen, const FirmwareI18n::Text &title, const FirmwareI18n::Text &resource) {
         if (!screen) return;
         if (!root) {
             root = lv_obj_create(screen);
             lv_obj_remove_style_all(root);
+            // Keep the input mask anchored to the viewport of scrollable screens.
             lv_obj_add_flag(root, LV_OBJ_FLAG_IGNORE_LAYOUT);
+            lv_obj_add_flag(root, LV_OBJ_FLAG_FLOATING);
             lv_obj_set_size(root, lv_display_get_horizontal_resolution(lv_obj_get_display(screen)),
                             lv_display_get_vertical_resolution(lv_obj_get_display(screen)));
             lv_obj_align(root, LV_ALIGN_CENTER, 0, 0);
@@ -43,8 +45,8 @@ public:
             lv_obj_align(description, LV_ALIGN_TOP_MID, 0, 112);
             lv_label_set_long_mode(description, LV_LABEL_LONG_DOT);
         }
-        FirmwareI18n::setLabel(heading, title ? title : "Bitte warten");
-        FirmwareI18n::setLabel(description, resource ? resource : "");
+        FirmwareI18n::setLabel(heading, title.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseWait) : title);
+        FirmwareI18n::setLabel(description, resource);
         lv_obj_remove_flag(root, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(root);
     }

@@ -162,6 +162,7 @@ export class ResourceListService {
           healthReason: this.buildHealthReason(unhealthyEntries),
           activeUsageSession: activeUsageSession
             ? {
+                id: activeUsageSession.id,
                 user: {
                   username: activeUsageSession.user.username,
                 },

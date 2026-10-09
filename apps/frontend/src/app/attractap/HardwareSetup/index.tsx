@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Chip, DrawerBody, DrawerHeader, useOverlayState } from '@heroui/react';
+import { Chip, DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { UsbIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../../../components/button';
@@ -94,7 +94,7 @@ export function AttractapHardwareSetup(props: Props) {
         <DrawerHeader>
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold">{t('title')}</h2>
+              <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
               <p className="text-sm text-muted">{t('subtitle')}</p>
             </div>
             <Chip color={isConnected ? 'success' : 'default'}>

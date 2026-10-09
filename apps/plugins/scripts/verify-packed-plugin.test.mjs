@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { validatePackageContract, verifyPackedPlugin } from './verify-packed-plugin.mjs';
+import { resolvePluginTestHostVersion, validatePackageContract, verifyPackedPlugin } from './verify-packed-plugin.mjs';
 
 const fixture = () => ({
   name: '@example/plugin',
@@ -60,6 +60,23 @@ test('does not require backend SDK metadata for a frontend-only package', () => 
   delete pkg.peerDependencies['@attraccess/plugins-backend-sdk'];
   assert.doesNotThrow(() => validatePackageContract(pkg, '1.2.0'));
 });
+
+test('release-target validation is explicit and never downgrades the workspace', () => {
+  assert.equal(resolvePluginTestHostVersion('1.10.0'), '1.10.0');
+  assert.equal(resolvePluginTestHostVersion('1.10.0', '1.11.0'), '1.11.0');
+  assert.equal(resolvePluginTestHostVersion('1.12.0', '1.11.0'), '1.12.0');
+  assert.throws(() => resolvePluginTestHostVersion('1.10.0', 'latest'), /Invalid plugin test/);
+});
+
+test('shared frontend UI plugins still reject older hosts and incompatible peers', () => {
+  const pkg = fixture();
+  pkg.attraccess.host = '^1.11.0';
+  pkg.peerDependencies['@attraccess/plugins-frontend-ui'] = '^1.11.0';
+  assert.throws(() => validatePackageContract(pkg, '1.10.0'), /not compatible/);
+  assert.doesNotThrow(() => validatePackageContract(pkg, '1.11.0'));
+  pkg.peerDependencies['@attraccess/plugins-frontend-ui'] = '^2.0.0';
+  assert.throws(() => validatePackageContract(pkg, '1.11.0'), /frontend-ui as a compatible peer/);
+});
 test('verifies actual packed entries and removes archives after success or failure', async () => {
   const workspace = mkdtempSync(path.join(tmpdir(), 'attraccess-packed-plugin-'));
   const packageDir = path.join(workspace, 'plugin');
@@ -79,6 +96,15 @@ test('verifies actual packed entries and removes archives after success or failu
     writeFileSync(path.join(packageDir, 'package.json'), JSON.stringify(pkg));
     writeFileSync(path.join(packageDir, 'frontend/index.js'), 'export default {};');
     await verifyPackedPlugin(packageDir, ['package.json', 'frontend/index.js'], workspace);
+    assert.equal(
+      readdirSync(packageDir).some((file) => file.endsWith('.tgz')),
+      false,
+    );
+    writeFileSync(path.join(packageDir, 'frontend/chunk.js'), 'var QueryClientContext = React.createContext(void 0);');
+    await assert.rejects(
+      verifyPackedPlugin(packageDir, ['frontend/index.js'], workspace),
+      /private React Query context/,
+    );
     assert.equal(
       readdirSync(packageDir).some((file) => file.endsWith('.tgz')),
       false,

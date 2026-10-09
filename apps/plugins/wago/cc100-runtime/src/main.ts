@@ -1,7 +1,10 @@
 import { connect, type MqttClient } from 'mqtt';
 import { Cc100OnboardIoAdapter } from './adapters';
-import { CC100_DIGITAL_PROFILE } from './onboard-profile';
-import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
+import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } from '../../shared/hardware-profile';
+import { ModbusDeviceRouter } from './modbus/adapter';
+import { JsonStateStore, WagoRuntime, type DiscoveryClaim } from './runtime';
+import { RunLed } from './status-led';
+import { MqttTransport } from './mqtt-transport';
 
 const hardwareId = required('WAGO_HARDWARE_ID');
 const defaultPrefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
@@ -11,14 +14,20 @@ const enrollmentSecret = required('WAGO_ENROLLMENT_SECRET');
 const store = new JsonStateStore(statePath);
 if (process.env.WAGO_IO_PATHS)
   throw new Error('WAGO_IO_PATHS is no longer supported; redeploy with the firmware-31 digital hardware profile');
-if (required('WAGO_HARDWARE_PROFILE') !== CC100_DIGITAL_PROFILE.id)
-  throw new Error(`unsupported WAGO_HARDWARE_PROFILE; expected ${CC100_DIGITAL_PROFILE.id}`);
-const adapter = new Cc100OnboardIoAdapter();
+const hardwareProfile = required('WAGO_HARDWARE_PROFILE');
+if (!isCc100HardwareProfile(hardwareProfile)) throw new Error('unsupported WAGO_HARDWARE_PROFILE');
+const onboard = new Cc100OnboardIoAdapter();
+const adapter =
+  hardwareProfile === CC100_MODBUS_PROFILE_ID
+    ? new ModbusDeviceRouter(onboard, undefined, [CC100_SERIAL_PATH])
+    : onboard;
 const mqttUrl = required('WAGO_MQTT_URL');
 let client: MqttClient | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let measurementTimer: NodeJS.Timeout | undefined;
 let inputTimer: NodeJS.Timeout | undefined;
+const runLed = new RunLed();
+runLed.set('starting');
 
 void handleAsync(start);
 
@@ -42,18 +51,22 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     clientId: username,
     username,
     password: credentials?.password ?? required('WAGO_MQTT_PASSWORD'),
+    ...(mqttUrl.startsWith('mqtts://') && process.env.WAGO_MQTT_TLS_INSECURE === 'true'
+      ? { rejectUnauthorized: false }
+      : {}),
+    ...(mqttUrl.startsWith('mqtts://') && process.env.WAGO_MQTT_TLS_SERVERNAME
+      ? { servername: process.env.WAGO_MQTT_TLS_SERVERNAME }
+      : {}),
   });
   const activeClient = client;
-  const transport: Transport = {
-    publish: (topic, payload, publishOptions) =>
-      publish(activeClient, topic, JSON.stringify(payload), publishOptions?.retain),
-    subscribe: (topic, listener) => subscribe(activeClient, topic, listener),
-  };
+  const transport = new MqttTransport(activeClient, logRuntimeError);
+  activeClient.on('error', logRuntimeError);
   const runtime = new WagoRuntime({
     hardwareId,
     prefix,
     pairingCode,
     enrollmentSecret,
+    runtimeImageId: process.env.WAGO_RUNTIME_IMAGE_ID,
     store,
     transport,
     device: adapter,
@@ -65,9 +78,15 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       activeClient.options.password = next.password;
       activeClient.reconnect();
     },
+    onReadiness: ({ connected, configurationAccepted, ready }) =>
+      runLed.set(ready ? 'ready' : !connected ? 'disconnected' : !configurationAccepted ? 'unconfigured' : 'fault'),
   });
   let initialized = false;
   let connected = false;
+  let starting = false;
+  let retryStartup = false;
+  let started = false;
+  let discoverySubscribed = false;
   const pendingConnectionStates: boolean[] = [];
 
   const applyConnectionState = (state: boolean): void => {
@@ -94,32 +113,53 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     initialized = true;
   };
 
-  activeClient.once(
-    'connect',
-    () =>
-      void handleAsync(async () => {
-        if (!credentials) {
+  const initializeOnConnect = async (): Promise<void> => {
+    if (activeClient !== client || started) return;
+    if (starting) {
+      retryStartup = true;
+      return;
+    }
+    starting = true;
+    retryStartup = false;
+    try {
+      if (!credentials) {
+        runLed.set('pairing');
+        if (!discoverySubscribed) {
           await transport.subscribe(runtime.discoveryClaimTopic(), async (payload) => {
             const claim = await runtime.receiveDiscoveryClaim(payload);
             if (!claim || activeClient !== client) return;
             activeClient.end(true, () => connectRuntime(claim));
           });
-          await runtime.publishDiscoveryAnnouncement();
-          return;
+          discoverySubscribed = true;
         }
-        try {
-          await runtime.start(activateConnectionHandling);
-        } finally {
-          // Also activate if subscriptions fail after commands become reachable.
-          await activateConnectionHandling();
-        }
-        if (connected && credentials) await runtime.acknowledgeCredentialRotation(credentials);
-        heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
-        measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
-        inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();
-      }),
-  );
-  activeClient.on('close', () => applyConnectionState(false));
+        await runtime.publishDiscoveryAnnouncement();
+        return;
+      }
+      try {
+        await runtime.start(activateConnectionHandling);
+      } finally {
+        // Also activate if subscriptions fail after commands become reachable.
+        await activateConnectionHandling();
+      }
+      if (connected && credentials) await runtime.acknowledgeCredentialRotation(credentials);
+      started = true;
+      heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
+      // The router applies each measurement's minimum interval; this is only the scheduler tick.
+      measurementTimer = setInterval(
+        () => void handleAsync(() => runtime.publishMeasurements()),
+        hardwareProfile === CC100_MODBUS_PROFILE_ID ? 100 : 5000,
+      ).unref();
+      inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();
+    } finally {
+      starting = false;
+      if (retryStartup && activeClient.connected) void handleAsync(initializeOnConnect);
+    }
+  };
+  activeClient.on('connect', () => void handleAsync(initializeOnConnect));
+  activeClient.on('close', () => {
+    if (activeClient === client) runLed.set('disconnected');
+    applyConnectionState(false);
+  });
   activeClient.on('connect', () => applyConnectionState(true));
 }
 
@@ -127,6 +167,7 @@ process.on('SIGTERM', () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   if (measurementTimer) clearInterval(measurementTimer);
   if (inputTimer) clearInterval(inputTimer);
+  runLed.stop();
   client?.end(true, () => process.exit(0));
 });
 
@@ -135,32 +176,11 @@ function required(name: string): string {
   if (!value) throw new Error(`${name} is required`);
   return value;
 }
-function publish(client: MqttClient, topic: string, payload: string, retain = false): Promise<void> {
-  return new Promise((resolve, reject) =>
-    client.publish(topic, payload, { qos: 1, retain }, (error) => (error ? reject(error) : resolve())),
-  );
-}
-function subscribe(
-  client: MqttClient,
-  topic: string,
-  listener: (payload: Buffer) => void | Promise<void>,
-): Promise<void> {
-  return new Promise((resolve, reject) =>
-    client.subscribe(topic, { qos: 1 }, (error) => {
-      if (error) return reject(error);
-      client.on('message', (receivedTopic, payload) => {
-        if (receivedTopic === topic) void handleAsync(() => listener(payload));
-      });
-      resolve();
-    }),
-  );
-}
 function handleAsync(callback: () => void | Promise<void>): Promise<void> {
-  return Promise.resolve()
-    .then(callback)
-    .catch((error: unknown) => {
-      process.stderr.write(
-        `WAGO CC100 runtime callback failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
-      );
-    });
+  return Promise.resolve().then(callback).catch(logRuntimeError);
+}
+function logRuntimeError(error: unknown): void {
+  process.stderr.write(
+    `WAGO CC100 runtime callback failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+  );
 }

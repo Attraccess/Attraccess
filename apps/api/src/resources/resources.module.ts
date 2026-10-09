@@ -27,6 +27,8 @@ import { ResourceMaintenanceModule } from './maintenances/maintenance.module';
 import { ResourceFormsModule } from './forms/forms.module';
 import { ResourceHealthModule } from './health/resource-health.module';
 import { LicenseModule } from '../license/license.module';
+import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 
 @Module({
   imports: [
@@ -56,9 +58,10 @@ import { LicenseModule } from '../license/license.module';
     ResourceFormsModule,
     ResourceHealthModule,
     LicenseModule,
+    LiveTopicsModule,
   ],
   controllers: [ResourcesController],
-  providers: [ResourcesService, ResourceImageService],
+  providers: [ResourcesService, ResourceImageService, ResourceLiveTopicsProvider],
   exports: [ResourcesService, ResourceImageService],
 })
 export class ResourcesModule {}

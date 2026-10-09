@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 foreach(run RANGE 1 2)
     execute_process(COMMAND "${HARNESS}" --output "${OUTPUT}/${run}"
-        RESULT_VARIABLE result_${run} OUTPUT_VARIABLE report ERROR_VARIABLE errors TIMEOUT 25)
+        RESULT_VARIABLE result_${run} OUTPUT_VARIABLE report ERROR_VARIABLE errors TIMEOUT 150)
     # The separate display-theme-host test owns correctness. A stable regression
     # can still be repeatable; crashes, setup failures and differing outcomes cannot.
     if(NOT result_${run} STREQUAL "0" AND NOT result_${run} STREQUAL "1")

@@ -69,6 +69,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
       'items[].name',
       'items[].description',
       'items[].quantity',
+      'items[].isUnavailable',
       'items[].unitPrice',
       'items[].total',
       'items[].isFixedFee',
@@ -292,6 +293,8 @@ export const SHIPPED_TRANSLATIONS: ShippedTranslation[] = [
   { templateType: EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, locale: 'de', key: 'button', value: 'Ressource ansehen' },
   { templateType: EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, locale: 'de', key: 'copy_link', value: COPY_LINK_DE },
   { templateType: EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, locale: 'de', key: 'footer', value: 'Du erhältst diese E-Mail, weil du Einweiser, Betreuer oder Administrator dieser Ressource bist.' },
+  { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'meter_unavailable', value: 'Endwert nicht verfügbar; keine Zählergebühr enthalten.' },
+  { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'quantity_unavailable', value: 'Nicht verfügbar' },
   // resource-usage-billing-transaction-summary
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'greeting', value: 'Hallo {name},' },
   { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'body', value: 'Deine Sitzung auf <strong>{resource}</strong> ist beendet. Hier ist dein Beleg:' },

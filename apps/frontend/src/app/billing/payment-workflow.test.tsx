@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   configuration: { minorUnit: 2, currency: 'EUR' } as { minorUnit: number; currency: string } | undefined,
   mutateKey: vi.fn(),
   refund: vi.fn(),
+  setMeterRate: vi.fn().mockResolvedValue(undefined),
+  meters: [{ id: 42, name: 'Heartbeats', creditsPerUnit: 5 }],
   invalidate: vi.fn(),
   success: vi.fn(),
   apiError: vi.fn(),
@@ -39,12 +41,20 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseBillingServiceGetBillingBalanceKeyFn: (input: unknown) => ['balance', input],
   useBillingServiceGetBillingTransactions: () => ({ data: undefined }),
   useBillingServiceGetResourceBillingConfiguration: () => ({ data: undefined }),
+  useResourceMeteringServiceListResourceMeters: () => ({ data: state.meters }),
+  useResourceMeteringServiceSetResourceMeterRate: () => ({ mutateAsync: state.setMeterRate }),
+  UseResourceMeteringServiceListResourceMetersKeyFn: (input: unknown) => ['meters', input],
   UseBillingServiceGetResourceBillingConfigurationKeyFn: (input: unknown) => ['resource-billing', input],
   useBillingServiceUpdateResourceBillingConfiguration: (callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.resource = callbacks;
     return { mutate: state.refund };
   },
 }));
+vi.mock('../resources/details/resourceBillingInfo/metering/MeterNotices', () => ({
+  MeterSetupNotice: () => null,
+  MeterSettlementNotices: () => null,
+}));
+vi.mock('../resources/details/meters/MeterNameEditor', () => ({ MeterNameEditor: () => null }));
 vi.mock('./dashboard/summary/live-updates', () => ({
   useLiveTransactionUpdates: ({ onUpdate }: { onUpdate: typeof state.live }) => {
     state.live = onUpdate;
@@ -149,7 +159,7 @@ it.each(['completed', 'failed'])(
   },
 );
 
-it('edits all three resource rates and converts them to minor units', async () => {
+it('edits all resource rates and converts them to minor units', async () => {
   render(
     <ResourceBillingInfoEditor resourceId={9}>
       {(open) => <button onClick={open}>Edit rates</button>}
@@ -160,12 +170,19 @@ it('edits all three resource rates and converts them to minor units', async () =
     ['EUR per usage', '1.25'],
     ['EUR per minute', '2.5'],
     ['EUR per operating minute', '3.75'],
+    ['Heartbeats — per measured value (EUR)', '0.3'],
   ]) {
     const input = screen.getByRole('textbox', { name });
     fireEvent.change(input, { target: { value } });
     fireEvent.blur(input);
   }
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(state.refund).toHaveBeenCalled());
+  expect(state.setMeterRate).toHaveBeenCalledWith({
+    resourceId: 9,
+    meterId: 42,
+    requestBody: { creditsPerUnit: 30 },
+  });
   expect(state.refund).toHaveBeenCalledWith({
     resourceId: 9,
     requestBody: { creditsPerUsage: 125, creditsPerMinute: 250, creditsPerOperatingMinute: 375 },

@@ -9,6 +9,7 @@ import type { WagoService } from './wago.service';
 describe('resource diagnostics', () => {
   function setup(ids: unknown[]) {
     const nodesQuery = {
+      select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -75,6 +76,26 @@ describe('resource diagnostics', () => {
     expect(controllersQuery.where).toHaveBeenCalledWith('controller.id IN (:...controllerIds)', {
       controllerIds: Array.from({ length: 20 }, (_, i) => i + 1),
     });
+  });
+  it('lists each own node once while still flagging channels shared with other resources', async () => {
+    const { nodesQuery, service } = setup([1]);
+    const node = (id: string, resourceId: number) => ({
+      id,
+      resourceId,
+      type: 'plugin.wago.command',
+      data: { controllerId: 1, channelId: 'do1' },
+    });
+    const own = [node('relay-on', 42), node('relay-off', 42)];
+    nodesQuery.getMany
+      .mockResolvedValueOnce(own)
+      // The conflict lookup also returns this resource's own nodes.
+      .mockResolvedValueOnce([...own, node('other', 7)])
+      .mockResolvedValueOnce([{ id: 7, name: 'Workbench outlet' }]);
+    const [controller] = (await service.getResource(42)).controllers;
+    expect(controller.references.map((reference) => [reference.nodeId, reference.conflictResources])).toEqual([
+      ['relay-on', [{ id: 7, name: 'Workbench outlet' }]],
+      ['relay-off', [{ id: 7, name: 'Workbench outlet' }]],
+    ]);
   });
   it('keeps both endpoints behind resources.update', () => {
     const guard = new EffectivePermissionsGuard(new Reflector());

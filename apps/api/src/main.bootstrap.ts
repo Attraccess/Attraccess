@@ -1,6 +1,6 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe, ClassSerializerInterceptor, Logger, LogLevel, Module } from '@nestjs/common';
+import { ValidationPipe, ClassSerializerInterceptor, Logger, Module } from '@nestjs/common';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import session from 'express-session';
@@ -21,6 +21,7 @@ import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
 import { SettingsService } from './settings/settings.service';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
+import { initializeProcessLogging, withLoggingLifecycle } from './logging/process-logging';
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -53,25 +54,34 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
 class PluginBootstrapConfigModule {}
 
 export async function bootstrap() {
+  Logger.attachBuffer();
   const bootstrapLogger = new Logger('Bootstrap');
   bootstrapLogger.log('Starting bootstrap process...');
   const skipDatabaseMigrations = process.env.SKIP_DATABASE_MIGRATIONS === 'true';
 
-  const initialLogLevels = (process.env.LOG_LEVELS || 'error,warn,log')
-    .split(',')
-    .filter((level): level is LogLevel => ['error', 'warn', 'log', 'debug', 'verbose'].includes(level));
-
   // Resolve plugin config and configure the plugin system BEFORE importing AppModule
   // (see PluginBootstrapConfigModule above for why ordering matters).
   const configContext = await NestFactory.createApplicationContext(PluginBootstrapConfigModule, {
-    logger: initialLogLevels,
+    bufferLogs: true,
+    autoFlushLogs: false,
+    abortOnError: false,
   });
-  const earlyConfig = configContext.get(ConfigService).get<AppConfigType>('app');
-  await configContext.close();
+  let earlyConfig: AppConfigType;
+  let routingLogger: ReturnType<typeof initializeProcessLogging>;
+  try {
+    earlyConfig = configContext.get(ConfigService).get<AppConfigType>('app');
+    // The config context has now loaded .env. Configure once, then replay the
+    // buffered framework/bootstrap entries once through all active destinations.
+    routingLogger = initializeProcessLogging();
+    configContext.useLogger(routingLogger);
+    Logger.flush();
+  } finally {
+    await configContext.close();
+  }
 
   if (!earlyConfig) {
     bootstrapLogger.error("Application configuration ('app') not loaded. Exiting.");
-    process.exit(1);
+    throw new Error("Application configuration ('app') not loaded.");
   }
   if (!earlyConfig.PLUGIN_DIR) {
     bootstrapLogger.warn('PLUGIN_DIR is not set — plugin backends will not be loaded.');
@@ -109,7 +119,7 @@ export async function bootstrap() {
   const { AppModule } = await import('./app/app.module');
 
   const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: initialLogLevels,
+    logger: routingLogger,
     abortOnError: false,
   });
 
@@ -155,12 +165,16 @@ export async function bootstrap() {
     };
   }
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: initialLogLevels,
+  const app = await NestFactory.create<NestExpressApplication>(withLoggingLifecycle(AppModule), {
+    logger: routingLogger,
     httpsOptions,
     abortOnError: false,
   });
   bootstrapLogger.log('Main application instance created.');
+
+  // Plugin configurations can include large device profiles and a previous
+  // draft for conflict detection, exceeding Express's default 100 KiB limit.
+  app.useBodyParser('json', { limit: '10mb' });
 
   // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told
   // how many proxy hops to trust. Without this, auth rate limiting buckets every request under the
@@ -229,7 +243,7 @@ export async function bootstrap() {
       bootstrapLogger.error('Failed to run database migrations');
       bootstrapLogger.error(error);
       PluginService.recordBootFailure(error);
-      process.exit(1);
+      throw error;
     }
   }
 
@@ -257,7 +271,7 @@ export async function bootstrap() {
   );
 
   bootstrapLogger.log(`🚀 Application is running with global prefix: ${globalPrefix}`);
-  bootstrapLogger.log(`📝 Enabled log levels: ${initialLogLevels.join(', ')}`);
+  bootstrapLogger.log(`📝 Enabled log levels: ${appConfig.LOG_LEVELS.join(', ')}`);
 
   app.useGlobalPipes(
     new ValidationPipe({

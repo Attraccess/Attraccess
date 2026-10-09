@@ -25,7 +25,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppTheme } from '@attraccess/ui';
 import { usePtrStore } from '../../../../stores/ptr.store';
-import Dagre from '@dagrejs/dagre';
+import { getLayoutedElements } from './flowLayout';
 import { Button } from '../../../../components/button';
 import {
   BoxSelectIcon,
@@ -56,35 +56,6 @@ import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
-function getLayoutedElements(nodes: Node[], edges: Edge[]) {
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB' });
-
-  edges.forEach((edge) => g.setEdge(edge.source, edge.target));
-  nodes.forEach((node) =>
-    g.setNode(node.id, {
-      ...node,
-      width: node.measured?.width ?? 0,
-      height: node.measured?.height ?? 0,
-    }),
-  );
-
-  Dagre.layout(g);
-
-  return {
-    nodes: nodes.map((node) => {
-      const position = g.node(node.id);
-      // We are shifting the dagre node position (anchor=center center) to the top left
-      // so it matches the React Flow node anchor point (top left).
-      const x = position.x - (node.measured?.width ?? 0) / 2;
-      const y = position.y - (node.measured?.height ?? 0) / 2;
-
-      return { ...node, position: { x, y } };
-    }),
-    edges,
-  };
-}
-
 // Efficient comparison functions to replace expensive JSON.stringify operations
 function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNodeDto | Node): boolean {
   return (
@@ -99,8 +70,6 @@ function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNod
 function areEdgesEqual(edge1: ResourceFlowEdgeDto | Edge, edge2: ResourceFlowEdgeDto | Edge): boolean {
   return edge1.id === edge2.id && edge1.source === edge2.source && edge1.target === edge2.target;
 }
-
-const jsConfetti = new JSConfetti();
 
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
@@ -160,7 +129,7 @@ function FlowsPageInner() {
     },
   });
 
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition, getInternalNode } = useReactFlow();
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   const nodeCatalogRef = useRef<NodeCatalogHandle>(null);
   const {
@@ -256,11 +225,19 @@ function FlowsPageInner() {
   }, [nodes, edges, saveFlow, resourceId]);
 
   const layout = useCallback(() => {
-    const layouted = getLayoutedElements(nodes, edges);
+    const sourceHandles = new Map(
+      nodes.map((node) => [
+        node.id,
+        [...(getInternalNode(node.id)?.internals.handleBounds?.source ?? [])]
+          .sort((a, b) => a.x - b.x)
+          .flatMap((handle) => (handle.id == null ? [] : [handle.id])),
+      ]),
+    );
+    const layouted = getLayoutedElements(nodes, edges, sourceHandles);
     setNodes([...layouted.nodes]);
     setEdges([...layouted.edges]);
     fitView();
-  }, [nodes, edges, fitView, setNodes, setEdges]);
+  }, [nodes, edges, fitView, setNodes, setEdges, getInternalNode]);
 
   const addStartNode = useCallback(
     (nodeType: string) => {
@@ -320,7 +297,21 @@ function FlowsPageInner() {
   }, [nodes, setNodes]);
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);
-  const [, setFlowExecutionHadError] = useState(false);
+  const flowExecutionHadError = useRef(false);
+  const [confettiEnabled, setConfettiEnabled] = useState(false);
+  const confettiRef = useRef<JSConfetti | null>(null);
+
+  useEffect(() => {
+    if (!confettiEnabled) return;
+
+    const confetti = new JSConfetti();
+    confettiRef.current = confetti;
+    return () => {
+      confettiRef.current = null;
+      confetti.clearCanvas();
+      confetti.destroyCanvas();
+    };
+  }, [confettiEnabled]);
 
   const isCoarsePointer = useMemo(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -336,7 +327,7 @@ function FlowsPageInner() {
   const onLiveLog = useCallback(
     (log: ResourceFlowLog) => {
       if (log.type === 'node.processing.failed') {
-        setFlowExecutionHadError(true);
+        flowExecutionHadError.current = true;
         return;
       }
 
@@ -348,24 +339,20 @@ function FlowsPageInner() {
       if (log.type === 'flow.completed') {
         setFlowIsRunning(false);
 
-        // Use functional state update to get current error state
-        setFlowExecutionHadError((currentErrorState) => {
-          if (!currentErrorState) {
-            jsConfetti.addConfetti();
-          } else {
-            jsConfetti.addConfetti({
-              emojis: ['❌', '😢', '💔', '😭', '🚫', '⚠️', '💥', '👎'],
-              emojiSize: 100,
-              confettiNumber: 2,
-            });
-          }
+        if (!flowExecutionHadError.current) {
+          confettiRef.current?.addConfetti();
+        } else {
+          confettiRef.current?.addConfetti({
+            emojis: ['❌', '😢', '💔', '😭', '🚫', '⚠️', '💥', '👎'],
+            emojiSize: 100,
+            confettiNumber: 2,
+          });
+        }
 
-          // Reset error state for next execution
-          return false;
-        });
+        flowExecutionHadError.current = false;
       }
     },
-    [setFlowIsRunning, setFlowExecutionHadError],
+    [setFlowIsRunning],
   );
 
   useEffect(() => {
@@ -505,7 +492,11 @@ function FlowsPageInner() {
               <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>
                 <DownloadIcon />
               </Button>
-              <LogViewer resourceId={Number(resourceId)}>
+              <LogViewer
+                resourceId={Number(resourceId)}
+                confettiEnabled={confettiEnabled}
+                onConfettiEnabledChange={setConfettiEnabled}
+              >
                 {(open) => (
                   <Button isIconOnly onPress={open} aria-label={t('actions.logs')}>
                     <LogsIcon />
@@ -561,7 +552,7 @@ export default function FlowsPage() {
   const { id: resourceId } = useParams();
 
   return (
-    <FlowProvider resourceId={Number(resourceId)}>
+    <FlowProvider key={resourceId} resourceId={Number(resourceId)}>
       <FlowsPageInner />
     </FlowProvider>
   );

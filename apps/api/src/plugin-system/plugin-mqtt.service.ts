@@ -92,6 +92,10 @@ export class PluginMqttService {
     await this.mqtt.publish(serverId, topic, payload, options);
   }
 
+  async refreshConnection(serverId: number): Promise<void> {
+    await this.mqtt.refreshConnection(serverId);
+  }
+
   clearPlugin(pluginId: string): void {
     for (const subscription of this.subscriptions) {
       if (subscription.pluginId === pluginId) {

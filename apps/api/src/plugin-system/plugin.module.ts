@@ -23,6 +23,7 @@ import {
   Repository,
 } from '@attraccess/plugins-backend-sdk';
 import { dataSourceConfig } from '../database/datasource';
+import { pluginActivationPlan } from './plugin-dependencies';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -42,6 +43,8 @@ import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-
 import { EncryptionService } from '../encryption/encryption.service';
 import { PLUGIN_AUDIT_HOST_PROVIDER, PluginAuditHostProvider } from '@attraccess/plugins-backend-sdk';
 import { createPluginAuditContext } from './plugin-audit-context';
+import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 
 @Global()
 @Module({})
@@ -85,7 +88,7 @@ export class PluginModule {
 
       return {
         module: PluginModule,
-        imports: [SettingsModule, MqttModule],
+        imports: [SettingsModule, MqttModule, LiveTopicsModule],
         providers: [
           PluginService,
           PluginSandboxService,
@@ -93,6 +96,7 @@ export class PluginModule {
           PluginMqttService,
           NpmPluginService,
           PluginClassificationService,
+          PluginLiveUpdatesService,
         ],
         exports: [PluginEventsService],
         controllers: [PluginController],
@@ -101,24 +105,60 @@ export class PluginModule {
 
     this.pluginManifests = PluginService.getPlugins();
 
-    const pluginModules = this.pluginManifests
-      .filter((manifest) => !PluginService.isPluginQuarantined(manifest))
-      .map((manifest) => {
-        try {
-          const module = PluginModule.loadPluginModule(manifest);
-          PluginService.markPluginAsLoaded(`${manifest.name}@${manifest.version}`);
-          return module;
-        } catch (error) {
-          this.logger.error(`Error loading plugin ${manifest.name}`, error);
-          PluginService.quarantinePlugin(manifest, error as Error);
-          return null;
+    const { ordered, failures } = pluginActivationPlan(this.pluginManifests);
+    for (const [name, error] of failures) {
+      const manifest = this.pluginManifests.find((plugin) => plugin.name === name);
+      PluginService.setPluginLoadError(`${name}@${manifest.version}`, error);
+    }
+    const pluginModules: DynamicModule[] = [];
+    const modulesByName = new Map<string, DynamicModule>();
+    const active = new Set<string>();
+    for (const manifest of ordered) {
+      if (
+        PluginService.isPluginQuarantined(manifest) ||
+        PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === manifest.name)?.status === 'error'
+      )
+        continue;
+      const failedDependency = manifest.dependencies?.find(
+        (dependency) => dependency.required && !active.has(dependency.name),
+      );
+      if (failedDependency) {
+        PluginService.setPluginLoadError(
+          `${manifest.name}@${manifest.version}`,
+          new Error(
+            `Required plugin ${failedDependency.name} failed to load; ${manifest.name} is inactive. Repair or retry the dependency.`,
+          ),
+        );
+        continue;
+      }
+      try {
+        const module = PluginModule.loadPluginModule(manifest);
+        PluginService.markPluginAsLoaded(`${manifest.name}@${manifest.version}`);
+        active.add(manifest.name);
+        if (module) {
+          const requiredModules = (manifest.dependencies ?? [])
+            .filter((dependency) => dependency.required)
+            .map((dependency) => modulesByName.get(dependency.name))
+            .filter((module) => Boolean(module));
+          // Nest also needs these edges so dependency lifecycle hooks run first.
+          const configured = requiredModules.length
+            ? {
+                ...(typeof module === 'function' ? { module: module as Type<unknown> } : module),
+                imports: [...(module.imports ?? []), ...requiredModules],
+              }
+            : module;
+          modulesByName.set(manifest.name, configured);
+          pluginModules.push(configured);
         }
-      })
-      .filter((module) => module !== null);
+      } catch (error) {
+        this.logger.error(`Error loading plugin ${manifest.name}`, error);
+        PluginService.quarantinePlugin(manifest, error as Error);
+      }
+    }
 
     return {
       module: PluginModule,
-      imports: [SettingsModule, MqttModule, ...pluginModules],
+      imports: [SettingsModule, MqttModule, LiveTopicsModule, ...pluginModules],
       providers: [
         PluginService,
         PluginSandboxService,
@@ -126,6 +166,7 @@ export class PluginModule {
         PluginMqttService,
         NpmPluginService,
         PluginClassificationService,
+        PluginLiveUpdatesService,
       ],
       exports: [PluginEventsService],
       controllers: [PluginController],
@@ -197,7 +238,10 @@ export class PluginModule {
         {
           provide: `plugin-mqtt-cleanup:${manifest.id}`,
           useFactory: () => ({
-            onModuleDestroy: () => PluginModule.pluginMqtt().clearPlugin(manifest.id),
+            onModuleDestroy: () => {
+              PluginModule.pluginMqtt().clearPlugin(manifest.id);
+              PluginModule.pluginLiveUpdates().clearPlugin(manifest.id);
+            },
           }),
         },
       ],
@@ -249,6 +293,9 @@ export class PluginModule {
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      liveUpdates: {
+        register: (definition) => PluginModule.pluginLiveUpdates().register(manifest.id, manifest.name, definition),
+      },
       audit: createPluginAuditContext(manifest.id, () =>
         PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<PluginAuditHostProvider>(
           PLUGIN_AUDIT_HOST_PROVIDER,
@@ -270,6 +317,9 @@ export class PluginModule {
         },
         publish(serverId, topic, payload, options) {
           return PluginModule.pluginMqtt().publish(serverId, topic, payload, options);
+        },
+        refreshConnection(serverId) {
+          return PluginModule.pluginMqtt().refreshConnection(serverId);
         },
       },
       get events(): EventEmitter2 {
@@ -362,6 +412,12 @@ export class PluginModule {
 
   private static pluginEvents(): PluginEventsService {
     return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(PluginEventsService, { strict: false });
+  }
+
+  private static pluginLiveUpdates(): PluginLiveUpdatesService {
+    return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(PluginLiveUpdatesService, {
+      strict: false,
+    });
   }
 
   private static pluginMqtt(): PluginMqttService {

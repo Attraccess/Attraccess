@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsageService } from './resourceUsage.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
+  Project,
   Resource,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
@@ -47,6 +49,7 @@ import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
+import { FlowExecutionError } from '../flows/errors/flow-execution.error';
 import { AuditService } from '../../audit/audit.service';
 
 const mockRbacService = {
@@ -370,6 +373,7 @@ describe('ResourceUsageService', () => {
           );
         }
         if (entity === ResourceUsage) {
+          if (opts.where.lifecyclePending && !opts.where.userId) return null; // Reservation gate.
           return resourceUsageRepository.findOne(opts as never);
         }
         if (entity === Resource) {
@@ -467,6 +471,47 @@ describe('ResourceUsageService', () => {
     expect(resourceUsageRepository.save).not.toHaveBeenCalled();
   });
 
+  describe('getSessionDetails', () => {
+    const requester = { id: 1, effectivePermissions: new Set<string>() } as AuthenticatedUser;
+
+    it('loads the requested visible session and its usage details for the owner', async () => {
+      const usage = { id: 8, userId: 1, resourceId: 5 } as ResourceUsage;
+      resourceUsageRepository.findOne.mockResolvedValue(usage);
+      expect(await service.getSessionDetails(5, 8, requester)).toBe(usage);
+      expect(resourceUsageRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 8, resourceId: 5, lifecyclePending: false },
+        relations: expect.arrayContaining(['project', 'supervisorUser', 'formSubmissions.form']),
+      });
+      expect(projectsService.findOneById).not.toHaveBeenCalled();
+    });
+
+    it('allows resource managers to view another user’s session', async () => {
+      resourceUsageRepository.findOne.mockResolvedValue({ id: 8, userId: 2 } as ResourceUsage);
+      expect(
+        await service.getSessionDetails(5, 8, { ...requester, effectivePermissions: new Set(['resources.update']) }),
+      ).toEqual({ id: 8, userId: 2 });
+      expect(projectsService.findOneById).not.toHaveBeenCalled();
+    });
+
+    it('requires project access before returning another member’s usage', async () => {
+      const usage = { id: 8, userId: 2, projectId: 3 } as ResourceUsage;
+      resourceUsageRepository.findOne.mockResolvedValue(usage);
+      projectsService.findOneById.mockResolvedValue({ id: 3 } as Project);
+      expect(await service.getSessionDetails(5, 8, requester)).toBe(usage);
+      expect(projectsService.findOneById).toHaveBeenCalledWith(1, 3);
+      projectsService.findOneById.mockRejectedValue(new NotFoundException('Project not found'));
+      await expect(service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+    });
+
+    it.each([null, { id: 8, userId: 2, projectId: null }])(
+      'rejects missing or inaccessible sessions (%s)',
+      async (usage) => {
+        resourceUsageRepository.findOne.mockResolvedValue(usage as ResourceUsage);
+        await expect(service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+      },
+    );
+  });
+
   describe('startSession', () => {
     const mockUser: User = { id: 1 } as User;
     const mockResource: Resource = {
@@ -553,6 +598,7 @@ describe('ResourceUsageService', () => {
         sessionDurationCreditsPerMinute: 0,
         operatingDurationCreditsPerMinute: 0,
         creditsPerUsage: 0,
+        meterRates: [],
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
@@ -1180,7 +1226,7 @@ describe('ResourceUsageService', () => {
       const mockActiveSession = { id: 1, resourceId: 1, userId: 1, user: { id: 1 } as User } as ResourceUsage;
       resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
 
-      const result = await service.getActiveSession(1, true);
+      const result = await service.getActiveSession(1);
 
       expect(result).toBe(mockActiveSession);
       expect(resourceUsageRepository.findOne).toHaveBeenCalledWith({
@@ -1189,7 +1235,9 @@ describe('ResourceUsageService', () => {
           endTime: IsNull(),
           isFinalized: true,
           lifecyclePending: false,
+          usageAction: ResourceUsageAction.Usage,
         },
+        order: { startTime: 'DESC', id: 'DESC' },
         relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
       });
     });
@@ -1197,7 +1245,7 @@ describe('ResourceUsageService', () => {
     it('should return null when no active session exists', async () => {
       resourceUsageRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.getActiveSession(1, true);
+      const result = await service.getActiveSession(1);
 
       expect(result).toBeNull();
     });
@@ -1297,7 +1345,20 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('leaves the session active when an acknowledgement timeout is propagated', async () => {
+    it.each([
+      {
+        failure: 'an acknowledgement timeout',
+        error: new ExternalEffectFailureError(
+          'MQTT acknowledgement timed out',
+          new Error('MQTT acknowledgement timed out'),
+          'acknowledgement-timeout',
+        ),
+      },
+      {
+        failure: 'an error node failure',
+        error: new FlowExecutionError('Bitte die Tür schließen'),
+      },
+    ])('leaves the session active when $failure is propagated', async ({ error }) => {
       const mockActiveSession = {
         id: 1,
         resourceId: 1,
@@ -1311,13 +1372,7 @@ describe('ResourceUsageService', () => {
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession);
-      flowExecutorService.runFlow.mockRejectedValueOnce(
-        new ExternalEffectFailureError(
-          'MQTT acknowledgement timed out',
-          new Error('MQTT acknowledgement timed out'),
-          'acknowledgement-timeout',
-        ),
-      );
+      flowExecutorService.runFlow.mockRejectedValueOnce(error);
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       let sessionEnded = false;
       (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
@@ -1332,16 +1387,16 @@ describe('ResourceUsageService', () => {
         return result;
       });
 
-      await expect(service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' })).rejects.toThrow(
-        'MQTT acknowledgement timed out',
-      );
+      await expect(service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' })).rejects.toBe(error);
 
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalledWith(ResourceUsageSessionEndedEvent.EVENT_NAME, expect.any(Object));
       expect(mockMetricsService.resourceUsageSessionsTotal.inc).not.toHaveBeenCalled();
       expect(usageTransactionCommitted).toBe(true);
       expect(sessionEnded).toBe(false);
+      expect(transactionalEntityManager.update).not.toHaveBeenCalled();
       expect(billingService.chargeForResourceUsage).not.toHaveBeenCalled();
+      expect(mockAuditService.recordResource).not.toHaveBeenCalled();
       expect(lifecycleAttempts.size).toBe(0);
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         1,

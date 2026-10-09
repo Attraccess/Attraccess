@@ -1,3 +1,4 @@
+#include "display/messages.hpp"
 #include "utils.hpp"
 #include <string>
 #include <cstdio>
@@ -340,56 +341,5 @@ time_t parseIso8601ToTimeT(const std::string &iso8601)
 
 std::string translateReaderError(const std::string &errorKey)
 {
-    const bool english = State::getActiveLanguage() == "en";
-    // Reader protocol error catalog. Keep the German wording as the canonical
-    // fallback for older servers while resolving every known code to English.
-    //
-    // Card / enrollment errors
-    if (errorKey == "USER_NOT_SET")
-        return english ? "No user selected" : "Kein Benutzer ausgewählt";
-    if (errorKey == "INVALID_PARAMS")
-        return english ? "Invalid request" : "Ungültige Anfrage";
-    if (errorKey == "CARD_ALREADY_ENROLLED")
-        return english ? "Card is already registered" : "Karte ist bereits registriert";
-    if (errorKey == "ENROLL_NEW_CARD_DATA_NOT_SET")
-        return english ? "Enrollment data is missing" : "Registrierungsdaten fehlen";
-    if (errorKey == "KEY_NOT_SET")
-        return english ? "Key is missing" : "Schlüssel fehlt";
-    if (errorKey == "USER_NOT_FOUND")
-        return english ? "User not found" : "Benutzer nicht gefunden";
-    if (errorKey == "RESET_NFC_CARD_DATA_NOT_SET")
-        return english ? "Reset data is missing" : "Daten zum Zurücksetzen fehlen";
-    if (errorKey == "INVALID_UID")
-        return english ? "Invalid card UID" : "Ungültige Karten-UID";
-    if (errorKey == "CARD_NOT_FOUND")
-        return english ? "Card not found" : "Karte nicht gefunden";
-    if (errorKey == "CARD_NOT_ACTIVE")
-        return english ? "Card is inactive" : "Karte ist nicht aktiv";
-
-    // Resource usage / session errors
-    if (errorKey == "INVALID_RESOURCE_ID")
-        return english ? "Invalid resource" : "Ungültige Ressource";
-    if (errorKey == "READER_NOT_FOUND")
-        return english ? "Reader not found" : "Leser nicht gefunden";
-    if (errorKey == "RESOURCE_NOT_ASSOCIATED_WITH_READER")
-        return english ? "Resource is not assigned to this reader" : "Ressource ist diesem Leser nicht zugeordnet";
-    if (errorKey == "USER_NOT_AUTHENTICATED")
-        return english ? "Not signed in" : "Nicht angemeldet";
-    if (errorKey == "INSUFFICIENT_BALANCE")
-        return english ? "Insufficient balance" : "Guthaben reicht nicht aus";
-
-    // Billing / top-up errors
-    if (errorKey == "SUMUP_NOT_ENABLED")
-        return english ? "Payments are not enabled" : "Bezahlung nicht aktiviert";
-    if (errorKey == "INVALID_AMOUNT")
-        return english ? "Invalid amount" : "Ungültiger Betrag";
-    if (errorKey == "NO_SUMUP_TERMINALS_AVAILABLE")
-        return english ? "No payment terminal available" : "Kein Zahlungsterminal verfügbar";
-    if (errorKey == "SUMUP_TOPUP_FAILED")
-        return english ? "Top-up failed" : "Aufladung fehlgeschlagen";
-
-    // Unknown keys and free-form server errors have no reliable locale. Keep
-    // them out of user-facing text and use the documented English fallback;
-    // callers retain the original value in their diagnostic/event state.
-    return "Something went wrong. Please try again.";
+    return FirmwareI18n::readerError(errorKey).render(State::getActiveLanguage());
 }

@@ -1,3 +1,4 @@
+import { LiveUpdatesProvider } from '../utils/live-updates';
 import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
@@ -29,6 +30,7 @@ import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 import { NotFound } from './not-found';
 import { ThemeToggle } from '../components/themeToggle';
+import { SessionBillingSummary } from './billing/sessionSummary';
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
@@ -91,7 +93,7 @@ function useIsTouchDevice() {
 }
 
 function AppLayout(props: PropsWithChildren) {
-  const { isAuthenticated, needsTwoFactorSetup } = useAuth();
+  const { isAuthenticated, needsTwoFactorSetup, user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -114,6 +116,7 @@ function AppLayout(props: PropsWithChildren) {
             <AttraccessUserActionsBridge>
               {props.children}
               {isAuthenticated && <SupervisorApprovalListener />}
+              {isAuthenticated && <SessionBillingSummary key={user?.id} />}
             </AttraccessUserActionsBridge>
           </ReactFlowProvider>
         </ToastProvider>
@@ -207,12 +210,16 @@ function AppContent() {
 }
 
 export function App() {
-  const { isInitialized } = useAuth();
+  const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
   useLocaleSync();
 
   configureApiClient();
 
-  return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
+  return (
+    <LiveUpdatesProvider userId={!isTwoFactorStatusLoading && !needsTwoFactorSetup ? user?.id : undefined}>
+      <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>
+    </LiveUpdatesProvider>
+  );
 }
 
 export default App;

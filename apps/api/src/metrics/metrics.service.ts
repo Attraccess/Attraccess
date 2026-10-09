@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, MoreThan } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
+import { activeUsageWhere } from '../resources/usage/active-usage';
 import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session } from '@attraccess/database-entities';
 import {
   Registry,
@@ -305,7 +306,7 @@ export class MetricsService implements OnModuleInit {
       this.projectRepository.count(),
       this.resourceGroupRepository.count(),
       this.mqttServerRepository.count(),
-      this.resourceUsageRepository.count({ where: { endTime: IsNull(), lifecyclePending: false } }),
+      this.resourceUsageRepository.count({ where: activeUsageWhere() }),
       this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
       this.userRepository
         .createQueryBuilder('user')

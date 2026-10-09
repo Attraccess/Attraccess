@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import { ManagementSecurityStatus } from './ManagementSecurityStatus';
 import type { ManagementPublicStatus } from '../../backend/wago-management.types';
+import { useWagoTranslations } from './i18n';
 
 const api = createPluginApiClient('/api/wago/commissioning/sessions');
 
 export function CommissioningSecurityPanel({ sessionId, controllerId }: { sessionId: number; controllerId: number }) {
+  const { t } = useWagoTranslations();
   const [status, setStatus] = useState<ManagementPublicStatus | null>(null);
   const [loadError, setLoadError] = useState(false);
   const generation = useRef(0);
@@ -40,9 +42,7 @@ export function CommissioningSecurityPanel({ sessionId, controllerId }: { sessio
   }
   return (
     <div className="wg:space-y-3">
-      {loadError && (
-        <p role="alert">Saved management status could not be loaded. Close and reopen this panel to retry.</p>
-      )}
+      {loadError && <p role="alert">{t('security.loadError')}</p>}
       <ManagementSecurityStatus
         controllerId={controllerId}
         status={status}

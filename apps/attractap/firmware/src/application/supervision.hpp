@@ -1,7 +1,8 @@
 #pragma once
 
 #include <string>
-#include "../nfc/nfc_contract.hpp"
+#include "../display/messages.hpp"
+#include "../rfid/rfid_contract.hpp"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -87,8 +88,8 @@ private:
     uint8_t cardUidLength = 0;
     uint8_t keyNo = 0;
     uint8_t keyBytes[16] = {0};
-    char errorMessage[64] = {0};
-    char hintMessage[160] = {0};
+    FirmwareI18n::Text errorMessage;
+    FirmwareI18n::Text hintMessage;
     char requesterName[64] = {0};
     uint32_t resourceId = 0;
     char armedRequesterName[64] = {0};
@@ -102,7 +103,7 @@ private:
     static constexpr uint32_t SUCCESS_DWELL_MS = 1200;
     static constexpr uint32_t ERROR_DWELL_MS = 1800;
 
-    void enter(const char *requester, const char *hint, uint32_t now, uint32_t deadlineMs);
+    void enter(const char *requester, const FirmwareI18n::Text &hint, uint32_t now, uint32_t deadlineMs);
     void resetActiveTransaction();
     void clearPendingWebStart();
     void beginWebInitiated(uint32_t resourceId, const char *requesterName, uint32_t deadlineMs);

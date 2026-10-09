@@ -134,7 +134,12 @@
     "availableTitle": "Plugin-Updates sind verfügbar",
     "availableDescription": "{{count}} installiertes Marketplace-Plugin kann aktualisiert werden. Prüfe die verfügbare Version vor der Installation.",
     "reviewUpdates": "Updates prüfen",
-    "modes": { "off": "Aus", "patch": "Nur Patches", "minor": "Patches und Minor", "follow": "Paketregel folgen" }
+    "modes": {
+      "off": "Aus",
+      "patch": "Nur Patches",
+      "minor": "Patches und Minor",
+      "follow": "Paketregel folgen"
+    }
   },
   "deleteTooltip": "Plugin entfernen",
   "aside": {
@@ -199,6 +204,24 @@
     "cancel": "Abbrechen",
     "update": "Aktualisieren",
     "downgrade": "Downgrade",
-    "direction": { "current": "Aktuell", "newer": "Neuer", "older": "Älter" }
+    "direction": {
+      "current": "Aktuell",
+      "newer": "Neuer",
+      "older": "Älter"
+    }
+  },
+  "dependencies": {
+    "title": "Plugin-Abhängigkeiten",
+    "description": "Erforderliche Plugins einschließlich indirekter Abhängigkeiten sind Teil dieses Vorgangs.",
+    "loading": "Abhängigkeiten werden aufgelöst…",
+    "required": "Erforderlich",
+    "optional": "Optional (wird nicht automatisch installiert)",
+    "install": "Wird installiert",
+    "reuse": "Bereits installiert · wird weiterverwendet",
+    "replace": "Wird ersetzt",
+    "requiredBy": "Von installierten Plugins benötigt",
+    "removalDescription": "Behalte dieses Plugin oder entferne die folgenden abhängigen Plugins ausdrücklich zusammen. Plugin-Daten bleiben erhalten.",
+    "removeTogether": "Diese abhängigen Plugins ebenfalls entfernen",
+    "approveChanges": "Ich bestätige die Installation dieser Abhängigkeiten und ihre Berechtigungen"
   }
 }

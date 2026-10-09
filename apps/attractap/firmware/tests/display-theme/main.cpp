@@ -12,10 +12,13 @@
 #include "display/screens/supervision/supervisionScreen.hpp"
 #include "display/screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 #include "display/shared/pinInput/pinInputPage.hpp"
+#include "display/shared/powerOff/powerOffButton.hpp"
 #include "fixtures.hpp"
+#include "display/screens/demoSettings/demoSettingsScreen.hpp"
 #include "state/language.hpp"
 #include "display/i18n.hpp"
 #include "demo/demo_localization.hpp"
+#include "display/screens/resourceDetails/resourceDetailsScreen.hpp"
 
 #include <algorithm>
 #include <array>
@@ -85,6 +88,13 @@ lv_obj_t *findObject(lv_obj_t *root, const lv_obj_class_t *type, const char *tex
 lv_obj_t *requireObject(lv_obj_t *root, const lv_obj_class_t *type, const char *text = nullptr)
 {
     auto *obj = findObject(root, type, text);
+    if (!obj) {
+        const auto dump = [](auto &&self, lv_obj_t *node) -> void {
+            if (lv_obj_check_type(node, &lv_label_class)) std::cerr << "LABEL " << lv_label_get_text(node) << '\n';
+            for (uint32_t i = 0; i < lv_obj_get_child_count(node); ++i) self(self, lv_obj_get_child(node, i));
+        };
+        dump(dump, root);
+    }
     expect(obj != nullptr, std::string("Missing production widget: ") + (text ? text : "class lookup"));
     return obj;
 }
@@ -262,7 +272,18 @@ void testSurfaces(Renderer &renderer)
     expect(lv_obj_get_style_border_width(screen.root, LV_PART_MAIN) == 0, "Screen has no border");
     auto *title = label(screen.root, "Production theme: surfaces");
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 24);
-    expect(lv_obj_get_style_text_font(title, LV_PART_MAIN) == &lv_font_montserrat_18, "Inherited 18px font");
+    const auto *bodyFont = lv_obj_get_style_text_font(title, LV_PART_MAIN);
+    expect(bodyFont->dsc == lv_font_montserrat_18.dsc && bodyFont->line_height == lv_font_montserrat_18.line_height &&
+               bodyFont->fallback == &attractap_font_montserrat_latin1_18,
+           "Inherited 18px font retains LVGL metrics and adds Latin-1 fallback");
+    for (uint32_t glyph : {0x00C4, 0x00D6, 0x00DC, 0x00DF, 0x00E4, 0x00F6, 0x00FC}) {
+        lv_font_glyph_dsc_t descriptor{};
+        expect(lv_font_get_glyph_dsc(bodyFont, &descriptor, glyph, 0) && !descriptor.is_placeholder,
+               "Inherited body font renders German glyphs without replacement boxes");
+    }
+    lv_font_glyph_dsc_t symbol{};
+    expect(lv_font_get_glyph_dsc(bodyFont, &symbol, 0xF00D, 0) && !symbol.is_placeholder,
+           "Inherited body font retains the close icon");
     expectColor(lv_obj_get_style_text_color(title, LV_PART_MAIN), DisplayTheme::text(), "Inherited body text");
     auto *surface = lv_obj_create(screen.root);
     lv_obj_set_size(surface, 400, 140);
@@ -510,11 +531,11 @@ void testCatalogLocales(Renderer &renderer)
                 lv_obj_set_pos(item, (i % 2) * 230, (i / 2) * 72);
                 lv_label_set_long_mode(item, LV_LABEL_LONG_MODE_WRAP);
                 const char *rendered = std::strcmp(locale, "en") == 0 ? entry.en : entry.de;
-                const char *translated = FirmwareI18n::translateForLocale(entry.de, "en");
+                const char *translated = FirmwareI18n::messageText(entry.id, "en");
                 expect(std::strcmp(translated, entry.en) == 0,
                        std::string("English catalog entry translates: ") + entry.de);
                 if (std::strcmp(locale, "de") == 0) {
-                    const char *reverse = FirmwareI18n::translateForLocale(entry.en, "de");
+                    const char *reverse = FirmwareI18n::messageText(entry.id, "de");
                     const bool validReverse = std::any_of(std::begin(FirmwareI18n::catalog),
                         std::end(FirmwareI18n::catalog), [&](const auto &candidate) {
                             return std::strcmp(candidate.en, entry.en) == 0 && std::strcmp(candidate.de, reverse) == 0;
@@ -602,6 +623,11 @@ void testInit(Renderer &renderer)
     auto *search = requireObject(screen.root, &lv_label_class, "suche Zertifikat");
     expectColor(lv_obj_get_style_text_color(search, LV_PART_MAIN), DisplayTheme::warning(), "Certificate search warning");
     renderer.capture("init-cert-search");
+    FirmwareI18n::refreshTree(screen.root, "en");
+    requireObject(screen.root, &lv_label_class, "Wi-Fi  192.0.2.42");
+    requireObject(screen.root, &lv_label_class, "Server: reader.example:443  (SSL)");
+    renderer.capture("init-cert-search-english");
+    FirmwareI18n::refreshTree(screen.root, "de");
     Fixtures::websocket.connected = true;
     Fixtures::websocket.phase = State::WS_CONNECTED;
     Fixtures::api.authenticated = true;
@@ -639,15 +665,28 @@ void testCard(Renderer &renderer, const std::string &name, const char *writing, 
     const lv_color_t colors[] = {DisplayTheme::text(), DisplayTheme::warning(), DisplayTheme::success(), DisplayTheme::danger()};
     for (size_t i = 0; i < states.size(); ++i) {
         card.setStatus(states[i]);
-        if (states[i] == CardScreen::STATUS_ERROR) card.setStatusMessage(Fixtures::errorMessage);
+        if (states[i] == CardScreen::STATUS_ERROR) card.setStatusMessage(FirmwareI18n::Text::literal(Fixtures::errorMessage));
         auto *status = requireObject(screen.root, &lv_label_class, text[i]);
         expectColor(lv_obj_get_style_text_color(status, LV_PART_MAIN), colors[i], name + ": status color");
         expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_32,
                name + ": server-derived status uses a Latin-1 font");
         expect(lv_obj_has_flag(cancel, LV_OBJ_FLAG_HIDDEN) == (states[i] == CardScreen::STATUS_SUCCESS), name + ": cancel visibility");
         renderer.capture(name + "-" + suffix[i]);
+        FirmwareI18n::refreshTree(screen.root, "en");
+        requireObject(screen.root, &lv_label_class, Fixtures::userName);
+        renderer.capture(name + "-english-" + suffix[i]);
+        FirmwareI18n::refreshTree(screen.root, "de");
         expect(lv_bar_get_value(bar) == 30, name + ": fixed 30-second countdown");
     }
+    // Keep supplied errors literal above, and separately cover the authored
+    // error identifiers used by the production application callbacks.
+    card.setStatusMessage(FirmwareI18n::readerError("CARD_NOT_ACTIVE"));
+    FirmwareI18n::refreshTree(screen.root, "en");
+    requireObject(screen.root, &lv_label_class, "Card is inactive");
+    renderer.capture(name + "-english-authored-error");
+    FirmwareI18n::refreshTree(screen.root, "de");
+    requireObject(screen.root, &lv_label_class, "Karte ist nicht aktiv");
+    renderer.capture(name + "-german-authored-error");
     Fixtures::nowMs += 5000;
     card.loop();
     settle();
@@ -661,7 +700,7 @@ void testCard(Renderer &renderer, const std::string &name, const char *writing, 
 void testSupervision(Renderer &renderer)
 {
     SupervisionScreen supervision;
-    SupervisionScreen::View view{Fixtures::nowMs + 30000, Fixtures::userName, Fixtures::errorMessage, Fixtures::supervisorHint};
+    SupervisionScreen::View view{Fixtures::nowMs + 30000, Fixtures::userName, FirmwareI18n::Text::literal(Fixtures::errorMessage), FirmwareI18n::Text::literal(Fixtures::supervisorHint)};
     supervision.render(view);
     supervision.init();
     ScreenGuard screen(supervision.getScreen(), &supervision);
@@ -684,7 +723,24 @@ void testSupervision(Renderer &renderer)
                "Supervision server-derived status uses a Latin-1 font");
         expect(lv_obj_has_flag(cancel, LV_OBJ_FLAG_HIDDEN) == (view.status == SupervisionScreen::STATUS_SUCCESS), "Supervision cancel visibility");
         renderer.capture(std::string("supervision-") + suffix[i]);
+        FirmwareI18n::refreshTree(screen.root, "en");
+        requireObject(screen.root, &lv_label_class, Fixtures::userName);
+        renderer.capture(std::string("supervision-english-") + suffix[i]);
+        FirmwareI18n::refreshTree(screen.root, "de");
     }
+    view.status = SupervisionScreen::STATUS_ERROR;
+    view.statusMessage = FirmwareI18n::readerError("CARD_NOT_ACTIVE");
+    view.supervisorHint = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {
+        FirmwareI18n::Message::TapSupervisorCardOrApproveInTheAppWebInterface,
+        FirmwareI18n::Text::literal("Maintenance %s")});
+    supervision.render(view);
+    FirmwareI18n::refreshTree(screen.root, "en");
+    requireObject(screen.root, &lv_label_class, "Card is inactive");
+    requireObject(screen.root, &lv_label_class, "Tap supervisor card or approve in the\napp/web interface\nMaintenance %s");
+    renderer.capture("supervision-english-authored-hint");
+    FirmwareI18n::refreshTree(screen.root, "de");
+    requireObject(screen.root, &lv_label_class, "Karte ist nicht aktiv");
+    renderer.capture("supervision-german-authored-hint");
     unsigned canceled = 0;
     supervision.setOnCancelCallback([&] { ++canceled; });
     supervision.armCancelGuard();
@@ -700,7 +756,7 @@ void testSupervision(Renderer &renderer)
 void testPin(Renderer &renderer)
 {
     PinInputPage pin;
-    ScreenGuard screen(pin.init("Geräte-PIN"));
+    ScreenGuard screen(pin.init(FirmwareI18n::Message::DevicePin));
     auto *field = requireObject(screen.root, &lv_textarea_class);
     auto *keyboard = requireObject(screen.root, &lv_keyboard_class);
     auto *title = requireObject(screen.root, &lv_label_class, "Geräte-PIN");
@@ -754,6 +810,99 @@ void testPin(Renderer &renderer)
     pin.setOnCancelCallback([&] { canceled = true; });
     lv_obj_send_event(keyboard, LV_EVENT_CANCEL, nullptr);
     expect(canceled && std::strlen(lv_textarea_get_text(field)) == 0, "PIN cancel callback clears field");
+}
+
+void testPowerOffLocales(Renderer &renderer)
+{
+    auto *root = lv_obj_create(nullptr);
+    ScreenGuard guard(root);
+    unsigned confirmed = 0;
+    auto *button = PowerOffButton::create(root, [&] { ++confirmed; });
+    lv_obj_send_event(button, LV_EVENT_CLICKED, nullptr);
+    expect(PowerOffButton::isConfirmVisible(), "Production power-off dialog opens");
+    FirmwareI18n::refreshTree(lv_layer_top(), "en");
+    requireObject(lv_layer_top(), &lv_label_class, "Power off");
+    renderer.capture("power-off-english");
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
+    requireObject(lv_layer_top(), &lv_label_class, "Ausschalten");
+    renderer.capture("power-off-german");
+    auto *cancel = lv_obj_get_parent(requireObject(lv_layer_top(), &lv_label_class, "Abbrechen"));
+    lv_obj_send_event(cancel, LV_EVENT_CLICKED, nullptr);
+    expect(!PowerOffButton::isConfirmVisible() && confirmed == 0, "Cancel does not power off");
+    lv_obj_send_event(button, LV_EVENT_CLICKED, nullptr);
+    auto *confirm = lv_obj_get_parent(requireObject(lv_layer_top(), &lv_label_class, "Ausschalten"));
+    lv_obj_send_event(confirm, LV_EVENT_CLICKED, nullptr);
+    expect(!PowerOffButton::isConfirmVisible() && confirmed == 1, "Production confirm callback fires once");
+}
+
+void testFormAndProjectLocaleRefresh(Renderer &renderer)
+{
+    ResourceDetailsScreen details;
+    API::ResourceBrief resource{};
+    resource.id = 1; resource.isHealthy = true;
+    std::strcpy(resource.name, "Maintenance");
+    details.setResourceAndUsageDetails(resource);
+    details.setUserDetails({"Alex", true, true, true, false});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    const auto click = [](lv_obj_t *root, const char *caption) {
+        lv_obj_send_event(lv_obj_get_parent(requireObject(root, &lv_label_class, caption)), LV_EVENT_CLICKED, nullptr);
+    };
+    API::ProjectsOfUserResponse projects{};
+    projects.page = 2; projects.limit = 10; projects.total = 50; projects.count = 1;
+    projects.items[0] = {42, "Maintenance %s"};
+    details.setProjects(projects);
+    click(guard.root, "Projekt wählen");
+    requireObject(lv_layer_top(), &lv_label_class, "Seite 2 von 5");
+    FirmwareI18n::refreshTree(lv_layer_top(), "en");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    requireObject(lv_layer_top(), &lv_label_class, "Page 2 of 5");
+    requireObject(lv_layer_top(), &lv_label_class, "Maintenance %s");
+    renderer.capture("projects-english-page-two");
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
+    FirmwareI18n::refreshTree(guard.root, "de");
+    requireObject(lv_layer_top(), &lv_label_class, "Seite 2 von 5");
+    renderer.capture("projects-german-page-two");
+    click(lv_layer_top(), "Maintenance %s");
+    details.setSelectedProject(42, "Maintenance %s");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    requireObject(guard.root, &lv_label_class, "Project: Maintenance %s");
+    API::ResourceUsageFormRequest request{};
+    request.resourceId = 1; request.action = API::ResourceUsageFormActionType::START;
+    request.resourceName = "Maintenance"; request.formCount = 1;
+    request.forms[0] = {1, "Notes %s", 1};
+    details.showFormsModal(request);
+    API::ResourceUsageFormFieldsPage page{};
+    page.formId = 1; page.fieldCount = 1;
+    page.fields[0].id = 5; page.fields[0].name = "Maintenance";
+    page.fields[0].type = API::ResourceUsageFormFieldType::TEXT;
+    page.fields[0].isRequired = true;
+    page.fields[0].options.text.hasPlaceholder = true;
+    page.fields[0].options.text.placeholder = "Maintenance";
+    details.renderFormField(page, false, true, 2, 3);
+    click(lv_layer_top(), "Absenden");
+    requireObject(lv_layer_top(), &lv_label_class, "Pflichtfeld");
+    FirmwareI18n::refreshTree(lv_layer_top(), "en");
+    requireObject(lv_layer_top(), &lv_label_class, "Required field");
+    requireObject(lv_layer_top(), &lv_label_class, "Please complete before starting\nMaintenance - Notes %s");
+    renderer.capture("form-english-validation");
+    click(lv_layer_top(), "Maintenance");
+    auto *keyboard = requireObject(lv_layer_top(), &lv_keyboard_class);
+    auto *field = lv_keyboard_get_textarea(keyboard);
+    expect(field != nullptr, "Production editor connects its textarea");
+    expect(std::string(lv_textarea_get_placeholder_text(field)) == "Maintenance", "Server placeholder has literal ownership");
+    lv_textarea_set_text(field, "value %s\nMaintenance");
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
+    expect(std::string(lv_textarea_get_text(field)) == "value %s\nMaintenance", "Editor value survives locale change");
+    renderer.capture("form-german-editor");
+    lv_obj_send_event(keyboard, LV_EVENT_READY, nullptr);
+    FirmwareI18n::refreshTree(lv_layer_top(), "en");
+    requireObject(lv_layer_top(), &lv_label_class, "value %s\nMaintenance");
+    renderer.capture("form-english-entered-preview");
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
+    requireObject(lv_layer_top(), &lv_label_class, "value %s\nMaintenance");
+    renderer.capture("form-german-entered-preview");
+    details.hideFormsModal();
 }
 
 void testFirmwareUpdateLocales(Renderer &renderer)
@@ -829,7 +978,7 @@ void testBackgroundScreens(Renderer &renderer)
         expectBackground(renderer, guard.root, "lockscreen-available");
         Fixtures::activeLanguage = "en";
         lock.loop();
-        requireObject(guard.root, &lv_label_class, "Tap your NFC \n        card/tag to sign in");
+        requireObject(guard.root, &lv_label_class, "Tap your RFID \n        card/tag to sign in");
         requireObject(guard.root, &lv_label_class, "Available");
         renderer.capture("lockscreen-english-available");
         lock.setUsageInfo(true, "Müller", false);
@@ -840,7 +989,7 @@ void testBackgroundScreens(Renderer &renderer)
         requireObject(guard.root, &lv_label_class, "Under maintenance");
         Fixtures::activeLanguage = "de";
         lock.loop();
-        requireObject(guard.root, &lv_label_class, "Bitte mit NFC \n        Karte/Tag anmelden");
+        requireObject(guard.root, &lv_label_class, "Bitte mit RFID \n        Karte/Tag anmelden");
         requireObject(guard.root, &lv_label_class, "In Wartung");
         expectBackground(renderer, guard.root, "lockscreen-in-use");
         expectBackground(renderer, guard.root, "lockscreen-maintenance");
@@ -933,7 +1082,7 @@ void testAuthenticatedList(Renderer &renderer)
     click("Stop"); expect(acted == 2 && action == ResourceListAction::Stop, "Stop targets its exact row");
     click("Öffnen"); expect(acted == 3 && action == ResourceListAction::OpenDoor, "Door action targets its exact row");
     click("Einweisung"); expect(acted == 3, "Missing introduction blocks a direct event too");
-    list.showActionProgress("Nutzung wird gestartet", "Lasercutter");
+    list.showActionProgress(FirmwareI18n::Message::StartingUsage, FirmwareI18n::Text::literal("Lasercutter"));
     list.setSessionTimeoutPaused(true);
     renderer.capture("att-880-action-pending");
     auto *overlay = lv_obj_get_child(guard.root, -1);
@@ -951,7 +1100,7 @@ void testAuthenticatedList(Renderer &renderer)
     resources.items[0].hasActiveUsage = true;
     std::strcpy(resources.items[0].activeUser, "Alex Example");
     list.setResourceList(resources);
-    list.showSuccessToast("Nutzung gestartet");
+    list.showSuccessToast(FirmwareI18n::Message::UsageStarted);
     renderer.capture("att-880-action-complete");
     resources.items[0].hasActiveUsage = false;
     resources.items[0].requiresSupervisor = true;
@@ -989,6 +1138,115 @@ void testAuthenticatedList(Renderer &renderer)
     expect(resourceListAction(resource, "Alex") == ResourceListAction::Takeover, "Foreign session requires explicit takeover");
     resource.allowTakeOver = false;
     expect(resourceListAction(resource, "Alex") == ResourceListAction::None, "Foreign usage is never a quick stop");
+}
+
+void testUsageStatsExpiry(Renderer &renderer)
+{
+    ResourceDetailsScreen details;
+    API::ResourceBrief resource{};
+    resource.id = 1;
+    resource.hasActiveUsage = true;
+    resource.activeUsageId = 99;
+    resource.isHealthy = true;
+    resource.accessKnown = true;
+    resource.hasIntroduction = true;
+    std::strcpy(resource.name, "Lasercutter");
+    std::strcpy(resource.activeUser, Fixtures::userName);
+    details.setResourceAndUsageDetails(resource);
+    details.setUserDetails({Fixtures::userName, false, true, false, false});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    API::UsageStats stats{};
+    stats.resourceId = 1;
+    stats.usageId = 99;
+    stats.meters = {{"Energy (kWh)", "0.125", 30, "0,30 EUR"}, {"Heartbeats", "3", 0, "0,00 EUR"}};
+    stats.operatingDurationMs = 60000;
+    stats.isOperating = 1;
+    const auto receivedAt = Fixtures::nowMs;
+    details.setUsageStats(stats);
+    Fixtures::nowMs = receivedAt + 24999;
+    details.loop();
+    requireObject(guard.root, &lv_label_class, "Energy (kWh): 0.125\n0,30 EUR / Wert\nHeartbeats: 3\n0,00 EUR / Wert");
+    requireObject(guard.root, &lv_label_class, "00:01:00 · Läuft");
+    renderer.capture("usage-stats-meters");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    requireObject(guard.root, &lv_label_class, "Current usage");
+    requireObject(guard.root, &lv_label_class, "00:01:00 · Running");
+    renderer.capture("usage-stats-meters-english");
+    FirmwareI18n::refreshTree(guard.root, "de");
+    Fixtures::nowMs = receivedAt + 25000;
+    details.loop();
+    requireObject(guard.root, &lv_label_class, "Warte auf Messwert");
+    requireObject(guard.root, &lv_label_class, "Keine Daten");
+    expect(!findObject(guard.root, &lv_label_class, "Heartbeats: 0"), "Expired consumption is unavailable, not zero");
+    renderer.capture("usage-stats-expired");
+    stats.meters = {{"Heartbeats", "0", 0, "0,00 EUR"}};
+    stats.isOperating = 0;
+    details.setUsageStats(stats);
+    requireObject(guard.root, &lv_label_class, "Heartbeats: 0\n0,00 EUR / Wert");
+    requireObject(guard.root, &lv_label_class, "00:01:00 · Leerlauf");
+    renderer.capture("usage-stats-recovered");
+}
+
+void testIntroducerDetails(Renderer &renderer)
+{
+    ResourceDetailsScreen details;
+    API::ResourceBrief resource{};
+    std::strcpy(resource.name, "Lathe");
+    resource.isHealthy = true;
+    resource.accessKnown = true;
+    std::string expected;
+    for (int i = 1; i <= 30; ++i) {
+        const auto name = "Tutor " + std::to_string(i) + " with a long display name" +
+                          (i == 30 ? " that needs to wrap onto another line" : "");
+        resource.introducers.push_back(name);
+        if (i > 1) expected += "\n";
+        expected += name;
+    }
+    details.setResourceAndUsageDetails(resource);
+    details.setUserDetails({"Learner", false, false, false, false});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    for (bool occupied : {false, true}) {
+        resource.hasActiveUsage = occupied;
+        std::strcpy(resource.activeUser, "Someone else");
+        details.setResourceAndUsageDetails(resource);
+        settle();
+        auto *list = requireObject(guard.root, &lv_label_class, expected.c_str());
+        auto *panel = lv_obj_get_parent(list);
+        expect(!lv_obj_has_flag(panel, LV_OBJ_FLAG_HIDDEN), "Introduction panel remains visible with occupancy");
+        expect(lv_obj_has_flag(guard.root, LV_OBJ_FLAG_SCROLLABLE), "Long list can be scrolled on reader");
+        renderer.capture(occupied ? "introducers-occupied-top" : "introducers-available-top");
+        lv_obj_scroll_to_y(guard.root, LV_COORD_MAX, LV_ANIM_OFF);
+        settle();
+        lv_area_t bounds;
+        lv_obj_get_coords(list, &bounds);
+        expect(bounds.y2 < 480 && bounds.y2 > 0, "Last tutor is reachable by scrolling");
+        expect(lv_obj_get_width(list) <= lv_obj_get_content_width(panel), "Long names wrap inside the panel");
+        renderer.capture(occupied ? "introducers-occupied-bottom" : "introducers-available-bottom");
+        details.showActionProgress(FirmwareI18n::Message::PleaseWait);
+        settle();
+        auto *overlay = lv_obj_get_child(guard.root, -1);
+        const auto expectOverlayCoverage = [&] {
+            lv_area_t area;
+            lv_obj_get_coords(overlay, &area);
+            expect(area.x1 == 0 && area.y1 == 0 && area.x2 == 479 && area.y2 == 479,
+                   "Pending action covers the viewport even when details are scrolled");
+            expect(lv_obj_has_flag(overlay, LV_OBJ_FLAG_CLICKABLE), "Pending overlay intercepts input");
+        };
+        expectOverlayCoverage();
+        renderer.capture(occupied ? "introducers-occupied-pending" : "introducers-available-pending");
+        lv_obj_scroll_to_y(guard.root, 0, LV_ANIM_OFF);
+        settle();
+        expectOverlayCoverage();
+        details.hideActionProgress();
+        expect(lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN), "Completed action hides its overlay");
+    }
+    resource.introducers = {"Updated tutor"};
+    details.setResourceAndUsageDetails(resource);
+    settle();
+    requireObject(guard.root, &lv_label_class, "Updated tutor");
+    expect(!findObject(guard.root, &lv_label_class, expected.c_str()), "Refresh replaces old introducers");
 }
 
 }
@@ -1030,158 +1288,102 @@ int main(int argc, char **argv)
         test("theme/automatic-button-states", [&] { testButtons(renderer, false); });
         test("theme/helper-button-states", [&] { testButtons(renderer, true); });
         test("theme/fields-and-keyboard-states", [&] { testInputs(renderer); });
-        test("i18n/default-user-fallback-transitions", [&] {
-            const std::string existingInstallDefault = Language::supported("de");
-            expect(existingInstallDefault == "de", "Existing installations retain German default");
-            const std::string setupBrowserDefault = Language::supported("DE-at");
-            expect(setupBrowserDefault == "de", "Setup browser locale resolves to supported base language");
-            expect(Language::supported("en-US") == "en", "English browser locale resolves to English");
-            expect(Language::supported("fr-CA") == "en", "Unsupported browser and device locales fall back to English");
-            expect(Language::active(false, "de", "en") == "en", "Unauthenticated display uses system default");
-            expect(Language::active(true, "de-AT", "en") == "de", "Authenticated display uses first user's locale");
-            expect(Language::active(true, "en-US", "de") == "en", "Changing users changes the active locale");
-            expect(Language::active(false, "en", "de") == "de", "Ending authentication returns to system default");
+        test("i18n/explicit-bindings-and-data-ownership", [&] {
+            using FirmwareI18n::Message;
+            using FirmwareI18n::Text;
+            expect(Language::supported(" DE_at ") == "de", "Legacy regional locale normalizes");
+            for (const auto *invalid : {"de-", "de-!!!", "de--DE", "de_DE_extra", "de-1234", "", "fr-CA"})
+                expect(Language::supported(invalid) == "en", "Invalid or unsupported locales fall back to English");
             Language::Session session;
-            expect(session.active() == "de", "Installation without saved default starts in German");
             session.setApi(true, "en");
-            expect(session.active() == "en", "Reader receives system default");
-            session.setUser("de-AT");
-            expect(session.active() == "de", "Authenticated card selects its user's locale");
-            session.setUser("en-US");
-            expect(session.active() == "en", "A second card replaces the previous user's locale");
-            session.setUser("");
-            expect(session.active() == "en", "Clearing authentication restores system default");
-            session.setApi(true, "de");
-            session.setUser("en");
+            session.setUser(true, "de-AT");
+            session.setDefault("de");
+            expect(session.active() == "de", "Active user survives default update");
+            session.setUser(true, "");
+            expect(session.active() == "en", "Authenticated user with missing locale uses English");
             session.setApi(false, "");
-            expect(session.active() == "de", "Disconnect restores preserved system default");
-            expect(std::string(Language::text("English fallback", "", "de")) == "English fallback",
-                   "Missing locale translation falls back to English");
-            expect(std::string(FirmwareI18n::translateForLocale("Sitzung beenden", "en")) == "End session",
-                   "Shared display catalog resolves German screen strings to English");
-            expect(std::string(FirmwareI18n::translateForLocale("End session", "de")) == "Sitzung beenden",
-                   "Visible labels can refresh back to German");
-            expect(std::string(FirmwareI18n::translateForLocale("Gesperrt", "en")) == "Unavailable (locked)",
-                   "Locked state has a distinct English translation for reversible locale changes");
-            auto *lockedRoot = lv_obj_create(lv_screen_active());
-            auto *lockedLabel = lv_label_create(lockedRoot);
-            FirmwareI18n::setLabel(lockedLabel, "Gesperrt");
-            FirmwareI18n::refreshTree(lockedRoot, "en");
-            FirmwareI18n::refreshTree(lockedRoot, "de");
-            expect(std::string(lv_label_get_text(lockedLabel)) == "Gesperrt",
-                   "Language refresh preserves message identity when two states once shared an English value");
-            lv_obj_delete(lockedRoot);
-            expect(std::string(FirmwareI18n::translateForLocale("Demo Ressource", "en")) == "Demo resource",
-                   "Demo fixture descriptions are translated");
-            expect(std::string(FirmwareI18n::translateForLocale("Unbekannt", "en")) == "Unknown",
-                   "Unknown demo roles are translated");
-            expect(std::string(FirmwareI18n::translateForLocale("Unbekannt 04A1", "en")) == "Unknown 04A1",
-                   "Generated unknown demo role names translate while retaining the card suffix");
-            expect(std::string(FirmwareI18n::translateForLocale("Kein Zugang", "en")) == "No access",
-                   "Demo role is translated to English");
-            expect(std::string(FirmwareI18n::translateForLocale("Eingewiesen", "en")) == "Introduced",
-                   "Second demo role is translated to English");
-            expect(std::string(FirmwareI18n::translateForLocale("Aufsichts-Karte auflegen oder per\nApp/Web bestätigen\nAlex", "en")) ==
-                       "Tap supervisor card or approve in the\napp/web interface\nAlex",
-                   "Supervision hint translates while preserving the server supplied user name");
-            expect(std::string(FirmwareI18n::translateForLocale("-- kein Einweiser verfügbar --", "en")) ==
-                       "-- no introducer available --",
-                   "Empty introducer state is translated");
-            expect(std::string(FirmwareI18n::translateForLocale("Rolle für Karte 04A1", "en")) == "Role for card 04A1",
-                   "Formatted demo role title preserves the card UID");
-            expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5", "en")) == "Page 2 of 5",
-                   "Formatted project pagination is translated");
-            expect(std::string(FirmwareI18n::translateForLocale("Seite 2 von 5 boats", "en")) == "Seite 2 von 5 boats",
-                   "Pagination matcher preserves trailing server text");
-            const std::string longScope(700, 'x');
-            const std::string longBreadcrumb = std::string("Bitte Formular ausfüllen\n") + longScope;
-            expect(std::string(FirmwareI18n::translateForLocale(longBreadcrumb.c_str(), "en")) ==
-                       std::string("Please complete the form\n") + longScope,
-                   "Long form breadcrumb translates its heading without truncating supplied scope");
-            const std::string longProject = std::string("Projekt: ") + longScope;
-            expect(std::string(FirmwareI18n::translateForLocale(longProject.c_str(), "en")) ==
-                       std::string("Project: ") + longScope,
-                   "Long project label translates its prefix without truncating supplied name");
-            auto *projectCaption = lv_label_create(lv_screen_active());
-            FirmwareI18n::setLabel(projectCaption, "Projekt: Maintenance");
-            FirmwareI18n::refreshTree(projectCaption, "en");
-            expect(std::string(lv_label_get_text(projectCaption)) == "Project: Maintenance",
-                   "Project caption refresh translates its firmware prefix and preserves supplied name");
-            FirmwareI18n::refreshTree(projectCaption, "de");
-            expect(std::string(lv_label_get_text(projectCaption)) == "Projekt: Maintenance",
-                   "Project caption refresh returns to German without translating the project name");
-            lv_obj_delete(projectCaption);
-            expect(std::string(DemoLocalization::resourceName(1, true)) == "CNC Router" &&
-                       std::string(DemoLocalization::resourceName(1, false)) == "CNC Fraese" &&
-                       std::string(DemoLocalization::resourceName(2, true)) == "3D Printer" &&
-                       std::string(DemoLocalization::resourceName(3, true)) == "Main Entrance",
-                   "Demo resource fixtures provide both languages");
-            expect(std::string(DemoLocalization::projectName(0, true)) == "Oak Furniture" &&
-                       std::string(DemoLocalization::projectName(0, false)) == "Möbelbau Eiche" &&
-                       std::string(DemoLocalization::projectName(5, true)) == "Printer Spare Part",
-                   "Demo project fixtures provide both languages");
-            const std::string longUid(300, '9');
-            const std::string longRole = std::string("Rolle für Karte ") + longUid;
-            expect(std::string(FirmwareI18n::translateForLocale(longRole.c_str(), "en")) ==
-                       std::string("Role for card ") + longUid,
-                   "Long demo role title preserves the complete card identifier");
-            expect(std::string(FirmwareI18n::translateForLocale("Keine Aufsicht verfügbar", "en-US")) == "No supervisor available",
-                   "Supervision errors use English on English readers");
-            expect(std::string(FirmwareI18n::translateForLocale("Karte konnte nicht\ngelesen werden", "en")) == "Could not\nread card",
-                   "Card read errors use English on English readers");
-            expect(std::string(FirmwareI18n::translateForLocale("Karte wird zurückgesetzt...\nbitte nicht bewegen", "en")) == "Resetting card...\nplease keep it still",
-                   "Reset status is translated");
-            expect(std::string(FirmwareI18n::translateForLocale("Aktion fehlgeschlagen", "de")) == "Aktion fehlgeschlagen",
-                   "German fallback remains available");
-            expect(std::string(FirmwareI18n::translateForLocale("Nicht katalogierter Firmwaretext", "en")) == "[Translation missing]",
-                   "Uncatalogued firmware UI text uses an English fallback");
+            expect(session.active() == "de", "API loss reveals latest retained default");
+            expect(std::string(Language::text("English fallback", "", "de")) == "English fallback", "Missing German translation uses English");
+            expect(std::string(FirmwareI18n::messageText(static_cast<Message>(9999), "de")) == "Something went wrong. Please try again.", "Missing identifier has safe English fallback");
+            expect(FirmwareI18n::readerError("unknown diagnostic").render("de") == "Something went wrong. Please try again.", "Unknown reader errors use English fallback");
             auto *root = lv_obj_create(lv_screen_active());
-            auto *label = lv_label_create(root);
-            FirmwareI18n::setLabel(label, "Sitzung beenden");
-            Language::Session visibleSession;
-            visibleSession.setApi(true, "en-US");
-            FirmwareI18n::refreshTree(root, visibleSession.active());
-            expect(std::string(lv_label_get_text(label)) == "End session",
-                   "Unauthenticated screen uses the received English system default");
-            visibleSession.setUser("de-AT");
-            FirmwareI18n::refreshTree(root, visibleSession.active());
-            expect(std::string(lv_label_get_text(label)) == "Sitzung beenden",
-                   "First authenticated user's German locale refreshes visible text");
-            visibleSession.setUser("en-US");
-            FirmwareI18n::refreshTree(root, visibleSession.active());
-            expect(std::string(lv_label_get_text(label)) == "End session",
-                   "Second authenticated user's English locale replaces the first user's locale");
-            visibleSession.setUser("");
-            FirmwareI18n::refreshTree(root, visibleSession.active());
-            expect(std::string(lv_label_get_text(label)) == "End session",
-                   "Unauthenticated screen returns to the system default after sign-out");
-            auto *serverValue = lv_label_create(root);
-            FirmwareI18n::setDynamicLabel(serverValue, "Maintenance");
-            FirmwareI18n::refreshTree(root, "de");
-            expect(std::string(lv_label_get_text(serverValue)) == "Maintenance", "Server resource names survive locale refresh");
-            auto *formValue = lv_label_create(root);
-            FirmwareI18n::setDynamicLabel(formValue, "12.5");
+            auto *caption = lv_label_create(root);
+            FirmwareI18n::setLabel(caption, Message::Loading);
+            FirmwareI18n::setLabel(caption, Text::format(Message::Pagination, {Text::literal("2"), Text::literal("5")}));
             FirmwareI18n::refreshTree(root, "en");
-            expect(std::string(lv_label_get_text(formValue)) == "12.5",
-                   "Entered form values survive a language refresh");
-            FirmwareI18n::setDynamicLabel(formValue, "Value is required");
+            expect(std::string(lv_label_get_text(caption)) == "Page 2 of 5", "Pagination replaces loading binding");
             FirmwareI18n::refreshTree(root, "de");
-            expect(std::string(lv_label_get_text(formValue)) == "Value is required",
-                   "Server field errors survive a language refresh");
-            auto *placeholder = lv_textarea_create(root);
-            lv_textarea_set_placeholder_text(placeholder, "Mind. 4 Ziffern");
+            expect(std::string(lv_label_get_text(caption)) == "Seite 2 von 5", "Pagination retains current page on reverse refresh");
+            const std::string name = "Maintenance %s\nSeite 2 von 5 {0}";
+            auto *project = lv_label_create(root);
+            FirmwareI18n::setLabel(project, Text::format(Message::ProjectName, {Text::literal(name)}));
+            FirmwareI18n::refreshTree(root, "en");
+            expect(std::string(lv_label_get_text(project)) == "Project: " + name, "Data arguments preserve percent signs, newlines and catalog-like text");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_label_get_text(project)) == "Projekt: " + name, "Reverse refresh preserves complete supplied names");
+            FirmwareI18n::setDynamicLabel(project, "Maintenance");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_label_get_text(project)) == "Maintenance", "Literal replacement unregisters old message");
+            auto *field = lv_textarea_create(root);
+            FirmwareI18n::setPlaceholder(field, Message::AtLeast4Digits);
+            lv_textarea_set_text(field, "12%\n34");
+            FirmwareI18n::refreshTree(root, "en");
+            expect(std::string(lv_textarea_get_placeholder_text(field)) == "At least 4 digits", "Registered placeholder translates");
+            FirmwareI18n::setDynamicPlaceholder(field, "Maintenance");
+            FirmwareI18n::refreshTree(root, "de");
+            expect(std::string(lv_textarea_get_placeholder_text(field)) == "Maintenance", "Server hint stays literal");
+            expect(std::string(lv_textarea_get_text(field)) == "12%\n34", "Entered text survives refresh");
+            FirmwareI18n::setDynamicPlaceholder(field, "0000");
+            FirmwareI18n::refreshTree(root, "en");
+            expect(std::string(lv_textarea_get_placeholder_text(field)) == "0000", "PIN numeric placeholder stays literal");
             auto *dropdown = lv_dropdown_create(root);
-            FirmwareI18n::setDropdownOptions(dropdown, "Suche WLANs...");
+            FirmwareI18n::setDropdownOptions(dropdown, Message::SearchingForWiFiNetworks);
             FirmwareI18n::refreshTree(root, "en");
-            expect(std::string(lv_textarea_get_placeholder_text(placeholder)) == "At least 4 digits",
-                   "Text-area placeholders refresh to English");
-            expect(std::string(lv_dropdown_get_options(dropdown)) == "Searching for Wi-Fi networks...",
-                   "Static dropdown options refresh to English");
-            FirmwareI18n::setDynamicDropdownOptions(dropdown, "Maintenance");
+            expect(std::string(lv_dropdown_get_options(dropdown)) == "Searching for Wi-Fi networks...", "Registered dropdown translates");
+            FirmwareI18n::setDynamicDropdownOptions(dropdown, "Maintenance\nWartung");
+            lv_dropdown_set_selected(dropdown, 1);
             FirmwareI18n::refreshTree(root, "de");
-            expect(std::string(lv_dropdown_get_options(dropdown)) == "Maintenance",
-                   "A single server-supplied Wi-Fi name is preserved");
+            expect(std::string(lv_dropdown_get_options(dropdown)) == "Maintenance\nWartung" && lv_dropdown_get_selected(dropdown) == 1, "Network options and selection stay literal");
+            std::vector<lv_obj_t *> many;
+            for (unsigned i = 0; i < 300; ++i) { auto *label = lv_label_create(root); FirmwareI18n::setLabel(label, Message::Settings); many.push_back(label); }
+            FirmwareI18n::refreshTree(root, "en");
+            for (auto *label : many) expect(std::string(lv_label_get_text(label)) == "Settings", "Every label refreshes beyond former registration limit");
             lv_obj_delete(root);
+            expect(!FirmwareI18n::bindings.count(caption) && !FirmwareI18n::bindings.count(field), "Deletion releases registration and formatting arguments");
+        });
+        test("demo/production-settings-and-role-picker", [&] {
+            DemoSettingsScreen demo;
+            demo.init();
+            ScreenGuard guard(demo.getScreen(), &demo);
+            settle();
+            requireObject(guard.root, &lv_label_class, "Maintenance");
+            requireObject(guard.root, &lv_label_class, "Kein Zugang ");
+            auto *cardholder = requireObject(guard.root, &lv_label_class, "Alex Müller");
+            lv_font_glyph_dsc_t glyph{};
+            expect(lv_font_get_glyph_dsc(lv_obj_get_style_text_font(cardholder, LV_PART_MAIN), &glyph, 0x00FC, 0) &&
+                       !glyph.is_placeholder,
+                   "Production demo cardholder name renders its supplied German glyph");
+            lv_area_t headingBounds, actionBounds;
+            lv_obj_get_coords(requireObject(guard.root, &lv_label_class, "Demo Einstellungen"), &headingBounds);
+            lv_obj_get_coords(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Karte hinzufügen")), &actionBounds);
+            expect(headingBounds.y2 < actionBounds.y1 || headingBounds.x2 < actionBounds.x1,
+                   "Translated demo heading does not overlap its action controls");
+            renderer.capture("demo-settings-german");
+            FirmwareI18n::refreshTree(guard.root, "en");
+            requireObject(guard.root, &lv_label_class, "Maintenance");
+            requireObject(guard.root, &lv_label_class, "No access ");
+            requireObject(guard.root, &lv_label_class, "Alex Müller");
+            renderer.capture("demo-settings-english");
+            // Production role-picker callback receives a supplied UID.
+            demo.onCardScanned("11223344");
+            FirmwareI18n::refreshTree(guard.root, "en");
+            requireObject(guard.root, &lv_label_class, "Role for card 11223344");
+            requireObject(guard.root, &lv_label_class, "Introduced");
+            renderer.capture("demo-role-picker-english");
+            FirmwareI18n::refreshTree(guard.root, "de");
+            requireObject(guard.root, &lv_label_class, "Rolle für Karte 11223344");
+            requireObject(guard.root, &lv_label_class, "Eingewiesen");
+            renderer.capture("demo-role-picker-german");
         });
         test("demo/fixture-locales", [&] { testDemoFixtureLocales(renderer); });
         test("demo/production-resource-list-locales", [&] { testDemoResourceListLocales(renderer); });
@@ -1210,9 +1412,13 @@ int main(int argc, char **argv)
             requireObject(screen.root, &lv_label_class, "Karte wird beschrieben...\nbitte nicht bewegen");
             renderer.capture("enrollment-german-writing");
         });
-        test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurückgesetzt...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
+        test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte zurücksetzen...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });
+        test("screen/introducer-details", [&] { testIntroducerDetails(renderer); });
+        test("screen/usage-stats-expiry", [&] { testUsageStatsExpiry(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });
+        test("screen/power-off-bilingual", [&] { testPowerOffLocales(renderer); });
+        test("screen/forms-and-projects-locale-refresh", [&] { testFormAndProjectLocaleRefresh(renderer); });
         test("screen/firmware-update-bilingual", [&] { testFirmwareUpdateLocales(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
                   << renderer.captures << " real LVGL frames\n";

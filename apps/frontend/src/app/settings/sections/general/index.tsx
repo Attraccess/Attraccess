@@ -1,3 +1,4 @@
+import { Select } from '../../../../components/select';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FieldError, Form, Input, Spinner, TextField } from '@heroui/react';
@@ -42,7 +43,9 @@ export function GeneralSection() {
   // and the displayed value falls back to the server's. The alternative — an effect that reassigns
   // the whole draft whenever the query object changes — overwrites edits the operator has not saved
   // yet as soon as a background refetch lands (ATT-868).
-  const [draft, setDraft] = useState<Partial<{ url: string; publicInternetUrl: string; licenseKey: string; attractapLanguage: 'en' | 'de' }>>({});
+  const [draft, setDraft] = useState<
+    Partial<{ url: string; publicInternetUrl: string; licenseKey: string; attractapLanguage: 'en' | 'de' }>
+  >({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   // Same query/mutation contract as the old AppSettingsForm — only the presentation changed.
@@ -54,7 +57,7 @@ export function GeneralSection() {
   const url = draft.url ?? savedUrl;
   const publicInternetUrl = draft.publicInternetUrl ?? savedPublicUrl;
   const licenseKey = draft.licenseKey ?? '';
-  const savedLanguage = (settings?.app as typeof settings.app & { attractapLanguage?: 'en' | 'de' } | undefined)?.attractapLanguage ?? 'de';
+  const savedLanguage = settings?.app.attractapLanguage ?? 'de';
   const attractapLanguage = draft.attractapLanguage ?? savedLanguage;
 
   const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
@@ -73,7 +76,11 @@ export function GeneralSection() {
     },
   });
 
-  const isDirty = url !== savedUrl || publicInternetUrl !== savedPublicUrl || licenseKey.trim() !== '' || attractapLanguage !== savedLanguage;
+  const isDirty =
+    url !== savedUrl ||
+    publicInternetUrl !== savedPublicUrl ||
+    licenseKey.trim() !== '' ||
+    attractapLanguage !== savedLanguage;
 
   const trimmedUrl = url.trim();
   const trimmedPublicUrl = publicInternetUrl.trim();
@@ -156,10 +163,19 @@ export function GeneralSection() {
           </TextField>
         </SettingsRow>
         <SettingsRow stacked label={t('inputs.attractapLanguage.label')}>
-          <select aria-label={t('inputs.attractapLanguage.label')} value={attractapLanguage} onChange={(event) => setDraft((current) => ({ ...current, attractapLanguage: event.target.value as 'en' | 'de' }))} className="w-full rounded-medium border border-default-300 bg-default-100 px-3 py-2">
-            <option value="en">English</option>
-            <option value="de">Deutsch</option>
-          </select>
+          <Select
+            aria-label={t('inputs.attractapLanguage.label')}
+            value={attractapLanguage}
+            onChange={(next) => {
+              if (next === 'en' || next === 'de') setDraft((current) => ({ ...current, attractapLanguage: next }));
+            }}
+            items={[
+              { key: 'en', label: 'English' },
+              { key: 'de', label: 'Deutsch' },
+            ]}
+            isDisabled={isSaving}
+            fullWidth
+          />
         </SettingsRow>
 
         <SettingsRow
@@ -196,12 +212,7 @@ export function GeneralSection() {
         <input type="submit" hidden />
       </Form>
 
-      <SettingsSaveBar
-        isDirty={isDirty}
-        isSaving={isSaving}
-        onSave={handleSave}
-        onDiscard={() => setDraft({})}
-      />
+      <SettingsSaveBar isDirty={isDirty} isSaving={isSaving} onSave={handleSave} onDiscard={() => setDraft({})} />
     </SettingsSection>
   );
 }

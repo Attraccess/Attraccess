@@ -1,3 +1,4 @@
+import { normalizeDeviceLanguage } from '../../language/device-language';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -50,6 +51,7 @@ export class AttractapCardHandler {
   public async startEnrollOfNewNfcCard(data: {
     readerId: number;
     userId: number;
+    actorId?: number;
     authenticationMethod?: 'session' | 'api-token';
     apiTokenId?: number;
   }) {
@@ -86,7 +88,7 @@ export class AttractapCardHandler {
       socket.state.enrollment = {
         userId: user.id,
         auditPrincipal: {
-          userId: user.id,
+          userId: data.actorId ?? user.id,
           authenticationMethod,
           ...(authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
         },
@@ -148,6 +150,7 @@ export class AttractapCardHandler {
     const keyString = this.attractapService.uint8ArrayToHexString(key);
 
     socket.state.enrollNewCardData = {
+      userId: enrollment.userId,
       keyNo,
       key: keyString,
       cardUID: uid,
@@ -183,7 +186,7 @@ export class AttractapCardHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: auditPrincipal.userId });
+    const user = await this.usersService.findOne({ id: cardData.userId });
     if (!user) {
       await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'USER_NOT_FOUND' }));
       return;
@@ -406,9 +409,4 @@ export class AttractapCardHandler {
       this.logger.error(`Failed to refresh resources after card authentication for reader ${socket.readerId}`, error);
     });
   }
-}
-
-function normalizeDeviceLanguage(locale: string | null | undefined): 'en' | 'de' {
-  const language = (locale ?? '').trim().toLowerCase().split(/[-_]/, 1)[0];
-  return language === 'de' ? 'de' : 'en';
 }

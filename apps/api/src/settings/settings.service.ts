@@ -1,3 +1,4 @@
+import { normalizeDeviceLanguage } from '../attractap/language/device-language';
 import { auditSettingsUpdateSchema, readAuditSettings } from '../audit/audit.config';
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -35,19 +36,11 @@ import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-set
 import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settings.dto';
 import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
 import { SettingsStoreService } from './settings-store.service';
-import {
-  FirstTimeSetupStatusDto,
-  FirstTimeSetupStepsDto,
-} from './dto/first-time-setup-status.dto';
+import { FirstTimeSetupStatusDto, FirstTimeSetupStepsDto } from './dto/first-time-setup-status.dto';
 import { MetricsTogglesDto } from './dto/metrics-toggles.dto';
 import { UpdateMetricsTogglesDto } from './dto/update-metrics-toggles.dto';
 import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-toggle-invalidator.token';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-function normalizeAttractapLanguage(language: string): 'en' | 'de' {
-  const baseLanguage = language.trim().toLowerCase().replace('_', '-').split('-')[0];
-  return baseLanguage === 'de' ? 'de' : 'en';
-}
 
 @Injectable()
 export class SettingsService {
@@ -93,9 +86,7 @@ export class SettingsService {
     const adminEmailVerified = userCount > 0 && verifiedAdminCount > 0;
 
     const stepsCompleted: FirstTimeSetupStepsDto = {
-      app:
-        !!app.url?.trim() &&
-        app.licenseKeyConfigured === true,
+      app: !!app.url?.trim() && app.licenseKeyConfigured === true,
       smtp:
         !!smtp.from?.trim() &&
         (!smtp.passConfigured || !!smtp.user?.trim()) &&
@@ -139,7 +130,7 @@ export class SettingsService {
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
       // Missing values preserve the legacy German behavior; malformed stored values use English.
-      attractapLanguage: attractapLanguage === null ? 'de' : normalizeAttractapLanguage(attractapLanguage),
+      attractapLanguage: attractapLanguage === null ? 'de' : normalizeDeviceLanguage(attractapLanguage),
     };
   }
 
@@ -148,7 +139,11 @@ export class SettingsService {
       await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.url, update.url ?? null);
     }
     if (Object.prototype.hasOwnProperty.call(update, 'publicInternetUrl')) {
-      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl, update.publicInternetUrl ?? null);
+      await this.settingsStore.setPlainSetting(
+        APP_PARENT,
+        APP_KEYS.publicInternetUrl,
+        update.publicInternetUrl ?? null,
+      );
     }
     if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
       await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
@@ -161,7 +156,7 @@ export class SettingsService {
 
   async getAttractapLanguage(): Promise<'en' | 'de'> {
     const language = await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage);
-    return language === null ? 'de' : normalizeAttractapLanguage(language);
+    return language === null ? 'de' : normalizeDeviceLanguage(language);
   }
 
   async getSmtpSettings(): Promise<SmtpSettingsDto> {
@@ -305,10 +300,7 @@ export class SettingsService {
     return {
       maxAttempts: parsePositiveInt(maxAttempts, RATE_LIMIT_DEFAULTS.maxAttempts),
       windowSeconds: parsePositiveInt(windowSeconds, RATE_LIMIT_DEFAULTS.windowSeconds),
-      lockoutDurationSeconds: parsePositiveInt(
-        lockoutDurationSeconds,
-        RATE_LIMIT_DEFAULTS.lockoutDurationSeconds,
-      ),
+      lockoutDurationSeconds: parsePositiveInt(lockoutDurationSeconds, RATE_LIMIT_DEFAULTS.lockoutDurationSeconds),
       exponentialBackoff: exponentialBackoff === 'true',
       backoffMultiplier: parsePositiveFloat(backoffMultiplier, RATE_LIMIT_DEFAULTS.backoffMultiplier),
     };
@@ -328,7 +320,11 @@ export class SettingsService {
     const writes: Array<Promise<void>> = [];
     if (update.sendMaxPerWindow !== undefined) {
       writes.push(
-        this.settingsStore.setPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.sendRateLimitMax, String(update.sendMaxPerWindow)),
+        this.settingsStore.setPlainSetting(
+          MESSAGING_PARENT,
+          MESSAGING_KEYS.sendRateLimitMax,
+          String(update.sendMaxPerWindow),
+        ),
       );
     }
     if (update.sendWindowSeconds !== undefined) {

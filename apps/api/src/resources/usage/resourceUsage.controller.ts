@@ -272,7 +272,7 @@ export class ResourceUsageController {
     description: 'Resource not found',
   })
   async getActiveSession(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<GetActiveUsageSessionDto> {
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId, true);
+    const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
     return { usage: activeSession || null };
   }
 
@@ -291,5 +291,18 @@ export class ResourceUsageController {
     return {
       canControl: await this.resourceUsageService.canControllResource(resourceId, req.user),
     } as CanControlResponseDto;
+  }
+
+  @Get(':usageId')
+  @Auth()
+  @ApiOperation({ summary: 'Get a resource usage session', operationId: 'resourceUsageGetSession' })
+  @ApiResponse({ status: 200, description: 'The usage session details.', type: ResourceUsage })
+  @ApiResponse({ status: 404, description: 'Usage session not found or not accessible.' })
+  async getSession(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('usageId', ParseIntPipe) usageId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceUsage> {
+    return this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
   }
 }

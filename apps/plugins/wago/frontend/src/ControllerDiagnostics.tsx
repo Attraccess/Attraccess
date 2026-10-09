@@ -1,6 +1,8 @@
 import { Button, Card } from '@heroui/react';
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { useWagoDiagnostics, type WagoDiagnostics } from './diagnostics';
+import { useWagoTranslations } from './i18n';
+import { presetDisplayName } from './configuration-model';
 
 function useDiagnosticsClock() {
   const [now, setNow] = useState(Date.now);
@@ -24,75 +26,92 @@ export function WagoStatus({
   pollingFailed?: boolean;
   pollingUpdatedAt?: number;
 }) {
+  const { t, language, tBackendMessage } = useWagoTranslations();
   const now = useDiagnosticsClock();
   const c = d.configuration;
   if (pollingFailed || (pollingUpdatedAt !== undefined && !pollFresh(pollingUpdatedAt, now)))
-    return <p role="alert">Current controller status is unknown until diagnostics polling recovers.</p>;
+    return <p role="alert">{t('diagnostics.unknownStatus')}</p>;
   return (
     <Card className="wg:min-w-0 wg:break-words">
       <Card.Header>
         <Card.Title>
-          {d.name}: {d.connectivity}
+          {d.name}: {t(`connectivity.${d.connectivity}`)}
         </Card.Title>
       </Card.Header>
       <Card.Content>
         <p>
-          Permanent heartbeat: {d.heartbeatAt ?? 'Never'} ({d.heartbeatFreshness})
+          {t('diagnostics.heartbeat', {
+            time: d.heartbeatAt ? new Date(d.heartbeatAt).toLocaleString(language) : t('controllers.never'),
+            freshness: tBackendMessage(d.heartbeatFreshness),
+          })}
         </p>
         <p>
-          Draft: {c.draftUpdatedAt ? (c.draftChanged ? 'unpublished changes' : 'matches publication') : 'none'} ·
-          Published: {c.publishedRevision ?? 'none'} ({c.publishedState ?? 'none'}) · Applied:{' '}
-          {c.appliedRevision ?? 'none'} · Reported: {c.reportedRevision ?? 'unknown'}
+          {t('diagnostics.configuration', {
+            draft: t(
+              c.draftUpdatedAt
+                ? c.draftChanged
+                  ? 'diagnostics.draftChanged'
+                  : 'diagnostics.draftMatches'
+                : 'diagnostics.none',
+            ),
+            published: c.publishedRevision ?? t('diagnostics.none'),
+            state: c.publishedState ? t(`revisions.state.${c.publishedState}`) : t('diagnostics.none'),
+            applied: c.appliedRevision ?? t('diagnostics.none'),
+            reported: c.reportedRevision ?? t('diagnostics.unknown'),
+          })}
         </p>
         {(c.revisionMismatch || c.rejected || c.validationErrorCount > 0) && (
           <p role="alert">
-            Configuration needs attention: {c.rejected ? 'controller rejected publication. ' : ''}
-            {c.revisionMismatch ? 'revisions do not match. ' : ''}
-            {c.validationErrorCount} draft validation errors. Open configuration to review and publish.
+            {t('diagnostics.attention')} {c.rejected ? t('diagnostics.rejected') : ''}{' '}
+            {c.revisionMismatch ? t('diagnostics.mismatch') : ''}{' '}
+            {t('diagnostics.validationErrors', { count: c.validationErrorCount })}
           </p>
         )}
         <p>
-          Hardware readiness: {d.hardwareReadiness}. {d.hardwareReadinessReason}
+          {t('diagnostics.hardware', { status: tBackendMessage(d.hardwareReadiness) })}{' '}
+          {tBackendMessage(d.hardwareReadinessReason)}
         </p>
-        {d.stateHardwareAvailable === false && (
-          <p role="alert">
-            Runtime reports hardware unavailable. Inspect the controller hardware connection and configuration before
-            retrying.
-          </p>
-        )}
-        {c.validationCodes.length > 0 && <p>Draft errors: {c.validationCodes.join(', ')}</p>}
+        {d.stateHardwareAvailable === false && <p role="alert">{t('diagnostics.hardwareUnavailable')}</p>}
+        {c.validationCodes.length > 0 && <p>{t('diagnostics.draftErrors', { codes: c.validationCodes.join(', ') })}</p>}
         {c.validationErrors.map((error, index) => (
-          <p key={`validation-${index}`}>
-            Draft {error.path}: {error.code}. Review this field in configuration.
-          </p>
+          <p key={`validation-${index}`}>{t('diagnostics.draftField', { path: error.path, code: error.code })}</p>
         ))}
         {c.rejectionErrors.map((error, index) => (
           <p role="alert" key={`rejection-${index}`}>
-            Rejected {error.path}: {error.code}. Review configuration and republish.
+            {t('diagnostics.rejectedField', { path: error.path, code: error.code })}
           </p>
         ))}
         <p>
-          Observed source connection:{' '}
-          {d.stateConnected === null ? 'unknown' : d.stateConnected ? 'connected' : 'disconnected'} · Source state time:{' '}
-          {d.stateSourceAt ?? 'unavailable'}
+          {t('diagnostics.connection', {
+            status: t(
+              d.stateConnected === null
+                ? 'diagnostics.unknown'
+                : d.stateConnected
+                  ? 'diagnostics.connected'
+                  : 'diagnostics.disconnected',
+            ),
+            time: d.stateSourceAt ? new Date(d.stateSourceAt).toLocaleString(language) : t('diagnostics.unavailable'),
+          })}
         </p>
         <p>
-          Sequence gaps: {d.sequenceGaps ?? 'unavailable'} · Boot: {d.activeStream ?? 'legacy/unavailable'}
+          {t('diagnostics.sequence', {
+            gaps: d.sequenceGaps ?? t('diagnostics.unavailable'),
+            boot: d.activeStream ?? t('diagnostics.legacy'),
+          })}
         </p>
-        {d.trackingExhausted && (
-          <p role="alert">
-            Stream tracking limit reached. Current data is unavailable; investigate repeated runtime restarts.
-          </p>
-        )}
+        {d.trackingExhausted && <p role="alert">{t('diagnostics.trackingLimit')}</p>}
         <p>
-          Runtime {d.runtimeVersion} · Protocol {d.protocolVersion}
-          {d.incompatible ? ' — incompatible; update the runtime' : ''}
+          {t('diagnostics.versions', { runtime: d.runtimeVersion, protocol: d.protocolVersion })}
+          {d.incompatible ? t('diagnostics.incompatible') : ''}
         </p>
-        <p>Capabilities: {d.capabilities.join(', ')}</p>
+        <p>{t('diagnostics.capabilities', { capabilities: d.capabilities.map(tBackendMessage).join(', ') })}</p>
         {d.faults.map((fault) => (
           <p role="alert" key={fault.channelId}>
-            Recent fault on {fault.channelId}: {fault.code} ({fault.receivedAt}). Inspect configuration and device
-            wiring.
+            {t('diagnostics.fault', {
+              channel: fault.channelId,
+              code: fault.code,
+              time: new Date(fault.receivedAt).toLocaleString(language),
+            })}
           </p>
         ))}
       </Card.Content>
@@ -106,12 +125,13 @@ export class WagoDiagnosticsBoundary extends Component<{ children: ReactNode }, 
     return { failed: true };
   }
   render() {
-    return this.state.failed ? (
-      <p role="alert">Diagnostics could not be displayed. Close and reopen diagnostics to retry.</p>
-    ) : (
-      this.props.children
-    );
+    return this.state.failed ? <DiagnosticsFailure /> : this.props.children;
   }
+}
+
+function DiagnosticsFailure() {
+  const { t } = useWagoTranslations();
+  return <p role="alert">{t('diagnostics.boundaryError')}</p>;
 }
 
 /** Includes polling and an error boundary; embedding hosts only supply the selected controller. */
@@ -124,13 +144,14 @@ export function ControllerDiagnostics(props: { controllerId: number; onConfigure
 }
 
 function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: number; onConfigure?: () => void }) {
+  const { t, tExists, language, tBackendMessage } = useWagoTranslations();
   const query = useWagoDiagnostics(controllerId);
   const now = useDiagnosticsClock();
   const pollingStale = !!query.data && !pollFresh(query.dataUpdatedAt, now);
   // Never render a cached online/current diagnosis after a failed or stalled poll.
   const d = query.isError || pollingStale ? undefined : query.data;
   return (
-    <section aria-label="Controller diagnostics" className="wg:flex wg:min-w-0 wg:flex-col wg:gap-4 wg:break-words">
+    <section aria-label={t('diagnostics.title')} className="wg:flex wg:min-w-0 wg:flex-col wg:gap-4 wg:break-words">
       <div className="wg:flex wg:flex-wrap wg:gap-2">
         <Button
           variant="secondary"
@@ -138,26 +159,17 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
             void query.refetch();
           }}
         >
-          Refresh diagnostics
+          {t('diagnostics.refresh')}
         </Button>
         {onConfigure && (
           <Button variant="secondary" onPress={onConfigure}>
-            Open configuration
+            {t('diagnostics.configure')}
           </Button>
         )}
       </div>
-      {query.isError && (
-        <p role="alert">
-          Diagnostics unavailable. The controller may have been removed or access denied. Current connection and sample
-          status are unknown until polling recovers.
-        </p>
-      )}
-      {!query.isError && pollingStale && (
-        <p role="alert">
-          Diagnostics refresh is overdue. Current connection and sample status are unknown. Refresh to recover.
-        </p>
-      )}
-      {query.isPending && <p>Loading diagnostics…</p>}
+      {query.isError && <p role="alert">{t('diagnostics.accessError')}</p>}
+      {!query.isError && pollingStale && <p role="alert">{t('diagnostics.overdue')}</p>}
+      {query.isPending && <p>{t('diagnostics.loading')}</p>}
       {d && (
         <>
           <WagoStatus diagnostics={d} pollingUpdatedAt={query.dataUpdatedAt} />
@@ -166,64 +178,84 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
               <Card.Header>
                 <Card.Title>{channel.id}</Card.Title>
                 <Card.Description>
-                  Setup preset: {channel.profile} · Capabilities: {channel.capabilities.join(', ')}
+                  {t('diagnostics.preset', {
+                    preset: presetDisplayName(channel.profile, t),
+                    capabilities: channel.capabilities.map(tBackendMessage).join(', '),
+                  })}
                 </Card.Description>
               </Card.Header>
               <Card.Content>
-                {channel.samples.length === 0 && <p>No supported input, output or measurement reported.</p>}
+                {channel.samples.length === 0 && <p>{t('diagnostics.noSamples')}</p>}
                 {channel.samples.map((sample) => (
                   <div key={`${sample.kind}:${sample.measurementKind ?? ''}`}>
                     <p>
-                      Latest {sample.kind}: {String(sample.value)} {sample.unit ?? ''} {sample.measurementKind ?? ''} ·{' '}
-                      {sample.current ? 'current source sample' : `not current: ${sample.availabilityReason}`}
+                      {t('diagnostics.latest', { kind: tBackendMessage(sample.kind) })} {String(sample.value)}{' '}
+                      {sample.unit && tExists(`modbus.options.${sample.unit}`)
+                        ? t(`modbus.options.${sample.unit}`)
+                        : (sample.unit ?? '')}{' '}
+                      {tBackendMessage(sample.measurementKind)} ·{' '}
+                      {sample.current
+                        ? t('diagnostics.current')
+                        : t('diagnostics.notCurrent', { reason: tBackendMessage(sample.availabilityReason) })}
                     </p>
                     <p>
-                      Source time: {sample.sourceAt ?? 'unavailable'} ({sample.sourceFreshness}). Received:{' '}
-                      {sample.receivedAt}. Receipt does not prove source freshness.
+                      {t('diagnostics.sampleTime', {
+                        source: sample.sourceAt
+                          ? new Date(sample.sourceAt).toLocaleString(language)
+                          : t('diagnostics.unavailable'),
+                        freshness: tBackendMessage(sample.sourceFreshness),
+                        received: new Date(sample.receivedAt).toLocaleString(language),
+                      })}
                     </p>
                     <p>
-                      Boot: {sample.streamId ?? 'legacy/unavailable'} · Sequence: {sample.sequence ?? 'unavailable'}
+                      {t('diagnostics.sampleSequence', {
+                        boot: sample.streamId ?? t('diagnostics.legacy'),
+                        sequence: sample.sequence ?? t('diagnostics.unavailable'),
+                      })}
                     </p>
                   </div>
                 ))}
                 <p>
-                  Safe state: {channel.safeState}. Disconnect: {channel.disconnectPolicy.mode}
-                  {channel.disconnectPolicy.timeoutMs ? ` after ${channel.disconnectPolicy.timeoutMs} ms` : ''}.
+                  {t('diagnostics.safeState', {
+                    state: tBackendMessage(channel.safeState),
+                    mode: tBackendMessage(channel.disconnectPolicy.mode),
+                    timeout: channel.disconnectPolicy.timeoutMs
+                      ? t('diagnostics.timeout', { timeout: channel.disconnectPolicy.timeoutMs })
+                      : '',
+                  })}
                 </p>
                 <p>
-                  Last correlated acknowledgement:{' '}
+                  {t('diagnostics.acknowledgement')}{' '}
                   {channel.acknowledgement
-                    ? `${channel.acknowledgement.status} · ${channel.acknowledgement.id} · ${channel.acknowledgement.receivedAt}`
-                    : 'none observed'}
+                    ? `${tBackendMessage(channel.acknowledgement.status)} · ${channel.acknowledgement.id} · ${new Date(channel.acknowledgement.receivedAt).toLocaleString(language)}`
+                    : t('diagnostics.noAcknowledgement')}
                 </p>
               </Card.Content>
             </Card>
           ))}
           <Card>
             <Card.Header>
-              <Card.Title>Flow references</Card.Title>
+              <Card.Title>{t('diagnostics.references')}</Card.Title>
             </Card.Header>
             <Card.Content>
-              <p>Warnings do not block resource usage. Required flow nodes determine gating.</p>
-              {d.references.length === 0 && <p>No references found.</p>}
+              <p>{t('diagnostics.referenceWarning')}</p>
+              {d.references.length === 0 && <p>{t('diagnostics.noReferences')}</p>}
               {d.references.map((ref) => (
                 <p key={`${ref.resourceId}-${ref.nodeId}`}>
-                  <a href={ref.href}>
-                    Resource {ref.resourceId}, node {ref.nodeId}
-                  </a>
-                  : {ref.channelId} ({ref.control ? 'control' : 'read/event'})
-                  {ref.invalid ? ' — invalid reference; reopen and update this node' : ''}
-                  {ref.conflict ? ' — also controlled by another resource' : ''}
+                  <a href={ref.href}>{t('diagnostics.reference', { resource: ref.resourceId, node: ref.nodeId })}</a>:{' '}
+                  {ref.channelId} ({t(ref.control ? 'diagnostics.control' : 'diagnostics.readEvent')})
+                  {ref.invalid ? t('diagnostics.invalidReference') : ''}
+                  {ref.conflict ? t('diagnostics.conflictingReference') : ''}
                 </p>
               ))}
-              {d.referencesTruncated && <p role="alert">Only the first 1,000 references are shown.</p>}
+              {d.referencesTruncated && <p role="alert">{t('diagnostics.truncated')}</p>}
             </Card.Content>
           </Card>
           <details>
-            <summary>Recent protocol events ({d.events.length})</summary>
+            <summary>{t('diagnostics.events', { count: d.events.length })}</summary>
             {d.events.map((event, index) => (
               <p key={index}>
-                {event.receivedAt}: {event.kind}
+                {new Date(event.receivedAt).toLocaleString(language)}: {event.kind}
               </p>
             ))}
             <p>{d.sequenceExplanation}</p>

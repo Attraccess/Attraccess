@@ -6,6 +6,8 @@ import { App } from './app';
 const state = vi.hoisted(() => ({
   authenticated: false,
   setup: false,
+  twoFactorLoading: false,
+  liveUserId: undefined as number | undefined,
   initialized: false,
   touch: false,
   ptr: true,
@@ -19,9 +21,16 @@ vi.mock('../hooks/useAuth', () => ({
     isInitialized: state.initialized,
     isAuthenticated: state.authenticated,
     needsTwoFactorSetup: state.setup,
+    isTwoFactorStatusLoading: state.twoFactorLoading,
     user: state.authenticated ? { id: 1 } : null,
     hasPermission: () => true,
   }),
+}));
+vi.mock('../utils/live-updates', () => ({
+  LiveUpdatesProvider: ({ userId, children }: PropsWithChildren<{ userId?: number }>) => {
+    state.liveUserId = userId;
+    return children;
+  },
 }));
 vi.mock('../hooks/useLocaleSync', () => ({ useLocaleSync: state.sync }));
 vi.mock('../stores/ptr.store', () => ({ usePtrStore: () => ({ pullToRefreshIsEnabled: state.ptr }) }));
@@ -35,6 +44,9 @@ vi.mock('../components/attraccessUserActionsBridge', () => ({
 }));
 vi.mock('../components/supervisorApproval/SupervisorApprovalListener', () => ({
   SupervisorApprovalListener: () => <p>Supervisor listener</p>,
+}));
+vi.mock('./billing/sessionSummary', () => ({
+  SessionBillingSummary: () => <p>Session billing listener</p>,
 }));
 vi.mock('../components/themeToggle', () => ({ ThemeToggle: () => <button>Theme</button> }));
 vi.mock('../components/bootScreen', () => ({ BootScreen: () => <p>Starting app</p> }));
@@ -60,6 +72,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.authenticated = false;
   state.setup = false;
+  state.twoFactorLoading = false;
+  state.liveUserId = undefined;
   state.initialized = false;
   state.touch = false;
   state.ptr = true;
@@ -87,6 +101,7 @@ it('shows boot and theme controls before initialization, then routes the authent
   expect(screen.getByText('Starting app')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Theme' })).toBeInTheDocument();
   expect(screen.queryByText('Supervisor listener')).toBeNull();
+  expect(screen.queryByText('Session billing listener')).toBeNull();
   view.unmount();
   state.initialized = true;
   state.authenticated = true;
@@ -97,6 +112,7 @@ it('shows boot and theme controls before initialization, then routes the authent
   );
   expect(screen.getByText('Home route')).toBeInTheDocument();
   expect(screen.getByText('Supervisor listener')).toBeInTheDocument();
+  expect(screen.getByText('Session billing listener')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Theme' })).toBeNull();
   expect(state.sync).toHaveBeenCalled();
 });
@@ -127,4 +143,32 @@ it('respects a disabled pull-to-refresh preference on touch devices', () => {
     </MemoryRouter>,
   );
   expect(screen.queryByRole('button', { name: 'Refresh gesture' })).toBeNull();
+});
+
+it('waits for two-factor status and required setup before enabling the live transport', () => {
+  state.authenticated = true;
+  state.initialized = true;
+  state.twoFactorLoading = true;
+  const app = (
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>
+  );
+  const view = render(app);
+  expect(state.liveUserId).toBeUndefined();
+  state.twoFactorLoading = false;
+  state.setup = true;
+  view.rerender(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(state.liveUserId).toBeUndefined();
+  state.setup = false;
+  view.rerender(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(state.liveUserId).toBe(1);
 });

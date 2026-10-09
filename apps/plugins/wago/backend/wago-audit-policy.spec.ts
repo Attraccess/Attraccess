@@ -18,6 +18,8 @@ describe('WAGO audit domain declaration', () => {
       'wago.claim',
       'wago.unclaim',
       'wago.credential_rotation',
+      'wago.network_change',
+      'wago.network_credential_retirement',
       'wago.manual_credential_fallback',
       'wago.publication',
       'wago.forced_publication',
@@ -28,15 +30,14 @@ describe('WAGO audit domain declaration', () => {
       'wago.profile_creation',
       'wago.profile_change',
       'wago.manual_command',
+      'wago.runtime_update',
     ])
       expect(actions).toContain(action);
-    expect(actions).toHaveLength(23);
+    expect(actions).toHaveLength(26);
   });
 
   it('declares every commissioning action with the commissioning subject', () => {
-    const commissioning = WAGO_AUDIT_DOMAIN.actions.filter((entry) =>
-      entry.action.startsWith('wago.commissioning.'),
-    );
+    const commissioning = WAGO_AUDIT_DOMAIN.actions.filter((entry) => entry.action.startsWith('wago.commissioning.'));
     expect(commissioning.map((entry) => entry.action)).toEqual(
       [
         'install',
@@ -45,10 +46,10 @@ describe('WAGO audit domain declaration', () => {
         'security_review',
         'security_apply',
         'security_recover',
+        'root_recovery',
         'platform_inspect',
         'platform_activate',
         'platform_recover',
-        'lease_recover',
       ].map((action) => `wago.commissioning.${action}`),
     );
     for (const entry of commissioning) {
@@ -66,9 +67,7 @@ describe('WAGO audit domain declaration', () => {
   });
 
   it('allows only identifier-shaped detail fields, never names or payloads', () => {
-    const allowed = new Set(
-      WAGO_AUDIT_DOMAIN.actions.flatMap((entry) => Object.keys(entry.details ?? {})),
-    );
+    const allowed = new Set(WAGO_AUDIT_DOMAIN.actions.flatMap((entry) => Object.keys(entry.details ?? {})));
     expect([...allowed].sort()).toEqual(
       [
         'after.logicalChannelCount',
@@ -77,6 +76,11 @@ describe('WAGO audit domain declaration', () => {
         'before.physicalPointCount',
         'channelId',
         'commandId',
+        'buildId',
+        'imageId',
+        'installerSha256',
+        'phase',
+        'failure',
         'operation',
         'presetId',
         'profileId',

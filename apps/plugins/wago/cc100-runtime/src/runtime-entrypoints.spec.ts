@@ -2,6 +2,9 @@ import { EventEmitter } from 'node:events';
 
 class FakeMqtt extends EventEmitter {
   connected = true;
+  outgoing = {};
+  stream = { destroy: jest.fn() };
+  removeOutgoingMessage = jest.fn();
   subscribe = jest.fn((_topic, _options, callback) => callback());
   publish = jest.fn((_topic, _payload, _options, callback) => callback());
   end = jest.fn((_force?, callback?) => callback?.());
@@ -84,6 +87,26 @@ async function boot() {
   await import('./simulator');
   await flush();
 }
+
+test.each([
+  ['mqtt://broker.test', undefined, undefined, {}],
+  ['mqtts://broker.test', 'true', 'broker.internal', { rejectUnauthorized: false, servername: 'broker.internal' }],
+])('uses configured MQTT transport %s', async (url, insecure, servername, options) => {
+  process.env.WAGO_MQTT_URL = url;
+  process.env.WAGO_MQTT_USERNAME = 'enrollment';
+  process.env.WAGO_MQTT_PASSWORD = 'fixture-only';
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
+  if (insecure) process.env.WAGO_MQTT_TLS_INSECURE = insecure;
+  if (servername) process.env.WAGO_MQTT_TLS_SERVERNAME = servername;
+  await import('./main');
+  await flush();
+  const { connect } = await import('mqtt');
+  expect(connect).toHaveBeenCalledWith(url, expect.objectContaining(options));
+  if (url.startsWith('mqtt://')) {
+    expect(jest.mocked(connect).mock.calls[0][1]).not.toHaveProperty('rejectUnauthorized');
+    expect(jest.mocked(connect).mock.calls[0][1]).not.toHaveProperty('servername');
+  }
+});
 
 test('enrolls, persists a claim before acknowledgment, and reconnects operationally', async () => {
   await boot();
@@ -215,4 +238,80 @@ test('production entrypoint drains connection states during startup and handles 
   expect(mockRuntime.retryCredentialRotationSubscription).toHaveBeenCalled();
   expect(mockRuntime.setConnected).toHaveBeenLastCalledWith(true);
   expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
+});
+
+test('production entrypoint retries interrupted startup after reconnect and installs telemetry timers once', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-rtu-v1';
+  delete process.env.WAGO_IO_PATHS;
+  mockState = { credentials: { username: 'permanent', password: 'persisted' } };
+  let failStartup!: (error: Error) => void;
+  mockRuntime.start.mockImplementationOnce(() => new Promise<void>((_resolve, reject) => (failStartup = reject)));
+  await import('./main');
+  await flush();
+  const client = mockClients[0];
+  client.emit('connect');
+  await flush();
+  client.connected = false;
+  client.emit('close');
+  await flush();
+  client.connected = true;
+  client.emit('connect');
+  await flush();
+  // Reconnect can arrive before slow disconnect handling has unwound startup.
+  failStartup(new Error('MQTT subscribe acknowledgment timed out'));
+  await flush();
+  expect(mockRuntime.start).toHaveBeenCalledTimes(2);
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(1);
+  client.emit('connect');
+  await flush();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.start).toHaveBeenCalledTimes(2);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(2);
+});
+
+test('boots after an SSH MQTT refresh using permanent state credentials and the recreated broker environment', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
+  delete process.env.WAGO_IO_PATHS;
+  process.env.WAGO_MQTT_URL = 'mqtts://new-broker.test:8883';
+  process.env.WAGO_MQTT_USE_ENV_CREDENTIALS = 'false';
+  process.env.WAGO_MQTT_USERNAME = 'old-environment-username';
+  process.env.WAGO_MQTT_PASSWORD = 'old-environment-password';
+  mockState = {
+    credentials: {
+      username: 'wago-controller-test-device',
+      password: 'refreshed-device-password',
+      prefix: 'attraccess/wago',
+      credentialEpoch: '22222222-2222-4222-8222-222222222222',
+    },
+    credentialRotation: { revision: 1, token: 'fresh-ssh-operation-token' },
+  };
+  await import('./main');
+  await flush();
+  const { connect } = await import('mqtt');
+  expect(connect).toHaveBeenCalledWith(
+    'mqtts://new-broker.test:8883',
+    expect.objectContaining({
+      username: 'wago-controller-test-device',
+      password: 'refreshed-device-password',
+    }),
+  );
+  mockClients[0].emit('connect');
+  await flush();
+  expect(mockRuntime.acknowledgeCredentialRotation).toHaveBeenCalledWith(mockState.credentials);
+});
+
+test('production RTU profile routes Modbus devices and schedules their configured polling intervals', async () => {
+  process.env.WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-rtu-v1';
+  delete process.env.WAGO_IO_PATHS;
+  mockState = { credentials: { username: 'permanent', password: 'persisted' } };
+  await import('./main');
+  await flush();
+  const { WagoRuntime } = await import('./runtime');
+  const { ModbusDeviceRouter } = await import('./modbus/adapter');
+  expect(jest.mocked(WagoRuntime).mock.calls[0][0].device).toBeInstanceOf(ModbusDeviceRouter);
+  mockClients[0].emit('connect');
+  await flush();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(mockRuntime.publishMeasurements).toHaveBeenCalledTimes(1);
 });

@@ -23,6 +23,7 @@ import { CompanionGatewayService } from '../../companion/companion-gateway.servi
 import axios from 'axios';
 import { registerPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
+import { settleFlowBranches } from './flow-execution-engine';
 
 jest.mock('axios');
 
@@ -179,6 +180,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
       operatingIntervals as never,
+      { report: jest.fn() } as never,
     );
   });
 
@@ -286,7 +288,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
     const ordinaryFailure = Promise.reject(new Error('ordinary node failure'));
 
-    const settled = service['settleFlowBranches']([
+    const settled = settleFlowBranches([
       ordinaryFailure as Promise<NodeProcessingResult[]>,
       laterExternalFailure as Promise<NodeProcessingResult[]>,
     ]);
@@ -316,6 +318,49 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(operatingIntervals.transition).toHaveBeenCalledWith(1, 'operating', {
       flowNodeId: 'operating-node',
       flowRunId: flowStart.flowRunId,
+    });
+  });
+
+  it('routes a metering start and collection branch to the reply channel of its operation', async () => {
+    const start = createNode({ id: 'start', type: ResourceFlowNodeType.INPUT_METERING_START, data: { meterId: 1 } });
+    const ready = createNode({
+      id: 'ready',
+      type: ResourceFlowNodeType.OUTPUT_METERING_READY,
+      data: { meterId: 1, source: 'shelly' },
+    });
+    const collect = createNode({
+      id: 'collect',
+      type: ResourceFlowNodeType.INPUT_METERING_COLLECT,
+      data: { meterId: 1 },
+    });
+    const report = createNode({
+      id: 'report',
+      type: ResourceFlowNodeType.OUTPUT_METERING_REPORT,
+      data: { meterId: 1, value: '{{scaleDecimal reading.wh "1/1000"}}' },
+    });
+    nodesById = { start, ready, collect, report };
+    edgesBySourceAndHandle = {
+      'start|': [{ source: 'start', target: 'ready' }],
+      'collect|': [{ source: 'collect', target: 'report' }],
+    };
+    const complete = jest.fn().mockResolvedValue(undefined);
+
+    initialNodes = [start];
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_START, {}, undefined, {
+      metering: { meterId: 1, operationId: 'op-1', kind: 'start', complete },
+    });
+    expect(complete).toHaveBeenLastCalledWith({ kind: 'ready', baseline: undefined, source: 'shelly' });
+
+    initialNodes = [collect];
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_METERING_COLLECT, { reading: { wh: 1500 } }, undefined, {
+      metering: { meterId: 1, operationId: 'op-2', kind: 'final', complete },
+    });
+    expect(complete).toHaveBeenLastCalledWith({
+      kind: 'reading',
+      mode: 'total',
+      value: '1.5',
+      observedAt: undefined,
+      source: undefined,
     });
   });
 
@@ -844,20 +889,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     edgesBySourceAndHandle[`${mqttNode.id}|failure`] = [];
     edgesBySourceAndHandle[`${continuationNode.id}|`] = [];
     mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
-    const processNode = jest.spyOn(
-      service as unknown as { processNode: () => Promise<NodeProcessingResult[]> },
-      'processNode',
-    );
+    flowLogs.start(1);
 
-    await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
+    const results = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
 
-    expect(processNode).toHaveBeenCalledWith(
-      expect.any(String),
-      continuationNode,
-      expect.objectContaining({ outputHandle: 'output' }),
-      undefined,
-      expect.any(Map),
-      {},
+    expect(results).toEqual([expect.objectContaining({ requestId: 'abc' })]);
+    expect(flowLogs.getLogs(1).logs).toContainEqual(
+      expect.objectContaining({ nodeId: continuationNode.id, type: 'node.processing.completed' }),
     );
   });
 
@@ -1438,6 +1476,82 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
+  describe('arithmetic templates', () => {
+    it('converts units in Set Payload using stored variables and publishes the converted fields', async () => {
+      (variablesService.getAll as jest.Mock).mockResolvedValue({ resource: { scale: 1000 }, global: {} });
+      const inputNode = createNode({ id: 'arithmetic-trigger' });
+      const setNode = createNode({
+        id: 'arithmetic-payload',
+        type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+        data: {
+          entries: [
+            { key: 'converted.energy_kwh', value: '{{divide payload.energy_wh variables.resource.scale}}' },
+            { key: 'converted.fahrenheit', value: '{{add (divide (multiply payload.celsius 9) 5) 32}}' },
+          ],
+        },
+      });
+      const mqttNode = createNode({
+        id: 'arithmetic-mqtt',
+        type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+        data: { serverId: 42, topic: 'devices/converted', payload: '{{json converted}}' },
+      });
+      initialNodes = [inputNode];
+      nodesById = { [inputNode.id]: inputNode, [setNode.id]: setNode, [mqttNode.id]: mqttNode };
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [{ source: setNode.id, target: mqttNode.id }];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { energy_wh: '1500', celsius: 20 } });
+
+      expect(mqttClientService.publish).toHaveBeenCalledWith(
+        42,
+        'devices/converted',
+        '{"energy_kwh":"1.5","fahrenheit":"68"}',
+        { qos: undefined, retain: undefined },
+      );
+    });
+
+    it('stores the result of an arithmetic template as a numeric variable', async () => {
+      const inputNode = createNode({ id: 'arithmetic-trigger' });
+      const setNode = createNode({
+        id: 'arithmetic-variable',
+        type: ResourceFlowNodeType.PROCESSING_SET_VARIABLES,
+        data: {
+          variables: [{ key: 'energy_kwh', value: '{{divide payload.energy_wh 1000}}', scope: 'resource' }],
+        },
+      });
+      initialNodes = [inputNode];
+      nodesById = { [inputNode.id]: inputNode, [setNode.id]: setNode };
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { energy_wh: 1500 } });
+
+      expect(variablesService.set).toHaveBeenCalledWith('resource', 1, 'energy_kwh', 1.5, 1);
+    });
+
+    it.each([0, undefined, 'not-a-number'])('stops a node with invalid arithmetic input %p', async (divisor) => {
+      const inputNode = createNode({ id: 'arithmetic-trigger' });
+      const setNode = createNode({
+        id: 'arithmetic-payload',
+        type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+        data: { entries: [{ key: 'converted', value: '{{divide payload.value payload.divisor}}' }] },
+      });
+      const mqttNode = createNode({
+        id: 'arithmetic-mqtt',
+        type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+        data: { serverId: 42, topic: 'devices/converted', payload: '{{converted}}' },
+      });
+      initialNodes = [inputNode];
+      nodesById = { [inputNode.id]: inputNode, [setNode.id]: setNode, [mqttNode.id]: mqttNode };
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [{ source: setNode.id, target: mqttNode.id }];
+
+      await expect(
+        service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { value: 1500, divisor } }),
+      ).rejects.toThrow('Template helper "divide"');
+      expect(mqttClientService.publish).not.toHaveBeenCalled();
+    });
+  });
+
   describe('variable nodes', () => {
     it('PROCESSING_SET_VARIABLES renders templates and stores JSON-parsed values', async () => {
       const setNode = createNode({
@@ -1664,6 +1778,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
       { transition: jest.fn() } as never,
+      { report: jest.fn() } as never,
     );
   });
 

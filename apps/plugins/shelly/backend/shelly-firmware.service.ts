@@ -8,8 +8,10 @@
 //          POST /rpc/Shelly.Update        -> starts the OTA ({ stage: 'stable' | 'beta' })
 //
 // Both are normalised into FirmwareStatus so the UI does not need to branch.
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { createSharedLiveSampler } from '@attraccess/plugins-backend-sdk';
 import { ShellyHttpClient, type DeviceCredentials } from './shelly-http.client';
+import type { Observable } from 'rxjs';
 
 export type FirmwareStage = 'stable' | 'beta';
 
@@ -54,7 +56,12 @@ interface Gen2CheckForUpdateResponse {
 }
 
 @Injectable()
-export class ShellyFirmwareService {
+export class ShellyFirmwareService implements OnModuleDestroy {
+  private readonly targets = new Map<
+    number,
+    { target: DeviceTarget & DeviceCredentials; timer: ReturnType<typeof setTimeout> }
+  >();
+  private readonly sample = createSharedLiveSampler<number, FirmwareStatus>();
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor
   // types for injection — always inject by an explicit token.
   constructor(@Inject(ShellyHttpClient) private readonly http: ShellyHttpClient) {}
@@ -68,15 +75,33 @@ export class ShellyFirmwareService {
    * unreachable for a while, so callers must poll getStatus() rather than expect
    * a completion signal here.
    */
-  async startUpdate(target: DeviceTarget & DeviceCredentials, stage: FirmwareStage): Promise<void> {
+  async startUpdate(target: DeviceTarget & DeviceCredentials, stage: FirmwareStage, deviceId?: number): Promise<void> {
     if (target.generation === 1) {
       const url = new URL(`http://${target.ipAddress}/ota`);
       url.searchParams.set(stage === 'beta' ? 'beta' : 'update', 'true');
       await this.http.getJson(url.toString(), target);
-      return;
+    } else {
+      await this.http.postJson(`http://${target.ipAddress}/rpc/Shelly.Update`, { stage }, target);
     }
+    if (deviceId !== undefined) {
+      clearTimeout(this.targets.get(deviceId)?.timer);
+      // Credentials stay server-side, only for this bounded firmware operation.
+      const timeout = setTimeout(() => this.targets.delete(deviceId), 5 * 60_000);
+      timeout.unref();
+      this.targets.set(deviceId, { target: { ...target }, timer: timeout });
+    }
+  }
 
-    await this.http.postJson(`http://${target.ipAddress}/rpc/Shelly.Update`, { stage }, target);
+  observe(deviceId: number, resolveTarget: () => Promise<DeviceTarget>): Observable<{ data: object }> {
+    return this.sample(deviceId, 5_000, async () => {
+      const target = this.targets.get(deviceId)?.target ?? (await resolveTarget());
+      return this.getStatus(target);
+    });
+  }
+
+  onModuleDestroy(): void {
+    this.targets.forEach(({ timer }) => clearTimeout(timer));
+    this.targets.clear();
   }
 
   private async getGen1Status(target: DeviceTarget & DeviceCredentials): Promise<FirmwareStatus> {

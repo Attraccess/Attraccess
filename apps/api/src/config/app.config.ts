@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
-import { LogLevel } from '@nestjs/common';
+import { logDestinationsSchema, logLevelsSchema } from '../logging/logging.config';
 import { join } from 'path';
 import { DEFAULT_STORAGE_ROOT } from './storage.config';
 
@@ -32,19 +32,9 @@ export const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
-    LOG_LEVELS: z
-      .string()
-      .default('log,error,warn')
-      .transform(
-        (val) =>
-          val
-            .split(',')
-            .map((s) => s.trim().toLowerCase())
-            .filter(Boolean) as LogLevel[],
-      )
-      .refine((levels) => levels.every((l) => ['log', 'error', 'warn', 'debug', 'verbose'].includes(l)), {
-        message: 'Invalid log level(s). Allowed: log, error, warn, debug, verbose.',
-      }),
+    LOG_LEVELS: logLevelsSchema,
+    LOG_DESTINATIONS: logDestinationsSchema,
+    LOG_FILE_PATH: z.string().optional(),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
     ATTRACCESS_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),

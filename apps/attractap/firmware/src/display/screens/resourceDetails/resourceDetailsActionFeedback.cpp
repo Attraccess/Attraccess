@@ -21,11 +21,11 @@ void ResourceDetailsScreen::onToastDelete(lv_event_t *e)
 {
    (void)e;
 }
-void ResourceDetailsScreen::showActionProgress(const char *title)
+void ResourceDetailsScreen::showActionProgress(const FirmwareI18n::Text &title)
 {
    this->actionInProgress = true;
-   this->actionTitle = title ? title : "Bitte warten";
-   actionOverlay.show(this->screen, this->actionTitle.c_str(), this->resourceCacheValid ? this->resourceCache.name : "");
+   this->actionTitle = title.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseWait) : title;
+   actionOverlay.show(this->screen, this->actionTitle, FirmwareI18n::Text::literal(this->resourceCacheValid ? this->resourceCache.name : ""));
 }
 void ResourceDetailsScreen::hideActionProgress()
 {
@@ -36,7 +36,7 @@ void ResourceDetailsScreen::hideActionProgress()
    this->actionInProgress = false;
 }
 void ResourceDetailsScreen::hideActionProgressVisual() { actionOverlay.hide(); }
-void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
+void ResourceDetailsScreen::showSuccessToast(const FirmwareI18n::Text &text, uint16_t ms)
 {
    if (!this->screen)
    {
@@ -61,7 +61,7 @@ void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
    // Replace content
    lv_obj_clean(this->successToast);
    lv_obj_t *lbl = lv_label_create(this->successToast);
-   FirmwareI18n::setLabel(lbl, text ? text : "Erfolgreich");
+   FirmwareI18n::setLabel(lbl, text.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::Success) : text);
    lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Show now

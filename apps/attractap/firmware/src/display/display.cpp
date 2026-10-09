@@ -391,8 +391,8 @@ void Display::loop()
     if (s_touchWarningPending)
     {
         s_touchWarningPending = false;
-        Display::showErrorPopup("Berührung nicht verfügbar",
-                                "Das Touch-Panel wurde nicht erkannt.\nBitte Hardware prüfen und neu starten.");
+        Display::showErrorPopup(FirmwareI18n::Message::TouchUnavailable,
+                                FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot);
     }
 
     Display::updateDrawerAvailability();
