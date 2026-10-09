@@ -405,6 +405,16 @@ int main(int argc, char **argv) {
     State::setUserLanguage(true, "de"); pump();
     assert(label(lv_layer_top(), "Pflichtfeld") == serverError);
     display.capture(output, "form-server-error-german");
+    // Known unknown-field validation errors still use the localized catalog.
+    server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":false,"errors":[{"fieldId":9,"code":"UNKNOWN_FIELD","message":"Unknown field #9."}]})"); pump();
+    assert(label(lv_layer_top(), "Eingabe ungültig.") == serverError);
+    assert(!label(lv_layer_top(), "Unknown field #9."));
+    display.capture(output, "form-unknown-field-german");
+    State::setUserLanguage(true, "en"); pump();
+    assert(label(lv_layer_top(), "Invalid input.") == serverError);
+    display.capture(output, "form-unknown-field-english");
+    State::setUserLanguage(true, "de"); pump();
+    assert(label(lv_layer_top(), "Eingabe ungültig.") == serverError);
     // Unknown identifiers and old servers without a code use English fallback.
     for (const auto *error : {R"({"fieldId":9,"code":"FUTURE_ERROR","message":"Unbekannter Fehler"})", R"({"fieldId":9,"message":"Alte Diagnose"})"}) {
         server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", std::string(R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":false,"errors":[)") + error + "]}"); pump();

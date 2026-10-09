@@ -1,6 +1,6 @@
 {
   "runtime": "attraccess-wago-cc100",
-  "runtimeVersion": "0.2.4",
+  "runtimeVersion": "0.2.5",
   "image": "ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>",
   "imageDigest": "Recorded by the publishing workflow as ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>@sha256:<digest>",
   "protocolVersion": "1.0.0",

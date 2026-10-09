@@ -528,7 +528,7 @@ inline Text formError(const std::string &code) {
     if (code == "REQUIRED_FIELD") return Message::RequiredField;
     if (code == "INVALID_NUMBER") return Message::InvalidNumber;
     if (code == "INVALID_SELECTION") return Message::InvalidSelection;
-    if (code == "INVALID_INPUT") return Message::InvalidInput;
+    if (code == "INVALID_INPUT" || code == "UNKNOWN_FIELD") return Message::InvalidInput;
     // Unknown or legacy messages have no reliable language. Keep diagnostics
     // in the API log and display the English fallback.
     return Text::literal(messageText(Message::InvalidInput, "en"));

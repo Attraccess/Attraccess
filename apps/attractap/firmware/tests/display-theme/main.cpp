@@ -897,6 +897,23 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     FirmwareI18n::refreshTree(lv_layer_top(), "de");
     requireObject(lv_layer_top(), &lv_label_class, "Bitte eine gültige Zahl eingeben");
     renderer.capture("form-server-error-german");
+    result.errors[0].code = "UNKNOWN_FIELD";
+    details.showFormPageErrors(result);
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
+    auto *unknownFieldError = requireObject(lv_layer_top(), &lv_label_class, "Eingabe ungültig.");
+    renderer.capture("form-unknown-field-german");
+    FirmwareI18n::refreshTree(lv_layer_top(), "en");
+    expect(requireObject(lv_layer_top(), &lv_label_class, "Invalid input.") == unknownFieldError,
+           "Known form error binding survives language refresh");
+    renderer.capture("form-unknown-field-english");
+    for (const auto *code : {"FUTURE_ERROR", ""}) {
+        result.errors[0].code = code;
+        details.showFormPageErrors(result);
+        for (const auto *locale : {"de", "en"}) {
+            FirmwareI18n::refreshTree(lv_layer_top(), locale);
+            requireObject(lv_layer_top(), &lv_label_class, "Invalid input.");
+        }
+    }
     click(lv_layer_top(), "Maintenance");
     auto *keyboard = requireObject(lv_layer_top(), &lv_keyboard_class);
     auto *field = lv_keyboard_get_textarea(keyboard);
