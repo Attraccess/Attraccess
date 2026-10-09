@@ -10,7 +10,7 @@ When you start Attraccess for the first time and no user account exists yet, you
 |-------|-------------|
 | **URL** | The address where users access Attraccess (e.g. `https://attraccess.your-domain.com`). Automatically pre-filled with the current browser address. |
 | **Public Internet URL** | Optional. Only needed if external services (e.g. payment providers) reach Attraccess via a different URL than your users. |
-| **License Key** | Your Attraccess license key. You receive this upon registration. |
+| **License Key** | Your Attraccess license key, including the special key for qualifying non-commercial use. See [Activation](getting-started/overview.md#activation). |
 
 > [!NOTE]
 > The URL is important for redirects after SSO login and for links in emails. Make sure it is correct.

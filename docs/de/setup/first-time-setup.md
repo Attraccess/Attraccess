@@ -10,7 +10,7 @@ Wenn Sie Attraccess zum ersten Mal starten und noch kein Benutzerkonto existiert
 |------|-------------|
 | **URL** | Die Adresse, unter der Benutzer auf Attraccess zugreifen (z.B. `https://attraccess.meine-domain.de`). Wird automatisch mit der aktuellen Browser-Adresse vorausgefüllt. |
 | **Öffentliche Internet-URL** | Optional. Nur nötig, wenn externe Dienste (z.B. Zahlungsanbieter) Attraccess über eine andere URL erreichen als Ihre Benutzer. |
-| **Lizenzschlüssel** | Ihr Attraccess-Lizenzschlüssel. Diesen erhalten Sie bei der Registrierung. |
+| **Lizenzschlüssel** | Ihr Attraccess-Lizenzschlüssel, einschließlich des speziellen Schlüssels für zulässige nicht-kommerzielle Nutzung. Siehe [Aktivierung](getting-started/overview.md#aktivierung). |
 
 > [!NOTE]
 > Die URL ist wichtig für Weiterleitungen nach der SSO-Anmeldung und für Links in E-Mails. Stellen Sie sicher, dass sie korrekt ist.

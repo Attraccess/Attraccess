@@ -1,6 +1,6 @@
 # Monitoring & Metriken
 
-Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur Metrik-Erfassung und **Grafana** zur Visualisierung. So erhalten Sie Echtzeit-Einblicke in die Nutzung Ihres Makerspaces, die Systemgesundheit und die betriebliche Leistung.
+Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur Metrik-Erfassung und **Grafana** zur Visualisierung. IT- und Betriebsteams können Ressourcennutzung, Anwendungszustand und betriebliche Leistung gemeinsam mit ihrer bestehenden Infrastruktur überwachen.
 
 ## Was Sie erhalten
 

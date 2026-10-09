@@ -48,11 +48,11 @@ Die Zwei-Faktor-Authentifizierung fügt Ihrem Konto eine zusätzliche Sicherheit
 4. Geben Sie Ihren aktuellen TOTP-Code zur Bestätigung ein
 
 > [!WARNING]
-> Wenn Sie den Zugang zu Ihrer Authenticator-App verlieren, müssen Sie sich an Ihren Werkstattadministrator wenden, um 2FA auf Ihrem Konto zurückzusetzen.
+> Wenn Sie den Zugang zu Ihrer Authenticator-App verlieren, müssen Sie sich an Ihren Administrator wenden, um 2FA auf Ihrem Konto zurückzusetzen.
 
 ## RFID-Karten
 
-Wenn Ihre Werkstatt Attractap-RFID-Leser verwendet, können Sie die mit Ihrem Konto verknüpften RFID-Karten einsehen.
+Wenn Ihre Organisation Attractap-RFID-Leser verwendet, können Sie die mit Ihrem Konto verknüpften RFID-Karten einsehen.
 
 1. Navigieren Sie zu **Mein Konto**
 2. Finden Sie den Abschnitt **RFID-Karten**
@@ -61,7 +61,7 @@ Wenn Ihre Werkstatt Attractap-RFID-Leser verwendet, können Sie die mit Ihrem Ko
 <!-- TODO: Screenshot des RFID-Karten-Abschnitts -->
 
 > [!NOTE]
-> RFID-Karten werden in der Regel von einem Werkstattadministrator oder über einen Attractap-Leser registriert. Wenden Sie sich an Ihren Administrator, wenn Sie eine neue Karte registrieren müssen.
+> RFID-Karten werden in der Regel von einem Administrator oder über einen Attractap-Leser registriert. Wenden Sie sich an Ihren Administrator, wenn Sie eine neue Karte registrieren müssen.
 
 ## Konto löschen
 

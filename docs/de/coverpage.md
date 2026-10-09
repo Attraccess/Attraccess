@@ -2,11 +2,12 @@
 
 # Attraccess
 
-> Die Zugangsverwaltung für Makerspaces, Werkstätten und FabLabs
+> Maschinenzugang für Industrie, Forschung und Hochschulen
 
-- Verwalten Sie Ressourcen, Benutzer und Zugangsberechtigungen
-- Integrieren Sie RFID-Leser und IoT-Geräte
-- Source-Available und selbst gehostet (on-premise)
+- Prüfen Sie Berechtigungen und Einweisungen des Bedienpersonals
+- Verbinden Sie Ausweisleser, Maschinen und SPS-Steuerungen
+- Dokumentieren Sie die Nutzung für Auswertungen und vorbeugende Wartung
+- Source-available und auf Ihrer eigenen Infrastruktur betrieben
 
 [Loslegen](getting-started/overview.md)
 [GitHub](https://github.com/Attraccess/Attraccess)

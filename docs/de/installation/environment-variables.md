@@ -18,7 +18,7 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 | `LOG_LEVELS` | `error,warn,log` | Kommagetrennte Protokollebenen: `error`, `warn`, `log`, `debug`, `verbose` |
 | `LOG_DESTINATIONS` | `console` | Kommagetrennte registrierte Treiber für API-Logs: zunächst `console`, `file`. Namen werden getrimmt, kleingeschrieben und dedupliziert. |
 | `LOG_FILE_PATH` | `<STORAGE_ROOT>/api.log` | Optionale Pfadüberschreibung für `file`; standardmäßig `api.log` direkt im Speicherverzeichnis (`./storage`, wenn `STORAGE_ROOT` nicht gesetzt ist). Explizite Pfade dürfen nicht leer sein; andernfalls ignoriert. Relative Pfade beziehen sich auf das Arbeitsverzeichnis des API-Prozesses; absolute Pfade sind erlaubt. |
-| `LICENSE_KEY` | – | Lizenzschlüssel für Attraccess |
+| `LICENSE_KEY` | – | Übernimmt den Lizenzschlüssel beim Initialisieren einer neuen Datenbank. Ändern Sie den gespeicherten Schlüssel bei bestehenden Installationen unter Einstellungen → Anwendungseinstellungen. |
 | `TZ` | – | Zeitzone, z.B. `Europe/Berlin` |
 | `TRUST_PROXY` | – | Anzahl vertrauenswürdiger Reverse-Proxy-Hops, damit das Auth-Rate-Limiting die echte Client-IP verwendet. `1` = einzelner Proxy (nginx/Traefik/Caddy), `2` = CDN + Proxy, oder eine kommagetrennte Liste vertrauenswürdiger Proxy-IPs/CIDRs (bzw. `loopback`, `linklocal`, `uniquelocal`). Nicht gesetzt = keinem Proxy vertrauen. |
 

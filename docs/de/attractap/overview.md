@@ -1,6 +1,6 @@
 # Attractap RFID-Leser
 
-Attractap ist ein ESP32-basierter RFID-Kartenleser, der physische Zugangskontrolle fuer Ihren Makerspace ermoeglicht. Er liest RFID-Karten, prueft Benutzerberechtigungen mit dem Attraccess-Backend und steuert den Zugang zu Maschinen und Tueren.
+Attractap ist ein ESP32-basierter RFID-Ausweisleser für Maschinen- und Türzugang in Produktionsbetrieben, Forschungslaboren und Hochschulen. Er liest die Karte eines Benutzers und prüft die Berechtigungen mit dem Attraccess-Backend. Über Attraccess-Integrationen und Flows lässt sich der Maschinenzugang mit SPS-Steuerungen oder anderen Gerätesteuerungen verbinden.
 
 ## Was ist Attractap?
 
@@ -43,7 +43,7 @@ Es sind mehrere Hardwarekonfigurationen verfuegbar, um verschiedenen Umgebungen 
 Siehe [Hardware](attractap/hardware.md) fuer detaillierte Spezifikationen jeder Variante.
 
 > [!TIP]
-> Fuer die meisten Setups bietet die **Touch WiFi**-Variante die beste Balance aus Funktionsumfang und einfacher Installation -- kein Netzwerkkabel erforderlich.
+> Wählen Sie die Variante passend zu den Netzwerk- und Anzeigeanforderungen Ihres Standorts: Ethernet für eine kabelgebundene Verbindung, Wi-Fi für drahtlosen Zugang und ein Touch-Display für die Bedienung direkt an der Maschine.
 
 ## Siehe auch
 
