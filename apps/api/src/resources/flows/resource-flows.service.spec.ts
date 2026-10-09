@@ -4,7 +4,7 @@ import { Resource, ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } fr
 import { EntityManager, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
-import { registerPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
+import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
 import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
 import { ResourceFlowsService } from './resource-flows.service';
 

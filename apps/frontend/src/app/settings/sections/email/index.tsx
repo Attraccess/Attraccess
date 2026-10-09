@@ -1,13 +1,9 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { Chip, FieldError, Form, Input, Spinner, TextField } from '@heroui/react';
 import { CheckIcon, ChevronRightIcon, XIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  ApiError,
   SmtpServiceType,
-  type SystemSettingsDto,
+  ApiError,
   useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetSystemSettingsKeyFn,
   useSettingsServiceUpdateSystemSettings,
@@ -15,26 +11,58 @@ import {
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { Select } from '../../../../components/select';
-import { PasswordInput } from '../../../../components/PasswordInput';
+import { Select } from '../../../../components/select/index';
+import { PasswordInput } from '../../../../components/PasswordInput/index';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
 import de from './de.json';
+import type { SystemSettingsDto } from '@attraccess/react-query-client';
 
-/** Outlook 365 has one host and one port; the API rejects anything else, so the UI pins them. */
+export /** Outlook 365 has one host and one port; the API rejects anything else, so the UI pins them. */
 const OUTLOOK_HOST = 'smtp.office365.com';
-const OUTLOOK_PORT = '587';
 
-type Field = 'service' | 'host' | 'port' | 'secure' | 'user' | 'from' | 'pass';
+export const OUTLOOK_PORT = '587';
 
-/**
- * Outgoing mail. Templates and the shared layout are sub-routes rather than panels — both are
- * full-screen editors, not settings — so this section is only the SMTP transport.
- */
-export function EmailSection() {
+export type Field = 'service' | 'host' | 'port' | 'secure' | 'user' | 'from' | 'pass';
+
+export function getSavedSmtpFields(settings: SystemSettingsDto | undefined) {
+  const savedService =
+    settings?.smtp.service === SmtpServiceType.OUTLOOK365 ? SmtpServiceType.OUTLOOK365 : SmtpServiceType.SMTP;
+  const savedHost = settings?.smtp.host ?? '';
+  const savedPort = settings?.smtp.port != null ? String(settings.smtp.port) : '';
+  const savedSecure = settings?.smtp.secure ?? false;
+  const savedUser = settings?.smtp.user ?? '';
+  const savedFrom = settings?.smtp.from ?? '';
+  return {
+    service: savedService,
+    host: savedHost,
+    port: savedPort,
+    secure: savedSecure,
+    user: savedUser,
+    from: savedFrom,
+  };
+}
+
+export function validateSmtpFields(host: string, port: string, from: string, t: (key: string) => string) {
+  const hostError = !host.trim() ? t('inputs.host.errors.required') : null;
+  const portNumber = Number(port);
+  const portError = !port.trim()
+    ? t('inputs.port.errors.required')
+    : !Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535
+      ? t('inputs.port.errors.invalid')
+      : null;
+  const fromError = !from.trim() ? t('inputs.from.errors.required') : null;
+  const hasError = !!(hostError || portError || fromError);
+  return { hostError, portNumber, portError, fromError, hasError };
+}
+
+export function useEmailSectionState() {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -119,12 +147,41 @@ export function EmailSection() {
       },
     });
   };
+  return {
+    t,
+    settings,
+    isLoading,
+    setDraft,
+    hasAttemptedSave,
+    service,
+    isOutlook,
+    host,
+    port,
+    secure,
+    user,
+    from,
+    pass,
+    isSaving,
+    isDirty,
+    hostError,
+    portError,
+    fromError,
+    handleSave,
+  } as const;
+}
 
-  if (isLoading) {
+/**
+ * Outgoing mail. Templates and the shared layout are sub-routes rather than panels — both are
+ * full-screen editors, not settings — so this section is only the SMTP transport.
+ */
+export function EmailSection() {
+  const model = useEmailSectionState();
+
+  if (model.isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted">
         <Spinner />
-        {t('loading')}
+        {model.t('loading')}
       </div>
     );
   }
@@ -132,20 +189,22 @@ export function EmailSection() {
   const aside = (
     <>
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{t('aside.statusTitle')}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{model.t('aside.statusTitle')}</h3>
         <div>
-          <Chip color={settings?.smtp.passConfigured ? 'success' : 'warning'} variant="soft">
+          <Chip color={model.settings?.smtp.passConfigured ? 'success' : 'warning'} variant="soft">
             <span className="flex items-center gap-1">
-              {settings?.smtp.passConfigured ? <CheckIcon size={14} /> : <XIcon size={14} />}
-              {settings?.smtp.passConfigured ? t('passwordStatus.configured') : t('passwordStatus.missing')}
+              {model.settings?.smtp.passConfigured ? <CheckIcon size={14} /> : <XIcon size={14} />}
+              {model.settings?.smtp.passConfigured
+                ? model.t('passwordStatus.configured')
+                : model.t('passwordStatus.missing')}
             </span>
           </Chip>
         </div>
-        <p className="text-xs text-muted">{t('aside.statusHint')}</p>
+        <p className="text-xs text-muted">{model.t('aside.statusHint')}</p>
       </div>
 
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-foreground">{t('aside.contentTitle')}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{model.t('aside.contentTitle')}</h3>
         {(
           [
             { to: '/settings/email/templates', key: 'templates' },
@@ -158,8 +217,8 @@ export function EmailSection() {
             className="flex items-center justify-between gap-2 border-b border-separator py-2 last:border-b-0"
           >
             <span className="flex min-w-0 flex-col">
-              <span className="text-sm font-medium text-foreground">{t(`subPages.${key}.title`)}</span>
-              <span className="text-xs text-muted">{t(`subPages.${key}.description`)}</span>
+              <span className="text-sm font-medium text-foreground">{model.t(`subPages.${key}.title`)}</span>
+              <span className="text-xs text-muted">{model.t(`subPages.${key}.description`)}</span>
             </span>
             <ChevronRightIcon size={16} className="shrink-0 text-muted" />
           </Link>
@@ -169,7 +228,7 @@ export function EmailSection() {
   );
 
   return (
-    <SettingsSection title={t('title')} description={t('description')} aside={aside}>
+    <SettingsSection title={model.t('title')} description={model.t('description')} aside={aside}>
       {/* validationBehavior="aria" for the same reason as General: in "native" mode the browser's
           constraint check swallows implicit submission before onSubmit runs, and react-aria
           suppresses the bubble, so Enter would silently do nothing. */}
@@ -178,15 +237,15 @@ export function EmailSection() {
         className="flex flex-col"
         onSubmit={(event) => {
           event.preventDefault();
-          handleSave();
+          model.handleSave();
         }}
       >
-        <SettingsRow label={t('inputs.service.label')} hint={t('inputs.service.description')}>
+        <SettingsRow label={model.t('inputs.service.label')} hint={model.t('inputs.service.description')}>
           <Select
-            aria-label={t('inputs.service.label')}
-            value={service}
+            aria-label={model.t('inputs.service.label')}
+            value={model.service}
             onChange={(key) =>
-              setDraft((current) =>
+              model.setDraft((current) =>
                 // Choosing Outlook fills in the host and port Microsoft accepts, as a visible draft
                 // edit rather than a pin — so it shows in the save bar and Discard undoes it.
                 // Switching back drops those two keys rather than leaving them in the draft: they
@@ -199,118 +258,92 @@ export function EmailSection() {
               )
             }
             items={[
-              { key: SmtpServiceType.SMTP, label: t('service.smtp') },
-              { key: SmtpServiceType.OUTLOOK365, label: t('service.outlook') },
+              { key: SmtpServiceType.SMTP, label: model.t('service.smtp') },
+              { key: SmtpServiceType.OUTLOOK365, label: model.t('service.outlook') },
             ]}
           />
         </SettingsRow>
 
-        <SettingsRow stacked label={t('inputs.host.label')} hint={t('inputs.host.description')}>
+        <SettingsRow stacked label={model.t('inputs.host.label')} hint={model.t('inputs.host.description')}>
           <TextField
             className="w-full"
-            aria-label={t('inputs.host.label')}
-            value={host}
-            isDisabled={isOutlook}
-            isInvalid={hasAttemptedSave && !!hostError}
-            onChange={(next) => setDraft((current) => ({ ...current, host: next }))}
+            aria-label={model.t('inputs.host.label')}
+            value={model.host}
+            isDisabled={model.isOutlook}
+            isInvalid={model.hasAttemptedSave && !!model.hostError}
+            onChange={(next) => model.setDraft((current) => ({ ...current, host: next }))}
           >
             <Input />
-            <FieldError>{hostError}</FieldError>
+            <FieldError>{model.hostError}</FieldError>
           </TextField>
         </SettingsRow>
 
-        <SettingsRow label={t('inputs.port.label')} hint={t('inputs.port.description')}>
+        <SettingsRow label={model.t('inputs.port.label')} hint={model.t('inputs.port.description')}>
           <TextField
-            aria-label={t('inputs.port.label')}
-            value={port}
-            isDisabled={isOutlook}
-            isInvalid={hasAttemptedSave && !!portError}
-            onChange={(next) => setDraft((current) => ({ ...current, port: next }))}
+            aria-label={model.t('inputs.port.label')}
+            value={model.port}
+            isDisabled={model.isOutlook}
+            isInvalid={model.hasAttemptedSave && !!model.portError}
+            onChange={(next) => model.setDraft((current) => ({ ...current, port: next }))}
           >
             <Input inputMode="numeric" />
-            <FieldError>{portError}</FieldError>
+            <FieldError>{model.portError}</FieldError>
           </TextField>
         </SettingsRow>
 
-        <SettingsRow label={t('inputs.secure.label')} hint={t('inputs.secure.description')}>
+        <SettingsRow label={model.t('inputs.secure.label')} hint={model.t('inputs.secure.description')}>
           <LabeledSwitch
-            aria-label={t('inputs.secure.label')}
-            isSelected={secure}
-            isDisabled={isOutlook}
-            onChange={(next) => setDraft((current) => ({ ...current, secure: next }))}
+            aria-label={model.t('inputs.secure.label')}
+            isSelected={model.secure}
+            isDisabled={model.isOutlook}
+            onChange={(next) => model.setDraft((current) => ({ ...current, secure: next }))}
           />
         </SettingsRow>
 
-        <SettingsRow stacked label={t('inputs.user.label')} hint={t('inputs.user.description')}>
+        <SettingsRow stacked label={model.t('inputs.user.label')} hint={model.t('inputs.user.description')}>
           <TextField
             className="w-full"
-            aria-label={t('inputs.user.label')}
-            value={user}
-            onChange={(next) => setDraft((current) => ({ ...current, user: next }))}
+            aria-label={model.t('inputs.user.label')}
+            value={model.user}
+            onChange={(next) => model.setDraft((current) => ({ ...current, user: next }))}
           >
             <Input autoComplete="off" />
           </TextField>
         </SettingsRow>
 
-        <SettingsRow stacked label={t('inputs.pass.label')} hint={t('inputs.pass.description')}>
+        <SettingsRow stacked label={model.t('inputs.pass.label')} hint={model.t('inputs.pass.description')}>
           <PasswordInput
             className="w-full"
-            aria-label={t('inputs.pass.label')}
+            aria-label={model.t('inputs.pass.label')}
             autoComplete="off"
-            value={pass}
-            onChange={(next) => setDraft((current) => ({ ...current, pass: next }))}
+            value={model.pass}
+            onChange={(next) => model.setDraft((current) => ({ ...current, pass: next }))}
           />
         </SettingsRow>
 
-        <SettingsRow stacked label={t('inputs.from.label')} hint={t('inputs.from.description')}>
+        <SettingsRow stacked label={model.t('inputs.from.label')} hint={model.t('inputs.from.description')}>
           <TextField
             className="w-full"
-            aria-label={t('inputs.from.label')}
-            value={from}
-            isInvalid={hasAttemptedSave && !!fromError}
-            onChange={(next) => setDraft((current) => ({ ...current, from: next }))}
+            aria-label={model.t('inputs.from.label')}
+            value={model.from}
+            isInvalid={model.hasAttemptedSave && !!model.fromError}
+            onChange={(next) => model.setDraft((current) => ({ ...current, from: next }))}
           >
             <Input />
-            <FieldError>{fromError}</FieldError>
+            <FieldError>{model.fromError}</FieldError>
           </TextField>
         </SettingsRow>
         <input type="submit" hidden />
       </Form>
 
-      <SettingsSaveBar isDirty={isDirty} isSaving={isSaving} onSave={handleSave} onDiscard={() => setDraft({})} />
+      <SettingsSaveBar
+        isDirty={model.isDirty}
+        isSaving={model.isSaving}
+        onSave={model.handleSave}
+        onDiscard={() => model.setDraft({})}
+      />
     </SettingsSection>
   );
 }
 
 export default EmailSection;
-
-function getSavedSmtpFields(settings: SystemSettingsDto | undefined) {
-  const savedService =
-    settings?.smtp.service === SmtpServiceType.OUTLOOK365 ? SmtpServiceType.OUTLOOK365 : SmtpServiceType.SMTP;
-  const savedHost = settings?.smtp.host ?? '';
-  const savedPort = settings?.smtp.port != null ? String(settings.smtp.port) : '';
-  const savedSecure = settings?.smtp.secure ?? false;
-  const savedUser = settings?.smtp.user ?? '';
-  const savedFrom = settings?.smtp.from ?? '';
-  return {
-    service: savedService,
-    host: savedHost,
-    port: savedPort,
-    secure: savedSecure,
-    user: savedUser,
-    from: savedFrom,
-  };
-}
-
-function validateSmtpFields(host: string, port: string, from: string, t: (key: string) => string) {
-  const hostError = !host.trim() ? t('inputs.host.errors.required') : null;
-  const portNumber = Number(port);
-  const portError = !port.trim()
-    ? t('inputs.port.errors.required')
-    : !Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535
-      ? t('inputs.port.errors.invalid')
-      : null;
-  const fromError = !from.trim() ? t('inputs.from.errors.required') : null;
-  const hasError = !!(hostError || portError || fromError);
-  return { hostError, portNumber, portError, fromError, hasError };
-}

@@ -11,10 +11,10 @@ import type {
   PluginSlotContribution,
 } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
-import { useDetection } from './detection';
-import { RabbitmqListBadge } from './RabbitmqListBadge';
-import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
-import { RabbitmqUserPanel } from './RabbitmqUserPanel';
+import { useDetection } from './detection/detection';
+import { RabbitmqListBadge } from './users/RabbitmqListBadge';
+import { RabbitmqStatusPanel } from './detection/RabbitmqStatusPanel';
+import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
 
 // Host slot ids exposed by the MQTT UI. The SDK is vendor-agnostic and does not
 // export them, and the host owns them in apps/frontend (which a plugin cannot

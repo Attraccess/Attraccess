@@ -106,7 +106,7 @@ PYTHON=/opt/homebrew/opt/python@3.14/bin/python3.14 \
 
 This target typechecks acceptance and frontend tests, runs HTTP acceptance, builds
 the static commissioning harness, then runs `test_commissioning_browser.py`
-through `acceptance/commissioning-browser.spec.ts`. It executes one journey at
+through `acceptance/commissioning/browser.spec.ts`. It executes one journey at
 each viewport size: `CommissioningDesktop` (1440x1000) and `CommissioningMobile`
 (390x844), for two Python tests. It is not included in `run_browser_tests.sh`.
 

@@ -1,8 +1,8 @@
 import { useState, type Dispatch, type SetStateAction, type ReactNode } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, act, fireEvent, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Node, Edge } from '@xyflow/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, vi, expect, it } from 'vitest';
 import FlowsPage from './index';
 const state = vi.hoisted(() => ({
   original: undefined as
@@ -87,7 +87,7 @@ vi.mock('@xyflow/react', () => ({
   Controls: () => null,
   Background: () => null,
 }));
-vi.mock('./flowContext', () => ({
+vi.mock('./context/index', () => ({
   FlowProvider: ({ children }: { children: ReactNode }) => children,
   useFlowContext: () => {
     const [nodes, setNodes] = useState<Node[]>([]);
@@ -172,6 +172,7 @@ beforeEach(() => {
   });
 });
 afterEach(cleanup);
+
 it('loads saved nodes and validation, disables saving unchanged graphs and restores pull-to-refresh on unmount', () => {
   state.original!.validationErrors = [{ nodeId: 'one', message: 'Missing config' }];
   const view = show();
@@ -183,6 +184,7 @@ it('loads saved nodes and validation, disables saving unchanged graphs and resto
   expect(state.refresh).toHaveBeenLastCalledWith(true);
   expect(state.remove).toHaveBeenCalledWith(state.live);
 });
+
 it.each(['type', 'position', 'data', 'identity', 'count'] as const)(
   'detects changed node %s and saves the graph',
   (change) => {
@@ -209,11 +211,15 @@ it.each(['type', 'position', 'data', 'identity', 'count'] as const)(
     );
     expect(saveButton()).toBeEnabled();
     fireEvent.click(saveButton());
-    expect(state.save).toHaveBeenCalledWith({ resourceId: 7, requestBody: { nodes: state.nodes, edges: state.edges } });
+    expect(state.save).toHaveBeenCalledWith({
+      resourceId: 7,
+      requestBody: { nodes: state.nodes, edges: state.edges },
+    });
     act(() => state.options.onSuccess());
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['flow', 7] });
   },
 );
+
 it.each(['source', 'target', 'identity', 'count'] as const)('detects changed edge %s', (change) => {
   show();
   act(() =>
@@ -228,6 +234,7 @@ it.each(['source', 'target', 'identity', 'count'] as const)('detects changed edg
   );
   expect(saveButton()).toBeEnabled();
 });
+
 it('supports keyboard copy/cut/paste/select-all without hijacking text inputs', () => {
   show();
   fireEvent.keyDown(document.body, { key: 'c', ctrlKey: true });
@@ -245,6 +252,7 @@ it('supports keyboard copy/cut/paste/select-all without hijacking text inputs', 
   expect(state.copy).toHaveBeenCalledOnce();
   input.remove();
 });
+
 it('adds catalog and dropped nodes, switches canvas mode and lays out the graph', () => {
   show();
   fireEvent.click(screen.getByText('Insert trigger'));
@@ -268,6 +276,7 @@ it('adds catalog and dropped nodes, switches canvas mode and lays out the graph'
   expect(state.fit).toHaveBeenCalled();
   expect(state.nodes.every((node) => Number.isFinite(node.position.x))).toBe(true);
 });
+
 it('auto-aligns using measured handles and preserves positions, data and connections through save and reload', () => {
   state.original = {
     nodes: ['if', 'left', 'right'].map((id) => ({
@@ -357,6 +366,7 @@ it('keeps confetti off until enabled, distinguishes failures and clears animatio
   show();
   expect(screen.getByRole('checkbox', { name: 'Confetti' })).not.toBeChecked();
 });
+
 it('shows loading and errors and routes import/export actions', () => {
   state.original = undefined;
   state.fetching = true;

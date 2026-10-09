@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Chip,
@@ -10,23 +9,24 @@ import {
   Label,
   TextArea,
   TextField,
-  type Key,
 } from '@heroui/react';
 import { LockIcon } from 'lucide-react';
+import { StandardDrawer } from '../../../components/standardDrawer';
+import { PermissionPicker } from '../../../components/permissionPicker/index';
+import { useEffect, useMemo, useState } from 'react';
+import type { Key } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { type SystemPermission } from '@attraccess/shared';
+import type { SystemPermission } from '@attraccess/shared';
 import {
   ApiError,
   Permission,
-  RoleWithUsageDto,
   useRbacServiceCreateRole,
   useRbacServiceListPermissions,
   useRbacServiceListRolesKey,
   useRbacServiceUpdateRole,
+  RoleWithUsageDto,
 } from '@attraccess/react-query-client';
-import { StandardDrawer } from '../../../components/standardDrawer';
-import { PermissionPicker } from '../../../components/permissionPicker';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useAuth } from '../../../hooks/useAuth';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
@@ -35,15 +35,15 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 
-const CATEGORY_ORDER = ['resources', 'users', 'system', 'billing'];
+export const CATEGORY_ORDER = ['resources', 'users', 'system', 'billing'];
 
-interface Props {
+export interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   role: RoleWithUsageDto | null;
 }
 
-export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
+export function useRoleFormDrawerState({ isOpen, onOpenChange, role }: Props) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -137,6 +137,52 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
       updateRole({ id: role.id, requestBody });
     }
   };
+  return {
+    t,
+    permissionLabel,
+    permissionDescription,
+    permissionCategory,
+    isReadOnly,
+    mode,
+    permissions,
+    name,
+    setName,
+    description,
+    setDescription,
+    selectedKeys,
+    permissionsByCategory,
+    nonGrantableKeys,
+    applySelection,
+    close,
+    isSaving,
+    handleSave,
+    isOpen,
+    onOpenChange,
+    role,
+  };
+}
+
+export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
+  const {
+    t,
+    permissionLabel,
+    permissionDescription,
+    permissionCategory,
+    isReadOnly,
+    mode,
+    permissions,
+    name,
+    setName,
+    description,
+    setDescription,
+    selectedKeys,
+    permissionsByCategory,
+    nonGrantableKeys,
+    applySelection,
+    close,
+    isSaving,
+    handleSave,
+  } = useRoleFormDrawerState({ isOpen, onOpenChange, role });
 
   return (
     <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>

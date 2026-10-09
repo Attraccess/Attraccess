@@ -3,9 +3,9 @@ import { expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useConfigurationActions } from '../src/queries';
+import { useConfigurationActions } from '../src/api/queries';
 
-vi.mock('../src/api', () => ({
+vi.mock('../src/api/client', () => ({
   publishConfiguration: vi.fn().mockResolvedValue({ revision: 2 }),
   rollbackConfiguration: vi.fn().mockResolvedValue({ revision: 3 }),
 }));

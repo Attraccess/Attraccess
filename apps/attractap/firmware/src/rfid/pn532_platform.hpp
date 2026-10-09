@@ -9,7 +9,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
-#include "platform.hpp" // millis()/delay()
+#include "../platform.hpp" // millis()/delay()
 
 typedef uint8_t byte;
 

@@ -6,99 +6,7 @@ import * as path from 'path';
 // typescript@7's package exports no longer expose the classic compiler API to the type
 // system, but it is still there at runtime. Require it untyped rather than pull in a
 // second parser just for this check.
-const ts = require('typescript');
-const tailwind = require('tailwindcss');
-
-const ROOT = path.resolve(__dirname, '..', '..', '..');
-const FRONTEND_SRC = path.join(ROOT, 'apps', 'frontend', 'src');
-const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'coverage', 'public']);
-
-/**
- * HeroUI v2 utilities can look valid to TypeScript and tailwind-merge while producing no CSS
- * under v3. Compile every literal class against the installed HeroUI stylesheet so a theme
- * upgrade is the authority, rather than a hand-maintained token list.
- *
- * Dynamic class construction is intentionally outside this guard. Tailwind cannot reliably
- * discover it either, so literals are the safe CI surface. This baseline records existing
- * dead utilities until each is deliberately replaced with the appropriate v3 design token.
- */
-const BASELINE = new Map(
-  [
-    'text-default-500',
-    'rounded-medium',
-    'border-default-200',
-    'text-default-700',
-    'lg:divide-default-200',
-    'lg:border-default-200',
-    'divide-default-200',
-    'text-default-400',
-    'bg-default-100',
-    'flex-gap-2',
-    'hover:bg-default-100',
-    'active:bg-default-200',
-    'focus-visible:ring-primary',
-    'bg-primary-100',
-    'dark:bg-primary-900/40',
-    'text-primary-600',
-    'dark:text-primary-300',
-    'wrap-none',
-    'text-small',
-    'text-tiny',
-    'text-default-600',
-    'hover:bg-primary-50',
-    'bg-warning-100',
-    'text-warning-800',
-    'border-warning-200',
-    'border-default-300',
-    'dark:bg-primary-900',
-    'text-default-300',
-    'text-muted-foreground',
-    'bg-primary-50',
-    'text-primary',
-    'text-large',
-    'transition-bg',
-    'text-success-600',
-    'text-danger-500',
-    'bg-content1',
-    'text-foreground-400',
-    'text-foreground-500',
-    'border-divider',
-    'text-foreground-700',
-    'text-primary-500',
-    'dark:border-default-100',
-    'divide-default-200/60',
-    'text-warning-500',
-    'bg-default-200',
-    'divide-divider',
-    'text-foreground-600',
-    'dark:text-success-400',
-    'bg-default-50',
-    'dark:bg-default-100/10',
-    'bg-default-50/60',
-    'dark:bg-default-100/5',
-    'text-warning-700',
-    'bg-warning-50',
-    'bg-primary',
-    'text-primary-foreground',
-    'text-default-900',
-    'text-default-800',
-    'text-primary-700',
-    'dark:text-default-400',
-    'dark:bg-primary-900/30',
-    'border-primary-200',
-    'dark:border-primary-800',
-    'dark:text-primary-400',
-    'hover:border-primary/50',
-    'hover:bg-default-50',
-    'bg-primary/10',
-    'rounded-small',
-    'border-primary',
-    'ring-primary/60',
-    'bg-default-300',
-    'ring-default-300/30',
-    'hover:ring-primary-300',
-  ].map((className) => [className, 'HeroUI v2 utility; replace with a deliberate v3 token.']),
-);
+export const ts = require('typescript');
 
 function listSourceFiles(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -111,7 +19,7 @@ function listSourceFiles(dir: string, out: string[] = []): string[] {
 }
 
 /** Locally authored CSS selectors are intentionally not Tailwind candidates. */
-function customClasses(dir: string, classes = new Set<string>()): Set<string> {
+export function customClasses(dir: string, classes = new Set<string>()): Set<string> {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
@@ -245,6 +153,8 @@ function classesIn(file: string): Set<string> {
   return classesInSource(file, fs.readFileSync(file, 'utf8'));
 }
 
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'coverage', 'public']);
+
 function stylesheetPath(specifier: string, base: string): string {
   const candidate = specifier.startsWith('.') ? path.resolve(base, specifier) : findPackageStylesheet(specifier, base);
   const packageJson = path.join(candidate, 'package.json');
@@ -281,6 +191,111 @@ function findPackageStylesheet(specifier: string, from: string): string {
   throw new Error(`Cannot resolve package stylesheet ${specifier} from ${from}`);
 }
 
+function emitsCss(compiled: { build(candidates: string[]): string }, className: string): boolean {
+  // build() caches candidates. Compare the output before adding this candidate so each
+  // literal is tested independently without recompiling the entire HeroUI theme.
+  const before = compiled.build([]);
+  return compiled.build([className]) !== before;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// typescript@7's package exports no longer expose the classic compiler API to the type
+// system, but it is still there at runtime. Require it untyped rather than pull in a
+// second parser just for this check.
+const tailwind = require('tailwindcss');
+
+const ROOT = path.resolve(__dirname, '..', '..', '..');
+
+const FRONTEND_SRC = path.join(ROOT, 'apps', 'frontend', 'src');
+
+/**
+ * HeroUI v2 utilities can look valid to TypeScript and tailwind-merge while producing no CSS
+ * under v3. Compile every literal class against the installed HeroUI stylesheet so a theme
+ * upgrade is the authority, rather than a hand-maintained token list.
+ *
+ * Dynamic class construction is intentionally outside this guard. Tailwind cannot reliably
+ * discover it either, so literals are the safe CI surface. This baseline records existing
+ * dead utilities until each is deliberately replaced with the appropriate v3 design token.
+ */
+const BASELINE = new Map(
+  [
+    'text-default-500',
+    'rounded-medium',
+    'border-default-200',
+    'text-default-700',
+    'lg:divide-default-200',
+    'lg:border-default-200',
+    'divide-default-200',
+    'text-default-400',
+    'bg-default-100',
+    'flex-gap-2',
+    'hover:bg-default-100',
+    'active:bg-default-200',
+    'focus-visible:ring-primary',
+    'bg-primary-100',
+    'dark:bg-primary-900/40',
+    'text-primary-600',
+    'dark:text-primary-300',
+    'wrap-none',
+    'text-small',
+    'text-tiny',
+    'text-default-600',
+    'hover:bg-primary-50',
+    'bg-warning-100',
+    'text-warning-800',
+    'border-warning-200',
+    'border-default-300',
+    'dark:bg-primary-900',
+    'text-default-300',
+    'text-muted-foreground',
+    'bg-primary-50',
+    'text-primary',
+    'text-large',
+    'transition-bg',
+    'text-success-600',
+    'text-danger-500',
+    'bg-content1',
+    'text-foreground-400',
+    'text-foreground-500',
+    'border-divider',
+    'text-foreground-700',
+    'text-primary-500',
+    'dark:border-default-100',
+    'divide-default-200/60',
+    'text-warning-500',
+    'bg-default-200',
+    'divide-divider',
+    'text-foreground-600',
+    'dark:text-success-400',
+    'bg-default-50',
+    'dark:bg-default-100/10',
+    'bg-default-50/60',
+    'dark:bg-default-100/5',
+    'text-warning-700',
+    'bg-warning-50',
+    'bg-primary',
+    'text-primary-foreground',
+    'text-default-900',
+    'text-default-800',
+    'text-primary-700',
+    'dark:text-default-400',
+    'dark:bg-primary-900/30',
+    'border-primary-200',
+    'dark:border-primary-800',
+    'dark:text-primary-400',
+    'hover:border-primary/50',
+    'hover:bg-default-50',
+    'bg-primary/10',
+    'rounded-small',
+    'border-primary',
+    'ring-primary/60',
+    'bg-default-300',
+    'ring-default-300/30',
+    'hover:ring-primary-300',
+  ].map((className) => [className, 'HeroUI v2 utility; replace with a deliberate v3 token.']),
+);
+
 async function createCompiler(): Promise<any> {
   const stylesEntry = fs.realpathSync(require.resolve('@heroui/styles')).replace(/\.js$/, '.css');
   return tailwind.compile(fs.readFileSync(stylesEntry, 'utf8'), {
@@ -290,13 +305,6 @@ async function createCompiler(): Promise<any> {
       return { base: path.dirname(file), content: fs.readFileSync(file, 'utf8') };
     },
   });
-}
-
-function emitsCss(compiled: any, className: string): boolean {
-  // build() caches candidates. Compare the output before adding this candidate so each
-  // literal is tested independently without recompiling the entire HeroUI theme.
-  const before = compiled.build([]);
-  return compiled.build([className]) !== before;
 }
 
 describe('HeroUI utility classes emit CSS (ATT-858)', () => {

@@ -4,9 +4,9 @@ import { Button } from '@heroui/react';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ConfigurationRevisions } from '../ConfigurationRevisions';
-import { readMetadata } from '../configuration-model';
-import { useDraftQuery } from '../queries';
+import { ConfigurationRevisions } from '../configuration/ConfigurationRevisions';
+import { readMetadata } from '../configuration/model';
+import { useDraftQuery } from '../api/queries';
 import { useWagoTranslations } from '../i18n';
 
 export function HistoryPage() {

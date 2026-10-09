@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Build-owned offline assets; the server supplies these outside the npm plugin archive.
 // node scripts/package-runtime-artifact.mjs --image-archive image.tar --image ghcr.io/attraccess/wago-cc100-runtime@sha256:… --version 0.1.0 --out ./release
+import { header } from './runtime-tar-header.mjs';
 import { constants, createReadStream, createWriteStream } from 'node:fs';
 import { open, mkdir, mkdtemp, rename, rm, writeFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -52,28 +53,7 @@ const output = resolve(values.out);
 await mkdir(output, { recursive: true });
 const stage = await mkdtemp(join(output, '.packaging-'));
 const filename = 'wago-cc100-runtime.tar';
-function header(name, bytes) {
-  const result = Buffer.alloc(512);
-  result.write(name, 0);
-  for (const [offset, width, value] of [
-    [100, 8, 0o644],
-    [108, 8, 0],
-    [116, 8, 0],
-    [124, 12, bytes],
-    [136, 12, 0],
-  ]) {
-    const field = value.toString(8).padStart(width - 1, '0') + '\0';
-    if (field.length !== width) throw new Error('Runtime image is too large');
-    result.write(field, offset);
-  }
-  result.fill(32, 148, 156);
-  result[156] = 48;
-  result.write('ustar\0', 257);
-  result.write('00', 263);
-  const sum = result.reduce((total, byte) => total + byte, 0);
-  result.write(sum.toString(8).padStart(6, '0') + '\0 ', 148);
-  return result;
-}
+
 try {
   const archive = await open(values['image-archive'], constants.O_RDONLY | constants.O_NOFOLLOW);
   try {

@@ -1,23 +1,16 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { MqttClientService } from './mqtt-client.service';
 import { MqttServer } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
-import * as mqtt from 'mqtt';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { EncryptionService } from '../encryption/encryption.service';
-import { MetricsService } from '../metrics/metrics.service';
-import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { TestingModule } from '@nestjs/testing';
+import * as mqtt from 'mqtt';
 import { EventEmitter } from 'node:events';
+import { Repository } from 'typeorm';
+import { inheritTestScope } from './../test-utils/inherit-test-scope';
+import { MqttClientService } from './mqtt-client.service';
+import { resetTestFixture } from './mqtt-client.service.setup.test-fixture';
+import { MqttClientServicePrivate } from './mqtt-client.service.spec.mqtt-client-service-private';
 
 // Interface to access private members for testing
-interface MqttClientServicePrivate {
-  getOrCreateClient: (serverId: number, keepTryingToConnect?: boolean) => Promise<mqtt.MqttClient>;
-  clients: Map<number, mqtt.MqttClient>;
-  subscriptions: Map<number, Map<string, { qosCounts: Map<0 | 1 | 2 | undefined, number>; effectiveQos?: 0 | 1 | 2 }>>;
-}
-
 // Mock mqtt module thoroughly to avoid actual connections and timers
 jest.mock('mqtt', () => {
   const { EventEmitter } = require('events');
@@ -91,65 +84,50 @@ describe('MqttClientService', () => {
   };
 
   let mockEventEmitter: Partial<EventEmitter2>;
+  const scope = {
+    get service() {
+      return service;
+    },
+    set service(value: typeof service) {
+      service = value;
+    },
+    get mockMetricsService() {
+      return mockMetricsService;
+    },
+    set mockMetricsService(value: typeof mockMetricsService) {
+      mockMetricsService = value;
+    },
+    get moduleRef() {
+      return moduleRef;
+    },
+    set moduleRef(value: typeof moduleRef) {
+      moduleRef = value;
+    },
+    get mockRepository() {
+      return mockRepository;
+    },
+    set mockRepository(value: typeof mockRepository) {
+      mockRepository = value;
+    },
+    get mockExternalCallTimer() {
+      return mockExternalCallTimer;
+    },
+    set mockExternalCallTimer(value: typeof mockExternalCallTimer) {
+      mockExternalCallTimer = value;
+    },
+    get mockServer() {
+      return mockServer;
+    },
+    get mockEventEmitter() {
+      return mockEventEmitter;
+    },
+    set mockEventEmitter(value: typeof mockEventEmitter) {
+      mockEventEmitter = value;
+    },
+  };
 
   beforeEach(async () => {
-    mockRepository = {
-      findOne: jest.fn(),
-      findOneBy: jest.fn().mockResolvedValue(mockServer),
-      update: jest.fn(),
-    };
-
-    mockEventEmitter = {
-      emit: jest.fn(),
-    };
-
-    mockMetricsService = {
-      mqttServersHealthy: { set: jest.fn() },
-    };
-    mockExternalCallTimer = {
-      time: jest.fn(<T>(_target: string, _operation: string, fn: () => Promise<T>) => fn()),
-    };
-
-    moduleRef = await Test.createTestingModule({
-      providers: [
-        MqttClientService,
-        {
-          provide: getRepositoryToken(MqttServer),
-          useValue: mockRepository,
-        },
-        {
-          provide: EventEmitter2,
-          useValue: mockEventEmitter,
-        },
-        {
-          provide: EncryptionService,
-          useValue: {
-            isEncrypted: jest.fn((value: string) => value.startsWith('enc:')),
-            encrypt: jest.fn((value: string) => `enc:${value}`),
-            decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
-          },
-        },
-        {
-          provide: MetricsService,
-          useValue: mockMetricsService,
-        },
-        {
-          provide: ExternalCallTimer,
-          useValue: mockExternalCallTimer,
-        },
-      ],
-    }).compile();
-
-    service = moduleRef.get<MqttClientService>(MqttClientService);
-
-    // Mock logger to prevent console output during tests
-    jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(jest.fn());
-    jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
-    jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
-
-    // Mock the getOrCreateClient method to avoid actual connection attempts
-    jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mqtt.connect({}));
+    await resetTestFixture(scope);
   });
 
   afterEach(async () => {
@@ -158,7 +136,7 @@ describe('MqttClientService', () => {
   });
 
   it('should be defined', () => {
-    expect(service).toBeDefined();
+    expect(scope.service).toBeDefined();
   });
 
   it('updates the healthy server metric after registering a connected client', async () => {
@@ -169,25 +147,36 @@ describe('MqttClientService', () => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
 
-    const servicePrivate = service as unknown as MqttClientServicePrivate;
+    const servicePrivate = scope.service as unknown as MqttClientServicePrivate;
 
     // Act
     await servicePrivate.getOrCreateClient(1);
 
     // Assert
     expect(servicePrivate.clients.get(1)?.connected).toBe(true);
-    expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenCalledWith(1);
+    expect(scope.mockMetricsService.mqttServersHealthy.set).toHaveBeenCalledWith(1);
   });
 
   describe('TLS options', () => {
     // Restores the real getOrCreateClient so createClient actually builds mqtt.connect options.
-    const connectWith = async (serverOverrides: Partial<typeof mockServer> & Record<string, unknown>) => {
+    const tlsOptionsScope = inheritTestScope(
+      {
+        get connectWith() {
+          return connectWith;
+        },
+      },
+      scope,
+    );
+    const connectWith = async (serverOverrides: Partial<typeof scope.mockServer> & Record<string, unknown>) => {
       jest.restoreAllMocks();
       jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
       jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
-      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({ ...mockServer, ...serverOverrides });
+      (scope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...scope.mockServer,
+        ...serverOverrides,
+      });
 
-      await (service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
+      await (scope.service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
 
       const connectMock = mqtt.connect as jest.Mock;
       return {
@@ -197,7 +186,7 @@ describe('MqttClientService', () => {
     };
 
     it('passes CA cert, servername and rejectUnauthorized=false when TLS trust options are set', async () => {
-      const { url, options } = await connectWith({
+      const { url, options } = await tlsOptionsScope.connectWith({
         useTls: true,
         port: 8883,
         caCert: '-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----',
@@ -212,7 +201,7 @@ describe('MqttClientService', () => {
     });
 
     it('keeps default certificate verification when TLS trust options are unset', async () => {
-      const { options } = await connectWith({ useTls: true, port: 8883 });
+      const { options } = await tlsOptionsScope.connectWith({ useTls: true, port: 8883 });
 
       expect(options.ca).toBeUndefined();
       expect(options.servername).toBeUndefined();
@@ -220,7 +209,11 @@ describe('MqttClientService', () => {
     });
 
     it('ignores TLS trust options when TLS is disabled', async () => {
-      const { url, options } = await connectWith({ useTls: false, caCert: 'ignored', tlsInsecure: true });
+      const { url, options } = await tlsOptionsScope.connectWith({
+        useTls: false,
+        caCert: 'ignored',
+        tlsInsecure: true,
+      });
 
       expect(url).toBe('mqtt://localhost:1883');
       expect(options.ca).toBeUndefined();
@@ -229,6 +222,18 @@ describe('MqttClientService', () => {
   });
 
   describe('connection ownership', () => {
+    const connectionOwnershipScope = inheritTestScope(
+      {
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+      },
+      scope,
+    );
+
     beforeEach(() => {
       jest.restoreAllMocks();
       jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
@@ -240,7 +245,7 @@ describe('MqttClientService', () => {
     afterEach(() => jest.useRealTimers());
 
     it('shares the reconnecting client between concurrent callers instead of creating a duplicate identity', async () => {
-      const internal = service as unknown as MqttClientServicePrivate;
+      const internal = connectionOwnershipScope.service as unknown as MqttClientServicePrivate;
       const client = await internal.getOrCreateClient(1);
       client.connected = false;
       client.emit('offline');
@@ -258,7 +263,7 @@ describe('MqttClientService', () => {
     });
 
     it('bounds reconnect waits without replacing or stopping the client', async () => {
-      const internal = service as unknown as MqttClientServicePrivate;
+      const internal = connectionOwnershipScope.service as unknown as MqttClientServicePrivate;
       const client = await internal.getOrCreateClient(1);
       client.connected = false;
       (mqtt.connect as jest.Mock).mockClear();
@@ -278,12 +283,12 @@ describe('MqttClientService', () => {
     it('retains a failed refresh connection for later callers while it continues reconnecting', async () => {
       const unreachable = Object.assign(new EventEmitter(), { connected: false, end: jest.fn() });
       (mqtt.connect as jest.Mock).mockImplementationOnce(() => unreachable);
-      const refresh = expect(service.refreshConnection(1)).rejects.toThrow('Timeout');
+      const refresh = expect(connectionOwnershipScope.service.refreshConnection(1)).rejects.toThrow('Timeout');
       await jest.advanceTimersByTimeAsync(10_000);
       await refresh;
       (mqtt.connect as jest.Mock).mockClear();
 
-      const retry = (service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
+      const retry = (connectionOwnershipScope.service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
       unreachable.connected = true;
       unreachable.emit('connect');
       await expect(retry).resolves.toBe(unreachable);
@@ -291,12 +296,12 @@ describe('MqttClientService', () => {
     });
 
     it('rejects a reconnect waiter when refreshing and ignores late events from the retired client', async () => {
-      const internal = service as unknown as MqttClientServicePrivate;
+      const internal = connectionOwnershipScope.service as unknown as MqttClientServicePrivate;
       const previous = await internal.getOrCreateClient(1);
       previous.connected = false;
       const waiting = expect(internal.getOrCreateClient(1)).rejects.toThrow('replaced');
 
-      await service.refreshConnection(1);
+      await connectionOwnershipScope.service.refreshConnection(1);
       await waiting;
       const replacement = internal.clients.get(1);
       previous.connected = true;
@@ -307,14 +312,44 @@ describe('MqttClientService', () => {
   });
 
   describe('publish', () => {
+    const publishScope = inheritTestScope(
+      {
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+        get mockExternalCallTimer() {
+          return scope.mockExternalCallTimer;
+        },
+        set mockExternalCallTimer(value: typeof scope.mockExternalCallTimer) {
+          scope.mockExternalCallTimer = value;
+        },
+        get mockRepository() {
+          return scope.mockRepository;
+        },
+        set mockRepository(value: typeof scope.mockRepository) {
+          scope.mockRepository = value;
+        },
+        get mockServer() {
+          return scope.mockServer;
+        },
+      },
+      scope,
+    );
+
     it('should successfully publish a message', async () => {
       // Arrange - mock the internal methods to avoid actual connections
-      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const getOrCreateClientSpy = jest.spyOn(
+        publishScope.service as unknown as MqttClientServicePrivate,
+        'getOrCreateClient',
+      );
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
 
       // Act
-      await service.publish(1, 'test/topic', 'test message');
+      await publishScope.service.publish(1, 'test/topic', 'test message');
 
       // Assert
       expect(getOrCreateClientSpy).toHaveBeenCalledWith(1);
@@ -323,7 +358,10 @@ describe('MqttClientService', () => {
 
     it('should throw an error if publishing fails', async () => {
       // Arrange - mock the client to throw an error on publish
-      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const getOrCreateClientSpy = jest.spyOn(
+        publishScope.service as unknown as MqttClientServicePrivate,
+        'getOrCreateClient',
+      );
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
 
@@ -339,20 +377,23 @@ describe('MqttClientService', () => {
         });
 
       // Act & Assert
-      await expect(service.publish(1, 'test/topic', 'test message')).rejects.toThrow('Publish error');
+      await expect(publishScope.service.publish(1, 'test/topic', 'test message')).rejects.toThrow('Publish error');
     });
 
     it('does not wait for the publish callback when dispatch completion is selected', async () => {
-      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const getOrCreateClientSpy = jest.spyOn(
+        publishScope.service as unknown as MqttClientServicePrivate,
+        'getOrCreateClient',
+      );
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
       mockClient.publish = jest.fn();
 
       await expect(
-        service.publish(1, 'test/topic', 'test message', undefined, { awaitAcknowledgement: false }),
+        publishScope.service.publish(1, 'test/topic', 'test message', undefined, { awaitAcknowledgement: false }),
       ).resolves.toBeUndefined();
 
-      expect(mockExternalCallTimer.time).toHaveBeenCalledWith('mqtt', 'publish', expect.any(Function));
+      expect(publishScope.mockExternalCallTimer.time).toHaveBeenCalledWith('mqtt', 'publish', expect.any(Function));
       expect(mockClient.publish).toHaveBeenCalledWith(
         'test/topic',
         'test message',
@@ -363,12 +404,15 @@ describe('MqttClientService', () => {
 
     it('should use server defaults when no options are provided', async () => {
       // Arrange
-      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({
-        ...mockServer,
+      (publishScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...publishScope.mockServer,
         defaultPublishQos: 1,
         defaultPublishRetain: true,
       });
-      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const getOrCreateClientSpy = jest.spyOn(
+        publishScope.service as unknown as MqttClientServicePrivate,
+        'getOrCreateClient',
+      );
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
 
@@ -376,7 +420,7 @@ describe('MqttClientService', () => {
       const publishSpy = jest.spyOn(mockClient, 'publish');
 
       // Act
-      await service.publish(1, 'test/topic', 'test message');
+      await publishScope.service.publish(1, 'test/topic', 'test message');
 
       // Assert
       expect(publishSpy).toHaveBeenCalled();
@@ -388,19 +432,22 @@ describe('MqttClientService', () => {
 
     it('should prefer per-call options over server defaults', async () => {
       // Arrange
-      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({
-        ...mockServer,
+      (publishScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...publishScope.mockServer,
         defaultPublishQos: 0,
         defaultPublishRetain: true,
       });
-      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const getOrCreateClientSpy = jest.spyOn(
+        publishScope.service as unknown as MqttClientServicePrivate,
+        'getOrCreateClient',
+      );
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
 
       const publishSpy = jest.spyOn(mockClient, 'publish');
 
       // Act
-      await service.publish(1, 'test/topic', 'test message', { qos: 2, retain: false });
+      await publishScope.service.publish(1, 'test/topic', 'test message', { qos: 2, retain: false });
 
       // Assert
       expect(publishSpy).toHaveBeenCalled();
@@ -412,6 +459,27 @@ describe('MqttClientService', () => {
   });
 
   describe('subscribe', () => {
+    const subscribeScope = inheritTestScope(
+      {
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+        get mockRepository() {
+          return scope.mockRepository;
+        },
+        set mockRepository(value: typeof scope.mockRepository) {
+          scope.mockRepository = value;
+        },
+        get mockServer() {
+          return scope.mockServer;
+        },
+      },
+      scope,
+    );
+
     it('re-subscribes tracked topics after reconnecting', async () => {
       jest.restoreAllMocks();
       jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
@@ -419,9 +487,9 @@ describe('MqttClientService', () => {
       jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
       jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
 
-      const servicePrivate = service as unknown as MqttClientServicePrivate;
+      const servicePrivate = subscribeScope.service as unknown as MqttClientServicePrivate;
       const client = await servicePrivate.getOrCreateClient(1);
-      await service.subscribe(1, 'devices/#');
+      await subscribeScope.service.subscribe(1, 'devices/#');
       (client.subscribe as jest.Mock).mockClear();
 
       client.emit('connect');
@@ -436,7 +504,7 @@ describe('MqttClientService', () => {
       jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
       jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
 
-      const servicePrivate = service as unknown as MqttClientServicePrivate;
+      const servicePrivate = subscribeScope.service as unknown as MqttClientServicePrivate;
       const client = await servicePrivate.getOrCreateClient(1);
       servicePrivate.subscriptions.set(1, new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]));
       client.subscribe = jest.fn(
@@ -452,27 +520,35 @@ describe('MqttClientService', () => {
 
     it('promotes a shared topic to the highest requested QoS', async () => {
       const mockClient = mqtt.connect({});
-      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
+      jest
+        .spyOn(subscribeScope.service as unknown as MqttClientServicePrivate, 'getOrCreateClient')
+        .mockResolvedValue(mockClient);
 
-      await service.subscribe(1, 'sensors/+', 0);
+      await subscribeScope.service.subscribe(1, 'sensors/+', 0);
       (mockClient.subscribe as jest.Mock).mockClear();
-      await service.subscribe(1, 'sensors/+', 2);
+      await subscribeScope.service.subscribe(1, 'sensors/+', 2);
 
       expect(mockClient.subscribe).toHaveBeenCalledWith('sensors/+', { qos: 2 }, expect.any(Function));
     });
 
     it('retains a server default QoS that is higher than a later request', async () => {
-      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({ ...mockServer, defaultSubscribeQos: 2 });
+      (subscribeScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...subscribeScope.mockServer,
+        defaultSubscribeQos: 2,
+      });
       const mockClient = mqtt.connect({});
-      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
+      jest
+        .spyOn(subscribeScope.service as unknown as MqttClientServicePrivate, 'getOrCreateClient')
+        .mockResolvedValue(mockClient);
 
-      await service.subscribe(1, 'sensors/+');
+      await subscribeScope.service.subscribe(1, 'sensors/+');
       (mockClient.subscribe as jest.Mock).mockClear();
-      await service.subscribe(1, 'sensors/+', 1);
+      await subscribeScope.service.subscribe(1, 'sensors/+', 1);
 
       expect(mockClient.subscribe).not.toHaveBeenCalled();
       expect(
-        (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
+        (subscribeScope.service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')
+          ?.effectiveQos,
       ).toBe(2);
     });
 
@@ -483,9 +559,13 @@ describe('MqttClientService', () => {
           callback?.(new Error('Subscribe error'));
         },
       );
-      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
+      jest
+        .spyOn(subscribeScope.service as unknown as MqttClientServicePrivate, 'getOrCreateClient')
+        .mockResolvedValue(mockClient);
 
-      await expect(service.subscribe(1, 'sensors/+', undefined, true)).rejects.toThrow('Subscribe error');
+      await expect(subscribeScope.service.subscribe(1, 'sensors/+', undefined, true)).rejects.toThrow(
+        'Subscribe error',
+      );
     });
   });
 
@@ -494,15 +574,50 @@ describe('MqttClientService', () => {
       jest.restoreAllMocks();
       for (const level of ['log', 'error', 'debug', 'warn'] as const)
         jest.spyOn(Logger.prototype, level).mockImplementation(jest.fn());
-      return service as unknown as MqttClientServicePrivate;
+      return scope.service as unknown as MqttClientServicePrivate;
     }
+    const refreshConnectionScope = inheritTestScope(
+      {
+        get useRealConnections() {
+          return useRealConnections;
+        },
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+        get mockRepository() {
+          return scope.mockRepository;
+        },
+        set mockRepository(value: typeof scope.mockRepository) {
+          scope.mockRepository = value;
+        },
+        get mockServer() {
+          return scope.mockServer;
+        },
+        get mockEventEmitter() {
+          return scope.mockEventEmitter;
+        },
+        set mockEventEmitter(value: typeof scope.mockEventEmitter) {
+          scope.mockEventEmitter = value;
+        },
+        get mockMetricsService() {
+          return scope.mockMetricsService;
+        },
+        set mockMetricsService(value: typeof scope.mockMetricsService) {
+          scope.mockMetricsService = value;
+        },
+      },
+      scope,
+    );
 
     it('uses current address, credentials and TLS settings, preserving shared subscriptions and rejecting late old-client events', async () => {
-      const internal = useRealConnections();
+      const internal = refreshConnectionScope.useRealConnections();
       const previous = await internal.getOrCreateClient(1);
-      await service.subscribe(1, 'devices/#', 2);
-      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({
-        ...mockServer,
+      await refreshConnectionScope.service.subscribe(1, 'devices/#', 2);
+      (refreshConnectionScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...refreshConnectionScope.mockServer,
         host: 'new-broker.test',
         port: 8883,
         useTls: true,
@@ -511,7 +626,7 @@ describe('MqttClientService', () => {
         tlsServername: 'broker.internal',
       });
       jest.mocked(mqtt.connect).mockClear();
-      await service.refreshConnection(1);
+      await refreshConnectionScope.service.refreshConnection(1);
       const current = internal.clients.get(1);
       expect(current).toBeDefined();
       expect(current).not.toBe(previous);
@@ -526,7 +641,7 @@ describe('MqttClientService', () => {
         }),
       );
       expect(current?.subscribe).toHaveBeenCalledWith('devices/#', { qos: 2 }, expect.any(Function));
-      jest.mocked(mockEventEmitter.emit as EventEmitter2['emit']).mockClear();
+      jest.mocked(refreshConnectionScope.mockEventEmitter.emit as EventEmitter2['emit']).mockClear();
       previous.emit('connect', { cmd: 'connack', sessionPresent: false, returnCode: 0 });
       previous.emit('message', 'devices/old', Buffer.from('stale'), {
         cmd: 'publish',
@@ -537,13 +652,13 @@ describe('MqttClientService', () => {
         retain: false,
       });
       expect(internal.clients.get(1)).toBe(current);
-      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      expect(refreshConnectionScope.mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('keeps reconnecting after refresh times out and restores existing subscriptions when the broker recovers', async () => {
-      const internal = useRealConnections();
+      const internal = refreshConnectionScope.useRealConnections();
       await internal.getOrCreateClient(1);
-      await service.subscribe(1, 'devices/#', 2);
+      await refreshConnectionScope.service.subscribe(1, 'devices/#', 2);
       const replacement = Object.assign(new EventEmitter(), {
         connected: false,
         end: jest.fn(),
@@ -552,25 +667,25 @@ describe('MqttClientService', () => {
       jest.mocked(mqtt.connect).mockReturnValueOnce(replacement);
       jest.useFakeTimers({ doNotFake: ['setImmediate'] });
       try {
-        const refresh = service.refreshConnection(1);
+        const refresh = refreshConnectionScope.service.refreshConnection(1);
         const failure = expect(refresh).rejects.toThrow('Timeout connecting');
         await new Promise(setImmediate);
         await jest.advanceTimersByTimeAsync(10_000);
         await failure;
-        expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(0);
+        expect(refreshConnectionScope.mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(0);
         expect(replacement.end).not.toHaveBeenCalled();
         replacement.connected = true;
         replacement.emit('connect');
         expect(internal.clients.get(1)).toBe(replacement);
         expect(replacement.subscribe).toHaveBeenCalledWith('devices/#', { qos: 2 }, expect.any(Function));
-        expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(1);
+        expect(refreshConnectionScope.mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(1);
       } finally {
         jest.useRealTimers();
       }
     });
 
     it('replaces an unreachable pending client without waiting for the previous broker and prevents it from reconnecting', async () => {
-      const internal = useRealConnections();
+      const internal = refreshConnectionScope.useRealConnections();
       const previous = Object.assign(new EventEmitter(), {
         connected: false,
         end: jest.fn(),
@@ -579,8 +694,11 @@ describe('MqttClientService', () => {
       const pending = internal.getOrCreateClient(1, true);
       const rejected = pending.catch((error) => error);
       await new Promise(setImmediate);
-      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({ ...mockServer, host: 'new-broker.test' });
-      await service.refreshConnection(1);
+      (refreshConnectionScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...refreshConnectionScope.mockServer,
+        host: 'new-broker.test',
+      });
+      await refreshConnectionScope.service.refreshConnection(1);
       expect((await rejected).message).toBe('MQTT connection was replaced');
       expect(previous.end).toHaveBeenCalledWith(true);
       const current = internal.clients.get(1);
@@ -605,58 +723,83 @@ describe('MqttClientService', () => {
   });
 
   describe('unsubscribe', () => {
+    const unsubscribeScope = inheritTestScope(
+      {
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+        get mockServer() {
+          return scope.mockServer;
+        },
+        get mockRepository() {
+          return scope.mockRepository;
+        },
+        set mockRepository(value: typeof scope.mockRepository) {
+          scope.mockRepository = value;
+        },
+      },
+      scope,
+    );
+
     it('keeps a shared broker subscription until its final consumer unsubscribes', async () => {
       const mockClient = mqtt.connect({});
-      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
-      await service.subscribe(1, 'sensors/+');
-      await service.subscribe(1, 'sensors/+');
+      (unsubscribeScope.service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+');
+      await unsubscribeScope.service.subscribe(1, 'sensors/+');
 
-      await service.unsubscribe(1, 'sensors/+');
+      await unsubscribeScope.service.unsubscribe(1, 'sensors/+');
       expect(mockClient.unsubscribe).not.toHaveBeenCalled();
 
-      await service.unsubscribe(1, 'sensors/+');
+      await unsubscribeScope.service.unsubscribe(1, 'sensors/+');
       expect(mockClient.unsubscribe).toHaveBeenCalledWith('sensors/+', expect.any(Function));
     });
 
     it('lowers a shared subscription QoS when its highest-QoS consumer unsubscribes', async () => {
       const mockClient = mqtt.connect({});
-      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
-      await service.subscribe(1, 'sensors/+', 0);
-      await service.subscribe(1, 'sensors/+', 2);
+      (unsubscribeScope.service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+', 0);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+', 2);
       (mockClient.subscribe as jest.Mock).mockClear();
 
-      await service.unsubscribe(1, 'sensors/+', 2);
+      await unsubscribeScope.service.unsubscribe(1, 'sensors/+', 2);
 
       expect(mockClient.subscribe).toHaveBeenCalledWith('sensors/+', { qos: 0 }, expect.any(Function));
       expect(
-        (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
+        (unsubscribeScope.service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')
+          ?.effectiveQos,
       ).toBe(0);
     });
 
     it('preserves the broker QoS when lowering the subscription is rejected', async () => {
       const mockClient = mqtt.connect({});
-      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
-      await service.subscribe(1, 'sensors/+', 0);
-      await service.subscribe(1, 'sensors/+', 2);
+      (unsubscribeScope.service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+', 0);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+', 2);
       mockClient.subscribe = jest.fn(
         (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
           callback?.(new Error('Subscribe error'));
         },
       );
 
-      await expect(service.unsubscribe(1, 'sensors/+', 2)).rejects.toThrow('Subscribe error');
+      await expect(unsubscribeScope.service.unsubscribe(1, 'sensors/+', 2)).rejects.toThrow('Subscribe error');
 
       expect(
-        (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
+        (unsubscribeScope.service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')
+          ?.effectiveQos,
       ).toBe(2);
     });
 
     it('reconciles a higher QoS subscriber added while a lower QoS update is pending', async () => {
       const mockClient = mqtt.connect({});
-      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
-      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
-      await service.subscribe(1, 'sensors/+', 0);
-      await service.subscribe(1, 'sensors/+', 2);
+      (unsubscribeScope.service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      jest
+        .spyOn(unsubscribeScope.service as unknown as MqttClientServicePrivate, 'getOrCreateClient')
+        .mockResolvedValue(mockClient);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+', 0);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+', 2);
       (mockClient.subscribe as jest.Mock).mockClear();
 
       let finishLowerQos!: () => void;
@@ -670,30 +813,31 @@ describe('MqttClientService', () => {
         },
       );
 
-      const lowerQos = service.unsubscribe(1, 'sensors/+', 2);
+      const lowerQos = unsubscribeScope.service.unsubscribe(1, 'sensors/+', 2);
       await new Promise(setImmediate);
-      const raiseQos = service.subscribe(1, 'sensors/+', 2);
+      const raiseQos = unsubscribeScope.service.subscribe(1, 'sensors/+', 2);
       finishLowerQos();
       await Promise.all([lowerQos, raiseQos]);
 
       expect(mockClient.subscribe).toHaveBeenNthCalledWith(1, 'sensors/+', { qos: 0 }, expect.any(Function));
       expect(mockClient.subscribe).toHaveBeenNthCalledWith(2, 'sensors/+', { qos: 2 }, expect.any(Function));
       expect(
-        (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
+        (unsubscribeScope.service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')
+          ?.effectiveQos,
       ).toBe(2);
     });
 
     it('does not re-subscribe after the final consumer unsubscribes during the server lookup', async () => {
       const mockClient = mqtt.connect({});
-      let resolveServerLookup!: (server: typeof mockServer) => void;
-      (mockRepository.findOneBy as jest.Mock).mockImplementationOnce(
+      let resolveServerLookup!: (server: typeof unsubscribeScope.mockServer) => void;
+      (unsubscribeScope.mockRepository.findOneBy as jest.Mock).mockImplementationOnce(
         () =>
-          new Promise<typeof mockServer>((resolve) => {
+          new Promise<typeof unsubscribeScope.mockServer>((resolve) => {
             resolveServerLookup = resolve;
           }),
       );
-      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
-      (service as unknown as MqttClientServicePrivate).subscriptions.set(
+      (unsubscribeScope.service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      (unsubscribeScope.service as unknown as MqttClientServicePrivate).subscriptions.set(
         1,
         new Map([
           [
@@ -709,10 +853,10 @@ describe('MqttClientService', () => {
         ]),
       );
 
-      const lowerQos = service.unsubscribe(1, 'sensors/+', 2);
+      const lowerQos = unsubscribeScope.service.unsubscribe(1, 'sensors/+', 2);
       await new Promise(setImmediate);
-      const finalUnsubscribe = service.unsubscribe(1, 'sensors/+', 0);
-      resolveServerLookup(mockServer);
+      const finalUnsubscribe = unsubscribeScope.service.unsubscribe(1, 'sensors/+', 0);
+      resolveServerLookup(unsubscribeScope.mockServer);
       await Promise.all([lowerQos, finalUnsubscribe]);
 
       expect(mockClient.subscribe).not.toHaveBeenCalled();
@@ -721,10 +865,10 @@ describe('MqttClientService', () => {
 
     it('removes the topic from reconnect subscriptions and the active client', async () => {
       const mockClient = mqtt.connect({});
-      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
-      await service.subscribe(1, 'sensors/+');
+      (unsubscribeScope.service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await unsubscribeScope.service.subscribe(1, 'sensors/+');
 
-      await service.unsubscribe(1, 'sensors/+');
+      await unsubscribeScope.service.unsubscribe(1, 'sensors/+');
 
       expect(mockClient.unsubscribe).toHaveBeenCalledWith('sensors/+', expect.any(Function));
     });
@@ -735,10 +879,12 @@ describe('MqttClientService', () => {
       const pendingClient = new Promise<mqtt.MqttClient>((resolve) => {
         connect = resolve;
       });
-      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockReturnValue(pendingClient);
+      jest
+        .spyOn(unsubscribeScope.service as unknown as MqttClientServicePrivate, 'getOrCreateClient')
+        .mockReturnValue(pendingClient);
 
-      const subscribe = service.subscribe(1, 'sensors/+');
-      await service.unsubscribe(1, 'sensors/+');
+      const subscribe = unsubscribeScope.service.subscribe(1, 'sensors/+');
+      await unsubscribeScope.service.unsubscribe(1, 'sensors/+');
       connect(mockClient);
       await subscribe;
 
@@ -746,3 +892,26 @@ describe('MqttClientService', () => {
     });
   });
 });
+export { MqttClientServicePrivate } from './mqtt-client.service.spec.mqtt-client-service-private';
+
+export type MqttClientServiceTestScope = {
+  service: MqttClientService;
+  mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
+  moduleRef: TestingModule;
+  mockRepository: Partial<Repository<MqttServer>>;
+  mockExternalCallTimer: { time: jest.Mock };
+  mockServer: {
+    id: number;
+    name: string;
+    host: string;
+    port: number;
+    clientId: string;
+    username: string;
+    password: string;
+    useTls: boolean;
+    defaultPublishQos: number;
+    defaultPublishRetain: boolean;
+    defaultSubscribeQos: number;
+  };
+  mockEventEmitter: Partial<EventEmitter2>;
+};

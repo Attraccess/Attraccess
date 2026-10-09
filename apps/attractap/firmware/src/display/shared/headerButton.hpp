@@ -1,6 +1,6 @@
 #pragma once
 
-#include "display/theme.hpp"
+#include "../theme.hpp"
 
 namespace ReaderHeader {
 // Header controls fill the row height, so the default pressed-state growth

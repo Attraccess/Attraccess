@@ -1,4 +1,3 @@
-import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowRight, Mail } from 'lucide-react';
 import {
   Alert,
@@ -14,10 +13,12 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../components/button';
+import { Button } from '../../components/button/index';
 import { StandardModal } from '../../components/standardModal';
+import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput/index';
+import { PasswordField } from '../../components/PasswordField/index';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
 import {
@@ -31,15 +32,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import { useToastMessage } from '../../components/toastProvider';
-import { PasswordField } from '../../components/PasswordField';
 import { PolicyError, PublicPasswordPolicy, validatePassword } from '@attraccess/shared';
 import { extractPolicyErrors } from '../../utils/policyErrors';
 
-interface RegisterFormProps {
+export interface RegisterFormProps {
   onHasAccount: () => void;
 }
 
-const FALLBACK_POLICY: PublicPasswordPolicy = {
+export const FALLBACK_POLICY: PublicPasswordPolicy = {
   minLength: 12,
   maxLength: 128,
   allowAllUnicode: true,
@@ -50,7 +50,7 @@ const FALLBACK_POLICY: PublicPasswordPolicy = {
   minZxcvbnScore: 3,
 };
 
-export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
+export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -180,6 +180,58 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
     }
     sessionStorage.setItem('twoFactorSetupIntent', 'true');
   }, []);
+  return {
+    t,
+    registeredEmail,
+    isOpen,
+    setOpen,
+    username,
+    setUsername,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    passwordConfirmation,
+    setPasswordConfirmation,
+    serverErrors,
+    setServerErrors,
+    policy,
+    usernameValidationMessages,
+    trimmedUsername,
+    trimmedEmail,
+    canSubmit,
+    isPending,
+    handleSubmit,
+    markTwoFactorSetupIntent,
+    onHasAccount,
+  } as const;
+}
+
+export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
+  const {
+    t,
+    registeredEmail,
+    isOpen,
+    setOpen,
+    username,
+    setUsername,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    passwordConfirmation,
+    setPasswordConfirmation,
+    serverErrors,
+    setServerErrors,
+    policy,
+    usernameValidationMessages,
+    trimmedUsername,
+    trimmedEmail,
+    canSubmit,
+    isPending,
+    handleSubmit,
+    markTwoFactorSetupIntent,
+  } = useRegistrationFormState({ onHasAccount });
 
   return (
     <>

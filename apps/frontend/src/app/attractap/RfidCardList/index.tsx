@@ -1,13 +1,7 @@
+import { useParams, useNavigate } from 'react-router-dom';
+import { NotFound } from '../../not-found/index';
 import {
   Button,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerHeading,
-  ModalHeading,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
   Table,
   TableBody,
   TableCell,
@@ -17,40 +11,122 @@ import {
   TableRow,
   TableScrollContainer,
   cn,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerHeading,
+  ModalHeading,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
 } from '@heroui/react';
-import { StandardDrawer } from '../../../components/standardDrawer';
-import { StandardModal } from '../../../components/standardModal';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useTranslations, AttraccessUser, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import {
   useAttractapServiceGetAllCards,
-  useAttractapServiceResetNfcCard,
   NFCCard,
-  useAttractapServiceEnrollNfcCard,
   useUsersServiceGetOneUserById,
   useLicenseServiceGetLicenseInformation,
+  useAttractapServiceEnrollNfcCard,
+  useAttractapServiceResetNfcCard,
 } from '@attraccess/react-query-client';
-import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
 import { EmptyState } from '../../../components/emptyState';
-
 import de from './de.json';
 import en from './en.json';
-import { NfcCardDeactivateModal } from './deactivate';
-import { NfcCardActivateModal } from './activate';
-import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { PageAction, PageHeader } from '../../../components/pageHeader';
+import { PlusIcon, ServerIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react';
+import { PageAction, PageHeader } from '../../../components/pageHeader/index';
 import { useAuth } from '../../../hooks/useAuth';
-import { useNavigate, useParams } from 'react-router-dom';
-import { NotFound } from '../../not-found';
+import { StandardDrawer } from '../../../components/standardDrawer';
+import { AttractapSelect } from '../AttractapSelect/index';
+import { StandardModal } from '../../../components/standardModal';
+import { NfcCardDeactivateModal } from './deactivate/index';
+import { NfcCardActivateModal } from './activate/index';
 
-interface DeleteModalProps {
+export interface EnrollNfcCardProps {
+  children: (onOpen: () => void) => React.ReactNode;
+  userId?: number;
+}
+
+export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
+  const { t } = useTranslations({
+    de,
+    en,
+  });
+
+  const [show, setShow] = useState(false);
+  const [readerId, setReaderId] = useState<number | null>(null);
+
+  const close = useCallback(() => setShow(false), []);
+  const toast = useToastMessage();
+  const { mutate: enrollNfcCardMutation, isPending } = useAttractapServiceEnrollNfcCard({
+    onSuccess: close,
+    onError: (error) => toast.error({ title: t('errorOperation'), description: (error as Error).message }),
+  });
+
+  const enrollNfcCard = useCallback(() => {
+    if (!readerId) {
+      return;
+    }
+
+    enrollNfcCardMutation({ requestBody: { readerId, ...(userId !== undefined ? { userId } : {}) } });
+  }, [readerId, enrollNfcCardMutation, userId]);
+
+  return (
+    <>
+      {children(() => setShow(true))}
+      <StandardDrawer
+        isOpen={show}
+        dialogProps={{ 'aria-label': t('enrollModal.title') }}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+      >
+        <DrawerHeader>
+          <div className="flex w-full items-start justify-between gap-3">
+            <DrawerHeading className="text-lg font-semibold">{t('enrollModal.title')}</DrawerHeading>
+            <Button isIconOnly variant="ghost" aria-label={t('enrollModal.cancel')} onPress={close}>
+              <XIcon size={16} />
+            </Button>
+          </div>
+        </DrawerHeader>
+        <DrawerBody>
+          <p>{t('enrollModal.description')}</p>
+          <AttractapSelect
+            label={t('enrollModal.readerLabel')}
+            placeholder={t('enrollModal.readerPlaceholder')}
+            selection={readerId}
+            onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+            data-cy="enroll-nfc-card-modal-reader-select"
+            requiredCapabilities={{ cardEnrollment: true }}
+          />
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="secondary" onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
+            {t('enrollModal.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            isDisabled={!readerId || isPending}
+            isPending={isPending}
+            onPress={enrollNfcCard}
+            data-cy="enroll-nfc-card-modal-enroll-button"
+          >
+            {t('enrollModal.enroll')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
+    </>
+  );
+};
+
+export interface DeleteModalProps {
   show: boolean;
   close: () => void;
   cardId: number | null;
 }
 
-const NfcCardDeleteModal = (props: DeleteModalProps) => {
+export const NfcCardDeleteModal = (props: DeleteModalProps) => {
   const { t } = useTranslations({
     de,
     en,
@@ -117,13 +193,13 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
   );
 };
 
-interface NfcCardTableCellProps {
+export interface NfcCardTableCellProps {
   header: string;
   card: NFCCard;
   onDeleteClick: () => void;
 }
 
-const NfcCardTableCell = (props: NfcCardTableCellProps) => {
+export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   const { t } = useTranslations({
     de,
     en,
@@ -201,89 +277,6 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
 
   return props.card[props.header as keyof NFCCard] as React.ReactNode;
 };
-
-interface EnrollNfcCardProps {
-  children: (onOpen: () => void) => React.ReactNode;
-  userId?: number;
-}
-
-const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
-  const { t } = useTranslations({
-    de,
-    en,
-  });
-
-  const [show, setShow] = useState(false);
-  const [readerId, setReaderId] = useState<number | null>(null);
-
-  const close = useCallback(() => setShow(false), []);
-  const toast = useToastMessage();
-  const { mutate: enrollNfcCardMutation, isPending } = useAttractapServiceEnrollNfcCard({
-    onSuccess: close,
-    onError: (error) => toast.error({ title: t('errorOperation'), description: (error as Error).message }),
-  });
-
-  const enrollNfcCard = useCallback(() => {
-    if (!readerId) {
-      return;
-    }
-
-    enrollNfcCardMutation({ requestBody: { readerId, ...(userId !== undefined ? { userId } : {}) } });
-  }, [readerId, enrollNfcCardMutation, userId]);
-
-  return (
-    <>
-      {children(() => setShow(true))}
-      <StandardDrawer
-        isOpen={show}
-        dialogProps={{ 'aria-label': t('enrollModal.title') }}
-        onOpenChange={(open) => {
-          if (!open) close();
-        }}
-      >
-        <DrawerHeader>
-          <div className="flex w-full items-start justify-between gap-3">
-            <DrawerHeading className="text-lg font-semibold">{t('enrollModal.title')}</DrawerHeading>
-            <Button isIconOnly variant="ghost" aria-label={t('enrollModal.cancel')} onPress={close}>
-              <XIcon size={16} />
-            </Button>
-          </div>
-        </DrawerHeader>
-        <DrawerBody>
-          <p>{t('enrollModal.description')}</p>
-          <AttractapSelect
-            label={t('enrollModal.readerLabel')}
-            placeholder={t('enrollModal.readerPlaceholder')}
-            selection={readerId}
-            onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-            data-cy="enroll-nfc-card-modal-reader-select"
-            requiredCapabilities={{ cardEnrollment: true }}
-          />
-        </DrawerBody>
-        <DrawerFooter>
-          <Button variant="secondary" onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
-            {t('enrollModal.cancel')}
-          </Button>
-          <Button
-            variant="primary"
-            isDisabled={!readerId || isPending}
-            isPending={isPending}
-            onPress={enrollNfcCard}
-            data-cy="enroll-nfc-card-modal-enroll-button"
-          >
-            {t('enrollModal.enroll')}
-          </Button>
-        </DrawerFooter>
-      </StandardDrawer>
-    </>
-  );
-};
-
-export function UserRfidCardsPage() {
-  const { id } = useParams<{ id: string }>();
-  if (!/^\d+$/.test(id ?? '') || Number(id) <= 0) return <NotFound />;
-  return <RfidCardList key={id} userId={Number(id)} />;
-}
 
 export function RfidCardList({ userId }: { userId?: number }) {
   const { t } = useTranslations({
@@ -396,4 +389,10 @@ export function RfidCardList({ userId }: { userId?: number }) {
       </Table>
     </>
   );
+}
+
+export function UserRfidCardsPage() {
+  const { id } = useParams<{ id: string }>();
+  if (!/^\d+$/.test(id ?? '') || Number(id) <= 0) return <NotFound />;
+  return <RfidCardList key={id} userId={Number(id)} />;
 }

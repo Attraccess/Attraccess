@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, ModalBody, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Spinner,
+} from '@heroui/react';
 import { StandardModal } from '../../../components/standardModal';
-import { Button } from '../../../components/button';
+import { Button } from '../../../components/button/index';
+import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -15,17 +25,16 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { getTranslationKeyForApiError } from '../../../utils/apiError';
 import en from './translations/en.json';
 import de from './translations/de.json';
-import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 
-type ActiveUsageSessionsBannerProps = {
+export type ActiveUsageSessionsBannerProps = {
   onShowMySessions: () => void;
 };
 
-const ACTIVE_RESOURCES_PAGE_SIZE = 50;
+export const ACTIVE_RESOURCES_PAGE_SIZE = 50;
 
-export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
+export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -182,6 +191,44 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       refetch();
     }
   }, [cachedResources, endSession, isEndingAll, isLoadingResources, queryClient, refetch, t, tExists, toast]);
+  return {
+    t,
+    isLoading,
+    isFetching,
+    activeCount,
+    isEndingAll,
+    isModalOpen,
+    setIsModalOpen,
+    endStatuses,
+    endErrors,
+    allCompleted,
+    activeResources,
+    successfulResources,
+    isLoadingResources,
+    openConfirmModal,
+    confirmEndAll,
+    onShowMySessions,
+  } as const;
+}
+
+export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
+  const {
+    t,
+    isLoading,
+    isFetching,
+    activeCount,
+    isEndingAll,
+    isModalOpen,
+    setIsModalOpen,
+    endStatuses,
+    endErrors,
+    allCompleted,
+    activeResources,
+    successfulResources,
+    isLoadingResources,
+    openConfirmModal,
+    confirmEndAll,
+  } = useActiveUsageSessionsBannerState({ onShowMySessions });
 
   if (isLoading || isFetching) {
     return (
@@ -225,7 +272,9 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       <StandardModal
         dialogProps={{ 'aria-label': allCompleted ? t('modal.completedTitle') : t('modal.title') }}
         isOpen={isModalOpen}
-        onOpenChange={(open) => { if (!open && !isEndingAll) setIsModalOpen(false); }}
+        onOpenChange={(open) => {
+          if (!open && !isEndingAll) setIsModalOpen(false);
+        }}
         size="md"
       >
         {({ close }) => (
@@ -252,9 +301,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                 <div className="space-y-2">
                   <div className="text-sm text-default-500">{t('modal.description')}</div>
                   {successfulResources.length > 0 && (
-                    <Alert status="success"
-                      className="text-sm"
-                    >
+                    <Alert status="success" className="text-sm">
                       <AlertContent>
                         <AlertTitle>{t('modal.successListTitle', { count: successfulResources.length })}</AlertTitle>
                       </AlertContent>
@@ -295,7 +342,8 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                 <Button variant="ghost" onPress={close} isDisabled={isEndingAll}>
                   {t('modal.cancel')}
                 </Button>
-                <Button variant="danger"
+                <Button
+                  variant="danger"
                   isPending={isEndingAll}
                   isDisabled={isLoadingResources || activeResources.length === 0}
                   onPress={confirmEndAll}

@@ -15,6 +15,13 @@ function buildFsMock({ configContent } = {}) {
   const writes = {};
   const chmods = {};
   const mockFs = {
+    constants: { W_OK: 2 },
+    accessSync: jest.fn(),
+    renameSync: jest.fn((source, target) => {
+      writes[target] = writes[source];
+      delete writes[source];
+    }),
+    unlinkSync: jest.fn(),
     readFileSync: jest.fn((p) => {
       if (typeof p === 'string' && p.endsWith('prometheus.yml') && configContent !== undefined) {
         return configContent;

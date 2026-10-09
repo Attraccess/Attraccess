@@ -1,60 +1,11 @@
 #include "initscreen.hpp"
-#include "display/fonts/attractap_fonts.hpp"
-#include "display/theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
+#include "../../theme.hpp"
 #include <string>
 #include <functional>
 
 #include <cstdio>
-#include "platform.hpp"
-
-void InitScreen::finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color)
-{
-   lv_obj_set_style_arc_color(spinner, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_arc_width(spinner, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_arc_color(spinner, color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_text_color(label, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-}
-
-void InitScreen::markStateAsSuccess(lv_obj_t *spinner, lv_obj_t *label)
-{
-   this->finalizeState(spinner, label, DisplayTheme::success());
-}
-
-void InitScreen::markStateAsError(lv_obj_t *spinner, lv_obj_t *label)
-{
-   this->finalizeState(spinner, label, DisplayTheme::danger());
-}
-
-void InitScreen::markStateAsWarning(lv_obj_t *spinner, lv_obj_t *label)
-{
-   // Amber: stage is actively working/retrying (e.g. sweeping CA certs) rather
-   // than cleanly succeeded or hard-failed.
-   this->finalizeState(spinner, label, DisplayTheme::warning());
-}
-
-std::string InitScreen::formatIp(esp_ip4_addr_t ip)
-{
-   char buf[16];
-   snprintf(buf, sizeof(buf), IPSTR, IP2STR(&ip));
-   return std::string(buf);
-}
-
-void InitScreen::resetState(lv_obj_t *spinner, lv_obj_t *label)
-{
-   lv_obj_set_style_arc_color(spinner, DisplayTheme::surfaceSecondary(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_arc_width(spinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_arc_color(spinner, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-   lv_obj_set_style_arc_width(spinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-}
+#include "../../../platform.hpp"
 
 void InitScreen::init()
 {
@@ -94,6 +45,197 @@ void InitScreen::init()
    lv_obj_set_style_pad_row(statesContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(statesContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+   this->createNetworkRows(statesContainer);
+
+   this->createApiRows(statesContainer);
+
+   this->createConnectionDetails(statesContainer);
+
+   // init() applied resetState (= PENDING visuals) to every row above; keep the
+   // change-detection caches in sync so loop() only re-styles on real transitions.
+   this->wifiStage = StageState::PENDING;
+   this->ethernetStage = StageState::PENDING;
+   this->apiConnectionStage = StageState::PENDING;
+   this->apiAuthenticationStage = StageState::PENDING;
+   this->lastLoopRefreshMs = 0;
+}
+
+void InitScreen::onOpenSettingsButtonEvent(lv_event_t *e)
+{
+   InitScreen *self = static_cast<InitScreen *>(lv_event_get_user_data(e));
+   if (!self)
+      return;
+
+   if (self->onOpenSettingsCallback)
+      self->onOpenSettingsCallback();
+}
+
+lv_obj_t *InitScreen::getScreen()
+{
+   return this->screen;
+}
+
+void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback)
+{
+   this->onOpenSettingsCallback = onOpenSettingsCallback;
+}
+
+std::string InitScreen::getName()
+{
+   return "InitScreen";
+}
+
+void InitScreen::onScreenLeave()
+{
+   this->resetState(this->wifiSpinner, this->wifiLabel);
+   this->resetState(this->ethernetSpinner, this->ethernetLabel);
+   this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
+   this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
+   this->wifiStage = StageState::PENDING;
+   this->ethernetStage = StageState::PENDING;
+   this->apiConnectionStage = StageState::PENDING;
+   this->apiAuthenticationStage = StageState::PENDING;
+}
+
+void InitScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->wifiSpinner = nullptr;
+   this->wifiLabel = nullptr;
+   this->ethernetSpinner = nullptr;
+   this->ethernetLabel = nullptr;
+   this->apiConnectionSpinner = nullptr;
+   this->apiConnectionLabel = nullptr;
+   this->apiAuthenticationSpinner = nullptr;
+   this->apiAuthenticationLabel = nullptr;
+   this->serverTargetLabel = nullptr;
+   this->certLabel = nullptr;
+   this->connectionStateLabel = nullptr;
+}
+
+void InitScreen::createApiRows(lv_obj_t *statesContainer)
+{
+   lv_obj_t *apiConnectionContainer = lv_obj_create(statesContainer);
+   lv_obj_remove_style_all(apiConnectionContainer);
+   lv_obj_set_width(apiConnectionContainer, lv_pct(100));
+   lv_obj_set_height(apiConnectionContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(apiConnectionContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(apiConnectionContainer, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(apiConnectionContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
+   lv_obj_remove_flag(apiConnectionContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(apiConnectionContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(apiConnectionContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(apiConnectionContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->apiConnectionSpinner = lv_spinner_create(apiConnectionContainer);
+   lv_obj_set_width(this->apiConnectionSpinner, 26);
+   lv_obj_set_height(this->apiConnectionSpinner, 26);
+   lv_obj_set_align(this->apiConnectionSpinner, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->apiConnectionSpinner, LV_OBJ_FLAG_CLICKABLE);
+
+   this->apiConnectionLabel = lv_label_create(apiConnectionContainer);
+   lv_obj_set_width(this->apiConnectionLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->apiConnectionLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->apiConnectionLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->apiConnectionLabel, "verbinde API");
+   lv_obj_set_style_text_font(this->apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
+
+   lv_obj_t *apiAuthenticationContainer = lv_obj_create(statesContainer);
+   lv_obj_remove_style_all(apiAuthenticationContainer);
+   lv_obj_set_width(apiAuthenticationContainer, lv_pct(100));
+   lv_obj_set_height(apiAuthenticationContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(apiAuthenticationContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(apiAuthenticationContainer, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(apiAuthenticationContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
+   lv_obj_remove_flag(apiAuthenticationContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(apiAuthenticationContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(apiAuthenticationContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(apiAuthenticationContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->apiAuthenticationSpinner = lv_spinner_create(apiAuthenticationContainer);
+   lv_obj_set_width(this->apiAuthenticationSpinner, 26);
+   lv_obj_set_height(this->apiAuthenticationSpinner, 26);
+   lv_obj_set_align(this->apiAuthenticationSpinner, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->apiAuthenticationSpinner, LV_OBJ_FLAG_CLICKABLE);
+
+   this->apiAuthenticationLabel = lv_label_create(apiAuthenticationContainer);
+   lv_obj_set_width(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->apiAuthenticationLabel, "authentifiziere an API");
+   lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
+
+}
+
+void InitScreen::createConnectionDetails(lv_obj_t *statesContainer)
+{
+   // Connection / cert-detection progress detail block. Smaller font, left aligned,
+   // so users can see the configured target, which CA is being tried, the live
+   // connection phase and the countdown to the next attempt.
+   lv_obj_t *detailsContainer = lv_obj_create(statesContainer);
+   lv_obj_remove_style_all(detailsContainer);
+   lv_obj_set_width(detailsContainer, lv_pct(100));
+   lv_obj_set_height(detailsContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(detailsContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(detailsContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(detailsContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(detailsContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(detailsContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(detailsContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->serverTargetLabel = lv_label_create(detailsContainer);
+   lv_obj_set_width(this->serverTargetLabel, lv_pct(100));
+   lv_obj_set_height(this->serverTargetLabel, LV_SIZE_CONTENT);
+   lv_label_set_text(this->serverTargetLabel, "");
+   lv_obj_set_style_text_font(this->serverTargetLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->serverTargetLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->certLabel = lv_label_create(detailsContainer);
+   lv_obj_set_width(this->certLabel, lv_pct(100));
+   lv_obj_set_height(this->certLabel, LV_SIZE_CONTENT);
+   lv_label_set_long_mode(this->certLabel, LV_LABEL_LONG_DOT);
+   lv_label_set_text(this->certLabel, "");
+   lv_obj_set_style_text_font(this->certLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->certLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->connectionStateLabel = lv_label_create(detailsContainer);
+   lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
+   lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
+   lv_label_set_text(this->connectionStateLabel, "");
+   lv_obj_set_style_text_font(this->connectionStateLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
+   DisplayTheme::button(openSettingsButton);
+   lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);
+   lv_obj_set_height(openSettingsButton, LV_SIZE_CONTENT);
+   lv_obj_set_align(openSettingsButton, LV_ALIGN_CENTER);
+   lv_obj_add_flag(openSettingsButton, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_add_flag(openSettingsButton, LV_OBJ_FLAG_SCROLLABLE);
+
+   lv_obj_t *openSettingsButtonLabel = lv_label_create(openSettingsButton);
+   lv_obj_set_width(openSettingsButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(openSettingsButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(openSettingsButtonLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(openSettingsButtonLabel, "Einstellungen");
+   lv_obj_set_style_text_color(openSettingsButtonLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_add_event_cb(openSettingsButton, &InitScreen::onOpenSettingsButtonEvent, LV_EVENT_CLICKED, this);
+
+}
+
+void InitScreen::createNetworkRows(lv_obj_t *statesContainer)
+{
    lv_obj_t *wifiContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(wifiContainer);
    lv_obj_set_width(wifiContainer, lv_pct(100));
@@ -153,136 +295,6 @@ void InitScreen::init()
 
    this->resetState(this->ethernetSpinner, this->ethernetLabel);
 
-   lv_obj_t *apiConnectionContainer = lv_obj_create(statesContainer);
-   lv_obj_remove_style_all(apiConnectionContainer);
-   lv_obj_set_width(apiConnectionContainer, lv_pct(100));
-   lv_obj_set_height(apiConnectionContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(apiConnectionContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(apiConnectionContainer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(apiConnectionContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
-   lv_obj_remove_flag(apiConnectionContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(apiConnectionContainer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(apiConnectionContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(apiConnectionContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->apiConnectionSpinner = lv_spinner_create(apiConnectionContainer);
-   lv_obj_set_width(this->apiConnectionSpinner, 26);
-   lv_obj_set_height(this->apiConnectionSpinner, 26);
-   lv_obj_set_align(this->apiConnectionSpinner, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(this->apiConnectionSpinner, LV_OBJ_FLAG_CLICKABLE);
-
-   this->apiConnectionLabel = lv_label_create(apiConnectionContainer);
-   lv_obj_set_width(this->apiConnectionLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->apiConnectionLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->apiConnectionLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->apiConnectionLabel, "verbinde API");
-   lv_obj_set_style_text_font(this->apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
-
-   lv_obj_t *apiAuthenticationContainer = lv_obj_create(statesContainer);
-   lv_obj_remove_style_all(apiAuthenticationContainer);
-   lv_obj_set_width(apiAuthenticationContainer, lv_pct(100));
-   lv_obj_set_height(apiAuthenticationContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(apiAuthenticationContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(apiAuthenticationContainer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(apiAuthenticationContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
-   lv_obj_remove_flag(apiAuthenticationContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(apiAuthenticationContainer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(apiAuthenticationContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(apiAuthenticationContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->apiAuthenticationSpinner = lv_spinner_create(apiAuthenticationContainer);
-   lv_obj_set_width(this->apiAuthenticationSpinner, 26);
-   lv_obj_set_height(this->apiAuthenticationSpinner, 26);
-   lv_obj_set_align(this->apiAuthenticationSpinner, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(this->apiAuthenticationSpinner, LV_OBJ_FLAG_CLICKABLE);
-
-   this->apiAuthenticationLabel = lv_label_create(apiAuthenticationContainer);
-   lv_obj_set_width(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->apiAuthenticationLabel, "authentifiziere an API");
-   lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
-
-   // Connection / cert-detection progress detail block. Smaller font, left aligned,
-   // so users can see the configured target, which CA is being tried, the live
-   // connection phase and the countdown to the next attempt.
-   lv_obj_t *detailsContainer = lv_obj_create(statesContainer);
-   lv_obj_remove_style_all(detailsContainer);
-   lv_obj_set_width(detailsContainer, lv_pct(100));
-   lv_obj_set_height(detailsContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(detailsContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(detailsContainer, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(detailsContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(detailsContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(detailsContainer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(detailsContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->serverTargetLabel = lv_label_create(detailsContainer);
-   lv_obj_set_width(this->serverTargetLabel, lv_pct(100));
-   lv_obj_set_height(this->serverTargetLabel, LV_SIZE_CONTENT);
-   lv_label_set_text(this->serverTargetLabel, "");
-   lv_obj_set_style_text_font(this->serverTargetLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->serverTargetLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->certLabel = lv_label_create(detailsContainer);
-   lv_obj_set_width(this->certLabel, lv_pct(100));
-   lv_obj_set_height(this->certLabel, LV_SIZE_CONTENT);
-   lv_label_set_long_mode(this->certLabel, LV_LABEL_LONG_DOT);
-   lv_label_set_text(this->certLabel, "");
-   lv_obj_set_style_text_font(this->certLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->certLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->connectionStateLabel = lv_label_create(detailsContainer);
-   lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
-   lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
-   lv_label_set_text(this->connectionStateLabel, "");
-   lv_obj_set_style_text_font(this->connectionStateLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
-   DisplayTheme::button(openSettingsButton);
-   lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(openSettingsButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(openSettingsButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(openSettingsButton, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_add_flag(openSettingsButton, LV_OBJ_FLAG_SCROLLABLE);
-
-   lv_obj_t *openSettingsButtonLabel = lv_label_create(openSettingsButton);
-   lv_obj_set_width(openSettingsButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(openSettingsButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(openSettingsButtonLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(openSettingsButtonLabel, "Einstellungen");
-   lv_obj_set_style_text_color(openSettingsButtonLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_add_event_cb(openSettingsButton, &InitScreen::onOpenSettingsButtonEvent, LV_EVENT_CLICKED, this);
-
-   // init() applied resetState (= PENDING visuals) to every row above; keep the
-   // change-detection caches in sync so loop() only re-styles on real transitions.
-   this->wifiStage = StageState::PENDING;
-   this->ethernetStage = StageState::PENDING;
-   this->apiConnectionStage = StageState::PENDING;
-   this->apiAuthenticationStage = StageState::PENDING;
-   this->lastLoopRefreshMs = 0;
-}
-
-void InitScreen::onOpenSettingsButtonEvent(lv_event_t *e)
-{
-   InitScreen *self = static_cast<InitScreen *>(lv_event_get_user_data(e));
-   if (!self)
-      return;
-
-   if (self->onOpenSettingsCallback)
-      self->onOpenSettingsCallback();
-}
-
-lv_obj_t *InitScreen::getScreen()
-{
-   return this->screen;
 }
 
 void InitScreen::applyStage(lv_obj_t *spinner, lv_obj_t *label, StageState newState, StageState &cached)
@@ -430,45 +442,51 @@ void InitScreen::loop()
    setLabelTextIfChanged(this->connectionStateLabel, stateLine.c_str());
 }
 
-void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback)
+void InitScreen::finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color)
 {
-   this->onOpenSettingsCallback = onOpenSettingsCallback;
+   lv_obj_set_style_arc_color(spinner, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(spinner, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_set_style_arc_color(spinner, color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+   lv_obj_set_style_text_color(label, color, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
-std::string InitScreen::getName()
+void InitScreen::markStateAsSuccess(lv_obj_t *spinner, lv_obj_t *label)
 {
-   return "InitScreen";
+   this->finalizeState(spinner, label, DisplayTheme::success());
 }
 
-void InitScreen::onScreenLeave()
+void InitScreen::markStateAsError(lv_obj_t *spinner, lv_obj_t *label)
 {
-   this->resetState(this->wifiSpinner, this->wifiLabel);
-   this->resetState(this->ethernetSpinner, this->ethernetLabel);
-   this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
-   this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
-   this->wifiStage = StageState::PENDING;
-   this->ethernetStage = StageState::PENDING;
-   this->apiConnectionStage = StageState::PENDING;
-   this->apiAuthenticationStage = StageState::PENDING;
+   this->finalizeState(spinner, label, DisplayTheme::danger());
 }
 
-void InitScreen::destroy()
+void InitScreen::markStateAsWarning(lv_obj_t *spinner, lv_obj_t *label)
 {
-   if (!this->screen)
-   {
-      return;
-   }
-   lv_obj_del(this->screen);
-   this->screen = nullptr;
-   this->wifiSpinner = nullptr;
-   this->wifiLabel = nullptr;
-   this->ethernetSpinner = nullptr;
-   this->ethernetLabel = nullptr;
-   this->apiConnectionSpinner = nullptr;
-   this->apiConnectionLabel = nullptr;
-   this->apiAuthenticationSpinner = nullptr;
-   this->apiAuthenticationLabel = nullptr;
-   this->serverTargetLabel = nullptr;
-   this->certLabel = nullptr;
-   this->connectionStateLabel = nullptr;
+   // Amber: stage is actively working/retrying (e.g. sweeping CA certs) rather
+   // than cleanly succeeded or hard-failed.
+   this->finalizeState(spinner, label, DisplayTheme::warning());
+}
+
+std::string InitScreen::formatIp(esp_ip4_addr_t ip)
+{
+   char buf[16];
+   snprintf(buf, sizeof(buf), IPSTR, IP2STR(&ip));
+   return std::string(buf);
+}
+
+void InitScreen::resetState(lv_obj_t *spinner, lv_obj_t *label)
+{
+   lv_obj_set_style_arc_color(spinner, DisplayTheme::surfaceSecondary(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(spinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_set_style_arc_color(spinner, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(spinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+   lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }

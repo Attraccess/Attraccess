@@ -41,9 +41,15 @@ vi.mock('@heroui/react', () => ({
   ModalFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ModalHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ModalHeading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
-  TextField: ({ children, value, onChange }: { children: React.ReactNode; value: string; onChange: (value: string) => void }) => (
-    <div onChange={(event) => onChange((event.target as HTMLInputElement).value)}>{children}</div>
-  ),
+  TextField: ({
+    children,
+    value,
+    onChange,
+  }: {
+    children: React.ReactNode;
+    value: string;
+    onChange: (value: string) => void;
+  }) => <div onChange={(event) => onChange((event.target as HTMLInputElement).value)}>{children}</div>,
   useOverlayState: () => {
     const [isOpen, setIsOpen] = useState(false);
     return { isOpen, open: () => setIsOpen(true), close: () => setIsOpen(false) };
@@ -51,7 +57,15 @@ vi.mock('@heroui/react', () => ({
 }));
 
 vi.mock('../../../../../components/button', () => ({
-  Button: ({ children, onPress, isDisabled }: { children: React.ReactNode; onPress: () => void; isDisabled?: boolean }) => (
+  Button: ({
+    children,
+    onPress,
+    isDisabled,
+  }: {
+    children: React.ReactNode;
+    onPress: () => void;
+    isDisabled?: boolean;
+  }) => (
     <button type="button" onClick={onPress} disabled={isDisabled}>
       {children}
     </button>
@@ -61,11 +75,18 @@ vi.mock('../../../../../components/button', () => ({
 vi.mock('../../../../../components/AlertStatusIcon', () => ({ AlertStatusIcon: () => null }));
 
 vi.mock('../../../../../components/standardModal', () => ({
-  StandardModal: ({ isOpen, children }: { isOpen: boolean; children: (props: { close: () => void }) => React.ReactNode }) =>
-    isOpen ? <div>{children({ close: vi.fn() })}</div> : null,
+  StandardModal: ({
+    isOpen,
+    children,
+  }: {
+    isOpen: boolean;
+    children: (props: { close: () => void }) => React.ReactNode;
+  }) => (isOpen ? <div>{children({ close: vi.fn() })}</div> : null),
 }));
 
-vi.mock('../../../../../components/toastProvider', () => ({ useToastMessage: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('../../../../../components/toastProvider', () => ({
+  useToastMessage: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
 
 describe('ChangeEmailForm', () => {
   beforeEach(() => mutate.mockClear());
@@ -74,7 +95,9 @@ describe('ChangeEmailForm', () => {
     const user = userEvent.setup();
     render(<ChangeEmailForm userId={7} />, { wrapper: QueryWrapper });
 
-    expect(screen.getByText("The current email address is not shown to protect this user's privacy.")).toBeInTheDocument();
+    expect(
+      screen.getByText("The current email address is not shown to protect this user's privacy."),
+    ).toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox'), 'new@example.com');
     await user.click(screen.getByRole('button', { name: 'Save' }));

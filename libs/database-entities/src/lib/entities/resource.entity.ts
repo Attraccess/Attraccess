@@ -1,109 +1,53 @@
+import { ApiProperty } from '@nestjs/swagger';
+
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  OneToMany,
-  ManyToMany,
-  ManyToOne,
-  JoinColumn,
-  JoinTable,
   DeleteDateColumn,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+  JoinColumn,
+  ManyToOne,
 } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { ResourceIntroduction } from './resourceIntroduction.entity';
-import { ResourceUsage } from './resourceUsage.entity';
-import { ResourceIntroducer } from './resourceIntroducer.entity';
-import { ResourceGroup } from './resourceGroup.entity';
+
 import { DocumentationType } from '../types/documentationType.enum';
-import { ResourceFlowNode } from './resourceFlowNode';
-import { ResourceFlowEdge } from './resourceFlowEdge';
-import { ResourceFlowVariable } from './resourceFlowVariable';
+
 import { Attractap } from './attractap.entity';
-import { ResourceMaintenance } from './resource.maintenance';
-import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
-import { ResourceType } from './resource.type';
-import { SupervisionMode, AutoIntroductionTarget } from './resource.supervision';
-import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
+
 import { Form } from './form';
+
+import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
+
+import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
+
 import { ResourceOperatingInterval } from './resource-operating-interval.entity';
+
+import { ResourceMaintenance } from './resource.maintenance';
+
+import { ResourceType } from './resource.type';
+
+import { ResourceFlowEdge } from './resourceFlowEdge';
+
+import { ResourceFlowNode } from './resourceFlowNode';
+
+import { ResourceFlowVariable } from './resourceFlowVariable';
+
+import { ResourceGroup } from './resourceGroup.entity';
+
+import { ResourceIntroducer } from './resourceIntroducer.entity';
+
+import { ResourceIntroduction } from './resourceIntroduction.entity';
+
+import { ResourceUsage } from './resourceUsage.entity';
+
+import { AutoIntroductionTarget, SupervisionMode } from './resource.supervision';
 
 @Entity()
 export class Resource {
-  @PrimaryGeneratedColumn()
-  @ApiProperty({
-    description: 'The unique identifier of the resource',
-    example: 1,
-  })
-  id!: number;
-
-  @Column({ type: 'text' })
-  @ApiProperty({
-    description: 'The name of the resource',
-    example: '3D Printer',
-  })
-  name!: string;
-
-  @Column({ type: 'simple-enum', enum: ResourceType })
-  @ApiProperty({
-    description: 'The type of the resource',
-    example: ResourceType.Machine,
-    enum: ResourceType,
-    enumName: 'ResourceType',
-  })
-  type!: ResourceType;
-
-  @Column({ type: 'boolean', default: false })
-  @ApiProperty({
-    description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
-    example: false,
-    default: false,
-  })
-  separateUnlockAndUnlatch!: boolean | null;
-
-  @Column({ type: 'text', nullable: true })
-  @ApiProperty({
-    description: 'A detailed description of the resource',
-    example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle',
-    required: false,
-  })
-  description!: string | null;
-
-  @Column({ type: 'text', nullable: true })
-  @ApiProperty({
-    description: 'The filename of the resource image',
-    example: '1234567890_abcdef.jpg',
-    required: false,
-  })
-  imageFilename!: string | null;
-
-  @Column({ type: 'text', nullable: true })
-  @ApiProperty({
-    description: 'The type of documentation (markdown or url)',
-    enum: DocumentationType,
-    required: false,
-    example: DocumentationType.MARKDOWN,
-    enumName: 'DocumentationType',
-  })
-  documentationType!: DocumentationType | null;
-
-  @Column({ type: 'text', nullable: true })
-  @ApiProperty({
-    description: 'Markdown content for resource documentation',
-    required: false,
-    example: '# Resource Documentation\n\nThis is a markdown documentation for the resource.',
-  })
-  documentationMarkdown!: string | null;
-
-  @Column({ type: 'text', nullable: true })
-  @ApiProperty({
-    description: 'URL to external documentation',
-    required: false,
-    example: 'https://example.com/documentation',
-  })
-  documentationUrl!: string | null;
-
   @Column({ type: 'boolean', default: false })
   @ApiProperty({
     description: 'Whether this resource allows overtaking by the next user without the prior user ending their session',
@@ -194,6 +138,79 @@ export class Resource {
   })
   autoIntroductionGroup!: ResourceGroup | null;
 
+  @PrimaryGeneratedColumn()
+  @ApiProperty({
+    description: 'The unique identifier of the resource',
+    example: 1,
+  })
+  id!: number;
+
+  @Column({ type: 'text' })
+  @ApiProperty({
+    description: 'The name of the resource',
+    example: '3D Printer',
+  })
+  name!: string;
+
+  @Column({ type: 'simple-enum', enum: ResourceType })
+  @ApiProperty({
+    description: 'The type of the resource',
+    example: ResourceType.Machine,
+    enum: ResourceType,
+    enumName: 'ResourceType',
+  })
+  type!: ResourceType;
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
+    example: false,
+    default: false,
+  })
+  separateUnlockAndUnlatch!: boolean | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'A detailed description of the resource',
+    example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle',
+    required: false,
+  })
+  description!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'The filename of the resource image',
+    example: '1234567890_abcdef.jpg',
+    required: false,
+  })
+  imageFilename!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'The type of documentation (markdown or url)',
+    enum: DocumentationType,
+    required: false,
+    example: DocumentationType.MARKDOWN,
+    enumName: 'DocumentationType',
+  })
+  documentationType!: DocumentationType | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Markdown content for resource documentation',
+    required: false,
+    example: '# Resource Documentation\n\nThis is a markdown documentation for the resource.',
+  })
+  documentationMarkdown!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'URL to external documentation',
+    required: false,
+    example: 'https://example.com/documentation',
+  })
+  documentationUrl!: string | null;
+
   @Column({ type: 'json', nullable: true })
   @ApiProperty({
     description: 'Custom metadata key-value pairs configured for this resource',
@@ -243,7 +260,6 @@ export class Resource {
 
   @OneToMany(() => ResourceFlowVariable, (variable) => variable.resource)
   flowVariables!: ResourceFlowVariable[];
-
 
   @OneToMany(() => ResourceIntroducer, (introducer) => introducer.resource)
   introducers!: ResourceIntroducer[];

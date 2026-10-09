@@ -13,26 +13,24 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { Eye, EyeOff, MoreVertical } from 'lucide-react';
-import { Button } from '../../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { AuthentikDiscoveryDialog } from '../discovery/authentik';
-import { KeycloakDiscoveryDialog } from '../discovery/keycloak';
+import { Button } from '../../../../components/button/index';
+import { AuthentikDiscoveryDialog } from '../discovery/authentik/index';
+import { KeycloakDiscoveryDialog } from '../discovery/keycloak/index';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
 import de from '../de.json';
 
-interface OIDCConfigFormProps {
-  form: SSOProviderFormApi;
-}
-
-export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
+export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
   const { t } = useTranslations({ en, de });
   const {
     formValues,
     setOidc,
     scopesInput,
     setScopesInput,
+    signingAlgorithmsInput,
+    setSigningAlgorithmsInput,
     usernameClaimPathsInput,
     setUsernameClaimPathsInput,
     emailClaimPathsInput,
@@ -45,22 +43,50 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
     roles,
     isLoadingRoles,
   } = form;
+  return {
+    t,
+    formValues,
+    setOidc,
+    scopesInput,
+    setScopesInput,
+    signingAlgorithmsInput,
+    setSigningAlgorithmsInput,
+    usernameClaimPathsInput,
+    setUsernameClaimPathsInput,
+    emailClaimPathsInput,
+    setEmailClaimPathsInput,
+    showClientSecret,
+    setShowClientSecret,
+    onAutoDiscovery,
+    oidcRoleMappingEntries,
+    setOidcRoleMappingEntries,
+    roles,
+    isLoadingRoles,
+  } as const;
+}
+
+export interface OIDCConfigFormProps {
+  form: SSOProviderFormApi;
+}
+
+export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
+  const model = useOIDCConfigFormState({ form });
 
   return (
     <>
       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-            {t('sections.oidcEndpoints')}
+            {model.t('sections.oidcEndpoints')}
           </h3>
-          <AuthentikDiscoveryDialog onDiscovery={onAutoDiscovery}>
+          <AuthentikDiscoveryDialog onDiscovery={model.onAutoDiscovery}>
             {(onOpenAuthentikDiscovery) => (
-              <KeycloakDiscoveryDialog onDiscovery={onAutoDiscovery}>
+              <KeycloakDiscoveryDialog onDiscovery={model.onAutoDiscovery}>
                 {(onOpenKeycloakDiscovery) => (
                   <Dropdown>
                     <DropdownTrigger className={buttonVariants({ variant: 'ghost' })}>
                       <MoreVertical className="w-4 h-4" />
-                      {t('autoDiscovery.label')}
+                      {model.t('autoDiscovery.label')}
                     </DropdownTrigger>
                     <DropdownPopover>
                       <DropdownMenu aria-label="OIDC auto discovery options">
@@ -70,7 +96,7 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
                           onPress={onOpenAuthentikDiscovery}
                           data-cy="sso-provider-form-authentik-discovery-button"
                         >
-                          {t('autoDiscovery.authentik')}
+                          {model.t('autoDiscovery.authentik')}
                         </DropdownItem>
 
                         <DropdownItem
@@ -79,7 +105,7 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
                           onPress={onOpenKeycloakDiscovery}
                           data-cy="sso-provider-form-keycloak-discovery-button"
                         >
-                          {t('autoDiscovery.keycloak')}
+                          {model.t('autoDiscovery.keycloak')}
                         </DropdownItem>
                       </DropdownMenu>
                     </DropdownPopover>
@@ -91,35 +117,31 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
         </div>
 
         <TextField
-          value={formValues.oidcConfiguration?.endSessionURL ?? ''}
-          onChange={(v) => setOidc('endSessionURL', v)}
+          value={model.formValues.oidcConfiguration?.endSessionURL ?? ''}
+          onChange={(v) => model.setOidc('endSessionURL', v)}
         >
-          <Label>{t('endSessionURL')}</Label>
+          <Label>{model.t('endSessionURL')}</Label>
           <Input placeholder="https://sso.example.com/logout" />
         </TextField>
-        <TextField value={formValues.oidcConfiguration?.jwksURL ?? ''} onChange={(v) => setOidc('jwksURL', v)}>
-          <Label>{t('jwksURL')}</Label>
+        <TextField
+          value={model.formValues.oidcConfiguration?.jwksURL ?? ''}
+          onChange={(v) => model.setOidc('jwksURL', v)}
+        >
+          <Label>{model.t('jwksURL')}</Label>
           <Input placeholder="https://sso.example.com/jwks" />
         </TextField>
-        <TextField
-          value={(formValues.oidcConfiguration?.signingAlgorithms ?? ['RS256']).join(', ')}
-          onChange={(v) =>
-            setOidc(
-              'signingAlgorithms',
-              v
-                .split(',')
-                .map((algorithm) => algorithm.trim())
-                .filter(Boolean),
-            )
-          }
-        >
-          <Label>{t('signingAlgorithms')}</Label>
+        <TextField value={model.signingAlgorithmsInput} onChange={model.setSigningAlgorithmsInput}>
+          <Label>{model.t('signingAlgorithms')}</Label>
           <Input placeholder="RS256" />
         </TextField>
-        <p className="text-sm text-muted">{t('oidcLogoutHint')}</p>
+        <p className="text-sm text-muted">{model.t('oidcLogoutHint')}</p>
 
-        <TextField isRequired value={formValues.oidcConfiguration?.issuer ?? ''} onChange={(v) => setOidc('issuer', v)}>
-          <Label>{t('issuer')}</Label>
+        <TextField
+          isRequired
+          value={model.formValues.oidcConfiguration?.issuer ?? ''}
+          onChange={(v) => model.setOidc('issuer', v)}
+        >
+          <Label>{model.t('issuer')}</Label>
           <Input
             placeholder="https://sso.example.com/auth/realms/example"
             data-cy="sso-provider-form-oidc-issuer-input"
@@ -128,10 +150,10 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
 
         <TextField
           isRequired
-          value={formValues.oidcConfiguration?.authorizationURL ?? ''}
-          onChange={(v) => setOidc('authorizationURL', v)}
+          value={model.formValues.oidcConfiguration?.authorizationURL ?? ''}
+          onChange={(v) => model.setOidc('authorizationURL', v)}
         >
-          <Label>{t('authorizationURL')}</Label>
+          <Label>{model.t('authorizationURL')}</Label>
           <Input
             placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/auth"
             data-cy="sso-provider-form-oidc-authorization-url-input"
@@ -140,10 +162,10 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
 
         <TextField
           isRequired
-          value={formValues.oidcConfiguration?.tokenURL ?? ''}
-          onChange={(v) => setOidc('tokenURL', v)}
+          value={model.formValues.oidcConfiguration?.tokenURL ?? ''}
+          onChange={(v) => model.setOidc('tokenURL', v)}
         >
-          <Label>{t('tokenURL')}</Label>
+          <Label>{model.t('tokenURL')}</Label>
           <Input
             placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/token"
             data-cy="sso-provider-form-oidc-token-url-input"
@@ -152,10 +174,10 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
 
         <TextField
           isRequired
-          value={formValues.oidcConfiguration?.userInfoURL ?? ''}
-          onChange={(v) => setOidc('userInfoURL', v)}
+          value={model.formValues.oidcConfiguration?.userInfoURL ?? ''}
+          onChange={(v) => model.setOidc('userInfoURL', v)}
         >
-          <Label>{t('userInfoURL')}</Label>
+          <Label>{model.t('userInfoURL')}</Label>
           <Input
             placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/userinfo"
             data-cy="sso-provider-form-oidc-user-info-url-input"
@@ -165,26 +187,26 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
 
       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
         <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-          {t('sections.oidcCredentials')}
+          {model.t('sections.oidcCredentials')}
         </h3>
         <TextField
           isRequired
-          value={formValues.oidcConfiguration?.clientId ?? ''}
-          onChange={(v) => setOidc('clientId', v)}
+          value={model.formValues.oidcConfiguration?.clientId ?? ''}
+          onChange={(v) => model.setOidc('clientId', v)}
         >
-          <Label>{t('clientId')}</Label>
+          <Label>{model.t('clientId')}</Label>
           <Input placeholder="your-client-id" data-cy="sso-provider-form-oidc-client-id-input" />
         </TextField>
 
         <TextField
           isRequired
-          value={formValues.oidcConfiguration?.clientSecret ?? ''}
-          onChange={(v) => setOidc('clientSecret', v)}
+          value={model.formValues.oidcConfiguration?.clientSecret ?? ''}
+          onChange={(v) => model.setOidc('clientSecret', v)}
         >
-          <Label>{t('clientSecret')}</Label>
+          <Label>{model.t('clientSecret')}</Label>
           <InputGroup>
             <InputGroup.Input
-              type={showClientSecret ? 'text' : 'password'}
+              type={model.showClientSecret ? 'text' : 'password'}
               placeholder="••••••••••••••••"
               data-cy="sso-provider-form-oidc-client-secret-input"
             />
@@ -193,12 +215,14 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
                 <Button
                   variant="ghost"
                   isIconOnly
-                  onPress={() => setShowClientSecret(!showClientSecret)}
+                  onPress={() => model.setShowClientSecret(!model.showClientSecret)}
                   data-cy="sso-provider-form-oidc-toggle-client-secret-button"
                 >
-                  {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {model.showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
                 </Button>
-                <TooltipContent>{showClientSecret ? t('hideClientSecret') : t('showClientSecret')}</TooltipContent>
+                <TooltipContent>
+                  {model.showClientSecret ? model.t('hideClientSecret') : model.t('showClientSecret')}
+                </TooltipContent>
               </Tooltip>
             </InputGroup.Suffix>
           </InputGroup>
@@ -206,28 +230,30 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
       </section>
 
       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.oidcClaims')}</h3>
-        <TextField value={scopesInput} onChange={setScopesInput}>
-          <Label>{t('scopes')}</Label>
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+          {model.t('sections.oidcClaims')}
+        </h3>
+        <TextField value={model.scopesInput} onChange={model.setScopesInput}>
+          <Label>{model.t('scopes')}</Label>
           <Input placeholder="openid, email, profile" data-cy="sso-provider-form-oidc-scopes-input" />
         </TextField>
-        <TextField value={usernameClaimPathsInput} onChange={setUsernameClaimPathsInput}>
-          <Label>{t('usernameClaimPaths')}</Label>
+        <TextField value={model.usernameClaimPathsInput} onChange={model.setUsernameClaimPathsInput}>
+          <Label>{model.t('usernameClaimPaths')}</Label>
           <Input placeholder="preferred_username, email, sub" data-cy="sso-provider-form-oidc-username-claims-input" />
         </TextField>
-        <TextField value={emailClaimPathsInput} onChange={setEmailClaimPathsInput}>
-          <Label>{t('emailClaimPaths')}</Label>
+        <TextField value={model.emailClaimPathsInput} onChange={model.setEmailClaimPathsInput}>
+          <Label>{model.t('emailClaimPaths')}</Label>
           <Input placeholder="email, emails[0].value, upn" data-cy="sso-provider-form-oidc-email-claims-input" />
         </TextField>
       </section>
 
       <RoleMappingsSection
         variant="oidc"
-        roles={roles}
-        isLoadingRoles={isLoadingRoles}
-        entries={oidcRoleMappingEntries}
-        onChange={setOidcRoleMappingEntries}
+        roles={model.roles}
+        isLoadingRoles={model.isLoadingRoles}
+        entries={model.oidcRoleMappingEntries}
+        onChange={model.setOidcRoleMappingEntries}
       />
     </>
   );
-};
+}

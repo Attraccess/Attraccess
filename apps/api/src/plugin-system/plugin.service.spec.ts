@@ -1,116 +1,54 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
+import { registerPluginServiceFixture } from './plugin.service.plugin-service.test-fixture';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import { PluginService } from './plugin.service';
 import { zipFileUpload } from './__test__/make-zip';
 
-const mockSpawn = jest.fn(() => ({ unref: jest.fn() }));
-jest.mock('child_process', () => ({ spawn: mockSpawn }));
-
-import { PluginService } from './plugin.service';
-
-const VALID_MANIFEST = {
-  name: 'uploaded-plugin',
-  version: '1.2.3',
-  main: {
-    frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
-    backend: { directory: 'dist', entryPoint: 'index.js' },
-  },
-  attraccessVersion: { min: '1.0.0' },
-  permissions: [PluginPermission.EMIT_EVENTS],
-};
-
-function newPluginDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'plugin-service-'));
-  PluginService.configure({ PLUGIN_DIR: dir, RESTART_BY_EXIT: true });
-  return dir;
-}
-
-function writePlugin(root: string, folder: string, manifest: unknown): void {
-  const dir = join(root, folder);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'plugin.json'), JSON.stringify(manifest));
-}
-
 describe('PluginService', () => {
-  let root: string;
-  let exitSpy: jest.SpyInstance;
-  let restartSpy: jest.SpyInstance;
-  let capturedRestart: (() => void) | null;
-
-  function flushScheduledRestart(): void {
-    expect(capturedRestart).not.toBeNull();
-    (capturedRestart as () => void)();
-  }
-
-  beforeEach(() => {
-    mockSpawn.mockClear();
-    capturedRestart = null;
-    root = newPluginDir();
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {
-      throw new Error('process.exit');
-    }) as unknown as never);
-    restartSpy = jest
-      .spyOn(PluginService.prototype as unknown as { restartApp: () => void }, 'restartApp')
-      .mockImplementation(() => undefined);
-    const realSetTimeout = global.setTimeout;
-    jest.spyOn(global, 'setTimeout').mockImplementation(((
-      fn: (...a: unknown[]) => void,
-      delay?: number,
-      ...args: unknown[]
-    ) => {
-      if (delay === 1000) {
-        capturedRestart = () => fn();
-        return 0 as unknown as NodeJS.Timeout;
-      }
-      return realSetTimeout(fn, delay as number, ...args);
-    }) as unknown as typeof setTimeout);
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-    rmSync(root, { recursive: true, force: true });
-  });
+  const fixture = registerPluginServiceFixture();
 
   describe('discovery', () => {
     it('ignores an orphaned npm directory when the same plugin is installed manually', () => {
-      writePlugin(root, 'wago', { ...VALID_MANIFEST, name: 'wago' });
-      writePlugin(root, 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28', { ...VALID_MANIFEST, name: 'wago' });
-      writeFileSync(join(root, '.npm-plugin-state.json'), '[]');
+      fixture.writePlugin(fixture.root, 'wago', { ...fixture.VALID_MANIFEST, name: 'wago' });
+      fixture.writePlugin(fixture.root, 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28', {
+        ...fixture.VALID_MANIFEST,
+        name: 'wago',
+      });
+      writeFileSync(join(fixture.root, '.npm-plugin-state.json'), '[]');
 
       expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual(['wago']);
     });
 
     it('discovers a tracked npm installation', () => {
       const folder = 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28';
-      writePlugin(root, folder, { ...VALID_MANIFEST, name: 'wago' });
-      writeFileSync(join(root, '.npm-plugin-state.json'), JSON.stringify([{ installPath: folder }]));
+      fixture.writePlugin(fixture.root, folder, { ...fixture.VALID_MANIFEST, name: 'wago' });
+      writeFileSync(join(fixture.root, '.npm-plugin-state.json'), JSON.stringify([{ installPath: folder }]));
 
       expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual([folder]);
     });
 
     it('keeps npm directories visible when the install state file is unreadable', () => {
       const folder = 'npm-QGF0dHJhY2Nlc3MvcGx1Z2luLXdhZ28';
-      writePlugin(root, folder, { ...VALID_MANIFEST, name: 'wago' });
-      writeFileSync(join(root, '.npm-plugin-state.json'), '{corrupt');
+      fixture.writePlugin(fixture.root, folder, { ...fixture.VALID_MANIFEST, name: 'wago' });
+      writeFileSync(join(fixture.root, '.npm-plugin-state.json'), '{corrupt');
 
       expect(PluginService.getPlugins().map(({ pluginDirectory }) => pluginDirectory)).toEqual([folder]);
     });
 
     it('rejects a ZIP upload whose name falls in the reserved npm directory namespace', async () => {
-      const zip = zipFileUpload({ 'plugin.json': JSON.stringify({ ...VALID_MANIFEST, name: 'npm-tools' }) });
+      const zip = zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, name: 'npm-tools' }) });
 
       await expect(new PluginService().uploadPlugin(zip)).rejects.toThrow('visible single path segment');
     });
 
     it('returns an empty array when the plugin folder does not exist', () => {
-      PluginService.configure({ PLUGIN_DIR: join(root, 'does-not-exist'), RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: join(fixture.root, 'does-not-exist'), RESTART_BY_EXIT: true });
       expect(PluginService.getPlugins()).toEqual([]);
     });
 
     it('discovers a manifest and assigns a stable id and prefixed backend directory', () => {
-      writePlugin(root, 'my-plugin', {
+      fixture.writePlugin(fixture.root, 'my-plugin', {
         name: 'my-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -126,7 +64,7 @@ describe('PluginService', () => {
     });
 
     it('keeps a plugin id stable across discovery scans', () => {
-      writePlugin(root, 'stable-plugin', {
+      fixture.writePlugin(fixture.root, 'stable-plugin', {
         name: 'stable-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -134,19 +72,19 @@ describe('PluginService', () => {
       });
 
       const first = PluginService.getPlugins()[0].id;
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
 
       expect(PluginService.getPlugins()[0].id).toBe(first);
     });
 
     it('reports per-plugin backend load status (loaded / error / unknown)', () => {
-      writePlugin(root, 'plugin-ok', {
+      fixture.writePlugin(fixture.root, 'plugin-ok', {
         name: 'plugin-ok',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
         attraccessVersion: { min: '1.0.0' },
       });
-      writePlugin(root, 'plugin-bad', {
+      fixture.writePlugin(fixture.root, 'plugin-bad', {
         name: 'plugin-bad',
         version: '2.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -165,7 +103,7 @@ describe('PluginService', () => {
     });
 
     it('persists a quarantined plugin error across a new process discovery', () => {
-      writePlugin(root, 'crashing-plugin', {
+      fixture.writePlugin(fixture.root, 'crashing-plugin', {
         name: 'crashing-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -174,7 +112,7 @@ describe('PluginService', () => {
       const [plugin] = PluginService.getPlugins();
 
       PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'));
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
 
       expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(true);
       expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({
@@ -184,7 +122,7 @@ describe('PluginService', () => {
     });
 
     it('keeps a failed plugin quarantined in memory when persistence fails', () => {
-      writePlugin(root, 'crashing-plugin', {
+      fixture.writePlugin(fixture.root, 'crashing-plugin', {
         name: 'crashing-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -202,7 +140,7 @@ describe('PluginService', () => {
     });
 
     it('removes quarantine state when a plugin is replaced', () => {
-      writePlugin(root, 'repaired-plugin', {
+      fixture.writePlugin(fixture.root, 'repaired-plugin', {
         name: 'repaired-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -212,13 +150,13 @@ describe('PluginService', () => {
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
 
       PluginService.clearPluginQuarantine(plugin.pluginDirectory);
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
 
       expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
     });
 
     it('preserves quarantine state when clearing it cannot be persisted', () => {
-      writePlugin(root, 'repaired-plugin', {
+      fixture.writePlugin(fixture.root, 'repaired-plugin', {
         name: 'repaired-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -237,7 +175,7 @@ describe('PluginService', () => {
     });
 
     it('persists the startup error before quarantining plugins from an incomplete startup', () => {
-      writePlugin(root, 'previously-active', {
+      fixture.writePlugin(fixture.root, 'previously-active', {
         name: 'previously-active',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -246,9 +184,9 @@ describe('PluginService', () => {
 
       PluginService.beginBootGuard();
       const error = new Error('Plugin onModuleInit failed');
-      error.stack = `${error.stack}\n    at ${join(root, 'previously-active', 'dist', 'index.js')}:1:1`;
+      error.stack = `${error.stack}\n    at ${join(fixture.root, 'previously-active', 'dist', 'index.js')}:1:1`;
       PluginService.recordBootFailure(error);
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
       PluginService.beginBootGuard();
 
       const [plugin] = PluginService.getPlugins();
@@ -257,7 +195,7 @@ describe('PluginService', () => {
     });
 
     it('quarantines guarded plugins after an abrupt startup failure', () => {
-      writePlugin(root, 'unrelated-plugin', {
+      fixture.writePlugin(fixture.root, 'unrelated-plugin', {
         name: 'unrelated-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -265,7 +203,7 @@ describe('PluginService', () => {
       });
 
       PluginService.beginBootGuard();
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
       PluginService.beginBootGuard();
 
       const [plugin] = PluginService.getPlugins();
@@ -273,7 +211,7 @@ describe('PluginService', () => {
     });
 
     it.each(['SIGINT', 'SIGTERM'] as const)('does not quarantine plugins when startup is stopped by %s', (signal) => {
-      writePlugin(root, 'installed-plugin', {
+      fixture.writePlugin(fixture.root, 'installed-plugin', {
         name: 'installed-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -285,14 +223,14 @@ describe('PluginService', () => {
       const handler = process.listeners(signal).find((listener) => !existing.has(listener));
       expect(handler).toBeDefined();
       handler?.();
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
       PluginService.beginBootGuard();
 
       expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
     });
 
     it('creates a configured plugin directory before writing boot guard state', () => {
-      const missingRoot = join(root, 'does-not-exist');
+      const missingRoot = join(fixture.root, 'does-not-exist');
       PluginService.configure({ PLUGIN_DIR: missingRoot, RESTART_BY_EXIT: true });
 
       expect(() => PluginService.beginBootGuard()).not.toThrow();
@@ -300,7 +238,7 @@ describe('PluginService', () => {
     });
 
     it('caches discovery between calls and re-scans after configure', () => {
-      writePlugin(root, 'plugin-a', {
+      fixture.writePlugin(fixture.root, 'plugin-a', {
         name: 'plugin-a',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -310,17 +248,17 @@ describe('PluginService', () => {
       const first = PluginService.getPlugins();
       expect(PluginService.getPlugins()).toBe(first);
 
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
       expect(PluginService.getPlugins()).not.toBe(first);
     });
 
     it('skips folders without a manifest', () => {
-      mkdirSync(join(root, 'not-a-plugin'), { recursive: true });
+      mkdirSync(join(fixture.root, 'not-a-plugin'), { recursive: true });
       expect(PluginService.getPlugins()).toEqual([]);
     });
 
     it('excludes internal npm backup storage from discovery', () => {
-      writePlugin(root, '.npm-backups', {
+      fixture.writePlugin(fixture.root, '.npm-backups', {
         name: 'stale-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -331,7 +269,7 @@ describe('PluginService', () => {
     });
 
     it('excludes hidden replacement backups from discovery', () => {
-      writePlugin(root, '.uploaded-plugin-backup', {
+      fixture.writePlugin(fixture.root, '.uploaded-plugin-backup', {
         name: 'uploaded-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -342,7 +280,7 @@ describe('PluginService', () => {
     });
 
     it('excludes a plugin whose declared permissions are invalid', () => {
-      writePlugin(root, 'bad-perms', {
+      fixture.writePlugin(fixture.root, 'bad-perms', {
         name: 'bad-perms',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -356,7 +294,7 @@ describe('PluginService', () => {
 
   describe('getManifestById / toManifestInfo', () => {
     it('finds a discovered plugin by id and returns undefined for unknown ids', () => {
-      writePlugin(root, 'find-me', {
+      fixture.writePlugin(fixture.root, 'find-me', {
         name: 'find-me',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -389,26 +327,26 @@ describe('PluginService', () => {
 
     it('unpacks a valid plugin, moves it into place and schedules a restart', async () => {
       const service = new PluginService();
-      const file = zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) });
+      const file = zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST) });
 
       const manifest = await service.uploadPlugin(file);
 
       expect(manifest.name).toBe('uploaded-plugin');
-      expect(existsSync(join(root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
-      expect(restartSpy).not.toHaveBeenCalled();
-      flushScheduledRestart();
-      expect(restartSpy).toHaveBeenCalledTimes(1);
+      expect(existsSync(join(fixture.root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
+      expect(fixture.restartSpy).not.toHaveBeenCalled();
+      fixture.flushScheduledRestart();
+      expect(fixture.restartSpy).toHaveBeenCalledTimes(1);
     });
 
     it('clears stale quarantine state for an uploaded replacement', async () => {
-      writePlugin(root, 'uploaded-plugin', VALID_MANIFEST);
+      fixture.writePlugin(fixture.root, 'uploaded-plugin', fixture.VALID_MANIFEST);
       const [previous] = PluginService.getPlugins();
       PluginService.quarantinePlugin(previous, new Error('prior crash'));
-      rmSync(join(root, 'uploaded-plugin'), { recursive: true, force: true });
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      rmSync(join(fixture.root, 'uploaded-plugin'), { recursive: true, force: true });
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
 
-      await new PluginService().uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      await new PluginService().uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST) }));
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
 
       expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
     });
@@ -419,7 +357,7 @@ describe('PluginService', () => {
     it('unpacks a plugin whose contents sit in a single wrapper folder', async () => {
       const service = new PluginService();
       const file = zipFileUpload({
-        'plugin-example/plugin.json': JSON.stringify(VALID_MANIFEST),
+        'plugin-example/plugin.json': JSON.stringify(fixture.VALID_MANIFEST),
         'plugin-example/dist/index.js': 'module.exports = {};',
         '__MACOSX/._plugin.json': 'junk',
       });
@@ -427,10 +365,10 @@ describe('PluginService', () => {
       const manifest = await service.uploadPlugin(file);
 
       expect(manifest.name).toBe('uploaded-plugin');
-      expect(existsSync(join(root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
-      expect(existsSync(join(root, 'uploaded-plugin', 'dist', 'index.js'))).toBe(true);
-      expect(existsSync(join(root, 'temp'))).toBe(true);
-      expect(readdirSync(join(root, 'temp'))).toEqual([]);
+      expect(existsSync(join(fixture.root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
+      expect(existsSync(join(fixture.root, 'uploaded-plugin', 'dist', 'index.js'))).toBe(true);
+      expect(existsSync(join(fixture.root, 'temp'))).toBe(true);
+      expect(readdirSync(join(fixture.root, 'temp'))).toEqual([]);
     });
 
     it('rejects a zip without a plugin.json instead of throwing ENOENT', async () => {
@@ -452,7 +390,7 @@ describe('PluginService', () => {
       const file = zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) });
 
       await expect(service.uploadPlugin(file)).rejects.toBeDefined();
-      expect(readdirSync(join(root, 'temp'))).toEqual([]);
+      expect(readdirSync(join(fixture.root, 'temp'))).toEqual([]);
     });
 
     it('rejects a manifest that fails schema validation', async () => {
@@ -465,12 +403,12 @@ describe('PluginService', () => {
       const service = new PluginService();
       await service.uploadPlugin(
         zipFileUpload({
-          'plugin.json': JSON.stringify(VALID_MANIFEST),
+          'plugin.json': JSON.stringify(fixture.VALID_MANIFEST),
           'dist/index.js': 'module.exports = "old";',
         }),
       );
 
-      const updatedManifest = { ...VALID_MANIFEST, version: '1.2.4' };
+      const updatedManifest = { ...fixture.VALID_MANIFEST, version: '1.2.4' };
       const manifest = await service.uploadPlugin(
         zipFileUpload({
           'plugin.json': JSON.stringify(updatedManifest),
@@ -479,31 +417,33 @@ describe('PluginService', () => {
       );
 
       expect(manifest.version).toBe('1.2.4');
-      expect(readFileSync(join(root, 'uploaded-plugin', 'dist', 'index.js'), 'utf8')).toBe('module.exports = "new";');
-      expect(readdirSync(root).filter((entry) => entry.startsWith('.uploaded-plugin-'))).toEqual([]);
+      expect(readFileSync(join(fixture.root, 'uploaded-plugin', 'dist', 'index.js'), 'utf8')).toBe(
+        'module.exports = "new";',
+      );
+      expect(readdirSync(fixture.root).filter((entry) => entry.startsWith('.uploaded-plugin-'))).toEqual([]);
     });
 
     it.each(['../outside-plugin', 'nested/plugin', '..\\outside-plugin'])(
       'rejects a plugin name that escapes its directory: %s',
       async (name) => {
         const service = new PluginService();
-        const manifest = { ...VALID_MANIFEST, name };
+        const manifest = { ...fixture.VALID_MANIFEST, name };
 
         await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
           'Plugin name must be a visible single path segment',
         );
-        expect(existsSync(join(root, 'outside-plugin'))).toBe(false);
+        expect(existsSync(join(fixture.root, 'outside-plugin'))).toBe(false);
       },
     );
 
     it('rejects a dot-prefixed plugin name that discovery would skip', async () => {
       const service = new PluginService();
-      const manifest = { ...VALID_MANIFEST, name: '.hidden-plugin' };
+      const manifest = { ...fixture.VALID_MANIFEST, name: '.hidden-plugin' };
 
       await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
         'Plugin name must be a visible single path segment',
       );
-      expect(existsSync(join(root, '.hidden-plugin'))).toBe(false);
+      expect(existsSync(join(fixture.root, '.hidden-plugin'))).toBe(false);
     });
 
     it('serializes plugin updates with the same name', async () => {
@@ -540,7 +480,7 @@ describe('PluginService', () => {
     });
 
     it('removes the plugin folder and schedules a restart', async () => {
-      writePlugin(root, 'delete-me', {
+      fixture.writePlugin(fixture.root, 'delete-me', {
         name: 'delete-me',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
@@ -552,32 +492,32 @@ describe('PluginService', () => {
 
       await service.deletePlugin(plugin.id);
 
-      expect(existsSync(join(root, 'delete-me'))).toBe(false);
+      expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
       expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
-      flushScheduledRestart();
-      expect(restartSpy).toHaveBeenCalledTimes(1);
+      fixture.flushScheduledRestart();
+      expect(fixture.restartSpy).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('restartApp', () => {
     it('restarts by exiting when RESTART_BY_EXIT is set', () => {
-      restartSpy.mockRestore();
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      fixture.restartSpy.mockRestore();
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
       expect(() => (new PluginService() as unknown as { restartApp: () => void }).restartApp()).toThrow('process.exit');
-      expect(exitSpy).toHaveBeenCalled();
-      expect(mockSpawn).not.toHaveBeenCalled();
+      expect(fixture.exitSpy).toHaveBeenCalled();
+      expect(fixture.mockSpawn).not.toHaveBeenCalled();
     });
 
     it('respawns a detached process when RESTART_BY_EXIT is not set', () => {
-      restartSpy.mockRestore();
-      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: false });
+      fixture.restartSpy.mockRestore();
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: false });
       expect(() => (new PluginService() as unknown as { restartApp: () => void }).restartApp()).toThrow('process.exit');
-      expect(mockSpawn).toHaveBeenCalledWith(
+      expect(fixture.mockSpawn).toHaveBeenCalledWith(
         process.argv[0],
         process.argv.slice(1),
         expect.objectContaining({ detached: true }),
       );
-      expect(exitSpy).toHaveBeenCalled();
+      expect(fixture.exitSpy).toHaveBeenCalled();
     });
   });
 });

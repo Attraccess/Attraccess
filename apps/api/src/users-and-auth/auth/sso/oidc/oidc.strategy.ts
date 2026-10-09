@@ -1,24 +1,41 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { OidcTokenVerifier, OidcVerificationUnavailableError } from './oidc-token-verifier.service';
 import { EncryptionService } from '../../../../encryption/encryption.service';
-import { Profile, Strategy } from 'passport-openidconnect';
-import { get } from 'lodash-es';
-import { PassportStrategy } from '@nestjs/passport';
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
-import { UsersService } from '../../../users/users.service';
+
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+
 import { ModuleRef } from '@nestjs/core';
-import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
-import { AuthService } from '../../auth.service';
-import { resolveSsoRoleAssignments } from '../permission-mapping';
-import { RbacService } from '../../../rbac/rbac.service';
-import { SSOService } from '../sso.service';
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
-import { ssoAuditSnapshot } from '../sso-audit-snapshot';
-import { randomUUID } from 'node:crypto';
-import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
+
+import { Profile, Strategy } from 'passport-openidconnect';
+
 import { MetricsService } from '../../../../metrics/metrics.service';
+
+import { UsersService } from '../../../users/users.service';
+
+import { AuthService } from '../../auth.service';
+
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
+
+import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
+
+import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
+
+import { randomUUID } from 'node:crypto';
+
+import { SsoAuditService } from '../../../../audit/sso-audit.service';
+
+import { RbacService } from '../../../rbac/rbac.service';
+
+import { resolveSsoRoleAssignments } from '../permission-mapping';
+
+import { ssoAuditSnapshot } from '../audit/provider-audit';
+
+import { SSOService } from '../sso.service';
+
+import { get } from 'lodash-es';
+
+import { PassportStrategy } from '@nestjs/passport';
 
 /** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
 export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
@@ -28,11 +45,8 @@ export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 
 @Injectable()
 export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
-  private readonly logger = new Logger(SSOOIDCStrategy.name);
-  private readonly config: SSOProviderOIDCConfiguration;
-
   constructor(
-    private moduleRef: ModuleRef,
+    protected moduleRef: ModuleRef,
     config: SSOProviderOIDCConfiguration,
     callbackURL: string,
     stateStore: OidcCookieStateStore,
@@ -62,6 +76,10 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
     this.config = config;
   }
 
+  protected readonly logger = new Logger(SSOOIDCStrategy.name);
+
+  protected readonly config: SSOProviderOIDCConfiguration;
+
   /**
    * Use per-request callback URL and state from the guard when set (so frontend/backend URL changes apply without restart).
    * State encodes redirectTo for fixed callback URIs (OIDC spec: use state param instead of redirect_uri query).
@@ -82,27 +100,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
     super.authenticate(req, opts);
   }
 
-  private isOIDCAppState(value: unknown): value is OIDCAppState {
-    return (
-      value !== null &&
-      typeof value === 'object' &&
-      (!('redirectTo' in value) || typeof (value as OIDCAppState).redirectTo === 'string')
-    );
-  }
-
-  private firstNonEmptyStringFromPaths(paths: string[], sources: unknown[]): string | undefined {
-    for (const p of paths) {
-      for (const src of sources) {
-        const value = get(src, p);
-        if (typeof value === 'string' && value.trim().length > 0) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private recordFailure(error: unknown): void {
+  protected recordFailure(error: unknown): void {
     try {
       const metricsService = this.moduleRef.get(MetricsService, { strict: false });
       recordSsoLoginFailure(metricsService, SSOProviderType.OIDC, classifySsoFailureReason(error), this.logger);
@@ -263,56 +261,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
     return await this.syncPermissionsFromClaims(user, claimSources);
   }
 
-  private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
-    const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
-    if (this.config.clientId) {
-      paths.push(`resource_access.${this.config.clientId}.roles`);
-    }
-
-    const values: unknown[] = [];
-    for (const path of paths) {
-      for (const source of claimSources) {
-        const value = get(source, path);
-        if (value !== undefined && value !== null) {
-          values.push(value);
-        }
-      }
-    }
-
-    return values;
-  }
-
-  private resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
-    const roleNames: string[] = [];
-
-    for (const value of claimValues) {
-      if (Array.isArray(value)) {
-        for (const entry of value) {
-          if (typeof entry === 'string') roleNames.push(entry);
-        }
-        continue;
-      }
-      if (typeof value === 'string') {
-        roleNames.push(value);
-        continue;
-      }
-      if (value && typeof value === 'object') {
-        for (const entry of Object.values(value)) {
-          if (typeof entry === 'string') roleNames.push(entry);
-          else if (Array.isArray(entry)) {
-            for (const item of entry) {
-              if (typeof item === 'string') roleNames.push(item);
-            }
-          }
-        }
-      }
-    }
-
-    this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
-    return roleNames;
-  }
-
-  private async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {
+  protected async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {
     const claimValues = this.getPermissionClaimValues(claimSources);
     this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
     const roleNames = this.resolveRoleNamesFromClaims(claimValues);
@@ -340,7 +289,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
     return user;
   }
 
-  private async recordProvisioningAudit(
+  protected async recordProvisioningAudit(
     userId: number,
     userCreated: boolean,
     changes?: { added: string[]; removed: string[]; updated: string[] },
@@ -379,5 +328,74 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
         `Failed to record committed OIDC provisioning audit: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  protected isOIDCAppState(value: unknown): value is OIDCAppState {
+    return (
+      value !== null &&
+      typeof value === 'object' &&
+      (!('redirectTo' in value) || typeof (value as OIDCAppState).redirectTo === 'string')
+    );
+  }
+
+  protected firstNonEmptyStringFromPaths(paths: string[], sources: unknown[]): string | undefined {
+    for (const p of paths) {
+      for (const src of sources) {
+        const value = get(src, p);
+        if (typeof value === 'string' && value.trim().length > 0) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  protected getPermissionClaimValues(claimSources: unknown[]): unknown[] {
+    const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
+    if (this.config.clientId) {
+      paths.push(`resource_access.${this.config.clientId}.roles`);
+    }
+
+    const values: unknown[] = [];
+    for (const path of paths) {
+      for (const source of claimSources) {
+        const value = get(source, path);
+        if (value !== undefined && value !== null) {
+          values.push(value);
+        }
+      }
+    }
+
+    return values;
+  }
+
+  protected resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
+    const roleNames: string[] = [];
+
+    for (const value of claimValues) {
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (typeof entry === 'string') roleNames.push(entry);
+        }
+        continue;
+      }
+      if (typeof value === 'string') {
+        roleNames.push(value);
+        continue;
+      }
+      if (value && typeof value === 'object') {
+        for (const entry of Object.values(value)) {
+          if (typeof entry === 'string') roleNames.push(entry);
+          else if (Array.isArray(entry)) {
+            for (const item of entry) {
+              if (typeof item === 'string') roleNames.push(item);
+            }
+          }
+        }
+      }
+    }
+
+    this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
+    return roleNames;
   }
 }

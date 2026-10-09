@@ -1,27 +1,10 @@
-import {
-  ApiError,
-  SSOProvider,
-  SSOProviderType,
-  User,
-  useAuthenticationServiceGetAllSsoProviders,
-  useLicenseServiceGetLicenseInformation,
-  useRbacServiceListPermissions,
-  useRbacServiceListRoles,
-  useUsersServiceDeleteUser,
-  useUsersServiceGetOneUserById,
-  useUsersServiceGetUserRoleAssignments,
-} from '@attraccess/react-query-client';
-
-import { PageHeader } from '../../../components/pageHeader';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { UserPermissionForm } from './components/permissionsForm';
-import { SetPasswordForm } from './components/setPasswordForm';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ChangeUsernameForm } from './components/changeUsername';
-import { ChangeEmailForm } from './components/changeEmail';
-
-import en from './en.json';
-import de from './de.json';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { NotFound } from '../../not-found/index';
+import { PageHeader } from '../../../components/pageHeader/index';
+import { UserPermissionForm } from './components/permissionsForm/index';
+import { SetPasswordForm } from './components/setPasswordForm/index';
+import { ChangeUsernameForm } from './components/changeUsername/index';
+import { ChangeEmailForm } from './components/changeEmail/index';
 import { Chip, ModalBody, ModalFooter, ModalHeader, ModalHeading, Separator, useOverlayState } from '@heroui/react';
 import {
   AlertTriangleIcon,
@@ -33,18 +16,39 @@ import {
   CreditCardIcon,
 } from 'lucide-react';
 import { FlatSection } from '../../../components/flatSection';
-import { Button } from '../../../components/button';
+import { Button } from '../../../components/button/index';
 import { StandardModal } from '../../../components/standardModal';
+import {
+  useRbacServiceListPermissions,
+  useRbacServiceListRoles,
+  useUsersServiceGetUserRoleAssignments,
+  ApiError,
+  SSOProvider,
+  SSOProviderType,
+  User,
+  useAuthenticationServiceGetAllSsoProviders,
+  useLicenseServiceGetLicenseInformation,
+  useUsersServiceDeleteUser,
+  useUsersServiceGetOneUserById,
+} from '@attraccess/react-query-client';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
+import { useMemo } from 'react';
+import en from './en.json';
+import de from './de.json';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
-import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
-import { useMemo } from 'react';
 import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
-import { NotFound } from '../../not-found';
 
-function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnType<typeof useTranslations>['t'] }) {
+export function EffectivePermissionsSection({
+  userId,
+  t,
+}: {
+  userId: number;
+  t: ReturnType<typeof useTranslations>['t'];
+}) {
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
   const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
   const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
@@ -105,20 +109,7 @@ function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnT
   );
 }
 
-// `/users/:id` also matches paths like `/users/security`, which used to render a detail page for a
-// user that cannot exist — heading `(ID: )`, empty body. A non-numeric segment is not a user (ATT-869).
-export function UserManagementDetailsPage() {
-  const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
-
-  if (!/^\d+$/.test(id ?? '')) {
-    return <NotFound />;
-  }
-
-  return <UserDetails id={Number(id)} roleIdToAssign={Number(searchParams.get('assignRoleId')) || undefined} />;
-}
-
-function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
+export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
   const { t, tExists } = useTranslations({
     en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
@@ -232,6 +223,45 @@ function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: numb
       });
     },
   });
+  return {
+    t,
+    navigate,
+    isOpen,
+    open,
+    setOpen,
+    hasPermission,
+    user,
+    license,
+    providersById,
+    ssoDetails,
+    ssoManagedProviders,
+    ssoManagedPermissionKeys,
+    isSelf,
+    deleteUser,
+    isDeleting,
+    id,
+    roleIdToAssign,
+  };
+}
+
+export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
+  const {
+    t,
+    navigate,
+    isOpen,
+    open,
+    setOpen,
+    hasPermission,
+    user,
+    license,
+    providersById,
+    ssoDetails,
+    ssoManagedProviders,
+    ssoManagedPermissionKeys,
+    isSelf,
+    deleteUser,
+    isDeleting,
+  } = useUserDetailsState({ id, roleIdToAssign });
 
   return (
     <div>
@@ -390,4 +420,17 @@ function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: numb
       </StandardModal>
     </div>
   );
+}
+
+// `/users/:id` also matches paths like `/users/security`, which used to render a detail page for a
+// user that cannot exist — heading `(ID: )`, empty body. A non-numeric segment is not a user (ATT-869).
+export function UserManagementDetailsPage() {
+  const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+
+  if (!/^\d+$/.test(id ?? '')) {
+    return <NotFound />;
+  }
+
+  return <UserDetails id={Number(id)} roleIdToAssign={Number(searchParams.get('assignRoleId')) || undefined} />;
 }

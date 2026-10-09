@@ -1,62 +1,18 @@
 import { ModuleRef } from '@nestjs/core';
-import { Profile, Strategy } from 'passport-openidconnect';
-import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
-import { AuthService } from '../../auth.service';
+import { registerSsooidcstrategyClaimPathResolutionFixture } from './oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
+import { Profile, Strategy } from 'passport-openidconnect';
 import {
-  AuthenticationType,
   SSOProvider,
-  SSOProviderOIDCConfiguration,
   SSOProviderType,
+  SSOProviderOIDCConfiguration,
   User,
+  AuthenticationType,
 } from '@attraccess/database-entities';
-import { UsersService } from '../../../users/users.service';
-import { RbacService } from '../../../rbac/rbac.service';
-import { SSOService } from '../sso.service';
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
+import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 
 describe('SSOOIDCStrategy - claim path resolution', () => {
-  const callbackURL = 'http://localhost/cb';
-  const mockStateStore = { store: jest.fn(), verify: jest.fn() } as unknown as OidcCookieStateStore;
-
-  function createStrategy(
-    config: Partial<SSOProviderOIDCConfiguration>,
-    usersServiceMock: Partial<UsersService>,
-    authServiceMock: Partial<AuthService>,
-    rbacServiceMock?: Partial<RbacService>,
-    ssoServiceMock?: Partial<SSOService>,
-    ssoAuditMock?: Partial<SsoAuditService>,
-  ) {
-    const moduleRef = {
-      get: jest.fn((token: unknown) => {
-        if (token === UsersService) return usersServiceMock;
-        if (token === AuthService) return authServiceMock;
-        if (token === RbacService) return rbacServiceMock ?? { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
-        if (token === SSOService) return ssoServiceMock;
-        if (token === SsoAuditService) return ssoAuditMock;
-        throw new Error('Unexpected dependency request');
-      }),
-    } as unknown as ModuleRef;
-
-    const baseConfig: SSOProviderOIDCConfiguration = {
-      id: 1,
-      ssoProviderId: 1,
-      issuer: 'https://issuer',
-      authorizationURL: 'https://issuer/auth',
-      tokenURL: 'https://issuer/token',
-      userInfoURL: 'https://issuer/userinfo',
-      clientId: 'client',
-      clientSecret: 'secret',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      scopes: null,
-      usernameClaimPaths: null,
-      emailClaimPaths: null,
-      ssoProvider: {} as SSOProvider,
-    };
-
-    return new SSOOIDCStrategy(moduleRef, { ...baseConfig, ...config }, callbackURL, mockStateStore);
-  }
+  const fixture = registerSsooidcstrategyClaimPathResolutionFixture();
 
   it('rejects missing subject or email before account creation and handles an unsuccessful create', async () => {
     const users = {
@@ -65,7 +21,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       buildUsernameFromSSOClaim: jest.fn((value) => value),
     };
     const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
-    const strategy = createStrategy({}, users, auth);
+    const strategy = fixture.createStrategy({}, users, auth);
     await expect(strategy.validateProfile('issuer', {} as Profile)).rejects.toThrow('No user ID');
     await expect(strategy.validateProfile('issuer', { id: 'subject' } as Profile)).rejects.toThrow('No email');
     expect(users.createOne).not.toHaveBeenCalled();
@@ -80,7 +36,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const users = { findOne: jest.fn().mockResolvedValue(user) };
     const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(7) };
     const rbac = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       {
         roleMappings: { operator: ['staff'], supervisor: ['leads'], member: ['members'] },
         emailClaimPaths: ['missing.path'],
@@ -131,7 +87,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       addAuthenticationDetails: jest.fn(),
     };
 
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       {
         usernameClaimPaths: ['customUser'],
       },
@@ -176,7 +132,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       addAuthenticationDetails: jest.fn(),
     };
 
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       {
         emailClaimPaths: ['mail'],
       },
@@ -221,7 +177,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
         roleMappings: { 'user-manager': ['admins'] },
       },
     } as SSOProvider;
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       { roleMappings: { 'user-manager': ['admins'] } },
       usersService,
       authService,
@@ -273,7 +229,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
         roleMappings: { 'user-manager': ['admins'] },
       },
     } as SSOProvider;
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       { roleMappings: { 'user-manager': ['admins'] } },
       usersService,
       authService,
@@ -324,7 +280,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
         roleMappings: null,
       },
     } as SSOProvider;
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       {},
       usersService,
       authService,
@@ -367,7 +323,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       addAuthenticationDetails: jest.fn(),
     };
 
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       {
         usernameClaimPaths: ['customUser'],
       },
@@ -408,7 +364,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
 
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const strategy = createStrategy({}, usersService, authService, rbacService);
+    const strategy = fixture.createStrategy({}, usersService, authService, rbacService);
 
     const profile = {
       id: 'ext-roles',
@@ -439,7 +395,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
 
     // Admin emptied the mapping table → stored config is {} — sync must still run so roles
     // granted under the old mapping get revoked at next login.
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       { roleMappings: {} } as Partial<SSOProviderOIDCConfiguration>,
       usersService,
       authService,
@@ -473,7 +429,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
 
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       {
         roleMappings: { 'user-manager': ['attraccess_admin'] },
       } as Partial<SSOProviderOIDCConfiguration>,
@@ -501,7 +457,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
       usersService,
       authService,
@@ -531,7 +487,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
       usersService,
       authService,
@@ -556,7 +512,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const strategy = createStrategy(
+    const strategy = fixture.createStrategy(
       { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
       usersService,
       authService,
@@ -581,7 +537,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     }
 
     it('filters configured `openid` from scopes so it is not passed twice', () => {
-      const strategy = createStrategy(
+      const strategy = fixture.createStrategy(
         { scopes: ['openid', 'email', 'profile'] },
         { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
@@ -590,7 +546,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     });
 
     it('filters `openid` case-insensitively and trimmed from configured scopes', () => {
-      const strategy = createStrategy(
+      const strategy = fixture.createStrategy(
         { scopes: [' OpenID ', 'Email', 'profile'] },
         { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
@@ -599,7 +555,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     });
 
     it('uses default scopes (without openid) when scopes is unset', () => {
-      const strategy = createStrategy(
+      const strategy = fixture.createStrategy(
         {},
         { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
@@ -608,7 +564,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     });
 
     it('uses default scopes (without openid) when scopes is an empty array', () => {
-      const strategy = createStrategy(
+      const strategy = fixture.createStrategy(
         { scopes: [] },
         { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
@@ -617,7 +573,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     });
 
     it('passes `skipUserProfile: false` explicitly so the userinfo endpoint is always fetched', () => {
-      const strategy = createStrategy(
+      const strategy = fixture.createStrategy(
         {},
         { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
@@ -631,7 +587,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       const baseAuthenticateSpy = jest.spyOn(Strategy.prototype, 'authenticate').mockImplementation(() => {
         /* noop: avoid running real Passport strategy */
       });
-      const strategy = createStrategy(
+      const strategy = fixture.createStrategy(
         {},
         {
           findOne: jest.fn(),
@@ -656,7 +612,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       const baseAuthenticateSpy = jest.spyOn(Strategy.prototype, 'authenticate').mockImplementation(() => {
         /* noop */
       });
-      const strategy = createStrategy(
+      const strategy = fixture.createStrategy(
         {},
         {
           findOne: jest.fn(),

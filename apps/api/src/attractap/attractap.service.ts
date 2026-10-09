@@ -1,84 +1,228 @@
+import {
+  Attractap,
+  AttractapCrashReport,
+  NFCCard,
+  Resource,
+  User,
+  AttractapFirmwareVersion,
+} from '@attraccess/database-entities';
+
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { subtle, pbkdf2Sync, randomBytes } from 'crypto';
-import { NFCCard, Attractap, AttractapCrashReport, Resource, User } from '@attraccess/database-entities';
-import { ReaderCrashReportPayload } from './websockets/websocket.types';
-import { DeleteResult, FindManyOptions, In, Repository } from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
-import { securelyHashToken } from './websockets/websocket.utils';
-import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { AttractapFirmwareVersion } from '@attraccess/database-entities';
-import { EncryptionService } from '../encryption/encryption.service';
-import { MetricsService } from '../metrics/metrics.service';
-import { CoredumpSymbolicationService } from './coredump-symbolication.service';
-import { AttractapFirmwareService } from './firmware.service';
-import { AttractapCrashReportDto } from './dtos/crash-report.dto';
-import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
-import { NotificationCategory } from '../notifications/notification-types';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { Repository, FindManyOptions, In, DeleteResult } from 'typeorm';
+
 import { AuditService } from '../audit/audit.service';
+
+import { EncryptionService } from '../encryption/encryption.service';
+
+import { MetricsService } from '../metrics/metrics.service';
+
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
+
+import { CoredumpSymbolicationService } from './coredump-symbolication.service';
+
+import { AttractapFirmwareService } from './firmware.service';
+
+import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+
+import { ReaderCrashReportPayload } from './websockets/websocket.types';
+
+import { randomBytes, pbkdf2Sync, subtle } from 'crypto';
+
+import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
+
+import { securelyHashToken } from './websockets/websocket.utils';
+
+import { NotificationCategory } from '../notifications/notification-types';
+
 import { createTranslator } from '../i18n/translate';
-import * as en from './rfid-card-notification.en.json';
+
 import * as de from './rfid-card-notification.de.json';
 
-const t = createTranslator({ en, de });
+import * as en from './rfid-card-notification.en.json';
+
+export const t = createTranslator({ en, de });
 
 @Injectable()
 export class AttractapService {
-  private readonly logger = new Logger(AttractapService.name);
-
   public constructor(
     @InjectRepository(NFCCard)
-    private readonly nfcCardRepository: Repository<NFCCard>,
+    protected readonly nfcCardRepository: Repository<NFCCard>,
     @InjectRepository(Attractap)
-    private readonly readerRepository: Repository<Attractap>,
+    protected readonly readerRepository: Repository<Attractap>,
     @InjectRepository(AttractapCrashReport)
-    private readonly crashReportRepository: Repository<AttractapCrashReport>,
+    protected readonly crashReportRepository: Repository<AttractapCrashReport>,
     @Inject(EventEmitter2)
-    private readonly eventEmitter: EventEmitter2,
+    protected readonly eventEmitter: EventEmitter2,
     @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    protected readonly resourceRepository: Repository<Resource>,
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly encryptionService: EncryptionService,
-    private readonly metricsService: MetricsService,
-    private readonly coredumpSymbolicationService: CoredumpSymbolicationService,
-    private readonly firmwareService: AttractapFirmwareService,
-    private readonly notifications: NotificationDispatchService,
-    private readonly audit: AuditService,
+    protected readonly userRepository: Repository<User>,
+    protected readonly encryptionService: EncryptionService,
+    protected readonly metricsService: MetricsService,
+    protected readonly coredumpSymbolicationService: CoredumpSymbolicationService,
+    protected readonly firmwareService: AttractapFirmwareService,
+    protected readonly notifications: NotificationDispatchService,
+    protected readonly audit: AuditService,
   ) {}
 
-  private notifyNfcCardChange(card: NFCCard | undefined, action: 'registered' | 'activated' | 'deactivated' | 'deleted'): void {
-    if (!card?.user) {
-      return;
+  protected readonly logger = new Logger(AttractapService.name);
+
+  public async createCrashReport(readerId: number, payload: ReaderCrashReportPayload): Promise<AttractapCrashReport> {
+    const coredump =
+      typeof payload.coredumpBase64 === 'string' && payload.coredumpBase64.length > 0
+        ? Buffer.from(payload.coredumpBase64, 'base64')
+        : null;
+
+    const report = await this.crashReportRepository.save({
+      attractapId: readerId,
+      resetReason: payload.resetReason,
+      rebootReason: payload.rebootReason || null,
+      heapFreeBytes: this.toNullableInt(payload.heapFreeBytes),
+      largestFreeBlockBytes: this.toNullableInt(payload.largestFreeBlockBytes),
+      uptimeBeforeResetMs: this.toNullableInt(payload.uptimeBeforeResetMs),
+      wsState: payload.wsState ?? null,
+      wifiState: payload.wifiState ?? null,
+      firmwareVersion: payload.firmwareVersion ?? null,
+      coredumpSize: coredump ? coredump.length : null,
+      coredump,
+      symbolicationStatus: coredump ? 'pending' : null,
+    });
+
+    if (coredump) {
+      await this.symbolicateCrashReport(report, readerId, coredump);
     }
 
-    void this.notifications.dispatch({
-      category: NotificationCategory.NFC_CARDS,
-      recipients: [card.user],
-      title: (recipient) => t(recipient.locale, `${action}Title`),
-      body: (recipient) => t(recipient.locale, `${action}Body`, { cardId: card.id }),
-      url: '/attractap/nfc-cards',
-      dedupeKey: `nfc-card-${card.id}-${action}`,
-    }).catch((error) => {
-      this.logger.error(`Failed to notify user ${card.user.id} about RFID card ${action}: ${(error as Error).message}`);
+    report.coredump = null;
+    return report;
+  }
+
+  protected async symbolicateCrashReport(
+    report: AttractapCrashReport,
+    readerId: number,
+    coredump: Buffer,
+  ): Promise<void> {
+    try {
+      const reader = await this.readerRepository.findOne({ where: { id: readerId } });
+      // No explicit buildId: the symbolication service extracts the truncated app ELF
+      // SHA256 from the coredump itself and matches it against published firmware ELFs.
+      const result = await this.coredumpSymbolicationService.symbolicate(coredump, {
+        variant: reader?.firmware?.variant ?? null,
+      });
+      await this.crashReportRepository.update(report.id, {
+        coredumpBuildId: result.buildId,
+        symbolicationStatus: result.status,
+        symbolizedBacktrace: result.backtrace,
+      });
+      report.coredumpBuildId = result.buildId;
+      report.symbolicationStatus = result.status;
+      report.symbolizedBacktrace = result.backtrace;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to symbolicate coredump for report ${report.id}: ${message}`);
+      await this.crashReportRepository
+        .update(report.id, { symbolicationStatus: 'failed', symbolizedBacktrace: message })
+        .catch(() => undefined);
+      report.symbolicationStatus = 'failed';
+      report.symbolizedBacktrace = message;
+    }
+  }
+
+  public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReportDto[]> {
+    const [reader, reports] = await Promise.all([
+      this.readerRepository.findOne({ where: { id: readerId } }),
+      this.crashReportRepository.find({
+        where: { attractapId: readerId },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+
+    const currentReaderFirmwareVersion = reader?.firmware?.version ?? null;
+    const latestServerFirmwareVersion =
+      reader?.firmware?.name && reader?.firmware?.variant
+        ? (this.firmwareService.getFirmwareDefinition(reader.firmware.name, reader.firmware.variant)?.version ?? null)
+        : null;
+
+    return reports.map((report) =>
+      this.toCrashReportDto(report, currentReaderFirmwareVersion, latestServerFirmwareVersion),
+    );
+  }
+
+  protected toCrashReportDto(
+    report: AttractapCrashReport,
+    currentReaderFirmwareVersion: string | null,
+    latestServerFirmwareVersion: string | null,
+  ): AttractapCrashReportDto {
+    const firmwareMatchesCurrentReader = this.compareNullableVersions(
+      report.firmwareVersion,
+      currentReaderFirmwareVersion,
+    );
+    const firmwareMatchesLatestServer = this.compareNullableVersions(
+      report.firmwareVersion,
+      latestServerFirmwareVersion,
+    );
+
+    return {
+      id: report.id,
+      attractapId: report.attractapId,
+      resetReason: report.resetReason,
+      rebootReason: report.rebootReason,
+      heapFreeBytes: report.heapFreeBytes,
+      largestFreeBlockBytes: report.largestFreeBlockBytes,
+      uptimeBeforeResetMs: report.uptimeBeforeResetMs,
+      wsState: report.wsState,
+      wifiState: report.wifiState,
+      firmwareVersion: report.firmwareVersion,
+      currentReaderFirmwareVersion,
+      latestServerFirmwareVersion,
+      firmwareMatchesCurrentReader,
+      firmwareMatchesLatestServer,
+      coredumpSize: report.coredumpSize,
+      coredumpBuildId: report.coredumpBuildId,
+      coredumpBuildIdKnown: report.coredumpBuildId
+        ? this.firmwareService.hasSymbolForBuildId(report.coredumpBuildId)
+        : null,
+      symbolicationStatus: report.symbolicationStatus,
+      symbolizedBacktrace: report.symbolizedBacktrace,
+      createdAt: report.createdAt,
+    };
+  }
+
+  protected compareNullableVersions(left: string | null, right: string | null): boolean | null {
+    if (!left || !right) {
+      return null;
+    }
+    return left === right;
+  }
+
+  public async getCrashReportCoredump(
+    readerId: number,
+    reportId: number,
+  ): Promise<{ filename: string; coredump: Buffer } | null> {
+    const report = await this.crashReportRepository.findOne({
+      where: { id: reportId, attractapId: readerId },
+      select: { id: true, attractapId: true, coredump: true },
     });
+
+    if (!report?.coredump) {
+      return null;
+    }
+
+    return {
+      filename: `reader-${readerId}-crash-${reportId}.coredump`,
+      coredump: report.coredump,
+    };
   }
 
-  public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
-    return this.decryptCardKey(card);
-  }
-
-  public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
-    const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
-    cards.forEach((card) => this.decryptCardKey(card));
-    return cards;
-  }
-
-  public async getAllNFCCards(): Promise<NFCCard[]> {
-    const cards = await this.nfcCardRepository.find();
-    cards.forEach((card) => this.decryptCardKey(card));
-    return cards;
+  protected toNullableInt(value: number | null | undefined): number | null {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return null;
+    }
+    return Math.trunc(value);
   }
 
   public async updateLastReaderConnection(id: number) {
@@ -95,88 +239,6 @@ export class AttractapService {
         'resources.introducers.user',
       ],
     });
-  }
-
-  public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
-    return this.decryptCardKey(card);
-  }
-
-  public async createNFCCard(
-    user: User,
-    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>,
-  ): Promise<NFCCard> {
-    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
-
-      return await transactionalEntityManager.save(NFCCard, {
-        ...data,
-        key: this.encryptionService.encrypt(data.key),
-        user,
-        isActive: true,
-      });
-    });
-    this.notifyNfcCardChange(card, 'registered');
-    return card;
-  }
-
-  /**
-   * Activates an RFID card (deactivates all other cards for the same user)
-   * @param id The ID of the RFID card to activate
-   * @returns The activated RFID card
-   */
-  public async activateNFCCard(id: number): Promise<NFCCard> {
-    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: ['user'] });
-
-      if (!card) {
-        throw new Error(`Card with ID ${id} not found`);
-      }
-
-      await transactionalEntityManager
-        .createQueryBuilder()
-        .update(NFCCard)
-        .set({ isActive: false })
-        .where({ user: { id: card.user.id } })
-        .execute();
-
-      return await transactionalEntityManager.save(NFCCard, {
-        ...card,
-        isActive: true,
-      });
-    });
-    this.notifyNfcCardChange(card, 'activated');
-    return card;
-  }
-
-  /**
-   * Deactivates an RFID card
-   * @param id The ID of the RFID card to deactivate
-   * @returns The deactivated RFID card
-   */
-  public async deactivateNFCCard(id: number): Promise<NFCCard> {
-    await this.nfcCardRepository.update(id, { isActive: false });
-    const card = await this.getNFCCardByID(id);
-    this.notifyNfcCardChange(card, 'deactivated');
-    return card;
-  }
-
-  public async deleteNFCCard(id: number): Promise<DeleteResult> {
-    const card = await this.getNFCCardByID(id);
-    const result = await this.nfcCardRepository.delete(id);
-    this.notifyNfcCardChange(card, 'deleted');
-    return result;
-  }
-
-  public async updateNFCCardLastSeen(uid: string): Promise<null | true> {
-    const card = await this.getNFCCardByUID(uid);
-
-    if (!card) {
-      return null;
-    }
-
-    await this.nfcCardRepository.update(card.id, { lastSeen: new Date() });
-    return true;
   }
 
   public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
@@ -271,9 +333,12 @@ export class AttractapService {
     principal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<void> {
     await this.audit.recordAttractap({
-      action: 'reader.deregistered', actorId: principal.userId, authenticationMethod: principal.authenticationMethod,
+      action: 'reader.deregistered',
+      actorId: principal.userId,
+      authenticationMethod: principal.authenticationMethod,
       ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
-      subjectId: readerId, details: { source: 'admin-api' },
+      subjectId: readerId,
+      details: { source: 'admin-api' },
     });
   }
 
@@ -290,159 +355,6 @@ export class AttractapService {
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {
     return await this.readerRepository.find(options);
-  }
-
-  public async createCrashReport(readerId: number, payload: ReaderCrashReportPayload): Promise<AttractapCrashReport> {
-    const coredump =
-      typeof payload.coredumpBase64 === 'string' && payload.coredumpBase64.length > 0
-        ? Buffer.from(payload.coredumpBase64, 'base64')
-        : null;
-
-    const report = await this.crashReportRepository.save({
-      attractapId: readerId,
-      resetReason: payload.resetReason,
-      rebootReason: payload.rebootReason || null,
-      heapFreeBytes: this.toNullableInt(payload.heapFreeBytes),
-      largestFreeBlockBytes: this.toNullableInt(payload.largestFreeBlockBytes),
-      uptimeBeforeResetMs: this.toNullableInt(payload.uptimeBeforeResetMs),
-      wsState: payload.wsState ?? null,
-      wifiState: payload.wifiState ?? null,
-      firmwareVersion: payload.firmwareVersion ?? null,
-      coredumpSize: coredump ? coredump.length : null,
-      coredump,
-      symbolicationStatus: coredump ? 'pending' : null,
-    });
-
-    if (coredump) {
-      await this.symbolicateCrashReport(report, readerId, coredump);
-    }
-
-    report.coredump = null;
-    return report;
-  }
-
-  private async symbolicateCrashReport(
-    report: AttractapCrashReport,
-    readerId: number,
-    coredump: Buffer,
-  ): Promise<void> {
-    try {
-      const reader = await this.readerRepository.findOne({ where: { id: readerId } });
-      // No explicit buildId: the symbolication service extracts the truncated app ELF
-      // SHA256 from the coredump itself and matches it against published firmware ELFs.
-      const result = await this.coredumpSymbolicationService.symbolicate(coredump, {
-        variant: reader?.firmware?.variant ?? null,
-      });
-      await this.crashReportRepository.update(report.id, {
-        coredumpBuildId: result.buildId,
-        symbolicationStatus: result.status,
-        symbolizedBacktrace: result.backtrace,
-      });
-      report.coredumpBuildId = result.buildId;
-      report.symbolicationStatus = result.status;
-      report.symbolizedBacktrace = result.backtrace;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to symbolicate coredump for report ${report.id}: ${message}`);
-      await this.crashReportRepository
-        .update(report.id, { symbolicationStatus: 'failed', symbolizedBacktrace: message })
-        .catch(() => undefined);
-      report.symbolicationStatus = 'failed';
-      report.symbolizedBacktrace = message;
-    }
-  }
-
-  public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReportDto[]> {
-    const [reader, reports] = await Promise.all([
-      this.readerRepository.findOne({ where: { id: readerId } }),
-      this.crashReportRepository.find({
-        where: { attractapId: readerId },
-        order: { createdAt: 'DESC' },
-      }),
-    ]);
-
-    const currentReaderFirmwareVersion = reader?.firmware?.version ?? null;
-    const latestServerFirmwareVersion =
-      reader?.firmware?.name && reader?.firmware?.variant
-        ? (this.firmwareService.getFirmwareDefinition(reader.firmware.name, reader.firmware.variant)?.version ?? null)
-        : null;
-
-    return reports.map((report) =>
-      this.toCrashReportDto(report, currentReaderFirmwareVersion, latestServerFirmwareVersion),
-    );
-  }
-
-  private toCrashReportDto(
-    report: AttractapCrashReport,
-    currentReaderFirmwareVersion: string | null,
-    latestServerFirmwareVersion: string | null,
-  ): AttractapCrashReportDto {
-    const firmwareMatchesCurrentReader = this.compareNullableVersions(
-      report.firmwareVersion,
-      currentReaderFirmwareVersion,
-    );
-    const firmwareMatchesLatestServer = this.compareNullableVersions(
-      report.firmwareVersion,
-      latestServerFirmwareVersion,
-    );
-
-    return {
-      id: report.id,
-      attractapId: report.attractapId,
-      resetReason: report.resetReason,
-      rebootReason: report.rebootReason,
-      heapFreeBytes: report.heapFreeBytes,
-      largestFreeBlockBytes: report.largestFreeBlockBytes,
-      uptimeBeforeResetMs: report.uptimeBeforeResetMs,
-      wsState: report.wsState,
-      wifiState: report.wifiState,
-      firmwareVersion: report.firmwareVersion,
-      currentReaderFirmwareVersion,
-      latestServerFirmwareVersion,
-      firmwareMatchesCurrentReader,
-      firmwareMatchesLatestServer,
-      coredumpSize: report.coredumpSize,
-      coredumpBuildId: report.coredumpBuildId,
-      coredumpBuildIdKnown: report.coredumpBuildId
-        ? this.firmwareService.hasSymbolForBuildId(report.coredumpBuildId)
-        : null,
-      symbolicationStatus: report.symbolicationStatus,
-      symbolizedBacktrace: report.symbolizedBacktrace,
-      createdAt: report.createdAt,
-    };
-  }
-
-  private compareNullableVersions(left: string | null, right: string | null): boolean | null {
-    if (!left || !right) {
-      return null;
-    }
-    return left === right;
-  }
-
-  public async getCrashReportCoredump(
-    readerId: number,
-    reportId: number,
-  ): Promise<{ filename: string; coredump: Buffer } | null> {
-    const report = await this.crashReportRepository.findOne({
-      where: { id: reportId, attractapId: readerId },
-      select: { id: true, attractapId: true, coredump: true },
-    });
-
-    if (!report?.coredump) {
-      return null;
-    }
-
-    return {
-      filename: `reader-${readerId}-crash-${reportId}.coredump`,
-      coredump: report.coredump,
-    };
-  }
-
-  private toNullableInt(value: number | null | undefined): number | null {
-    if (value === null || value === undefined || !Number.isFinite(value)) {
-      return null;
-    }
-    return Math.trunc(value);
   }
 
   public uint8ArrayToHexString(uint8Array: Uint8Array) {
@@ -493,7 +405,7 @@ export class AttractapService {
     return new Uint8Array(derivedKey).slice(0, 16);
   }
 
-  private async resolveNfcKeySeedToken(user: User): Promise<string> {
+  protected async resolveNfcKeySeedToken(user: User): Promise<string> {
     if (!user.nfcKeySeedToken) {
       const token = randomBytes(24).toString('base64url').slice(0, 32);
       user.nfcKeySeedToken = this.encryptionService.encrypt(token);
@@ -503,11 +415,134 @@ export class AttractapService {
     return this.encryptionService.decryptIfEncrypted(user.nfcKeySeedToken) ?? user.nfcKeySeedToken;
   }
 
+  protected notifyNfcCardChange(
+    card: NFCCard | undefined,
+    action: 'registered' | 'activated' | 'deactivated' | 'deleted',
+  ): void {
+    if (!card?.user) {
+      return;
+    }
+
+    void this.notifications
+      .dispatch({
+        category: NotificationCategory.NFC_CARDS,
+        recipients: [card.user],
+        title: (recipient) => t(recipient.locale, `${action}Title`),
+        body: (recipient) => t(recipient.locale, `${action}Body`, { cardId: card.id }),
+        url: '/attractap/nfc-cards',
+        dedupeKey: `nfc-card-${card.id}-${action}`,
+      })
+      .catch((error) => {
+        this.logger.error(
+          `Failed to notify user ${card.user.id} about RFID card ${action}: ${(error as Error).message}`,
+        );
+      });
+  }
+
+  public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
+    const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
+    return this.decryptCardKey(card);
+  }
+
+  public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
+    const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
+    cards.forEach((card) => this.decryptCardKey(card));
+    return cards;
+  }
+
+  public async getAllNFCCards(): Promise<NFCCard[]> {
+    const cards = await this.nfcCardRepository.find();
+    cards.forEach((card) => this.decryptCardKey(card));
+    return cards;
+  }
+
+  public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
+    const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
+    return this.decryptCardKey(card);
+  }
+
+  public async createNFCCard(
+    user: User,
+    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>,
+  ): Promise<NFCCard> {
+    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
+      await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
+
+      return await transactionalEntityManager.save(NFCCard, {
+        ...data,
+        key: this.encryptionService.encrypt(data.key),
+        user,
+        isActive: true,
+      });
+    });
+    this.notifyNfcCardChange(card, 'registered');
+    return card;
+  }
+
+  /**
+   * Activates an RFID card (deactivates all other cards for the same user)
+   * @param id The ID of the RFID card to activate
+   * @returns The activated RFID card
+   */
+  public async activateNFCCard(id: number): Promise<NFCCard> {
+    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
+      const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: ['user'] });
+
+      if (!card) {
+        throw new Error(`Card with ID ${id} not found`);
+      }
+
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .update(NFCCard)
+        .set({ isActive: false })
+        .where({ user: { id: card.user.id } })
+        .execute();
+
+      return await transactionalEntityManager.save(NFCCard, {
+        ...card,
+        isActive: true,
+      });
+    });
+    this.notifyNfcCardChange(card, 'activated');
+    return card;
+  }
+
+  /**
+   * Deactivates an RFID card
+   * @param id The ID of the RFID card to deactivate
+   * @returns The deactivated RFID card
+   */
+  public async deactivateNFCCard(id: number): Promise<NFCCard> {
+    await this.nfcCardRepository.update(id, { isActive: false });
+    const card = await this.getNFCCardByID(id);
+    this.notifyNfcCardChange(card, 'deactivated');
+    return card;
+  }
+
+  public async deleteNFCCard(id: number): Promise<DeleteResult> {
+    const card = await this.getNFCCardByID(id);
+    const result = await this.nfcCardRepository.delete(id);
+    this.notifyNfcCardChange(card, 'deleted');
+    return result;
+  }
+
+  public async updateNFCCardLastSeen(uid: string): Promise<null | true> {
+    const card = await this.getNFCCardByUID(uid);
+
+    if (!card) {
+      return null;
+    }
+
+    await this.nfcCardRepository.update(card.id, { lastSeen: new Date() });
+    return true;
+  }
+
   /**
    * Decrypts card key in place for use in the app. Assumes stored values are
    * already encrypted (see migration EncryptSensitiveData).
    */
-  private decryptCardKey(card?: NFCCard | null): NFCCard | undefined {
+  protected decryptCardKey(card?: NFCCard | null): NFCCard | undefined {
     if (!card?.key) {
       return card ?? undefined;
     }

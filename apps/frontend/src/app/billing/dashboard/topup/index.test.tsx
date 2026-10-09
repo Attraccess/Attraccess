@@ -75,7 +75,7 @@ it('uses the default amount and reports mutation errors without starting transac
   expect(state.mutate).toHaveBeenCalledWith({ requestBody: { amount: 1000, readerId: 'reader-1' } });
   const error = new Error('Reader offline');
   act(() => state.callbacks.onError(error));
-  expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ error, baseTranslationKey: 'error.toast' }));
+  expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ error, baseTranslationKey: 'api' }));
   expect(screen.queryByText(/Complete transaction/)).toBeNull();
 });
 it('does not submit without a reader or currency configuration', () => {

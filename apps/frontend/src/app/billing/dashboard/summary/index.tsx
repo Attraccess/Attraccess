@@ -1,5 +1,4 @@
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import {
   Button,
   Chip,
@@ -15,8 +14,12 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader';
+import { PageHeader } from '../../../../components/pageHeader/index';
 import { EmptyState } from '../../../../components/emptyState';
+import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
+import { TransactionDetailsModal } from './transactionDetailsModal/index';
+import { RefundModal } from './transactionDetailsModal/refund/index';
+import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import de from './de.json';
 import en from './en.json';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -27,19 +30,16 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
 } from '@attraccess/react-query-client';
-import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { TransactionDetailsModal } from './transactionDetailsModal';
-import { RefundModal } from './transactionDetailsModal/refund';
 
-interface Props {
+export interface Props {
   className?: string;
   transactionsPerPage?: number;
   userId?: number;
   isDisabled?: boolean;
 }
 
-export function SummaryCard(props: Props) {
+export function useSummaryCardState(props: Props) {
   const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
 
@@ -157,6 +157,39 @@ export function SummaryCard(props: Props) {
     setOpenedTransactionId(transactionId);
     setIsOpenDetails(true);
   }, []);
+  return {
+    className,
+    t,
+    configuration,
+    balance,
+    isLoadingBalance,
+    transactions,
+    getDetailsCellContent,
+    statusColor,
+    formatCredits,
+    openedTransactionId,
+    isOpenDetails,
+    setIsOpenDetails,
+    openDetails,
+  };
+}
+
+export function SummaryCard(props: Props) {
+  const {
+    className,
+    t,
+    configuration,
+    balance,
+    isLoadingBalance,
+    transactions,
+    getDetailsCellContent,
+    statusColor,
+    formatCredits,
+    openedTransactionId,
+    isOpenDetails,
+    setIsOpenDetails,
+    openDetails,
+  } = useSummaryCardState(props);
 
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;

@@ -1,32 +1,32 @@
 import {
-  AnalyticsService,
   ResourceUsage,
+  AnalyticsService,
   useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
 } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer/index';
+import { useMemo, useCallback, useEffect, useState } from 'react';
+import {
+  combinedOperatingDurationStatus,
+  attributedDurationByResourceAndUsage,
+  mergeOperatingDurationSummaries,
+  operatingDurationWindows,
+} from './operating-duration';
 import { useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
-import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
 import { useQuery } from '@tanstack/react-query';
-import {
-  attributedDurationByResourceAndUsage,
-  combinedOperatingDurationStatus,
-  mergeOperatingDurationSummaries,
-  operatingDurationWindows,
-  type OperatingDurationSummary,
-} from './operating-duration';
+import type { OperatingDurationSummary } from './operating-duration';
 
-const RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST = 100;
-
-function durationMsForSession(item: ResourceUsage, asOf: Date): number {
+export function durationMsForSession(item: ResourceUsage, asOf: Date): number {
   const now = new Date();
   const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
   return end - new Date(item.startTime).getTime();
 }
 
-export function ResourceUsageExport(props: ExportProps) {
+export const RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST = 100;
+
+export function useResourceUsageExportStateInputs(props: ExportProps) {
   const { t } = useTranslations({
     de,
     en,
@@ -118,7 +118,36 @@ export function ResourceUsageExport(props: ExportProps) {
       return prev.filter((k) => k !== key);
     });
   }, []);
+  return {
+    t,
+    fetchAll,
+    setFetchAll,
+    data,
+    status,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    resourceUsageExport,
+    isFetchingAllPages,
+    fetchStatus,
+    resourceIds,
+    operatingDurationRanges,
+    operatingDurations,
+    operatingDurationsStatus,
+    attributedDurations,
+    formatDateTimeFull,
+    formatUsageDuration,
+    activeOptions,
+    setActiveOptions,
+    options,
+    setOption,
+    props,
+  } as const;
+}
 
+export function useResourceUsageExportStateColumns(model: ReturnType<typeof useResourceUsageExportStateInputs>) {
+  const { t, formatDateTimeFull, formatUsageDuration, props, operatingDurations, attributedDurations } = model;
   const columns = useMemo(() => {
     return [
       {
@@ -187,7 +216,7 @@ export function ResourceUsageExport(props: ExportProps) {
         key: 'operatingDurationMs',
         getter: (item) =>
           operatingDurations?.[item.resourceId]?.operatingDataAvailable
-            ? attributedDurations.get(item.resourceId)?.get(item.id) ?? 0
+            ? (attributedDurations.get(item.resourceId)?.get(item.id) ?? 0)
             : '',
         selectedByDefault: true,
       },
@@ -223,6 +252,45 @@ export function ResourceUsageExport(props: ExportProps) {
       },
     ] as ColumnDefinition<ResourceUsage>[];
   }, [attributedDurations, formatUsageDuration, formatDateTimeFull, operatingDurations, props.end, t]);
+  return { ...model, columns } as const;
+}
+
+export function useResourceUsageExportStateOutput(model: ReturnType<typeof useResourceUsageExportStateColumns>) {
+  return {
+    setFetchAll: model.setFetchAll,
+    refetch: model.refetch,
+    resourceUsageExport: model.resourceUsageExport,
+    isFetchingAllPages: model.isFetchingAllPages,
+    fetchStatus: model.fetchStatus,
+    resourceIds: model.resourceIds,
+    operatingDurationsStatus: model.operatingDurationsStatus,
+    options: model.options,
+    setOption: model.setOption,
+    columns: model.columns,
+  } as const;
+}
+
+export function useResourceUsageExportState(props: ExportProps) {
+  const useResourceUsageExportStateInputsModel = useResourceUsageExportStateInputs(props);
+  const useResourceUsageExportStateColumnsModel = useResourceUsageExportStateColumns(
+    useResourceUsageExportStateInputsModel,
+  );
+  return useResourceUsageExportStateOutput(useResourceUsageExportStateColumnsModel);
+}
+
+export function ResourceUsageExport(props: ExportProps) {
+  const {
+    setFetchAll,
+    refetch,
+    resourceUsageExport,
+    isFetchingAllPages,
+    fetchStatus,
+    resourceIds,
+    operatingDurationsStatus,
+    options,
+    setOption,
+    columns,
+  } = useResourceUsageExportState(props);
 
   // TODO: handle grouping by user and resource
 

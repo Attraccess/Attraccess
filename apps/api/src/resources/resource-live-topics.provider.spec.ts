@@ -6,7 +6,7 @@ import { Subject } from 'rxjs';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
-import { FlowLogRecorderService } from './flows/flow-log-recorder.service';
+import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
 
 function setup() {
   const registry = new LiveTopicsService();

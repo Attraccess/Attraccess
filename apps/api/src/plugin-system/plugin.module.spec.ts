@@ -1,14 +1,18 @@
-import { dataSourceConfig } from '../database/datasource';
+import { registerPluginModuleFixture } from './plugin.module.plugin-module.test-fixture';
 import 'reflect-metadata';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { EMPTY } from 'rxjs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { User } from '@attraccess/database-entities';
-import { PluginPermission, PluginPermissionError, PLUGIN_AUDIT_HOST_PROVIDER } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from './plugin.module';
+import { PluginLiveUpdatesService } from './plugin-live-updates.service';
+import { LoadedPluginManifest } from './plugin.manifest';
+import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
+import { dataSourceConfig } from './../database/datasource';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
@@ -16,54 +20,22 @@ import { PluginMqttService } from './plugin-mqtt.service';
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
 import { PluginClassificationService } from './plugin-classification.service';
-import { SettingsModule } from '../settings/settings.module';
-import { LiveTopicsModule } from '../live-updates/live-topics.module';
-import { PluginLiveUpdatesService } from './plugin-live-updates.service';
-import { MqttModule } from '../mqtt/mqtt.module';
-import { LoadedPluginManifest } from './plugin.manifest';
-import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
-import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
-
-function newPluginDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'plugin-module-'));
-  PluginService.configure({ PLUGIN_DIR: dir, RESTART_BY_EXIT: true });
-  return dir;
-}
-
-function manifest(overrides: Partial<LoadedPluginManifest> = {}): LoadedPluginManifest {
-  return {
-    id: 'plugin-id',
-    name: 'ctx-plugin',
-    version: '1.0.0',
-    pluginDirectory: 'ctx-plugin',
-    permissions: [],
-    main: { backend: { directory: 'ctx-plugin/dist', entryPoint: 'index.js' } },
-    attraccessVersion: { min: '1.0.0' },
-    ...overrides,
-  } as LoadedPluginManifest;
-}
+import { SettingsModule } from './../settings/settings.module';
+import { LiveTopicsModule } from './../live-updates/live-topics.module';
+import { MqttModule } from './../mqtt/mqtt.module';
+import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
 
 describe('PluginModule', () => {
-  let root: string;
-
-  beforeEach(() => {
-    root = newPluginDir();
-    PluginModule.configure({ DISABLE_PLUGINS: false });
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-    rmSync(root, { recursive: true, force: true });
-  });
+  const fixture = registerPluginModuleFixture();
 
   describe('forRoot', () => {
     it.each([false, true])('registers unique declared entities only with database access: %s', (allowed) => {
       const registry = dataSourceConfig.entities as unknown[];
       const previous = [...registry];
       try {
-        mkdirSync(join(root, 'entities/dist'), { recursive: true });
+        mkdirSync(join(fixture.root, 'entities/dist'), { recursive: true });
         writeFileSync(
-          join(root, 'entities/plugin.json'),
+          join(fixture.root, 'entities/plugin.json'),
           JSON.stringify({
             name: 'entities',
             version: '1.0.0',
@@ -73,7 +45,7 @@ describe('PluginModule', () => {
           }),
         );
         writeFileSync(
-          join(root, 'entities/dist/index.js'),
+          join(fixture.root, 'entities/dist/index.js'),
           'class Widget {} class WidgetModule {} module.exports = { default: { entities: [Widget, Widget], register: () => ({ module: WidgetModule }) } };',
         );
         PluginModule.forRoot();
@@ -108,9 +80,9 @@ describe('PluginModule', () => {
     });
 
     it('isolates a failing plugin load without crashing the module', () => {
-      mkdirSync(join(root, 'broken'), { recursive: true });
+      mkdirSync(join(fixture.root, 'broken'), { recursive: true });
       writeFileSync(
-        join(root, 'broken', 'plugin.json'),
+        join(fixture.root, 'broken', 'plugin.json'),
         JSON.stringify({
           name: 'broken',
           version: '1.0.0',
@@ -128,9 +100,9 @@ describe('PluginModule', () => {
     });
 
     it('does not import a plugin persisted as quarantined after a previous failure', () => {
-      mkdirSync(join(root, 'quarantined', 'dist'), { recursive: true });
+      mkdirSync(join(fixture.root, 'quarantined', 'dist'), { recursive: true });
       writeFileSync(
-        join(root, 'quarantined', 'plugin.json'),
+        join(fixture.root, 'quarantined', 'plugin.json'),
         JSON.stringify({
           name: 'quarantined',
           version: '1.0.0',
@@ -138,7 +110,7 @@ describe('PluginModule', () => {
           attraccessVersion: { min: '1.0.0' },
         }),
       );
-      writeFileSync(join(root, 'quarantined', 'dist', 'index.js'), 'throw new Error("must not be imported");');
+      writeFileSync(join(fixture.root, 'quarantined', 'dist', 'index.js'), 'throw new Error("must not be imported");');
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
 
@@ -147,9 +119,9 @@ describe('PluginModule', () => {
     });
 
     it('does not register a credential provider from a plugin whose factory fails', () => {
-      mkdirSync(join(root, 'broken-provider', 'dist'), { recursive: true });
+      mkdirSync(join(fixture.root, 'broken-provider', 'dist'), { recursive: true });
       writeFileSync(
-        join(root, 'broken-provider', 'plugin.json'),
+        join(fixture.root, 'broken-provider', 'plugin.json'),
         JSON.stringify({
           name: 'broken-provider',
           version: '1.0.0',
@@ -158,7 +130,7 @@ describe('PluginModule', () => {
         }),
       );
       writeFileSync(
-        join(root, 'broken-provider', 'dist', 'index.js'),
+        join(fixture.root, 'broken-provider', 'dist', 'index.js'),
         [
           'module.exports = {',
           "  default: { register: () => { throw new Error('register failed'); }, credentialProvisioningProvider: () => ({ id: 'orphan' }) }",
@@ -177,9 +149,9 @@ describe('PluginModule', () => {
       // installs node_modules under dist/apps/api). Its index.js does a bare
       // require('@nestjs/common') — exactly what an externalized backend ships.
       // Without host-aware resolution this throws "Cannot find module".
-      mkdirSync(join(root, 'needs-host-dep', 'dist'), { recursive: true });
+      mkdirSync(join(fixture.root, 'needs-host-dep', 'dist'), { recursive: true });
       writeFileSync(
-        join(root, 'needs-host-dep', 'plugin.json'),
+        join(fixture.root, 'needs-host-dep', 'plugin.json'),
         JSON.stringify({
           name: 'needs-host-dep',
           version: '1.0.0',
@@ -188,7 +160,7 @@ describe('PluginModule', () => {
         }),
       );
       writeFileSync(
-        join(root, 'needs-host-dep', 'dist', 'index.js'),
+        join(fixture.root, 'needs-host-dep', 'dist', 'index.js'),
         [
           "const nest = require('@nestjs/common');",
           'if (typeof nest.Module !== "function") { throw new Error("host @nestjs/common not resolved"); }',
@@ -213,7 +185,7 @@ describe('PluginModule', () => {
         PluginModule as unknown as {
           createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
         }
-      ).createPluginContext(manifest({ permissions }));
+      ).createPluginContext(fixture.manifest({ permissions }));
     }
 
     it('projects the manifest down to public info', () => {
@@ -245,6 +217,22 @@ describe('PluginModule', () => {
       expect(moduleRef.get).toHaveBeenCalledWith(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false });
     });
 
+    it('binds live topic registration to the plugin identity through the guarded context', () => {
+      const register = jest.fn(() => jest.fn());
+      (moduleRef.get as jest.Mock).mockImplementation((token: unknown) =>
+        token === PluginLiveUpdatesService ? { register } : undefined,
+      );
+      const definition = {
+        topic: 'status',
+        identifier: 'none' as const,
+        authorize: jest.fn(),
+        source: jest.fn(() => EMPTY),
+      };
+      build([]).liveUpdates.register(definition);
+      expect(register).toHaveBeenCalledWith('plugin-id', 'ctx-plugin', definition);
+      expect(moduleRef.get).toHaveBeenCalledWith(PluginLiveUpdatesService, { strict: false });
+    });
+
     it('hands back the live host DataSource when DATABASE_ACCESS is granted', () => {
       expect(build([PluginPermission.DATABASE_ACCESS]).dataSource).toBe(dataSource);
       expect(() => build([]).dataSource).toThrow(PluginPermissionError);
@@ -261,7 +249,9 @@ describe('PluginModule', () => {
       };
       internals.dataSourceRef = null;
 
-      const context = internals.createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+      const context = internals.createPluginContext(
+        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+      );
       const retained = context.getRepository(Widget);
       expect(host.getRepository).not.toHaveBeenCalled();
       expect(() => retained.find()).toThrow(/accessed before bootstrap completed/);
@@ -284,7 +274,9 @@ describe('PluginModule', () => {
       };
       internals.resetHostReferences();
 
-      const denied = internals.createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+      const denied = internals.createPluginContext(
+        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+      );
       const retained = denied.getRepository('user');
       new PluginModule(host, events, moduleRef);
 
@@ -294,7 +286,7 @@ describe('PluginModule', () => {
 
       internals.resetHostReferences();
       const allowed = internals.createPluginContext(
-        manifest({ permissions: [PluginPermission.DATABASE_ACCESS, PluginPermission.READ_USERS] }),
+        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS, PluginPermission.READ_USERS] }),
       );
       const permitted = allowed.getRepository('user');
       new PluginModule(host, events, moduleRef);
@@ -314,7 +306,9 @@ describe('PluginModule', () => {
       new PluginModule(first, events, moduleRef);
       internals.resetHostReferences();
 
-      const context = internals.createPluginContext(manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+      const context = internals.createPluginContext(
+        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+      );
       const retained = context.getRepository(Widget);
       new PluginModule(second, events, moduleRef);
 

@@ -17,7 +17,7 @@ const flowContext = vi.hoisted(() => ({
   removeNode: vi.fn(),
 }));
 
-vi.mock('../flowContext', () => ({
+vi.mock('../context/index', () => ({
   useFlowContext: () => flowContext,
 }));
 
@@ -172,7 +172,6 @@ describe('AttraccessNode', () => {
   });
 });
 
-
 it('retains translated input and output handle labels when tNodeExists is omitted', () => {
   const translate = vi.fn((key: string) => `Translated ${key}`);
   render(<AttraccessNode schema={{ ...schema, inputs: ['in'] }} tNodeTranslations={translate} />);
@@ -182,7 +181,9 @@ it('retains translated input and output handle labels when tNodeExists is omitte
 
 it('uses raw plugin handle names only for explicitly missing translations', () => {
   const translate = vi.fn((key: string) => key);
-  render(<AttraccessNode schema={{ ...schema, inputs: ['in'] }} tNodeTranslations={translate} tNodeExists={() => false} />);
+  render(
+    <AttraccessNode schema={{ ...schema, inputs: ['in'] }} tNodeTranslations={translate} tNodeExists={() => false} />,
+  );
   expect(translate).not.toHaveBeenCalledWith('nodes.input.event.inputs.in');
   expect(translate).not.toHaveBeenCalledWith('nodes.input.event.outputs.out');
 });
