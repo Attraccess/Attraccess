@@ -13,7 +13,7 @@ import { AuditService } from '../../audit/audit.service';
 
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 
-import { ResourceUsageService } from '../usage/resourceUsage.service';
+import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
 
 import { SupervisionLiveService } from './supervision-live.service';
 import { ResourceUsage, User, ResourceIntroducerType } from '@attraccess/database-entities';

@@ -7,7 +7,7 @@ import {
   validateSnapshot,
 } from './model';
 // eslint-disable-next-line @nx/enforce-module-boundaries
-import { validateSnapshot as validateRuntimeSnapshot } from '../../cc100-runtime/src/configuration';
+import { validateSnapshot as validateRuntimeSnapshot } from '../../cc100-runtime/src/runtime/configuration/validation';
 
 describe('WAGO configuration snapshots', () => {
   it.each([

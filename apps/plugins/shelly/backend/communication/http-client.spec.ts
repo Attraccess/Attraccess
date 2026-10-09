@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { ShellyHttpClient } from './http-client';
-import { ShellyProbeService } from '../devices/probe.service';
+import { ShellyProbeService } from '../devices/discovery/probe.service';
 
 describe('Shelly HTTP authentication', () => {
   let fetchMock: jest.SpyInstance;

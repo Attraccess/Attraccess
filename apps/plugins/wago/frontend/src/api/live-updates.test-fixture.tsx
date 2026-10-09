@@ -4,7 +4,7 @@ import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { vi } from 'vitest';
 import { useWagoLiveQuery } from './live-updates';
-import { useFrontPanel } from '../front-panel/useFrontPanel';
+import { useFrontPanel } from '../front-panel/working-copy/useFrontPanel';
 
 const panelApi = vi.hoisted(() => ({ getDraft: vi.fn(), baseline: vi.fn(), manual: vi.fn() }));
 export { panelApi };

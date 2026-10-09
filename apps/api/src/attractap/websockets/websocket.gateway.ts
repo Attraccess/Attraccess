@@ -28,25 +28,25 @@ import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.serv
 
 import { AttractapService } from '../attractap.service';
 
-import { AttractapAuthHandler } from './handlers/auth.handler';
+import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 
-import { AttractapBillingHandler } from './handlers/billing.handler';
+import { AttractapBillingHandler } from './handlers/billing/billing.handler';
 
-import { AttractapCardHandler } from './handlers/card.handler';
+import { AttractapCardHandler } from './handlers/card/card.handler';
 
-import { AttractapCrashReportHandler } from './handlers/crash-report.handler';
+import { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
 
-import { AttractapFirmwareHandler } from './handlers/firmware.handler';
+import { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
 
-import { AttractapFormsHandler } from './handlers/forms.handler';
+import { AttractapFormsHandler } from './handlers/forms/forms.handler';
 
-import { AttractapProjectsHandler } from './handlers/projects.handler';
+import { AttractapProjectsHandler } from './handlers/projects/projects.handler';
 
-import { ResourceListService } from './handlers/resource-list.service';
+import { ResourceListService } from './handlers/resource-list/resource-list.service';
 
-import { AttractapSessionHandler } from './handlers/session.handler';
+import { AttractapSessionHandler } from './handlers/session/session.handler';
 
-import { AttractapSupervisionHandler } from './handlers/supervision.handler';
+import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 
 import { WebsocketService } from './websocket.service';
 

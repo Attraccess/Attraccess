@@ -1,16 +1,16 @@
-import { FrontPanelStatusAlerts } from './FrontPanelStatusAlerts';
+import { FrontPanelStatusAlerts } from './working-copy/StatusAlerts';
 // Combines controller configuration and live controls on one responsive page.
 // FEATURE: WAGO front panel exposes physical terminals and device settings.
 import { Alert, Button, Spinner } from '@heroui/react';
 import { ArrowLeft, History, Plus } from 'lucide-react';
-import { OnboardCard } from './Cards';
-import { DeviceSettings } from './DeviceSettings';
-import { BusSettings, TerminalSettings } from './SettingsDrawer';
+import { OnboardCard } from './controls/Cards';
+import { DeviceSettings } from './settings/DeviceSettings';
+import { BusSettings, TerminalSettings } from './settings/SettingsDrawer';
 import { addDevice, type Terminal, type PanelConfiguration } from './model';
-import { useFrontPanelState } from './useFrontPanelState';
-import { FrontPanelModalBackdrop } from './FrontPanelModalBackdrop';
-import { FrontPanelPanelDevices } from './FrontPanelPanelDevices';
-import { FrontPanelLeaveDialog } from './FrontPanelLeaveDialog';
+import { useFrontPanelState } from './working-copy/useFrontPanelState';
+import { FrontPanelModalBackdrop } from './working-copy/ModalBackdrop';
+import { FrontPanelPanelDevices } from './controls/Devices';
+import { FrontPanelLeaveDialog } from './working-copy/LeaveDialog';
 
 export type Selection =
   | { kind: 'terminal'; terminal: Terminal }

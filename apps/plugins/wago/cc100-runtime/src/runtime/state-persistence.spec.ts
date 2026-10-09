@@ -1,4 +1,4 @@
-import { MemoryDeviceAdapter } from '../adapters';
+import { MemoryDeviceAdapter } from '../io/adapters';
 import { JsonStateStore, WagoRuntime, hash, type Snapshot } from '../runtime';
 import { TestTransport, snapshot, desired, commands, validCommand, createRuntimeFixture } from '../runtime.test-utils';
 

@@ -45,9 +45,9 @@ import { NetworkPayload } from './model';
 
 import { EVIDENCE_MS } from './model';
 
-import { WagoCommissioningSession } from '../commissioning/session.entity';
+import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
 
-import { assertCommissioningBroker } from '../commissioning/preflight';
+import { assertCommissioningBroker } from '../commissioning/delivery/preflight';
 
 import { lookup } from 'node:dns/promises';
 

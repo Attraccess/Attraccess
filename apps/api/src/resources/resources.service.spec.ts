@@ -34,7 +34,7 @@ import { ResourcesService } from './resources.service';
 
 import { mockMetricsService } from './resources.service.spec.mock-metrics-service';
 
-import { activeUsageSql } from './usage/active-usage';
+import { activeUsageSql } from './usage/sessions/active-usage';
 
 export type ResourcesServiceTestScope = {
   resourceRepository: jest.Mocked<Repository<Resource>>;

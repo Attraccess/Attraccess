@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { type Cc100HardwareProfile } from '../../shared/hardware-profile';
-import { type CommissioningCheckpoint } from './progress';
-import { WagoCommissioningSession } from './session.entity';
+import { type CommissioningCheckpoint } from './delivery/progress';
+import { WagoCommissioningSession } from './sessions/session.entity';
 import { isCc100Fw31Identity } from '../host/firmware-identity';
 
 export type RuntimeDeliveryBundle = {

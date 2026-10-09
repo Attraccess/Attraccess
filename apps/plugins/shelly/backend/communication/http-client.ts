@@ -8,7 +8,7 @@
 // header when the device asks for one.
 import { createHash, randomBytes } from 'crypto';
 import { Injectable } from '@nestjs/common';
-import { validateShellyUrl } from '../devices/address';
+import { validateShellyUrl } from './address';
 
 const REQUEST_TIMEOUT_MS = 8000;
 

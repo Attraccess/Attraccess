@@ -12,7 +12,7 @@ import { Repository } from 'typeorm';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
 import { NodeProcessingResult, heartbeatKey } from '../node-executors';
-import { activeUsageSql } from '../../usage/active-usage';
+import { activeUsageSql } from '../../usage/sessions/active-usage';
 
 /** Minute-based activity triggers and heartbeat expiry share the executor's live state. */
 export class FlowResourceMonitor {

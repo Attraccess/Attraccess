@@ -14,17 +14,17 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { DeviceRegistryService } from './device-registry.service';
-import type { DiscoveryResult } from './discovery.service';
-import { DiscoveryService } from './discovery.service';
-import { InvalidCidrError } from './network-scan';
-import { validateShellyAddress } from './address';
+import { DeviceRegistryService } from './registry/service';
+import type { DiscoveryResult } from './discovery/service';
+import { DiscoveryService } from './discovery/service';
+import { InvalidCidrError } from './discovery/network-scan';
+import { validateShellyAddress } from '../communication/address';
 import type { ShellyDeviceInfo } from '../communication/device-api.service';
 import { ShellyDeviceApiService } from '../communication/device-api.service';
-import { ShellyDevice } from './device.entity';
+import { ShellyDevice } from './registry/device.entity';
 import type { FirmwareStage, FirmwareStatus } from '../firmware/service.service';
 import { ShellyFirmwareService } from '../firmware/service.service';
-import { ShellyProbeService } from './probe.service';
+import { ShellyProbeService } from './discovery/probe.service';
 import type { ProbeResult } from './types';
 
 export interface AddDeviceBody {

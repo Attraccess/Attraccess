@@ -34,7 +34,7 @@ import { Redis } from 'ioredis';
 
 import { AuditService } from '../../../audit/audit.service';
 
-import { BillingService } from '../../../billing/billing.service';
+import { BillingService } from '../../../billing/charges/billing.service';
 
 import { MetricsService } from '../../../metrics/metrics.service';
 
@@ -44,7 +44,7 @@ import { ProjectsService } from '../../../projects/projects.service';
 
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 
-import { ResourceFlowsExecutorService } from '../../flows/resource-flows-executor.service';
+import { ResourceFlowsExecutorService } from '../../flows/execution/resource-flows-executor.service';
 
 import { ResourceFormsService } from '../../forms/forms.service';
 
@@ -70,7 +70,7 @@ import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
-import { ResourceUsageService } from '../resourceUsage.service';
+import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { ResourceAuditOrigin } from '../../../audit/audit-policy';
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */

@@ -23,7 +23,7 @@ import { useWagoTranslations } from '../i18n';
 import { NetworkChangeDetails } from '../runtime/NetworkChangeDetails';
 import { RuntimeUpdateDetails } from '../runtime/RuntimeUpdateDetails';
 import { RuntimeUpdateSummary } from '../runtime/RuntimeUpdateSummary';
-import { useCommissioningVerification } from '../commissioning/useCommissioningVerification';
+import { useCommissioningVerification } from '../commissioning/status/useCommissioningVerification';
 import { useRuntimeStatus } from '../runtime/useRuntimeStatus';
 
 export const cellClass = 'wg:whitespace-nowrap wg:align-middle';

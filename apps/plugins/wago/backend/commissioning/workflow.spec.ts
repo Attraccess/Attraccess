@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
 import { fw31IdentityOutput } from '../fixtures/fw31-identity';
 import { AddWagoCommissioningPrincipal1780000000009 } from '../migrations/1780000000009-add-wago-commissioning-principal';
 import plugin from '../plugin';
-import { WagoCommissioningSession } from './session.entity';
+import { WagoCommissioningSession } from './sessions/session.entity';
 import { WagoCommissioningService } from './service';
 import { WagoController } from '../controllers/entity';
 import { WagoManagementEntity } from '../management/entity';

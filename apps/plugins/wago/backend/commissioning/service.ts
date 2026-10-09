@@ -8,13 +8,13 @@ import { PLUGIN_CONTEXT, PluginContext } from '@attraccess/plugins-backend-sdk';
 
 import { WagoService } from '../controllers/service';
 
-import { assertCommissioningBroker } from './preflight';
+import { assertCommissioningBroker } from './delivery/preflight';
 
 import { CommissioningPrincipal } from './audit';
 
 import { WagoRuntimeArtifactsService, WagoRuntimeArtifactCatalog } from '../runtime/artifacts/catalog';
 
-import { WagoCommissioningReadiness } from './readiness';
+import { WagoCommissioningReadiness } from './readiness/readiness';
 
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 
@@ -22,13 +22,13 @@ import { DeliveryInput } from './model';
 
 import { CommissioningSessionResponse } from './model';
 
-import { DeliveryAttempt } from './delivery-attempt';
+import { DeliveryAttempt } from './delivery/delivery-attempt';
 
 import { requireDeliveryCredentials } from './model';
 
-import { WagoCommissioningTimeoutError } from './progress';
+import { WagoCommissioningTimeoutError } from './delivery/progress';
 
-import { WagoCommissioningSession } from './session.entity';
+import { WagoCommissioningSession } from './sessions/session.entity';
 
 import {
   RuntimeReleaseChangedError,
@@ -37,11 +37,11 @@ import {
   WagoStorageCapacityError,
 } from './model';
 
-import { WagoManagedProvisioningError } from '../runtime/managed/provisioning-error';
+import { WagoManagedProvisioningError } from '../runtime/managed/provisioning/provisioning-error';
 
 import { randomBytes } from 'node:crypto';
 
-import { commissionClock } from './clock';
+import { commissionClock } from './delivery/clock';
 
 import { RuntimeDeliveryBundle } from './model';
 
@@ -53,9 +53,9 @@ import { type WagoCommissioningPreflightReport } from '../../shared/commissionin
 
 import { isSupportedController } from './model';
 
-import { managedProvisionPreflightScript } from '../runtime/managed/provision';
+import { managedProvisionPreflightScript } from '../runtime/managed/provisioning/provision';
 
-import { WagoCommissioningProgress } from './lifecycle';
+import { WagoCommissioningProgress } from './sessions/lifecycle';
 
 export { runtimeBundleInstallScript } from '../runtime/install';
 

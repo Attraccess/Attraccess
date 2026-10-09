@@ -9,7 +9,7 @@ import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } f
 import { PluginModule } from './plugin.module';
 import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { LoadedPluginManifest } from './plugin.manifest';
-import { ResourceFlowsExecutorService } from './../resources/flows/resource-flows-executor.service';
+import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 import { dataSourceConfig } from './../database/datasource';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';

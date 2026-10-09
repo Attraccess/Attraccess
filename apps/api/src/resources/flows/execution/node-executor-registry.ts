@@ -2,9 +2,9 @@ import { BillingTransactionItem, ResourceFlowNodeType } from '@attraccess/databa
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
-import { ResourceUsageService } from '../../usage/resourceUsage.service';
+import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { ResourceHealthService } from '../../health/resource-health.service';
-import { ResourceFlowVariablesService } from '../resource-flow-variables.service';
+import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { ResourceOperatingIntervalService } from '../../operating-intervals/resource-operating-interval.service';
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
 import { ResourceMeteringService } from '../../metering/resource-metering.service';

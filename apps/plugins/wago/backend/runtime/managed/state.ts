@@ -16,11 +16,11 @@ import {
   type ManagedRuntimeUpdateHost,
 } from '../update/coordinator';
 
-import { WagoCommissioningSession } from '../../commissioning/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 
 import { WagoController } from '../../controllers/entity';
 
-import { WagoCommissioningReadiness } from '../../commissioning/readiness';
+import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
 
 import { WagoService } from '../../controllers/service';
 

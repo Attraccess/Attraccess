@@ -9,7 +9,7 @@ import { encodeMeasurement } from '../../measurement-contract';
 import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
 import { FrontPanel } from '../src/front-panel/FrontPanel';
 import { addDevice } from '../src/front-panel/model';
-import { useFrontPanel } from '../src/front-panel/useFrontPanel';
+import { useFrontPanel } from '../src/front-panel/working-copy/useFrontPanel';
 import { DIGITAL_TERMINALS } from '../../backend/configuration/digital';
 import { updateTerminal } from '../src/front-panel/model';
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { OutputController } from '../outputs/controller';
-import { DiscoveryClaim } from '../runtime-protocol';
+import { DiscoveryClaim } from './identity/protocol';
 import { type DeviceAdapter, type RuntimeState, type StateStore, type Transport, type ValidationError } from './types';
 export abstract class RuntimeContext {
   protected state: RuntimeState = { outputs: {}, commandIds: [], commandExpiries: {} };

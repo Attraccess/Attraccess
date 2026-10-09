@@ -1,4 +1,4 @@
-import { CommissioningManagementRefresh } from '../../commissioning/accept';
+import { CommissioningManagementRefresh } from '../../commissioning/delivery/accept';
 export type Credentials = {
   sessionId: number;
   host: string;

@@ -20,7 +20,7 @@ import { ResourceImageService } from './resourceImage.service';
 
 import { PaginatedResponse } from '../types/response';
 
-import { activeUsageSql } from './usage/active-usage';
+import { activeUsageSql } from './usage/sessions/active-usage';
 
 import { FileUpload } from '../common/types/file-upload.types';
 

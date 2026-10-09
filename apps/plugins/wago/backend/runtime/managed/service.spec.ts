@@ -1,15 +1,15 @@
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { DataSource } from 'typeorm';
 import { BuildRuntimeArtifact } from '../artifacts/build';
-import { WagoCommissioningReadiness } from '../../commissioning/readiness';
-import { WagoCommissioningSession } from '../../commissioning/session.entity';
-import { commissioningVerification } from '../../commissioning/verification';
+import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
+import { commissioningVerification } from '../../commissioning/sessions/verification';
 import { WagoController } from '../../controllers/entity';
 import { WagoDeviceOperations } from '../device-operations';
 import { WagoDeviceOperation, WagoManagedAccess } from './access.entity';
 import { WagoManagedRuntimeService } from './service';
 import { resetTestFixture } from './setup.test-fixture';
-import { managedSsh } from './ssh';
+import { managedSsh } from './transport/ssh';
 import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
 import { WagoService } from '../../controllers/service';
 
@@ -42,11 +42,11 @@ jest.mock('../../controllers/service', () => ({ WagoService: class {} }));
 
 jest.mock('../artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
 
-jest.mock('../../commissioning/readiness', () => ({ WagoCommissioningReadiness: class {} }));
+jest.mock('../../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
 
-jest.mock('./ssh', () => ({ ...jest.requireActual('./ssh'), managedSsh: jest.fn() }));
+jest.mock('./transport/ssh', () => ({ ...jest.requireActual('./transport/ssh'), managedSsh: jest.fn() }));
 
-jest.mock('../../commissioning/verification', () => ({ commissioningVerification: jest.fn() }));
+jest.mock('../../commissioning/sessions/verification', () => ({ commissioningVerification: jest.fn() }));
 
 describe('managed enrolment and durable credential lifecycle', () => {
   let db: DataSource;

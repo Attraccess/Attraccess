@@ -36,7 +36,7 @@ import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 
-import { BillingService } from './billing.service';
+import { BillingService } from './charges/billing.service';
 
 import { BalanceDto } from './dto/balance.dto';
 
@@ -48,9 +48,9 @@ import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
 
 import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
 
-import { LiveNotificationsService } from './liveNotificationsService';
+import { LiveNotificationsService } from './live-notifications/live-notifications.service';
 
-import { SumUpService } from './sumup.service';
+import { SumUpService } from './sumup/sumup.service';
 import { PaginationOptionsDto } from '../types/request';
 
 import { ModifyBalanceDto } from './dto/modify-balance.dto';

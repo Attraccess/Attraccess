@@ -19,9 +19,9 @@ import {
   ResourceFlowSaveDto,
 } from './dto/index';
 
-import { FlowLogRecorderService, ResourceFlowLogEvent } from './flow-log-recorder.service';
+import { FlowLogRecorderService, ResourceFlowLogEvent } from './logs/flow-log-recorder.service';
 
-import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
+import { ResourceFlowsExecutorService } from './execution/resource-flows-executor.service';
 
 import { ResourceFlowsService } from './resource-flows.service';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';

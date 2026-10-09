@@ -6,16 +6,16 @@ import { WagoNetworkChangeService } from './service';
 import { WagoNetworkChange, WagoMqttCredentialRetirement } from './entity';
 import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from '../runtime/managed/access.entity';
 import { WagoController } from '../controllers/entity';
-import { WagoCommissioningSession } from '../commissioning/session.entity';
+import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
 import { WagoCredentialRotationEntity } from '../credentials/service';
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 import { WagoService } from '../controllers/service';
 import { WagoRuntimeArtifactsService } from '../runtime/artifacts/catalog';
-import { WagoCommissioningReadiness } from '../commissioning/readiness';
+import { WagoCommissioningReadiness } from '../commissioning/readiness/readiness';
 import { RuntimeUpdateError } from '../runtime/update/coordinator';
-import { managedSsh } from '../runtime/managed/ssh';
-import { managedHostHelper } from '../runtime/managed/helper';
-import { MANAGED_HELPER_PROTOCOL } from '../runtime/managed/installer';
+import { managedSsh } from '../runtime/managed/transport/ssh';
+import { managedHostHelper } from '../runtime/managed/provisioning/helper';
+import { MANAGED_HELPER_PROTOCOL } from '../runtime/managed/provisioning/installer';
 import type { BuildRuntimeArtifact } from '../runtime/artifacts/build';
 
 type NetworkChangeFixture = {

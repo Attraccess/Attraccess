@@ -14,7 +14,7 @@ import {
 
 import { AuditService } from '../../audit/audit.service';
 
-import { LiveNotificationsService } from '../../billing/liveNotificationsService';
+import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
 import { meterCharge, meterDiscount, formatMeterValue } from './quantity';
 

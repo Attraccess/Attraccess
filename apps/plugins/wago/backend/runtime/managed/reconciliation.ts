@@ -2,11 +2,11 @@ import { ConflictException } from '@nestjs/common';
 
 import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
 
-import { WagoCommissioningSession } from '../../commissioning/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 
 import { WagoController } from '../../controllers/entity';
 
-import { commissioningVerification } from '../../commissioning/verification';
+import { commissioningVerification } from '../../commissioning/sessions/verification';
 
 import { ManagementSetupReason, LiveHeartbeat } from './contracts';
 

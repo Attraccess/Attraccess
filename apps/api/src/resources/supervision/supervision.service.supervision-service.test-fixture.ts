@@ -2,7 +2,7 @@ import { ResourceUsage, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from '../../audit/audit.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
-import { ResourceUsageService } from '../usage/resourceUsage.service';
+import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 import { SupervisionLiveService } from './supervision-live.service';

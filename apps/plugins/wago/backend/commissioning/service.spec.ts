@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { PassThrough } from 'node:stream';
 import { fw31IdentityOutput, fw31OsRelease } from '../fixtures/fw31-identity';
 import { wagoCodesysClassificationShell } from '../host/codesys-classification';
-import { WagoCommissioningTimeoutError } from './progress';
-import { WagoCommissioningSession } from './session.entity';
+import { WagoCommissioningTimeoutError } from './delivery/progress';
+import { WagoCommissioningSession } from './sessions/session.entity';
 import {
   isSupportedController,
   runtimeBundleInstallScript,
@@ -17,7 +17,7 @@ import {
 } from './service';
 import { WagoDeviceOperations } from '../runtime/device-operations';
 import { wagoFw31IdentityRead } from '../host/firmware-identity';
-import { WagoManagedProvisioningError } from '../runtime/managed/provisioning-error';
+import { WagoManagedProvisioningError } from '../runtime/managed/provisioning/provisioning-error';
 import { WagoService } from '../controllers/service';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));

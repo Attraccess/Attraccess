@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import de from './de.json';
 import en from './en.json';
 
-// System billing item names emitted by the API (apps/api/src/billing/billing.service.ts).
+// System billing item names emitted by the API (apps/api/src/billing/charges/billing.service.ts).
 // The modal falls back to the raw item name when no translation exists, so every
 // system item must stay localized in both locales.
 const SYSTEM_ITEM_NAMES = ['PER_SESSION', 'PER_MINUTE', 'PER_ATTRIBUTABLE_OPERATING_MINUTE', 'BILLING_FACTOR'] as const;

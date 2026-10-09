@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { connectAsync, type MqttClient } from 'mqtt';
 // Acceptance composes the standalone production runtime directly.
 // eslint-disable-next-line @nx/enforce-module-boundaries
-import { MemoryDeviceAdapter } from '../cc100-runtime/src/adapters';
+import { MemoryDeviceAdapter } from '../cc100-runtime/src/io/adapters';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from '../cc100-runtime/src/runtime';
 

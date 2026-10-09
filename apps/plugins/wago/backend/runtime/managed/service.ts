@@ -4,13 +4,13 @@ import { Inject, Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 
-import { WagoCommissioningReadiness } from '../../commissioning/readiness';
+import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
 
 import { WagoController } from '../../controllers/entity';
 
-import { managedHostHelper } from './helper';
+import { managedHostHelper } from './provisioning/helper';
 
-import { managedWatchdogScript } from './provision';
+import { managedWatchdogScript } from './provisioning/provision';
 
 import { type ManagedSetupStage, managedSetupFailure } from './setup-error';
 
@@ -18,7 +18,7 @@ import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
 
 import { WagoService } from '../../controllers/service';
 
-import { WagoCommissioningSession } from '../../commissioning/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 
 import {
   RuntimeUpdateError,
@@ -27,7 +27,7 @@ import {
   type RuntimeUpdateStore,
 } from '../update/coordinator';
 
-import { MANAGED_HELPER_PROTOCOL, signInstaller } from './installer';
+import { MANAGED_HELPER_PROTOCOL, signInstaller } from './provisioning/installer';
 
 import { WagoManagedRuntimeReconciliation } from './reconciliation';
 

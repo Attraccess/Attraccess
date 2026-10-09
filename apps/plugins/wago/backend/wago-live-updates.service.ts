@@ -6,7 +6,7 @@ import { WagoDiagnosticsService } from './diagnostics/service';
 import { WagoManagedRuntimeService } from './runtime/managed/service';
 import { WagoNetworkChangeService } from './network/service';
 import { WagoController } from './controllers/entity';
-import { WagoCommissioningSession } from './commissioning/session.entity';
+import { WagoCommissioningSession } from './commissioning/sessions/session.entity';
 
 /** Sample authoritative services once per active topic, shared across tabs/users. */
 @Injectable()

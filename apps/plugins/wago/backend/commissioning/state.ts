@@ -4,13 +4,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
 
-import { WagoCommissioningSession } from './session.entity';
+import { WagoCommissioningSession } from './sessions/session.entity';
 
 import { WagoService } from '../controllers/service';
 
 import { WagoRuntimeArtifactsService, WagoRuntimeArtifactCatalog } from '../runtime/artifacts/catalog';
 
-import { WagoCommissioningReadiness } from './readiness';
+import { WagoCommissioningReadiness } from './readiness/readiness';
 
 import { type CommissioningOperationGuard } from '../runtime/operation-guard';
 
@@ -18,7 +18,7 @@ import { WagoManagementService } from '../management/service';
 
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 
-import { type commissioningVerification } from './verification';
+import { type commissioningVerification } from './sessions/verification';
 
 import { type Cc100HardwareProfile } from '../../shared/hardware-profile';
 
@@ -31,7 +31,7 @@ import {
   type ManagementPublicStatus,
 } from '../management/model';
 
-import { type CommissioningCheckpoint } from './progress';
+import { type CommissioningCheckpoint } from './delivery/progress';
 
 import { TemporarySshCredential } from './model';
 

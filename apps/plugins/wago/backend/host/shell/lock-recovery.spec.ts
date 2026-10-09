@@ -1,7 +1,7 @@
 import { chmodSync, existsSync, linkSync, statSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from '../../fixtures/fw31-shell-fixture';
-import { managedWatchdogScript } from '../../runtime/managed/provision';
+import { managedWatchdogScript } from '../../runtime/managed/provisioning/provision';
 import { sshLockRecoveryScript } from './lock-recovery';
 
 const hardwareId = 'cc100-979e17dc42de34a1';

@@ -1,6 +1,6 @@
 import { WagoManagedAccess } from './runtime/managed/access.entity';
 import { WagoController } from './controllers/entity';
-import { WagoCommissioningSession } from './commissioning/session.entity';
+import { WagoCommissioningSession } from './commissioning/sessions/session.entity';
 import { ManagedRuntimeFixture } from './runtime/managed/setup.test-fixture';
 export async function initializeCutover(scope: ManagedRuntimeFixture, remoteStatus: string) {
   const current = await scope.db.getRepository(WagoController).save(

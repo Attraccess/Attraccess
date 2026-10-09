@@ -1,4 +1,4 @@
-import { registerBillingControllerFixture } from './billing.controller.billing-controller.test-fixture';
+import { registerBillingControllerFixture } from './billing.controller.test-fixture';
 import { BillingTransaction } from '@attraccess/database-entities';
 import { ForbiddenException } from '@nestjs/common';
 import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dto';

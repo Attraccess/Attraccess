@@ -43,7 +43,7 @@ import { EmailService } from '../../email/email.service';
 
 import { MetricsService } from '../../metrics/metrics.service';
 
-import { LiveNotificationsService } from '../liveNotificationsService';
+import { LiveNotificationsService } from '../live-notifications/live-notifications.service';
 
 export abstract class BillingLedger {
   async getBalance(userId: number, transactionalEntityManager?: EntityManager): Promise<number> {

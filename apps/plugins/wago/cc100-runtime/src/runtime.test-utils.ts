@@ -1,4 +1,4 @@
-import { MemoryDeviceAdapter } from './adapters';
+import { MemoryDeviceAdapter } from './io/adapters';
 import { JsonStateStore, WagoRuntime, type Snapshot, type Transport } from './runtime';
 
 export class TestTransport implements Transport {

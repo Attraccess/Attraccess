@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fw31Model, fw31Revisions } from '../fixtures/fw31-identity';
 import { fw31ShellFixture } from '../fixtures/fw31-shell-fixture';
 import { wagoCodesysClassificationShell } from './codesys-classification';
-import { CommissioningProgressReader, commissioningCheckpoints } from '../commissioning/progress';
+import { CommissioningProgressReader, commissioningCheckpoints } from '../commissioning/delivery/progress';
 import {
   WAGO_DIN,
   WAGO_DOUT,

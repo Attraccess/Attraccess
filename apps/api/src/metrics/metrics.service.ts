@@ -1,4 +1,4 @@
-import { activeUsageWhere } from '../resources/usage/active-usage';
+import { activeUsageWhere } from '../resources/usage/sessions/active-usage';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';

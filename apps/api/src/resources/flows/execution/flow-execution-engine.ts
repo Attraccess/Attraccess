@@ -9,7 +9,7 @@ import {
 
 import { Repository, EntityManager } from 'typeorm';
 
-import { FlowLogRecorderService } from '../flow-log-recorder.service';
+import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
 import { FlowTimer } from '../../../metrics/instrumentation/flow/flow.helper';
 

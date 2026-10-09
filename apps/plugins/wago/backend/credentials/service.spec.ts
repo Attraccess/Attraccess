@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
-import { MemoryDeviceAdapter } from '../../cc100-runtime/src/adapters';
+import { MemoryDeviceAdapter } from '../../cc100-runtime/src/io/adapters';
 import type { RuntimeState } from '../../cc100-runtime/src/runtime';
 import { WagoRuntime } from '../../cc100-runtime/src/runtime';
 import { WagoController } from '../controllers/entity';

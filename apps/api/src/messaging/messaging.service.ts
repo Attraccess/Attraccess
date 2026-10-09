@@ -15,7 +15,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { DataSource, Repository, MoreThan, Not } from 'typeorm';
 
-import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
+import { ResourceUsageService } from '../resources/usage/sessions/resource-usage.service';
 
 import { MessagingLiveService } from './messaging-live.service';
 

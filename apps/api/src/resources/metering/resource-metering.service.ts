@@ -25,11 +25,11 @@ import {
   ResourceUsage,
 } from '@attraccess/database-entities';
 
-import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
+import { ResourceFlowsExecutorService } from '../flows/execution/resource-flows-executor.service';
 
 import { AuditService } from '../../audit/audit.service';
 
-import { LiveNotificationsService } from '../../billing/liveNotificationsService';
+import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
 import { MeteringOperationError, MeteringReadings } from './metering-readings';
 

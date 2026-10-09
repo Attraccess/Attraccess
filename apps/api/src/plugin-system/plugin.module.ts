@@ -69,7 +69,7 @@ import { dataSourceConfig } from '../database/datasource';
 
 import { EncryptionService } from '../encryption/encryption.service';
 
-import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
+import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 
 import { createPluginAuditContext } from './runtime/audit-context';
 

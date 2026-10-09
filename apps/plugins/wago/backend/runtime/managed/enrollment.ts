@@ -1,8 +1,13 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
-import { managedHostHelper } from './helper';
+import { managedHostHelper } from './provisioning/helper';
 
-import { MANAGED_HELPER_PROTOCOL, signInstaller, generateInstallerAuthority, installerPublicKey } from './installer';
+import {
+  MANAGED_HELPER_PROTOCOL,
+  signInstaller,
+  generateInstallerAuthority,
+  installerPublicKey,
+} from './provisioning/installer';
 
 import {
   RuntimeUpdateError,
@@ -21,11 +26,11 @@ import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from 
 
 import { generateManagementKey, restoreManagementKey } from '../../management/key';
 
-import { managedProvisionScript } from './provision';
+import { managedProvisionScript } from './provisioning/provision';
 
-import { WagoManagedProvisioningError, type ManagedProvisioningStage } from './provisioning-error';
+import { WagoManagedProvisioningError, type ManagedProvisioningStage } from './provisioning/provisioning-error';
 
-import { WagoCommissioningSession } from '../../commissioning/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 
 import { Credentials, RootProbe, RootAcceptance } from './contracts';
 

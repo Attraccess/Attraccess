@@ -4,7 +4,7 @@ import { randomBytes, createHash, randomUUID } from 'node:crypto';
 
 import { RuntimeUpdateError } from '../update/coordinator';
 
-import { managedSsh } from './ssh';
+import { managedSsh } from './transport/ssh';
 
 import { Credentials } from './contracts';
 
@@ -12,15 +12,15 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 
 import { restoreManagementKey } from '../../management/key';
 
-import { installerPublicKey } from './installer';
+import { installerPublicKey } from './provisioning/installer';
 
-import { managedHostHelper } from './helper';
+import { managedHostHelper } from './provisioning/helper';
 
 import { type BuildRuntimeArtifact } from '../artifacts/build';
 
 import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
 
-import { WagoCommissioningSession } from '../../commissioning/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 
 import { WagoManagedRuntimeEnrollment } from './enrollment';
 

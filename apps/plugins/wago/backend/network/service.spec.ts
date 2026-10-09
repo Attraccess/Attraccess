@@ -3,12 +3,12 @@ import { DataSource } from 'typeorm';
 import { WagoNetworkChangeService, networkChangeInput } from './service';
 import { WagoDeviceOperation, WagoManagedAccess } from '../runtime/managed/access.entity';
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
-import { managedSsh } from '../runtime/managed/ssh';
+import { managedSsh } from '../runtime/managed/transport/ssh';
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { WagoNetworkChanges1780010660000 } from '../migrations/1780010660000-add-wago-network-changes';
 import type { BuildRuntimeArtifact } from '../runtime/artifacts/build';
-import { WagoCommissioningSession } from '../commissioning/session.entity';
+import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
 import { WagoController } from '../controllers/entity';
 import { WagoCredentialRotationEntity } from '../credentials/service';
 import { WagoDeviceOperations } from '../runtime/device-operations';
@@ -20,8 +20,8 @@ import { WagoService } from '../controllers/service';
 jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
 jest.mock('../controllers/service', () => ({ WagoService: class {} }));
 jest.mock('../runtime/artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
-jest.mock('../commissioning/readiness', () => ({ WagoCommissioningReadiness: class {} }));
-jest.mock('../runtime/managed/ssh', () => ({ managedSsh: jest.fn() }));
+jest.mock('../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
+jest.mock('../runtime/managed/transport/ssh', () => ({ managedSsh: jest.fn() }));
 jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
 
 const artifact = {

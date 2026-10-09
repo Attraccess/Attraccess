@@ -1,5 +1,5 @@
 import { runtimeVersion } from './../manifest.json';
-import { MemoryDeviceAdapter } from './adapters';
+import { MemoryDeviceAdapter } from './io/adapters';
 import { JsonStateStore, WagoRuntime, hash, type Snapshot } from './runtime';
 import { TestTransport, commands, createRuntimeFixture, desired, snapshot, validCommand } from './runtime.test-utils';
 

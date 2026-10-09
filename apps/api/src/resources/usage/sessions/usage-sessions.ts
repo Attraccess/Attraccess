@@ -35,7 +35,7 @@ import {
   ResourceUsageSessionTakenOverEvent,
 } from '../events/resource-usage.events';
 
-import { type ResourceUsageService } from '../resourceUsage.service';
+import { type ResourceUsageService } from './resource-usage.service';
 
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 

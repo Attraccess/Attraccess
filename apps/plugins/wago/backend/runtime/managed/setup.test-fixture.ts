@@ -5,11 +5,11 @@ import { WagoManagedRuntimeService } from './service';
 import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './access.entity';
 import { WagoNetworkChange, WagoMqttCredentialRetirement } from '../../network/entity';
 import { WagoController } from '../../controllers/entity';
-import { WagoCommissioningSession } from '../../commissioning/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 import { WagoService } from '../../controllers/service';
 import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
-import { WagoCommissioningReadiness } from '../../commissioning/readiness';
-import { managedSsh } from './ssh';
+import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
+import { managedSsh } from './transport/ssh';
 import type { BuildRuntimeArtifact } from '../artifacts/build';
 
 export type ManagedRuntimeFixture = {

@@ -17,7 +17,7 @@ import { requireMeter } from './metering-catalog';
 
 import { toMeterValue, MeteringValueError, meterCharge } from './quantity';
 
-import { findActiveUsage } from '../usage/active-usage';
+import { findActiveUsage } from '../usage/sessions/active-usage';
 import { ConflictException } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
