@@ -193,7 +193,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     expect(await settings.getAttractapLanguage()).toBe(expected);
   });
 
-  it('persists before and after language values in the audit log for successful HTTP changes', async () => {
+  it('persists settings.updated with canonical language deltas for successful HTTP changes', async () => {
     await store.setPlainSetting('app', 'attractap_language', 'de');
     for (const attractapLanguage of ['en', 'de']) {
       await request(app.getHttpServer())
@@ -203,16 +203,33 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
         .expect(200)
         .expect(({ body }) => expect(body.app.attractapLanguage).toBe(attractapLanguage));
     }
-    const rows = await source
-      .getRepository(AuditLog)
-      .find({ where: { action: 'settings.updated' }, order: { id: 'ASC' } });
-    expect(rows.map(({ details }) => details)).toEqual([
-      { settingKey: 'app.attractapLanguage', before: 'de', after: 'en' },
-      { settingKey: 'app.attractapLanguage', before: 'en', after: 'de' },
+    const rows = await source.getRepository(AuditLog).find({ order: { id: 'ASC' } });
+    expect(rows.map(({ action, details }) => ({ action, details }))).toEqual([
+      { action: 'settings.updated', details: { settingKey: 'app.attractapLanguage', before: 'de', after: 'en' } },
+      { action: 'settings.updated', details: { settingKey: 'app.attractapLanguage', before: 'en', after: 'de' } },
     ]);
     await read({ action: 'settings.updated' })
       .expect(200)
       .expect(({ body }) => expect(body.items).toHaveLength(2));
+  });
+
+  it('records no successful language audit change when HTTP persistence fails', async () => {
+    await store.setPlainSetting('app', 'attractap_language', 'de');
+    const failure = jest.spyOn(store, 'setPlainSetting').mockRejectedValueOnce(new Error('Injected write failure'));
+    try {
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-manager')
+        .send({ app: { attractapLanguage: 'en' } })
+        .expect(500);
+      expect(await store.getPlainSetting('app', 'attractap_language')).toBe('de');
+      expect(
+        await source.getRepository(Setting).findOneByOrFail({ parent: 'app', key: 'attractap_language' }),
+      ).toMatchObject({ value: 'de' });
+      expect(await source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      failure.mockRestore();
+    }
   });
 
   it.each(fixture.scenarios)(
