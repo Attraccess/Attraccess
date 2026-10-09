@@ -1,6 +1,6 @@
 # Monitoring & Metrics
 
-Attraccess includes built-in monitoring support using **Prometheus** for metrics collection and **Grafana** for visualization. This gives you real-time insight into how your makerspace is being used, system health, and operational performance.
+Attraccess includes built-in monitoring support using **Prometheus** for metrics collection and **Grafana** for visualization. IT and operations teams can monitor resource usage, application health and operational performance alongside their existing infrastructure.
 
 ## What You Get
 

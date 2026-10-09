@@ -2,17 +2,17 @@
 
 ## Was ist Attraccess?
 
-Attraccess ist eine Open-Source-Plattform zur Verwaltung von Ressourcen und Zugängen in Makerspaces, Werkstätten und FabLabs. Die Software läuft als Webanwendung auf Ihrem eigenen Server und kann von jedem Gerät mit einem Webbrowser genutzt werden.
+Attraccess ist eine Plattform mit öffentlich einsehbarem Quellcode (source-available) für Maschinenzugang und Ressourcenverwaltung in Industrie, Forschung und Hochschulen. Sie verbindet Berechtigungen und Einweisungen mit Maschinenzugang, Nutzungsnachweisen und vorbeugender Wartung. Die Software läuft als Webanwendung auf Ihrer eigenen Infrastruktur und kann auf Desktops, Tablets und Smartphones genutzt werden.
 
 ## Hauptfunktionen
 
 ### Ressourcenverwaltung
 
-Verwalten Sie alle Maschinen, Werkzeuge und Geräte in Ihrer Werkstatt an einem zentralen Ort. Jede Ressource hat eine eigene Detailseite mit Bild, Beschreibung und Dokumentation.
+Verwalten Sie Maschinen, Werkzeuge, Arbeitsplätze und Türen in Produktionsbereichen, Forschungslaboren und Hochschuleinrichtungen an einem zentralen Ort. Jede Ressource hat eine eigene Detailseite mit Bild, Beschreibung und Dokumentation.
 
-### Einweisungssystem
+### Qualifikationen & Einweisungen
 
-Legen Sie fest, dass Benutzer eine Einweisung erhalten müssen, bevor sie eine Ressource nutzen dürfen. Einweiser können anderen Benutzern den Zugang freischalten. Alle Einweisungen werden dokumentiert.
+Dokumentieren Sie Einweisungen und erteilen Sie Zugangsberechtigungen pro Maschine oder Ressourcengruppe. Autorisierte Einweiser erfassen und widerrufen Einweisungen; Aufsichtsmodi unterstützen Schulungen an der Maschine.
 
 ### Wartungsplanung
 
@@ -22,13 +22,21 @@ Planen Sie regelmäßige Wartungen für Ihre Ressourcen. Attraccess zeigt den ak
 
 Mit dem **Attractap RFID-Leser** können Sie den physischen Zugang zu Maschinen über RFID-Karten steuern. Benutzer halten ihre Karte an den Leser, und Attraccess prüft die Berechtigung.
 
-### Flows & Automatisierung
+### Maschinenintegration & Automatisierung
 
-Erstellen Sie visuelle Automatisierungen mit dem Flow-Editor. Verbinden Sie Aktionen wie HTTP-Anfragen, MQTT-Nachrichten und Bedingungen zu automatischen Abläufen.
+Verbinden Sie Maschinen über das WAGO-SPS-Plugin oder erstellen Sie visuelle Automatisierungen mit dem Flow-Editor. Verknüpfen Sie Zugangsentscheidungen und Nutzungssitzungen über MQTT, AMQP oder HTTP mit Gerätesteuerungen und Statussignalen.
 
 ### Projekte
 
-Organisieren Sie Ihre Arbeit in Projekten. Laden Sie Teammitglieder ein und verwalten Sie projektbezogene Berechtigungen.
+Organisieren Sie Produktions-, Entwicklungs- und Forschungsarbeiten in Projekten. Laden Sie Teammitglieder ein, verwalten Sie projektbezogene Berechtigungen und ordnen Sie Maschinensitzungen Projekten zu.
+
+### Nutzungsnachweise & Auswertungen
+
+Erfassen Sie, wer welche Maschine wann und wie lange genutzt hat. Exportieren Sie Nutzungsdaten als CSV für betriebliche Auswertungen und Projektanalysen.
+
+### IT & Betrieb
+
+Binden Sie Ihren vorhandenen Identitätsanbieter über [OIDC oder SAML](user-management/sso-overview.md) an, ordnen Sie Gruppen Rollen zu, prüfen Sie [Audit-Protokolle](settings/audit-log.md) und überwachen Sie die Anwendung mit [Prometheus und Grafana](monitoring/overview.md).
 
 ### Abrechnung
 
@@ -46,6 +54,16 @@ Attraccess besteht aus:
 - **Datenbank** – SQLite (keine separate Datenbank nötig)
 - **RFID-Hardware** – Attractap-Leser (ESP32-basiert, optional)
 - **Bereitstellung** – Docker-Container
+
+## Lizenzierung
+
+Attraccess ist **source-available** unter der [modifizierten Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md).
+
+- **Kommerzielle Nutzung**, einschließlich interner Nutzung in Unternehmen, erfordert nach einer kostenlosen Testphase von bis zu **30 Tagen** eine kommerzielle Lizenz.
+- **Nicht-kommerzielle Nutzung** durch Privatpersonen und gemeinnützige Organisationen ist im Rahmen der Lizenzbedingungen kostenlos.
+- **Forks und weitergegebene Änderungen** unterliegen denselben Lizenzbedingungen. Separat lizenzierte Komponenten behalten ihre jeweilige Lizenz.
+
+Für kommerzielle Lizenzen und Unterstützung bei der Integration wenden Sie sich an [contact@attraccess.org](mailto:contact@attraccess.org). Die vollständigen Bedingungen finden Sie in der verlinkten Lizenz.
 
 ## Nächste Schritte
 

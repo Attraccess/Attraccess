@@ -40,7 +40,7 @@ This page lists frequently encountered problems and their solutions.
 
 | Cause | Solution |
 |-------|----------|
-| Not introduced | You need a safety introduction before you can use the resource. Ask an authorized introducer at your workshop. |
+| Not introduced | You need a safety introduction before you can use the resource. Ask an authorized introducer for the resource. |
 | Resource under maintenance | The resource may be temporarily unavailable for maintenance. Check the resource status on the detail page. |
 | Resource in use | Someone else may be using the resource. Wait until their session ends. |
 
@@ -55,7 +55,7 @@ This page lists frequently encountered problems and their solutions.
 3. Check your email for a reset link
 4. Set a new password
 
-If you do not receive the reset email, contact your workshop administrator. They can reset your password for you.
+If you do not receive the reset email, contact your administrator. They can reset your password for you.
 
 ## RFID Card Not Recognized
 

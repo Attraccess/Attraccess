@@ -1,6 +1,6 @@
 # MQTT Examples
 
-This page shows practical examples of how to use MQTT with Attraccess to control machines, receive sensor data, and automate your makerspace.
+This page shows practical examples of how to use MQTT with Attraccess to control machines, receive sensor data and automate equipment in production and lab environments.
 
 > [!NOTE]
 > All examples assume you have already [connected an MQTT broker](devices/mqtt/server-setup.md) and are familiar with the basics of [Flows](flows/overview.md).

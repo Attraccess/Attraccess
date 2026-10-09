@@ -13,7 +13,7 @@ Diese Seite erklärt die verschiedenen Möglichkeiten, sich bei Attraccess anzum
 
 ## Anmeldung mit SSO
 
-Wenn Ihre Werkstatt einen Single-Sign-On-(SSO-)Anbieter konfiguriert hat, sehen Sie zusätzliche Schaltflächen auf der Anmeldeseite (z. B. "Mit Google anmelden" oder "Mit Keycloak anmelden").
+Wenn Ihre Organisation einen Single-Sign-On-(SSO-)Anbieter konfiguriert hat, sehen Sie zusätzliche Schaltflächen auf der Anmeldeseite für den Identitätsanbieter Ihres Unternehmens oder Ihrer Hochschule (z. B. Microsoft Entra ID oder Keycloak).
 
 1. Klicken Sie auf die **SSO-Schaltfläche** Ihres Anbieters
 2. Sie werden zur Anmeldeseite Ihres Anbieters weitergeleitet
@@ -44,7 +44,7 @@ Wenn die Selbstregistrierung aktiviert ist, können Sie ein neues Konto erstelle
 4. Möglicherweise müssen Sie Ihre E-Mail-Adresse bestätigen, bevor Sie sich anmelden können
 
 > [!NOTE]
-> Manche Werkstätten deaktivieren die Selbstregistrierung. In diesem Fall bitten Sie Ihren Administrator, ein Konto für Sie zu erstellen.
+> Manche Organisationen deaktivieren die Selbstregistrierung. Fragen Sie in diesem Fall Ihren Administrator, wie Sie Zugang erhalten.
 
 ## Passwort vergessen
 
@@ -57,7 +57,7 @@ Wenn Sie Ihr Passwort vergessen haben:
 5. Klicken Sie auf den Link und legen Sie ein neues Passwort fest
 
 > [!WARNING]
-> Wenn Sie die E-Mail nicht erhalten, prüfen Sie Ihren Spam-Ordner. Wenn das Problem weiterhin besteht, wenden Sie sich an Ihren Werkstattadministrator.
+> Wenn Sie die E-Mail nicht erhalten, prüfen Sie Ihren Spam-Ordner. Wenn das Problem weiterhin besteht, wenden Sie sich an Ihren Administrator.
 
 ## Siehe auch
 

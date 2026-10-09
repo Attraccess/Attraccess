@@ -1,15 +1,25 @@
 # Attraccess
 
-A comprehensive resource management system for tracking and managing access to shared resources.
+Attraccess manages machine access and resource usage for industry, R&D and universities. It checks operator permissions and safety briefings, connects machines through PLCs and automation flows, and records usage for reporting and maintenance.
+
+Attraccess runs on your own infrastructure and is **source-available** under the [modified Prosperity Public License 3.0](LICENSE.md). Commercial use requires a license after a 30-day evaluation; qualifying non-commercial use is free under the license terms.
 
 ## Features
 
 - Resource Management
   - Track resource status, usage, and maintenance
   - Image support for resources with automatic resizing and caching
-  - Role-based access control
-  - Maintenance scheduling
-  - Usage tracking and reporting
+  - Operator permissions and documented safety briefings
+  - Preventive maintenance scheduling
+  - Usage tracking, project attribution and CSV reporting
+- Machine Integration
+  - Badge access through Attractap readers
+  - WAGO PLC integration and automation via MQTT, AMQP and HTTP
+  - Workstation access through Attraccess Companion
+- IT & Operations
+  - Single sign-on via OIDC and SAML
+  - Role-based access control and audit logging
+  - On-premises deployment with Prometheus and Grafana monitoring
 
 ## Everything below is meant for developers
 

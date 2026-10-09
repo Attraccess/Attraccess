@@ -40,7 +40,7 @@ Diese Seite listet häufig auftretende Probleme und deren Lösungen auf.
 
 | Ursache | Lösung |
 |---------|--------|
-| Keine Einweisung | Sie benötigen eine Sicherheitseinweisung, bevor Sie die Ressource nutzen können. Fragen Sie einen autorisierten Einweiser in Ihrer Werkstatt. |
+| Keine Einweisung | Sie benötigen eine Sicherheitseinweisung, bevor Sie die Ressource nutzen können. Fragen Sie einen autorisierten Einweiser für die Ressource. |
 | Ressource in Wartung | Die Ressource ist möglicherweise vorübergehend für Wartungsarbeiten nicht verfügbar. Prüfen Sie den Ressourcenstatus auf der Detailseite. |
 | Ressource in Benutzung | Eine andere Person nutzt möglicherweise die Ressource. Warten Sie, bis deren Sitzung beendet ist. |
 
@@ -55,7 +55,7 @@ Diese Seite listet häufig auftretende Probleme und deren Lösungen auf.
 3. Prüfen Sie Ihre E-Mails auf einen Link zum Zurücksetzen
 4. Legen Sie ein neues Passwort fest
 
-Wenn Sie die E-Mail zum Zurücksetzen nicht erhalten, wenden Sie sich an Ihren Werkstattadministrator. Dieser kann Ihr Passwort für Sie zurücksetzen.
+Wenn Sie die E-Mail zum Zurücksetzen nicht erhalten, wenden Sie sich an Ihren Administrator. Dieser kann Ihr Passwort für Sie zurücksetzen.
 
 ## RFID-Karte wird nicht erkannt
 
