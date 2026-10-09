@@ -1296,6 +1296,10 @@ int main(int argc, char **argv)
                 expect(Language::supported(german) == "de", "Complete German locales normalize");
             for (const auto *invalid : {"de-", "de-!!!", "de--DE", "de_DE_extraextra", "de-Latn-DE-!", "de-DE-Latn", "de-abc", "de-u", "de-u-x-private", "de-x", "de-1901-1901", "de-u-co-phonebk-u-ca-gregory", "", "fr-CA"})
                 expect(Language::supported(invalid) == "en", "Invalid or unsupported locales fall back to English");
+            for (const auto *german : {"de-u-foo-ca-gregory-kn", "de-u-1a", "de-u-kn", "de-t-en", "de-t-en-US-h0-hybrid", "de-t-h0-hybrid", "de-t-zh-Hant-TW-m0-ungegn-u-ca-gregory-x-reader", "de-t-en-US-1901", "de-u-ca-gregory-ca-buddhist", "de-t-h0-abc-h0-def", "de-x-u-ca-ca-12"})
+                expect(Language::supported(german) == "de", std::string("Valid locale extension: ") + german);
+            for (const auto *invalid : {"de-u-12", "de-u-a1", "de-u-foo-12", "de-u-ca-gregory-12", "de-t-12", "de-t-h0", "de-t-en-h0", "de-t-en-12", "de-t-abcd", "de-t-en-US-ca-gregory", "de-t-en-US-1901-1901", "de-t-h0-abc-12", "de-u-ca-ca-12", "de-u-kn-kn-a1"})
+                expect(Language::supported(invalid) == "en", std::string("Malformed locale extension: ") + invalid);
             Language::Session session;
             session.setApi(true, "en");
             session.setUser(true, "de-AT");

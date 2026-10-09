@@ -14,6 +14,17 @@ describe('device language locale normalization', () => {
     'de-a-foo-b-bar',
     'de-DE-extra',
     'de-1234',
+    'de-u-foo-ca-gregory-kn',
+    'de-u-1a',
+    'de-u-kn',
+    'de-t-en',
+    'de-t-en-US-h0-hybrid',
+    'de-t-h0-hybrid',
+    'de-t-zh-Hant-TW-m0-ungegn-u-ca-gregory-x-reader',
+    'de-t-en-US-1901',
+    'de-u-ca-gregory-ca-buddhist',
+    'de-t-h0-abc-h0-def',
+    'de-x-u-ca-ca-12',
   ])('resolves the complete German locale %s', (locale) => {
     expect(normalizeDeviceLanguage(locale)).toBe('de');
   });
@@ -37,6 +48,20 @@ describe('device language locale normalization', () => {
     'de-1901-1901',
     'de-u-co-phonebk-u-ca-gregory',
     'de-DE-extraextra',
+    'de-u-12',
+    'de-u-a1',
+    'de-u-foo-12',
+    'de-u-ca-gregory-12',
+    'de-t-12',
+    'de-t-h0',
+    'de-t-en-h0',
+    'de-t-en-12',
+    'de-t-abcd',
+    'de-t-en-US-ca-gregory',
+    'de-t-en-US-1901-1901',
+    'de-t-h0-abc-12',
+    'de-u-ca-ca-12',
+    'de-u-kn-kn-a1',
   ])('uses English for unsupported or malformed locale %s', (locale) => {
     expect(normalizeDeviceLanguage(locale)).toBe('en');
   });

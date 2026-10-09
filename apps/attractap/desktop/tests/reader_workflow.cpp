@@ -647,6 +647,12 @@ int main(int argc, char **argv) {
     assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "de");
     click("Abmelden");
     assert(State::getActiveLanguage() == "en" && label(lv_screen_active(), "Tap RFID card or open a resource"));
+    for (const auto *malformed : {"de-u-12", "de-t-12"}) {
+        defaultLanguage("de");
+        defaultLanguage(malformed);
+        assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "en");
+        assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
+    }
     userLocale = "en-US"; username = "Robin"; login();
     assert(State::getActiveLanguage() == "en");
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();

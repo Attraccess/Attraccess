@@ -139,7 +139,7 @@ it('keeps an unsaved language choice during background refetches', async () => {
     expect.objectContaining({ requestBody: { app: expect.objectContaining({ attractapLanguage: 'en' }) } }),
   );
 });
-it.each(['en-US', 'fr-CA', 'de-!!!', 'de-', 'de-u', 'de-1901-1901'])(
+it.each(['en-US', 'fr-CA', 'de-!!!', 'de-', 'de-u', 'de-1901-1901', 'de-u-12', 'de-t-12', 'de-u-ca-ca-12'])(
   'suggests English for setup browser locale %s',
   (locale) => {
     const original = Object.getOwnPropertyDescriptor(window.navigator, 'language');

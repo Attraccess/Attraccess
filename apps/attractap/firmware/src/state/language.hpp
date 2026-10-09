@@ -35,14 +35,18 @@ inline std::string supported(std::string locale)
     if (parts[0] != "de") return "en";
     const auto alpha = [](std::string_view value) { return value.find_first_not_of("abcdefghijklmnopqrstuvwxyz") == value.npos; };
     const auto numeric = [](std::string_view value) { return value.find_first_not_of("0123456789") == value.npos; };
+    const auto languageTail = [&](size_t &index, size_t end) {
+        if (index < end && parts[index].size() == 4 && alpha(parts[index])) ++index;
+        if (index < end && ((parts[index].size() == 2 && alpha(parts[index])) || (parts[index].size() == 3 && numeric(parts[index])))) ++index;
+        std::vector<std::string_view> variants;
+        while (index < end && (parts[index].size() >= 5 || (parts[index].size() == 4 && parts[index][0] >= '0' && parts[index][0] <= '9'))) {
+            if (std::find(variants.begin(), variants.end(), parts[index]) != variants.end()) return false;
+            variants.push_back(parts[index++]);
+        }
+        return true;
+    };
     size_t index = 1;
-    if (index < parts.size() && parts[index].size() == 4 && alpha(parts[index])) ++index;
-    if (index < parts.size() && ((parts[index].size() == 2 && alpha(parts[index])) || (parts[index].size() == 3 && numeric(parts[index])))) ++index;
-    std::vector<std::string_view> variants;
-    while (index < parts.size() && (parts[index].size() >= 5 || (parts[index].size() == 4 && parts[index][0] >= '0' && parts[index][0] <= '9'))) {
-        if (std::find(variants.begin(), variants.end(), parts[index]) != variants.end()) return "en";
-        variants.push_back(parts[index++]);
-    }
+    if (!languageTail(index, parts.size())) return "en";
     std::string extensions;
     while (index < parts.size() && parts[index].size() == 1 && parts[index] != "x") {
         const auto singleton = parts[index++][0];
@@ -51,6 +55,31 @@ inline std::string supported(std::string locale)
         const auto first = index;
         while (index < parts.size() && parts[index].size() >= 2) ++index;
         if (index == first) return "en";
+        // Unicode u/t extensions have stricter syntax than generic BCP 47
+        // extensions. Match Intl.Locale, used by setup and the API:
+        // https://www.unicode.org/reports/tr35/#Unicode_locale_identifier
+        size_t field = first;
+        if (singleton == 'u') {
+            while (field < index && parts[field].size() >= 3) ++field; // Attributes.
+            while (field < index) {
+                if (parts[field].size() != 2 || !alpha(parts[field].substr(1))) return "en";
+                ++field; // A Unicode key may have no value (e.g. u-kn).
+                while (field < index && parts[field].size() >= 3) ++field;
+            }
+        } else if (singleton == 't') {
+            const auto language = parts[field];
+            if (alpha(language) && (language.size() == 2 || language.size() == 3 || language.size() >= 5)) {
+                ++field;
+                if (!languageTail(field, index)) return "en";
+            }
+            while (field < index) {
+                const auto key = parts[field++];
+                if (key.size() != 2 || !alpha(key.substr(0, 1)) || !numeric(key.substr(1))) return "en";
+                const auto value = field;
+                while (field < index && parts[field].size() >= 3) ++field;
+                if (field == value) return "en"; // Transform fields require a value.
+            }
+        }
     }
     if (index < parts.size() && parts[index] == "x") {
         if (++index == parts.size()) return "en";

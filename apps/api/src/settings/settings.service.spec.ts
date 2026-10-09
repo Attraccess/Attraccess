@@ -97,6 +97,9 @@ describe('SettingsService', () => {
     ['de-DE-u-co-phonebk', 'de'],
     ['de-CH-1901', 'de'],
     ['de_DE_extraextra', 'en'],
+    ['de-u-12', 'en'],
+    ['de-t-12', 'en'],
+    ['de-u-ca-ca-12', 'en'],
   ])('resolves stored language %s in both read methods', async (stored, expected) => {
     store.getPlainSetting.mockResolvedValue(stored);
     expect(await service.getAttractapLanguage()).toBe(expected);
