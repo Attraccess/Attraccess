@@ -27,6 +27,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useAuthenticationServiceCreateOneSsoProvider: () => ({ mutateAsync: state.create, isPending: false }),
   useAuthenticationServiceUpdateOneSsoProvider: () => ({ mutateAsync: state.update, isPending: false }),
   useRbacServiceListRoles: () => ({ data: [], isLoading: false }),
+  useSsoServiceGetSsoLogoutUrls: () => ({ data: undefined, isLoading: false }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
