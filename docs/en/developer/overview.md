@@ -2,7 +2,7 @@
 
 This guide helps you get started with Attraccess development. Attraccess is a source-available web application for machine access control and resource management in industry, R&D and universities.
 
-Development, redistribution and commercial use are subject to the [modified Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). See [Licensing](getting-started/overview.md#licensing) for an overview.
+Development, redistribution and commercial use are subject to the [modified Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). See [Licensing](getting-started/overview.md#licensing) for an English summary of the German license terms.
 
 ## Tech Stack
 

@@ -14,7 +14,7 @@ Attraccess runs on your own infrastructure and is **source-available** under the
   - Usage tracking, project attribution and CSV reporting
 - Machine Integration
   - Badge access through Attractap readers
-  - WAGO PLC integration and automation via MQTT, AMQP and HTTP
+  - WAGO PLC integration and automation via MQTT and HTTP
   - Workstation access through Attraccess Companion
 - IT & Operations
   - Single sign-on via OIDC and SAML

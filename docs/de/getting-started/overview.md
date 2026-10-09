@@ -24,7 +24,7 @@ Mit dem **Attractap RFID-Leser** können Sie den physischen Zugang zu Maschinen 
 
 ### Maschinenintegration & Automatisierung
 
-Verbinden Sie Maschinen über das WAGO-SPS-Plugin oder erstellen Sie visuelle Automatisierungen mit dem Flow-Editor. Verknüpfen Sie Zugangsentscheidungen und Nutzungssitzungen über MQTT, AMQP oder HTTP mit Gerätesteuerungen und Statussignalen.
+Verbinden Sie Maschinen über das WAGO-SPS-Plugin oder erstellen Sie visuelle Automatisierungen mit dem Flow-Editor. Verknüpfen Sie Zugangsentscheidungen und Nutzungssitzungen über MQTT oder HTTP mit Gerätesteuerungen und Statussignalen.
 
 ### Projekte
 
@@ -64,6 +64,18 @@ Attraccess ist **source-available** unter der [modifizierten Prosperity Public L
 - **Forks und weitergegebene Änderungen** unterliegen denselben Lizenzbedingungen. Separat lizenzierte Komponenten behalten ihre jeweilige Lizenz.
 
 Für kommerzielle Lizenzen und Unterstützung bei der Integration wenden Sie sich an [contact@attraccess.org](mailto:contact@attraccess.org). Die vollständigen Bedingungen finden Sie in der verlinkten Lizenz.
+
+### Aktivierung
+
+Jede Installation benötigt einen Lizenzschlüssel, auch kostenlose Installationen. Tragen Sie ihn im Feld **Lizenzschlüssel** des [Einrichtungsassistenten](setup/first-time-setup.md) oder unter **Einstellungen → Anwendungseinstellungen** ein. Alternativ können Sie die [Umgebungsvariable](installation/environment-variables.md) `LICENSE_KEY` setzen. In der Oberfläche gespeicherte Einstellungen haben Vorrang vor den Vorgaben aus Umgebungsvariablen.
+
+Für zulässige nicht-kommerzielle Nutzung kopieren Sie nach Prüfung der Lizenzbedingungen den folgenden speziellen Schlüssel exakt:
+
+```text
+I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md
+```
+
+Für eine kommerzielle Testphase oder kommerzielle Nutzung fordern Sie einen Lizenzschlüssel bei [contact@attraccess.org](mailto:contact@attraccess.org) an.
 
 ## Nächste Schritte
 

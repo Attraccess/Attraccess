@@ -92,7 +92,7 @@ Welche Aktion verfügbar ist, hängt von Ihren Berechtigungen und dem aktuellen 
 | **Einweisung** | Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Öffnen Sie die Details für weitere Hinweise und wenden Sie sich an einen berechtigten Einweiser. |
 | **Belegt**     | Eine andere Person nutzt die Maschine. Warten Sie, bis diese ihre Nutzung beendet hat.                                                                                   |
 | **Übernehmen** | Die Übernahme der laufenden Nutzung ist erlaubt. Tippen Sie auf die Schaltfläche, um die Details zu öffnen, und wählen Sie dort die Übernahme aus.                       |
-| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an Ihre Administration.                                      |
+| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                      |
 | **Laden ...**  | Der Leser prüft, welche Aktionen für Sie verfügbar sind. Warten Sie, bis sich die Schaltfläche aktualisiert.                                                             |
 
 ## Zum Schluss abmelden
@@ -106,7 +106,7 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 | Was Sie sehen                              | Was Sie tun können                                                                                                                                                                                                |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihre Administration zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
-| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an Ihre Administration.                                               |
+| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                               |
 | Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                              |
 
 ## Weiterführende Anleitungen

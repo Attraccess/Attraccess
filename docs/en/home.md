@@ -8,7 +8,7 @@ Attraccess helps you manage machines, tools, workstations and doors across produ
 
 Run Attraccess on your own infrastructure, connect your identity provider and use usage records, maintenance schedules and audit logs to support day-to-day operations.
 
-Attraccess is **source-available** under the [modified Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Commercial use requires a license after a 30-day evaluation; qualifying non-commercial use is free. See [Licensing](getting-started/overview.md#licensing) for details.
+Attraccess is **source-available** under the [modified Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Commercial use requires a license after a 30-day evaluation; qualifying non-commercial use is free. The full license terms are written in German; see [Licensing and activation](getting-started/overview.md#licensing) for an English summary and setup instructions.
 
 ## Who is this documentation for?
 
@@ -33,7 +33,7 @@ Attraccess is **source-available** under the [modified Prosperity Public License
 - **Qualifications & Access Control** – Documented safety briefings and permissions per resource or resource group
 - **Badge Access** – Physical access via Attractap RFID readers
 - **Maintenance Planning** – Schedule preventive maintenance by time, usage hours or session count
-- **Machine & PLC Integration** – Connect WAGO controllers and automate equipment via MQTT, AMQP or HTTP
+- **Machine & PLC Integration** – Connect WAGO controllers and automate equipment via MQTT or HTTP
 - **Projects & Usage Records** – Assign sessions to projects and export usage as CSV
 - **SSO Integration** – Login via OIDC or SAML with group-to-role mappings
 - **Audit Log & Monitoring** – Track sensitive changes and monitor operations with Prometheus and Grafana

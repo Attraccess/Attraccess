@@ -8,7 +8,7 @@ Attraccess hilft Ihnen, Maschinen, Werkzeuge, Arbeitsplätze und Türen in Produ
 
 Betreiben Sie Attraccess auf Ihrer eigenen Infrastruktur, binden Sie Ihren Identitätsanbieter an und unterstützen Sie den Betriebsalltag mit Nutzungsnachweisen, Wartungsplänen und Audit-Protokollen.
 
-Attraccess ist **source-available** unter der [modifizierten Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Kommerzielle Nutzung erfordert nach einer 30-tägigen Testphase eine Lizenz; nicht-kommerzielle Nutzung ist im Rahmen der Lizenzbedingungen kostenlos. Weitere Informationen finden Sie unter [Lizenzierung](getting-started/overview.md#lizenzierung).
+Attraccess ist **source-available** unter der [modifizierten Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Kommerzielle Nutzung erfordert nach einer 30-tägigen Testphase eine Lizenz; nicht-kommerzielle Nutzung ist im Rahmen der Lizenzbedingungen kostenlos. Auch kostenlose Installationen benötigen einen Lizenzschlüssel. Weitere Informationen finden Sie unter [Lizenzierung und Aktivierung](getting-started/overview.md#lizenzierung).
 
 ## Für wen ist diese Dokumentation?
 
@@ -33,7 +33,7 @@ Attraccess ist **source-available** unter der [modifizierten Prosperity Public L
 - **Qualifikationen & Zugangssteuerung** – Dokumentierte Einweisungen und Berechtigungen pro Ressource oder Ressourcengruppe
 - **Ausweiszugang** – Physischer Zugang über Attractap RFID-Leser
 - **Wartungsplanung** – Vorbeugende Wartung nach Zeit, Nutzungsstunden oder Sitzungsanzahl planen
-- **Maschinen- & SPS-Integration** – WAGO-Steuerungen anbinden und Geräte über MQTT, AMQP oder HTTP automatisieren
+- **Maschinen- & SPS-Integration** – WAGO-Steuerungen anbinden und Geräte über MQTT oder HTTP automatisieren
 - **Projekte & Nutzungsnachweise** – Sitzungen Projekten zuordnen und Nutzungsdaten als CSV exportieren
 - **SSO-Integration** – Anmeldung über OIDC oder SAML mit Zuordnung von Gruppen zu Rollen
 - **Audit-Protokoll & Monitoring** – Sensible Änderungen nachverfolgen und den Betrieb mit Prometheus und Grafana überwachen

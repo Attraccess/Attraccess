@@ -24,7 +24,7 @@ With the **Attractap RFID Reader**, you can control physical access to machines 
 
 ### Machine Integration & Automation
 
-Connect machines through the WAGO PLC plugin or build visual automations using the flow editor. Use MQTT, AMQP or HTTP to link access decisions and usage sessions with equipment controls and status signals.
+Connect machines through the WAGO PLC plugin or build visual automations using the flow editor. Use MQTT or HTTP to link access decisions and usage sessions with equipment controls and status signals.
 
 ### Projects
 
@@ -63,7 +63,19 @@ Attraccess is **source-available** under the [modified Prosperity Public License
 - **Non-commercial use** by private individuals and non-profit organizations is free under the license terms.
 - **Forks and redistributed modifications** remain subject to the same license terms. Components with separate licenses retain those licenses.
 
-For commercial licensing and integration support, contact [contact@attraccess.org](mailto:contact@attraccess.org). The linked license contains the full terms.
+The linked `LICENSE.md` contains the full terms in German and takes precedence over this English summary. For licensing questions and integration support, contact [contact@attraccess.org](mailto:contact@attraccess.org).
+
+### Activation
+
+Every installation needs a license key, including free installations. Enter it in the **License Key** field of the [Setup Wizard](setup/first-time-setup.md) or under **Settings → Application Settings**. Alternatively, set the `LICENSE_KEY` [environment variable](installation/environment-variables.md). Settings saved in the UI override environment variable defaults.
+
+For qualifying non-commercial use, copy the following special key exactly after reviewing the license terms:
+
+```text
+I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md
+```
+
+For a commercial evaluation or commercial use, request a license key from [contact@attraccess.org](mailto:contact@attraccess.org).
 
 ## Next Steps
 
