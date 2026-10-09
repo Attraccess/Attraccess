@@ -1093,7 +1093,12 @@ describe('durable audit SQLite', () => {
         { provide: SettingsService, useValue: settings },
         {
           provide: SessionService,
-          useValue: { validateSession: async (token: string) => (token === 'session' ? { id: 42 } : null) },
+          useValue: {
+            authenticateSession: async (token: string) =>
+              token === 'session'
+                ? { user: { id: 42 }, session: { id: 'audit-fixture', ssoContext: null } }
+                : null,
+          },
         },
         { provide: TwoFactorService, useValue: { getStatus: async () => ({ required: false }) } },
         { provide: RbacService, useValue: { getEffectivePermissions: async () => ownerPermissions } },

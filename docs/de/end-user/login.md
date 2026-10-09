@@ -2,7 +2,7 @@
 
 Diese Seite erklärt die verschiedenen Möglichkeiten, sich bei Attraccess anzumelden.
 
-## Anmeldung mit Benutzername und Passwort
+## Anmeldung mit E-Mail oder Benutzername und Passwort
 
 1. Öffnen Sie Attraccess in Ihrem Browser
 2. Geben Sie Ihren **Benutzernamen oder Ihre E-Mail-Adresse** ein
@@ -24,9 +24,9 @@ Wenn Ihre Werkstatt einen Single-Sign-On-(SSO-)Anbieter konfiguriert hat, sehen 
 
 ## Zwei-Faktor-Authentifizierung (2FA)
 
-Wenn die Zwei-Faktor-Authentifizierung für Ihr Konto aktiviert ist, werden Sie nach der Passworteingabe nach einem zusätzlichen Code gefragt.
+Wenn die Zwei-Faktor-Authentifizierung für Ihr Konto aktiviert ist, werden Sie nach dem Absenden Ihrer Zugangsdaten nach einem zusätzlichen Code gefragt.
 
-1. Geben Sie Ihren Benutzernamen und Ihr Passwort wie gewohnt ein
+1. Geben Sie Ihre E-Mail-Adresse oder Ihren Benutzernamen und Ihr Passwort ein und klicken Sie auf **Anmelden**
 2. Öffnen Sie Ihre **Authenticator-App** (z. B. Google Authenticator, Microsoft Authenticator, Authy)
 3. Geben Sie den **sechsstelligen Code** ein, der in der App angezeigt wird
 4. Klicken Sie auf **Bestätigen**

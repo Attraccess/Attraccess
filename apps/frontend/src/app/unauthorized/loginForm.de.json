@@ -3,16 +3,15 @@
   "subtitle": "Bereit, dein nächstes Projekt umzusetzen? Melde dich an, um Maschinen zu buchen und loszulegen.",
   "noAccount": "Neu hier?",
   "signUpButton": "Hier geht's los",
-  "username": "Benutzername",
+  "username": "E-Mail oder Benutzername",
   "password": "Passwort",
   "twoFactorCode": "Authenticator-Code",
-  "twoFactorHelper": "Nur eingeben, wenn du 2FA bereits eingerichtet hast. Andernfalls leer lassen und nach der Anmeldung einrichten.",
   "rememberMe": "Angemeldet bleiben",
   "forgotPassword": "Passwort vergessen?",
   "signInButton": "Los geht's",
   "signingIn": "Anmelden...",
   "accordion": {
-    "title": "Anmelden mit E-Mail und Passwort"
+    "title": "Anmelden mit E-Mail oder Benutzername und Passwort"
   },
   "resendVerification": {
     "prompt": "Verifizierungs-E-Mail nicht erhalten oder Link abgelaufen? Gib deine E-Mail ein, um einen neuen zu erhalten.",
@@ -20,5 +19,8 @@
     "button": "Verifizierungsmail erneut senden",
     "successTitle": "E-Mail gesendet!",
     "successMessage": "Wenn ein Konto mit dieser E-Mail existiert und noch nicht verifiziert ist, wurde ein neuer Verifizierungslink gesendet."
-  }
+  },
+  "twoFactorInstruction": "Gib den sechsstelligen Code aus deiner Authenticator-App ein, um die Anmeldung abzuschließen.",
+  "verifyCode": "Code bestätigen",
+  "changeCredentials": "E-Mail, Benutzername oder Passwort ändern"
 }
