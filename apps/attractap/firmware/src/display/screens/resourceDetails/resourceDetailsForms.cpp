@@ -229,10 +229,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
       FormFieldWidget *widget = this->findFieldWidget(result.formId, result.errors[i].fieldId);
       if (widget && widget->errorLabel)
       {
-         // Field errors come from the server and may contain arbitrary text.
-         // Keep them out of the firmware UI catalog so a later language refresh
-         // does not replace them with the label's initial empty value.
-         FirmwareI18n::setDynamicLabel(widget->errorLabel, result.errors[i].message.c_str());
+         FirmwareI18n::setLabel(widget->errorLabel, FirmwareI18n::formError(result.errors[i].code));
          shown = true;
       }
    }

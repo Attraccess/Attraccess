@@ -2,6 +2,8 @@
 import { AttractapAuthHandler } from './auth.handler';
 import { AttractapEvent, AttractapEventType } from '../websocket.types';
 import { verifyToken } from '../websocket.utils';
+import { AttractapGateway } from '../websocket.gateway';
+import { WebsocketService } from '../websocket.service';
 
 jest.mock('../websocket.utils', () => ({
   verifyToken: jest.fn(),
@@ -63,7 +65,7 @@ describe('AttractapAuthHandler', () => {
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
     (handler as any).settingsService = { getAttractapLanguage: jest.fn().mockResolvedValue('de') };
-    (handler as any).websocketService = { sockets: new Map() };
+    (handler as any).websocketService = new WebsocketService();
   });
 
   describe('handleReaderRegister', () => {
@@ -130,6 +132,40 @@ describe('AttractapAuthHandler', () => {
 
   describe('handleAuthentication', () => {
     const data = { payload: { id: 42, token: 'client-token' } } as AttractapEvent['data'];
+
+    it('delivers a default changed while the initial language read is pending', async () => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      mockVerifyToken.mockResolvedValue(true);
+      let finishRead!: (language: 'en' | 'de') => void;
+      let readStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        readStarted = resolve;
+      });
+      (handler as any).settingsService.getAttractapLanguage.mockImplementation(() => {
+        readStarted();
+        return new Promise((resolve) => {
+          finishRead = resolve;
+        });
+      });
+      const websocketService = (handler as any).websocketService;
+      websocketService.sockets.set(mockSocket.id, mockSocket);
+      const gateway = Object.create(AttractapGateway.prototype);
+      gateway.websocketService = websocketService;
+      const authentication = handler.handleAuthentication(mockSocket as any, data);
+      await started;
+      await gateway.updateReaderLanguage('en');
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+      finishRead('de');
+      await authentication;
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.READER_AUTHENTICATED,
+            payload: { name: 'Reader', language: 'en' },
+          }),
+        }),
+      );
+    });
 
     it('revokes the previous reader identity when reauthentication fails', async () => {
       mockSocket.readerId = 99;

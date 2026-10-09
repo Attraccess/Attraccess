@@ -264,6 +264,7 @@ export interface ResourceUsageFormCancelPayload {
 export interface ResourceUsageFormPageErrorPayload {
   fieldId: number;
   message: string;
+  code?: string;
 }
 
 export interface ResourceUsageFormPageResultPayload {

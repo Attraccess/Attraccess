@@ -181,21 +181,33 @@ export class ResourceFormsService {
     resourceId: number,
     formId: number,
     answers: { fieldId: number; value: unknown }[],
-  ): Promise<{ valid: boolean; errors: { fieldId: number; message: string }[] }> {
+  ): Promise<{ valid: boolean; errors: { fieldId: number; message: string; code: string }[] }> {
     await this.ensureResourceExists(resourceId);
     const form = await this.getFormOrThrow(resourceId, formId);
-    const errors: { fieldId: number; message: string }[] = [];
+    const errors: { fieldId: number; message: string; code: string }[] = [];
 
     for (const answer of answers) {
       const field = form.fields?.find((item) => item.id === answer.fieldId);
       if (!field) {
-        errors.push({ fieldId: answer.fieldId, message: `Unknown field #${answer.fieldId}.` });
+        errors.push({ fieldId: answer.fieldId, message: `Unknown field #${answer.fieldId}.`, code: 'UNKNOWN_FIELD' });
         continue;
       }
       try {
         this.validateFieldAnswer(form, field, answer.value);
       } catch (error) {
-        errors.push({ fieldId: field.id, message: (error as Error).message });
+        // Add stable identifiers for firmware; keep the diagnostic message for
+        // existing clients. Field names and values remain separate display data.
+        const missingRequired =
+          field.isRequired &&
+          (answer.value === undefined || answer.value === null || answer.value === '' || field.type === 'boolean');
+        const code = missingRequired
+          ? 'REQUIRED_FIELD'
+          : field.type === 'number'
+            ? 'INVALID_NUMBER'
+            : field.type === 'select'
+              ? 'INVALID_SELECTION'
+              : 'INVALID_INPUT';
+        errors.push({ fieldId: field.id, message: (error as Error).message, code });
       }
     }
 

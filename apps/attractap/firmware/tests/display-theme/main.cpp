@@ -886,6 +886,17 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     requireObject(lv_layer_top(), &lv_label_class, "Required field");
     requireObject(lv_layer_top(), &lv_label_class, "Please complete before starting\nMaintenance - Notes %s");
     renderer.capture("form-english-validation");
+    API::ResourceUsageFormPageResult result{};
+    result.formId = 1; result.errorCount = 1;
+    result.errors[0].fieldId = 5; result.errors[0].code = "INVALID_NUMBER";
+    result.errors[0].message = "Raw diagnostic %s";
+    details.showFormPageErrors(result);
+    FirmwareI18n::refreshTree(lv_layer_top(), "en");
+    requireObject(lv_layer_top(), &lv_label_class, "Please enter a valid number");
+    renderer.capture("form-server-error-english");
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
+    requireObject(lv_layer_top(), &lv_label_class, "Bitte eine gültige Zahl eingeben");
+    renderer.capture("form-server-error-german");
     click(lv_layer_top(), "Maintenance");
     auto *keyboard = requireObject(lv_layer_top(), &lv_keyboard_class);
     auto *field = lv_keyboard_get_textarea(keyboard);

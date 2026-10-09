@@ -182,6 +182,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
           message.data.payload,
         );
+        // An older auth/update retry must not restore a superseded default.
+        if (
+          (message.data.type === AttractapEventType.READER_AUTHENTICATED ||
+            message.data.type === AttractapEventType.READER_LANGUAGE) &&
+          this.websocketService.readerLanguage !== undefined
+        ) {
+          message.data.payload.language = this.websocketService.readerLanguage;
+        }
         const stringifiedMessage = JSON.stringify(this.sanitizeForLVGL(message));
         client.send(stringifiedMessage);
 
@@ -498,6 +506,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @OnEvent('settings.attractap-language')
   async updateReaderLanguage(language: 'en' | 'de') {
+    this.websocketService.readerLanguage = language;
     const readers = Array.from(this.websocketService.sockets.values()).filter(
       (socket) => typeof socket.readerId === 'number' && socket.readerId > 0 && socket.readyState === WebSocket.OPEN,
     );

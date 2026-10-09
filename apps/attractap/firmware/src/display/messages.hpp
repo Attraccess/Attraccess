@@ -33,6 +33,7 @@ enum class Message {
     PleaseCompleteBeforeTakingOver,
     PleaseCompleteTheHighlightedFields,
     RequiredField,
+    InvalidNumber,
     TapToEnter,
     StartTime,
     User,
@@ -268,6 +269,7 @@ inline constexpr Entry catalog[] = {
     {Message::PleaseCompleteBeforeTakingOver, "Bitte vor der Übernahme ausfüllen", "Please complete before taking over"},
     {Message::PleaseCompleteTheHighlightedFields, "Bitte markierte Felder ausfüllen.", "Please complete the highlighted fields."},
     {Message::RequiredField, "Pflichtfeld", "Required field"},
+    {Message::InvalidNumber, "Bitte eine gültige Zahl eingeben", "Please enter a valid number"},
     {Message::TapToEnter, "Antippen zum Eingeben", "Tap to enter"},
     {Message::StartTime, "Startzeit", "Start time"},
     {Message::User, "Nutzer", "User"},
@@ -522,6 +524,15 @@ struct Text {
         return result;
     }
 };
+inline Text formError(const std::string &code) {
+    if (code == "REQUIRED_FIELD") return Message::RequiredField;
+    if (code == "INVALID_NUMBER") return Message::InvalidNumber;
+    if (code == "INVALID_SELECTION") return Message::InvalidSelection;
+    if (code == "INVALID_INPUT") return Message::InvalidInput;
+    // Unknown or legacy messages have no reliable language. Keep diagnostics
+    // in the API log and display the English fallback.
+    return Text::literal(messageText(Message::InvalidInput, "en"));
+}
 inline Text readerError(const std::string &code) {
     if (code == "USER_NOT_SET") return Message::NoUserSelected;
     if (code == "INVALID_PARAMS") return Message::ErrorInvalidParams;

@@ -5,7 +5,7 @@ export function normalizeDeviceLanguage(locale: string | null | undefined): 'en'
     // Intl.Locale can discard a repeated u-key and its malformed trailing fields
     // before validating them. Check the original extension, excluding private use.
     // https://www.unicode.org/reports/tr35/#Unicode_locale_identifier
-    const unicodeExtension = tag.split(/-x(?:-|$)/i)[0].match(/-u((?:-[a-z0-9]{2,8})*)/i)?.[1];
+    const unicodeExtension = tag.split(/-x(?:-|$)/i)[0].match(/-u(?=-|$)((?:-[a-z0-9]{2,8})*)/i)?.[1];
     if (unicodeExtension && !/^(?:-[a-z0-9]{3,8})*(?:-[a-z0-9][a-z](?:-[a-z0-9]{3,8})*)*$/i.test(unicodeExtension)) {
       return 'en';
     }

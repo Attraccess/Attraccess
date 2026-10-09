@@ -66,7 +66,6 @@
     "FirmwareI18n::setDynamicLabel(optLabel, displayValue.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
     "FirmwareI18n::setDynamicLabel(this->formsEditorTitleLabel, title.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
     "FirmwareI18n::setDynamicLabel(this->formsModalProgressLabel, progress.c_str())": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
-    "FirmwareI18n::setDynamicLabel(widget->errorLabel, result.errors[i].message.c_str())": "Server-supplied validation error; preserve its text.",
     "FirmwareI18n::setDynamicLabel(widget.previewLabel, displayValue.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
     "FirmwareI18n::setDynamicLabel(widget.previewLabel, hint)": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
     "FirmwareI18n::setDynamicPlaceholder(this->formsEditorTextarea, placeholder)": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents."

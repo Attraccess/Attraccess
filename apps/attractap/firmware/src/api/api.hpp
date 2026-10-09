@@ -223,6 +223,7 @@ public:
         {
             uint32_t fieldId = 0;
             std::string message;
+            std::string code;
         } errors[MAX_FORM_PAGE_ERRORS];
     };
 

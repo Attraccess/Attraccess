@@ -25,6 +25,8 @@ describe('device language locale normalization', () => {
     'de-u-ca-gregory-ca-buddhist',
     'de-t-h0-abc-h0-def',
     'de-x-u-ca-ca-12',
+    'de-US-u-ca-gregory',
+    'de-US-x-u-ca-ca-12',
   ])('resolves the complete German locale %s', (locale) => {
     expect(normalizeDeviceLanguage(locale)).toBe('de');
   });
@@ -62,6 +64,8 @@ describe('device language locale normalization', () => {
     'de-t-h0-abc-12',
     'de-u-ca-ca-12',
     'de-u-kn-kn-a1',
+    'de-US-u-ca-ca-12',
+    'DE_us_U_kn_kn_A1',
   ])('uses English for unsupported or malformed locale %s', (locale) => {
     expect(normalizeDeviceLanguage(locale)).toBe('en');
   });

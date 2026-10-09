@@ -83,24 +83,28 @@ describe('ResourceFormsService pagination + per-field validation', () => {
     const result = await service.validatePageAnswers(5, 7, [{ fieldId: 11, value: '' }]);
     expect(result.valid).toBe(false);
     expect(result.errors[0].fieldId).toBe(11);
+    expect(result.errors[0].code).toBe('REQUIRED_FIELD');
   });
 
   it('rejects a non-numeric number field', async () => {
     const result = await service.validatePageAnswers(5, 7, [{ fieldId: 12, value: 'abc' }]);
     expect(result.valid).toBe(false);
     expect(result.errors[0].fieldId).toBe(12);
+    expect(result.errors[0].code).toBe('INVALID_NUMBER');
   });
 
   it('rejects an unchecked required boolean', async () => {
     const result = await service.validatePageAnswers(5, 7, [{ fieldId: 13, value: false }]);
     expect(result.valid).toBe(false);
     expect(result.errors[0].fieldId).toBe(13);
+    expect(result.errors[0].code).toBe('REQUIRED_FIELD');
   });
 
   it('rejects a select value outside the configured options', async () => {
     const result = await service.validatePageAnswers(5, 7, [{ fieldId: 14, value: 'green' }]);
     expect(result.valid).toBe(false);
     expect(result.errors[0].fieldId).toBe(14);
+    expect(result.errors[0].code).toBe('INVALID_SELECTION');
   });
 
   it('accepts an in-range select value', async () => {
@@ -112,6 +116,7 @@ describe('ResourceFormsService pagination + per-field validation', () => {
     const result = await service.validatePageAnswers(5, 7, [{ fieldId: 999, value: 'x' }]);
     expect(result.valid).toBe(false);
     expect(result.errors[0].fieldId).toBe(999);
+    expect(result.errors[0].code).toBe('UNKNOWN_FIELD');
   });
 
   it('validates lifecycle form drafts without publishing submissions', async () => {

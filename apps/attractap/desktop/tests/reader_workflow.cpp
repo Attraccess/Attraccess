@@ -395,6 +395,23 @@ int main(int argc, char **argv) {
     server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"totalFieldCount":1,"fields":[{"id":9,"name":"Sichtprüfung","type":"text","isRequired":true,"value":"OK"}]})"); pump();
     click("Absenden", true);
     assert(server.count("RESOURCE_USAGE_FORM_SUBMIT_PAGE") == 1);
+    server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":false,"errors":[{"fieldId":9,"code":"REQUIRED_FIELD","message":"Server diagnostic %s"}]})"); pump();
+    auto *serverError = requireLabel(lv_layer_top(), "Pflichtfeld");
+    assert(!label(lv_layer_top(), "Server diagnostic %s"));
+    State::setUserLanguage(true, "en"); pump();
+    assert(label(lv_layer_top(), "Required field") == serverError);
+    assert(label(lv_layer_top(), "Sichtprüfung *") && label(lv_layer_top(), "OK"));
+    display.capture(output, "form-server-error-english");
+    State::setUserLanguage(true, "de"); pump();
+    assert(label(lv_layer_top(), "Pflichtfeld") == serverError);
+    display.capture(output, "form-server-error-german");
+    // Unknown identifiers and old servers without a code use English fallback.
+    for (const auto *error : {R"({"fieldId":9,"code":"FUTURE_ERROR","message":"Unbekannter Fehler"})", R"({"fieldId":9,"message":"Alte Diagnose"})"}) {
+        server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", std::string(R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":false,"errors":[)") + error + "]}"); pump();
+        assert(label(lv_layer_top(), "Invalid input.") == serverError);
+        assert(!label(lv_layer_top(), "Unbekannter Fehler") && !label(lv_layer_top(), "Alte Diagnose"));
+    }
+    click("Absenden", true);
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":true})"); pump();
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeForm + 2);
     // Holding the original touch/card must not dismiss the new summary.
@@ -647,7 +664,7 @@ int main(int argc, char **argv) {
     assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "de");
     click("Abmelden");
     assert(State::getActiveLanguage() == "en" && label(lv_screen_active(), "Tap RFID card or open a resource"));
-    for (const auto *malformed : {"de-u-12", "de-t-12"}) {
+    for (const auto *malformed : {"de-u-12", "de-t-12", "de-US-u-ca-ca-12"}) {
         defaultLanguage("de");
         defaultLanguage(malformed);
         assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "en");
@@ -705,6 +722,9 @@ int main(int argc, char **argv) {
     assert(State::getActiveLanguage() == "de");
     server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":""})"); list(false); pump();
     assert(State::getActiveLanguage() == "en");
+    // A rolled-back server omits the additive language field entirely.
+    server.push("READER_AUTHENTICATED", R"({"name":"Legacy server"})"); list(false); pump();
+    assert(State::getApiState().authenticated && State::getActiveLanguage() == "en");
     Settings::saveNetworkConfig("Maintenance %s", "test-password");
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
     Display::loop();

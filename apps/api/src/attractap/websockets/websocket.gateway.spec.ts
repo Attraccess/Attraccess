@@ -89,6 +89,7 @@ describe('AttractapGateway', () => {
     for (const socket of [authenticated, unauthenticated, missingIdentity, closed])
       websocketService.sockets.set(socket.id, socket);
     await gateway.updateReaderLanguage('en');
+    expect(websocketService.readerLanguage).toBe('en');
     expect(authenticated.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ data: { type: AttractapEventType.READER_LANGUAGE, payload: { language: 'en' } } }),
     );
@@ -96,8 +97,31 @@ describe('AttractapGateway', () => {
     (authenticated.sendMessage as jest.Mock).mockClear();
     authenticated.readerId = null;
     await gateway.updateReaderLanguage('de');
+    expect(websocketService.readerLanguage).toBe('de');
     expect(authenticated.sendMessage).not.toHaveBeenCalled();
   });
+
+  it.each([AttractapEventType.READER_AUTHENTICATED, AttractapEventType.READER_LANGUAGE])(
+    'retries %s with the latest persisted default',
+    async (type) => {
+      const client = createMockSocket();
+      const wait = jest.spyOn(
+        gateway as unknown as { waitForClientResponse: () => Promise<void> },
+        'waitForClientResponse',
+      );
+      wait.mockResolvedValue(undefined);
+      await gateway.handleConnection(client);
+      const socket = Array.from(websocketService.sockets.values())[0];
+      (client.send as jest.Mock).mockClear();
+      wait.mockImplementationOnce(async () => {
+        await gateway.updateReaderLanguage('en');
+        throw new Error('Lost acknowledgement');
+      });
+      await socket.sendMessage(new AttractapEvent(type, { language: 'de', name: 'Reader' }));
+      const sent = (client.send as jest.Mock).mock.calls.map(([body]) => JSON.parse(body).data.payload.language);
+      expect(sent).toEqual(['de', 'en']);
+    },
+  );
 
   beforeEach(async () => {
     licenseService = {
