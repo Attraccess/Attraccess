@@ -11,7 +11,7 @@ import {
   Label,
   Description,
 } from '@heroui/react';
-import { ReactNode } from 'react';
+import { ComponentProps, ReactNode } from 'react';
 
 interface SelectItem {
   key: string;
@@ -35,6 +35,7 @@ export interface Props {
   disabledKeys?: Iterable<string | number>;
   variant?: 'primary' | 'secondary';
   fullWidth?: boolean;
+  popoverProps?: Pick<ComponentProps<typeof SelectPopover>, 'placement' | 'offset'>;
   'aria-label'?: string;
   'data-cy'?: string;
   isLoading?: boolean;
@@ -56,6 +57,7 @@ export function Select({
   disabledKeys,
   variant,
   fullWidth,
+  popoverProps,
   'aria-label': ariaLabel,
   'data-cy': dataCy,
 }: Props) {
@@ -82,7 +84,7 @@ export function Select({
         <SelectValue />
         <SelectIndicator />
       </SelectTrigger>
-      <SelectPopover>
+      <SelectPopover {...popoverProps}>
         <ListBox>
           {items.map((item) => (
             <ListBoxItem

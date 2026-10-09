@@ -940,7 +940,7 @@ void testFirmwareUpdateLocales(Renderer &renderer)
     screen.setProgress(67);
     screen.init();
     ScreenGuard guard(screen.getScreen(), &screen);
-    auto *title = requireObject(guard.root, &lv_label_class, "Softwareaktualiesierung");
+    auto *title = requireObject(guard.root, &lv_label_class, "Softwareaktualisierung");
     auto *version = requireObject(guard.root, &lv_label_class, "test -> 2.0.0");
     FirmwareI18n::refreshTree(guard.root, "en");
     expect(std::string(lv_label_get_text(title)) == "Software update",
@@ -953,7 +953,7 @@ void testFirmwareUpdateLocales(Renderer &renderer)
     FirmwareI18n::refreshTree(guard.root, "en");
     renderer.capture("firmware-update-english");
     FirmwareI18n::refreshTree(guard.root, "de");
-    expect(std::string(lv_label_get_text(title)) == "Softwareaktualiesierung",
+    expect(std::string(lv_label_get_text(title)) == "Softwareaktualisierung",
            "Production firmware update title refreshes to German");
     renderer.capture("firmware-update-german");
 }
@@ -1408,6 +1408,36 @@ int main(int argc, char **argv)
             requireObject(guard.root, &lv_label_class, "No access ");
             requireObject(guard.root, &lv_label_class, "Alex Müller");
             renderer.capture("demo-settings-english");
+            unsigned scansStarted = 0, scansCancelled = 0;
+            demo.setStartScanCallback([&] { ++scansStarted; });
+            demo.setCancelScanCallback([&] { ++scansCancelled; });
+            for (const char *language : {"en", "de"}) {
+                Fixtures::activeLanguage = language;
+                FirmwareI18n::refreshTree(guard.root, language);
+                const bool english = std::string(language) == "en";
+                auto *add = lv_obj_get_parent(requireObject(guard.root, &lv_label_class,
+                                                          english ? "Add card" : "Karte hinzufügen"));
+                const unsigned started = scansStarted, cancelled = scansCancelled;
+                lv_obj_send_event(add, LV_EVENT_CLICKED, nullptr);
+                expect(demo.isWaitingForCard() && scansStarted == started + 1,
+                       "Add card starts the production NFC scan callback");
+                // Refresh the open overlay in both directions before cancelling.
+                FirmwareI18n::refreshTree(guard.root, english ? "de" : "en");
+                FirmwareI18n::refreshTree(guard.root, language);
+                auto *prompt = requireObject(guard.root, &lv_label_class,
+                                            english ? "Hold card to reader..." : "Karte ans Lesegerät halten...");
+                renderer.capture(english ? "demo-scan-cancel-english" : "demo-scan-cancel-german");
+                auto *cancel = lv_obj_get_parent(requireObject(lv_obj_get_parent(prompt), &lv_label_class,
+                                                             english ? "Cancel" : "Abbrechen"));
+                lv_obj_send_event(cancel, LV_EVENT_CLICKED, nullptr);
+                expect(!demo.isWaitingForCard() && scansCancelled == cancelled + 1,
+                       "Cancel closes the scan and invokes the production NFC cancellation callback once");
+                expect(findObject(guard.root, &lv_label_class,
+                                  english ? "Hold card to reader..." : "Karte ans Lesegerät halten...") == nullptr,
+                       "Cancelled scan overlay is removed and Add card is reachable again");
+            }
+            // Role selection and direct deletion preserve existing demo behavior;
+            // the base revision has no role-picker Cancel or delete confirmation.
             // Production role-picker callback receives a supplied UID.
             demo.onCardScanned("11223344");
             FirmwareI18n::refreshTree(guard.root, "en");

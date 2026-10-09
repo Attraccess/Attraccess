@@ -405,7 +405,7 @@ inline constexpr Entry catalog[] = {
     {Message::Supervision, "Aufsicht", "Supervision"},
     {Message::LoadingAlt, "Laden ...", "Loading ..."},
     {Message::Status, "Status: ", "Status: "},
-    {Message::SoftwareUpdate, "Softwareaktualiesierung", "Software update"},
+    {Message::SoftwareUpdate, "Softwareaktualisierung", "Software update"},
     {Message::OpenSettings, "Einstellungen öffnen", "Open settings"},
     {Message::ConfigureNetworkSettingsToConnectToTheServer, "Zur Verbindung mit dem Server konfigurieren Sie die Netzwerkeinstellungen.", "Configure network settings to connect to the server."},
     {Message::PageUOfU, "Seite %u von %u", "Page %u of %u"},

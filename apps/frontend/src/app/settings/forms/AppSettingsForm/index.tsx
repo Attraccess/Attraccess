@@ -143,6 +143,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
       </TextField>
       <Select
         label={t('inputs.attractapLanguage.label')}
+        popoverProps={{ placement: 'top', offset: 32 }}
         value={attractapLanguage}
         onChange={(next) => {
           if (next === 'en' || next === 'de') {

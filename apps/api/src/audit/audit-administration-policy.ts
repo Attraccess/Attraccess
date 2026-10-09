@@ -45,6 +45,7 @@ const permissions: Check = (v) => {
 export const SETTING_KEYS = [
   'app.url',
   'app.publicInternetUrl',
+  'app.attractapLanguage',
   'app.licenseKeyConfigured',
   'app.licenseKeyChanged',
   'smtp.service',
@@ -285,6 +286,7 @@ export function safeAuditSender(value: string): string {
 
 function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
+  if (key === 'app.attractapLanguage') return value === 'en' || value === 'de';
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
   if (key === 'smtp.host') return value === safeAuditHost(value);

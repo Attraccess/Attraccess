@@ -241,7 +241,10 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       providers: [
         SessionStrategy,
         { provide: AuditService, useValue: audit },
-        { provide: SettingsService, useValue: new SettingsService(null, store, null) },
+        {
+          provide: SettingsService,
+          useValue: new SettingsService(null, store, { getSettings: async () => ({}) } as never),
+        },
         { provide: SessionService, useValue: { authenticateSession: async () => null } },
         { provide: TwoFactorService, useValue: { getStatus: async () => ({ required: false }) } },
         { provide: RbacService, useValue: { getEffectivePermissions: async () => ownerPermissions } },
@@ -286,6 +289,44 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     if (app) await app.close();
     if (source?.isInitialized) await source.destroy();
     if (directory) await rm(directory, { recursive: true, force: true });
+  });
+
+  it.each([
+    [null, 'de'],
+    ['', 'en'],
+    ['fr', 'en'],
+    ['de-DE', 'de'],
+    ['de-u-12', 'en'],
+  ])('resolves persisted language %s through the real store and its cache', async (value, expected) => {
+    const repository = source.getRepository(Setting);
+    await repository.delete({ parent: 'app', key: 'attractap_language' });
+    if (value !== null) await repository.save(repository.create({ parent: 'app', key: 'attractap_language', value }));
+    const persistedStore = new SettingsStoreService(repository, null);
+    const settings = new SettingsService(null, persistedStore, null);
+    expect((await settings.getAppSettings()).attractapLanguage).toBe(expected);
+    expect(await settings.getAttractapLanguage()).toBe(expected);
+  });
+
+  it('persists before and after language values in the audit log for successful HTTP changes', async () => {
+    await store.setPlainSetting('app', 'attractap_language', 'de');
+    for (const attractapLanguage of ['en', 'de']) {
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-manager')
+        .send({ app: { attractapLanguage } })
+        .expect(200)
+        .expect(({ body }) => expect(body.app.attractapLanguage).toBe(attractapLanguage));
+    }
+    const rows = await source
+      .getRepository(AuditLog)
+      .find({ where: { action: 'settings.updated' }, order: { id: 'ASC' } });
+    expect(rows.map(({ details }) => details)).toEqual([
+      { settingKey: 'app.attractapLanguage', before: 'de', after: 'en' },
+      { settingKey: 'app.attractapLanguage', before: 'en', after: 'de' },
+    ]);
+    await read({ action: 'settings.updated' })
+      .expect(200)
+      .expect(({ body }) => expect(body.items).toHaveLength(2));
   });
 
   it.each(scenarios)('exposes $domain events through every admin filter without mixing targets', async (scenario) => {
