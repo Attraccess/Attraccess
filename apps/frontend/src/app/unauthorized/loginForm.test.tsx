@@ -5,40 +5,35 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginForm } from './loginForm';
 import { TestWrapper } from '../../test-utils/wrappers';
+import en from './loginForm.en.json';
+import de from './loginForm.de.json';
 
 const loginMock = vi.fn();
 const resendMutateMock = vi.fn();
+const locale = vi.hoisted(() => ({ current: 'en' }));
+const pending = vi.hoisted(() => ({ login: false, resend: false }));
+const signup = vi.hoisted(() => ({ enabled: true }));
+const labels = { en, de };
 let loginError: Error | null = null;
 let resendOnSuccess: (() => void) | undefined;
 let resendOnError: ((error: unknown) => void) | undefined;
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => {
-    const translations: Record<string, string> = {
-      title: 'Welcome back, maker!',
-      noAccount: 'First time here?',
-      signUpButton: 'Get started here',
-      username: 'Username',
-      password: 'Password',
-      twoFactorCode: 'Authenticator code',
-      twoFactorHelper: 'Enter the code if you already set up 2FA.',
-      forgotPassword: 'Password slipped your mind?',
-      signInButton: 'Start making',
-      signingIn: 'Signing in...',
-      'accordion.title': 'Sign in with email and password',
-      'api.UserEmailNotVerifiedException.title': 'Email not verified',
-      'api.UserEmailNotVerifiedException.description': 'Please verify your email before signing in.',
-      'api.generic.title': 'Server Error',
-      'api.generic.description': '{{error}}',
-      'resendVerification.prompt': "Didn't receive the verification email?",
-      'resendVerification.emailLabel': 'Email address',
-      'resendVerification.button': 'Resend verification email',
-      'resendVerification.successTitle': 'Email sent!',
-      'resendVerification.successMessage': 'A new verification link has been sent.',
+  useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+    const translations = locales[locale.current];
+    const lookup = (key: string) => key.split('.').reduce<unknown>(
+      (value, part) => value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+      translations,
+    );
+    const t = (key: string, vars?: Record<string, unknown>) => {
+      const value = lookup(key);
+      if (typeof value !== 'string') return key;
+      return Object.entries(vars ?? {}).reduce(
+        (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, String(replacement)),
+        value,
+      );
     };
-
-    const t = (key: string) => translations[key] ?? key;
-    const tExists = (key: string) => Boolean(translations[key]);
+    const tExists = (key: string) => lookup(key) !== undefined;
     return { t, tExists };
   },
 }));
@@ -46,7 +41,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 vi.mock('../../hooks/useAuth', () => ({
   useLogin: () => ({
     mutate: loginMock,
-    isPending: false,
+    isPending: pending.login,
     error: loginError,
   }),
 }));
@@ -60,7 +55,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     }
   },
   useUsersServiceIsLocalSignupEnabled: () => ({
-    data: { value: true },
+    data: { value: signup.enabled },
     isLoading: false,
   }),
   useUsersServiceResendVerificationEmail: (options: {
@@ -69,7 +64,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   }) => {
     resendOnSuccess = options?.onSuccess;
     resendOnError = options?.onError;
-    return { mutate: resendMutateMock, isPending: false };
+    return { mutate: resendMutateMock, isPending: pending.resend };
   },
 }));
 
@@ -78,6 +73,9 @@ vi.mock('../../utils/apiError', () => ({
     const message = error?.body?.message;
     if (message === 'UserEmailNotVerifiedException') {
       return { key: 'api.UserEmailNotVerifiedException' };
+    }
+    if (message === 'TooManyAuthAttempts') {
+      return { key: 'api.TooManyAuthAttempts' };
     }
     return { key: 'api.generic' };
   },
@@ -99,6 +97,10 @@ describe('LoginForm – resend verification email', () => {
     loginError = null;
     resendOnSuccess = undefined;
     resendOnError = undefined;
+    locale.current = 'en';
+    pending.login = false;
+    pending.resend = false;
+    signup.enabled = true;
   });
 
   it('does not show resend section when there is no login error', () => {
@@ -108,6 +110,74 @@ describe('LoginForm – resend verification email', () => {
     expect(screen.queryByTestId('resend-verification-button')).not.toBeInTheDocument();
   });
 
+  it('uses descriptive navigation and action labels', () => {
+    renderLogin();
+
+    expect(screen.getByRole('button', { name: 'Create an account' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Forgot password?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('keeps the sign-in action visible and named while pending', () => {
+    pending.login = true;
+    renderLogin();
+
+    const button = screen.getByRole('button', { name: 'Sign in' });
+    expect(button).toBeDisabled();
+  });
+
+  it('keeps the resend action visible and named while pending', () => {
+    pending.resend = true;
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+    renderLogin();
+
+    const button = screen.getByRole('button', { name: 'Resend verification email' });
+    expect(button).toBeDisabled();
+  });
+
+  it.each([
+    ['en', 'Sign in with email and password', 'Create an account'],
+    ['de', 'Anmelden mit E-Mail und Passwort', 'Konto erstellen'],
+  ] as const)('keeps the disabled-signup accordion action descriptive in %s', (language, accordionLabel, signupLabel) => {
+    locale.current = language;
+    signup.enabled = false;
+    renderLogin();
+
+    expect(screen.queryByRole('button', { name: signupLabel })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: accordionLabel })).toBeInTheDocument();
+  });
+
+  it('renders descriptive German navigation, field, recovery, and resend labels', () => {
+    locale.current = 'de';
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+
+    renderLogin();
+
+    expect(screen.getByText(labels.de.noAccount)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Konto erstellen' })).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.username)).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.de.password)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Passwort vergessen?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
+  });
+
+  it('keeps the German resend action visible and named while pending', () => {
+    locale.current = 'de';
+    pending.resend = true;
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+    renderLogin();
+
+    const button = screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' });
+    expect(button).toBeDisabled();
+  });
+
   it('shows resend section when UserEmailNotVerifiedException occurs', () => {
     const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
     apiError.body = { message: 'UserEmailNotVerifiedException' };
@@ -115,9 +185,9 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    expect(screen.getByText("Didn't receive the verification email?")).toBeInTheDocument();
+    expect(screen.getByText(labels.en.resendVerification.prompt)).toBeInTheDocument();
     expect(screen.getByTestId('resend-email-input')).toBeInTheDocument();
-    expect(screen.getByTestId('resend-verification-button')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument();
   });
 
   it('does not show resend section for other login errors', () => {
@@ -130,6 +200,20 @@ describe('LoginForm – resend verification email', () => {
     expect(screen.queryByTestId('resend-verification-section')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['en', 'Please wait 17 seconds before trying to sign in again.'],
+    ['de', 'Bitte warte 17 Sekunden, bevor du dich erneut anmeldest.'],
+  ] as const)('shows the rate-limit retry time in %s', (language, message) => {
+    locale.current = language;
+    const apiError = new Error('Too many attempts') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'TooManyAuthAttempts', retryAfterSeconds: 17 };
+    loginError = apiError;
+
+    renderLogin();
+
+    expect(screen.getByText(message)).toBeInTheDocument();
+  });
+
   it('calls resend mutation with entered email', async () => {
     const user = userEvent.setup();
     const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
@@ -138,7 +222,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
 
@@ -165,7 +249,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'not-an-email');
 
     expect(screen.getByTestId('resend-verification-button')).toBeDisabled();
@@ -179,7 +263,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, '  test@example.com  ');
     await user.click(screen.getByTestId('resend-verification-button'));
 
@@ -196,7 +280,7 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
 
@@ -217,14 +301,14 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    const input = screen.getByLabelText('Email address');
+    const input = screen.getByLabelText(labels.en.resendVerification.emailLabel);
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
     act(() => resendOnSuccess?.());
 
     await waitFor(() => {
       expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();
-      expect(screen.getByText('Email sent!')).toBeInTheDocument();
+      expect(screen.getByText(labels.en.resendVerification.successTitle)).toBeInTheDocument();
       expect(screen.queryByTestId('resend-verification-section')).not.toBeInTheDocument();
     });
   });
@@ -247,8 +331,8 @@ describe('LoginForm – resend verification email', () => {
 
     renderLogin();
 
-    expect(screen.getByLabelText('Username')).toBeInTheDocument();
-    expect(screen.getByLabelText('Password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start making' })).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.en.username)).toBeInTheDocument();
+    expect(screen.getByLabelText(labels.en.password)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
   });
 });

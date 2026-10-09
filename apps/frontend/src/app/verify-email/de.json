@@ -2,12 +2,12 @@
   "success": {
     "title": "E-Mail verifiziert!",
     "message": "Ihre E-Mail wurde erfolgreich verifiziert. Sie können sich jetzt in Ihr Konto einloggen.",
-    "goToLogin": "Zum Login"
+    "goToLogin": "Zur Anmeldung"
   },
   "error": {
     "title": "Verifizierung fehlgeschlagen",
-    "tryAgain": "Erneut versuchen",
-    "backToLogin": "Zurück zum Login",
+    "tryAgain": "E-Mail erneut verifizieren",
+    "backToLogin": "Zurück zur Anmeldung",
     "errorTitle": "Fehler"
   },
   "resend": {

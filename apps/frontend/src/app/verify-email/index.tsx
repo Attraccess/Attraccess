@@ -50,7 +50,6 @@ export function VerifyEmail() {
       });
       const translation = t(key, { error: errorMessage });
       setError(translation);
-      didSendRequest.current = false;
     },
   });
 
@@ -166,7 +165,11 @@ export function VerifyEmail() {
             <Button
               variant="primary"
               className="w-full"
-              onPress={activateEmail}
+              onPress={() => {
+                didSendRequest.current = false;
+                activateEmail();
+              }}
+              isPending={verifyEmail.isPending}
               isDisabled={verifyEmail.isPending}
               data-cy="verify-email-error-try-again-button"
             >

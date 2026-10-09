@@ -242,7 +242,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           isDisabled={!canSubmit}
           data-cy="registration-form-create-account-button"
         >
-          {isPending ? t('creatingAccount') : t('createAccountButton')}
+          {t('createAccountButton')}
           <ArrowRight className="group-hover:translate-x-1 transition-transform" />
         </Button>
       </form>

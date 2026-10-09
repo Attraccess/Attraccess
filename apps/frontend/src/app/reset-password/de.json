@@ -8,7 +8,7 @@
     "success": {
         "title": "Passwort zurücksetzen",
         "message": "Passwort wurde erfolgreich zurückgesetzt",
-        "goToLogin": "Zum Login"
+        "goToLogin": "Zur Anmeldung"
     },
     "error": {
         "title": "Passwort zurücksetzen",
