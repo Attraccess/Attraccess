@@ -1292,7 +1292,9 @@ int main(int argc, char **argv)
             using FirmwareI18n::Message;
             using FirmwareI18n::Text;
             expect(Language::supported(" DE_at ") == "de", "Legacy regional locale normalizes");
-            for (const auto *invalid : {"de-", "de-!!!", "de--DE", "de_DE_extra", "de-1234", "", "fr-CA"})
+            for (const auto *german : {"de-Latn-DE", "de-DE-u-co-phonebk", "de-CH-1901", "de-Latn-CH-1996-u-ca-gregory", "de-DE-x-reader", "de-a-foo-b-bar", "de-DE-extra", "de-1234"})
+                expect(Language::supported(german) == "de", "Complete German locales normalize");
+            for (const auto *invalid : {"de-", "de-!!!", "de--DE", "de_DE_extraextra", "de-Latn-DE-!", "de-DE-Latn", "de-abc", "de-u", "de-u-x-private", "de-x", "de-1901-1901", "de-u-co-phonebk-u-ca-gregory", "", "fr-CA"})
                 expect(Language::supported(invalid) == "en", "Invalid or unsupported locales fall back to English");
             Language::Session session;
             session.setApi(true, "en");

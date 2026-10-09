@@ -851,6 +851,11 @@ describe('AttractapCardHandler', () => {
     it.each([
       ['de-AT', 'de'],
       ['de_CH', 'de'],
+      ['de-Latn-DE', 'de'],
+      ['de-DE-u-co-phonebk', 'de'],
+      ['de-CH-1901', 'de'],
+      ['de-u', 'en'],
+      ['de-1901-1901', 'en'],
       ['en-US', 'en'],
       ['fr-FR', 'en'],
       ['de-!!!', 'en'],

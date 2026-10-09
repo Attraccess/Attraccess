@@ -139,14 +139,36 @@ it('keeps an unsaved language choice during background refetches', async () => {
     expect.objectContaining({ requestBody: { app: expect.objectContaining({ attractapLanguage: 'en' }) } }),
   );
 });
-it.each(['en-US', 'fr-CA', 'de-!!!', 'de-'])('suggests English for setup browser locale %s', (locale) => {
-  const original = Object.getOwnPropertyDescriptor(window.navigator, 'language');
-  Object.defineProperty(window.navigator, 'language', { configurable: true, value: locale });
-  try {
-    render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
-    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
-  } finally {
-    if (original) Object.defineProperty(window.navigator, 'language', original);
-    else Reflect.deleteProperty(window.navigator, 'language');
-  }
-});
+it.each(['en-US', 'fr-CA', 'de-!!!', 'de-', 'de-u', 'de-1901-1901'])(
+  'suggests English for setup browser locale %s',
+  (locale) => {
+    const original = Object.getOwnPropertyDescriptor(window.navigator, 'language');
+    Object.defineProperty(window.navigator, 'language', { configurable: true, value: locale });
+    try {
+      render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
+      expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
+    } finally {
+      if (original) Object.defineProperty(window.navigator, 'language', original);
+      else Reflect.deleteProperty(window.navigator, 'language');
+    }
+  },
+);
+
+it.each(['de-Latn-DE', 'de-DE-u-co-phonebk', 'de-CH-1901'])(
+  'suggests and saves German for setup browser locale %s',
+  (locale) => {
+    const original = Object.getOwnPropertyDescriptor(window.navigator, 'language');
+    Object.defineProperty(window.navigator, 'language', { configurable: true, value: locale });
+    try {
+      render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
+      expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('Deutsch');
+      fireEvent.click(screen.getByRole('button', { name: 'actions.next' }));
+      expect(state.setup).toHaveBeenCalledWith(
+        expect.objectContaining({ requestBody: { app: expect.objectContaining({ attractapLanguage: 'de' }) } }),
+      );
+    } finally {
+      if (original) Object.defineProperty(window.navigator, 'language', original);
+      else Reflect.deleteProperty(window.navigator, 'language');
+    }
+  },
+);

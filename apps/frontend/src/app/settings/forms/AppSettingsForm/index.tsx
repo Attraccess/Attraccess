@@ -1,4 +1,5 @@
 import { Select } from '../../../../components/select';
+import { normalizeDeviceLanguage } from '@attraccess/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -41,8 +42,9 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const [url, setUrl] = useState(window.location.origin);
   const [publicInternetUrl, setPublicInternetUrl] = useState(window.location.origin);
   const [licenseKey, setLicenseKey] = useState('');
-  const browserIsGerman = /^de(?:[-_](?:[a-z]{2}|[0-9]{3}))?$/i.test(navigator.language || '');
-  const [attractapLanguage, setAttractapLanguage] = useState<'en' | 'de'>(browserIsGerman ? 'de' : 'en');
+  const [attractapLanguage, setAttractapLanguage] = useState<'en' | 'de'>(() =>
+    normalizeDeviceLanguage(navigator.language),
+  );
 
   const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, {
     enabled: variant === 'standalone',
