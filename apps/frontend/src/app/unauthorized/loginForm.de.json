@@ -1,14 +1,14 @@
 {
   "title": "Willkommen zurück, Maker!",
-  "subtitle": "Bereit, dein nächstes Projekt umzusetzen? Melde dich an, um Maschinen zu buchen und loszulegen.",
-  "noAccount": "Neu hier?",
-  "signUpButton": "Hier geht's los",
+  "subtitle": "Melde dich an, um Maschinen zu buchen.",
+  "noAccount": "Noch kein Konto?",
+  "signUpButton": "Konto erstellen",
   "username": "E-Mail oder Benutzername",
   "password": "Passwort",
   "twoFactorCode": "Authenticator-Code",
   "rememberMe": "Angemeldet bleiben",
   "forgotPassword": "Passwort vergessen?",
-  "signInButton": "Los geht's",
+  "signInButton": "Anmelden",
   "signingIn": "Anmelden...",
   "accordion": {
     "title": "Anmelden mit E-Mail oder Benutzername und Passwort"

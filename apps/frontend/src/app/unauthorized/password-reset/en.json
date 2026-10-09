@@ -1,7 +1,7 @@
 {
     "title": "Password Reset",
-    "goBackButton": "Go Back",
-    "mainButton": "Reset password",
+    "goBackButton": "Back to sign in",
+    "mainButton": "Send password reset link",
     "success": {
         "title": "Password reset requested",
         "description": "Please watch your E-Mail inbox"
@@ -9,5 +9,5 @@
     "error": {
         "title": "Password Reset"
     },
-    "emailLabel": "E-Mail"
+    "emailLabel": "Email address"
 }

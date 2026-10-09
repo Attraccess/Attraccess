@@ -8,7 +8,7 @@
     "success": {
         "title": "Reset Password",
         "message": "Password reset successfully",
-        "goToLogin": "Go to Login"
+        "goToLogin": "Go to sign in"
     },
     "error": {
         "title": "Reset Password",
